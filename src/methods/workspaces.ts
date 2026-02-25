@@ -1,0 +1,1247 @@
+import fs from "node:fs/promises";
+import path from "node:path";
+import {
+  deriveSessionTitle,
+  loadCombinedSessionStoreForGateway,
+  loadConfig,
+  pruneLegacyStoreKeys,
+  resolveGatewaySessionStoreTarget,
+  updateSessionStore,
+  isCronSessionKey,
+  type SessionStoreEntry,
+} from "../lib/workspace-session-store.js";
+import {
+  CANONICAL_WORKSPACES_CONFIG_PATH,
+  createWorkspaceId,
+  detectWorkspaceFromText,
+  ensureWorkspaceFolders,
+  expandPath,
+  findWorkspaceById,
+  normalizePinnedPath,
+  readWorkspaceConfig,
+  resolveGodModeRoot,
+  resolvePathInWorkspace,
+  toDisplayPath,
+  type WorkspaceConfigEntry,
+  type WorkspaceConfigFile,
+  type WorkspaceType,
+  writeWorkspaceConfig,
+} from "../lib/workspaces-config.js";
+import type { GatewayRequestHandler } from "openclaw/plugin-sdk";
+
+type GatewayRequestHandlers = Record<string, GatewayRequestHandler>;
+
+const ErrorCodes = {
+  INVALID_REQUEST: "INVALID_REQUEST",
+  UNAVAILABLE: "UNAVAILABLE",
+} as const;
+
+function errorShape(code: string, message: string): { code: string; message: string } {
+  return { code, message };
+}
+
+/** Max file size for workspaces.readFile (1MB). */
+const MAX_READ_SIZE = 1_000_000;
+/** Max image file size for workspaces.readFile (8MB). */
+const MAX_IMAGE_READ_SIZE = 8_000_000;
+
+/** Max concurrent fs.stat calls while scanning. */
+const STAT_CONCURRENCY = 20;
+
+/** Keep workspace sections compact; this is not a full file explorer. */
+const MAX_WORKSPACE_SECTION_ITEMS = 200;
+/** Bound text indexing for workspace search. */
+const MAX_SEARCH_TEXT_FILES = 120;
+const MAX_SEARCH_TEXT_BYTES = 16_000;
+
+const SKIP_NAMES = new Set(["node_modules", "__pycache__", "venv", ".git", "dist", "build"]);
+
+const TEXT_EXTENSIONS = new Set([
+  ".md",
+  ".txt",
+  ".json",
+  ".json5",
+  ".yaml",
+  ".yml",
+  ".toml",
+  ".ts",
+  ".tsx",
+  ".js",
+  ".jsx",
+  ".py",
+  ".sh",
+  ".css",
+  ".scss",
+  ".html",
+  ".xml",
+  ".csv",
+  ".env",
+  ".ini",
+  ".cfg",
+  ".conf",
+  ".log",
+  ".rs",
+  ".go",
+  ".java",
+  ".rb",
+  ".lua",
+]);
+
+const ARTIFACT_EXTENSIONS = new Set([
+  ".md",
+  ".txt",
+  ".html",
+  ".htm",
+  ".json",
+  ".json5",
+  ".yaml",
+  ".yml",
+  ".toml",
+  ".csv",
+  ".pdf",
+  ".png",
+  ".jpg",
+  ".jpeg",
+  ".gif",
+  ".webp",
+  ".svg",
+  ".doc",
+  ".docx",
+  ".ppt",
+  ".pptx",
+  ".xls",
+  ".xlsx",
+  ".xml",
+]);
+
+const IMAGE_MIME_BY_EXT: Record<string, string> = {
+  ".png": "image/png",
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".gif": "image/gif",
+  ".webp": "image/webp",
+  ".svg": "image/svg+xml",
+};
+
+type WorkspaceItem = {
+  id: string;
+  name: string;
+  type: "file" | "directory";
+  path: string;
+  modifiedAt?: number;
+  size?: number;
+  children?: WorkspaceItem[];
+};
+
+type WorkspaceFileEntry = {
+  path: string;
+  name: string;
+  type: "markdown" | "html" | "image" | "json" | "text" | "folder";
+  size: number;
+  modified: string;
+  isDirectory?: boolean;
+  searchText?: string;
+};
+
+type WorkspaceSessionEntry = {
+  id: string;
+  key: string;
+  title: string;
+  created: string;
+  status: "running" | "complete" | "blocked";
+  workspaceSubfolder: string | null;
+};
+
+function pathToId(p: string): string {
+  return p
+    .replace(/[^a-zA-Z0-9]/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .toLowerCase();
+}
+
+function workspaceTypeToLegacyType(
+  type: WorkspaceType,
+): "projects" | "clients" | "vault" | "custom" {
+  if (type === "team") {
+    return "clients";
+  }
+  if (type === "personal") {
+    return "vault";
+  }
+  if (type === "project") {
+    return "projects";
+  }
+  return "custom";
+}
+
+function inferFileType(fileName: string, isDirectory: boolean): WorkspaceFileEntry["type"] {
+  if (isDirectory) {
+    return "folder";
+  }
+  const ext = path.extname(fileName).toLowerCase();
+  if (ext === ".md") {
+    return "markdown";
+  }
+  if (ext === ".html" || ext === ".htm") {
+    return "html";
+  }
+  if ([".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg"].includes(ext)) {
+    return "image";
+  }
+  if ([".json", ".json5"].includes(ext)) {
+    return "json";
+  }
+  return "text";
+}
+
+/**
+ * Scan a directory for workspace items with recursive support and batched stat calls.
+ */
+export async function scanDirectory(
+  dirPath: string,
+  maxDepth: number = 1,
+  currentDepth: number = 0,
+): Promise<WorkspaceItem[]> {
+  if (currentDepth >= maxDepth) {
+    return [];
+  }
+
+  let rawEntries: import("node:fs").Dirent[];
+  try {
+    rawEntries = await fs.readdir(dirPath, { withFileTypes: true });
+  } catch {
+    return [];
+  }
+
+  const visible = rawEntries.filter((entry) => {
+    const name = String(entry.name);
+    return !name.startsWith(".") && !SKIP_NAMES.has(name);
+  });
+
+  visible.sort((a, b) => {
+    if (a.isDirectory() && !b.isDirectory()) {
+      return -1;
+    }
+    if (!a.isDirectory() && b.isDirectory()) {
+      return 1;
+    }
+    return String(a.name).localeCompare(String(b.name));
+  });
+
+  const items: WorkspaceItem[] = [];
+  for (let i = 0; i < visible.length; i += STAT_CONCURRENCY) {
+    const batch = visible.slice(i, i + STAT_CONCURRENCY);
+    const stats = await Promise.allSettled(
+      batch.map(async (entry) => {
+        const name = String(entry.name);
+        const fullPath = path.join(dirPath, name);
+        const stat = await fs.stat(fullPath);
+        return { entry, fullPath, stat, name };
+      }),
+    );
+
+    for (const result of stats) {
+      if (result.status !== "fulfilled") {
+        continue;
+      }
+      const { entry, fullPath, stat, name } = result.value;
+      const isDirectory = entry.isDirectory();
+      const item: WorkspaceItem = {
+        id: pathToId(fullPath),
+        name,
+        type: isDirectory ? "directory" : "file",
+        path: toDisplayPath(fullPath),
+        modifiedAt: stat.mtimeMs,
+      };
+      if (!isDirectory) {
+        item.size = stat.size;
+      }
+      if (isDirectory && currentDepth + 1 < maxDepth) {
+        item.children = await scanDirectory(fullPath, maxDepth, currentDepth + 1);
+      }
+      items.push(item);
+    }
+  }
+
+  return items;
+}
+
+async function pathExists(filePath: string): Promise<boolean> {
+  try {
+    await fs.access(filePath);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function normalizeSessionWorkspaceSubfolder(value: unknown): string | null {
+  if (value == null) {
+    return null;
+  }
+  const normalized = (
+    typeof value === "string" ? value : typeof value === "number" ? String(value) : ""
+  )
+    .trim()
+    .replace(/^\/+|\/+$/g, "");
+  return normalized ? normalized.split(path.sep).join("/") : null;
+}
+
+function normalizeWorkspaceRelativePath(input: string): string {
+  const normalized = input
+    .replaceAll("\\", "/")
+    .replace(/^\.\/+/, "")
+    .replace(/\/{2,}/g, "/");
+  return normalized.replace(/^\/+/, "");
+}
+
+function dedupeWorkspaceEntries(entries: WorkspaceFileEntry[]): WorkspaceFileEntry[] {
+  const byPath = new Map<string, WorkspaceFileEntry>();
+  for (const entry of entries) {
+    const normalizedPath = normalizeWorkspaceRelativePath(entry.path);
+    if (!normalizedPath) {
+      continue;
+    }
+    const existing = byPath.get(normalizedPath);
+    if (!existing || entry.modified > existing.modified) {
+      byPath.set(normalizedPath, {
+        ...entry,
+        path: normalizedPath,
+      });
+    }
+  }
+  return Array.from(byPath.values());
+}
+
+function sortAndCapWorkspaceEntries(entries: WorkspaceFileEntry[]): WorkspaceFileEntry[] {
+  return dedupeWorkspaceEntries(entries)
+    .toSorted((a, b) => b.modified.localeCompare(a.modified))
+    .slice(0, MAX_WORKSPACE_SECTION_ITEMS);
+}
+
+function canIndexTextForSearch(filePath: string): boolean {
+  const ext = path.extname(filePath).toLowerCase();
+  if (!ext) {
+    return false;
+  }
+  return TEXT_EXTENSIONS.has(ext);
+}
+
+async function loadWorkspaceEntrySearchText(
+  workspacePath: string,
+  relativePath: string,
+): Promise<string | undefined> {
+  if (!canIndexTextForSearch(relativePath)) {
+    return undefined;
+  }
+  const absolutePath = resolvePathInWorkspace(workspacePath, relativePath);
+  if (!absolutePath) {
+    return undefined;
+  }
+  let stat: import("node:fs").Stats;
+  try {
+    stat = await fs.stat(absolutePath);
+  } catch {
+    return undefined;
+  }
+  if (stat.isDirectory() || stat.size <= 0 || stat.size > MAX_SEARCH_TEXT_BYTES) {
+    return undefined;
+  }
+  try {
+    const raw = await fs.readFile(absolutePath, "utf-8");
+    const normalized = raw.replace(/\s+/g, " ").trim();
+    if (!normalized) {
+      return undefined;
+    }
+    return normalized.slice(0, MAX_SEARCH_TEXT_BYTES);
+  } catch {
+    return undefined;
+  }
+}
+
+async function enrichWorkspaceEntriesForSearch(
+  workspace: WorkspaceConfigEntry,
+  entries: WorkspaceFileEntry[],
+): Promise<WorkspaceFileEntry[]> {
+  if (entries.length === 0) {
+    return entries;
+  }
+  const limited = entries.slice(0, MAX_SEARCH_TEXT_FILES);
+  const textByPath = new Map<string, string>();
+
+  await Promise.all(
+    limited.map(async (entry) => {
+      const searchText = await loadWorkspaceEntrySearchText(workspace.path, entry.path);
+      if (!searchText) {
+        return;
+      }
+      textByPath.set(normalizeWorkspaceRelativePath(entry.path), searchText);
+    }),
+  );
+
+  if (textByPath.size === 0) {
+    return entries;
+  }
+
+  return entries.map((entry) => {
+    const key = normalizeWorkspaceRelativePath(entry.path);
+    const searchText = textByPath.get(key);
+    return searchText ? { ...entry, searchText } : entry;
+  });
+}
+
+function flattenArtifactItems(workspacePath: string, items: WorkspaceItem[]): WorkspaceFileEntry[] {
+  const flattened: WorkspaceFileEntry[] = [];
+  const walk = (nodes: WorkspaceItem[]) => {
+    for (const node of nodes) {
+      if (node.type === "directory") {
+        if (node.children) {
+          walk(node.children);
+        }
+        continue;
+      }
+      const ext = path.extname(node.name).toLowerCase();
+      if (!ARTIFACT_EXTENSIONS.has(ext)) {
+        continue;
+      }
+      const absolutePath = expandPath(node.path);
+      const relative = path.relative(workspacePath, absolutePath).split(path.sep).join("/");
+      flattened.push({
+        path: relative,
+        name: node.name,
+        type: inferFileType(node.name, false),
+        size: node.size ?? 0,
+        modified: new Date(node.modifiedAt ?? Date.now()).toISOString(),
+      });
+    }
+  };
+  walk(items);
+  return flattened;
+}
+
+async function listWorkspaceOutputs(
+  workspace: WorkspaceConfigEntry,
+): Promise<WorkspaceFileEntry[]> {
+  const allArtifacts: WorkspaceFileEntry[] = [];
+
+  for (const dir of workspace.artifactDirs) {
+    const dirPath = path.join(workspace.path, dir);
+    const items = await scanDirectory(dirPath, 4);
+    allArtifacts.push(...flattenArtifactItems(workspace.path, items));
+  }
+
+  return sortAndCapWorkspaceEntries(allArtifacts);
+}
+
+async function getPinnedEntries(
+  workspace: WorkspaceConfigEntry,
+  outputs: WorkspaceFileEntry[],
+): Promise<WorkspaceFileEntry[]> {
+  const outputByPath = new Map(outputs.map((entry) => [entry.path, entry]));
+
+  const pinned: WorkspaceFileEntry[] = [];
+  for (const pinnedPath of workspace.pinned) {
+    const normalized = pinnedPath.split(path.sep).join("/");
+    const existing = outputByPath.get(normalized);
+    if (existing) {
+      pinned.push(existing);
+      continue;
+    }
+
+    const absolutePath = resolvePathInWorkspace(workspace.path, normalized);
+    if (!absolutePath) {
+      continue;
+    }
+    try {
+      const stat = await fs.stat(absolutePath);
+      if (stat.isDirectory()) {
+        continue;
+      }
+      pinned.push({
+        path: normalized,
+        name: path.basename(normalized),
+        type: inferFileType(normalized, false),
+        size: stat.size,
+        modified: new Date(stat.mtimeMs).toISOString(),
+      });
+    } catch {
+      // ignore stale pinned file
+    }
+  }
+
+  return pinned.toSorted((a, b) => b.modified.localeCompare(a.modified));
+}
+
+function deriveSessionStatus(updatedAtMs: number): "running" | "complete" | "blocked" {
+  const ageMs = Date.now() - updatedAtMs;
+  if (ageMs < 2 * 60 * 1000) {
+    return "running";
+  }
+  return "complete";
+}
+
+function resolveWorkspaceSessionTitle(key: string, entry: Record<string, unknown>): string {
+  const displayName = typeof entry.displayName === "string" ? entry.displayName.trim() : "";
+  if (displayName) {
+    return displayName;
+  }
+  const label = typeof entry.label === "string" ? entry.label.trim() : "";
+  if (label) {
+    return label;
+  }
+  const subject = typeof entry.subject === "string" ? entry.subject.trim() : "";
+  if (subject) {
+    return subject;
+  }
+  const derived = deriveSessionTitle(entry as SessionStoreEntry);
+  if (derived) {
+    return derived;
+  }
+  return key;
+}
+
+async function listWorkspaceSessions(
+  workspaceId: string,
+  workspaceConfig?: WorkspaceConfigFile,
+): Promise<WorkspaceSessionEntry[]> {
+  const cfg = await loadConfig();
+  const combined = (await loadCombinedSessionStoreForGateway(cfg)).store;
+
+  const rows: WorkspaceSessionEntry[] = [];
+  for (const [key, entry] of Object.entries(combined)) {
+    if (isCronSessionKey(key)) {
+      continue;
+    }
+    const rawWorkspaceId = (entry as Record<string, unknown>).workspaceId;
+    const entryWorkspaceId = (typeof rawWorkspaceId === "string" ? rawWorkspaceId : "").trim();
+    let resolvedWorkspaceId = entryWorkspaceId;
+    if (!resolvedWorkspaceId && workspaceConfig) {
+      const titleSource = [
+        key,
+        String(entry.displayName ?? ""),
+        String(entry.label ?? ""),
+        String(entry.subject ?? ""),
+        String(entry.groupChannel ?? ""),
+      ]
+        .join(" ")
+        .trim();
+      if (titleSource) {
+        const detection = detectWorkspaceFromText(workspaceConfig, titleSource);
+        if (detection.workspaceId && detection.score >= 3) {
+          resolvedWorkspaceId = detection.workspaceId;
+        }
+      }
+    }
+    if (!resolvedWorkspaceId || resolvedWorkspaceId !== workspaceId) {
+      continue;
+    }
+    const workspaceSubfolder = normalizeSessionWorkspaceSubfolder(
+      (entry as Record<string, unknown>).workspaceSubfolder,
+    );
+    const updatedAt = Number(entry.updatedAt ?? Date.now());
+    rows.push({
+      id: entry.sessionId,
+      key,
+      title: resolveWorkspaceSessionTitle(key, entry as Record<string, unknown>),
+      created: new Date(updatedAt).toISOString(),
+      status: deriveSessionStatus(updatedAt),
+      workspaceSubfolder,
+    });
+  }
+
+  rows.sort((a, b) => b.created.localeCompare(a.created));
+  return rows;
+}
+
+function resolveWorkspaceSummary(
+  workspace: WorkspaceConfigEntry,
+  artifactCount: number,
+  sessions: WorkspaceSessionEntry[],
+): {
+  id: string;
+  name: string;
+  emoji: string;
+  type: WorkspaceType;
+  path: string;
+  artifactCount: number;
+  sessionCount: number;
+  lastUpdated: string;
+  lastScanned: number;
+  legacyType: "projects" | "clients" | "vault" | "custom";
+} {
+  const sessionCount = sessions.length;
+  const sessionUpdated = sessions
+    .map((entry) => Date.parse(entry.created))
+    .filter((value) => Number.isFinite(value))
+    .reduce((acc, value) => Math.max(acc, value), 0);
+  const lastUpdatedMs = sessionUpdated || Date.now();
+
+  return {
+    id: workspace.id,
+    name: workspace.name,
+    emoji: workspace.emoji,
+    type: workspace.type,
+    path: toDisplayPath(workspace.path),
+    artifactCount,
+    sessionCount,
+    lastUpdated: new Date(lastUpdatedMs).toISOString(),
+    lastScanned: Date.now(),
+    legacyType: workspaceTypeToLegacyType(workspace.type),
+  };
+}
+
+async function normalizePathForRead(
+  params: Record<string, unknown>,
+  config: WorkspaceConfigFile,
+): Promise<{ absolutePath: string | null; error?: string }> {
+  const explicitWorkspaceId =
+    typeof params.workspaceId === "string" ? String(params.workspaceId).trim() : "";
+  const filePath = typeof params.filePath === "string" ? String(params.filePath).trim() : "";
+
+  if (explicitWorkspaceId && filePath) {
+    if (filePath.includes("\0")) {
+      return { absolutePath: null, error: "invalid path" };
+    }
+    const workspace = findWorkspaceById(config, explicitWorkspaceId);
+    if (!workspace) {
+      return { absolutePath: null, error: `workspace not found: ${explicitWorkspaceId}` };
+    }
+    const absolute = resolvePathInWorkspace(workspace.path, filePath);
+    if (!absolute) {
+      return { absolutePath: null, error: "filePath is outside workspace" };
+    }
+    // Resolve symlinks to prevent escape via symlink pointing outside workspace
+    let realPath: string;
+    try {
+      realPath = await fs.realpath(absolute);
+    } catch {
+      return { absolutePath: null, error: "path does not exist" };
+    }
+    let realRoot: string;
+    try {
+      realRoot = await fs.realpath(workspace.path);
+    } catch {
+      return { absolutePath: null, error: "workspace root does not exist" };
+    }
+    if (realPath !== realRoot && !realPath.startsWith(realRoot + path.sep)) {
+      return { absolutePath: null, error: "filePath is outside workspace" };
+    }
+    return { absolutePath: realPath };
+  }
+
+  const legacyPath = typeof params.path === "string" ? String(params.path).trim() : "";
+  if (!legacyPath) {
+    return { absolutePath: null, error: "path is required" };
+  }
+
+  if (legacyPath.includes("\0")) {
+    return { absolutePath: null, error: "invalid path" };
+  }
+
+  const absolutePath = path.resolve(expandPath(legacyPath));
+  // Resolve symlinks to prevent escape via symlink pointing outside workspace
+  let resolvedPath: string;
+  try {
+    resolvedPath = await fs.realpath(absolutePath);
+  } catch {
+    return { absolutePath: null, error: "path does not exist" };
+  }
+  const allowedRoots: string[] = [];
+  for (const workspace of config.workspaces) {
+    try {
+      allowedRoots.push(await fs.realpath(path.resolve(workspace.path)));
+    } catch {
+      // skip workspaces whose root doesn't exist
+    }
+  }
+  const isAllowed = allowedRoots.some(
+    (root) => resolvedPath === root || resolvedPath.startsWith(root + path.sep),
+  );
+  if (!isAllowed) {
+    return {
+      absolutePath: null,
+      error: "path is outside allowed workspace directories",
+    };
+  }
+
+  return { absolutePath: resolvedPath };
+}
+
+function getImageMimeTypeForExtension(extension: string): string | null {
+  if (!extension) {
+    return null;
+  }
+  return IMAGE_MIME_BY_EXT[extension] ?? null;
+}
+
+async function readFileForWorkspace(absolutePath: string): Promise<{
+  content: string | null;
+  size?: number;
+  modifiedAt?: number;
+  mime?: string;
+  contentType?: string;
+  error?: string;
+}> {
+  let stat: import("node:fs").Stats;
+  try {
+    stat = await fs.stat(absolutePath);
+  } catch (err) {
+    return { content: null, error: err instanceof Error ? err.message : String(err) };
+  }
+
+  if (stat.isDirectory()) {
+    return { content: null, error: "path is a directory, not a file" };
+  }
+
+  const extension = path.extname(absolutePath).toLowerCase();
+  const imageMime = getImageMimeTypeForExtension(extension);
+  if (imageMime) {
+    if (stat.size > MAX_IMAGE_READ_SIZE) {
+      return {
+        content: null,
+        size: stat.size,
+        error: `image too large (${Math.round(stat.size / 1024)}KB, max ${Math.round(MAX_IMAGE_READ_SIZE / 1024)}KB)`,
+      };
+    }
+    try {
+      const raw = await fs.readFile(absolutePath);
+      const content = `data:${imageMime};base64,${raw.toString("base64")}`;
+      return {
+        content,
+        size: stat.size,
+        modifiedAt: stat.mtimeMs,
+        mime: imageMime,
+        contentType: imageMime,
+      };
+    } catch (err) {
+      return { content: null, error: err instanceof Error ? err.message : String(err) };
+    }
+  }
+
+  if (stat.size > MAX_READ_SIZE) {
+    return {
+      content: null,
+      size: stat.size,
+      error: `file too large (${Math.round(stat.size / 1024)}KB, max ${Math.round(MAX_READ_SIZE / 1024)}KB)`,
+    };
+  }
+
+  if (extension && !TEXT_EXTENSIONS.has(extension)) {
+    return {
+      content: null,
+      error: `unsupported file type: ${extension}`,
+      mime: "application/octet-stream",
+    };
+  }
+
+  let content: string;
+  try {
+    content = await fs.readFile(absolutePath, "utf-8");
+  } catch (err) {
+    return { content: null, error: err instanceof Error ? err.message : String(err) };
+  }
+  const mime =
+    extension === ".md"
+      ? "text/markdown"
+      : extension === ".html" || extension === ".htm"
+        ? "text/html"
+        : extension === ".json" || extension === ".json5"
+          ? "application/json"
+          : "text/plain";
+
+  return {
+    content,
+    size: stat.size,
+    modifiedAt: stat.mtimeMs,
+    mime,
+    contentType: mime,
+  };
+}
+
+function resolveWorkspacePathByType(type: WorkspaceType, id: string): string {
+  const root = resolveGodModeRoot();
+  if (type === "team") {
+    return path.join(root, "clients", id);
+  }
+  if (type === "personal") {
+    return path.join(root, "memory", "personal", id);
+  }
+  return path.join(root, "memory", "projects", id);
+}
+
+function normalizeCreateType(value: unknown): WorkspaceType {
+  const normalized = (typeof value === "string" ? value : "project").trim().toLowerCase();
+  if (normalized === "team" || normalized === "team-workspace") {
+    return "team";
+  }
+  if (normalized === "personal") {
+    return "personal";
+  }
+  return "project";
+}
+
+async function findSessionKeyFromSessionId(sessionId: string): Promise<string | null> {
+  const cfg = await loadConfig();
+  const combined = (await loadCombinedSessionStoreForGateway(cfg)).store;
+  for (const [key, entry] of Object.entries(combined)) {
+    if (entry.sessionId === sessionId) {
+      return key;
+    }
+  }
+  return null;
+}
+
+const list: GatewayRequestHandler = async ({ respond }) => {
+  const config = await readWorkspaceConfig();
+
+  const summaries = await Promise.all(
+    config.workspaces.map(async (workspace) => {
+      const outputs = await listWorkspaceOutputs(workspace);
+      const sessions = await listWorkspaceSessions(workspace.id, config);
+      const summary = resolveWorkspaceSummary(workspace, outputs.length, sessions);
+      return {
+        id: summary.id,
+        name: summary.name,
+        emoji: summary.emoji,
+        type: summary.type,
+        path: summary.path,
+        artifactCount: summary.artifactCount,
+        sessionCount: summary.sessionCount,
+        lastUpdated: summary.lastUpdated,
+        lastScanned: summary.lastScanned,
+        legacyType: summary.legacyType,
+      };
+    }),
+  );
+
+  respond(true, {
+    configPath: CANONICAL_WORKSPACES_CONFIG_PATH,
+    workspaces: summaries,
+    sources: summaries.map((workspace) => workspace.path),
+  });
+};
+
+const get: GatewayRequestHandler = async ({ params, respond }) => {
+  const id = typeof params.id === "string" ? String(params.id).trim() : "";
+  if (!id) {
+    respond(true, { workspace: null, error: "id is required" });
+    return;
+  }
+
+  const config = await readWorkspaceConfig();
+  const workspace = findWorkspaceById(config, id);
+  if (!workspace) {
+    respond(true, { workspace: null, error: `workspace not found: ${id}` });
+    return;
+  }
+
+  const rawOutputs = await listWorkspaceOutputs(workspace);
+  const outputs = await enrichWorkspaceEntriesForSearch(workspace, rawOutputs);
+  const sessions = await listWorkspaceSessions(workspace.id, config);
+  const pinned = await getPinnedEntries(workspace, outputs);
+  const summary = resolveWorkspaceSummary(workspace, outputs.length, sessions);
+
+  // Resolve pinned sessions
+  const cfg = await loadConfig();
+  const combinedStore = (await loadCombinedSessionStoreForGateway(cfg)).store;
+  const pinnedSessions: WorkspaceSessionEntry[] = [];
+  for (const sessionKey of workspace.pinnedSessions) {
+    const canonicalSessionKey = sessionKey.trim().toLowerCase();
+    const entry = combinedStore[canonicalSessionKey] as Record<string, unknown> | undefined;
+    if (!entry) {
+      continue;
+    }
+    const updatedAt = Number(entry.updatedAt ?? Date.now());
+    pinnedSessions.push({
+      id: typeof entry.sessionId === "string" ? entry.sessionId : "",
+      key: sessionKey,
+      title: resolveWorkspaceSessionTitle(sessionKey, entry),
+      created: new Date(updatedAt).toISOString(),
+      status: deriveSessionStatus(updatedAt),
+      workspaceSubfolder: null,
+    });
+  }
+
+  respond(true, {
+    workspace: {
+      ...workspace,
+      path: summary.path,
+      artifactCount: summary.artifactCount,
+      sessionCount: summary.sessionCount,
+      lastUpdated: summary.lastUpdated,
+      type: workspace.type,
+      legacyType: summary.legacyType,
+      lastScanned: Date.now(),
+    },
+    pinned,
+    pinnedSessions,
+    outputs,
+    sessions,
+  });
+};
+
+const readFile: GatewayRequestHandler = async ({ params, respond }) => {
+  const config = await readWorkspaceConfig();
+  const resolved = await normalizePathForRead(params, config);
+  if (!resolved.absolutePath) {
+    respond(true, { content: null, error: resolved.error ?? "path is required" });
+    return;
+  }
+
+  const result = await readFileForWorkspace(resolved.absolutePath);
+  respond(true, {
+    ...result,
+    path: toDisplayPath(resolved.absolutePath),
+  });
+};
+
+const pin: GatewayRequestHandler = async ({ params, respond }) => {
+  const workspaceId =
+    typeof params.workspaceId === "string" ? String(params.workspaceId).trim() : "";
+  const filePath = typeof params.filePath === "string" ? String(params.filePath).trim() : "";
+
+  if (!workspaceId || !filePath) {
+    respond(
+      false,
+      undefined,
+      errorShape(ErrorCodes.INVALID_REQUEST, "workspaceId and filePath are required"),
+    );
+    return;
+  }
+
+  const config = await readWorkspaceConfig();
+  const workspace = findWorkspaceById(config, workspaceId);
+  if (!workspace) {
+    respond(
+      false,
+      undefined,
+      errorShape(ErrorCodes.INVALID_REQUEST, `workspace not found: ${workspaceId}`),
+    );
+    return;
+  }
+
+  const normalized = normalizePinnedPath(workspace.path, filePath);
+  if (!normalized) {
+    respond(
+      false,
+      undefined,
+      errorShape(ErrorCodes.INVALID_REQUEST, "filePath is outside workspace"),
+    );
+    return;
+  }
+
+  if (!workspace.pinned.includes(normalized)) {
+    workspace.pinned = [...workspace.pinned, normalized];
+    await writeWorkspaceConfig(config);
+  }
+
+  respond(true, {
+    ok: true,
+    workspaceId,
+    pinned: workspace.pinned,
+  });
+};
+
+const unpin: GatewayRequestHandler = async ({ params, respond }) => {
+  const workspaceId =
+    typeof params.workspaceId === "string" ? String(params.workspaceId).trim() : "";
+  const filePath = typeof params.filePath === "string" ? String(params.filePath).trim() : "";
+
+  if (!workspaceId || !filePath) {
+    respond(
+      false,
+      undefined,
+      errorShape(ErrorCodes.INVALID_REQUEST, "workspaceId and filePath are required"),
+    );
+    return;
+  }
+
+  const config = await readWorkspaceConfig();
+  const workspace = findWorkspaceById(config, workspaceId);
+  if (!workspace) {
+    respond(
+      false,
+      undefined,
+      errorShape(ErrorCodes.INVALID_REQUEST, `workspace not found: ${workspaceId}`),
+    );
+    return;
+  }
+
+  const normalized = normalizePinnedPath(workspace.path, filePath);
+  if (!normalized) {
+    respond(
+      false,
+      undefined,
+      errorShape(ErrorCodes.INVALID_REQUEST, "filePath is outside workspace"),
+    );
+    return;
+  }
+
+  workspace.pinned = workspace.pinned.filter((entry) => entry !== normalized);
+  await writeWorkspaceConfig(config);
+
+  respond(true, {
+    ok: true,
+    workspaceId,
+    pinned: workspace.pinned,
+  });
+};
+
+const fileSession: GatewayRequestHandler = async ({ params, respond }) => {
+  const workspaceId =
+    typeof params.workspaceId === "string" ? String(params.workspaceId).trim() : "";
+  const sessionId = typeof params.sessionId === "string" ? String(params.sessionId).trim() : "";
+  const sessionKeyInput =
+    typeof params.sessionKey === "string" ? String(params.sessionKey).trim() : "";
+  const workspaceSubfolderInput =
+    typeof params.workspaceSubfolder === "string" ? String(params.workspaceSubfolder).trim() : "";
+
+  if (!workspaceId || (!sessionId && !sessionKeyInput)) {
+    respond(false, undefined, {
+      ...errorShape(
+        ErrorCodes.INVALID_REQUEST,
+        "workspaceId and one of sessionId/sessionKey are required",
+      ),
+    });
+    return;
+  }
+
+  const workspacesConfig = await readWorkspaceConfig();
+  const workspace = findWorkspaceById(workspacesConfig, workspaceId);
+  if (!workspace) {
+    respond(
+      false,
+      undefined,
+      errorShape(ErrorCodes.INVALID_REQUEST, `workspace not found: ${workspaceId}`),
+    );
+    return;
+  }
+
+  const resolvedSessionKey = sessionKeyInput || (await findSessionKeyFromSessionId(sessionId));
+  if (!resolvedSessionKey) {
+    respond(false, undefined, {
+      ...errorShape(
+        ErrorCodes.INVALID_REQUEST,
+        "session not found for provided sessionId/sessionKey",
+      ),
+    });
+    return;
+  }
+
+  const workspaceSubfolder = workspaceSubfolderInput
+    ? normalizePinnedPath(workspace.path, workspaceSubfolderInput)
+    : null;
+
+  const cfg = await loadConfig();
+  const target = await resolveGatewaySessionStoreTarget({ cfg, key: resolvedSessionKey });
+
+  try {
+    await updateSessionStore(target.storePath, (store) => {
+      const existing = target.storeKeys.map((key) => store[key]).find(Boolean);
+      if (!existing) {
+        return;
+      }
+
+      store[target.canonicalKey] = {
+        ...existing,
+        updatedAt: Date.now(),
+        workspaceId: workspace.id,
+        workspaceSubfolder: workspaceSubfolder ?? null,
+      } as typeof existing & { workspaceId: string; workspaceSubfolder: string | null };
+
+      pruneLegacyStoreKeys({
+        store,
+        canonicalKey: target.canonicalKey,
+        candidates: target.storeKeys,
+      });
+    });
+  } catch (err) {
+    respond(
+      false,
+      undefined,
+      errorShape(
+        ErrorCodes.UNAVAILABLE,
+        `failed to update session workspace metadata: ${String(err)}`,
+      ),
+    );
+    return;
+  }
+
+  respond(true, {
+    ok: true,
+    sessionKey: target.canonicalKey,
+    workspaceId: workspace.id,
+    workspaceSubfolder: workspaceSubfolder ?? null,
+  });
+};
+
+const detectFromMessage: GatewayRequestHandler = async ({ params, respond }) => {
+  const text = typeof params.text === "string" ? String(params.text) : "";
+  const config = await readWorkspaceConfig();
+  const result = detectWorkspaceFromText(config, text);
+  respond(true, result);
+};
+
+const createWorkspace: GatewayRequestHandler = async ({ params, respond }) => {
+  const name = typeof params.name === "string" ? String(params.name).trim() : "";
+  const type = normalizeCreateType(params.type);
+  const explicitPath = typeof params.path === "string" ? String(params.path).trim() : "";
+  const emoji = typeof params.emoji === "string" ? String(params.emoji).trim() : "";
+  const keywordsRaw = Array.isArray(params.keywords) ? (params.keywords as unknown[]) : [];
+
+  if (!name) {
+    respond(false, undefined, errorShape(ErrorCodes.INVALID_REQUEST, "name is required"));
+    return;
+  }
+
+  const config = await readWorkspaceConfig();
+  const existingIds = new Set(config.workspaces.map((workspace) => workspace.id));
+  const id = createWorkspaceId(name, existingIds);
+
+  const workspacePath = path.resolve(
+    explicitPath ? expandPath(explicitPath) : resolveWorkspacePathByType(type, id),
+  );
+
+  const keywords = Array.from(
+    new Set(
+      [
+        ...keywordsRaw.map((entry) =>
+          (typeof entry === "string" ? entry : "").trim().toLowerCase(),
+        ),
+        ...name
+          .toLowerCase()
+          .split(/[^a-z0-9]+/)
+          .filter(Boolean),
+        id,
+      ].filter(Boolean),
+    ),
+  );
+
+  const workspace: WorkspaceConfigEntry = {
+    id,
+    name,
+    emoji: emoji || (type === "team" ? "👥" : type === "personal" ? "🌱" : "📁"),
+    type,
+    path: workspacePath,
+    keywords,
+    pinned: [],
+    pinnedSessions: [],
+    artifactDirs: ["outputs"],
+  };
+
+  await ensureWorkspaceFolders(workspace.path);
+  config.workspaces.push(workspace);
+  await writeWorkspaceConfig(config);
+
+  respond(true, {
+    workspace: {
+      ...workspace,
+      path: toDisplayPath(workspace.path),
+    },
+  });
+};
+
+const scan: GatewayRequestHandler = async ({ respond }) => {
+  const config = await readWorkspaceConfig();
+
+  const results = await Promise.all(
+    config.workspaces.map(async (workspace) => {
+      const exists = await pathExists(workspace.path);
+      const outputs = await listWorkspaceOutputs(workspace);
+      return {
+        path: toDisplayPath(workspace.path),
+        found: exists,
+        artifactCount: outputs.length,
+        workspaceId: workspace.id,
+      };
+    }),
+  );
+
+  respond(true, {
+    scanned: true,
+    timestamp: Date.now(),
+    configPath: CANONICAL_WORKSPACES_CONFIG_PATH,
+    results,
+  });
+};
+
+const pinSession: GatewayRequestHandler = async ({ params, respond }) => {
+  const workspaceId =
+    typeof params.workspaceId === "string" ? String(params.workspaceId).trim() : "";
+  const sessionKey = typeof params.sessionKey === "string" ? String(params.sessionKey).trim() : "";
+
+  if (!workspaceId || !sessionKey) {
+    respond(
+      false,
+      undefined,
+      errorShape(ErrorCodes.INVALID_REQUEST, "workspaceId and sessionKey are required"),
+    );
+    return;
+  }
+
+  const config = await readWorkspaceConfig();
+  const workspace = findWorkspaceById(config, workspaceId);
+  if (!workspace) {
+    respond(
+      false,
+      undefined,
+      errorShape(ErrorCodes.INVALID_REQUEST, `workspace not found: ${workspaceId}`),
+    );
+    return;
+  }
+
+  if (!workspace.pinnedSessions.includes(sessionKey)) {
+    workspace.pinnedSessions = [...workspace.pinnedSessions, sessionKey];
+    await writeWorkspaceConfig(config);
+  }
+
+  respond(true, { ok: true, workspaceId, pinnedSessions: workspace.pinnedSessions });
+};
+
+const unpinSession: GatewayRequestHandler = async ({ params, respond }) => {
+  const workspaceId =
+    typeof params.workspaceId === "string" ? String(params.workspaceId).trim() : "";
+  const sessionKey = typeof params.sessionKey === "string" ? String(params.sessionKey).trim() : "";
+
+  if (!workspaceId || !sessionKey) {
+    respond(
+      false,
+      undefined,
+      errorShape(ErrorCodes.INVALID_REQUEST, "workspaceId and sessionKey are required"),
+    );
+    return;
+  }
+
+  const config = await readWorkspaceConfig();
+  const workspace = findWorkspaceById(config, workspaceId);
+  if (!workspace) {
+    respond(
+      false,
+      undefined,
+      errorShape(ErrorCodes.INVALID_REQUEST, `workspace not found: ${workspaceId}`),
+    );
+    return;
+  }
+
+  workspace.pinnedSessions = workspace.pinnedSessions.filter((key) => key !== sessionKey);
+  await writeWorkspaceConfig(config);
+
+  respond(true, { ok: true, workspaceId, pinnedSessions: workspace.pinnedSessions });
+};
+
+export const workspacesHandlers: GatewayRequestHandlers = {
+  "workspaces.list": list,
+  "workspaces.get": get,
+  "workspaces.scan": scan,
+  "workspaces.readFile": readFile,
+  "workspaces.pin": pin,
+  "workspaces.unpin": unpin,
+  "workspaces.pinSession": pinSession,
+  "workspaces.unpinSession": unpinSession,
+  "workspaces.fileSession": fileSession,
+  "workspaces.detectFromMessage": detectFromMessage,
+  "workspaces.create": createWorkspace,
+};
+
+export { expandPath };

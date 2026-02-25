@@ -1,0 +1,6 @@
+src/
+scripts/
+tsup.config.ts
+*.test.ts
+node_modules/
+.gitignore

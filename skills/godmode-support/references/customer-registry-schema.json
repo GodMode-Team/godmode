@@ -1,0 +1,179 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "GodMode Support Registry",
+  "description": "Registry of team members and customers for GodMode remote support",
+  "type": "object",
+  "required": ["entries"],
+  "properties": {
+    "entries": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "name", "tailscaleHostname", "telegramUserId", "type", "platform"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique identifier (slug format)",
+            "pattern": "^[a-z0-9-]+$",
+            "examples": ["acme-corp", "jake-vps", "sarah-dev"]
+          },
+          "name": {
+            "type": "string",
+            "description": "Display name (person or company)",
+            "examples": ["Acme Corporation", "Jake's VPS", "Sarah"]
+          },
+          "type": {
+            "type": "string",
+            "enum": ["team", "customer"],
+            "description": "Team members have more permissive access; customers require approval flows"
+          },
+          "platform": {
+            "type": "string",
+            "enum": ["macos", "linux"],
+            "description": "Operating system - determines which support CLI commands to use"
+          },
+          "contact": {
+            "type": "string",
+            "format": "email",
+            "description": "Primary contact email"
+          },
+          "tailscaleHostname": {
+            "type": "string",
+            "description": "Tailscale machine hostname for SSH",
+            "examples": ["acme-corp-godmode", "jake-dev-vps"]
+          },
+          "telegramUserId": {
+            "type": "string",
+            "description": "Telegram user ID for support chat identification",
+            "pattern": "^[0-9]+$"
+          },
+          "sshConsent": {
+            "type": "boolean",
+            "default": false,
+            "description": "Whether user has consented to SSH support access (always true for team)"
+          },
+          "consentDate": {
+            "type": "string",
+            "format": "date",
+            "description": "Date SSH consent was granted (ISO 8601)"
+          },
+          "timezone": {
+            "type": "string",
+            "description": "User timezone for scheduling",
+            "default": "America/Chicago",
+            "examples": ["America/New_York", "America/Los_Angeles", "Europe/London"]
+          },
+          "tier": {
+            "type": "string",
+            "enum": ["beta", "standard", "premium"],
+            "default": "beta",
+            "description": "Tier (affects SLA, not capabilities) - only relevant for customers"
+          },
+          "machineSpecs": {
+            "type": "object",
+            "description": "Hardware specifications",
+            "properties": {
+              "model": {
+                "type": "string",
+                "examples": ["Mac Mini M2", "DigitalOcean Droplet", "Hetzner VPS"]
+              },
+              "cpu": {
+                "type": "string",
+                "examples": ["M2", "4 vCPU", "AMD EPYC"]
+              },
+              "ram": {
+                "type": "string",
+                "examples": ["8GB", "16GB", "32GB"]
+              },
+              "storage": {
+                "type": "string",
+                "examples": ["256GB SSD", "512GB NVMe", "100GB"]
+              },
+              "provider": {
+                "type": "string",
+                "description": "Cloud provider if VPS",
+                "examples": ["DigitalOcean", "Hetzner", "Linode", "AWS", "self-hosted"]
+              }
+            }
+          },
+          "notes": {
+            "type": "string",
+            "description": "Free-form notes about this customer"
+          },
+          "onboardedAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When customer was onboarded"
+          },
+          "lastSupportContact": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Last time customer contacted support"
+          }
+        }
+      }
+    },
+    "metadata": {
+      "type": "object",
+      "properties": {
+        "version": {
+          "type": "string",
+          "default": "1.0.0"
+        },
+        "lastUpdated": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    }
+  },
+  "examples": [
+    {
+      "entries": [
+        {
+          "id": "jake-vps",
+          "name": "Jake's Dev VPS",
+          "type": "team",
+          "platform": "linux",
+          "contact": "jake@godmode.ai",
+          "tailscaleHostname": "jake-dev-vps",
+          "telegramUserId": "111222333",
+          "sshConsent": true,
+          "consentDate": "2026-02-01",
+          "timezone": "America/Chicago",
+          "machineSpecs": {
+            "model": "DigitalOcean Droplet",
+            "cpu": "4 vCPU",
+            "ram": "8GB",
+            "storage": "160GB SSD",
+            "provider": "DigitalOcean"
+          },
+          "notes": "Team member - full access"
+        },
+        {
+          "id": "acme-corp",
+          "name": "Acme Corporation",
+          "type": "customer",
+          "platform": "macos",
+          "contact": "john@acme.com",
+          "tailscaleHostname": "acme-corp-godmode",
+          "telegramUserId": "123456789",
+          "sshConsent": true,
+          "consentDate": "2026-02-01",
+          "timezone": "America/New_York",
+          "tier": "beta",
+          "machineSpecs": {
+            "model": "Mac Mini M2",
+            "ram": "16GB",
+            "storage": "512GB"
+          },
+          "notes": "Early beta tester, very technical"
+        }
+      ],
+      "metadata": {
+        "version": "2.0.0",
+        "lastUpdated": "2026-02-03T12:00:00Z"
+      }
+    }
+  ]
+}

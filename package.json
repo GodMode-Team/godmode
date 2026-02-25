@@ -1,0 +1,43 @@
+{
+  "name": "@godmode-team/godmode-plugin",
+  "version": "1.0.0",
+  "private": false,
+  "description": "GodMode - Personal AI Operating System plugin for OpenClaw",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist",
+    "openclaw.plugin.json",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsup && node scripts/bundle-ui.mjs",
+    "clean": "rm -rf dist",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "json5": "^2.2.3"
+  },
+  "devDependencies": {
+    "openclaw": "^2026.2.23",
+    "tsup": "^8.5.1",
+    "typescript": "^5.9.2"
+  },
+  "peerDependencies": {
+    "openclaw": ">=2026.0.0"
+  },
+  "peerDependenciesMeta": {
+    "openclaw": {
+      "optional": false
+    }
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "openclaw": {
+    "extensions": [
+      "./index.ts"
+    ]
+  }
+}
