@@ -35,8 +35,20 @@ This repository is the standalone home for the GodMode OpenClaw plugin.
 
 - Install: `pnpm install`
 - Build: `pnpm build`
+- Sync fallback UI snapshot: `pnpm ui:sync`
 - Typecheck: `pnpm typecheck`
 - Clean: `pnpm clean`
+
+## UI Source of Truth
+
+- UI source lives in `~/Projects/godmode-ui` (not in this repo's `assets/` or `dist/`).
+- Never hand-edit `assets/godmode-ui/*` or `dist/godmode-ui/*`.
+- Local dev/build flow:
+  1. `cd ~/Projects/godmode-ui && pnpm build`
+  2. `cd ~/Projects/godmode-plugin && pnpm build`
+- `scripts/bundle-ui.mjs` now fails if a sibling `../godmode-ui` repo exists but is not built.
+- Use `GODMODE_UI_ALLOW_FALLBACK=1` only when you intentionally need fallback snapshot assets.
+- Before release, refresh fallback snapshot with `pnpm ui:sync` and commit if it changed.
 
 ## Coding Guardrails
 
@@ -67,5 +79,7 @@ Before shipping changes:
    - `rg "\.\./\.\./\.\./\.\./src/" -n`
 2. Build plugin:
    - `pnpm build`
-3. Confirm handlers still export expected RPC methods.
-4. Confirm no host-core-only assumptions were introduced.
+3. If UI changed, refresh snapshot fallback:
+   - `pnpm ui:sync`
+4. Confirm handlers still export expected RPC methods.
+5. Confirm no host-core-only assumptions were introduced.

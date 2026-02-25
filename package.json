@@ -16,6 +16,7 @@
     "build": "pnpm build:code && pnpm bundle:ui",
     "build:code": "tsup",
     "bundle:ui": "node scripts/bundle-ui.mjs",
+    "ui:sync": "node scripts/sync-ui-from-repo.mjs",
     "clean": "rm -rf dist",
     "typecheck": "tsc --noEmit",
     "pack:check": "npm pack --dry-run"
