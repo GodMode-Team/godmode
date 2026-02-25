@@ -490,21 +490,22 @@ const godmodePlugin = {
 
     const godmodeUiCandidates = [
       join(pluginRoot, "dist", "godmode-ui"),
+      join(pluginRoot, "godmode-ui", "dist"),
       join(pluginRoot, "assets", "godmode-ui"),
-      join(pluginRoot, "dist", "control-ui"),
       join(monorepoRoot, "dist", "control-ui"),
     ];
-    const godmodeUiRoot =
-      godmodeUiCandidates.find((p) => {
-        const index = join(p, "index.html");
-        if (!existsSync(index)) return false;
-        try {
-          const html = readFileSync(index, "utf8");
-          return /<godmode-app\b/i.test(html);
-        } catch {
-          return existsSync(index);
-        }
-      }) ?? godmodeUiCandidates.find((p) => existsSync(join(p, "index.html")));
+    const godmodeUiRoot = godmodeUiCandidates.find((p) => {
+      const index = join(p, "index.html");
+      if (!existsSync(index)) {
+        return false;
+      }
+      try {
+        const html = readFileSync(index, "utf8");
+        return /<godmode-app\b/i.test(html);
+      } catch {
+        return false;
+      }
+    });
 
     const deckUiCandidates = [
       join(pluginRoot, "dist", "deck"),

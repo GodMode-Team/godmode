@@ -3,9 +3,9 @@
  *
  * Source resolution order:
  * 1) --ui-dir <path>
- * 2) <plugin>/dist/control-ui
- * 3) <plugin>/../../dist/control-ui (monorepo build output)
- * 4) <plugin>/assets/godmode-ui (committed fallback snapshot)
+ * 2) <plugin>/godmode-ui/dist
+ * 3) <plugin>/assets/godmode-ui (committed fallback snapshot)
+ * 4) <plugin>/../../dist/control-ui (monorepo build output, only if godmode build)
  *
  * If no source exists, the script fails by default to prevent shipping a
  * plugin build with missing UI assets.
@@ -19,7 +19,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const pluginRoot = resolve(__dirname, "..");
 const monorepoRoot = resolve(pluginRoot, "../..");
 const fallbackUiSource = join(pluginRoot, "assets", "godmode-ui");
-const pluginUiBuildOutput = join(pluginRoot, "dist", "control-ui");
+const pluginUiBuildOutput = join(pluginRoot, "godmode-ui", "dist");
 
 // Allow override via --ui-dir flag
 const uiDirFlagIndex = process.argv.indexOf("--ui-dir");
@@ -32,15 +32,28 @@ const uiDest = join(pluginRoot, "dist", "godmode-ui");
 const candidateSources = [
   explicitUiSource,
   pluginUiBuildOutput,
-  join(monorepoRoot, "dist", "control-ui"),
   fallbackUiSource,
+  join(monorepoRoot, "dist", "control-ui"),
 ].filter(Boolean);
 
-const uiSource = candidateSources.find((candidate) => existsSync(String(candidate)));
+function hasGodModeRootTag(sourceDir) {
+  const indexPath = join(sourceDir, "index.html");
+  if (!existsSync(indexPath)) {
+    return false;
+  }
+  try {
+    const html = readFileSync(indexPath, "utf8");
+    return /<godmode-app\b/i.test(html);
+  } catch {
+    return false;
+  }
+}
+
+const uiSource = candidateSources.find((candidate) => hasGodModeRootTag(String(candidate)));
 
 if (!uiSource) {
   const optional = process.env.GODMODE_UI_OPTIONAL === "1";
-  const detail = `No UI source found. Checked: ${candidateSources.join(", ")}`;
+  const detail = `No GodMode UI source found. Checked: ${candidateSources.join(", ")}`;
   if (optional) {
     console.warn(`[bundle-ui] ${detail}`);
     console.warn("[bundle-ui] GODMODE_UI_OPTIONAL=1 set; skipping UI bundling.");
@@ -48,20 +61,9 @@ if (!uiSource) {
   }
   console.error(`[bundle-ui] ${detail}`);
   console.error(
-    "[bundle-ui] Provide --ui-dir <path> or commit fallback UI assets under assets/godmode-ui.",
+    "[bundle-ui] Build godmode-ui first or provide --ui-dir containing <godmode-app>.",
   );
   process.exit(1);
-}
-
-// Verify the root app tag exists.
-const indexPath = join(uiSource, "index.html");
-if (existsSync(indexPath)) {
-  const html = readFileSync(indexPath, "utf8");
-  if (!/<(godmode|openclaw)-app\b/i.test(html)) {
-    console.warn(
-      `[bundle-ui] WARNING: ${indexPath} does not appear to include a known app root element.`,
-    );
-  }
 }
 
 // Copy recursively.
