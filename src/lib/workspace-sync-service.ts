@@ -282,7 +282,7 @@ export class WorkspaceSyncService {
       ],
     });
 
-    watcher.on("all", (_event, changedPath) => {
+    watcher.on("all", (_event: string, changedPath: string) => {
       if (changedPath.includes(`${path.sep}.git${path.sep}`)) {
         return;
       }

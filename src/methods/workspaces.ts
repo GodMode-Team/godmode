@@ -315,9 +315,10 @@ function dedupeWorkspaceEntries(entries: WorkspaceFileEntry[]): WorkspaceFileEnt
 }
 
 function sortAndCapWorkspaceEntries(entries: WorkspaceFileEntry[]): WorkspaceFileEntry[] {
-  return dedupeWorkspaceEntries(entries)
-    .toSorted((a, b) => b.modified.localeCompare(a.modified))
-    .slice(0, MAX_WORKSPACE_SECTION_ITEMS);
+  const sorted = dedupeWorkspaceEntries(entries).sort((a, b) =>
+    b.modified.localeCompare(a.modified),
+  );
+  return sorted.slice(0, MAX_WORKSPACE_SECTION_ITEMS);
 }
 
 function canIndexTextForSearch(filePath: string): boolean {
@@ -470,7 +471,7 @@ async function getPinnedEntries(
     }
   }
 
-  return pinned.toSorted((a, b) => b.modified.localeCompare(a.modified));
+  return pinned.sort((a, b) => b.modified.localeCompare(a.modified));
 }
 
 function deriveSessionStatus(updatedAtMs: number): "running" | "complete" | "blocked" {
@@ -540,8 +541,10 @@ async function listWorkspaceSessions(
       (entry as Record<string, unknown>).workspaceSubfolder,
     );
     const updatedAt = Number(entry.updatedAt ?? Date.now());
+    const sessionId =
+      typeof entry.sessionId === "string" && entry.sessionId.trim() ? entry.sessionId : key;
     rows.push({
-      id: entry.sessionId,
+      id: sessionId,
       key,
       title: resolveWorkspaceSessionTitle(key, entry as Record<string, unknown>),
       created: new Date(updatedAt).toISOString(),

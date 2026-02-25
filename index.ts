@@ -17,7 +17,8 @@ import {
   type OutgoingHttpHeaders,
   type ServerResponse,
 } from "node:http";
-import { dirname, join, resolve } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk";
 // Method handler imports
 import { agentLogHandlers } from "./src/methods/agent-log.js";
@@ -47,10 +48,16 @@ import { createStaticFileHandler } from "./src/static-server.js";
 // Read from package.json at load time so it can't drift
 let pluginVersion = "1.0.0";
 try {
-  const pkg = JSON.parse(
-    readFileSync(join(dirname(import.meta.url.replace("file://", "")), "package.json"), "utf8"),
-  );
-  pluginVersion = pkg.version ?? pluginVersion;
+  const moduleDir = dirname(fileURLToPath(import.meta.url));
+  const packageJsonCandidates = [join(moduleDir, "package.json"), join(moduleDir, "..", "package.json")];
+  for (const candidate of packageJsonCandidates) {
+    if (!existsSync(candidate)) {
+      continue;
+    }
+    const pkg = JSON.parse(readFileSync(candidate, "utf8"));
+    pluginVersion = pkg.version ?? pluginVersion;
+    break;
+  }
 } catch {
   // Bundled installs may not have package.json alongside index.js
 }
@@ -477,12 +484,15 @@ const godmodePlugin = {
     );
 
     // ── 2. Resolve UI asset paths ─────────────────────────────────
-    const pluginRoot = dirname(api.source);
+    const sourceDir = dirname(api.source);
+    const pluginRoot = basename(sourceDir) === "dist" ? resolve(sourceDir, "..") : sourceDir;
     const monorepoRoot = resolve(pluginRoot, "../..");
 
     const godmodeUiCandidates = [
-      join(monorepoRoot, "dist", "control-ui"),
       join(pluginRoot, "dist", "godmode-ui"),
+      join(pluginRoot, "assets", "godmode-ui"),
+      join(pluginRoot, "dist", "control-ui"),
+      join(monorepoRoot, "dist", "control-ui"),
     ];
     const godmodeUiRoot =
       godmodeUiCandidates.find((p) => {
@@ -551,7 +561,7 @@ const godmodePlugin = {
 h1{color:#ff6b6b}code{background:#16213e;padding:2px 8px;border-radius:4px}a{color:#4ecdc4}</style></head>
 <body><h1>GodMode UI Not Available</h1>
 <p>The GodMode plugin is loaded but the UI assets haven't been built yet.</p>
-<p>Run: <code>pnpm godmode-ui:build</code></p>
+<p>Run: <code>pnpm build</code> in the plugin repo, then restart gateway.</p>
 <p>Then restart the gateway.</p>
 <p><a href="/godmode/health">Check plugin health →</a></p>
 </body></html>`);
@@ -571,7 +581,7 @@ h1{color:#ff6b6b}code{background:#16213e;padding:2px 8px;border-radius:4px}a{col
     if (godmodeUiRoot) {
       api.logger.info(`[GodMode] Serving UI at /godmode from ${godmodeUiRoot}`);
     } else {
-      api.logger.warn("[GodMode] No built UI found. Run 'pnpm godmode-ui:build' first.");
+      api.logger.warn("[GodMode] No built UI found. Run 'pnpm build' in the plugin repo.");
     }
 
     if (deckUiRoot) {
@@ -742,7 +752,7 @@ h1{color:#ff6b6b}code{background:#16213e;padding:2px 8px;border-radius:4px}a{col
             checks.push({
               name: "GodMode UI built",
               ok: !!godmodeUiRoot,
-              detail: godmodeUiRoot ?? "Not found — run: pnpm godmode-ui:build",
+              detail: godmodeUiRoot ?? "Not found — run: pnpm build (plugin repo)",
             });
 
             // 4. Deck assets

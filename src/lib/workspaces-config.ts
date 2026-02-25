@@ -5,6 +5,20 @@ import JSON5 from "json5";
 
 export type WorkspaceType = "personal" | "project" | "team";
 
+export type WorkspaceGitSyncConfig = {
+  type: "git";
+  remote?: string;
+  branch: string;
+  autoPull: {
+    enabled: boolean;
+    interval?: string;
+  };
+  autoPush: {
+    enabled: boolean;
+    debounceMs: number;
+  };
+};
+
 export type WorkspaceConfigEntry = {
   id: string;
   name: string;
@@ -16,6 +30,7 @@ export type WorkspaceConfigEntry = {
   pinnedSessions: string[];
   /** Directories (relative to path) scanned for artifacts. Defaults to ["outputs"]. */
   artifactDirs: string[];
+  sync?: WorkspaceGitSyncConfig;
 };
 
 export type WorkspaceConfigFile = {
@@ -137,6 +152,62 @@ function defaultEmoji(type: WorkspaceType): string {
   return "📁";
 }
 
+function normalizePositiveNumber(raw: unknown, fallback: number): number {
+  const value = typeof raw === "number" ? raw : Number(raw);
+  if (!Number.isFinite(value) || value <= 0) {
+    return fallback;
+  }
+  return value;
+}
+
+function normalizeWorkspaceSyncConfig(raw: unknown): WorkspaceGitSyncConfig | undefined {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+    return undefined;
+  }
+
+  const candidate = raw as Record<string, unknown>;
+  const syncType = typeof candidate.type === "string" ? candidate.type.trim().toLowerCase() : "";
+  if (syncType !== "git") {
+    return undefined;
+  }
+
+  const autoPullRaw =
+    candidate.autoPull && typeof candidate.autoPull === "object" && !Array.isArray(candidate.autoPull)
+      ? (candidate.autoPull as Record<string, unknown>)
+      : {};
+  const autoPushRaw =
+    candidate.autoPush && typeof candidate.autoPush === "object" && !Array.isArray(candidate.autoPush)
+      ? (candidate.autoPush as Record<string, unknown>)
+      : {};
+
+  const remote =
+    typeof candidate.remote === "string" && candidate.remote.trim()
+      ? candidate.remote.trim()
+      : undefined;
+  const branch =
+    typeof candidate.branch === "string" && candidate.branch.trim()
+      ? candidate.branch.trim()
+      : "main";
+  const autoPullInterval =
+    typeof autoPullRaw.interval === "string" && autoPullRaw.interval.trim()
+      ? autoPullRaw.interval.trim()
+      : undefined;
+
+  return {
+    type: "git",
+    remote,
+    branch,
+    autoPull: {
+      enabled: Boolean(autoPullRaw.enabled),
+      interval: autoPullInterval,
+    },
+    autoPush: {
+      enabled: Boolean(autoPushRaw.enabled),
+      debounceMs: normalizePositiveNumber(autoPushRaw.debounceMs, 15_000),
+    },
+  };
+}
+
 function normalizeWorkspaceEntry(
   raw: Record<string, unknown>,
   index: number,
@@ -185,6 +256,7 @@ function normalizeWorkspaceEntry(
     artifactDirs: dedupeNonEmpty(
       Array.isArray(raw.artifactDirs) ? (raw.artifactDirs as unknown[]) : ["outputs"],
     ),
+    sync: normalizeWorkspaceSyncConfig(raw.sync),
   };
 }
 
@@ -210,7 +282,7 @@ async function listSubdirectories(root: string): Promise<string[]> {
     return entries
       .filter((entry) => entry.isDirectory() && !entry.name.startsWith("."))
       .map((entry) => entry.name)
-      .toSorted((a, b) => a.localeCompare(b));
+      .sort((a: string, b: string) => a.localeCompare(b));
   } catch {
     return [];
   }
@@ -246,6 +318,7 @@ async function buildDefaultWorkspaceConfig(): Promise<WorkspaceConfigFile> {
     keywords: ["life", "personal", "health", "family"],
     pinned: [],
     pinnedSessions: [],
+    artifactDirs: ["outputs"],
   });
 
   const projectFolders = await listSubdirectories(projectsRoot);
@@ -264,6 +337,7 @@ async function buildDefaultWorkspaceConfig(): Promise<WorkspaceConfigFile> {
       keywords: inferKeywords(folder, id),
       pinned: [],
       pinnedSessions: [],
+      artifactDirs: ["outputs"],
     });
   }
 
@@ -283,6 +357,7 @@ async function buildDefaultWorkspaceConfig(): Promise<WorkspaceConfigFile> {
       keywords: inferKeywords(folder, id),
       pinned: [],
       pinnedSessions: [],
+      artifactDirs: ["outputs"],
     });
   }
 
