@@ -27,6 +27,7 @@ import {
   type WorkspaceType,
   writeWorkspaceConfig,
 } from "../lib/workspaces-config.js";
+import { readTasks, type NativeTask } from "./tasks.js";
 import type { GatewayRequestHandler } from "openclaw/plugin-sdk";
 
 type GatewayRequestHandlers = Record<string, GatewayRequestHandler>;
@@ -969,6 +970,12 @@ const get: GatewayRequestHandler = async ({ params, respond }) => {
     });
   }
 
+  // Load tasks scoped to this workspace (match on workspace name)
+  const tasksData = await readTasks();
+  const workspaceTasks: NativeTask[] = tasksData.tasks.filter(
+    (t) => t.project === workspace.name,
+  );
+
   respond(true, {
     workspace: {
       ...workspace,
@@ -985,6 +992,7 @@ const get: GatewayRequestHandler = async ({ params, respond }) => {
     outputs,
     folderTree: buildFolderTree(outputs),
     sessions,
+    tasks: workspaceTasks,
   });
 };
 

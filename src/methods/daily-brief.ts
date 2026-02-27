@@ -403,103 +403,101 @@ const captureEveningReview: GatewayRequestHandler = async ({ params, respond }) 
   }
 };
 
+// ── Brief item parsing helpers ─────────────────────────────────────
+
+type BriefItem = { title: string; completed: boolean };
+
 /**
- * dailyBrief.tasks — Syncs Win The Day items with the native task list.
- *
- * Reads the daily note's Win The Day section and syncs with tasks.json.
- * - New items from the note are added as tasks (source: "import")
- * - Tasks already in the task list are NOT overwritten (user edits preserved)
- * - Completed status syncs bidirectionally
+ * Parse Win The Day / Today's Mission checkbox items from a daily note.
+ * Returns the raw section content and parsed items.
  */
-const syncBriefTasks: GatewayRequestHandler = async ({ params, respond }) => {
-  const vaultPath = getVaultPath();
-  if (!vaultPath) {
-    respond(true, { synced: 0, message: "No Obsidian vault configured" });
-    return;
-  }
-
-  const { date } = params as { date?: string };
-  const briefDate = date || getTodayDate();
-  const filePath = join(vaultPath, getDailyFolder(), `${briefDate}.md`);
-
-  let content: string;
-  try {
-    content = await readFile(filePath, "utf-8");
-  } catch {
-    respond(true, { synced: 0, message: "No daily note found for this date" });
-    return;
-  }
-
-  // Parse Win The Day items from the daily note
+function parseWinTheDayItems(content: string): { sectionContent: string; items: BriefItem[] } | null {
   const missionMatch = content.match(
     /##\s*(?:\u{1F3AF}\s*)?(?:Win The Day|Today's Mission)([\s\S]*?)(?=^##\s|$)/mu,
   );
   if (!missionMatch) {
-    respond(true, { synced: 0, message: "No Win The Day section found" });
-    return;
+    return null;
   }
 
   const sectionContent = missionMatch[1];
-  type BriefItem = { title: string; completed: boolean };
-  const briefItems: BriefItem[] = [];
+  const items: BriefItem[] = [];
 
-  // Parse numbered items
+  // Parse numbered items: 1. [x] **Title**
   const numberedRegex = /^\d+\.\s*\[([ x])\]\s*\*\*(.+?)\*\*/gm;
   let match;
   while ((match = numberedRegex.exec(sectionContent)) !== null) {
-    briefItems.push({ title: match[2].trim(), completed: match[1] === "x" });
+    items.push({ title: match[2].trim(), completed: match[1] === "x" });
   }
 
-  // Fall back to bullet items
-  if (briefItems.length === 0) {
+  // Fall back to bullet items: - [x] **Title**
+  if (items.length === 0) {
     const bulletRegex = /^[-*]\s*\[([ x])\]\s*\*\*(.+?)\*\*/gm;
     while ((match = bulletRegex.exec(sectionContent)) !== null) {
-      briefItems.push({ title: match[2].trim(), completed: match[1] === "x" });
+      items.push({ title: match[2].trim(), completed: match[1] === "x" });
     }
   }
 
-  if (briefItems.length === 0) {
-    respond(true, { synced: 0, message: "No task items found in Win The Day section" });
-    return;
+  return { sectionContent, items };
+}
+
+/**
+ * Case-insensitive substring match for deduplicating tasks against brief items.
+ */
+function titlesMatch(taskTitle: string, briefTitle: string): boolean {
+  const a = taskTitle.toLowerCase().trim();
+  const b = briefTitle.toLowerCase().trim();
+  return a === b || a.includes(b) || b.includes(a);
+}
+
+// ── Exported sync functions (called from tasks.ts and RPC) ────────
+
+/**
+ * syncTasksFromBrief — Reads Win The Day items and creates/updates tasks.
+ *
+ * - New items from the note are added as tasks (source: "import")
+ * - Tasks already in the task list are NOT overwritten if user-edited
+ * - Completed status syncs from brief to tasks
+ */
+export async function syncTasksFromBrief(date: string): Promise<{
+  added: number;
+  updated: number;
+  total: number;
+}> {
+  const vaultPath = getVaultPath();
+  if (!vaultPath) {
+    return { added: 0, updated: 0, total: 0 };
   }
 
-  // Read existing tasks
-  const TASKS_FILE = join(DATA_DIR, "tasks.json");
-  type NativeTask = {
-    id: string;
-    title: string;
-    status: "pending" | "complete";
-    project: string | null;
-    dueDate: string | null;
-    priority: "high" | "medium" | "low";
-    createdAt: string;
-    completedAt: string | null;
-    carryOver: boolean;
-    source: "chat" | "cron" | "import";
-    userEdited?: boolean;
-  };
-  type TasksData = { tasks: NativeTask[]; updatedAt: string | null };
-
-  let tasksData: TasksData;
+  const filePath = join(vaultPath, getDailyFolder(), `${date}.md`);
+  let content: string;
   try {
-    const raw = await readFile(TASKS_FILE, "utf-8");
-    tasksData = JSON.parse(raw) as TasksData;
+    content = await readFile(filePath, "utf-8");
   } catch {
-    tasksData = { tasks: [], updatedAt: null };
+    return { added: 0, updated: 0, total: 0 };
   }
+
+  const parsed = parseWinTheDayItems(content);
+  if (!parsed || parsed.items.length === 0) {
+    return { added: 0, updated: 0, total: 0 };
+  }
+
+  // Use shared task reader from tasks.ts
+  const { readTasks, writeTasks } = await import("./tasks.js");
+  const tasksData = await readTasks();
 
   let added = 0;
   let updated = 0;
 
-  for (const item of briefItems) {
-    // Check if task already exists (match by title, case-insensitive)
+  for (const item of parsed.items) {
+    // Dedup by title similarity + same due date
     const existing = tasksData.tasks.find(
-      (t) => t.title.toLowerCase() === item.title.toLowerCase() && t.dueDate === briefDate,
+      (t) => titlesMatch(t.title, item.title) && t.dueDate === date,
     );
 
     if (existing) {
       // Only update completion status if user hasn't manually edited
-      if (!existing.userEdited && item.completed && existing.status !== "complete") {
+      const userEdited = (existing as Record<string, unknown>).userEdited;
+      if (!userEdited && item.completed && existing.status !== "complete") {
         existing.status = "complete";
         existing.completedAt = new Date().toISOString();
         updated++;
@@ -512,31 +510,142 @@ const syncBriefTasks: GatewayRequestHandler = async ({ params, respond }) => {
         title: item.title,
         status: item.completed ? "complete" : "pending",
         project: null,
-        dueDate: briefDate,
+        dueDate: date,
         priority: "high",
         createdAt: new Date().toISOString(),
         completedAt: item.completed ? new Date().toISOString() : null,
         carryOver: false,
         source: "import",
+        sessionId: null,
       });
       added++;
     }
   }
 
   if (added > 0 || updated > 0) {
-    const { mkdir: mkdirAsync } = await import("node:fs/promises");
-    const { dirname: dirnameHelper } = await import("node:path");
-    await mkdirAsync(dirnameHelper(TASKS_FILE), { recursive: true });
-    tasksData.updatedAt = new Date().toISOString();
-    await writeFile(TASKS_FILE, JSON.stringify(tasksData, null, 2), "utf-8");
+    await writeTasks(tasksData);
+  }
+
+  return { added, updated, total: parsed.items.length };
+}
+
+/**
+ * syncBriefFromTasks — Updates the Win The Day section in the daily note
+ * to reflect current task completion state.
+ *
+ * Preserves all non-task content in the section. Only updates checkbox
+ * state for items that match existing tasks.
+ */
+export async function syncBriefFromTasks(date: string): Promise<{
+  updated: number;
+}> {
+  const vaultPath = getVaultPath();
+  if (!vaultPath) {
+    return { updated: 0 };
+  }
+
+  const filePath = join(vaultPath, getDailyFolder(), `${date}.md`);
+  let content: string;
+  try {
+    content = await readFile(filePath, "utf-8");
+  } catch {
+    return { updated: 0 };
+  }
+
+  // Get today's tasks
+  const { readTasks } = await import("./tasks.js");
+  const tasksData = await readTasks();
+  const todayTasks = tasksData.tasks.filter(
+    (t) => t.dueDate === date || (t.dueDate != null && t.dueDate <= date && t.status === "pending"),
+  );
+
+  if (todayTasks.length === 0) {
+    return { updated: 0 };
+  }
+
+  let updatedCount = 0;
+  let updatedContent = content;
+
+  // Update checkbox state for matching items in the markdown
+  // Match both numbered and bullet checkbox items
+  const checkboxRegex = /^(\s*(?:\d+\.|-|\*)\s*)\[([ x])\](\s*\*\*(.+?)\*\*)/gm;
+  updatedContent = updatedContent.replace(checkboxRegex, (fullMatch, prefix, currentCheck, rest, title) => {
+    const matchingTask = todayTasks.find((t) => titlesMatch(t.title, title.trim()));
+    if (!matchingTask) {
+      return fullMatch;
+    }
+
+    const shouldBeChecked = matchingTask.status === "complete";
+    const isChecked = currentCheck === "x";
+
+    if (shouldBeChecked !== isChecked) {
+      updatedCount++;
+      return `${prefix}[${shouldBeChecked ? "x" : " "}]${rest}`;
+    }
+    return fullMatch;
+  });
+
+  if (updatedCount > 0) {
+    await writeFile(filePath, updatedContent, "utf-8");
+  }
+
+  return { updated: updatedCount };
+}
+
+/**
+ * dailyBrief.tasks — Syncs Win The Day items with the native task list.
+ * (Legacy handler, delegates to syncTasksFromBrief.)
+ */
+const syncBriefTasks: GatewayRequestHandler = async ({ params, respond }) => {
+  const { date } = params as { date?: string };
+  const briefDate = date || getTodayDate();
+  const result = await syncTasksFromBrief(briefDate);
+
+  if (result.total === 0) {
+    const vaultPath = getVaultPath();
+    if (!vaultPath) {
+      respond(true, { synced: 0, message: "No Obsidian vault configured" });
+      return;
+    }
+    respond(true, { synced: 0, message: "No task items found in Win The Day section" });
+    return;
   }
 
   respond(true, {
-    synced: added + updated,
-    added,
-    updated,
-    total: briefItems.length,
-    message: `Synced ${added + updated} tasks (${added} new, ${updated} updated)`,
+    synced: result.added + result.updated,
+    added: result.added,
+    updated: result.updated,
+    total: result.total,
+    message: `Synced ${result.added + result.updated} tasks (${result.added} new, ${result.updated} updated)`,
+  });
+};
+
+/**
+ * dailyBrief.syncTasks — Bidirectional sync between tasks and daily brief.
+ *
+ * Calls syncTasksFromBrief (brief -> tasks) then syncBriefFromTasks
+ * (tasks -> brief) for the given date.
+ */
+const syncTasksBidirectional: GatewayRequestHandler = async ({ params, respond }) => {
+  const { date } = params as { date?: string };
+  const briefDate = date || getTodayDate();
+
+  // Phase 1: Brief -> Tasks (import new items, update completion)
+  const fromBrief = await syncTasksFromBrief(briefDate);
+
+  // Phase 2: Tasks -> Brief (write task completion back to markdown)
+  const toBrief = await syncBriefFromTasks(briefDate);
+
+  respond(true, {
+    fromBrief: {
+      added: fromBrief.added,
+      updated: fromBrief.updated,
+      total: fromBrief.total,
+    },
+    toBrief: {
+      updated: toBrief.updated,
+    },
+    message: `Brief->Tasks: ${fromBrief.added} added, ${fromBrief.updated} updated. Tasks->Brief: ${toBrief.updated} checkboxes updated.`,
   });
 };
 
@@ -545,5 +654,6 @@ export const dailyBriefHandlers: GatewayRequestHandlers = {
   "dailyBrief.update": updateDailyBrief,
   "dailyBrief.eveningCapture": captureEveningReview,
   "dailyBrief.tasks": syncBriefTasks,
+  "dailyBrief.syncTasks": syncTasksBidirectional,
   "eveningReview.capture": captureEveningReview,
 };
