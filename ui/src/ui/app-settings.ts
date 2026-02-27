@@ -237,6 +237,12 @@ export async function refreshActiveTab(host: SettingsHost) {
   }
   if (host.tab === "workspaces") {
     await loadWorkspaces(host as unknown as GodModeApp);
+    // Load all tasks for the workspaces landing page
+    import("./controllers/workspaces").then(async ({ loadAllTasks }) => {
+      (host as unknown as GodModeApp).allTasks = await loadAllTasks(
+        host as unknown as GodModeApp,
+      );
+    });
   }
   if (host.tab === "wheel-of-life") {
     await loadWheelOfLife(host as unknown as GodModeApp);

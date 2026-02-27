@@ -1095,6 +1095,50 @@ export function renderApp(state: AppViewState) {
                     void startTeamSetup(state);
                   });
                 },
+                allTasks: state.allTasks ?? [],
+                taskFilter: state.taskFilter ?? "all",
+                showCompletedTasks: state.showCompletedTasks ?? false,
+                onToggleTaskComplete: async (taskId, currentStatus) => {
+                  const { toggleTaskComplete, loadAllTasks, getWorkspace } =
+                    await import("./controllers/workspaces");
+                  const result = await toggleTaskComplete(state, taskId, currentStatus);
+                  if (!result) {
+                    state.showToast("Failed to update task", "error");
+                    return;
+                  }
+                  // Refresh tasks
+                  state.allTasks = await loadAllTasks(state);
+                  if (state.selectedWorkspace) {
+                    const refreshed = await getWorkspace(state, state.selectedWorkspace.id);
+                    if (refreshed) {
+                      state.selectedWorkspace = refreshed;
+                    }
+                  }
+                },
+                onCreateTask: async (title, project) => {
+                  const { createTask, loadAllTasks, getWorkspace } =
+                    await import("./controllers/workspaces");
+                  const result = await createTask(state, title, project);
+                  if (!result) {
+                    state.showToast("Failed to create task", "error");
+                    return;
+                  }
+                  state.showToast(`Task created: ${result.title}`, "success");
+                  // Refresh tasks
+                  state.allTasks = await loadAllTasks(state);
+                  if (state.selectedWorkspace) {
+                    const refreshed = await getWorkspace(state, state.selectedWorkspace.id);
+                    if (refreshed) {
+                      state.selectedWorkspace = refreshed;
+                    }
+                  }
+                },
+                onSetTaskFilter: (filter) => {
+                  state.taskFilter = filter;
+                },
+                onToggleCompletedTasks: () => {
+                  state.showCompletedTasks = !(state.showCompletedTasks ?? false);
+                },
               })
             : nothing
         }

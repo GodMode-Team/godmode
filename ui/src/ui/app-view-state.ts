@@ -35,7 +35,7 @@ import type { Agent, FeedItem, NativeTask } from "./views/mission-types";
 import type { AgentLogData, DailyBriefData } from "./views/my-day";
 import type { Person } from "./views/people";
 import type { Project } from "./views/work";
-import type { WorkspaceDetail, WorkspaceSummary } from "./views/workspaces";
+import type { TaskFilter, WorkspaceDetail, WorkspaceSummary, WorkspaceTask } from "./views/workspaces";
 
 export type AppViewState = {
   settings: UiSettings;
@@ -210,6 +210,9 @@ export type AppViewState = {
   workspacesLoading?: boolean;
   workspacesCreateLoading?: boolean;
   workspacesError?: string | null;
+  allTasks?: WorkspaceTask[];
+  taskFilter?: TaskFilter;
+  showCompletedTasks?: boolean;
   // My Day state
   myDayLoading?: boolean;
   myDayError?: string | null;

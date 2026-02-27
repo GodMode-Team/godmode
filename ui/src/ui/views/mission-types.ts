@@ -53,6 +53,8 @@ export type NativeTask = {
   createdAt: string;
   completedAt?: string;
   source: "chat" | "cron" | "import";
+  /** Linked chat session key — set when user opens a session for a task */
+  sessionId?: string | null;
 };
 
 export type FeedItem = {

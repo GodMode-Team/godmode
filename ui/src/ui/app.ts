@@ -133,7 +133,7 @@ import type { ToolExecutionInfo } from "./types/chat-types";
 import { type ChatAttachment, type ChatQueueItem, type CronFormState } from "./ui-types";
 import type { NostrProfileFormState } from "./views/channels.nostr-profile-form";
 import type { LifetracksConfig } from "./views/lifetracks";
-import type { WorkspaceDetail, WorkspaceSummary } from "./views/workspaces";
+import type { TaskFilter, WorkspaceDetail, WorkspaceSummary, WorkspaceTask } from "./views/workspaces";
 
 declare global {
   interface Window {
@@ -379,6 +379,9 @@ export class GodModeApp extends LitElement {
   @state() workspacesLoading = false;
   @state() workspacesCreateLoading = false;
   @state() workspacesError: string | null = null;
+  @state() allTasks?: WorkspaceTask[];
+  @state() taskFilter?: TaskFilter;
+  @state() showCompletedTasks?: boolean;
 
   // My Day state
   @state() myDayLoading = false;
@@ -1404,6 +1407,83 @@ export class GodModeApp extends LitElement {
 
   async handleMissionTaskComplete(taskId: string) {
     await handleMissionTaskCompleteInternal(this, taskId);
+  }
+
+  handleMissionTaskClick(task: import("./views/mission-types").NativeTask) {
+    this.openSessionForTask(task);
+  }
+
+  /**
+   * Opens (or navigates to) a chat session linked to a task.
+   * Calls tasks.openSession to get/create a session key, then
+   * switches to that session in the chat tab with a contextual prompt.
+   */
+  private async openSessionForTask(task: import("./views/mission-types").NativeTask) {
+    if (!this.client || !this.connected) {
+      this.showToast("Not connected to gateway", "error");
+      return;
+    }
+
+    try {
+      const result = await this.client.request<{
+        sessionId: string;
+        created: boolean;
+        task: import("./views/mission-types").NativeTask;
+      }>("tasks.openSession", { taskId: task.id });
+
+      if (!result.sessionId) {
+        this.showToast("Failed to open session for task", "error");
+        return;
+      }
+
+      // Navigate to the session
+      const { saveDraft } = await import("./app-chat.js");
+      const { syncUrlWithSessionKey } = await import("./app-settings.js");
+      const { loadChatHistory } = await import("./controllers/chat.js");
+
+      saveDraft(this);
+
+      // Add to open tabs if not already there
+      const openTabs = this.settings.openTabs.includes(result.sessionId)
+        ? this.settings.openTabs
+        : [...this.settings.openTabs, result.sessionId];
+
+      this.applySettings({
+        ...this.settings,
+        openTabs,
+        sessionKey: result.sessionId,
+        lastActiveSessionKey: result.sessionId,
+        tabLastViewed: {
+          ...this.settings.tabLastViewed,
+          [result.sessionId]: Date.now(),
+        },
+      });
+
+      this.sessionKey = result.sessionId;
+      this.setTab("chat" as import("./navigation").Tab);
+
+      // If this is a new session, pre-fill with a task context prompt
+      if (result.created) {
+        const projectCtx = task.project ? ` (project: ${task.project})` : "";
+        this.chatMessage = `Let's work on: ${task.title}${projectCtx}`;
+      } else {
+        this.chatMessage = "";
+      }
+
+      this.chatMessages = [];
+      this.chatStream = null;
+      this.chatStreamStartedAt = null;
+      this.chatRunId = null;
+      this.resetToolStream();
+      this.resetChatScroll();
+      void this.loadAssistantIdentity();
+      syncUrlWithSessionKey(this, result.sessionId, true);
+      void loadChatHistory(this);
+      this.requestUpdate();
+    } catch (err) {
+      console.error("[Mission] Failed to open session for task:", err);
+      this.showToast("Failed to open session for task", "error");
+    }
   }
 
   handleMissionOpenDeck() {

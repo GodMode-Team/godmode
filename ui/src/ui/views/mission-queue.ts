@@ -16,6 +16,7 @@ export type MissionCenterProps = {
   error?: string | null;
   onRefresh?: () => void;
   onTaskComplete?: (taskId: string) => void;
+  onTaskClick?: (task: NativeTask) => void;
   onOpenDeck?: () => void;
 };
 
@@ -183,11 +184,16 @@ export function renderMissionCenter(props: MissionCenterProps) {
                   (task) => html`
                 <div class="mc-task-card">
                   <div class="mc-task-main">
-                    <div class="mc-task-title">${task.title}</div>
+                    <button
+                      class="mc-task-title mc-task-title--clickable"
+                      title="Open session for this task"
+                      @click=${() => props.onTaskClick?.(task)}
+                    >${task.title}</button>
                     <div class="mc-task-meta">
                       ${priorityBadge(task.priority)}
                       ${task.project ? html`<span class="mc-task-project">${task.project}</span>` : nothing}
                       ${task.dueDate ? html`<span class="mc-task-due">${task.dueDate}</span>` : nothing}
+                      ${task.sessionId ? html`<span class="mc-task-linked">linked</span>` : nothing}
                     </div>
                   </div>
                   ${

@@ -1,6 +1,17 @@
 import { html, nothing } from "lit";
 import { formatAgo } from "../format";
 
+export type WorkspaceTask = {
+  id: string;
+  title: string;
+  status: "pending" | "complete";
+  project: string | null;
+  dueDate: string | null;
+  priority: "high" | "medium" | "low";
+  createdAt: string;
+  completedAt: string | null;
+};
+
 export type WorkspaceSummary = {
   id: string;
   name: string;
@@ -47,6 +58,7 @@ export type WorkspaceDetail = WorkspaceSummary & {
   outputs: WorkspaceFileEntry[];
   folderTree?: FolderTreeNode[];
   sessions: WorkspaceSessionEntry[];
+  tasks: WorkspaceTask[];
 };
 
 export type WorkspaceCreateRequest = {
@@ -54,6 +66,8 @@ export type WorkspaceCreateRequest = {
   type: "personal" | "project" | "team";
   path?: string;
 };
+
+export type TaskFilter = "all" | "outstanding" | "complete";
 
 export type WorkspacesProps = {
   connected: boolean;
@@ -65,6 +79,9 @@ export type WorkspacesProps = {
   loading?: boolean;
   createLoading?: boolean;
   error?: string | null;
+  allTasks?: WorkspaceTask[];
+  taskFilter?: TaskFilter;
+  showCompletedTasks?: boolean;
   onSearch?: (query: string) => void;
   onItemSearch?: (query: string) => void;
   onSelectWorkspace?: (workspace: WorkspaceSummary) => void;
@@ -76,6 +93,10 @@ export type WorkspacesProps = {
   onCreateWorkspace?: (input: WorkspaceCreateRequest) => Promise<boolean | void> | boolean | void;
   onToggleFolder?: (folderPath: string) => void;
   onTeamSetup?: () => void;
+  onToggleTaskComplete?: (taskId: string, currentStatus: string) => void;
+  onCreateTask?: (title: string, project: string) => void;
+  onSetTaskFilter?: (filter: TaskFilter) => void;
+  onToggleCompletedTasks?: () => void;
 };
 
 function formatFileSize(size: number): string {
@@ -116,6 +137,92 @@ function statusDotClass(status: WorkspaceSessionEntry["status"]): string {
     return "ws-session-dot ws-session-dot--blocked";
   }
   return "ws-session-dot ws-session-dot--complete";
+}
+
+function priorityBadgeClass(priority: WorkspaceTask["priority"]): string {
+  return `ws-task-priority ws-task-priority--${priority}`;
+}
+
+function priorityLabel(priority: WorkspaceTask["priority"]): string {
+  if (priority === "high") return "High";
+  if (priority === "low") return "Low";
+  return "Med";
+}
+
+function formatDueDate(dueDate: string | null): string {
+  if (!dueDate) return "";
+  const today = new Date().toISOString().slice(0, 10);
+  if (dueDate === today) return "Today";
+  if (dueDate < today) return `Overdue (${dueDate})`;
+  return dueDate;
+}
+
+function dueDateClass(dueDate: string | null): string {
+  if (!dueDate) return "ws-task-due";
+  const today = new Date().toISOString().slice(0, 10);
+  if (dueDate < today) return "ws-task-due ws-task-due--overdue";
+  if (dueDate === today) return "ws-task-due ws-task-due--today";
+  return "ws-task-due";
+}
+
+function sortTasks(tasks: WorkspaceTask[]): WorkspaceTask[] {
+  return [...tasks].sort((a, b) => {
+    const priorityOrder = { high: 0, medium: 1, low: 2 };
+    // Due date first (soonest first, null last)
+    if (a.dueDate && b.dueDate) {
+      const cmp = a.dueDate.localeCompare(b.dueDate);
+      if (cmp !== 0) return cmp;
+    } else if (a.dueDate && !b.dueDate) {
+      return -1;
+    } else if (!a.dueDate && b.dueDate) {
+      return 1;
+    }
+    // Then priority
+    return priorityOrder[a.priority] - priorityOrder[b.priority];
+  });
+}
+
+function renderTaskRow(
+  task: WorkspaceTask,
+  onToggle?: (taskId: string, currentStatus: string) => void,
+): ReturnType<typeof html> {
+  const isComplete = task.status === "complete";
+  return html`
+    <div class="ws-list-row ws-task-row ${isComplete ? "ws-task-row--complete" : ""}">
+      <button
+        class="ws-task-check ${isComplete ? "ws-task-check--done" : ""}"
+        @click=${() => onToggle?.(task.id, task.status)}
+        title=${isComplete ? "Mark incomplete" : "Mark complete"}
+      >
+        ${isComplete ? "&#10003;" : ""}
+      </button>
+      <span class="ws-list-title ${isComplete ? "ws-task-title--done" : ""}">${task.title}</span>
+      <span class=${priorityBadgeClass(task.priority)}>${priorityLabel(task.priority)}</span>
+      ${task.dueDate ? html`<span class=${dueDateClass(task.dueDate)}>${formatDueDate(task.dueDate)}</span>` : nothing}
+    </div>
+  `;
+}
+
+function renderAllTaskRow(
+  task: WorkspaceTask,
+  onToggle?: (taskId: string, currentStatus: string) => void,
+): ReturnType<typeof html> {
+  const isComplete = task.status === "complete";
+  return html`
+    <div class="ws-list-row ws-task-row ${isComplete ? "ws-task-row--complete" : ""}">
+      <button
+        class="ws-task-check ${isComplete ? "ws-task-check--done" : ""}"
+        @click=${() => onToggle?.(task.id, task.status)}
+        title=${isComplete ? "Mark incomplete" : "Mark complete"}
+      >
+        ${isComplete ? "&#10003;" : ""}
+      </button>
+      <span class="ws-list-title ${isComplete ? "ws-task-title--done" : ""}">${task.title}</span>
+      ${task.project ? html`<span class="ws-task-project">${task.project}</span>` : nothing}
+      <span class=${priorityBadgeClass(task.priority)}>${priorityLabel(task.priority)}</span>
+      ${task.dueDate ? html`<span class=${dueDateClass(task.dueDate)}>${formatDueDate(task.dueDate)}</span>` : nothing}
+    </div>
+  `;
 }
 
 function matchesQuery(query: string, value: string): boolean {
@@ -172,54 +279,85 @@ function filterFolderTree(query: string, nodes: FolderTreeNode[]): FolderTreeNod
   }, []);
 }
 
+/** Count all file nodes (non-folder) in a tree, recursively. */
+function countFilesInTree(nodes: FolderTreeNode[]): number {
+  let count = 0;
+  for (const node of nodes) {
+    if (node.type === "file") {
+      count++;
+    } else if (node.children) {
+      count += countFilesInTree(node.children);
+    }
+  }
+  return count;
+}
+
+type FolderNodeContext = {
+  expandedFolders: Set<string>;
+  pinnedPaths: Set<string>;
+  workspaceId: string;
+  onToggleFolder?: (path: string) => void;
+  onItemClick?: (item: WorkspaceFileEntry) => void;
+  onPinToggle?: (workspaceId: string, filePath: string, pinned: boolean) => void;
+};
+
 function renderFolderNode(
   node: FolderTreeNode,
   depth: number,
-  expandedFolders: Set<string>,
-  onToggleFolder?: (path: string) => void,
-  onItemClick?: (item: WorkspaceFileEntry) => void,
+  ctx: FolderNodeContext,
 ): ReturnType<typeof html> {
   if (node.type === "file") {
+    const isPinned = ctx.pinnedPaths.has(node.path);
     return html`
-      <button
-        class="ws-folder-file"
-        style="padding-left: ${12 + depth * 16}px"
-        @click=${() =>
-          onItemClick?.({
-            path: node.path,
-            name: node.name,
-            type: node.fileType ?? "text",
-            size: node.size ?? 0,
-            modified: node.modified ?? new Date(),
-          })}
-      >
-        <span class="ws-list-icon">${fileIcon(node.fileType ?? "text")}</span>
-        <span class="ws-list-title">${node.name}</span>
-        ${node.size != null ? html`<span class="ws-list-meta">${formatFileSize(node.size)}</span>` : nothing}
-      </button>
+      <div class="ws-folder-file-row" style="padding-left: ${12 + depth * 16}px">
+        <button
+          class="ws-folder-file"
+          @click=${() =>
+            ctx.onItemClick?.({
+              path: node.path,
+              name: node.name,
+              type: node.fileType ?? "text",
+              size: node.size ?? 0,
+              modified: node.modified ?? new Date(),
+            })}
+        >
+          <span class="ws-list-icon">${fileIcon(node.fileType ?? "text")}</span>
+          <span class="ws-list-title">${node.name}</span>
+          ${node.size != null ? html`<span class="ws-list-meta">${formatFileSize(node.size)}</span>` : nothing}
+          ${node.modified ? html`<span class="ws-list-meta">${formatAgo(node.modified.getTime())}</span>` : nothing}
+        </button>
+        <button
+          class="ws-pin-btn ${isPinned ? "active" : ""}"
+          @click=${() => ctx.onPinToggle?.(ctx.workspaceId, node.path, isPinned)}
+          title=${isPinned ? "Unpin" : "Pin"}
+        >
+          ${isPinned ? "Unpin" : "Pin"}
+        </button>
+      </div>
     `;
   }
 
-  const isExpanded = expandedFolders.has(node.path);
+  const isExpanded = ctx.expandedFolders.has(node.path);
   const children = node.children ?? [];
+  const fileCount = countFilesInTree(children);
 
   return html`
     <div class="ws-folder-node">
       <button
         class="ws-folder-header"
         style="padding-left: ${12 + depth * 16}px"
-        @click=${() => onToggleFolder?.(node.path)}
+        @click=${() => ctx.onToggleFolder?.(node.path)}
       >
         <span class="ws-folder-chevron ${isExpanded ? "expanded" : ""}">&#9654;</span>
         <span class="ws-list-icon">&#128193;</span>
         <span class="ws-folder-name">${node.name}</span>
-        <span class="ws-list-meta">${children.length}</span>
+        <span class="ws-folder-count">${fileCount} ${fileCount === 1 ? "file" : "files"}</span>
       </button>
       ${isExpanded
         ? html`
             <div class="ws-folder-children">
               ${children.map((child) =>
-                renderFolderNode(child, depth + 1, expandedFolders, onToggleFolder, onItemClick),
+                renderFolderNode(child, depth + 1, ctx),
               )}
             </div>
           `
@@ -284,6 +422,7 @@ function renderWorkspaceDetail(props: {
   workspace: WorkspaceDetail;
   itemSearchQuery: string;
   expandedFolders?: Set<string>;
+  showCompletedTasks?: boolean;
   onItemSearch?: (query: string) => void;
   onBack?: () => void;
   onItemClick?: (item: WorkspaceFileEntry) => void;
@@ -291,11 +430,15 @@ function renderWorkspaceDetail(props: {
   onPinToggle?: (workspaceId: string, filePath: string, pinned: boolean) => void;
   onPinSessionToggle?: (workspaceId: string, sessionKey: string, pinned: boolean) => void;
   onToggleFolder?: (folderPath: string) => void;
+  onToggleTaskComplete?: (taskId: string, currentStatus: string) => void;
+  onCreateTask?: (title: string, project: string) => void;
+  onToggleCompletedTasks?: () => void;
 }) {
   const {
     workspace,
     itemSearchQuery,
     expandedFolders = new Set<string>(),
+    showCompletedTasks = false,
     onItemSearch,
     onBack,
     onItemClick,
@@ -303,6 +446,9 @@ function renderWorkspaceDetail(props: {
     onPinToggle,
     onPinSessionToggle,
     onToggleFolder,
+    onToggleTaskComplete,
+    onCreateTask,
+    onToggleCompletedTasks,
   } = props;
 
   const filteredPinned = filterFiles(itemSearchQuery, workspace.pinned).toSorted(
@@ -318,10 +464,21 @@ function renderWorkspaceDetail(props: {
     : [];
   const filteredSessions = filterSessions(itemSearchQuery, workspace.sessions);
   const pinnedSessionKeys = new Set(workspace.pinnedSessions.map((s) => s.key));
+  const pinnedFilePaths = new Set(workspace.pinned.map((f) => f.path));
   const hasItemSearch = itemSearchQuery.trim().length > 0;
   const showPinnedSection = filteredPinned.length > 0 || filteredPinnedSessions.length > 0;
   const showSessionsSection =
     filteredSessions.length > 0 || workspace.sessions.length === 0 || hasItemSearch;
+
+  // Context for folder tree nodes: shared pin state and callbacks
+  const folderCtx: FolderNodeContext = {
+    expandedFolders,
+    pinnedPaths: pinnedFilePaths,
+    workspaceId: workspace.id,
+    onToggleFolder,
+    onItemClick,
+    onPinToggle,
+  };
 
   return html`
     <div class="workspaces-container">
@@ -399,7 +556,7 @@ function renderWorkspaceDetail(props: {
                 ? filteredFolderTree.length === 0
                   ? html`<div class="ws-empty">No artifacts</div>`
                   : filteredFolderTree.map((node) =>
-                      renderFolderNode(node, 0, expandedFolders, onToggleFolder, onItemClick),
+                      renderFolderNode(node, 0, folderCtx),
                     )
                 : filteredArtifacts.length === 0
                   ? html`<div class="ws-empty">No artifacts</div>`
@@ -454,8 +611,76 @@ function renderWorkspaceDetail(props: {
               `
             : nothing
         }
+
+        ${renderWorkspaceTasksSection({
+          tasks: workspace.tasks ?? [],
+          workspaceName: workspace.name,
+          showCompleted: showCompletedTasks,
+          onToggleTaskComplete,
+          onCreateTask,
+          onToggleCompletedTasks,
+        })}
       </div>
     </div>
+  `;
+}
+
+function renderWorkspaceTasksSection(props: {
+  tasks: WorkspaceTask[];
+  workspaceName: string;
+  showCompleted: boolean;
+  onToggleTaskComplete?: (taskId: string, currentStatus: string) => void;
+  onCreateTask?: (title: string, project: string) => void;
+  onToggleCompletedTasks?: () => void;
+}): ReturnType<typeof html> {
+  const { tasks, workspaceName, showCompleted, onToggleTaskComplete, onCreateTask, onToggleCompletedTasks } = props;
+  const pending = sortTasks(tasks.filter((t) => t.status === "pending"));
+  const completed = sortTasks(tasks.filter((t) => t.status === "complete"));
+
+  return html`
+    <section class="ws-section">
+      <div class="ws-section__header">
+        <h3>Tasks</h3>
+        <span>${pending.length} open${completed.length > 0 ? `, ${completed.length} done` : ""}</span>
+      </div>
+      <div class="ws-list ws-list--scroll">
+        ${pending.length === 0 && completed.length === 0
+          ? html`<div class="ws-empty">No tasks</div>`
+          : nothing}
+        ${pending.map((task) => renderTaskRow(task, onToggleTaskComplete))}
+        ${completed.length > 0
+          ? html`
+              <button class="ws-task-completed-toggle" @click=${() => onToggleCompletedTasks?.()}>
+                ${showCompleted ? "Hide" : "Show"} ${completed.length} completed
+              </button>
+              ${showCompleted ? completed.map((task) => renderTaskRow(task, onToggleTaskComplete)) : nothing}
+            `
+          : nothing}
+      </div>
+      ${onCreateTask
+        ? html`
+            <form
+              class="ws-task-create-form"
+              @submit=${(e: Event) => {
+                e.preventDefault();
+                const form = e.currentTarget as HTMLFormElement;
+                const input = form.querySelector("input") as HTMLInputElement;
+                const title = input.value.trim();
+                if (!title) return;
+                onCreateTask(title, workspaceName);
+                input.value = "";
+              }}
+            >
+              <input
+                type="text"
+                class="ws-task-create-input"
+                placeholder="Add a task..."
+              />
+              <button type="submit" class="ws-task-create-btn">Add</button>
+            </form>
+          `
+        : nothing}
+    </section>
   `;
 }
 
@@ -470,6 +695,9 @@ export function renderWorkspaces(props: WorkspacesProps) {
     loading,
     createLoading,
     error,
+    allTasks = [],
+    taskFilter = "all",
+    showCompletedTasks = false,
     onSearch,
     onItemSearch,
     onSelectWorkspace,
@@ -481,6 +709,10 @@ export function renderWorkspaces(props: WorkspacesProps) {
     onCreateWorkspace,
     onToggleFolder,
     onTeamSetup,
+    onToggleTaskComplete,
+    onCreateTask,
+    onSetTaskFilter,
+    onToggleCompletedTasks,
   } = props;
 
   const filteredWorkspaces = workspaces.filter((workspace) =>
@@ -492,6 +724,7 @@ export function renderWorkspaces(props: WorkspacesProps) {
       workspace: selectedWorkspace,
       itemSearchQuery: itemSearchQuery ?? "",
       expandedFolders,
+      showCompletedTasks,
       onItemSearch,
       onBack,
       onItemClick,
@@ -499,6 +732,9 @@ export function renderWorkspaces(props: WorkspacesProps) {
       onPinToggle,
       onPinSessionToggle,
       onToggleFolder,
+      onToggleTaskComplete,
+      onCreateTask,
+      onToggleCompletedTasks,
     });
   }
 
@@ -623,8 +859,67 @@ export function renderWorkspaces(props: WorkspacesProps) {
                       )
                 }
               </div>
+
+              ${renderAllTasksSection({
+                tasks: allTasks,
+                taskFilter,
+                onToggleTaskComplete,
+                onSetTaskFilter,
+              })}
             `
       }
+    </div>
+  `;
+}
+
+function renderAllTasksSection(props: {
+  tasks: WorkspaceTask[];
+  taskFilter: TaskFilter;
+  onToggleTaskComplete?: (taskId: string, currentStatus: string) => void;
+  onSetTaskFilter?: (filter: TaskFilter) => void;
+}): ReturnType<typeof html> {
+  const { tasks, taskFilter, onToggleTaskComplete, onSetTaskFilter } = props;
+
+  if (tasks.length === 0) {
+    return html``;
+  }
+
+  let filtered: WorkspaceTask[];
+  if (taskFilter === "outstanding") {
+    filtered = tasks.filter((t) => t.status === "pending");
+  } else if (taskFilter === "complete") {
+    filtered = tasks.filter((t) => t.status === "complete");
+  } else {
+    filtered = tasks;
+  }
+  const sorted = sortTasks(filtered);
+
+  return html`
+    <div class="ws-all-tasks-section">
+      <section class="ws-section">
+        <div class="ws-section__header">
+          <h3>All Tasks</h3>
+          <div class="ws-task-filters">
+            <button
+              class="ws-task-filter-btn ${taskFilter === "all" ? "active" : ""}"
+              @click=${() => onSetTaskFilter?.("all")}
+            >All</button>
+            <button
+              class="ws-task-filter-btn ${taskFilter === "outstanding" ? "active" : ""}"
+              @click=${() => onSetTaskFilter?.("outstanding")}
+            >Outstanding</button>
+            <button
+              class="ws-task-filter-btn ${taskFilter === "complete" ? "active" : ""}"
+              @click=${() => onSetTaskFilter?.("complete")}
+            >Complete</button>
+          </div>
+        </div>
+        <div class="ws-list ws-list--scroll">
+          ${sorted.length === 0
+            ? html`<div class="ws-empty">No tasks</div>`
+            : sorted.map((task) => renderAllTaskRow(task, onToggleTaskComplete))}
+        </div>
+      </section>
     </div>
   `;
 }

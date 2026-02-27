@@ -51,6 +51,7 @@ function makeWorkspaceDetail(overrides: Partial<WorkspaceDetail> = {}): Workspac
     pinnedSessions: [],
     outputs: [],
     sessions: [],
+    tasks: [],
     ...overrides,
   };
 }

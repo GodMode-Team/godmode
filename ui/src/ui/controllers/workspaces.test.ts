@@ -62,6 +62,7 @@ function makeDetail(id = "godmode"): WorkspaceDetail {
     pinnedSessions: [],
     outputs: [],
     sessions: [],
+    tasks: [],
   };
 }
 

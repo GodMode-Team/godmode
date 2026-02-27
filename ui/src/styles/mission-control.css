@@ -1100,6 +1100,34 @@
   line-height: 1.3;
 }
 
+.mc-task-title--clickable {
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  display: block;
+  width: 100%;
+}
+
+.mc-task-title--clickable:hover {
+  color: var(--mc-accent, #67e8f9);
+  text-decoration: underline;
+}
+
+.mc-task-linked {
+  font-size: 9px;
+  padding: 1px 5px;
+  border-radius: 8px;
+  background: var(--mc-card-border, rgba(255, 255, 255, 0.08));
+  color: var(--mc-text-muted, #888);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
 .mc-task-meta {
   display: flex;
   align-items: center;

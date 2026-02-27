@@ -10,6 +10,7 @@ import type {
   WorkspaceFileEntry,
   WorkspaceSessionEntry,
   WorkspaceSummary,
+  WorkspaceTask,
 } from "../views/workspaces";
 
 export type WorkspacesState = {
@@ -69,6 +70,17 @@ type GatewayFolderTreeNode = {
   children?: GatewayFolderTreeNode[];
 };
 
+type GatewayTask = {
+  id: string;
+  title: string;
+  status: "pending" | "complete";
+  project: string | null;
+  dueDate: string | null;
+  priority: "high" | "medium" | "low";
+  createdAt: string;
+  completedAt: string | null;
+};
+
 type GatewayWorkspaceDetailResult = {
   workspace: GatewayWorkspaceSummary;
   pinned: GatewayWorkspaceFile[];
@@ -76,6 +88,7 @@ type GatewayWorkspaceDetailResult = {
   outputs: GatewayWorkspaceFile[];
   folderTree?: GatewayFolderTreeNode[];
   sessions: GatewayWorkspaceSession[];
+  tasks?: GatewayTask[];
 };
 
 function toDate(value: string | number | undefined, fallback = Date.now()): Date {
@@ -124,6 +137,19 @@ function transformSession(entry: GatewayWorkspaceSession): WorkspaceSessionEntry
     created: toDate(entry.created),
     status: entry.status,
     workspaceSubfolder: entry.workspaceSubfolder,
+  };
+}
+
+function transformTask(entry: GatewayTask): WorkspaceTask {
+  return {
+    id: entry.id,
+    title: entry.title,
+    status: entry.status,
+    project: entry.project,
+    dueDate: entry.dueDate,
+    priority: entry.priority,
+    createdAt: entry.createdAt,
+    completedAt: entry.completedAt,
   };
 }
 
@@ -215,6 +241,7 @@ export async function getWorkspace(
       outputs: (result.outputs ?? []).map(transformFile),
       folderTree: result.folderTree ? transformFolderTree(result.folderTree) : undefined,
       sessions: (result.sessions ?? []).map(transformSession),
+      tasks: (result.tasks ?? []).map(transformTask),
     };
   } catch (err) {
     console.error("[Workspaces] get failed:", err);
@@ -287,6 +314,7 @@ export async function selectWorkspace(state: WorkspacesState, workspace: Workspa
         pinnedSessions: [],
         outputs: [],
         sessions: [],
+        tasks: [],
       };
 }
 
@@ -439,4 +467,84 @@ export function toggleWorkspaceFolder(
     next.add(folderPath);
   }
   return next;
+}
+
+// ── Task integration ─────────────────────────────────────────────────
+
+export async function loadWorkspaceTasks(
+  state: WorkspacesState,
+  workspaceName: string,
+): Promise<WorkspaceTask[]> {
+  if (!state.client || !state.connected) {
+    return [];
+  }
+  try {
+    const result = await state.client.request<{ tasks: GatewayTask[] }>(
+      "tasks.byProject",
+      { project: workspaceName },
+    );
+    return (result.tasks ?? []).map(transformTask);
+  } catch (err) {
+    console.error("[Workspaces] loadWorkspaceTasks failed:", err);
+    return [];
+  }
+}
+
+export async function loadAllTasks(
+  state: WorkspacesState,
+): Promise<WorkspaceTask[]> {
+  if (!state.client || !state.connected) {
+    return [];
+  }
+  try {
+    const result = await state.client.request<{ tasks: GatewayTask[] }>(
+      "tasks.list",
+      {},
+    );
+    return (result.tasks ?? []).map(transformTask);
+  } catch (err) {
+    console.error("[Workspaces] loadAllTasks failed:", err);
+    return [];
+  }
+}
+
+export async function toggleTaskComplete(
+  state: WorkspacesState,
+  taskId: string,
+  currentStatus: string,
+): Promise<WorkspaceTask | null> {
+  if (!state.client || !state.connected) {
+    return null;
+  }
+  const newStatus = currentStatus === "complete" ? "pending" : "complete";
+  try {
+    const result = await state.client.request<GatewayTask>(
+      "tasks.update",
+      { id: taskId, status: newStatus },
+    );
+    return transformTask(result);
+  } catch (err) {
+    console.error("[Workspaces] toggleTaskComplete failed:", err);
+    return null;
+  }
+}
+
+export async function createTask(
+  state: WorkspacesState,
+  title: string,
+  project: string,
+): Promise<WorkspaceTask | null> {
+  if (!state.client || !state.connected) {
+    return null;
+  }
+  try {
+    const result = await state.client.request<GatewayTask>(
+      "tasks.create",
+      { title, project, source: "chat" },
+    );
+    return transformTask(result);
+  } catch (err) {
+    console.error("[Workspaces] createTask failed:", err);
+    return null;
+  }
 }
