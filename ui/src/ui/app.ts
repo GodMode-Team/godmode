@@ -379,6 +379,7 @@ export class GodModeApp extends LitElement {
   @state() workspacesLoading = false;
   @state() workspacesCreateLoading = false;
   @state() workspacesError: string | null = null;
+  @state() workspaceExpandedFolders: Set<string> = new Set();
   @state() allTasks?: WorkspaceTask[];
   @state() taskFilter?: TaskFilter;
   @state() showCompletedTasks?: boolean;

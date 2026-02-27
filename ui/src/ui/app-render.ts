@@ -1088,6 +1088,7 @@ export function renderApp(state: AppViewState) {
                       state.workspaceExpandedFolders ?? new Set(),
                       folderPath,
                     );
+                    state.requestUpdate();
                   });
                 },
                 onTeamSetup: () => {

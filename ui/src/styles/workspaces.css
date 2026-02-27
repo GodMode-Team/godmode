@@ -159,14 +159,18 @@
   color: var(--ok);
 }
 
+.workspaces-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+}
+
 .workspace-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
   gap: 12px;
   padding: 16px;
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
   align-content: start;
 }
 

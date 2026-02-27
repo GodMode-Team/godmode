@@ -545,6 +545,15 @@ function renderWorkspaceDetail(props: {
             : nothing
         }
 
+        ${renderWorkspaceTasksSection({
+          tasks: workspace.tasks ?? [],
+          workspaceName: workspace.name,
+          showCompleted: showCompletedTasks,
+          onToggleTaskComplete,
+          onCreateTask,
+          onToggleCompletedTasks,
+        })}
+
         <section class="ws-section">
           <div class="ws-section__header">
             <h3>Artifacts</h3>
@@ -611,15 +620,6 @@ function renderWorkspaceDetail(props: {
               `
             : nothing
         }
-
-        ${renderWorkspaceTasksSection({
-          tasks: workspace.tasks ?? [],
-          workspaceName: workspace.name,
-          showCompleted: showCompletedTasks,
-          onToggleTaskComplete,
-          onCreateTask,
-          onToggleCompletedTasks,
-        })}
       </div>
     </div>
   `;
@@ -845,27 +845,29 @@ export function renderWorkspaces(props: WorkspacesProps) {
               </div>
             `
           : html`
-              <div class="workspace-grid">
-                ${
-                  filteredWorkspaces.length === 0
-                    ? html`
-                        <div class="workspaces-empty">
-                          <span class="workspaces-empty-icon">${connected ? "📭" : "🔌"}</span>
-                          <span>${connected ? "No workspaces found" : "Connect to gateway to see workspaces"}</span>
-                        </div>
-                      `
-                    : filteredWorkspaces.map((workspace) =>
-                        renderWorkspaceCard(workspace, onSelectWorkspace),
-                      )
-                }
-              </div>
+              <div class="workspaces-body">
+                <div class="workspace-grid">
+                  ${
+                    filteredWorkspaces.length === 0
+                      ? html`
+                          <div class="workspaces-empty">
+                            <span class="workspaces-empty-icon">${connected ? "📭" : "🔌"}</span>
+                            <span>${connected ? "No workspaces found" : "Connect to gateway to see workspaces"}</span>
+                          </div>
+                        `
+                      : filteredWorkspaces.map((workspace) =>
+                          renderWorkspaceCard(workspace, onSelectWorkspace),
+                        )
+                  }
+                </div>
 
-              ${renderAllTasksSection({
-                tasks: allTasks,
-                taskFilter,
-                onToggleTaskComplete,
-                onSetTaskFilter,
-              })}
+                ${renderAllTasksSection({
+                  tasks: allTasks,
+                  taskFilter,
+                  onToggleTaskComplete,
+                  onSetTaskFilter,
+                })}
+              </div>
             `
       }
     </div>
