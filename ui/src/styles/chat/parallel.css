@@ -1,0 +1,344 @@
+/* =========================================
+   Parallel Sessions — 4-lane Deck layout
+   ========================================= */
+
+.parallel-columns {
+  display: flex;
+  flex: 1 1 0;
+  height: 100%;
+  min-height: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.parallel-col {
+  flex: 1 1 0;
+  min-width: 280px;
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid var(--border);
+  background: var(--bg);
+  cursor: default;
+  transition: border-color 0.15s ease, background 0.15s ease;
+  border-top: 3px solid transparent;
+}
+
+.parallel-col:last-child {
+  border-right: none;
+}
+
+/* ── Empty lane (drop zone) ── */
+.parallel-col--empty {
+  background: var(--bg);
+}
+
+.parallel-col__drop-zone {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 24px;
+  color: var(--muted);
+}
+
+.parallel-col__drop-icon {
+  opacity: 0.4;
+  transition: opacity 0.15s ease;
+}
+
+.parallel-col__drop-text {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--muted);
+  user-select: none;
+}
+
+/* Dragover highlight — works on both empty and filled lanes */
+.parallel-col--dragover {
+  background: color-mix(in srgb, var(--accent) 8%, var(--bg));
+  border-top-color: var(--accent) !important;
+}
+
+.parallel-col--dragover .parallel-col__drop-icon {
+  opacity: 0.8;
+}
+
+.parallel-col--dragover .parallel-col__drop-text {
+  color: var(--accent);
+}
+
+/* ── Filled lane ── */
+.parallel-col--filled {
+  border-top-color: var(--border);
+}
+
+/* Working session — green top border */
+.parallel-col--working {
+  border-top-color: var(--success, #22c55e) !important;
+}
+
+/* Ready lane — red top border */
+.parallel-col--ready {
+  border-top-color: var(--danger, #ef4444) !important;
+}
+
+/* Column Header */
+.parallel-col__header {
+  padding: 10px 14px 8px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+  cursor: grab;
+  user-select: none;
+}
+
+.parallel-col__header--dragging {
+  opacity: 0.7;
+  cursor: grabbing;
+}
+
+.parallel-col__title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.parallel-col__drag-handle {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1;
+  letter-spacing: -1px;
+  flex-shrink: 0;
+}
+
+.parallel-col__name {
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--text-strong);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.parallel-col__header-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.parallel-col__close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  border-radius: var(--radius-sm, 4px);
+  transition: background 0.1s ease, color 0.1s ease;
+  padding: 0;
+}
+
+.parallel-col__close:hover {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+
+.parallel-col__status {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  flex-shrink: 0;
+}
+
+.parallel-col__status--working {
+  color: var(--success, #22c55e);
+}
+
+.parallel-col__status--ready {
+  color: var(--danger, #ef4444);
+}
+
+.parallel-col__status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+.parallel-col__status-dot--working {
+  background: var(--success, #22c55e);
+}
+
+.parallel-col__status-dot--ready {
+  background: var(--danger, #ef4444);
+}
+
+.parallel-col__status-dot--idle {
+  background: color-mix(in srgb, var(--muted) 60%, transparent);
+}
+
+.parallel-col__meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.parallel-col__model {
+  font-family: var(--mono, monospace);
+}
+
+.parallel-col__turns {
+  font-weight: 600;
+  color: var(--text);
+}
+
+.parallel-col__tokens.warn {
+  color: var(--warn, #f5a623);
+}
+
+.parallel-col__tokens.danger {
+  color: var(--danger, #e53e3e);
+}
+
+/* Messages Area */
+.parallel-col__messages {
+  flex: 1 1 0;
+  overflow-y: auto;
+  padding: 8px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 0;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable both-edges;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) color-mix(in srgb, var(--border) 14%, transparent);
+}
+
+.parallel-col__messages::-webkit-scrollbar {
+  width: 10px;
+}
+
+.parallel-col__messages::-webkit-scrollbar-track {
+  background: color-mix(in srgb, var(--border) 14%, transparent);
+  border-radius: var(--radius-full);
+}
+
+.parallel-col__messages::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: var(--radius-full);
+}
+
+.parallel-col__messages::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, var(--border-strong) 82%, var(--text) 18%);
+}
+
+.parallel-col__empty {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.parallel-col__msg {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 10px;
+  border-radius: var(--radius-md, 8px);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.parallel-col__msg--user {
+  background: var(--surface-hover);
+  align-self: flex-end;
+  max-width: 90%;
+}
+
+.parallel-col__msg--assistant {
+  background: transparent;
+  max-width: 90%;
+}
+
+.parallel-col__msg-role {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.parallel-col__msg-text {
+  color: var(--text);
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+}
+
+/* Compose Area */
+.parallel-col__compose {
+  padding: 8px 12px;
+  border-top: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.parallel-col__input {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md, 8px);
+  background: var(--bg-elevated);
+  color: var(--text);
+  font-size: 13px;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.15s ease;
+  box-sizing: border-box;
+}
+
+.parallel-col__input:focus {
+  border-color: var(--accent);
+}
+
+.parallel-col__input::placeholder {
+  color: var(--muted);
+}
+
+/* Responsive: stack if too narrow */
+@media (max-width: 600px) {
+  .parallel-columns {
+    flex-direction: column;
+    overflow-x: hidden;
+    overflow-y: auto;
+  }
+
+  .parallel-col {
+    min-width: 0;
+    min-height: 200px;
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .parallel-col:last-child {
+    border-bottom: none;
+  }
+}

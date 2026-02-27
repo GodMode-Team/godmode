@@ -1,0 +1,442 @@
+/**
+ * Workspaces controller
+ * Handles workspace listing/detail/pin/session-pin over gateway RPC.
+ */
+
+import type { GatewayBrowserClient } from "../gateway";
+import type {
+  FolderTreeNode,
+  WorkspaceDetail,
+  WorkspaceFileEntry,
+  WorkspaceSessionEntry,
+  WorkspaceSummary,
+} from "../views/workspaces";
+
+export type WorkspacesState = {
+  client: GatewayBrowserClient | null;
+  connected: boolean;
+  workspaces?: WorkspaceSummary[];
+  selectedWorkspace?: WorkspaceDetail | null;
+  workspacesSearchQuery?: string;
+  workspacesLoading?: boolean;
+  workspacesError?: string | null;
+};
+
+export type WorkspaceCreateInput = {
+  name: string;
+  type?: "personal" | "project" | "team";
+  path?: string;
+};
+
+type GatewayWorkspaceSummary = {
+  id: string;
+  name: string;
+  emoji?: string;
+  type: "personal" | "project" | "team";
+  path: string;
+  artifactCount?: number;
+  sessionCount?: number;
+  lastUpdated?: string;
+  lastScanned?: number;
+};
+
+type GatewayWorkspaceFile = {
+  path: string;
+  name: string;
+  type: "markdown" | "html" | "image" | "json" | "text" | "folder";
+  size: number;
+  modified: string;
+  isDirectory?: boolean;
+  searchText?: string;
+};
+
+type GatewayWorkspaceSession = {
+  id: string;
+  key: string;
+  title: string;
+  created: string;
+  status: "running" | "complete" | "blocked";
+  workspaceSubfolder: string | null;
+};
+
+type GatewayFolderTreeNode = {
+  name: string;
+  path: string;
+  type: "folder" | "file";
+  fileType?: string;
+  size?: number;
+  modified?: string;
+  children?: GatewayFolderTreeNode[];
+};
+
+type GatewayWorkspaceDetailResult = {
+  workspace: GatewayWorkspaceSummary;
+  pinned: GatewayWorkspaceFile[];
+  pinnedSessions: GatewayWorkspaceSession[];
+  outputs: GatewayWorkspaceFile[];
+  folderTree?: GatewayFolderTreeNode[];
+  sessions: GatewayWorkspaceSession[];
+};
+
+function toDate(value: string | number | undefined, fallback = Date.now()): Date {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return new Date(value);
+  }
+  if (typeof value === "string") {
+    const parsed = Date.parse(value);
+    if (Number.isFinite(parsed)) {
+      return new Date(parsed);
+    }
+  }
+  return new Date(fallback);
+}
+
+function transformSummary(entry: GatewayWorkspaceSummary): WorkspaceSummary {
+  return {
+    id: entry.id,
+    name: entry.name,
+    emoji: entry.emoji || "📁",
+    type: entry.type,
+    path: entry.path,
+    artifactCount: entry.artifactCount ?? 0,
+    sessionCount: entry.sessionCount ?? 0,
+    lastUpdated: toDate(entry.lastUpdated, entry.lastScanned),
+  };
+}
+
+function transformFile(entry: GatewayWorkspaceFile): WorkspaceFileEntry {
+  return {
+    path: entry.path,
+    name: entry.name,
+    type: entry.type,
+    size: entry.size,
+    modified: toDate(entry.modified),
+    isDirectory: entry.isDirectory,
+    searchText: entry.searchText,
+  };
+}
+
+function transformSession(entry: GatewayWorkspaceSession): WorkspaceSessionEntry {
+  return {
+    id: entry.id,
+    key: entry.key,
+    title: entry.title,
+    created: toDate(entry.created),
+    status: entry.status,
+    workspaceSubfolder: entry.workspaceSubfolder,
+  };
+}
+
+function transformFolderTree(nodes: GatewayFolderTreeNode[]): FolderTreeNode[] {
+  return nodes.map((node) => ({
+    name: node.name,
+    path: node.path,
+    type: node.type,
+    fileType: node.fileType as FolderTreeNode["fileType"],
+    size: node.size,
+    modified: node.modified ? toDate(node.modified) : undefined,
+    children: node.children ? transformFolderTree(node.children) : undefined,
+  }));
+}
+
+function mergeSummaryIntoDetail(
+  summary: WorkspaceSummary,
+  detail: WorkspaceDetail,
+): WorkspaceDetail {
+  return {
+    ...detail,
+    id: summary.id,
+    name: summary.name,
+    emoji: summary.emoji,
+    type: summary.type,
+    path: summary.path,
+    artifactCount: summary.artifactCount,
+    sessionCount: summary.sessionCount,
+    lastUpdated: summary.lastUpdated,
+  };
+}
+
+export async function loadWorkspaces(state: WorkspacesState) {
+  if (!state.client || !state.connected) {
+    state.workspaces = [];
+    state.workspacesLoading = false;
+    state.workspacesError = "Connect to gateway to see workspaces";
+    return;
+  }
+
+  state.workspacesLoading = true;
+  state.workspacesError = null;
+
+  try {
+    const result = await state.client.request<{
+      workspaces: GatewayWorkspaceSummary[];
+    }>("workspaces.list", {});
+
+    state.workspaces = (result.workspaces ?? []).map(transformSummary);
+
+    if (state.selectedWorkspace) {
+      const latestSummary = state.workspaces.find(
+        (entry) => entry.id === state.selectedWorkspace?.id,
+      );
+      if (latestSummary) {
+        state.selectedWorkspace = mergeSummaryIntoDetail(latestSummary, state.selectedWorkspace);
+      }
+    }
+  } catch (err) {
+    console.error("[Workspaces] load failed:", err);
+    state.workspacesError = err instanceof Error ? err.message : "Failed to load workspaces";
+    state.workspaces = [];
+  } finally {
+    state.workspacesLoading = false;
+  }
+}
+
+export async function getWorkspace(
+  state: WorkspacesState,
+  id: string,
+): Promise<WorkspaceDetail | null> {
+  if (!state.client || !state.connected) {
+    return null;
+  }
+
+  try {
+    const result = await state.client.request<GatewayWorkspaceDetailResult>("workspaces.get", {
+      id,
+    });
+
+    if (!result.workspace) {
+      return null;
+    }
+
+    return {
+      ...transformSummary(result.workspace),
+      pinned: (result.pinned ?? []).map(transformFile),
+      pinnedSessions: (result.pinnedSessions ?? []).map(transformSession),
+      outputs: (result.outputs ?? []).map(transformFile),
+      folderTree: result.folderTree ? transformFolderTree(result.folderTree) : undefined,
+      sessions: (result.sessions ?? []).map(transformSession),
+    };
+  } catch (err) {
+    console.error("[Workspaces] get failed:", err);
+    return null;
+  }
+}
+
+export async function readWorkspaceFile(
+  state: WorkspacesState,
+  filePath: string,
+  workspaceId?: string,
+): Promise<{ content: string; mime: string } | null> {
+  if (!state.client || !state.connected) {
+    return null;
+  }
+
+  try {
+    const result = await state.client.request<{
+      content: string | null;
+      mime?: string;
+      contentType?: string;
+      error?: string;
+    }>("workspaces.readFile", workspaceId ? { workspaceId, filePath } : { path: filePath });
+
+    if (!result.content) {
+      if (result.error) {
+        console.warn("[Workspaces] readFile failed:", result.error);
+      }
+      return null;
+    }
+
+    return {
+      content: result.content,
+      mime: result.contentType ?? result.mime ?? "text/plain",
+    };
+  } catch (err) {
+    console.error("[Workspaces] readFile error:", err);
+    return null;
+  }
+}
+
+export async function scanWorkspaces(state: WorkspacesState) {
+  if (!state.client || !state.connected) {
+    return;
+  }
+  try {
+    state.workspacesLoading = true;
+    state.workspacesError = null;
+    await state.client.request("workspaces.scan", {});
+    await loadWorkspaces(state);
+  } catch (err) {
+    state.workspacesError = err instanceof Error ? err.message : "Failed to scan workspaces";
+  } finally {
+    state.workspacesLoading = false;
+  }
+}
+
+export async function selectWorkspace(state: WorkspacesState, workspace: WorkspaceSummary | null) {
+  if (!workspace) {
+    state.selectedWorkspace = null;
+    return;
+  }
+
+  const detail = await getWorkspace(state, workspace.id);
+  state.selectedWorkspace = detail
+    ? detail
+    : {
+        ...workspace,
+        pinned: [],
+        pinnedSessions: [],
+        outputs: [],
+        sessions: [],
+      };
+}
+
+export async function toggleWorkspacePin(
+  state: WorkspacesState,
+  workspaceId: string,
+  filePath: string,
+  pinned: boolean,
+): Promise<boolean> {
+  if (!state.client || !state.connected) {
+    return false;
+  }
+
+  try {
+    await state.client.request(pinned ? "workspaces.unpin" : "workspaces.pin", {
+      workspaceId,
+      filePath,
+    });
+
+    if (state.selectedWorkspace?.id === workspaceId) {
+      const refreshed = await getWorkspace(state, workspaceId);
+      if (refreshed) {
+        state.selectedWorkspace = refreshed;
+      }
+    }
+
+    return true;
+  } catch (err) {
+    console.error("[Workspaces] pin toggle failed:", err);
+    return false;
+  }
+}
+
+export async function toggleWorkspaceSessionPin(
+  state: WorkspacesState,
+  workspaceId: string,
+  sessionKey: string,
+  pinned: boolean,
+): Promise<boolean> {
+  if (!state.client || !state.connected) {
+    return false;
+  }
+
+  try {
+    await state.client.request(pinned ? "workspaces.unpinSession" : "workspaces.pinSession", {
+      workspaceId,
+      sessionKey,
+    });
+
+    if (state.selectedWorkspace?.id === workspaceId) {
+      const refreshed = await getWorkspace(state, workspaceId);
+      if (refreshed) {
+        state.selectedWorkspace = refreshed;
+      }
+    }
+
+    return true;
+  } catch (err) {
+    console.error("[Workspaces] session pin toggle failed:", err);
+    return false;
+  }
+}
+
+export async function createWorkspace(
+  state: WorkspacesState,
+  input: WorkspaceCreateInput,
+): Promise<WorkspaceSummary | null> {
+  if (!state.client || !state.connected) {
+    return null;
+  }
+
+  const name = String(input.name ?? "").trim();
+  if (!name) {
+    state.workspacesError = "Workspace name is required";
+    return null;
+  }
+
+  const type = input.type ?? "project";
+  const customPath = String(input.path ?? "").trim();
+
+  try {
+    const result = await state.client.request<{
+      workspace?: GatewayWorkspaceSummary;
+    }>("workspaces.create", {
+      name,
+      type,
+      ...(customPath ? { path: customPath } : {}),
+    });
+
+    if (!result.workspace) {
+      state.workspacesError = "Workspace creation returned no workspace";
+      return null;
+    }
+
+    const created = transformSummary(result.workspace);
+    const current = state.workspaces ?? [];
+    const deduped = new Map(current.map((workspace) => [workspace.id, workspace]));
+    deduped.set(created.id, created);
+    state.workspaces = Array.from(deduped.values()).toSorted(
+      (a, b) => b.lastUpdated.getTime() - a.lastUpdated.getTime(),
+    );
+    state.workspacesError = null;
+    return created;
+  } catch (err) {
+    console.error("[Workspaces] create failed:", err);
+    state.workspacesError = err instanceof Error ? err.message : "Failed to create workspace";
+    return null;
+  }
+}
+
+export function setWorkspacesSearchQuery(state: WorkspacesState, query: string) {
+  state.workspacesSearchQuery = query;
+}
+
+export function clearWorkspaceSelection(state: WorkspacesState) {
+  state.selectedWorkspace = null;
+}
+
+export async function startTeamSetup(state: WorkspacesState & {
+  chatMessage?: string;
+  setTab?: (tab: string) => void;
+}): Promise<void> {
+  if (!state.client || !state.connected) {
+    return;
+  }
+  try {
+    const res = await state.client.request<{ prompt?: string }>(
+      "workspaces.teamSetupPrompt",
+      {},
+    );
+    if (res?.prompt) {
+      state.chatMessage = res.prompt;
+      state.setTab?.("chat");
+    }
+  } catch {
+    state.chatMessage =
+      "I want to set up a Team Workspace so my team can collaborate. Please walk me through it step by step, keeping it simple.";
+    state.setTab?.("chat");
+  }
+}
+
+export function toggleWorkspaceFolder(
+  expandedFolders: Set<string>,
+  folderPath: string,
+): Set<string> {
+  const next = new Set(expandedFolders);
+  if (next.has(folderPath)) {
+    next.delete(folderPath);
+  } else {
+    next.add(folderPath);
+  }
+  return next;
+}

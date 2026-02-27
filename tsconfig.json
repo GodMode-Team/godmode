@@ -12,5 +12,5 @@
     "types": ["node"]
   },
   "include": ["index.ts", "src/**/*.ts", "scripts/**/*.mjs", "tsup.config.ts"],
-  "exclude": ["dist", "node_modules"]
+  "exclude": ["dist", "node_modules", "ui"]
 }

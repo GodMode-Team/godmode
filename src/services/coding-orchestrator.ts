@@ -40,7 +40,7 @@ type KeywordScopeRule = {
 };
 
 const KEYWORD_SCOPE_RULES: KeywordScopeRule[] = [
-  { keywords: ["ui", "frontend", "ux", "css", "component", "dashboard", "web ui"], scopes: ["src/ui/**", "godmode-ui/**"], rationale: "UI/frontend" },
+  { keywords: ["ui", "frontend", "ux", "css", "component", "dashboard", "web ui"], scopes: ["src/ui/**", "ui/**"], rationale: "UI/frontend" },
   { keywords: ["agent", "session", "tool", "prompt", "model"], scopes: ["src/agents/**"], rationale: "agents" },
   { keywords: ["gateway", "rpc", "websocket", "server"], scopes: ["src/gateway/**"], rationale: "gateway" },
   { keywords: ["plugin", "extension", "hook"], scopes: ["src/plugins/**", "extensions/**"], rationale: "plugins" },
@@ -48,10 +48,10 @@ const KEYWORD_SCOPE_RULES: KeywordScopeRule[] = [
   { keywords: ["ios", "swift", "xcode"], scopes: ["apps/ios/**"], rationale: "iOS" },
   { keywords: ["android", "kotlin", "gradle"], scopes: ["apps/android/**"], rationale: "Android" },
   { keywords: ["mac app", "macos", "menubar"], scopes: ["apps/macos/**"], rationale: "macOS" },
-  { keywords: ["test", "tests", "vitest", "e2e"], scopes: ["src/**", "godmode-ui/**"], rationale: "testing" },
+  { keywords: ["test", "tests", "vitest", "e2e"], scopes: ["src/**", "ui/**"], rationale: "testing" },
 ];
 
-const BROAD_SCOPES = new Set(["**", "src/**", "godmode-ui/**"]);
+const BROAD_SCOPES = new Set(["**", "src/**", "ui/**"]);
 
 function extractPathScopes(task: string): string[] {
   const matches = Array.from(

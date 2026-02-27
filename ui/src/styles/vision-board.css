@@ -1,0 +1,405 @@
+/* ===== Vision Board Dashboard ===== */
+
+.vision-container {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+  padding: 1.5rem;
+  max-width: 1000px;
+  margin: 0 auto;
+}
+
+/* Header */
+.vision-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.vision-header-left {
+  flex: 1;
+  min-width: 200px;
+}
+
+.vision-title {
+  font-size: 1.75rem;
+  font-weight: 600;
+  color: var(--text);
+  margin: 0;
+}
+
+.vision-subtitle {
+  font-size: 0.875rem;
+  color: var(--text-muted);
+  margin: 0.25rem 0 0 0;
+}
+
+.vision-header-right {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.vision-status {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-size: 0.625rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 0.25rem 0.5rem;
+  border-radius: var(--radius-sm);
+  background: var(--card);
+}
+
+.vision-status.online {
+  color: var(--ok);
+}
+
+.vision-status.offline {
+  color: var(--text-muted);
+}
+
+.vision-refresh-btn {
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--card);
+  color: var(--text);
+  cursor: pointer;
+  font-size: 0.875rem;
+  transition: all var(--duration-normal) ease;
+}
+
+.vision-refresh-btn:hover {
+  background: var(--bg-hover);
+  border-color: var(--border-strong);
+}
+
+/* Section labels */
+.vision-section-label {
+  font-size: 0.625rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin-bottom: 0.75rem;
+}
+
+/* CDA Section */
+.vision-cda-section {
+  background: linear-gradient(135deg, var(--card) 0%, var(--bg) 100%);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 2rem;
+  text-align: center;
+}
+
+.vision-cda-label {
+  font-size: 0.625rem;
+  font-weight: 600;
+  color: var(--accent);
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  margin-bottom: 1rem;
+}
+
+.vision-cda-statement {
+  font-size: 1.5rem;
+  font-weight: 500;
+  color: var(--text);
+  line-height: 1.4;
+  margin: 0 0 1.5rem 0;
+  font-style: italic;
+}
+
+.vision-cda-meta {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 2rem;
+  flex-wrap: wrap;
+}
+
+.vision-cda-deadline {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--text-muted);
+  font-size: 0.875rem;
+}
+
+.vision-cda-deadline .meta-icon {
+  font-size: 1rem;
+}
+
+.vision-cda-deadline .meta-value {
+  font-weight: 600;
+  color: var(--text);
+}
+
+.vision-cda-progress {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.progress-bar-container {
+  width: 150px;
+  height: 8px;
+  background: var(--border);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.progress-bar-container.small {
+  width: 100px;
+  height: 6px;
+}
+
+.progress-bar-fill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 4px;
+  transition: width var(--duration-normal) ease;
+}
+
+.progress-label {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+/* Identity Section */
+.vision-identity-section {
+  margin-top: 0;
+}
+
+.vision-identity-card {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--accent);
+  border-radius: var(--radius-md);
+  padding: 1.25rem 1.5rem;
+}
+
+.identity-icon {
+  font-size: 1.5rem;
+}
+
+.identity-statement {
+  font-size: 1.125rem;
+  font-weight: 500;
+  color: var(--text);
+  margin: 0;
+  font-style: italic;
+}
+
+/* Themes Section */
+.vision-themes-section {
+  margin-top: 0;
+}
+
+.vision-themes-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1rem;
+}
+
+.vision-theme-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 1.25rem;
+  transition: all var(--duration-normal) ease;
+}
+
+.vision-theme-card:hover {
+  background: var(--bg-hover);
+  border-color: var(--border-strong);
+}
+
+.theme-card-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.theme-icon {
+  font-size: 1.25rem;
+}
+
+.theme-title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.theme-description {
+  font-size: 0.875rem;
+  color: var(--text-muted);
+  margin: 0 0 0.75rem 0;
+  line-height: 1.4;
+}
+
+.theme-progress {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.theme-spokes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+  margin-bottom: 0.75rem;
+}
+
+.theme-spoke-badge {
+  font-size: 0.625rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  padding: 0.125rem 0.5rem;
+}
+
+.theme-key-results {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+  border-top: 1px solid var(--border);
+  padding-top: 0.75rem;
+}
+
+.key-result-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.75rem;
+}
+
+.kr-text {
+  color: var(--text-muted);
+}
+
+.kr-progress {
+  font-weight: 600;
+  color: var(--text);
+}
+
+/* Bottom grid (Values + Anti-Goals) */
+.vision-bottom-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2rem;
+}
+
+@media (max-width: 700px) {
+  .vision-bottom-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Values Section */
+.vision-values-section {
+  margin-top: 0;
+}
+
+.vision-values-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.vision-value-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 0.75rem 1rem;
+}
+
+.value-rank {
+  width: 1.5rem;
+  height: 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--accent);
+  color: white;
+  font-size: 0.75rem;
+  font-weight: 600;
+  border-radius: 50%;
+}
+
+.value-text {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--text);
+}
+
+/* Anti-Goals Section */
+.vision-antigoals-section {
+  margin-top: 0;
+}
+
+.vision-antigoals-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.vision-antigoal-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 0.75rem 1rem;
+}
+
+.antigoal-icon {
+  font-size: 1rem;
+}
+
+.antigoal-text {
+  font-size: 0.875rem;
+  color: var(--text-muted);
+}
+
+/* Empty state */
+.vision-empty-state {
+  color: var(--text-muted);
+  font-size: 0.875rem;
+  font-style: italic;
+}
+
+/* Loading and error states */
+.vision-loading,
+.vision-error,
+.vision-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  padding: 4rem 2rem;
+  text-align: center;
+  color: var(--text-muted);
+}
+
+.vision-error .error-icon,
+.vision-empty .empty-icon {
+  font-size: 2rem;
+}

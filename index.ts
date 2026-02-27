@@ -9,7 +9,7 @@
  * via a license gate wrapper.
  */
 
-import { createReadStream, existsSync, readFileSync, statSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import {
   request as httpRequest,
   type IncomingHttpHeaders,
@@ -56,6 +56,34 @@ import { CodingOrchestrator } from "./src/services/coding-orchestrator.js";
 import { CodingNotificationService } from "./src/services/coding-notification.js";
 // Static file server for UIs
 import { createStaticFileHandler } from "./src/static-server.js";
+import { DATA_DIR } from "./src/data-paths.js";
+
+// ── Options file reader (for feature flags in HTTP handler) ─────────
+const OPTIONS_FILE_PATH = join(DATA_DIR, "godmode-options.json");
+const OPTIONS_CACHE_TTL_MS = 5_000; // re-read every 5 seconds max
+let cachedOptions: Record<string, unknown> = {};
+let optionsCachedAt = 0;
+
+const OPTIONS_DEFAULTS: Record<string, unknown> = {
+  "focusPulse.enabled": true,
+  "deck.enabled": false,
+  "missionControl.enabled": false,
+};
+
+function readOptionsSync(): Record<string, unknown> {
+  const now = Date.now();
+  if (now - optionsCachedAt < OPTIONS_CACHE_TTL_MS) {
+    return cachedOptions;
+  }
+  try {
+    const raw = readFileSync(OPTIONS_FILE_PATH, "utf-8");
+    cachedOptions = { ...OPTIONS_DEFAULTS, ...JSON.parse(raw) };
+  } catch {
+    cachedOptions = { ...OPTIONS_DEFAULTS };
+  }
+  optionsCachedAt = now;
+  return cachedOptions;
+}
 
 // ── Version ───────────────────────────────────────────────────────────
 // Read from package.json at load time so it can't drift
@@ -533,13 +561,11 @@ const godmodePlugin = {
     // ── 2. Resolve UI asset paths ─────────────────────────────────
     const sourceDir = dirname(api.source);
     const pluginRoot = basename(sourceDir) === "dist" ? resolve(sourceDir, "..") : sourceDir;
-    const monorepoRoot = resolve(pluginRoot, "../..");
 
     const godmodeUiCandidates = [
       join(pluginRoot, "dist", "godmode-ui"),
-      join(pluginRoot, "godmode-ui", "dist"),
+      join(pluginRoot, "ui", "dist"),
       join(pluginRoot, "assets", "godmode-ui"),
-      join(monorepoRoot, "dist", "control-ui"),
     ];
     const godmodeUiRoot = godmodeUiCandidates.find((p) => {
       const index = join(p, "index.html");
@@ -559,9 +585,6 @@ const godmodePlugin = {
       join(pluginRoot, "assets", "deck"),
       join(pluginRoot, "deck", "dist"),
       join(pluginRoot, "..", "openclaw-deck", "dist"),
-      join(pluginRoot, "..", "GodMode", "dist", "deck"),
-      join(monorepoRoot, "dist", "deck"),
-      join(monorepoRoot, "deck", "dist"),
     ];
     const deckUiRoot = deckUiCandidates.find((p) => {
       const index = join(p, "index.html");
@@ -608,6 +631,12 @@ const godmodePlugin = {
 
       // Mission Control sidecar proxy (/ops/* -> http://127.0.0.1:3456/*)
       if (isOpsPath(pathname)) {
+        const opts = readOptionsSync();
+        if (!opts["missionControl.enabled"]) {
+          res.writeHead(200, { "Content-Type": "application/json", "Cache-Control": "no-cache" });
+          res.end(JSON.stringify({ disabled: true, message: "Mission Control is not enabled. Enable it in GodMode Options." }));
+          return true;
+        }
         await proxyOpsRequest(req, res);
         return true;
       }
@@ -616,6 +645,12 @@ const godmodePlugin = {
       // absolute /api/* paths. Proxy those only when the request originated
       // from /ops so core gateway APIs remain untouched.
       if (shouldProxyOpsApiRequest(req, pathname)) {
+        const opts = readOptionsSync();
+        if (!opts["missionControl.enabled"]) {
+          res.writeHead(200, { "Content-Type": "application/json", "Cache-Control": "no-cache" });
+          res.end(JSON.stringify({ disabled: true, message: "Mission Control is not enabled. Enable it in GodMode Options." }));
+          return true;
+        }
         await proxyOpsRequest(req, res);
         return true;
       }
@@ -643,6 +678,19 @@ h1{color:#ff6b6b}code{background:#16213e;padding:2px 8px;border-radius:4px}a{col
 
       // Deck UI
       if (pathname === "/deck" || pathname.startsWith("/deck/")) {
+        const opts = readOptionsSync();
+        if (!opts["deck.enabled"]) {
+          res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+          res.end(`<!DOCTYPE html>
+<html><head><title>Deck — Disabled</title>
+<style>body{font-family:system-ui;max-width:600px;margin:80px auto;padding:0 20px;color:#e0e0e0;background:#1a1a2e}
+h1{color:#a0a0a0}code{background:#16213e;padding:2px 8px;border-radius:4px}a{color:#4ecdc4}</style></head>
+<body><h1>Deck is disabled</h1>
+<p>Deck is disabled. Enable it in GodMode Settings &gt; Options.</p>
+<p><a href="/godmode">Back to GodMode</a></p>
+</body></html>`);
+          return true;
+        }
         if (deckHandler) {
           deckHandler(req, res);
         } else {

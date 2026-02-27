@@ -13,23 +13,31 @@
     "README.md"
   ],
   "scripts": {
-    "build": "pnpm build:code && pnpm bundle:ui",
+    "build": "pnpm build:ui && pnpm build:code && pnpm bundle:ui",
     "build:code": "tsup",
+    "build:ui": "vite build --config ui/vite.config.ts",
     "bundle:ui": "node scripts/bundle-ui.mjs",
+    "dev:ui": "vite --config ui/vite.config.ts",
+    "test:ui": "vitest run --config ui/vitest.config.ts",
     "ui:sync": "node scripts/sync-ui-from-repo.mjs",
-    "clean": "rm -rf dist",
+    "clean": "rm -rf dist ui/dist",
     "typecheck": "tsc --noEmit",
     "pack:check": "npm pack --dry-run"
   },
   "dependencies": {
+    "@noble/ed25519": "3.0.0",
     "chokidar": "^4.0.3",
-    "json5": "^2.2.3"
+    "dompurify": "^3.3.1",
+    "json5": "^2.2.3",
+    "lit": "^3.3.2",
+    "marked": "^17.0.1"
   },
   "devDependencies": {
     "@types/node": "^24.3.3",
     "openclaw": "^2026.2.23",
     "tsup": "^8.5.1",
-    "typescript": "^5.9.2"
+    "typescript": "^5.9.3",
+    "vite": "7.3.1"
   },
   "peerDependencies": {
     "openclaw": ">=2026.0.0"

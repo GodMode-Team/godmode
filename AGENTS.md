@@ -39,16 +39,14 @@ This repository is the standalone home for the GodMode OpenClaw plugin.
 - Typecheck: `pnpm typecheck`
 - Clean: `pnpm clean`
 
-## UI Source of Truth
+## UI Source
 
-- UI source lives in `~/Projects/godmode-ui` (not in this repo's `assets/` or `dist/`).
+- UI source lives in `ui/` (Lit web components, Vite build).
+- `pnpm build:ui` builds to `ui/dist/`; `pnpm bundle:ui` copies into `dist/godmode-ui/`.
+- `pnpm dev:ui` starts Vite dev server for UI development.
 - Never hand-edit `assets/godmode-ui/*` or `dist/godmode-ui/*`.
-- Local dev/build flow:
-  1. `cd ~/Projects/godmode-ui && pnpm build`
-  2. `cd ~/Projects/godmode-plugin && pnpm build`
-- `scripts/bundle-ui.mjs` now fails if a sibling `../godmode-ui` repo exists but is not built.
-- Use `GODMODE_UI_ALLOW_FALLBACK=1` only when you intentionally need fallback snapshot assets.
-- Before release, refresh fallback snapshot with `pnpm ui:sync` and commit if it changed.
+- `assets/godmode-ui/` is a committed fallback snapshot for npm installs that skip the build.
+- Refresh fallback: `pnpm ui:sync` and commit if changed.
 
 ## Coding Guardrails
 

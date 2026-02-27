@@ -1,0 +1,118 @@
+/* People tab styles */
+
+.people-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  border-radius: 6px;
+  transition: background 0.15s;
+}
+
+.people-card:hover {
+  background: var(--mc-bg-hover);
+}
+
+.people-card-main {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.people-avatar {
+  font-size: 20px;
+  flex-shrink: 0;
+  width: 28px;
+  text-align: center;
+}
+
+.people-card-info {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+
+.people-name {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--mc-text);
+}
+
+.people-role {
+  font-size: 12px;
+  color: var(--mc-text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.people-last-contact {
+  font-size: 11px;
+  color: var(--mc-text-muted);
+  flex-shrink: 0;
+}
+
+.people-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding-left: 38px;
+}
+
+.people-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 8px;
+  border-radius: 10px;
+  font-size: 11px;
+  background: var(--mc-bg-hover);
+  color: var(--mc-text-muted);
+  border: 1px solid var(--mc-border);
+}
+
+/* People detail view */
+
+.people-detail .my-day-card-content {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.people-detail-row {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  font-size: 14px;
+}
+
+.people-detail-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--mc-text-muted);
+  min-width: 100px;
+  flex-shrink: 0;
+}
+
+.people-detail-row a {
+  color: var(--mc-accent);
+  text-decoration: none;
+}
+
+.people-detail-row a:hover {
+  text-decoration: underline;
+}
+
+.people-back-btn {
+  background: none;
+  border: none;
+  color: var(--mc-accent);
+  cursor: pointer;
+  font-size: 13px;
+  padding: 0;
+  margin-right: 8px;
+}
+
+.people-back-btn:hover {
+  text-decoration: underline;
+}

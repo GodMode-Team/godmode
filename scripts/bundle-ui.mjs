@@ -4,10 +4,8 @@
  * GodMode UI source resolution order:
  * 1) --ui-dir <path>
  * 2) GODMODE_UI_DIR=<path>
- * 3) <plugin>/../godmode-ui/dist (local source-of-truth repo)
- * 4) <plugin>/godmode-ui/dist
- * 5) <plugin>/assets/godmode-ui (committed fallback snapshot)
- * 6) <plugin>/../../dist/control-ui (legacy monorepo output)
+ * 3) <plugin>/ui/dist (in-repo Vite build output)
+ * 4) <plugin>/assets/godmode-ui (committed fallback snapshot)
  *
  * Deck source resolution order:
  * 1) --deck-dir <path>
@@ -17,13 +15,9 @@
  * 5) sibling workspaces:
  *    - ../openclaw-deck/dist
  *    - ../GodMode/dist/deck
- * 6) <plugin>/../../dist/deck or <plugin>/../../deck/dist
  *
  * Missing assets fail the build by default to avoid shipping a plugin without UIs.
  * Set GODMODE_UI_OPTIONAL=1 or GODMODE_DECK_OPTIONAL=1 to skip a missing bundle.
- *
- * If a sibling godmode-ui repo exists, fallback snapshots are blocked by default.
- * Override with GODMODE_UI_ALLOW_FALLBACK=1 for intentional fallback usage.
  */
 
 import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -32,7 +26,6 @@ import { fileURLToPath } from "node:url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const pluginRoot = resolve(__dirname, "..");
-const monorepoRoot = resolve(pluginRoot, "../..");
 
 function readFlag(flagName) {
   const index = process.argv.indexOf(flagName);
@@ -156,9 +149,6 @@ function copyBundle({
 
 const uiDirFlag = readFlag("--ui-dir");
 const uiDirEnv = readEnvPath("GODMODE_UI_DIR");
-const localUiRepoRoot = join(pluginRoot, "..", "godmode-ui");
-const localUiRepoDist = join(localUiRepoRoot, "dist");
-const localUiRepoExists = existsSync(join(localUiRepoRoot, "package.json"));
 
 assertExplicitSource({
   label: "--ui-dir",
@@ -174,26 +164,11 @@ assertExplicitSource({
   hint: "Run a UI build first or point GODMODE_UI_DIR at a built UI directory.",
 });
 
-if (!uiDirFlag && !uiDirEnv && localUiRepoExists && process.env.GODMODE_UI_ALLOW_FALLBACK !== "1") {
-  if (!hasGodModeRootTag(localUiRepoDist)) {
-    console.error(
-      `[bundle-ui] Found local UI repo (${localUiRepoRoot}) but no valid build at ${localUiRepoDist}.`,
-    );
-    console.error(`[bundle-ui] Run: (cd ${localUiRepoRoot} && pnpm build)`);
-    console.error(
-      "[bundle-ui] Or set GODMODE_UI_ALLOW_FALLBACK=1 if you intentionally want to use fallback assets.",
-    );
-    process.exit(1);
-  }
-}
-
 const uiCandidates = [
   uiDirFlag,
   uiDirEnv,
-  localUiRepoDist,
-  join(pluginRoot, "godmode-ui", "dist"),
+  join(pluginRoot, "ui", "dist"),
   join(pluginRoot, "assets", "godmode-ui"),
-  join(monorepoRoot, "dist", "control-ui"),
 ].filter(Boolean);
 
 copyBundle({
@@ -202,7 +177,7 @@ copyBundle({
   destination: join(pluginRoot, "dist", "godmode-ui"),
   validator: hasGodModeRootTag,
   optionalEnv: "GODMODE_UI_OPTIONAL",
-  missingHint: "Build godmode-ui first or pass --ui-dir containing <godmode-app>.",
+  missingHint: "Run 'pnpm build:ui' first or pass --ui-dir containing <godmode-app>.",
   afterCopy: (destination, source) => {
     writeBundleSourceMeta(destination, source, "godmode-ui");
   },
@@ -232,8 +207,6 @@ const deckCandidates = [
   join(pluginRoot, "assets", "deck"),
   join(pluginRoot, "..", "openclaw-deck", "dist"),
   join(pluginRoot, "..", "GodMode", "dist", "deck"),
-  join(monorepoRoot, "dist", "deck"),
-  join(monorepoRoot, "deck", "dist"),
 ].filter(Boolean);
 
 copyBundle({

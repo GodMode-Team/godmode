@@ -1,0 +1,1041 @@
+import { html, nothing } from "lit";
+import { ref } from "lit/directives/ref.js";
+import { repeat } from "lit/directives/repeat.js";
+import {
+  renderMessageGroup,
+  renderReadingIndicatorGroup,
+  renderStreamingGroup,
+  renderCompactionSummary,
+  isCompactionSummary,
+} from "../chat/grouped-render";
+import { normalizeMessage, normalizeRoleForGrouping } from "../chat/message-normalizer";
+import type { FailedMessage } from "../controllers/chat";
+import { icons } from "../icons";
+import type { ToastType } from "../toast";
+import type { SessionsListResult } from "../types";
+import type { ChatItem, MessageGroup, ToolExecutionInfo } from "../types/chat-types";
+import type { ChatAttachment, ChatQueueItem } from "../ui-types";
+import { validateFilesForUpload } from "../upload-constants";
+import { renderMarkdownSidebar } from "./markdown-sidebar";
+import "../components/resizable-divider";
+
+export type CompactionIndicatorStatus = {
+  active: boolean;
+  startedAt: number | null;
+  completedAt: number | null;
+};
+
+export type ChatProps = {
+  basePath?: string;
+  sessionKey: string;
+  onSessionKeyChange: (next: string) => void;
+  thinkingLevel: string | null;
+  showThinking: boolean;
+  loading: boolean;
+  sending: boolean;
+  sendingSessionKey?: string | null; // Which session is actively sending
+  canAbort?: boolean;
+  compactionStatus?: CompactionIndicatorStatus | null;
+  messages: unknown[];
+  toolMessages: unknown[];
+  stream: string | null;
+  streamStartedAt: number | null;
+  assistantAvatarUrl?: string | null;
+  draft: string;
+  queue: ChatQueueItem[];
+  connected: boolean;
+  canSend: boolean;
+  disabledReason: string | null;
+  error: string | null;
+  sessions: SessionsListResult | null;
+  // Focus mode
+  focusMode: boolean;
+  // Sidebar state
+  sidebarOpen?: boolean;
+  sidebarContent?: string | null;
+  sidebarError?: string | null;
+  sidebarMimeType?: string | null;
+  sidebarFilePath?: string | null;
+  sidebarTitle?: string | null;
+  splitRatio?: number;
+  assistantName: string;
+  assistantAvatar: string | null;
+  userName?: string;
+  userAvatar?: string | null;
+  // Working indicator
+  currentToolName?: string | null;
+  currentToolInfo?: ToolExecutionInfo | null;
+  isWorking?: boolean; // True when session is actively processing
+  // Scroll state
+  showNewMessages?: boolean;
+  onScrollToBottom?: () => void;
+  // Image attachments
+  attachments?: ChatAttachment[];
+  onAttachmentsChange?: (attachments: ChatAttachment[]) => void;
+  // Event handlers
+  onRefresh: () => void;
+  onToggleFocusMode: () => void;
+  onDraftChange: (next: string) => void;
+  onSend: (queue?: boolean) => void;
+  onAbort?: () => void;
+  onCompact?: () => void;
+  onQueueRemove: (id: string) => void;
+  onNewSession: () => void;
+  onConsciousnessFlush?: () => void;
+  consciousnessStatus?: "idle" | "loading" | "ok" | "error";
+  onOpenSidebar?: (
+    content: string,
+    opts?: { mimeType?: string | null; filePath?: string | null; title?: string | null },
+  ) => void;
+  onMessageLinkClick?: (href: string) => boolean | Promise<boolean>;
+  onCloseSidebar?: () => void;
+  onSplitRatioChange?: (ratio: number) => void;
+  onChatScroll?: (event: Event) => void;
+  // Retry after context overflow
+  pendingRetry?: FailedMessage | null;
+  onRetry?: () => void;
+  onClearRetry?: () => void;
+  // Toast notifications for file upload errors
+  showToast?: (message: string, type: ToastType) => void;
+};
+
+const COMPACTION_TOAST_DURATION_MS = 5000;
+
+function resolveConsciousnessIconSrc(basePath?: string): string {
+  const trimmedBasePath = (basePath ?? "").trim();
+  if (!trimmedBasePath || trimmedBasePath === "/") {
+    return "/consciousness-icon.webp";
+  }
+  const normalizedBasePath = trimmedBasePath.startsWith("/")
+    ? trimmedBasePath
+    : `/${trimmedBasePath}`;
+  const withoutTrailingSlash = normalizedBasePath.endsWith("/")
+    ? normalizedBasePath.slice(0, -1)
+    : normalizedBasePath;
+  return `${withoutTrailingSlash}/consciousness-icon.webp`;
+}
+
+function adjustTextareaHeight(el: HTMLTextAreaElement) {
+  el.style.height = "auto";
+  el.style.height = `${el.scrollHeight}px`;
+}
+
+function estimateContextUsage(props: ChatProps): number | null {
+  // Use actual token data from the sessions list
+  const activeSession = props.sessions?.sessions?.find((row) => row.key === props.sessionKey);
+
+  if (!activeSession) {
+    return null;
+  }
+
+  const used = activeSession.totalTokens ?? 0;
+  const max = activeSession.contextTokens ?? props.sessions?.defaults?.contextTokens ?? 200000;
+
+  if (max <= 0) {
+    return null;
+  }
+
+  return used / max;
+}
+
+function renderContextBadge(props: ChatProps) {
+  const usage = estimateContextUsage(props);
+  if (usage === null) {
+    return nothing;
+  }
+
+  const percentage = Math.round(usage * 100);
+  const colorClass = percentage >= 90 ? "danger" : percentage >= 70 ? "warn" : "ok";
+
+  // Get token details for tooltip
+  const activeSession = props.sessions?.sessions?.find((row) => row.key === props.sessionKey);
+  const used = activeSession?.totalTokens ?? 0;
+  const max = activeSession?.contextTokens ?? props.sessions?.defaults?.contextTokens ?? 200000;
+
+  return html`
+    <button
+      type="button"
+      class="chat-context-badge chat-context-badge--${colorClass}"
+      role="status"
+      aria-label="Context window: ${percentage}% used. Click to compact."
+      @click=${() => props.onCompact?.()}
+      ?disabled=${!props.connected}
+    >
+      ${percentage}%
+      <span class="chat-context-badge__tooltip">
+        ${used.toLocaleString()} / ${max.toLocaleString()} tokens<br>
+        Click to compact
+      </span>
+    </button>
+  `;
+}
+
+function renderCompactionIndicator(status: CompactionIndicatorStatus | null | undefined) {
+  if (!status) {
+    return nothing;
+  }
+
+  if (status.active) {
+    return html`
+      <div class="compaction-bar compaction-bar--active">
+        <span class="compaction-bar__icon">${icons.loader}</span>
+        <span class="compaction-bar__text">Optimizing context...</span>
+      </div>
+    `;
+  }
+
+  if (status.completedAt) {
+    const elapsed = Date.now() - status.completedAt;
+    if (elapsed < COMPACTION_TOAST_DURATION_MS) {
+      return html`
+        <div class="compaction-bar compaction-bar--complete">
+          <span class="compaction-bar__icon">${icons.check}</span>
+          <span class="compaction-bar__text">Context optimized</span>
+        </div>
+      `;
+    }
+  }
+
+  return nothing;
+}
+
+function generateAttachmentId(): string {
+  return `att-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+}
+
+function handleDragOver(e: DragEvent) {
+  e.preventDefault();
+  e.stopPropagation();
+  if (e.dataTransfer) {
+    e.dataTransfer.dropEffect = "copy";
+  }
+}
+
+function handleDragEnter(e: DragEvent, element: HTMLElement) {
+  e.preventDefault();
+  e.stopPropagation();
+  element.classList.add("chat--drag-over");
+}
+
+function handleDragLeave(e: DragEvent, element: HTMLElement) {
+  e.preventDefault();
+  e.stopPropagation();
+  // Only remove class if we're leaving the element entirely
+  const rect = element.getBoundingClientRect();
+  if (
+    e.clientX <= rect.left ||
+    e.clientX >= rect.right ||
+    e.clientY <= rect.top ||
+    e.clientY >= rect.bottom
+  ) {
+    element.classList.remove("chat--drag-over");
+  }
+}
+
+function handleDrop(e: DragEvent, props: ChatProps) {
+  e.preventDefault();
+  e.stopPropagation();
+
+  const element = e.currentTarget as HTMLElement;
+  element.classList.remove("chat--drag-over");
+
+  const files = e.dataTransfer?.files;
+  if (!files || files.length === 0 || !props.onAttachmentsChange) {
+    return;
+  }
+
+  // Validate files before processing
+  const currentAttachments = props.attachments ?? [];
+  const existingSize = currentAttachments.reduce((sum, att) => {
+    return sum + (att.dataUrl?.length ?? 0) * 0.75;
+  }, 0);
+
+  const { validFiles, errors } = validateFilesForUpload(files, existingSize);
+
+  // Show validation errors
+  for (const error of errors) {
+    props.showToast?.(error, "error");
+  }
+
+  if (validFiles.length === 0) {
+    return;
+  }
+
+  // Original working pattern: accumulate all files, update once at end
+  const newAttachments: ChatAttachment[] = [];
+  let pending = validFiles.length;
+
+  for (const file of validFiles) {
+    const reader = new FileReader();
+
+    reader.addEventListener("load", () => {
+      const dataUrl = reader.result as string;
+      newAttachments.push({
+        id: generateAttachmentId(),
+        dataUrl,
+        mimeType: file.type || "application/octet-stream",
+        fileName: file.name,
+      });
+      pending--;
+      if (pending === 0) {
+        props.onAttachmentsChange?.([...currentAttachments, ...newAttachments]);
+      }
+    });
+
+    reader.addEventListener("error", () => {
+      props.showToast?.(`Failed to read "${file.name}"`, "error");
+      pending--;
+      if (pending === 0 && newAttachments.length > 0) {
+        props.onAttachmentsChange?.([...currentAttachments, ...newAttachments]);
+      }
+    });
+
+    reader.readAsDataURL(file);
+  }
+}
+
+function handlePaste(e: ClipboardEvent, props: ChatProps) {
+  const items = e.clipboardData?.items;
+  if (!items || !props.onAttachmentsChange) {
+    return;
+  }
+
+  const imageFiles: File[] = [];
+  for (let i = 0; i < items.length; i++) {
+    const item = items[i];
+    if (item.type.startsWith("image/")) {
+      const file = item.getAsFile();
+      if (file) {
+        imageFiles.push(file);
+      }
+    }
+  }
+
+  if (imageFiles.length === 0) {
+    return;
+  }
+
+  e.preventDefault();
+
+  // Validate pasted images
+  const currentAttachments = props.attachments ?? [];
+  const existingSize = currentAttachments.reduce((sum, att) => {
+    return sum + (att.dataUrl?.length ?? 0) * 0.75;
+  }, 0);
+
+  const { validFiles, errors } = validateFilesForUpload(imageFiles, existingSize);
+
+  for (const error of errors) {
+    props.showToast?.(error, "error");
+  }
+
+  if (validFiles.length === 0) {
+    return;
+  }
+
+  // Original working pattern: accumulate all, update once at end
+  const newAttachments: ChatAttachment[] = [];
+  let pending = validFiles.length;
+
+  for (const file of validFiles) {
+    const reader = new FileReader();
+
+    reader.addEventListener("load", () => {
+      const dataUrl = reader.result as string;
+      newAttachments.push({
+        id: generateAttachmentId(),
+        dataUrl,
+        mimeType: file.type,
+        fileName: file.name || "pasted-image",
+      });
+      pending--;
+      if (pending === 0) {
+        props.onAttachmentsChange?.([...currentAttachments, ...newAttachments]);
+      }
+    });
+
+    reader.addEventListener("error", () => {
+      props.showToast?.("Failed to read pasted image", "error");
+      pending--;
+      if (pending === 0 && newAttachments.length > 0) {
+        props.onAttachmentsChange?.([...currentAttachments, ...newAttachments]);
+      }
+    });
+
+    reader.readAsDataURL(file);
+  }
+}
+
+function handleFileSelect(e: Event, props: ChatProps) {
+  const input = e.target as HTMLInputElement;
+  const files = input.files;
+  if (!files || !props.onAttachmentsChange) {
+    return;
+  }
+
+  // Validate files before processing
+  const currentAttachments = props.attachments ?? [];
+  const existingSize = currentAttachments.reduce((sum, att) => {
+    return sum + (att.dataUrl?.length ?? 0) * 0.75;
+  }, 0);
+
+  const { validFiles, errors } = validateFilesForUpload(files, existingSize);
+
+  // Show validation errors
+  for (const error of errors) {
+    props.showToast?.(error, "error");
+  }
+
+  if (validFiles.length === 0) {
+    input.value = "";
+    return;
+  }
+
+  // Original working pattern: accumulate all, update once at end
+  const newAttachments: ChatAttachment[] = [];
+  let pending = validFiles.length;
+
+  for (const file of validFiles) {
+    const reader = new FileReader();
+
+    reader.addEventListener("load", () => {
+      const dataUrl = reader.result as string;
+      newAttachments.push({
+        id: generateAttachmentId(),
+        dataUrl,
+        mimeType: file.type || "application/octet-stream",
+        fileName: file.name,
+      });
+      pending--;
+      if (pending === 0) {
+        props.onAttachmentsChange?.([...currentAttachments, ...newAttachments]);
+      }
+    });
+
+    reader.addEventListener("error", () => {
+      props.showToast?.(`Failed to read "${file.name}"`, "error");
+      pending--;
+      if (pending === 0 && newAttachments.length > 0) {
+        props.onAttachmentsChange?.([...currentAttachments, ...newAttachments]);
+      }
+    });
+
+    reader.readAsDataURL(file);
+  }
+
+  // Reset so same file can be selected again
+  input.value = "";
+}
+
+function renderAttachmentPreview(props: ChatProps) {
+  const attachments = props.attachments ?? [];
+  if (attachments.length === 0) {
+    return nothing;
+  }
+
+  return html`
+    <div class="chat-attachments">
+      ${attachments.map((att) => {
+        const isImage = att.mimeType.startsWith("image/");
+        const fileName = att.fileName || "file";
+        const shortName = fileName.length > 20 ? fileName.slice(0, 17) + "..." : fileName;
+
+        return html`
+          <div class="chat-attachment ${isImage ? "" : "chat-attachment--file"}">
+            ${
+              isImage
+                ? html`<img src=${att.dataUrl} alt="Attachment preview" class="chat-attachment__img" />`
+                : html`<div class="chat-attachment__file">
+                  ${icons.fileText}
+                  <span class="chat-attachment__filename" title=${fileName}>${shortName}</span>
+                </div>`
+            }
+            <button
+              class="chat-attachment__remove"
+              type="button"
+              aria-label="Remove attachment"
+              @click=${() => {
+                const next = (props.attachments ?? []).filter((a) => a.id !== att.id);
+                props.onAttachmentsChange?.(next);
+              }}
+            >
+              ${icons.x}
+            </button>
+          </div>
+        `;
+      })}
+    </div>
+  `;
+}
+
+function isPlainPrimaryClick(event: MouseEvent): boolean {
+  return event.button === 0 && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey;
+}
+
+function openAnchorFallback(anchor: HTMLAnchorElement) {
+  const href = anchor.href;
+  if (!href) {
+    return;
+  }
+  if (anchor.target === "_blank") {
+    window.open(href, "_blank", "noopener,noreferrer");
+    return;
+  }
+  window.location.assign(href);
+}
+
+function extractPathCandidateFromCode(text: string): string | null {
+  const candidate = text.trim();
+  if (!candidate || candidate.includes("\n")) {
+    return null;
+  }
+  if (
+    candidate.startsWith("/") ||
+    candidate.startsWith("~/") ||
+    candidate.startsWith("./") ||
+    candidate.startsWith("../") ||
+    /^[a-z]:[\\/]/i.test(candidate)
+  ) {
+    return candidate;
+  }
+  if (/^[^:\s]+\/[^\s]+$/.test(candidate) && /\.[a-z0-9]{1,12}$/i.test(candidate)) {
+    return candidate;
+  }
+  return null;
+}
+
+async function handleChatThreadLinkClick(event: MouseEvent, props: ChatProps) {
+  const rawTarget = event.target;
+  const target =
+    rawTarget instanceof Element
+      ? rawTarget
+      : rawTarget instanceof Node
+        ? rawTarget.parentElement
+        : null;
+  if (!target) {
+    return;
+  }
+
+  if (!props.onMessageLinkClick || !isPlainPrimaryClick(event)) {
+    return;
+  }
+
+  const anchor = target.closest("a");
+  if (anchor instanceof HTMLAnchorElement) {
+    if (anchor.hasAttribute("download")) {
+      return;
+    }
+
+    const href = anchor.getAttribute("href");
+    if (!href) {
+      return;
+    }
+
+    event.preventDefault();
+    const handled = await props.onMessageLinkClick(href);
+    if (!handled) {
+      openAnchorFallback(anchor);
+    }
+    return;
+  }
+
+  const code = target.closest("code");
+  if (!(code instanceof HTMLElement)) {
+    return;
+  }
+
+  const pathCandidate = extractPathCandidateFromCode(code.textContent ?? "");
+  if (!pathCandidate) {
+    return;
+  }
+
+  event.preventDefault();
+  await props.onMessageLinkClick(pathCandidate);
+}
+
+export function renderChat(props: ChatProps) {
+  const canCompose = props.connected;
+  const isBusy = props.sending || props.stream !== null;
+  const _canAbort = Boolean(props.canAbort && props.onAbort);
+  const activeSession = props.sessions?.sessions?.find((row) => row.key === props.sessionKey);
+  const reasoningLevel = activeSession?.reasoningLevel ?? "off";
+  const showReasoning = props.showThinking && reasoningLevel !== "off";
+  const assistantIdentity = {
+    name: props.assistantName,
+    avatar: props.assistantAvatar ?? props.assistantAvatarUrl ?? null,
+  };
+
+  const hasAttachments = (props.attachments?.length ?? 0) > 0;
+  const composePlaceholder = props.connected
+    ? hasAttachments
+      ? "Add a message or paste more images..."
+      : "Message (↩ to send, ⌘↩ to queue, Shift+↩ for line breaks)"
+    : "Connect to the gateway to start chatting…";
+
+  const splitRatio = props.splitRatio ?? 0.6;
+  const sidebarOpen = Boolean(props.sidebarOpen && props.onCloseSidebar);
+  const consciousnessIconSrc = resolveConsciousnessIconSrc(props.basePath);
+  const thread = html`
+    <div
+      class="chat-thread"
+      role="log"
+      aria-live="polite"
+      @scroll=${props.onChatScroll}
+      @click=${(event: MouseEvent) => void handleChatThreadLinkClick(event, props)}
+    >
+      ${
+        props.loading
+          ? html`
+              <div class="muted">Loading chat…</div>
+            `
+          : nothing
+      }
+      ${repeat(
+        buildChatItems(props),
+        (item) => item.key,
+        (item) => {
+          try {
+            if (item.kind === "reading-indicator") {
+              return renderReadingIndicatorGroup(assistantIdentity, props.currentToolInfo);
+            }
+
+            if (item.kind === "stream") {
+              return renderStreamingGroup(
+                item.text,
+                item.startedAt,
+                props.onOpenSidebar,
+                assistantIdentity,
+                props.currentToolInfo,
+              );
+            }
+
+            if (item.kind === "compaction-summary") {
+              return renderCompactionSummary(item.message);
+            }
+
+            if (item.kind === "group") {
+              return renderMessageGroup(item, {
+                onOpenSidebar: props.onOpenSidebar,
+                showReasoning,
+                assistantName: props.assistantName,
+                assistantAvatar: assistantIdentity.avatar,
+                userName: props.userName,
+                userAvatar: props.userAvatar,
+              });
+            }
+
+            return nothing;
+          } catch (err) {
+            console.error("[chat] item render error:", err, item.key);
+            return nothing;
+          }
+        },
+      )}
+    </div>
+  `;
+
+  return html`
+    <section 
+      class="card chat"
+      @dragover=${handleDragOver}
+      @dragenter=${(e: DragEvent) => handleDragEnter(e, e.currentTarget as HTMLElement)}
+      @dragleave=${(e: DragEvent) => handleDragLeave(e, e.currentTarget as HTMLElement)}
+      @drop=${(e: DragEvent) => handleDrop(e, props)}
+    >
+      ${props.disabledReason ? html`<div class="callout">${props.disabledReason}</div>` : nothing}
+
+      ${props.error ? html`<div class="callout danger">${props.error}</div>` : nothing}
+
+      ${renderCompactionIndicator(props.compactionStatus)}
+
+      ${
+        props.pendingRetry && props.onRetry
+          ? html`
+            <div class="callout info chat-retry-banner">
+              <span class="chat-retry-banner__text">
+                Message ready to retry after compaction
+              </span>
+              <div class="chat-retry-banner__actions">
+                <button
+                  class="btn btn--primary btn--sm"
+                  type="button"
+                  @click=${props.onRetry}
+                >
+                  Retry
+                </button>
+                ${
+                  props.onClearRetry
+                    ? html`
+                      <button
+                        class="btn btn--ghost btn--sm"
+                        type="button"
+                        @click=${props.onClearRetry}
+                      >
+                        Dismiss
+                      </button>
+                    `
+                    : nothing
+                }
+              </div>
+            </div>
+          `
+          : nothing
+      }
+
+      ${
+        props.focusMode
+          ? html`
+            <button
+              class="chat-focus-exit"
+              type="button"
+              @click=${props.onToggleFocusMode}
+              aria-label="Exit focus mode"
+              title="Exit focus mode"
+            >
+              ${icons.x}
+            </button>
+          `
+          : nothing
+      }
+
+      <div
+        class="chat-split-container ${sidebarOpen ? "chat-split-container--open" : ""}"
+      >
+        <div
+          class="chat-main"
+          style="flex: ${sidebarOpen ? `0 0 ${splitRatio * 100}%` : "1 1 100%"}"
+        >
+          ${thread}
+        </div>
+
+        ${
+          sidebarOpen
+            ? html`
+              <resizable-divider
+                .splitRatio=${splitRatio}
+                @resize=${(e: CustomEvent) => props.onSplitRatioChange?.(e.detail.splitRatio)}
+              ></resizable-divider>
+              <div class="chat-sidebar">
+                ${renderMarkdownSidebar({
+                  content: props.sidebarContent ?? null,
+                  error: props.sidebarError ?? null,
+                  mimeType: props.sidebarMimeType ?? null,
+                  filePath: props.sidebarFilePath ?? null,
+                  title: props.sidebarTitle ?? null,
+                  onClose: props.onCloseSidebar!,
+                  onViewRawText: () => {
+                    if (!props.sidebarContent || !props.onOpenSidebar) {
+                      return;
+                    }
+                    props.onOpenSidebar(props.sidebarContent, {
+                      mimeType: "text/plain",
+                      filePath: props.sidebarFilePath ?? null,
+                      title: props.sidebarTitle ?? null,
+                    });
+                  },
+                })}
+              </div>
+            `
+            : nothing
+        }
+      </div>
+
+      ${
+        props.queue.length
+          ? html`
+            <div class="chat-queue" role="status" aria-live="polite">
+              <div class="chat-queue__title">Queued (${props.queue.length})</div>
+              <div class="chat-queue__list">
+                ${props.queue.map(
+                  (item) => html`
+                    <div class="chat-queue__item">
+                      <div class="chat-queue__text">
+                        ${
+                          item.text ||
+                          (item.attachments?.length ? `Image (${item.attachments.length})` : "")
+                        }
+                      </div>
+                      <button
+                        class="btn chat-queue__remove"
+                        type="button"
+                        aria-label="Remove queued message"
+                        @click=${() => props.onQueueRemove(item.id)}
+                      >
+                        ${icons.x}
+                      </button>
+                    </div>
+                  `,
+                )}
+              </div>
+            </div>
+          `
+          : nothing
+      }
+
+      <div class="chat-compose">
+        <div class="chat-compose__wrapper">
+          <input
+            type="file"
+            id="chat-file-input"
+            multiple
+            style="display: none"
+            @change=${(e: Event) => handleFileSelect(e, props)}
+          />
+          ${renderAttachmentPreview(props)}
+
+          <div class="chat-compose__input-area">
+            <textarea
+              class="chat-compose__textarea"
+              ${ref((el) => el && adjustTextareaHeight(el as HTMLTextAreaElement))}
+              .value=${props.draft}
+              ?disabled=${!props.connected}
+              @keydown=${(e: KeyboardEvent) => {
+                if (e.key !== "Enter") {
+                  return;
+                }
+                if (e.isComposing || e.keyCode === 229) {
+                  return;
+                }
+                if (e.shiftKey) {
+                  return;
+                } // Allow Shift+Enter for line breaks
+                if (!props.connected) {
+                  return;
+                }
+                e.preventDefault();
+                // Cmd/Ctrl+Enter = queue (wait turn), regular Enter = send (immediate/interrupt)
+                const wantsQueue = e.ctrlKey || e.metaKey;
+                if (canCompose) {
+                  props.onSend(wantsQueue);
+                }
+              }}
+              @input=${(e: Event) => {
+                const target = e.target as HTMLTextAreaElement;
+                adjustTextareaHeight(target);
+                props.onDraftChange(target.value);
+              }}
+              @paste=${(e: ClipboardEvent) => handlePaste(e, props)}
+              placeholder=${composePlaceholder}
+            ></textarea>
+
+            <div class="chat-compose__actions">
+              ${renderContextBadge(props)}
+
+              <button
+                class="chat-compose__toolbar-btn"
+                type="button"
+                title="Attach files"
+                ?disabled=${!props.connected}
+                @click=${() => {
+                  const input = document.getElementById("chat-file-input") as HTMLInputElement;
+                  input?.click();
+                }}
+              >
+                ${icons.paperclip}
+              </button>
+
+              ${props.onConsciousnessFlush
+                ? html`
+                  <button
+                    class="chat-compose__toolbar-btn consciousness-btn ${props.consciousnessStatus === "ok" ? "consciousness-btn--ok" : ""} ${props.consciousnessStatus === "error" ? "consciousness-btn--error" : ""}"
+                    type="button"
+                    ?disabled=${props.consciousnessStatus === "loading"}
+                    @click=${props.onConsciousnessFlush}
+                    title="Sync consciousness — refreshes Atlas's live context (⌘⇧H)"
+                    aria-label="Sync consciousness"
+                  >
+                    ${props.consciousnessStatus === "loading"
+                      ? icons.loader
+                      : html`<img src=${consciousnessIconSrc} width="18" height="18" alt="" style="display:block;opacity:0.9;" />`
+                    }
+                  </button>
+                `
+                : nothing
+              }
+
+              <button
+                class="chat-compose__send-btn"
+                ?disabled=${!props.canSend || !props.connected}
+                @click=${() => props.onSend(false)}
+                title=${isBusy ? "Send now - interrupts current run (↵)" : "Send message (↵)"}
+              >
+                ${icons.arrowUp}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  `;
+}
+
+const CHAT_HISTORY_RENDER_LIMIT = 200;
+
+function groupMessages(items: ChatItem[]): Array<ChatItem | MessageGroup> {
+  const result: Array<ChatItem | MessageGroup> = [];
+  let currentGroup: MessageGroup | null = null;
+
+  for (const item of items) {
+    if (item.kind !== "message") {
+      if (currentGroup) {
+        result.push(currentGroup);
+        currentGroup = null;
+      }
+      result.push(item);
+      continue;
+    }
+
+    const normalized = normalizeMessage(item.message);
+    const role = normalizeRoleForGrouping(normalized.role);
+    const timestamp = normalized.timestamp || Date.now();
+
+    if (!currentGroup || currentGroup.role !== role) {
+      if (currentGroup) {
+        result.push(currentGroup);
+      }
+      currentGroup = {
+        kind: "group",
+        key: `group:${role}:${item.key}`,
+        role,
+        messages: [{ message: item.message, key: item.key }],
+        timestamp,
+        isStreaming: false,
+      };
+    } else {
+      currentGroup.messages.push({ message: item.message, key: item.key });
+    }
+  }
+
+  if (currentGroup) {
+    result.push(currentGroup);
+  }
+  return result;
+}
+
+function messageHasImage(message: unknown): boolean {
+  const m = message as Record<string, unknown>;
+  const content = m.content;
+  if (!Array.isArray(content)) {
+    return false;
+  }
+  for (const block of content) {
+    if (typeof block !== "object" || block === null) {
+      continue;
+    }
+    const b = block as Record<string, unknown>;
+    if (b.type === "image") {
+      return true;
+    }
+    if (Array.isArray(b.content)) {
+      for (const nested of b.content) {
+        if (typeof nested !== "object" || nested === null) {
+          continue;
+        }
+        if ((nested as Record<string, unknown>).type === "image") {
+          return true;
+        }
+      }
+    }
+  }
+  return false;
+}
+
+function buildChatItems(props: ChatProps): Array<ChatItem | MessageGroup> {
+  const items: ChatItem[] = [];
+  const history = Array.isArray(props.messages) ? props.messages : [];
+  const tools = Array.isArray(props.toolMessages) ? props.toolMessages : [];
+  const historyStart = Math.max(0, history.length - CHAT_HISTORY_RENDER_LIMIT);
+  if (historyStart > 0) {
+    items.push({
+      kind: "message",
+      key: "chat:history:notice",
+      message: {
+        role: "system",
+        content: `Showing last ${CHAT_HISTORY_RENDER_LIMIT} messages (${historyStart} hidden).`,
+        timestamp: Date.now(),
+      },
+    });
+  }
+  for (let i = historyStart; i < history.length; i++) {
+    const msg = history[i];
+
+    // Handle compaction summary messages with special rendering
+    if (isCompactionSummary(msg)) {
+      items.push({
+        kind: "compaction-summary" as const,
+        key: `compaction:${i}`,
+        message: msg,
+      } as ChatItem);
+      continue;
+    }
+
+    const normalized = normalizeMessage(msg);
+
+    if (!props.showThinking && normalized.role.toLowerCase() === "toolresult") {
+      if (!messageHasImage(msg)) {
+        continue;
+      }
+    }
+
+    items.push({
+      kind: "message",
+      key: messageKey(msg, i),
+      message: msg,
+    });
+  }
+  if (props.showThinking) {
+    for (let i = 0; i < tools.length; i++) {
+      items.push({
+        kind: "message",
+        key: messageKey(tools[i], i + history.length),
+        message: tools[i],
+      });
+    }
+  }
+
+  if (props.stream !== null) {
+    const key = `stream:${props.sessionKey}:${props.streamStartedAt ?? "live"}`;
+    if (props.stream.trim().length > 0) {
+      items.push({
+        kind: "stream",
+        key,
+        text: props.stream,
+        startedAt: props.streamStartedAt ?? Date.now(),
+      });
+    } else {
+      items.push({ kind: "reading-indicator", key });
+    }
+  } else if (props.isWorking) {
+    // Show working indicator even when not streaming (e.g., running tools)
+    const key = `working:${props.sessionKey}`;
+    items.push({ kind: "reading-indicator", key });
+  } else if (props.sending || props.canAbort) {
+    // Fallback: show indicator while sending or if we can abort (run in progress)
+    const key = `sending:${props.sessionKey}`;
+    items.push({ kind: "reading-indicator", key });
+  }
+
+  return groupMessages(items);
+}
+
+function messageKey(message: unknown, index: number): string {
+  const m = message as Record<string, unknown>;
+  const toolCallId = typeof m.toolCallId === "string" ? m.toolCallId : "";
+  if (toolCallId) {
+    return `tool:${toolCallId}`;
+  }
+  const id = typeof m.id === "string" ? m.id : "";
+  if (id) {
+    return `msg:${id}`;
+  }
+  const messageId = typeof m.messageId === "string" ? m.messageId : "";
+  if (messageId) {
+    return `msg:${messageId}`;
+  }
+  const timestamp = typeof m.timestamp === "number" ? m.timestamp : null;
+  const role = typeof m.role === "string" ? m.role : "unknown";
+  if (timestamp != null) {
+    return `msg:${role}:${timestamp}:${index}`;
+  }
+  return `msg:${role}:${index}`;
+}

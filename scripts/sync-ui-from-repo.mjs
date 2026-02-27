@@ -1,8 +1,8 @@
 /**
  * sync-ui-from-repo.mjs — Sync built GodMode UI into plugin fallback assets.
  *
- * This keeps assets/godmode-ui aligned for environments that do not have
- * a sibling godmode-ui repo available at build time.
+ * This keeps assets/godmode-ui aligned for npm installs that skip the build step.
+ * Default source is ui/dist (in-repo Vite output).
  */
 
 import { cpSync, existsSync, mkdirSync, readFileSync, rmSync } from "node:fs";
@@ -36,13 +36,13 @@ function hasGodModeRootTag(sourceDir) {
 const sourceDir =
   readFlag("--ui-dir") ||
   (process.env.GODMODE_UI_DIR ? resolve(process.env.GODMODE_UI_DIR) : null) ||
-  join(pluginRoot, "..", "godmode-ui", "dist");
+  join(pluginRoot, "ui", "dist");
 
 const destDir = readFlag("--dest") || join(pluginRoot, "assets", "godmode-ui");
 
 if (!hasGodModeRootTag(sourceDir)) {
   console.error(`[sync-ui] Missing valid GodMode UI build at: ${sourceDir}`);
-  console.error("[sync-ui] Run UI build first, e.g. `cd ../godmode-ui && pnpm build`.");
+  console.error("[sync-ui] Run UI build first: `pnpm build:ui`.");
   process.exit(1);
 }
 

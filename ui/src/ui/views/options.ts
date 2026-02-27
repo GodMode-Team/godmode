@@ -1,0 +1,122 @@
+import { html, nothing } from "lit";
+
+// ===== Feature Descriptors =====
+
+type FeatureDescriptor = {
+  key: string;
+  icon: string;
+  name: string;
+  description: string;
+  default: boolean;
+};
+
+const FEATURES: FeatureDescriptor[] = [
+  {
+    key: "focusPulse.enabled",
+    icon: "\u2600\uFE0F",
+    name: "Focus Pulse",
+    description:
+      "Morning priority ritual + persistent focus widget in the topbar. Silent 30-min pulse checks compare your activity against your plan.",
+    default: true,
+  },
+  {
+    key: "deck.enabled",
+    icon: "\uD83C\uDFDB\uFE0F",
+    name: "Deck",
+    description:
+      "Parallel agent session manager. Opens in a separate tab for multi-agent workflows.",
+    default: false,
+  },
+  {
+    key: "missionControl.enabled",
+    icon: "\uD83D\uDCE1",
+    name: "Mission Control",
+    description:
+      "Ops dashboard for gateway health, feed activity, and task queue. Under reconstruction.",
+    default: false,
+  },
+];
+
+// ===== Types =====
+
+export type OptionsProps = {
+  connected: boolean;
+  loading?: boolean;
+  options: Record<string, unknown> | null;
+  onToggle: (key: string, value: unknown) => void;
+  onRefresh: () => void;
+};
+
+// ===== Render =====
+
+function renderToggle(checked: boolean, onChange: () => void) {
+  return html`
+    <button
+      class="options-toggle ${checked ? "options-toggle--on" : ""}"
+      role="switch"
+      aria-checked="${checked}"
+      @click=${onChange}
+    >
+      <span class="options-toggle-track">
+        <span class="options-toggle-thumb"></span>
+      </span>
+    </button>
+  `;
+}
+
+function renderFeatureCard(
+  feature: FeatureDescriptor,
+  options: Record<string, unknown> | null,
+  onToggle: (key: string, value: unknown) => void,
+) {
+  const currentValue = options?.[feature.key] ?? feature.default;
+  const isEnabled = Boolean(currentValue);
+
+  return html`
+    <div class="options-card card">
+      <div class="options-card-header">
+        <div class="options-card-info">
+          <span class="options-card-icon">${feature.icon}</span>
+          <span class="options-card-name">${feature.name}</span>
+        </div>
+        ${renderToggle(isEnabled, () => onToggle(feature.key, !isEnabled))}
+      </div>
+      <div class="options-card-description">${feature.description}</div>
+    </div>
+  `;
+}
+
+export function renderOptions(props: OptionsProps) {
+  const { connected, loading, options, onToggle } = props;
+
+  if (!connected) {
+    return html`
+      <section class="tab-body options-section">
+        <div class="options-empty">Not connected to gateway.</div>
+      </section>
+    `;
+  }
+
+  if (loading && !options) {
+    return html`
+      <section class="tab-body options-section">
+        <div class="options-loading">Loading options...</div>
+      </section>
+    `;
+  }
+
+  return html`
+    <section class="tab-body options-section">
+      <div class="options-grid">
+        ${FEATURES.map((feature) =>
+          renderFeatureCard(feature, options, onToggle),
+        )}
+      </div>
+      ${FEATURES.length === 0
+        ? html`<div class="options-empty">
+            No configurable features yet.
+          </div>`
+        : nothing}
+    </section>
+  `;
+}
