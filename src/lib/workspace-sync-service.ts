@@ -214,6 +214,7 @@ export class WorkspaceSyncService {
   }
 
   async manualSync(workspaceId: string): Promise<WorkspaceSyncStatus> {
+    await this.ensureStarted();
     const workspace = this.workspaceById.get(workspaceId);
     if (!workspace || !workspace.sync) {
       const status: WorkspaceSyncStatus = {
@@ -237,6 +238,37 @@ export class WorkspaceSyncService {
     );
   }
 
+  /** Cancel any pending debounce timer and push immediately. */
+  async pushNow(workspaceId: string): Promise<WorkspaceSyncStatus> {
+    await this.ensureStarted();
+    const existing = this.pushTimers.get(workspaceId);
+    if (existing) {
+      clearTimeout(existing);
+      this.pushTimers.delete(workspaceId);
+    }
+    await this.runPush(workspaceId, "manual");
+    return (
+      this.status.get(workspaceId) ?? {
+        status: "error",
+        lastActivityAt: Date.now(),
+        lastError: "Push status unavailable",
+      }
+    );
+  }
+
+  /** Run a git pull immediately (bypasses interval timer). */
+  async pullNow(workspaceId: string): Promise<WorkspaceSyncStatus> {
+    await this.ensureStarted();
+    await this.runPull(workspaceId, "manual");
+    return (
+      this.status.get(workspaceId) ?? {
+        status: "error",
+        lastActivityAt: Date.now(),
+        lastError: "Pull status unavailable",
+      }
+    );
+  }
+
   private async teardownWorkspace(workspaceId: string): Promise<void> {
     const pull = this.pullTimers.get(workspaceId);
     if (pull) {
@@ -255,6 +287,13 @@ export class WorkspaceSyncService {
       await watcher.close();
       this.watchers.delete(workspaceId);
     }
+  }
+
+  private async ensureStarted(): Promise<void> {
+    if (this.started) {
+      return;
+    }
+    await this.start();
   }
 
   private ensureAutoPull(workspace: WorkspaceConfigEntry): void {

@@ -19,6 +19,19 @@ export type WorkspaceGitSyncConfig = {
   };
 };
 
+export type TeamWorkspaceConfig = {
+  github?: string;
+  role?: "admin" | "member";
+  agentName?: string;
+  memberId?: string;
+};
+
+export type WorkspaceCurationConfig = {
+  enabled: boolean;
+  schedule?: string;
+  threshold?: number;
+};
+
 export type WorkspaceConfigEntry = {
   id: string;
   name: string;
@@ -31,6 +44,8 @@ export type WorkspaceConfigEntry = {
   /** Directories (relative to path) scanned for artifacts. Defaults to ["outputs"]. */
   artifactDirs: string[];
   sync?: WorkspaceGitSyncConfig;
+  team?: TeamWorkspaceConfig;
+  curation?: WorkspaceCurationConfig;
 };
 
 export type WorkspaceConfigFile = {
@@ -208,6 +223,50 @@ function normalizeWorkspaceSyncConfig(raw: unknown): WorkspaceGitSyncConfig | un
   };
 }
 
+function normalizeTeamConfig(raw: unknown): TeamWorkspaceConfig | undefined {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+    return undefined;
+  }
+  const candidate = raw as Record<string, unknown>;
+  const github =
+    typeof candidate.github === "string" && candidate.github.trim()
+      ? candidate.github.trim()
+      : undefined;
+  const roleRaw = typeof candidate.role === "string" ? candidate.role.trim().toLowerCase() : "";
+  const role = roleRaw === "admin" ? "admin" : roleRaw === "member" ? "member" : undefined;
+  const agentName =
+    typeof candidate.agentName === "string" && candidate.agentName.trim()
+      ? candidate.agentName.trim()
+      : undefined;
+  const memberId =
+    typeof candidate.memberId === "string" && candidate.memberId.trim()
+      ? candidate.memberId.trim()
+      : undefined;
+
+  if (!github && !role && !agentName && !memberId) {
+    return undefined;
+  }
+  return { github, role, agentName, memberId };
+}
+
+function normalizeCurationConfig(raw: unknown): WorkspaceCurationConfig | undefined {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+    return undefined;
+  }
+  const candidate = raw as Record<string, unknown>;
+  const enabled = Boolean(candidate.enabled);
+  const schedule =
+    typeof candidate.schedule === "string" && candidate.schedule.trim()
+      ? candidate.schedule.trim()
+      : undefined;
+  const threshold =
+    typeof candidate.threshold === "number" && Number.isFinite(candidate.threshold) && candidate.threshold > 0
+      ? candidate.threshold
+      : undefined;
+
+  return { enabled, schedule, threshold };
+}
+
 function normalizeWorkspaceEntry(
   raw: Record<string, unknown>,
   index: number,
@@ -257,6 +316,8 @@ function normalizeWorkspaceEntry(
       Array.isArray(raw.artifactDirs) ? (raw.artifactDirs as unknown[]) : ["outputs"],
     ),
     sync: normalizeWorkspaceSyncConfig(raw.sync),
+    team: normalizeTeamConfig(raw.team),
+    curation: normalizeCurationConfig(raw.curation),
   };
 }
 
@@ -508,10 +569,34 @@ export function detectWorkspaceFromText(
   return best;
 }
 
-export async function ensureWorkspaceFolders(workspacePath: string): Promise<void> {
+export async function ensureWorkspaceFolders(
+  workspacePath: string,
+  type?: WorkspaceType,
+): Promise<void> {
   await fs.mkdir(workspacePath, { recursive: true });
   await fs.mkdir(path.join(workspacePath, "sessions"), { recursive: true });
   await fs.mkdir(path.join(workspacePath, "outputs"), { recursive: true });
+
+  if (type === "team") {
+    const teamDirs = [
+      ".godmode",
+      ".godmode/local",
+      "memory",
+      "skills",
+      "tools",
+      "comms",
+      "artifacts",
+      "artifacts/docs",
+      "artifacts/templates",
+      "artifacts/generated",
+      "artifacts/exports",
+      "clients",
+      "integrations",
+    ];
+    for (const dir of teamDirs) {
+      await fs.mkdir(path.join(workspacePath, dir), { recursive: true });
+    }
+  }
 }
 
 export function getWorkspaceConfigPathCandidates(): string[] {

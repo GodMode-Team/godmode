@@ -24,23 +24,36 @@ import type { OpenClawPluginApi } from "openclaw/plugin-sdk";
 import { agentLogHandlers } from "./src/methods/agent-log.js";
 import { briefNotesHandlers } from "./src/methods/brief-notes.js";
 import { calendarHandlers } from "./src/methods/calendar.js";
-import { clickupHandlers } from "./src/methods/clickup.js";
+// clickup removed — stub, not shipping
 import { consciousnessHandlers } from "./src/methods/consciousness.js";
 import { dailyBriefHandlers } from "./src/methods/daily-brief.js";
 import { dataSourcesHandlers } from "./src/methods/data-sources.js";
 import { goalsHandlers } from "./src/methods/goals.js";
-import { innerWorkHandlers } from "./src/methods/inner-work.js";
+// inner-work removed — stub, not shipping
 import { lifeDashboardsHandlers } from "./src/methods/life-dashboards.js";
-import { lifetracksHandlers } from "./src/methods/lifetracks.js";
+// lifetracks hidden — deferred, keeping code for future
 import { onboardingHandlers } from "./src/methods/onboarding.js";
 import { peopleDataHandlers } from "./src/methods/people-data.js";
 import { projectsHandlers } from "./src/methods/projects.js";
 import { subagentRunsHandlers } from "./src/methods/subagent-runs.js";
+import { createCodingTaskHandlers } from "./src/methods/coding-tasks.js";
 import { tasksHandlers } from "./src/methods/tasks.js";
+import { teamCommsHandlers } from "./src/methods/team-comms.js";
+import { teamCurationHandlers } from "./src/methods/team-curation.js";
+import { teamWorkspaceHandlers } from "./src/methods/team-workspace.js";
+import { createTeamMessageTool } from "./src/tools/team-message.js";
+import { createTeamMemoryWriteTool } from "./src/tools/team-memory.js";
+import { createCodingTaskTool } from "./src/tools/coding-task.js";
 // therapy handlers deprecated — old code, not shipping in plugin
 import { uiSlotsHandlers } from "./src/methods/ui-slots.js";
 import { workspacesHandlers } from "./src/methods/workspaces.js";
+import { focusPulseHandlers } from "./src/methods/focus-pulse.js";
+import { optionsHandlers } from "./src/methods/options.js";
+import { trustTrackerHandlers } from "./src/methods/trust-tracker.js";
+import { createTrustRateTool } from "./src/tools/trust-rate.js";
 import { initAgentLogWriter } from "./src/services/agent-log-writer.js";
+import { CodingOrchestrator } from "./src/services/coding-orchestrator.js";
+import { CodingNotificationService } from "./src/services/coding-notification.js";
 // Static file server for UIs
 import { createStaticFileHandler } from "./src/static-server.js";
 
@@ -259,6 +272,29 @@ function appendForwardedFor(
   return remoteAddress ?? prior;
 }
 
+function isApiPath(pathname: string): boolean {
+  return pathname === "/api" || pathname.startsWith("/api/");
+}
+
+function isOpsReferer(referer: string): boolean {
+  try {
+    return isOpsPath(new URL(referer, "http://localhost").pathname);
+  } catch {
+    return referer === OPS_PROXY_PREFIX || referer.startsWith(`${OPS_PROXY_PREFIX}/`);
+  }
+}
+
+function shouldProxyOpsApiRequest(req: IncomingMessage, pathname: string): boolean {
+  if (!isApiPath(pathname)) {
+    return false;
+  }
+  const referer = firstHeaderValue(req.headers.referer);
+  if (!referer) {
+    return false;
+  }
+  return isOpsReferer(referer);
+}
+
 function rewriteOpsLocationHeader(location: string): string {
   if (location.startsWith(`${OPS_PROXY_PREFIX}/`) || location === OPS_PROXY_PREFIX) {
     return location;
@@ -355,7 +391,9 @@ async function proxyOpsRequest(req: IncomingMessage, res: ServerResponse): Promi
       return new URL(OPS_PROXY_PREFIX, "http://localhost");
     }
   })();
-  const targetPath = `${stripOpsPrefix(requestUrl.pathname)}${requestUrl.search}`;
+  const targetPath = isOpsPath(requestUrl.pathname)
+    ? `${stripOpsPrefix(requestUrl.pathname)}${requestUrl.search}`
+    : `${requestUrl.pathname}${requestUrl.search}`;
   const headers = buildOpsProxyHeaders(req);
   const method = req.method ?? "GET";
 
@@ -452,6 +490,9 @@ const godmodePlugin = {
     }
 
     // ── 1. Register all gateway RPC methods (license-gated) ───────
+    const codingOrchestrator = new CodingOrchestrator(api);
+    const codingNotification = new CodingNotificationService(api);
+    const codingHandlers = createCodingTaskHandlers(codingOrchestrator);
 
     const allHandlers: Record<string, unknown> = {
       ...projectsHandlers,
@@ -459,19 +500,25 @@ const godmodePlugin = {
       ...workspacesHandlers,
       ...dailyBriefHandlers,
       ...lifeDashboardsHandlers,
-      ...lifetracksHandlers,
-      ...innerWorkHandlers,
+      // lifetracks + inner-work removed from registration
       ...goalsHandlers,
       ...peopleDataHandlers,
       ...dataSourcesHandlers,
       ...agentLogHandlers,
       ...briefNotesHandlers,
-      ...clickupHandlers,
+      // clickup removed from registration
       ...calendarHandlers,
       ...subagentRunsHandlers,
       ...uiSlotsHandlers,
       ...onboardingHandlers,
       ...consciousnessHandlers,
+      ...teamWorkspaceHandlers,
+      ...teamCommsHandlers,
+      ...teamCurationHandlers,
+      ...focusPulseHandlers,
+      ...optionsHandlers,
+      ...trustTrackerHandlers,
+      ...codingHandlers,
     };
 
     for (const [method, handler] of Object.entries(allHandlers)) {
@@ -509,10 +556,26 @@ const godmodePlugin = {
 
     const deckUiCandidates = [
       join(pluginRoot, "dist", "deck"),
+      join(pluginRoot, "assets", "deck"),
+      join(pluginRoot, "deck", "dist"),
+      join(pluginRoot, "..", "openclaw-deck", "dist"),
+      join(pluginRoot, "..", "GodMode", "dist", "deck"),
       join(monorepoRoot, "dist", "deck"),
       join(monorepoRoot, "deck", "dist"),
     ];
-    const deckUiRoot = deckUiCandidates.find((p) => existsSync(join(p, "index.html")));
+    const deckUiRoot = deckUiCandidates.find((p) => {
+      const index = join(p, "index.html");
+      if (!existsSync(index)) {
+        return false;
+      }
+      try {
+        const html = readFileSync(index, "utf8");
+        // Reject dev-source HTML (e.g. <script src="/src/main.tsx">)
+        return !/\/src\/main\.[jt]sx?/.test(html);
+      } catch {
+        return false;
+      }
+    });
 
     // ── 3. Serve UIs + health endpoint via HTTP ───────────────────
     const godmodeHandler = godmodeUiRoot
@@ -549,6 +612,14 @@ const godmodePlugin = {
         return true;
       }
 
+      // Mission Control API fallback: some dashboard actions still call
+      // absolute /api/* paths. Proxy those only when the request originated
+      // from /ops so core gateway APIs remain untouched.
+      if (shouldProxyOpsApiRequest(req, pathname)) {
+        await proxyOpsRequest(req, res);
+        return true;
+      }
+
       // GodMode UI
       if (pathname === "/godmode" || pathname.startsWith("/godmode/")) {
         if (godmodeHandler) {
@@ -571,8 +642,21 @@ h1{color:#ff6b6b}code{background:#16213e;padding:2px 8px;border-radius:4px}a{col
       }
 
       // Deck UI
-      if (deckHandler && (pathname === "/deck" || pathname.startsWith("/deck/"))) {
-        deckHandler(req, res);
+      if (pathname === "/deck" || pathname.startsWith("/deck/")) {
+        if (deckHandler) {
+          deckHandler(req, res);
+        } else {
+          res.writeHead(503, { "Content-Type": "text/html; charset=utf-8" });
+          res.end(`<!DOCTYPE html>
+<html><head><title>Deck — UI Not Built</title>
+<style>body{font-family:system-ui;max-width:600px;margin:80px auto;padding:0 20px;color:#e0e0e0;background:#1a1a2e}
+h1{color:#ff6b6b}code{background:#16213e;padding:2px 8px;border-radius:4px}a{color:#4ecdc4}</style></head>
+<body><h1>Deck UI Not Available</h1>
+<p>The GodMode plugin is loaded but Deck assets haven't been bundled yet.</p>
+<p>Run: <code>pnpm build</code> in <code>~/Projects/godmode-plugin</code>, then restart gateway.</p>
+<p><a href="/godmode/health">Check plugin health →</a></p>
+</body></html>`);
+        }
         return true;
       }
 
@@ -612,6 +696,8 @@ h1{color:#ff6b6b}code{background:#16213e;padding:2px 8px;border-radius:4px}a{col
     // ── 5. Lifecycle hooks ────────────────────────────────────────
     api.on("gateway_start", async () => {
       api.logger.info("[GodMode] Gateway started — plugin active");
+
+      // Agent log writer
       try {
         const started = await initAgentLogWriter();
         if (started) {
@@ -622,7 +708,160 @@ h1{color:#ff6b6b}code{background:#16213e;padding:2px 8px;border-radius:4px}a{col
       } catch (err) {
         api.logger.warn(`[GodMode] agent-log writer failed to initialize: ${String(err)}`);
       }
+
+      // Workspace sync service
+      try {
+        const { startWorkspaceSyncService } = await import("./src/lib/workspace-sync-service.js");
+        await startWorkspaceSyncService(api.logger);
+        api.logger.info("[GodMode] workspace sync service initialized");
+      } catch (err) {
+        api.logger.warn(`[GodMode] workspace sync service failed to start: ${String(err)}`);
+      }
+
+      // Curation agent service
+      try {
+        const { getCurationAgentService } = await import("./src/services/curation-agent.js");
+        const curation = getCurationAgentService(api.logger);
+        await curation.start();
+      } catch (err) {
+        api.logger.warn(`[GodMode] curation service failed to start: ${String(err)}`);
+      }
     });
+
+    api.on("gateway_stop", async () => {
+      try {
+        const { getCurationAgentService } = await import("./src/services/curation-agent.js");
+        getCurationAgentService().stop();
+      } catch {
+        // Non-fatal
+      }
+      try {
+        const { getWorkspaceSyncService } = await import("./src/lib/workspace-sync-service.js");
+        await getWorkspaceSyncService().stop();
+      } catch {
+        // Non-fatal
+      }
+    });
+
+    // Team workspace bootstrap — inject shared context
+    api.on("before_prompt_build", async (event, ctx) => {
+      const prependChunks: string[] = [];
+      try {
+        const { handleTeamBootstrap } = await import("./src/hooks/team-bootstrap.js");
+        const teamResult = await handleTeamBootstrap(event, ctx);
+        if (teamResult?.prependContext) {
+          prependChunks.push(teamResult.prependContext);
+        }
+      } catch (err) {
+        api.logger.warn(`[GodMode] team bootstrap hook error: ${String(err)}`);
+      }
+      try {
+        const { loadTrustContext } = await import("./src/hooks/trust-bootstrap.js");
+        const trustResult = await loadTrustContext();
+        if (trustResult?.prependContext) {
+          prependChunks.push(trustResult.prependContext);
+        }
+      } catch (err) {
+        api.logger.warn(`[GodMode] trust bootstrap hook error: ${String(err)}`);
+      }
+      try {
+        const { loadOnboardingContext } = await import("./src/hooks/onboarding-context.js");
+        const onboardingResult = await loadOnboardingContext();
+        if (onboardingResult?.prependContext) {
+          prependChunks.push(onboardingResult.prependContext);
+        }
+      } catch (err) {
+        api.logger.warn(`[GodMode] onboarding context hook error: ${String(err)}`);
+      }
+      if (prependChunks.length === 0) {
+        return;
+      }
+      return { prependContext: prependChunks.join("\n\n---\n\n") };
+    });
+
+    // Team memory routing — write session memory to team workspace on reset
+    api.on("before_reset", async (event, ctx) => {
+      try {
+        const { handleTeamMemoryRoute } = await import("./src/hooks/team-memory-route.js");
+        await handleTeamMemoryRoute(event, ctx);
+      } catch (err) {
+        api.logger.warn(`[GodMode] team memory route hook error: ${String(err)}`);
+      }
+    });
+
+    // Coding orchestration — enforce worktree isolation on all coding spawns
+    api.on("before_tool_call", async (event) => {
+      const name = event.toolName?.trim().toLowerCase() ?? "";
+      const isSpawn = name === "sessions_spawn" || name === "task" || name.endsWith(".sessions_spawn");
+      if (!isSpawn || !codingOrchestrator.isEnabled()) return;
+
+      const params = event.params ?? {};
+      const label = typeof params.label === "string" ? params.label : undefined;
+
+      // Check if this spawn was set up through the coding_task orchestrator
+      const task = await codingOrchestrator.findTaskForSpawn(label);
+      if (task) {
+        api.logger.info(`[GodMode][Coding] spawn allowed for task ${task.id}`);
+        return;
+      }
+
+      // No matching task — block and instruct
+      api.logger.info(`[GodMode][Coding] spawn blocked — no matching coding_task (label=${label ?? "none"})`);
+      return {
+        block: true,
+        blockReason: [
+          "Coding tasks require worktree isolation to prevent overwrites between sessions.",
+          "",
+          "Call the `coding_task` tool first with your task description.",
+          "It will create an isolated worktree and branch, then give you",
+          "the exact spawn instructions (including the label) to use.",
+          "",
+          "Example: coding_task({ task: \"Build signup form\" })",
+          "Then use the returned spawn instructions to call sessions_spawn.",
+        ].join("\n"),
+      };
+    });
+
+    api.on("subagent_spawning", async (event) => {
+      api.logger.info(`[GodMode][Coding] subagent spawning: ${event.childSessionKey} (${event.label ?? "unlabeled"})`);
+      // Link child session to the orchestrated task so subagent_ended can correlate
+      if (event.label) {
+        try {
+          await codingOrchestrator.registerTaskSpawn(event.label, event.childSessionKey);
+        } catch (err) {
+          api.logger.warn(`[GodMode][Coding] failed to register spawn: ${String(err)}`);
+        }
+      }
+      return { status: "ok" as const };
+    });
+
+    api.on("subagent_ended", async (event) => {
+      try {
+        const { task } = await codingOrchestrator.handleTaskCompleted({
+          childSessionKey: event.targetSessionKey,
+          label: (event as Record<string, unknown>).label as string | undefined,
+          outcome: event.outcome,
+          error: event.error,
+        });
+        if (task) {
+          await codingNotification.sendCompletionNotification({
+            taskId: task.id,
+            description: task.description,
+            outcome: task.status === "done" ? "completed" : "failed",
+            prUrl: task.prUrl,
+            error: task.error,
+          });
+        }
+      } catch (err) {
+        api.logger.warn(`[GodMode] coding subagent_ended hook error: ${String(err)}`);
+      }
+    });
+
+    // Team + coding tools
+    api.registerTool((ctx) => createTeamMessageTool(ctx));
+    api.registerTool((ctx) => createTeamMemoryWriteTool(ctx));
+    api.registerTool((ctx) => createCodingTaskTool(ctx, { orchestrator: codingOrchestrator }));
+    api.registerTool((ctx) => createTrustRateTool(ctx));
 
     // ── 6. Register CLI commands ──────────────────────────────────
     api.registerCli(
@@ -813,6 +1052,223 @@ h1{color:#ff6b6b}code{background:#16213e;padding:2px 8px;border-radius:4px}a{col
               console.log("  \x1b[32mAll checks passed.\x1b[0m\n");
             } else {
               console.log(`  \x1b[31m${failures} issue(s) found.\x1b[0m\n`);
+            }
+          });
+        // ── Team workspace commands ─────────────────────────────────
+        const workspace = godmode.command("workspace").description("Team workspace management");
+
+        workspace
+          .command("create")
+          .description("Create a new team workspace")
+          .requiredOption("--name <name>", "Workspace name")
+          .option("--github <org/repo>", "GitHub repository (org/repo or full URL)")
+          .option("--branch <branch>", "Git branch", "main")
+          .action(async (opts: { name: string; github?: string; branch: string }) => {
+            const { createWorkspaceId, readWorkspaceConfig, resolveGodModeRoot, writeWorkspaceConfig, ensureWorkspaceFolders } = await import("./src/lib/workspaces-config.js");
+            const { scaffoldTeamWorkspace, resolveGitMemberId } = await import("./src/lib/team-workspace-scaffold.js");
+
+            const config = await readWorkspaceConfig();
+            const existingIds = new Set(config.workspaces.map((w) => w.id));
+            const id = createWorkspaceId(opts.name, existingIds);
+            const workspacePath = join(resolveGodModeRoot(), "clients", id);
+
+            const memberId = await resolveGitMemberId(workspacePath).catch(() => "local");
+            await ensureWorkspaceFolders(workspacePath, "team");
+            await scaffoldTeamWorkspace({
+              workspacePath,
+              name: opts.name,
+              id,
+              github: opts.github,
+              creatorName: memberId,
+              creatorId: memberId,
+            });
+
+            config.workspaces.push({
+              id,
+              name: opts.name,
+              emoji: "👥",
+              type: "team",
+              path: workspacePath,
+              keywords: [id, opts.name.toLowerCase()],
+              pinned: [],
+              pinnedSessions: [],
+              artifactDirs: ["outputs", "artifacts"],
+              sync: {
+                type: "git",
+                remote: opts.github ? "origin" : undefined,
+                branch: opts.branch,
+                autoPull: { enabled: true, interval: "30s" },
+                autoPush: { enabled: true, debounceMs: 5000 },
+              },
+              team: { github: opts.github, role: "admin", memberId },
+              curation: { enabled: true },
+            });
+            await writeWorkspaceConfig(config);
+
+            console.log(`\x1b[32m✓\x1b[0m Created team workspace: ${opts.name} (${id})`);
+            console.log(`  Path: ${workspacePath}`);
+            if (opts.github) {
+              console.log(`  GitHub: ${opts.github}`);
+            }
+          });
+
+        workspace
+          .command("join <url>")
+          .description("Join an existing team workspace via GitHub URL")
+          .option("--branch <branch>", "Git branch", "main")
+          .action(async (url: string, opts: { branch: string }) => {
+            console.log(`Joining team workspace from: ${url}`);
+            console.log(`Use the gateway RPC method 'workspace.joinTeam' for full clone + setup.`);
+            console.log(`  openclaw rpc workspace.joinTeam '{"github":"${url}","branch":"${opts.branch}"}'`);
+          });
+
+        workspace
+          .command("sync [id]")
+          .description("Trigger immediate sync for a workspace")
+          .action(async (id?: string) => {
+            if (!id) {
+              console.error("Usage: openclaw godmode workspace sync <workspace-id>");
+              return;
+            }
+            console.log(`Triggering sync for workspace: ${id}`);
+            console.log(`Use gateway RPC: openclaw rpc workspace.syncNow '{"workspaceId":"${id}"}'`);
+          });
+
+        workspace
+          .command("list")
+          .description("List all team workspaces")
+          .action(async () => {
+            const { readWorkspaceConfig, toDisplayPath } = await import("./src/lib/workspaces-config.js");
+            const config = await readWorkspaceConfig({ initializeIfMissing: false });
+            const teams = config.workspaces.filter((w) => w.type === "team");
+            if (teams.length === 0) {
+              console.log("No team workspaces configured.");
+              return;
+            }
+            console.log(`\nTeam Workspaces (${teams.length}):`);
+            console.log("─".repeat(50));
+            for (const w of teams) {
+              const sync = w.sync ? "git-synced" : "local";
+              const github = w.team?.github ? ` (${w.team.github})` : "";
+              console.log(`  ${w.emoji} ${w.name} [${w.id}] — ${sync}${github}`);
+              console.log(`    ${toDisplayPath(w.path)}`);
+            }
+          });
+
+        // ── Comms commands ───────────────────────────────────────────
+        const comms = godmode.command("comms").description("Team communication");
+
+        comms
+          .command("send")
+          .description("Send a message to the team feed")
+          .requiredOption("--workspace <id>", "Workspace ID")
+          .requiredOption("--type <type>", "Message type (handoff/question/alert/blocked/fyi)")
+          .requiredOption("--msg <message>", "Message body")
+          .option("--to <recipient>", "Optional recipient")
+          .action(async (opts: { workspace: string; type: string; msg: string; to?: string }) => {
+            const { createFeedMessage, appendFeedMessage, resolveFeedPath } = await import("./src/lib/team-feed.js");
+            const { findWorkspaceById, readWorkspaceConfig } = await import("./src/lib/workspaces-config.js");
+            const { resolveGitMemberId } = await import("./src/lib/team-workspace-scaffold.js");
+
+            const config = await readWorkspaceConfig({ initializeIfMissing: false });
+            const workspace = findWorkspaceById(config, opts.workspace);
+            if (!workspace) {
+              console.error(`Workspace not found: ${opts.workspace}`);
+              process.exit(1);
+            }
+
+            const memberId = workspace.team?.memberId || await resolveGitMemberId(workspace.path);
+            const feedPath = resolveFeedPath(workspace.path);
+            const message = createFeedMessage({
+              from: memberId,
+              type: opts.type as "fyi",
+              msg: opts.msg,
+              to: opts.to,
+            });
+
+            await appendFeedMessage(feedPath, message);
+            console.log(`\x1b[32m✓\x1b[0m Message sent (${message.id}): [${opts.type}] ${opts.msg}`);
+          });
+
+        comms
+          .command("feed")
+          .description("Read recent messages from the team feed")
+          .requiredOption("--workspace <id>", "Workspace ID")
+          .option("--since <date>", "Show messages since ISO date")
+          .option("--limit <n>", "Max messages to show", "20")
+          .action(async (opts: { workspace: string; since?: string; limit: string }) => {
+            const { readFeed, resolveFeedPath } = await import("./src/lib/team-feed.js");
+            const { findWorkspaceById, readWorkspaceConfig } = await import("./src/lib/workspaces-config.js");
+
+            const config = await readWorkspaceConfig({ initializeIfMissing: false });
+            const workspace = findWorkspaceById(config, opts.workspace);
+            if (!workspace) {
+              console.error(`Workspace not found: ${opts.workspace}`);
+              process.exit(1);
+            }
+
+            const feedPath = resolveFeedPath(workspace.path);
+            const messages = await readFeed(feedPath, {
+              since: opts.since,
+              limit: Number(opts.limit) || 20,
+            });
+
+            if (messages.length === 0) {
+              console.log("No messages.");
+              return;
+            }
+
+            console.log(`\nFeed (${messages.length} messages):`);
+            console.log("─".repeat(60));
+            for (const m of messages) {
+              const to = m.to ? ` → ${m.to}` : "";
+              console.log(`  [${m.type}] ${m.from}${to}: ${m.msg}`);
+              console.log(`    ${m.ts} (${m.id})`);
+            }
+          });
+
+        // ── Curation commands ────────────────────────────────────────
+        const curation = godmode.command("curation").description("Workspace memory curation");
+
+        curation
+          .command("run")
+          .description("Manually trigger curation for a workspace")
+          .requiredOption("--workspace <id>", "Workspace ID")
+          .action(async (opts: { workspace: string }) => {
+            const { getCurationAgentService } = await import("./src/services/curation-agent.js");
+            const service = getCurationAgentService();
+            const result = await service.runCuration(opts.workspace);
+            if (result.ok) {
+              console.log(`\x1b[32m✓\x1b[0m Curation completed for ${opts.workspace}`);
+            } else {
+              console.error(`\x1b[31m✗\x1b[0m Curation failed: ${result.error}`);
+            }
+          });
+
+        curation
+          .command("candidates")
+          .description("Show SOP candidates for a workspace")
+          .requiredOption("--workspace <id>", "Workspace ID")
+          .action(async (opts: { workspace: string }) => {
+            const { findWorkspaceById, readWorkspaceConfig } = await import("./src/lib/workspaces-config.js");
+            const fsp = await import("node:fs/promises");
+            const pathMod = await import("node:path");
+
+            const config = await readWorkspaceConfig({ initializeIfMissing: false });
+            const workspace = findWorkspaceById(config, opts.workspace);
+            if (!workspace) {
+              console.error(`Workspace not found: ${opts.workspace}`);
+              process.exit(1);
+            }
+
+            try {
+              const content = await fsp.readFile(
+                pathMod.join(workspace.path, "memory", "sop-candidates.md"),
+                "utf-8",
+              );
+              console.log(content);
+            } catch {
+              console.log("No SOP candidates yet.");
             }
           });
       },

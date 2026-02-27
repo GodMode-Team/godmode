@@ -14,6 +14,101 @@
         "type": "string",
         "default": "~/godmode",
         "description": "Root directory for GodMode data files"
+      },
+      "focusPulse": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "default": false,
+            "description": "Enable Focus Pulse daily priority tracking in the topbar"
+          }
+        }
+      },
+      "coding": {
+        "type": "object",
+        "description": "Coding task orchestration — worktrees, dispatch, validation, PRs",
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "default": true,
+            "description": "Enable coding task orchestration"
+          },
+          "maxParallelWriters": {
+            "type": "number",
+            "default": 1,
+            "description": "Maximum concurrent write tasks (each gets its own worktree)"
+          },
+          "autoMerge": {
+            "type": "boolean",
+            "default": false,
+            "description": "Auto-merge PRs to main after all validation gates pass (squash merge)"
+          },
+          "defaultRepoVisibility": {
+            "type": "string",
+            "default": "private",
+            "description": "Visibility for newly created repos (private or public)"
+          },
+          "validation": {
+            "type": "object",
+            "description": "Validation gates run after each coding task completes",
+            "properties": {
+              "lint": {
+                "type": "boolean",
+                "default": true,
+                "description": "Run pnpm lint after task completion"
+              },
+              "typecheck": {
+                "type": "boolean",
+                "default": true,
+                "description": "Run pnpm tsc --noEmit after task completion"
+              },
+              "test": {
+                "type": "boolean",
+                "default": true,
+                "description": "Run pnpm test --run after task completion"
+              }
+            }
+          },
+          "notifications": {
+            "type": "object",
+            "properties": {
+              "enabled": {
+                "type": "boolean",
+                "default": true,
+                "description": "Enable task completion notifications"
+              },
+              "channel": {
+                "type": "string",
+                "default": "imessage",
+                "description": "Notification channel (currently imessage)"
+              },
+              "to": {
+                "type": "string",
+                "description": "iMessage handle/number for completion alerts"
+              },
+              "service": {
+                "type": "string",
+                "default": "imessage",
+                "description": "iMessage service: imessage, sms, or auto"
+              },
+              "accountId": {
+                "type": "string",
+                "description": "Optional iMessage account id for outbound alerts"
+              },
+              "onlyWhenDesktopIdle": {
+                "type": "boolean",
+                "default": true,
+                "description": "Only send notifications when desktop has been idle"
+              },
+              "desktopIdleSeconds": {
+                "type": "number",
+                "default": 120,
+                "description": "Required desktop idle duration before alerts are sent"
+              }
+            }
+          }
+        }
       }
     },
     "required": ["licenseKey"]
