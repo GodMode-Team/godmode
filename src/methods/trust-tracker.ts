@@ -373,8 +373,64 @@ export const trustTrackerHandlers: GatewayRequestHandlers = {
     const summaries = computeSummary(state, daysBack ?? 30);
     respond(true, { summaries, workflows: state.workflows });
   },
+
+  /**
+   * Returns a feedback prompt for a given skill/workflow.
+   * Called by the UI or session system after a skill completes to inject
+   * the trust feedback ask at the right moment (not in every system prompt).
+   */
+  "trust.postSkillPrompt": async ({ params, respond }) => {
+    const { skillName } = (params ?? {}) as { skillName?: string };
+    if (!skillName || typeof skillName !== "string" || !skillName.trim()) {
+      respond(false, undefined, { code: "INVALID_PARAMS", message: "skillName is required" });
+      return;
+    }
+
+    const normalized = skillName.trim();
+    const state = await readState();
+
+    // Check if this skill matches a tracked workflow
+    const isTracked = state.workflows.some(
+      (w) => w.toLowerCase() === normalized.toLowerCase(),
+    );
+
+    // Include any stored feedback so the agent can apply lessons learned
+    const storedFeedback = isTracked
+      ? (state.workflowFeedback[normalized] ?? []).slice(-3)
+      : [];
+
+    const prompt = generatePostSkillFeedbackPrompt(normalized);
+
+    respond(true, {
+      prompt,
+      skillName: normalized,
+      isTracked,
+      storedFeedback,
+      message: isTracked
+        ? `Feedback prompt ready for tracked workflow "${normalized}".`
+        : `"${normalized}" is not yet tracked. The agent can auto-add it when rating.`,
+    });
+  },
 };
 
-// --- Exported for prompt hook ---
+// --- Post-skill feedback prompt ---
+
+/**
+ * Generates a brief feedback prompt to append after a skill/workflow completes.
+ * This replaces the old global system-prompt injection with a targeted ask
+ * that only fires at skill boundaries.
+ *
+ * @param skillName - the workflow/skill that just completed
+ * @returns a short prompt string the agent can use to ask for a trust rating
+ */
+export function generatePostSkillFeedbackPrompt(skillName: string): string {
+  return (
+    `How'd I do on that ${skillName} task? ` +
+    `Rate 1-10 and any feedback helps me improve. ` +
+    `(Use the trust_rate tool to record your rating.)`
+  );
+}
+
+// --- Exported for prompt hook (legacy, kept for compatibility) ---
 
 export { readState as readTrustState, computeSummary as computeTrustSummary };

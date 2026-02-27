@@ -803,15 +803,8 @@ h1{color:#ff6b6b}code{background:#16213e;padding:2px 8px;border-radius:4px}a{col
       } catch (err) {
         api.logger.warn(`[GodMode] team bootstrap hook error: ${String(err)}`);
       }
-      try {
-        const { loadTrustContext } = await import("./src/hooks/trust-bootstrap.js");
-        const trustResult = await loadTrustContext();
-        if (trustResult?.prependContext) {
-          prependChunks.push(trustResult.prependContext);
-        }
-      } catch (err) {
-        api.logger.warn(`[GodMode] trust bootstrap hook error: ${String(err)}`);
-      }
+      // Trust context injection removed — feedback now happens at skill
+      // completion boundaries via trust.postSkillPrompt / trust_rate tool.
       try {
         const { loadOnboardingContext } = await import("./src/hooks/onboarding-context.js");
         const onboardingResult = await loadOnboardingContext();

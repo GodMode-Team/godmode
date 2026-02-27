@@ -29,8 +29,8 @@ async function saveState(state: TrustTrackerState): Promise<void> {
  * Creates the `trust_rate` agent tool.
  * Lets the agent rate how well a task was completed (1-10) for a tracked
  * workflow. After 10 ratings the running average becomes the trust score.
- * Below a 7, the agent should ask the user "what would make this better?"
- * and store that feedback via trust.feedback.
+ * Below a 7, the result includes a note prompting the agent to ask
+ * what could be improved and store feedback via trust.feedback.
  */
 export function createTrustRateTool(_ctx: {
   sessionKey?: string;
@@ -40,11 +40,12 @@ export function createTrustRateTool(_ctx: {
     name: "trust_rate",
     label: "Trust Rate",
     description:
-      "Rate how well a task was completed (1-10) for a tracked workflow category. " +
-      "Use this AFTER you finish a task that matches one of the user's tracked workflows " +
-      "(e.g. daily brief, email triage, code reviews). After 10 ratings the running " +
-      "average becomes the trust score. If the score is below 7, ask the user " +
-      "'What would make this better?' and store the answer via trust.feedback. " +
+      "Record a 1-10 rating for a completed skill or workflow task. " +
+      "Call this after finishing a task that matches a tracked workflow " +
+      "(e.g. daily brief, email triage, code reviews). " +
+      "After 10 ratings the running average becomes the trust score. " +
+      "If the score drops below 7, ask the user what could be better " +
+      "and store their answer via trust.feedback. " +
       "New workflows are auto-added if under the limit.",
     parameters: {
       type: "object",
@@ -110,6 +111,22 @@ export function createTrustRateTool(_ctx: {
       // Include any stored feedback for this workflow so the agent learns
       const storedFeedback = state.workflowFeedback?.[workflow]?.slice(-3) ?? [];
 
+      // Build the result message. If the individual rating is below 7,
+      // add a note prompting the agent to ask what could be improved.
+      let message: string;
+      if (needsFeedback) {
+        message = `Trust score: ${trustScore}/10. Ask the user: "What would make ${workflow} better?" Then store their answer via trust.feedback.`;
+      } else if (trustScore !== null) {
+        message = `Trust score: ${trustScore}/10`;
+      } else {
+        message = `Rated ${rating}/10 (${count}/${SCORE_THRESHOLD} until trust score)`;
+      }
+
+      const improvementNote =
+        entry.rating < FEEDBACK_THRESHOLD
+          ? `This rating was below ${FEEDBACK_THRESHOLD}. Consider asking the user what could be improved and store their feedback via trust.feedback.`
+          : undefined;
+
       return jsonResult({
         rated: true,
         workflow: entry.workflow,
@@ -119,11 +136,8 @@ export function createTrustRateTool(_ctx: {
         needsFeedback,
         ratingsUntilScore: count < SCORE_THRESHOLD ? SCORE_THRESHOLD - count : 0,
         storedFeedback,
-        message: needsFeedback
-          ? `Trust score: ${trustScore}/10. Ask the user: "What would make ${workflow} better?" Then store their answer via trust.feedback.`
-          : trustScore !== null
-            ? `Trust score: ${trustScore}/10`
-            : `Rated ${rating}/10 (${count}/${SCORE_THRESHOLD} until trust score)`,
+        message,
+        ...(improvementNote ? { improvementNote } : {}),
       });
     },
   } as AnyAgentTool;
