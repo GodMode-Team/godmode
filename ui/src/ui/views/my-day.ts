@@ -4,6 +4,7 @@ import { toSanitizedMarkdownHtml } from "../markdown.js";
 import { extractOpenablePathFromEventTarget } from "../openable-file-path.js";
 import type { DailyBriefData, DailyBriefProps } from "./daily-brief.js";
 import { renderDailyBrief } from "./daily-brief.js";
+import type { WorkspaceTask } from "./workspaces.js";
 
 // Re-export for convenience
 export type { DailyBriefData } from "./daily-brief.js";
@@ -49,6 +50,11 @@ export type MyDayProps = {
   // Focus Pulse
   focusPulseActive?: boolean;
   onStartMorningSet?: () => void;
+  // Today's tasks
+  todayTasks?: WorkspaceTask[];
+  todayTasksLoading?: boolean;
+  onToggleTaskComplete?: (taskId: string, currentStatus: string) => void;
+  onStartTask?: (taskId: string) => void;
 };
 
 // ===== Helper Functions =====
@@ -118,6 +124,65 @@ function sourcePathLabel(sourcePath?: string): string {
   }
   const parts = sourcePath.split("/");
   return parts[parts.length - 1] || sourcePath;
+}
+
+// ===== Today Tasks Section =====
+
+function renderTodayTasks(props: MyDayProps) {
+  const tasks = props.todayTasks ?? [];
+  const pendingTasks = tasks.filter((t) => t.status === "pending");
+  const count = pendingTasks.length;
+
+  if (props.todayTasksLoading && tasks.length === 0) {
+    return html`
+      <div class="today-tasks">
+        <div class="today-tasks-header">
+          <span class="today-tasks-title">Today's Tasks</span>
+          <span class="today-tasks-count">loading...</span>
+        </div>
+      </div>
+    `;
+  }
+
+  return html`
+    <div class="today-tasks">
+      <div class="today-tasks-header">
+        <span class="today-tasks-title">Today's Tasks</span>
+        <span class="today-tasks-count">${count > 0 ? `${count} open` : "All done!"}</span>
+      </div>
+      ${count === 0 && !props.todayTasksLoading
+        ? html`<div class="today-tasks-empty">No pending tasks for today.</div>`
+        : html`
+          <div class="today-tasks-list">
+            ${pendingTasks.map(
+              (task) => html`
+                <div class="today-task-row">
+                  <button
+                    class="today-task-check"
+                    @click=${() => props.onToggleTaskComplete?.(task.id, task.status)}
+                    title="Complete task"
+                  ></button>
+                  <div class="today-task-info">
+                    <span class="today-task-title">${task.title}</span>
+                    ${task.dueDate
+                      ? html`<span class="today-task-due">${task.dueDate}</span>`
+                      : nothing}
+                    ${task.project
+                      ? html`<span class="today-task-project">${task.project}</span>`
+                      : nothing}
+                  </div>
+                  <button
+                    class="today-task-start"
+                    @click=${() => props.onStartTask?.(task.id)}
+                    title="Start a session for this task"
+                  >Start</button>
+                </div>
+              `,
+            )}
+          </div>
+        `}
+    </div>
+  `;
 }
 
 // ===== Main Render Function =====
@@ -236,6 +301,9 @@ export function renderMyDay(props: MyDayProps) {
           }
         </div>
       </div>
+
+      <!-- Today Tasks (above brief, only in my-day mode) -->
+      ${viewMode === "my-day" ? renderTodayTasks(props) : nothing}
 
       <!-- Content: Brief or Agent Log -->
       <div class="today-content">

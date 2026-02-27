@@ -383,6 +383,7 @@ export class GodModeApp extends LitElement {
   @state() allTasks?: WorkspaceTask[];
   @state() taskFilter?: TaskFilter;
   @state() showCompletedTasks?: boolean;
+  @state() editingTaskId: string | null = null;
 
   // My Day state
   @state() myDayLoading = false;
@@ -399,6 +400,10 @@ export class GodModeApp extends LitElement {
   @state() agentLogError: string | null = null;
   @state() briefNotes: Record<string, string> = {};
   @state() briefEditing = false;
+
+  // Today tasks state
+  @state() todayTasks: import("./views/workspaces").WorkspaceTask[] = [];
+  @state() todayTasksLoading = false;
 
   @state() chatPrivateMode = false;
 
@@ -1512,8 +1517,41 @@ export class GodModeApp extends LitElement {
           completedAt: newStatus === "complete" ? new Date().toISOString() : null,
         },
       });
+      // Refresh today tasks so the UI updates
+      const { loadTodayTasks } = await import("./controllers/my-day.js");
+      await loadTodayTasks(this);
     } catch (err) {
       console.error("[MyDay] Failed to update task status:", err);
+    }
+  }
+
+  async handleTodayStartTask(taskId: string) {
+    if (!this.client || !this.connected) {
+      return;
+    }
+    try {
+      const result = await this.client.request<{ sessionKey: string }>(
+        "tasks.openSession",
+        { taskId },
+      );
+      if (result?.sessionKey) {
+        this.setTab("chat" as import("./navigation").Tab);
+        this.sessionKey = result.sessionKey;
+        // Ensure session is in open tabs
+        const openTabs = this.settings.openTabs.includes(result.sessionKey)
+          ? this.settings.openTabs
+          : [...this.settings.openTabs, result.sessionKey];
+        this.applySettings({
+          ...this.settings,
+          sessionKey: result.sessionKey,
+          lastActiveSessionKey: result.sessionKey,
+          openTabs,
+        });
+        this.requestUpdate();
+      }
+    } catch (err) {
+      console.error("[MyDay] Failed to open session for task:", err);
+      this.showToast("Failed to open session for task", "error");
     }
   }
 

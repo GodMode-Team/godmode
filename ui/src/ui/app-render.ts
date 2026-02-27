@@ -1140,6 +1140,78 @@ export function renderApp(state: AppViewState) {
                 onToggleCompletedTasks: () => {
                   state.showCompletedTasks = !(state.showCompletedTasks ?? false);
                 },
+                editingTaskId: state.editingTaskId ?? null,
+                workspaceNames: (state.workspaces ?? []).map((w) => w.name),
+                onStartTask: async (taskId) => {
+                  const { startTask, loadAllTasks } =
+                    await import("./controllers/workspaces");
+                  const result = await startTask(state, taskId);
+                  if (!result?.sessionId) {
+                    state.showToast("Failed to open session for task", "error");
+                    return;
+                  }
+                  // Navigate to the session
+                  saveDraft(state);
+                  const nextKey = result.sessionId;
+                  const openTabs = state.settings.openTabs.includes(nextKey)
+                    ? state.settings.openTabs
+                    : [...state.settings.openTabs, nextKey];
+                  state.applySettings({
+                    ...state.settings,
+                    openTabs,
+                    sessionKey: nextKey,
+                    lastActiveSessionKey: nextKey,
+                    tabLastViewed: {
+                      ...state.settings.tabLastViewed,
+                      [nextKey]: Date.now(),
+                    },
+                  });
+                  state.sessionKey = nextKey;
+                  state.setTab("chat" as Tab);
+                  // Find the task for context prompt on new sessions
+                  if (result.created) {
+                    const allTasks = state.allTasks ?? [];
+                    const wsTasks = state.selectedWorkspace?.tasks ?? [];
+                    const task = [...allTasks, ...wsTasks].find((t) => t.id === taskId);
+                    const projectCtx = task?.project ? ` (project: ${task.project})` : "";
+                    state.chatMessage = `Let's work on: ${task?.title ?? "this task"}${projectCtx}`;
+                  } else {
+                    state.chatMessage = "";
+                  }
+                  state.chatMessages = [];
+                  state.chatStream = null;
+                  state.chatStreamStartedAt = null;
+                  state.chatRunId = null;
+                  state.resetToolStream();
+                  state.resetChatScroll();
+                  void state.loadAssistantIdentity();
+                  syncUrlWithSessionKey(state, nextKey, true);
+                  void loadChatHistory(state);
+                  // Refresh tasks
+                  state.allTasks = await loadAllTasks(state);
+                  state.requestUpdate();
+                },
+                onEditTask: (taskId) => {
+                  state.editingTaskId = taskId;
+                },
+                onUpdateTask: async (taskId, updates) => {
+                  const { updateTask, loadAllTasks, getWorkspace } =
+                    await import("./controllers/workspaces");
+                  const result = await updateTask(state, taskId, updates);
+                  if (!result) {
+                    state.showToast("Failed to update task", "error");
+                    return;
+                  }
+                  state.editingTaskId = null;
+                  // Refresh tasks
+                  state.allTasks = await loadAllTasks(state);
+                  if (state.selectedWorkspace) {
+                    const refreshed = await getWorkspace(state, state.selectedWorkspace.id);
+                    if (refreshed) {
+                      state.selectedWorkspace = refreshed;
+                    }
+                  }
+                },
               })
             : nothing
         }
@@ -1180,6 +1252,15 @@ export function renderApp(state: AppViewState) {
                   // Focus Pulse
                   focusPulseActive: focusPulseActive,
                   onStartMorningSet: focusPulseEnabled ? () => state.handleFocusPulseStartMorning() : undefined,
+                  // Today's tasks
+                  todayTasks: state.todayTasks ?? [],
+                  todayTasksLoading: state.todayTasksLoading ?? false,
+                  onToggleTaskComplete: (taskId: string, currentStatus: string) =>
+                    state.handleMyDayTaskStatusChange(
+                      taskId,
+                      currentStatus === "complete" ? "pending" : "complete",
+                    ),
+                  onStartTask: (taskId: string) => state.handleTodayStartTask(taskId),
                 })
             : nothing
         }

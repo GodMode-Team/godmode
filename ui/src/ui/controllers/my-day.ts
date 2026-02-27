@@ -5,6 +5,7 @@
 
 import type { GatewayBrowserClient } from "../gateway";
 import type { AgentLogData, DailyBriefData } from "../views/my-day";
+import type { WorkspaceTask } from "../views/workspaces";
 
 export type MyDayState = {
   client: GatewayBrowserClient | null;
@@ -24,6 +25,9 @@ export type MyDayState = {
   todaySelectedDate?: string;
   // View mode
   todayViewMode?: "my-day" | "agent-log";
+  // Today's tasks
+  todayTasks?: WorkspaceTask[];
+  todayTasksLoading?: boolean;
   // Methods
   loadBriefNotes?: () => Promise<void>;
 };
@@ -206,6 +210,62 @@ function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise
   });
 }
 
+// ── Today's Tasks ────────────────────────────────────────────────────
+
+type GatewayTodayTask = {
+  id: string;
+  title: string;
+  status: "pending" | "complete";
+  project: string | null;
+  dueDate: string | null;
+  priority: "high" | "medium" | "low";
+  createdAt: string;
+  completedAt: string | null;
+};
+
+/**
+ * Load today's pending tasks via the tasks.today RPC.
+ */
+export async function loadTodayTasks(state: MyDayState): Promise<WorkspaceTask[]> {
+  if (!state.client || !state.connected) {
+    return [];
+  }
+
+  state.todayTasksLoading = true;
+  try {
+    const result = await state.client.request<{ tasks: GatewayTodayTask[] }>(
+      "tasks.today",
+      {},
+    );
+    const tasks: WorkspaceTask[] = (result.tasks ?? []).map((t) => ({
+      id: t.id,
+      title: t.title,
+      status: t.status,
+      project: t.project,
+      dueDate: t.dueDate,
+      priority: t.priority,
+      createdAt: t.createdAt,
+      completedAt: t.completedAt,
+    }));
+    state.todayTasks = tasks;
+    return tasks;
+  } catch (err) {
+    console.error("[MyDay] Failed to load today tasks:", err);
+    return state.todayTasks ?? [];
+  } finally {
+    state.todayTasksLoading = false;
+  }
+}
+
+/**
+ * Fire-and-forget: sync tasks between the daily brief and task system.
+ */
+export function syncTodayTasks(client: GatewayBrowserClient) {
+  client.request("dailyBrief.syncTasks", {}).catch((err: unknown) => {
+    console.warn("[MyDay] dailyBrief.syncTasks failed (non-blocking):", err);
+  });
+}
+
 /**
  * Load daily brief only (for refresh or date navigation)
  */
@@ -265,7 +325,7 @@ export function openBriefInObsidian(date?: string) {
 }
 
 /**
- * Load all My Day data (just the brief now).
+ * Load all My Day data (brief, agent log, and today's tasks).
  */
 export async function loadMyDay(state: MyDayState) {
   if (!state.client || !state.connected) {
@@ -276,6 +336,7 @@ export async function loadMyDay(state: MyDayState) {
   state.myDayError = null;
   state.dailyBriefLoading = true;
   state.agentLogLoading = true;
+  state.todayTasksLoading = true;
 
   const date = state.todaySelectedDate;
 
@@ -288,13 +349,18 @@ export async function loadMyDay(state: MyDayState) {
     withTimeout(loadDailyBrief(state.client, date), 10_000, "Daily Brief"),
     loadBriefNotesPromise,
     withTimeout(loadAgentLog(state.client, date, { refresh: false }), 10_000, "Agent Log"),
+    withTimeout(loadTodayTasks(state), 8_000, "Today Tasks"),
   ]);
 
   state.dailyBrief = results[0].status === "fulfilled" ? results[0].value : null;
   state.agentLog = results[2].status === "fulfilled" ? results[2].value : null;
+  // todayTasks is set inside loadTodayTasks — no extra assignment needed
+
+  // Fire-and-forget: sync tasks between brief and task system
+  syncTodayTasks(state.client);
 
   // Log failures but don't block the page
-  const labels = ["Brief", "Brief Notes", "Agent Log"];
+  const labels = ["Brief", "Brief Notes", "Agent Log", "Today Tasks"];
   const failures = results
     .map((r, i) => (r.status === "rejected" ? { section: labels[i], reason: r.reason } : null))
     .filter(Boolean);
@@ -311,6 +377,7 @@ export async function loadMyDay(state: MyDayState) {
   state.myDayLoading = false;
   state.dailyBriefLoading = false;
   state.agentLogLoading = false;
+  state.todayTasksLoading = false;
 }
 
 /**

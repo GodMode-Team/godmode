@@ -213,11 +213,15 @@ export type AppViewState = {
   allTasks?: WorkspaceTask[];
   taskFilter?: TaskFilter;
   showCompletedTasks?: boolean;
+  editingTaskId?: string | null;
   // My Day state
   myDayLoading?: boolean;
   myDayError?: string | null;
   todaySelectedDate?: string;
   todayViewMode?: "my-day" | "agent-log";
+  // Today tasks
+  todayTasks?: WorkspaceTask[];
+  todayTasksLoading?: boolean;
   // Daily Brief state
   dailyBrief?: DailyBriefData | null;
   dailyBriefLoading?: boolean;
@@ -402,6 +406,7 @@ export type AppViewState = {
   // My Day handlers
   handleMyDayRefresh: () => Promise<void>;
   handleMyDayTaskStatusChange: (taskId: string, newStatus: "pending" | "complete") => Promise<void>;
+  handleTodayStartTask: (taskId: string) => Promise<void>;
   // Date navigation handlers
   handleDatePrev: () => void;
   handleDateNext: () => void;

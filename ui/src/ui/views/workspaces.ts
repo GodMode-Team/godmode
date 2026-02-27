@@ -82,6 +82,8 @@ export type WorkspacesProps = {
   allTasks?: WorkspaceTask[];
   taskFilter?: TaskFilter;
   showCompletedTasks?: boolean;
+  editingTaskId?: string | null;
+  workspaceNames?: string[];
   onSearch?: (query: string) => void;
   onItemSearch?: (query: string) => void;
   onSelectWorkspace?: (workspace: WorkspaceSummary) => void;
@@ -97,6 +99,9 @@ export type WorkspacesProps = {
   onCreateTask?: (title: string, project: string) => void;
   onSetTaskFilter?: (filter: TaskFilter) => void;
   onToggleCompletedTasks?: () => void;
+  onStartTask?: (taskId: string) => void;
+  onEditTask?: (taskId: string | null) => void;
+  onUpdateTask?: (taskId: string, updates: { title?: string; dueDate?: string | null }) => void;
 };
 
 function formatFileSize(size: number): string {
@@ -185,8 +190,53 @@ function sortTasks(tasks: WorkspaceTask[]): WorkspaceTask[] {
 function renderTaskRow(
   task: WorkspaceTask,
   onToggle?: (taskId: string, currentStatus: string) => void,
+  onStartTask?: (taskId: string) => void,
+  editingTaskId?: string | null,
+  onEditTask?: (taskId: string | null) => void,
+  onUpdateTask?: (taskId: string, updates: { title?: string; dueDate?: string | null }) => void,
 ): ReturnType<typeof html> {
   const isComplete = task.status === "complete";
+  const isEditing = editingTaskId === task.id;
+
+  if (isEditing) {
+    return html`
+      <form
+        class="ws-list-row ws-task-row ws-task-edit-row"
+        @submit=${(e: Event) => {
+          e.preventDefault();
+          const form = e.currentTarget as HTMLFormElement;
+          const titleInput = form.querySelector(".ws-task-edit-input") as HTMLInputElement;
+          const dateInput = form.querySelector(".ws-task-date-input") as HTMLInputElement;
+          const newTitle = titleInput.value.trim();
+          if (!newTitle) return;
+          onUpdateTask?.(task.id, {
+            title: newTitle,
+            dueDate: dateInput.value || null,
+          });
+          onEditTask?.(null);
+        }}
+      >
+        <input
+          type="text"
+          class="ws-task-edit-input"
+          .value=${task.title}
+          @click=${(e: Event) => e.stopPropagation()}
+        />
+        <input
+          type="date"
+          class="ws-task-date-input"
+          .value=${task.dueDate ?? ""}
+        />
+        <button type="submit" class="ws-task-save-btn">Save</button>
+        <button
+          type="button"
+          class="ws-task-cancel-btn"
+          @click=${() => onEditTask?.(null)}
+        >Cancel</button>
+      </form>
+    `;
+  }
+
   return html`
     <div class="ws-list-row ws-task-row ${isComplete ? "ws-task-row--complete" : ""}">
       <button
@@ -196,9 +246,20 @@ function renderTaskRow(
       >
         ${isComplete ? "&#10003;" : ""}
       </button>
-      <span class="ws-list-title ${isComplete ? "ws-task-title--done" : ""}">${task.title}</span>
+      <span
+        class="ws-list-title ws-task-title-clickable ${isComplete ? "ws-task-title--done" : ""}"
+        @click=${() => onEditTask?.(task.id)}
+        title="Click to edit"
+      >${task.title}</span>
       <span class=${priorityBadgeClass(task.priority)}>${priorityLabel(task.priority)}</span>
       ${task.dueDate ? html`<span class=${dueDateClass(task.dueDate)}>${formatDueDate(task.dueDate)}</span>` : nothing}
+      ${!isComplete && onStartTask
+        ? html`<button
+            class="ws-task-start-btn"
+            @click=${() => onStartTask(task.id)}
+            title="Start working on this task"
+          >Start</button>`
+        : nothing}
     </div>
   `;
 }
@@ -206,8 +267,53 @@ function renderTaskRow(
 function renderAllTaskRow(
   task: WorkspaceTask,
   onToggle?: (taskId: string, currentStatus: string) => void,
+  onStartTask?: (taskId: string) => void,
+  editingTaskId?: string | null,
+  onEditTask?: (taskId: string | null) => void,
+  onUpdateTask?: (taskId: string, updates: { title?: string; dueDate?: string | null }) => void,
 ): ReturnType<typeof html> {
   const isComplete = task.status === "complete";
+  const isEditing = editingTaskId === task.id;
+
+  if (isEditing) {
+    return html`
+      <form
+        class="ws-list-row ws-task-row ws-task-edit-row"
+        @submit=${(e: Event) => {
+          e.preventDefault();
+          const form = e.currentTarget as HTMLFormElement;
+          const titleInput = form.querySelector(".ws-task-edit-input") as HTMLInputElement;
+          const dateInput = form.querySelector(".ws-task-date-input") as HTMLInputElement;
+          const newTitle = titleInput.value.trim();
+          if (!newTitle) return;
+          onUpdateTask?.(task.id, {
+            title: newTitle,
+            dueDate: dateInput.value || null,
+          });
+          onEditTask?.(null);
+        }}
+      >
+        <input
+          type="text"
+          class="ws-task-edit-input"
+          .value=${task.title}
+          @click=${(e: Event) => e.stopPropagation()}
+        />
+        <input
+          type="date"
+          class="ws-task-date-input"
+          .value=${task.dueDate ?? ""}
+        />
+        <button type="submit" class="ws-task-save-btn">Save</button>
+        <button
+          type="button"
+          class="ws-task-cancel-btn"
+          @click=${() => onEditTask?.(null)}
+        >Cancel</button>
+      </form>
+    `;
+  }
+
   return html`
     <div class="ws-list-row ws-task-row ${isComplete ? "ws-task-row--complete" : ""}">
       <button
@@ -217,10 +323,21 @@ function renderAllTaskRow(
       >
         ${isComplete ? "&#10003;" : ""}
       </button>
-      <span class="ws-list-title ${isComplete ? "ws-task-title--done" : ""}">${task.title}</span>
+      <span
+        class="ws-list-title ws-task-title-clickable ${isComplete ? "ws-task-title--done" : ""}"
+        @click=${() => onEditTask?.(task.id)}
+        title="Click to edit"
+      >${task.title}</span>
       ${task.project ? html`<span class="ws-task-project">${task.project}</span>` : nothing}
       <span class=${priorityBadgeClass(task.priority)}>${priorityLabel(task.priority)}</span>
       ${task.dueDate ? html`<span class=${dueDateClass(task.dueDate)}>${formatDueDate(task.dueDate)}</span>` : nothing}
+      ${!isComplete && onStartTask
+        ? html`<button
+            class="ws-task-start-btn"
+            @click=${() => onStartTask(task.id)}
+            title="Start working on this task"
+          >Start</button>`
+        : nothing}
     </div>
   `;
 }
@@ -433,6 +550,10 @@ function renderWorkspaceDetail(props: {
   onToggleTaskComplete?: (taskId: string, currentStatus: string) => void;
   onCreateTask?: (title: string, project: string) => void;
   onToggleCompletedTasks?: () => void;
+  onStartTask?: (taskId: string) => void;
+  editingTaskId?: string | null;
+  onEditTask?: (taskId: string | null) => void;
+  onUpdateTask?: (taskId: string, updates: { title?: string; dueDate?: string | null }) => void;
 }) {
   const {
     workspace,
@@ -449,6 +570,10 @@ function renderWorkspaceDetail(props: {
     onToggleTaskComplete,
     onCreateTask,
     onToggleCompletedTasks,
+    onStartTask,
+    editingTaskId,
+    onEditTask,
+    onUpdateTask,
   } = props;
 
   const filteredPinned = filterFiles(itemSearchQuery, workspace.pinned).toSorted(
@@ -552,6 +677,10 @@ function renderWorkspaceDetail(props: {
           onToggleTaskComplete,
           onCreateTask,
           onToggleCompletedTasks,
+          onStartTask,
+          editingTaskId,
+          onEditTask,
+          onUpdateTask,
         })}
 
         <section class="ws-section">
@@ -632,8 +761,15 @@ function renderWorkspaceTasksSection(props: {
   onToggleTaskComplete?: (taskId: string, currentStatus: string) => void;
   onCreateTask?: (title: string, project: string) => void;
   onToggleCompletedTasks?: () => void;
+  onStartTask?: (taskId: string) => void;
+  editingTaskId?: string | null;
+  onEditTask?: (taskId: string | null) => void;
+  onUpdateTask?: (taskId: string, updates: { title?: string; dueDate?: string | null }) => void;
 }): ReturnType<typeof html> {
-  const { tasks, workspaceName, showCompleted, onToggleTaskComplete, onCreateTask, onToggleCompletedTasks } = props;
+  const {
+    tasks, workspaceName, showCompleted, onToggleTaskComplete, onCreateTask,
+    onToggleCompletedTasks, onStartTask, editingTaskId, onEditTask, onUpdateTask,
+  } = props;
   const pending = sortTasks(tasks.filter((t) => t.status === "pending"));
   const completed = sortTasks(tasks.filter((t) => t.status === "complete"));
 
@@ -647,13 +783,13 @@ function renderWorkspaceTasksSection(props: {
         ${pending.length === 0 && completed.length === 0
           ? html`<div class="ws-empty">No tasks</div>`
           : nothing}
-        ${pending.map((task) => renderTaskRow(task, onToggleTaskComplete))}
+        ${pending.map((task) => renderTaskRow(task, onToggleTaskComplete, onStartTask, editingTaskId, onEditTask, onUpdateTask))}
         ${completed.length > 0
           ? html`
               <button class="ws-task-completed-toggle" @click=${() => onToggleCompletedTasks?.()}>
                 ${showCompleted ? "Hide" : "Show"} ${completed.length} completed
               </button>
-              ${showCompleted ? completed.map((task) => renderTaskRow(task, onToggleTaskComplete)) : nothing}
+              ${showCompleted ? completed.map((task) => renderTaskRow(task, onToggleTaskComplete, onStartTask, editingTaskId, onEditTask, onUpdateTask)) : nothing}
             `
           : nothing}
       </div>
@@ -698,6 +834,8 @@ export function renderWorkspaces(props: WorkspacesProps) {
     allTasks = [],
     taskFilter = "all",
     showCompletedTasks = false,
+    editingTaskId,
+    workspaceNames = [],
     onSearch,
     onItemSearch,
     onSelectWorkspace,
@@ -713,6 +851,9 @@ export function renderWorkspaces(props: WorkspacesProps) {
     onCreateTask,
     onSetTaskFilter,
     onToggleCompletedTasks,
+    onStartTask,
+    onEditTask,
+    onUpdateTask,
   } = props;
 
   const filteredWorkspaces = workspaces.filter((workspace) =>
@@ -735,6 +876,10 @@ export function renderWorkspaces(props: WorkspacesProps) {
       onToggleTaskComplete,
       onCreateTask,
       onToggleCompletedTasks,
+      onStartTask,
+      editingTaskId,
+      onEditTask,
+      onUpdateTask,
     });
   }
 
@@ -866,6 +1011,12 @@ export function renderWorkspaces(props: WorkspacesProps) {
                   taskFilter,
                   onToggleTaskComplete,
                   onSetTaskFilter,
+                  onCreateTask,
+                  workspaceNames,
+                  onStartTask,
+                  editingTaskId,
+                  onEditTask,
+                  onUpdateTask,
                 })}
               </div>
             `
@@ -879,10 +1030,19 @@ function renderAllTasksSection(props: {
   taskFilter: TaskFilter;
   onToggleTaskComplete?: (taskId: string, currentStatus: string) => void;
   onSetTaskFilter?: (filter: TaskFilter) => void;
+  onCreateTask?: (title: string, project: string) => void;
+  workspaceNames?: string[];
+  onStartTask?: (taskId: string) => void;
+  editingTaskId?: string | null;
+  onEditTask?: (taskId: string | null) => void;
+  onUpdateTask?: (taskId: string, updates: { title?: string; dueDate?: string | null }) => void;
 }): ReturnType<typeof html> {
-  const { tasks, taskFilter, onToggleTaskComplete, onSetTaskFilter } = props;
+  const {
+    tasks, taskFilter, onToggleTaskComplete, onSetTaskFilter,
+    onCreateTask, workspaceNames = [], onStartTask, editingTaskId, onEditTask, onUpdateTask,
+  } = props;
 
-  if (tasks.length === 0) {
+  if (tasks.length === 0 && !onCreateTask) {
     return html``;
   }
 
@@ -919,8 +1079,40 @@ function renderAllTasksSection(props: {
         <div class="ws-list ws-list--scroll">
           ${sorted.length === 0
             ? html`<div class="ws-empty">No tasks</div>`
-            : sorted.map((task) => renderAllTaskRow(task, onToggleTaskComplete))}
+            : sorted.map((task) => renderAllTaskRow(task, onToggleTaskComplete, onStartTask, editingTaskId, onEditTask, onUpdateTask))}
         </div>
+        ${onCreateTask
+          ? html`
+              <form
+                class="ws-task-create-form"
+                @submit=${(e: Event) => {
+                  e.preventDefault();
+                  const form = e.currentTarget as HTMLFormElement;
+                  const input = form.querySelector(".ws-task-create-input") as HTMLInputElement;
+                  const select = form.querySelector(".ws-task-create-project") as HTMLSelectElement | null;
+                  const title = input.value.trim();
+                  if (!title) return;
+                  const project = select?.value || workspaceNames[0] || "";
+                  onCreateTask(title, project);
+                  input.value = "";
+                }}
+              >
+                <input
+                  type="text"
+                  class="ws-task-create-input"
+                  placeholder="Add a task..."
+                />
+                ${workspaceNames.length > 0
+                  ? html`
+                      <select class="ws-task-create-project">
+                        ${workspaceNames.map((name) => html`<option value=${name}>${name}</option>`)}
+                      </select>
+                    `
+                  : nothing}
+                <button type="submit" class="ws-task-create-btn">Add</button>
+              </form>
+            `
+          : nothing}
       </section>
     </div>
   `;

@@ -529,6 +529,45 @@ export async function toggleTaskComplete(
   }
 }
 
+export async function updateTask(
+  state: WorkspacesState,
+  taskId: string,
+  updates: { title?: string; dueDate?: string | null; status?: string },
+): Promise<WorkspaceTask | null> {
+  if (!state.client || !state.connected) {
+    return null;
+  }
+  try {
+    const result = await state.client.request<GatewayTask>(
+      "tasks.update",
+      { id: taskId, ...updates },
+    );
+    return transformTask(result);
+  } catch (err) {
+    console.error("[Workspaces] updateTask failed:", err);
+    return null;
+  }
+}
+
+export async function startTask(
+  state: WorkspacesState,
+  taskId: string,
+): Promise<{ sessionId: string; created: boolean } | null> {
+  if (!state.client || !state.connected) {
+    return null;
+  }
+  try {
+    const result = await state.client.request<{
+      sessionId: string;
+      created: boolean;
+    }>("tasks.openSession", { taskId });
+    return result;
+  } catch (err) {
+    console.error("[Workspaces] startTask failed:", err);
+    return null;
+  }
+}
+
 export async function createTask(
   state: WorkspacesState,
   title: string,
