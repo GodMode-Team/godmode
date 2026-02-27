@@ -1,6 +1,7 @@
 import { readFile, writeFile, stat } from "node:fs/promises";
 import { join } from "node:path";
 import type { GatewayRequestHandler } from "openclaw/plugin-sdk";
+import { DATA_DIR } from "../data-paths.js";
 
 type GatewayRequestHandlers = Record<string, GatewayRequestHandler>;
 
@@ -402,9 +403,147 @@ const captureEveningReview: GatewayRequestHandler = async ({ params, respond }) 
   }
 };
 
+/**
+ * dailyBrief.tasks — Syncs Win The Day items with the native task list.
+ *
+ * Reads the daily note's Win The Day section and syncs with tasks.json.
+ * - New items from the note are added as tasks (source: "import")
+ * - Tasks already in the task list are NOT overwritten (user edits preserved)
+ * - Completed status syncs bidirectionally
+ */
+const syncBriefTasks: GatewayRequestHandler = async ({ params, respond }) => {
+  const vaultPath = getVaultPath();
+  if (!vaultPath) {
+    respond(true, { synced: 0, message: "No Obsidian vault configured" });
+    return;
+  }
+
+  const { date } = params as { date?: string };
+  const briefDate = date || getTodayDate();
+  const filePath = join(vaultPath, getDailyFolder(), `${briefDate}.md`);
+
+  let content: string;
+  try {
+    content = await readFile(filePath, "utf-8");
+  } catch {
+    respond(true, { synced: 0, message: "No daily note found for this date" });
+    return;
+  }
+
+  // Parse Win The Day items from the daily note
+  const missionMatch = content.match(
+    /##\s*(?:\u{1F3AF}\s*)?(?:Win The Day|Today's Mission)([\s\S]*?)(?=^##\s|$)/mu,
+  );
+  if (!missionMatch) {
+    respond(true, { synced: 0, message: "No Win The Day section found" });
+    return;
+  }
+
+  const sectionContent = missionMatch[1];
+  type BriefItem = { title: string; completed: boolean };
+  const briefItems: BriefItem[] = [];
+
+  // Parse numbered items
+  const numberedRegex = /^\d+\.\s*\[([ x])\]\s*\*\*(.+?)\*\*/gm;
+  let match;
+  while ((match = numberedRegex.exec(sectionContent)) !== null) {
+    briefItems.push({ title: match[2].trim(), completed: match[1] === "x" });
+  }
+
+  // Fall back to bullet items
+  if (briefItems.length === 0) {
+    const bulletRegex = /^[-*]\s*\[([ x])\]\s*\*\*(.+?)\*\*/gm;
+    while ((match = bulletRegex.exec(sectionContent)) !== null) {
+      briefItems.push({ title: match[2].trim(), completed: match[1] === "x" });
+    }
+  }
+
+  if (briefItems.length === 0) {
+    respond(true, { synced: 0, message: "No task items found in Win The Day section" });
+    return;
+  }
+
+  // Read existing tasks
+  const TASKS_FILE = join(DATA_DIR, "tasks.json");
+  type NativeTask = {
+    id: string;
+    title: string;
+    status: "pending" | "complete";
+    project: string | null;
+    dueDate: string | null;
+    priority: "high" | "medium" | "low";
+    createdAt: string;
+    completedAt: string | null;
+    carryOver: boolean;
+    source: "chat" | "cron" | "import";
+    userEdited?: boolean;
+  };
+  type TasksData = { tasks: NativeTask[]; updatedAt: string | null };
+
+  let tasksData: TasksData;
+  try {
+    const raw = await readFile(TASKS_FILE, "utf-8");
+    tasksData = JSON.parse(raw) as TasksData;
+  } catch {
+    tasksData = { tasks: [], updatedAt: null };
+  }
+
+  let added = 0;
+  let updated = 0;
+
+  for (const item of briefItems) {
+    // Check if task already exists (match by title, case-insensitive)
+    const existing = tasksData.tasks.find(
+      (t) => t.title.toLowerCase() === item.title.toLowerCase() && t.dueDate === briefDate,
+    );
+
+    if (existing) {
+      // Only update completion status if user hasn't manually edited
+      if (!existing.userEdited && item.completed && existing.status !== "complete") {
+        existing.status = "complete";
+        existing.completedAt = new Date().toISOString();
+        updated++;
+      }
+    } else {
+      // Add new task from daily brief
+      const { randomUUID } = await import("node:crypto");
+      tasksData.tasks.push({
+        id: randomUUID(),
+        title: item.title,
+        status: item.completed ? "complete" : "pending",
+        project: null,
+        dueDate: briefDate,
+        priority: "high",
+        createdAt: new Date().toISOString(),
+        completedAt: item.completed ? new Date().toISOString() : null,
+        carryOver: false,
+        source: "import",
+      });
+      added++;
+    }
+  }
+
+  if (added > 0 || updated > 0) {
+    const { mkdir: mkdirAsync } = await import("node:fs/promises");
+    const { dirname: dirnameHelper } = await import("node:path");
+    await mkdirAsync(dirnameHelper(TASKS_FILE), { recursive: true });
+    tasksData.updatedAt = new Date().toISOString();
+    await writeFile(TASKS_FILE, JSON.stringify(tasksData, null, 2), "utf-8");
+  }
+
+  respond(true, {
+    synced: added + updated,
+    added,
+    updated,
+    total: briefItems.length,
+    message: `Synced ${added + updated} tasks (${added} new, ${updated} updated)`,
+  });
+};
+
 export const dailyBriefHandlers: GatewayRequestHandlers = {
   "dailyBrief.get": getDailyBrief,
   "dailyBrief.update": updateDailyBrief,
   "dailyBrief.eveningCapture": captureEveningReview,
+  "dailyBrief.tasks": syncBriefTasks,
   "eveningReview.capture": captureEveningReview,
 };

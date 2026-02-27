@@ -72,9 +72,22 @@ async function runScriptWithLock(): Promise<{ stdout: string; stderr: string }> 
   }
 }
 
-const flush: GatewayRequestHandler = async ({ respond }) => {
+const flush: GatewayRequestHandler = async ({ respond, context }) => {
   const scriptReady = assertScriptReady();
   if (!scriptReady.ok) {
+    // Graceful fallback: if script doesn't exist, just read existing file
+    const existing = readConsciousness();
+    if (existing) {
+      respond(true, {
+        ok: true,
+        message: "Consciousness file loaded (sync script not available)",
+        content: existing,
+        lineCount: existing.split("\n").length,
+        updatedAt: new Date().toISOString(),
+        scriptMissing: true,
+      });
+      return;
+    }
     respond(false, undefined, {
       code: "NOT_FOUND",
       message: scriptReady.message,
@@ -82,17 +95,35 @@ const flush: GatewayRequestHandler = async ({ respond }) => {
     return;
   }
   try {
+    // Broadcast "syncing" status so the UI shows loading state
+    context?.broadcast?.("consciousness:status", { status: "syncing" }, { dropIfSlow: true });
+
     const { stdout } = await runScriptWithLock();
     const content = readConsciousness();
     const lineCount = content ? content.split("\n").length : 0;
-    respond(true, {
+    const result = {
       ok: true,
       message: stdout.trim() || `Consciousness updated (${lineCount} lines)`,
       content,
       lineCount,
       updatedAt: new Date().toISOString(),
-    });
+    };
+
+    // Broadcast success so the golden icon shows confirmation
+    context?.broadcast?.("consciousness:status", {
+      status: "ok",
+      lineCount,
+      updatedAt: result.updatedAt,
+    }, { dropIfSlow: true });
+
+    respond(true, result);
   } catch (err) {
+    // Broadcast error status
+    context?.broadcast?.("consciousness:status", {
+      status: "error",
+      message: String(err),
+    }, { dropIfSlow: true });
+
     respond(false, undefined, {
       code: "UNAVAILABLE",
       message: String(err),

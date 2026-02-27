@@ -2,8 +2,10 @@
  * trust-tracker.ts — Gateway methods for Trust Tracker.
  *
  * Lightweight, scoped feedback loop: user picks 3-5 workflow categories
- * to track, rates tasks 1-5 after completion, and the agent surfaces
- * what it learned in future similar tasks.
+ * to track, rates tasks 1-10 after completion. After 10 ratings the
+ * running average becomes the workflow's "trust score." Below a 7 the
+ * agent proactively asks for improvement feedback which gets routed
+ * back into the workflow's context so it scores higher next time.
  *
  * Source of truth: ~/godmode/data/trust-tracker.json
  */
@@ -17,16 +19,21 @@ import { DATA_DIR } from "../data-paths.js";
 type GatewayRequestHandlers = Record<string, GatewayRequestHandler>;
 
 const STATE_FILE = join(DATA_DIR, "trust-tracker.json");
-const MAX_WORKFLOWS = 5;
+export const MAX_WORKFLOWS = 5;
 const MAX_RATINGS = 500;
+/** Number of ratings needed before a trust score is assigned. */
+export const SCORE_THRESHOLD = 10;
+/** Trust score below this triggers feedback collection. */
+export const FEEDBACK_THRESHOLD = 7;
 
 // --- Types ---
 
 export type TrustRating = {
   id: string;
   workflow: string;
-  rating: 1 | 2 | 3 | 4 | 5;
+  rating: number; // 1-10
   note?: string;
+  feedback?: string; // improvement feedback when score < 7
   sessionId?: string;
   timestamp: string;
 };
@@ -34,6 +41,8 @@ export type TrustRating = {
 export type TrustTrackerState = {
   workflows: string[];
   ratings: TrustRating[];
+  /** Per-workflow feedback that gets injected into skill context. */
+  workflowFeedback: Record<string, string[]>;
   createdAt: string;
   updatedAt: string;
 };
@@ -42,8 +51,13 @@ export type WorkflowSummary = {
   workflow: string;
   avgRating: number;
   count: number;
+  /** Assigned after SCORE_THRESHOLD (10) ratings — the running average. */
+  trustScore: number | null;
+  /** True when trust score is below FEEDBACK_THRESHOLD (7). */
+  needsFeedback: boolean;
   trend: "improving" | "declining" | "stable" | "new";
   recentNotes: string[];
+  recentFeedback: string[];
 };
 
 // --- Helpers ---
@@ -53,6 +67,7 @@ function emptyState(): TrustTrackerState {
   return {
     workflows: [],
     ratings: [],
+    workflowFeedback: {},
     createdAt: now,
     updatedAt: now,
   };
@@ -83,11 +98,19 @@ function computeSummary(state: TrustTrackerState, daysBack = 30): WorkflowSummar
     const count = all.length;
 
     if (count === 0) {
-      summaries.push({ workflow, avgRating: 0, count: 0, trend: "new", recentNotes: [] });
+      summaries.push({
+        workflow, avgRating: 0, count: 0, trustScore: null,
+        needsFeedback: false, trend: "new", recentNotes: [], recentFeedback: [],
+      });
       continue;
     }
 
     const avg = all.reduce((sum, r) => sum + r.rating, 0) / count;
+    const roundedAvg = Math.round(avg * 10) / 10;
+
+    // Trust score is the running average, assigned after SCORE_THRESHOLD ratings
+    const trustScore = count >= SCORE_THRESHOLD ? roundedAvg : null;
+    const needsFeedback = trustScore !== null && trustScore < FEEDBACK_THRESHOLD;
 
     // Trend: compare first half avg to second half avg
     let trend: WorkflowSummary["trend"] = "stable";
@@ -97,8 +120,8 @@ function computeSummary(state: TrustTrackerState, daysBack = 30): WorkflowSummar
       const secondHalf = recent.slice(mid);
       const firstAvg = firstHalf.reduce((s, r) => s + r.rating, 0) / firstHalf.length;
       const secondAvg = secondHalf.reduce((s, r) => s + r.rating, 0) / secondHalf.length;
-      if (secondAvg - firstAvg > 0.3) trend = "improving";
-      else if (firstAvg - secondAvg > 0.3) trend = "declining";
+      if (secondAvg - firstAvg > 0.5) trend = "improving";
+      else if (firstAvg - secondAvg > 0.5) trend = "declining";
     } else if (count < 3) {
       trend = "new";
     }
@@ -109,12 +132,18 @@ function computeSummary(state: TrustTrackerState, daysBack = 30): WorkflowSummar
       .slice(-3)
       .map((r) => r.note!);
 
+    // Recent feedback (last 3 improvement suggestions)
+    const recentFeedback = (state.workflowFeedback[workflow] ?? []).slice(-3);
+
     summaries.push({
       workflow,
-      avgRating: Math.round(avg * 10) / 10,
+      avgRating: roundedAvg,
       count,
+      trustScore,
+      needsFeedback,
       trend,
       recentNotes,
+      recentFeedback,
     });
   }
 
@@ -147,6 +176,72 @@ export const trustTrackerHandlers: GatewayRequestHandlers = {
     respond(true, { workflows: state.workflows });
   },
 
+  "trust.workflows.add": async ({ params, respond, context }) => {
+    const { workflow } = params as { workflow?: string };
+    if (!workflow || typeof workflow !== "string" || !workflow.trim()) {
+      respond(false, undefined, { code: "INVALID_PARAMS", message: "workflow name is required" });
+      return;
+    }
+    const state = await readState();
+    const normalized = workflow.trim();
+
+    // Check if already tracked (case-insensitive)
+    if (state.workflows.some((w) => w.toLowerCase() === normalized.toLowerCase())) {
+      respond(true, {
+        added: false,
+        reason: "already_tracked",
+        message: `"${normalized}" is already being tracked.`,
+        workflows: state.workflows,
+      });
+      return;
+    }
+
+    if (state.workflows.length >= MAX_WORKFLOWS) {
+      respond(true, {
+        added: false,
+        reason: "limit_reached",
+        message: `You're tracking ${MAX_WORKFLOWS} workflows already. Remove one first to add "${normalized}".`,
+        workflows: state.workflows,
+      });
+      return;
+    }
+
+    state.workflows.push(normalized);
+    await writeState(state);
+    context?.broadcast?.("trust:update", { workflows: state.workflows });
+    respond(true, {
+      added: true,
+      message: `Now tracking "${normalized}". I'll ask for a 1-10 rating after each ${normalized} task. After 10 ratings you'll get a trust score.`,
+      workflows: state.workflows,
+    });
+  },
+
+  "trust.workflows.remove": async ({ params, respond, context }) => {
+    const { workflow } = params as { workflow?: string };
+    if (!workflow || typeof workflow !== "string") {
+      respond(false, undefined, { code: "INVALID_PARAMS", message: "workflow name is required" });
+      return;
+    }
+    const state = await readState();
+    const idx = state.workflows.findIndex((w) => w.toLowerCase() === workflow.trim().toLowerCase());
+    if (idx === -1) {
+      respond(true, {
+        removed: false,
+        message: `"${workflow}" is not being tracked.`,
+        workflows: state.workflows,
+      });
+      return;
+    }
+    const removed = state.workflows.splice(idx, 1)[0];
+    await writeState(state);
+    context?.broadcast?.("trust:update", { workflows: state.workflows });
+    respond(true, {
+      removed: true,
+      message: `Stopped tracking "${removed}".`,
+      workflows: state.workflows,
+    });
+  },
+
   "trust.rate": async ({ params, respond, context }) => {
     const { workflow, rating, note, sessionId } = params as {
       workflow?: string;
@@ -159,8 +254,8 @@ export const trustTrackerHandlers: GatewayRequestHandlers = {
       respond(false, undefined, { code: "INVALID_PARAMS", message: "workflow is required" });
       return;
     }
-    if (!rating || typeof rating !== "number" || rating < 1 || rating > 5 || !Number.isInteger(rating)) {
-      respond(false, undefined, { code: "INVALID_PARAMS", message: "rating must be an integer 1-5" });
+    if (!rating || typeof rating !== "number" || rating < 1 || rating > 10 || !Number.isInteger(rating)) {
+      respond(false, undefined, { code: "INVALID_PARAMS", message: "rating must be an integer 1-10" });
       return;
     }
 
@@ -175,7 +270,7 @@ export const trustTrackerHandlers: GatewayRequestHandlers = {
     const entry: TrustRating = {
       id: randomUUID(),
       workflow: normalizedWorkflow,
-      rating: rating as TrustRating["rating"],
+      rating,
       ...(note ? { note: note.trim() } : {}),
       ...(sessionId ? { sessionId } : {}),
       timestamp: new Date().toISOString(),
@@ -189,8 +284,58 @@ export const trustTrackerHandlers: GatewayRequestHandlers = {
     }
 
     await writeState(state);
-    context?.broadcast?.("trust:update", { entry, workflows: state.workflows });
-    respond(true, { entry });
+
+    // Compute trust score for this workflow
+    const workflowRatings = state.ratings.filter((r) => r.workflow === normalizedWorkflow);
+    const count = workflowRatings.length;
+    const avg = workflowRatings.reduce((s, r) => s + r.rating, 0) / count;
+    const trustScore = count >= SCORE_THRESHOLD ? Math.round(avg * 10) / 10 : null;
+    const needsFeedback = trustScore !== null && trustScore < FEEDBACK_THRESHOLD;
+
+    context?.broadcast?.("trust:update", { entry, workflows: state.workflows, trustScore });
+    respond(true, {
+      entry,
+      count,
+      trustScore,
+      needsFeedback,
+      ratingsUntilScore: count < SCORE_THRESHOLD ? SCORE_THRESHOLD - count : 0,
+      message: needsFeedback
+        ? `Trust score for "${normalizedWorkflow}" is ${trustScore}/10. What could make this better?`
+        : trustScore !== null
+          ? `Trust score for "${normalizedWorkflow}": ${trustScore}/10`
+          : `Rating logged (${count}/${SCORE_THRESHOLD} until trust score is assigned)`,
+    });
+  },
+
+  "trust.feedback": async ({ params, respond, context }) => {
+    const { workflow, feedback } = params as { workflow?: string; feedback?: string };
+    if (!workflow || typeof workflow !== "string" || !workflow.trim()) {
+      respond(false, undefined, { code: "INVALID_PARAMS", message: "workflow is required" });
+      return;
+    }
+    if (!feedback || typeof feedback !== "string" || !feedback.trim()) {
+      respond(false, undefined, { code: "INVALID_PARAMS", message: "feedback text is required" });
+      return;
+    }
+
+    const state = await readState();
+    const normalized = workflow.trim();
+    if (!state.workflowFeedback) state.workflowFeedback = {};
+    if (!state.workflowFeedback[normalized]) state.workflowFeedback[normalized] = [];
+    state.workflowFeedback[normalized].push(feedback.trim());
+
+    // Keep at most 20 feedback entries per workflow
+    if (state.workflowFeedback[normalized].length > 20) {
+      state.workflowFeedback[normalized] = state.workflowFeedback[normalized].slice(-20);
+    }
+
+    await writeState(state);
+    context?.broadcast?.("trust:feedback", { workflow: normalized, feedback: feedback.trim() });
+    respond(true, {
+      stored: true,
+      message: `Feedback noted for "${normalized}". I'll apply this next time.`,
+      feedbackCount: state.workflowFeedback[normalized].length,
+    });
   },
 
   "trust.history": async ({ params, respond }) => {

@@ -20,7 +20,7 @@ export const uiSlotsHandlers: GatewayRequestHandlers = {
     }
 
     const payload: SlotUpdatePayload = { tabId, html, mode };
-    context.broadcast("ui.slot.update", payload, { dropIfSlow: true });
+    context?.broadcast?.("ui.slot.update", payload, { dropIfSlow: true });
     respond(true, { ok: true });
   },
 
@@ -32,7 +32,7 @@ export const uiSlotsHandlers: GatewayRequestHandlers = {
     }
 
     const payload: SlotUpdatePayload = { tabId, html: null, mode: "replace" };
-    context.broadcast("ui.slot.update", payload, { dropIfSlow: true });
+    context?.broadcast?.("ui.slot.update", payload, { dropIfSlow: true });
     respond(true, { ok: true });
   },
 };

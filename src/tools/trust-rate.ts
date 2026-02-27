@@ -3,10 +3,10 @@ import { join, dirname } from "node:path";
 import { randomUUID } from "node:crypto";
 import { type AnyAgentTool, jsonResult } from "openclaw/plugin-sdk";
 import { DATA_DIR } from "../data-paths.js";
+import { MAX_WORKFLOWS, SCORE_THRESHOLD, FEEDBACK_THRESHOLD } from "../methods/trust-tracker.js";
 import type { TrustRating, TrustTrackerState } from "../methods/trust-tracker.js";
 
 const STATE_FILE = join(DATA_DIR, "trust-tracker.json");
-const MAX_WORKFLOWS = 5;
 const MAX_RATINGS = 500;
 
 async function readState(): Promise<TrustTrackerState> {
@@ -15,7 +15,7 @@ async function readState(): Promise<TrustTrackerState> {
     return JSON.parse(raw) as TrustTrackerState;
   } catch {
     const now = new Date().toISOString();
-    return { workflows: [], ratings: [], createdAt: now, updatedAt: now };
+    return { workflows: [], ratings: [], workflowFeedback: {}, createdAt: now, updatedAt: now };
   }
 }
 
@@ -27,7 +27,10 @@ async function saveState(state: TrustTrackerState): Promise<void> {
 
 /**
  * Creates the `trust_rate` agent tool.
- * Lets the agent rate how well a task was completed for a tracked workflow.
+ * Lets the agent rate how well a task was completed (1-10) for a tracked
+ * workflow. After 10 ratings the running average becomes the trust score.
+ * Below a 7, the agent should ask the user "what would make this better?"
+ * and store that feedback via trust.feedback.
  */
 export function createTrustRateTool(_ctx: {
   sessionKey?: string;
@@ -37,10 +40,12 @@ export function createTrustRateTool(_ctx: {
     name: "trust_rate",
     label: "Trust Rate",
     description:
-      "Rate how well a task was completed (1-5) for a specific workflow category. " +
-      "Use this after completing a task that falls under one of the user's tracked " +
-      "workflow categories to help the system learn their preferences over time. " +
-      "If the user hasn't set up workflows yet, suggest they pick 3-5 categories.",
+      "Rate how well a task was completed (1-10) for a tracked workflow category. " +
+      "Use this AFTER you finish a task that matches one of the user's tracked workflows " +
+      "(e.g. daily brief, email triage, code reviews). After 10 ratings the running " +
+      "average becomes the trust score. If the score is below 7, ask the user " +
+      "'What would make this better?' and store the answer via trust.feedback. " +
+      "New workflows are auto-added if under the limit.",
     parameters: {
       type: "object",
       properties: {
@@ -50,7 +55,7 @@ export function createTrustRateTool(_ctx: {
         },
         rating: {
           type: "number",
-          description: "Rating from 1 (poor) to 5 (excellent)",
+          description: "Rating from 1 (poor) to 10 (excellent)",
         },
         note: {
           type: "string",
@@ -67,8 +72,8 @@ export function createTrustRateTool(_ctx: {
       if (!workflow) {
         return jsonResult({ error: "workflow is required" });
       }
-      if (!Number.isInteger(rating) || rating < 1 || rating > 5) {
-        return jsonResult({ error: "rating must be an integer from 1 to 5" });
+      if (!Number.isInteger(rating) || rating < 1 || rating > 10) {
+        return jsonResult({ error: "rating must be an integer from 1 to 10" });
       }
 
       const state = await readState();
@@ -81,7 +86,7 @@ export function createTrustRateTool(_ctx: {
       const entry: TrustRating = {
         id: randomUUID(),
         workflow,
-        rating: rating as TrustRating["rating"],
+        rating,
         ...(note ? { note } : {}),
         timestamp: new Date().toISOString(),
       };
@@ -95,11 +100,30 @@ export function createTrustRateTool(_ctx: {
 
       await saveState(state);
 
+      // Compute trust score
+      const workflowRatings = state.ratings.filter((r) => r.workflow === workflow);
+      const count = workflowRatings.length;
+      const avg = workflowRatings.reduce((s, r) => s + r.rating, 0) / count;
+      const trustScore = count >= SCORE_THRESHOLD ? Math.round(avg * 10) / 10 : null;
+      const needsFeedback = trustScore !== null && trustScore < FEEDBACK_THRESHOLD;
+
+      // Include any stored feedback for this workflow so the agent learns
+      const storedFeedback = state.workflowFeedback?.[workflow]?.slice(-3) ?? [];
+
       return jsonResult({
         rated: true,
         workflow: entry.workflow,
         rating: entry.rating,
-        totalRatings: state.ratings.filter((r) => r.workflow === workflow).length,
+        count,
+        trustScore,
+        needsFeedback,
+        ratingsUntilScore: count < SCORE_THRESHOLD ? SCORE_THRESHOLD - count : 0,
+        storedFeedback,
+        message: needsFeedback
+          ? `Trust score: ${trustScore}/10. Ask the user: "What would make ${workflow} better?" Then store their answer via trust.feedback.`
+          : trustScore !== null
+            ? `Trust score: ${trustScore}/10`
+            : `Rated ${rating}/10 (${count}/${SCORE_THRESHOLD} until trust score)`,
       });
     },
   } as AnyAgentTool;

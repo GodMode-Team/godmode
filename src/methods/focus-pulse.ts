@@ -206,7 +206,7 @@ function broadcastState(
   // Build a slim payload for the UI
   const currentFocus = state.currentFocus;
   const lastCheck = state.pulseChecks[state.pulseChecks.length - 1];
-  context.broadcast(
+  context?.broadcast?.(
     "focusPulse:update",
     {
       active: state.active,
@@ -253,6 +253,55 @@ const startMorningSet: GatewayRequestHandler = async ({ respond, context }) => {
     items = parseWinTheDay(noteContent);
   }
 
+  // Sync daily brief tasks to native task list
+  try {
+    const TASKS_FILE = join(DATA_DIR, "tasks.json");
+    const { readFile: rf, writeFile: wf, mkdir: mk } = await import("node:fs/promises");
+    const { dirname: dn } = await import("node:path");
+    const { randomUUID } = await import("node:crypto");
+
+    type SyncTask = {
+      id: string; title: string; status: "pending" | "complete";
+      project: string | null; dueDate: string | null;
+      priority: "high" | "medium" | "low"; createdAt: string;
+      completedAt: string | null; carryOver: boolean;
+      source: "chat" | "cron" | "import";
+    };
+    type TasksData = { tasks: SyncTask[]; updatedAt: string | null };
+
+    let tasksData: TasksData;
+    try {
+      tasksData = JSON.parse(await rf(TASKS_FILE, "utf-8")) as TasksData;
+    } catch {
+      tasksData = { tasks: [], updatedAt: null };
+    }
+
+    for (const item of items) {
+      const exists = tasksData.tasks.some(
+        (t) => t.title.toLowerCase() === item.title.toLowerCase() && t.dueDate === today,
+      );
+      if (!exists) {
+        tasksData.tasks.push({
+          id: randomUUID(),
+          title: item.title,
+          status: item.completed ? "complete" : "pending",
+          project: null,
+          dueDate: today,
+          priority: "high",
+          createdAt: new Date().toISOString(),
+          completedAt: item.completed ? new Date().toISOString() : null,
+          carryOver: false,
+          source: "import",
+        });
+      }
+    }
+    await mk(dn(TASKS_FILE), { recursive: true });
+    tasksData.updatedAt = new Date().toISOString();
+    await wf(TASKS_FILE, JSON.stringify(tasksData, null, 2), "utf-8");
+  } catch {
+    // Task sync is best-effort — don't block morning set
+  }
+
   // Update state: morning set started, items loaded
   const state = await readState();
   state.date = today;
@@ -260,9 +309,20 @@ const startMorningSet: GatewayRequestHandler = async ({ respond, context }) => {
   state.items = items.length > 0 ? items : state.items;
   await writeState(state);
 
+  // Tell the UI to open a new session for the morning ritual
+  context?.broadcast?.("focusPulse:morningSet", {
+    action: "new-session",
+    title: `Morning Set — ${today}`,
+    items,
+  }, { dropIfSlow: true });
+
+  broadcastState(context, state);
+
   respond(true, {
     items,
     noteFound: noteContent !== null,
+    newSession: true, // Signal to UI: open a fresh session
+    sessionTitle: `Morning Set — ${today}`,
     message: items.length > 0
       ? `Found ${items.length} Win The Day items. Review and pick your #1 focus.`
       : "No Win The Day items found in today's daily note. You can set priorities manually.",

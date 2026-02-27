@@ -5,17 +5,17 @@ export function createCodingTaskHandlers(
   orchestrator: CodingOrchestrator,
 ): Record<string, GatewayRequestHandler> {
   return {
-    "coding.launch": async (_params, respond) => {
-      const params = _params as Record<string, unknown>;
-      const task = typeof params.task === "string" ? params.task.trim() : "";
+    "coding.launch": async ({ params, respond }) => {
+      const p = params as Record<string, unknown>;
+      const task = typeof p.task === "string" ? p.task.trim() : "";
       if (!task) {
         respond({ error: "task is required" });
         return;
       }
 
       const repoRoot =
-        typeof params.repoRoot === "string" && params.repoRoot.trim()
-          ? params.repoRoot.trim()
+        typeof p.repoRoot === "string" && p.repoRoot.trim()
+          ? p.repoRoot.trim()
           : undefined;
 
       if (!repoRoot) {
@@ -26,19 +26,19 @@ export function createCodingTaskHandlers(
       const result = await orchestrator.launchTask({
         task,
         repoRoot,
-        model: typeof params.model === "string" ? params.model : undefined,
-        thinking: typeof params.thinking === "string" ? params.thinking : undefined,
-        scopeGlobs: Array.isArray(params.scopeGlobs)
-          ? (params.scopeGlobs as string[]).filter((g) => typeof g === "string")
+        model: typeof p.model === "string" ? p.model : undefined,
+        thinking: typeof p.thinking === "string" ? p.thinking : undefined,
+        scopeGlobs: Array.isArray(p.scopeGlobs)
+          ? (p.scopeGlobs as string[]).filter((g) => typeof g === "string")
           : undefined,
       });
 
       respond(result);
     },
 
-    "coding.list": async (_params, respond) => {
-      const params = _params as Record<string, unknown>;
-      const status = typeof params.status === "string" ? params.status.trim() : undefined;
+    "coding.list": async ({ params, respond }) => {
+      const p = params as Record<string, unknown>;
+      const status = typeof p.status === "string" ? p.status.trim() : undefined;
       const validStatuses = ["queued", "running", "validating", "done", "failed"];
       const tasks = await orchestrator.listTasks(
         status && validStatuses.includes(status) ? (status as "queued") : undefined,
@@ -46,14 +46,14 @@ export function createCodingTaskHandlers(
       respond({ tasks });
     },
 
-    "coding.status": async (_params, respond) => {
+    "coding.status": async ({ respond }) => {
       const summary = await orchestrator.statusSummary();
       respond(summary);
     },
 
-    "coding.cancel": async (_params, respond) => {
-      const params = _params as Record<string, unknown>;
-      const taskId = typeof params.taskId === "string" ? params.taskId.trim() : "";
+    "coding.cancel": async ({ params, respond }) => {
+      const p = params as Record<string, unknown>;
+      const taskId = typeof p.taskId === "string" ? p.taskId.trim() : "";
       if (!taskId) {
         respond({ error: "taskId is required" });
         return;

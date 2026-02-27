@@ -207,6 +207,226 @@ function calculateHealthScore(result: Omit<AssessmentResult, "healthScore" | "ti
   return Math.min(100, score);
 }
 
+// ── Config Recommendations ───────────────────────────────────────
+
+export type ConfigRecommendation = {
+  key: string;
+  label: string;
+  currentValue: unknown;
+  recommendedValue: unknown;
+  reason: string;
+  priority: "critical" | "recommended" | "optional";
+};
+
+/**
+ * Generate specific OC config recommendations for GodMode users.
+ * Reads the current config and compares against the ideal GodMode setup.
+ */
+export async function generateConfigRecommendations(): Promise<ConfigRecommendation[]> {
+  const config = await safeReadJson<Record<string, unknown>>(OC_CONFIG) ?? {};
+  const recommendations: ConfigRecommendation[] = [];
+
+  const gateway = config.gateway as Record<string, unknown> | undefined;
+  const agents = config.agents as Record<string, unknown> | undefined;
+  const defaults = (agents?.defaults ?? config.agentDefaults) as Record<string, unknown> | undefined;
+  const tools = config.tools as Record<string, unknown> | undefined;
+  const plugins = config.plugins as Record<string, unknown> | undefined;
+  const cron = config.cron as Record<string, unknown> | undefined;
+  const session = config.session as Record<string, unknown> | undefined;
+
+  // Critical: gateway.mode must be "local"
+  if (gateway?.mode !== "local") {
+    recommendations.push({
+      key: "gateway.mode",
+      label: "Gateway mode",
+      currentValue: gateway?.mode ?? "not set",
+      recommendedValue: "local",
+      reason: "Required for GodMode to run. The gateway refuses to start without this.",
+      priority: "critical",
+    });
+  }
+
+  // Critical: gateway.controlUi
+  const controlUi = gateway?.controlUi as Record<string, unknown> | undefined;
+  if (!controlUi?.enabled) {
+    recommendations.push({
+      key: "gateway.controlUi.enabled",
+      label: "Control UI",
+      currentValue: controlUi?.enabled ?? false,
+      recommendedValue: true,
+      reason: "Enables the GodMode web interface.",
+      priority: "critical",
+    });
+  }
+
+  // Recommended: memory search
+  const memSearch = defaults?.memorySearch as Record<string, unknown> | undefined;
+  if (!memSearch?.enabled) {
+    recommendations.push({
+      key: "agents.defaults.memorySearch.enabled",
+      label: "Memory search",
+      currentValue: false,
+      recommendedValue: true,
+      reason: "Core learning mechanism. Your agent gets smarter with every conversation.",
+      priority: "recommended",
+    });
+  }
+
+  // Recommended: session memory indexing
+  const experimental = memSearch?.experimental as Record<string, unknown> | undefined;
+  if (memSearch?.enabled && !experimental?.sessionMemory) {
+    recommendations.push({
+      key: "agents.defaults.memorySearch.experimental.sessionMemory",
+      label: "Session memory indexing",
+      currentValue: false,
+      recommendedValue: true,
+      reason: "Indexes past conversations so the agent learns from your entire history.",
+      priority: "recommended",
+    });
+  }
+
+  // Recommended: compaction mode
+  const compaction = defaults?.compaction as Record<string, unknown> | undefined;
+  if (compaction?.mode !== "safeguard") {
+    recommendations.push({
+      key: "agents.defaults.compaction.mode",
+      label: "Compaction mode",
+      currentValue: compaction?.mode ?? "default",
+      recommendedValue: "safeguard",
+      reason: "Safer for complex reasoning. Prevents context loss during compression.",
+      priority: "recommended",
+    });
+  }
+
+  // Recommended: memory flush
+  const memFlush = compaction?.memoryFlush as Record<string, unknown> | undefined;
+  if (!memFlush?.enabled) {
+    recommendations.push({
+      key: "agents.defaults.compaction.memoryFlush.enabled",
+      label: "Pre-compaction memory flush",
+      currentValue: false,
+      recommendedValue: true,
+      reason: "Writes learned insights to permanent storage before context is compressed.",
+      priority: "recommended",
+    });
+  }
+
+  // Recommended: heartbeat
+  const heartbeat = defaults?.heartbeat as Record<string, unknown> | undefined;
+  if (!heartbeat?.enabled) {
+    recommendations.push({
+      key: "agents.defaults.heartbeat.enabled",
+      label: "Heartbeat",
+      currentValue: false,
+      recommendedValue: true,
+      reason: "Powers the daily brief and morning set routine.",
+      priority: "recommended",
+    });
+  }
+
+  // Recommended: user timezone
+  if (!defaults?.userTimezone) {
+    recommendations.push({
+      key: "agents.defaults.userTimezone",
+      label: "Timezone",
+      currentValue: "not set",
+      recommendedValue: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      reason: "Correct timezone ensures morning brief, session resets, and daily notes work correctly.",
+      priority: "recommended",
+    });
+  }
+
+  // Recommended: thinking
+  if (!defaults?.thinkingDefault) {
+    recommendations.push({
+      key: "agents.defaults.thinkingDefault",
+      label: "Extended thinking",
+      currentValue: "off",
+      recommendedValue: "low",
+      reason: "Enables extended thinking for better reasoning quality.",
+      priority: "recommended",
+    });
+  }
+
+  // Recommended: tools profile
+  if (!tools?.profile || tools.profile === "minimal") {
+    recommendations.push({
+      key: "tools.profile",
+      label: "Tool profile",
+      currentValue: tools?.profile ?? "not set",
+      recommendedValue: "full",
+      reason: "Full profile unlocks web search, media understanding, and shell execution.",
+      priority: "recommended",
+    });
+  }
+
+  // Recommended: web search
+  const webTools = tools?.web as Record<string, unknown> | undefined;
+  const search = webTools?.search as Record<string, unknown> | undefined;
+  if (!search?.provider) {
+    recommendations.push({
+      key: "tools.web.search.provider",
+      label: "Web search provider",
+      currentValue: "not set",
+      recommendedValue: "brave",
+      reason: "Enables real-time web search for research and fact-checking.",
+      priority: "recommended",
+    });
+  }
+
+  // Recommended: loop detection
+  const loopDetection = tools?.loopDetection as Record<string, unknown> | undefined;
+  if (!loopDetection?.enabled) {
+    recommendations.push({
+      key: "tools.loopDetection.enabled",
+      label: "Loop detection",
+      currentValue: false,
+      recommendedValue: true,
+      reason: "Prevents the agent from getting stuck in tool-call loops.",
+      priority: "recommended",
+    });
+  }
+
+  // Critical: plugins enabled
+  if (!plugins?.enabled) {
+    recommendations.push({
+      key: "plugins.enabled",
+      label: "Plugin system",
+      currentValue: false,
+      recommendedValue: true,
+      reason: "Required for GodMode plugin to load.",
+      priority: "critical",
+    });
+  }
+
+  // Optional: cron
+  if (!cron?.enabled) {
+    recommendations.push({
+      key: "cron.enabled",
+      label: "Cron jobs",
+      currentValue: false,
+      recommendedValue: true,
+      reason: "Enables scheduled tasks like evening journal capture and weekly reviews.",
+      priority: "optional",
+    });
+  }
+
+  // Optional: session idle reset
+  const reset = session?.reset as Record<string, unknown> | undefined;
+  if (!reset?.mode) {
+    recommendations.push({
+      key: "session.reset.mode",
+      label: "Session reset",
+      currentValue: "not set",
+      recommendedValue: "idle",
+      reason: "Clears context after inactivity for a fresh start.",
+      priority: "optional",
+    });
+  }
+
+  return recommendations;
+}
+
 // ── Main Scanner ─────────────────────────────────────────────────
 
 export async function runAssessment(): Promise<AssessmentResult> {

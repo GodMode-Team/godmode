@@ -18,6 +18,8 @@ type GodModeOptions = Record<string, unknown>;
 
 const DEFAULTS: GodModeOptions = {
   "focusPulse.enabled": true,
+  "deck.enabled": false,
+  "missionControl.enabled": false,
 };
 
 async function readOptions(): Promise<GodModeOptions> {
@@ -52,7 +54,7 @@ const setOption: GatewayRequestHandler = async ({ params, respond, context }) =>
   options[key] = value;
   await writeOptions(options);
 
-  context.broadcast("godmode.options:update", options, { dropIfSlow: true });
+  context?.broadcast?.("godmode.options:update", options, { dropIfSlow: true });
   respond(true, { key, value, options });
 };
 

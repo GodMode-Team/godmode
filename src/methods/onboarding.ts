@@ -22,7 +22,33 @@ import {
   type OnboardingPhase,
   emptyOnboardingState,
 } from "./onboarding-types.js";
-import { runAssessment } from "./onboarding-scanner.js";
+import { runAssessment, generateConfigRecommendations } from "./onboarding-scanner.js";
+
+// ── Checklist Types ─────────────────────────────────────────────
+
+type ChecklistStep = {
+  id: string;
+  label: string;
+  completed: boolean;
+  detail?: string;
+};
+
+type ChecklistMilestone = {
+  id: string;
+  phase: number;
+  title: string;
+  description: string;
+  emoji: string;
+  status: "complete" | "in-progress" | "locked";
+  steps: ChecklistStep[];
+};
+
+type OnboardingChecklist = {
+  milestones: ChecklistMilestone[];
+  percentComplete: number;
+  currentPhase: number;
+  completedAt: string | null;
+};
 
 type GatewayRequestHandlers = Record<string, GatewayRequestHandler>;
 
@@ -74,9 +100,347 @@ function deepMerge<T extends Record<string, unknown>>(target: T, source: Record<
   return result;
 }
 
+// ── Checklist Builder ────────────────────────────────────────────
+
+/**
+ * Derive milestone status from the current phase and completed phases list.
+ * A milestone is "complete" if its phase appears in completedPhases,
+ * "in-progress" if it matches the current active phase, or "locked" otherwise.
+ */
+function milestoneStatus(
+  milestonePhase: number,
+  currentPhase: number,
+  completedPhases: number[],
+): "complete" | "in-progress" | "locked" {
+  if (completedPhases.includes(milestonePhase)) return "complete";
+  if (milestonePhase === currentPhase) return "in-progress";
+  return "locked";
+}
+
+function buildPhase0Steps(state: OnboardingState): ChecklistStep[] {
+  const a = state.assessment;
+  return [
+    {
+      id: "p0-run-assessment",
+      label: "Run assessment",
+      completed: a !== null,
+      detail: a ? `Score: ${a.healthScore}/100` : undefined,
+    },
+    {
+      id: "p0-review-score",
+      label: "Review score",
+      completed: a !== null && state.completedPhases.includes(0),
+      detail: a ? `${a.features.filter((f) => f.enabled).length}/${a.features.length} features enabled` : undefined,
+    },
+    {
+      id: "p0-identify-gaps",
+      label: "Identify gaps",
+      completed: state.completedPhases.includes(0),
+      detail: a
+        ? (() => {
+            const gaps: string[] = [];
+            if (a.authMethod === "none") gaps.push("auth");
+            if (!a.memoryStatus.hasMemoryMd) gaps.push("memory");
+            if (a.channelsConnected.length === 0) gaps.push("channels");
+            return gaps.length > 0 ? `Gaps: ${gaps.join(", ")}` : "No major gaps";
+          })()
+        : undefined,
+    },
+  ];
+}
+
+function buildPhase1Steps(state: OnboardingState): ChecklistStep[] {
+  const i = state.interview;
+  return [
+    {
+      id: "p1-name",
+      label: "Your name & role",
+      completed: Boolean(i?.name),
+      detail: i?.name ? `${i.name}${i.role ? ` (${i.role})` : ""}` : undefined,
+    },
+    {
+      id: "p1-mission",
+      label: "Your mission",
+      completed: Boolean(i?.mission),
+      detail: i?.mission ? truncate(i.mission, 60) : undefined,
+    },
+    {
+      id: "p1-routine",
+      label: "Daily routine",
+      completed: Boolean(i?.dailyRoutine),
+    },
+    {
+      id: "p1-tools",
+      label: "Tools you use",
+      completed: Boolean(i?.tools && i.tools.length > 0),
+      detail: i?.tools && i.tools.length > 0 ? i.tools.slice(0, 4).join(", ") : undefined,
+    },
+    {
+      id: "p1-pain",
+      label: "Pain points",
+      completed: Boolean(i?.painPoints && i.painPoints.length > 0),
+      detail:
+        i?.painPoints && i.painPoints.length > 0
+          ? `${i.painPoints.length} identified`
+          : undefined,
+    },
+    {
+      id: "p1-workflows",
+      label: "Key workflows",
+      completed: Boolean(i?.workflows && i.workflows.length > 0),
+      detail:
+        i?.workflows && i.workflows.length > 0
+          ? i.workflows.slice(0, 3).join(", ")
+          : undefined,
+    },
+    {
+      id: "p1-team",
+      label: "Team setup",
+      completed: Boolean(i?.teamOrSolo),
+      detail: i?.teamOrSolo ?? undefined,
+    },
+  ];
+}
+
+function buildPhase2Steps(state: OnboardingState): ChecklistStep[] {
+  const sb = state.secondBrain;
+  return [
+    {
+      id: "p2-memory",
+      label: "Seed MEMORY.md",
+      completed: Boolean(sb?.memorySeeded),
+    },
+    {
+      id: "p2-obsidian",
+      label: "Connect Obsidian",
+      completed: Boolean(sb?.obsidianPath),
+      detail: sb?.obsidianPath ? `Path: ${sb.obsidianPath}` : undefined,
+    },
+    {
+      id: "p2-daily-brief",
+      label: "Configure daily brief",
+      completed: Boolean(sb?.dailyBriefConfigured),
+    },
+  ];
+}
+
+function buildPhase3Steps(state: OnboardingState): ChecklistStep[] {
+  const au = state.audit;
+  return [
+    {
+      id: "p3-map",
+      label: "Map workflows to OC skills",
+      completed: Boolean(au?.mappings && au.mappings.length > 0),
+      detail:
+        au?.mappings && au.mappings.length > 0
+          ? `${au.mappings.length} mapped`
+          : undefined,
+    },
+    {
+      id: "p3-automations",
+      label: "Identify automations",
+      completed: Boolean(
+        au?.mappings && au.mappings.some((m) => m.automations.length > 0),
+      ),
+      detail: au?.mappings
+        ? (() => {
+            const count = au.mappings.reduce((n, m) => n + m.automations.length, 0);
+            return count > 0 ? `${count} automations` : undefined;
+          })()
+        : undefined,
+    },
+    {
+      id: "p3-trust",
+      label: "Set up Trust Tracker categories",
+      completed: Boolean(
+        au?.recommendedTrustWorkflows && au.recommendedTrustWorkflows.length > 0,
+      ),
+      detail:
+        au?.recommendedTrustWorkflows && au.recommendedTrustWorkflows.length > 0
+          ? au.recommendedTrustWorkflows.slice(0, 3).join(", ")
+          : undefined,
+    },
+  ];
+}
+
+function buildPhase4Steps(state: OnboardingState): ChecklistStep[] {
+  const cfg = state.configuration;
+  const hasChanges = Boolean(cfg?.changes && cfg.changes.length > 0);
+  const appliedCount = cfg?.changes?.filter((c) => c.applied).length ?? 0;
+  const totalCount = cfg?.changes?.length ?? 0;
+  return [
+    {
+      id: "p4-audit",
+      label: "Run config audit",
+      completed: hasChanges,
+      detail: hasChanges ? `${totalCount} recommendations found` : undefined,
+    },
+    {
+      id: "p4-settings",
+      label: "Apply recommended settings",
+      completed: hasChanges && appliedCount > 0,
+      detail: hasChanges ? `${appliedCount}/${totalCount} applied` : undefined,
+    },
+    {
+      id: "p4-features",
+      label: "Enable GodMode features",
+      completed: appliedCount >= totalCount && totalCount > 0,
+    },
+    {
+      id: "p4-channels",
+      label: "Set up channels",
+      completed: Boolean(cfg?.completed),
+    },
+  ];
+}
+
+function buildPhase5Steps(state: OnboardingState): ChecklistStep[] {
+  const fw = state.firstWin;
+  return [
+    {
+      id: "p5-pick",
+      label: "Pick a demo task",
+      completed: Boolean(fw?.demoType),
+      detail: fw?.demoType ? fw.demoType.replace(/-/g, " ") : undefined,
+    },
+    {
+      id: "p5-run",
+      label: "Run it live",
+      completed: Boolean(fw?.outcome),
+    },
+    {
+      id: "p5-celebrate",
+      label: "Celebrate the result",
+      completed: Boolean(fw?.completed),
+    },
+  ];
+}
+
+function buildPhase6Steps(state: OnboardingState): ChecklistStep[] {
+  const gr = state.grandReveal;
+  return [
+    {
+      id: "p6-review",
+      label: "Review your setup",
+      completed: Boolean(gr),
+      detail: gr ? `Score: ${gr.healthBefore} -> ${gr.healthAfter}` : undefined,
+    },
+    {
+      id: "p6-guide",
+      label: "Get your GodMode guide",
+      completed: Boolean(state.completedAt),
+    },
+  ];
+}
+
+/** Truncate a string to maxLen with ellipsis. */
+function truncate(s: string, maxLen: number): string {
+  return s.length > maxLen ? s.slice(0, maxLen - 1) + "\u2026" : s;
+}
+
+/** Build a full checklist from the current onboarding state. */
+function buildChecklist(state: OnboardingState): OnboardingChecklist {
+  const phase = state.phase;
+  const cp = state.completedPhases;
+
+  const milestones: ChecklistMilestone[] = [
+    {
+      id: "health-scan",
+      phase: 0,
+      title: "Health Scan",
+      description: "Scan your current OpenClaw config and identify gaps",
+      emoji: "\u{1FA7A}",
+      status: milestoneStatus(0, phase, cp),
+      steps: buildPhase0Steps(state),
+    },
+    {
+      id: "get-to-know-you",
+      phase: 1,
+      title: "Get to Know You",
+      description: "Tell me about yourself so I can personalize everything",
+      emoji: "\u{1F44B}",
+      status: milestoneStatus(1, phase, cp),
+      steps: buildPhase1Steps(state),
+    },
+    {
+      id: "second-brain",
+      phase: 2,
+      title: "Second Brain",
+      description: "Set up your memory, notes, and daily brief",
+      emoji: "\u{1F9E0}",
+      status: milestoneStatus(2, phase, cp),
+      steps: buildPhase2Steps(state),
+    },
+    {
+      id: "workflow-mapping",
+      phase: 3,
+      title: "Workflow Mapping",
+      description: "Map your workflows to OpenClaw capabilities",
+      emoji: "\u{1F5FA}\uFE0F",
+      status: milestoneStatus(3, phase, cp),
+      steps: buildPhase3Steps(state),
+    },
+    {
+      id: "configure-and-tune",
+      phase: 4,
+      title: "Configure & Tune",
+      description: "Apply recommended settings and enable features",
+      emoji: "\u{2699}\uFE0F",
+      status: milestoneStatus(4, phase, cp),
+      steps: buildPhase4Steps(state),
+    },
+    {
+      id: "first-win",
+      phase: 5,
+      title: "First Win",
+      description: "See GodMode in action with a live demo",
+      emoji: "\u{1F3C6}",
+      status: milestoneStatus(5, phase, cp),
+      steps: buildPhase5Steps(state),
+    },
+    {
+      id: "godmode-unlocked",
+      phase: 6,
+      title: "You're in GodMode",
+      description: "Review your transformation and get your guide",
+      emoji: "\u{1F525}",
+      status: milestoneStatus(6, phase, cp),
+      steps: buildPhase6Steps(state),
+    },
+  ];
+
+  // Calculate percentComplete from all steps across all milestones
+  const allSteps = milestones.flatMap((m) => m.steps);
+  const completedSteps = allSteps.filter((s) => s.completed).length;
+  const percentComplete =
+    allSteps.length > 0 ? Math.round((completedSteps / allSteps.length) * 100) : 0;
+
+  return {
+    milestones,
+    percentComplete,
+    currentPhase: phase,
+    completedAt: state.completedAt,
+  };
+}
+
+/** Build a default checklist when no onboarding state file exists. */
+function buildDefaultChecklist(): OnboardingChecklist {
+  return buildChecklist(emptyOnboardingState());
+}
+
 // ── Handlers ─────────────────────────────────────────────────────
 
 export const onboardingHandlers: GatewayRequestHandlers = {
+  /**
+   * Get a structured onboarding checklist with progress tracking.
+   * Returns milestones with sub-steps, completion status, and percent complete.
+   */
+  "onboarding.checklist": async ({ respond }) => {
+    const state = await readOnboarding();
+    // readOnboarding always returns a valid state (defaults if file missing)
+    respond(true, buildChecklist(state));
+  },
+
   /**
    * Get current onboarding status. Returns the full state.
    */
@@ -335,5 +699,46 @@ export const onboardingHandlers: GatewayRequestHandlers = {
     const recommendedTrustWorkflows = workflows.slice(0, 5);
 
     respond(true, { mappings, recommendedTrustWorkflows });
+  },
+
+  /**
+   * Audit the user's OC config and generate specific recommendations.
+   * Returns prioritized list of config changes needed for optimal GodMode.
+   * Used during Phase 4 (Configure & Tune) of onboarding.
+   */
+  "onboarding.configAudit": async ({ respond, context }) => {
+    const recommendations = await generateConfigRecommendations();
+
+    const critical = recommendations.filter((r) => r.priority === "critical");
+    const recommended = recommendations.filter((r) => r.priority === "recommended");
+    const optional = recommendations.filter((r) => r.priority === "optional");
+
+    // Store recommendations in onboarding state as pending config changes
+    const state = await readOnboarding();
+    state.configuration = state.configuration ?? { changes: [], completed: false };
+    state.configuration.changes = recommendations.map((r) => ({
+      key: r.key,
+      label: r.label,
+      from: r.currentValue,
+      to: r.recommendedValue,
+      applied: false,
+    }));
+    await writeOnboarding(state);
+
+    try {
+      context?.broadcast?.("onboarding:update", state);
+    } catch {}
+
+    respond(true, {
+      total: recommendations.length,
+      critical,
+      recommended,
+      optional,
+      message: critical.length > 0
+        ? `Found ${critical.length} critical and ${recommended.length} recommended config changes.`
+        : recommendations.length > 0
+          ? `Found ${recommendations.length} recommendations to optimize your setup.`
+          : "Your config looks good! No changes needed.",
+    });
   },
 };

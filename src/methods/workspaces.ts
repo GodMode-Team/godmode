@@ -143,6 +143,16 @@ type WorkspaceFileEntry = {
   searchText?: string;
 };
 
+type FolderTreeNode = {
+  name: string;
+  path: string;
+  type: "folder" | "file";
+  fileType?: WorkspaceFileEntry["type"];
+  size?: number;
+  modified?: string;
+  children?: FolderTreeNode[];
+};
+
 type WorkspaceSessionEntry = {
   id: string;
   key: string;
@@ -319,6 +329,99 @@ function sortAndCapWorkspaceEntries(entries: WorkspaceFileEntry[]): WorkspaceFil
     b.modified.localeCompare(a.modified),
   );
   return sorted.slice(0, MAX_WORKSPACE_SECTION_ITEMS);
+}
+
+/**
+ * Build a folder tree from flat workspace file entries.
+ * Groups files by directory path, creating nested folder nodes.
+ */
+function buildFolderTree(entries: WorkspaceFileEntry[]): FolderTreeNode[] {
+  const root: Map<string, FolderTreeNode> = new Map();
+
+  function ensureFolder(segments: string[]): FolderTreeNode {
+    const key = segments.join("/");
+    const existing = root.get(key);
+    if (existing) {
+      return existing;
+    }
+
+    const node: FolderTreeNode = {
+      name: segments[segments.length - 1],
+      path: key,
+      type: "folder",
+      children: [],
+    };
+
+    if (segments.length === 1) {
+      root.set(key, node);
+    } else {
+      const parent = ensureFolder(segments.slice(0, -1));
+      if (!parent.children) {
+        parent.children = [];
+      }
+      parent.children.push(node);
+      root.set(key, node);
+    }
+
+    return node;
+  }
+
+  for (const entry of entries) {
+    const parts = entry.path.split("/");
+    if (parts.length === 1) {
+      // Top-level file
+      const fileNode: FolderTreeNode = {
+        name: entry.name,
+        path: entry.path,
+        type: "file",
+        fileType: entry.type,
+        size: entry.size,
+        modified: entry.modified,
+      };
+      root.set(`__file__${entry.path}`, fileNode);
+    } else {
+      const folderSegments = parts.slice(0, -1);
+      const folder = ensureFolder(folderSegments);
+      if (!folder.children) {
+        folder.children = [];
+      }
+      folder.children.push({
+        name: entry.name,
+        path: entry.path,
+        type: "file",
+        fileType: entry.type,
+        size: entry.size,
+        modified: entry.modified,
+      });
+    }
+  }
+
+  // Collect top-level nodes: folders at depth 1 + top-level files
+  const topLevel: FolderTreeNode[] = [];
+  for (const [key, node] of root.entries()) {
+    if (key.startsWith("__file__")) {
+      topLevel.push(node);
+    } else if (!key.includes("/")) {
+      topLevel.push(node);
+    }
+  }
+
+  // Sort: folders first, then alphabetically
+  const sortNodes = (nodes: FolderTreeNode[]) => {
+    nodes.sort((a, b) => {
+      if (a.type === "folder" && b.type !== "folder") return -1;
+      if (a.type !== "folder" && b.type === "folder") return 1;
+      return a.name.localeCompare(b.name);
+    });
+    for (const node of nodes) {
+      if (node.children && node.children.length > 0) {
+        sortNodes(node.children);
+      }
+    }
+  };
+  sortNodes(topLevel);
+
+  return topLevel;
 }
 
 function canIndexTextForSearch(filePath: string): boolean {
@@ -880,6 +983,7 @@ const get: GatewayRequestHandler = async ({ params, respond }) => {
     pinned,
     pinnedSessions,
     outputs,
+    folderTree: buildFolderTree(outputs),
     sessions,
   });
 };
@@ -1233,6 +1337,38 @@ const unpinSession: GatewayRequestHandler = async ({ params, respond }) => {
   respond(true, { ok: true, workspaceId, pinnedSessions: workspace.pinnedSessions });
 };
 
+/**
+ * workspaces.teamSetupPrompt — returns a beginner-friendly guided prompt
+ * that the UI can inject into a new chat to walk the user through team
+ * workspace setup step by step.
+ */
+const teamSetupPrompt: GatewayRequestHandler = async ({ respond }) => {
+  const prompt = [
+    "I'd like to set up a Team Workspace so my team's AI assistants can collaborate, share knowledge, and work together.",
+    "",
+    "Please walk me through this step by step. I'm not very technical, so please keep it simple and tell me exactly what to do at each step.",
+    "",
+    "Here's what I need help with:",
+    "1. Create a shared space on GitHub where our team's work will be stored (a private repository)",
+    "2. Set up my Team Workspace in GodMode and connect it to that shared space",
+    "3. Get a simple invite link or instructions I can send to my team members so they can join",
+    "4. Make sure everything syncs automatically so we don't have to think about it",
+    "",
+    "A few things to keep in mind:",
+    "- I want the workspace to be PRIVATE (only my team can see it)",
+    "- Each team member will need their own OpenClaw setup — please tell me what they need to install",
+    "- I want our AIs to be able to share memory, skills, and documents with each other",
+    "",
+    "Start with step 1 and walk me through it. Wait for me to confirm each step is done before moving to the next one.",
+    "",
+    "Use the workspace.provisionTeam tool when I'm ready to create the workspace. Ask me for:",
+    "- A name for our team workspace (e.g. 'Acme Marketing Team')",
+    "- Our GitHub organization name (or help me create one if I don't have one)",
+  ].join("\n");
+
+  respond(true, { prompt });
+};
+
 export const workspacesHandlers: GatewayRequestHandlers = {
   "workspaces.list": list,
   "workspaces.get": get,
@@ -1245,6 +1381,7 @@ export const workspacesHandlers: GatewayRequestHandlers = {
   "workspaces.fileSession": fileSession,
   "workspaces.detectFromMessage": detectFromMessage,
   "workspaces.create": createWorkspace,
+  "workspaces.teamSetupPrompt": teamSetupPrompt,
 };
 
 export { expandPath };

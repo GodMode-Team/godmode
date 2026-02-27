@@ -216,5 +216,11 @@ export async function loadOnboardingContext(): Promise<{ prependContext?: string
   const prompt = phasePrompt(state);
   if (!prompt) return;
 
-  return { prependContext: prompt };
+  const progressHint = `\n\nThe user can ask to check their onboarding progress at any time. ` +
+    `If they say something like "check my onboarding progress", "how's my onboarding going", ` +
+    `"show onboarding checklist", or "what's left in onboarding", ` +
+    `call \`onboarding.checklist\` and present the milestones and steps in a friendly visual format ` +
+    `(use checkmarks for completed steps, circles for pending ones).`;
+
+  return { prependContext: prompt + progressHint };
 }

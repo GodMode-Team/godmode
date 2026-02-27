@@ -1,5 +1,6 @@
-import { readFile, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { readFile, writeFile, mkdir } from "node:fs/promises";
+import { randomUUID } from "node:crypto";
+import { join, dirname } from "node:path";
 import { DATA_DIR } from "../data-paths.js";
 import type { GatewayRequestHandler } from "openclaw/plugin-sdk";
 
@@ -36,6 +37,7 @@ async function readTasks(): Promise<TasksData> {
 
 async function writeTasks(data: TasksData): Promise<void> {
   data.updatedAt = new Date().toISOString();
+  await mkdir(dirname(TASKS_FILE), { recursive: true });
   await writeFile(TASKS_FILE, JSON.stringify(data, null, 2), "utf-8");
 }
 
@@ -119,7 +121,7 @@ const createTask: GatewayRequestHandler = async ({ params, respond }) => {
     return;
   }
   const task: NativeTask = {
-    id: crypto.randomUUID(),
+    id: randomUUID(),
     title,
     status: "pending",
     project: project ?? null,
@@ -167,6 +169,8 @@ const updateTask: GatewayRequestHandler = async ({ params, respond }) => {
   if (updates.status === "complete" && !task.completedAt) {
     task.completedAt = new Date().toISOString();
   }
+  // Mark as user-edited so daily brief sync won't overwrite
+  (task as Record<string, unknown>).userEdited = true;
   data.tasks[idx] = task;
   await writeTasks(data);
   respond(true, task);
