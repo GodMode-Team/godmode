@@ -5,14 +5,22 @@ import {
   updateCodingTaskState,
   type SwarmStage,
 } from "../lib/coding-task-state.js";
+import {
+  readWorkspaceConfig,
+  findWorkspaceById,
+  detectWorkspaceFromText,
+} from "../lib/workspaces-config.js";
 import type { CodingOrchestrator } from "./coding-orchestrator.js";
 
 // ── Copy & voice resource paths ────────────────────────────────
 
 const HOME = process.env.HOME ?? process.env.USERPROFILE ?? "/tmp";
-const VOICE_BIBLE = path.join(HOME, "godmode/memory/projects/voice-bible/VOICE-BIBLE-v1.md");
-const COPY_SKILL = path.join(HOME, "godmode/skills/copy/SKILL.md");
-const BRAND_GUIDE = path.join(HOME, "godmode/projects/godmode/brand/BRAND-GUIDE.md");
+const GODMODE_ROOT = process.env.GODMODE_ROOT ?? path.join(HOME, "godmode");
+
+// Global fallbacks
+const VOICE_BIBLE = path.join(GODMODE_ROOT, "memory/projects/voice-bible/VOICE-BIBLE-v1.md");
+const COPY_SKILL = path.join(GODMODE_ROOT, "skills/copy/SKILL.md");
+const BRAND_GUIDE_FALLBACK = path.join(GODMODE_ROOT, "projects/godmode/brand/BRAND-GUIDE.md");
 
 async function readOptionalFile(p: string): Promise<string> {
   try {
@@ -20,6 +28,115 @@ async function readOptionalFile(p: string): Promise<string> {
   } catch {
     return "";
   }
+}
+
+async function fileExists(p: string): Promise<boolean> {
+  try {
+    await fs.access(p);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+// ── Workspace-aware resource resolution ────────────────────────
+
+type WorkspaceResources = {
+  voiceBible: string;
+  copySkill: string;
+  brandGuide: string;
+  projectContext: string;
+  workspaceName: string;
+};
+
+/** Search common brand guide filenames in a directory. */
+const BRAND_GUIDE_NAMES = [
+  "BRAND-GUIDE.md",
+  "BRAND-STRATEGY-GUIDE.md",
+  "brand-guide.md",
+];
+
+async function findBrandGuide(dir: string): Promise<string> {
+  for (const name of BRAND_GUIDE_NAMES) {
+    const p = path.join(dir, name);
+    if (await fileExists(p)) return p;
+  }
+  // Also check brand/ subdirectory
+  for (const name of BRAND_GUIDE_NAMES) {
+    const p = path.join(dir, "brand", name);
+    if (await fileExists(p)) return p;
+  }
+  return "";
+}
+
+async function resolveWorkspaceResources(
+  taskDescription: string,
+): Promise<WorkspaceResources> {
+  const result: WorkspaceResources = {
+    voiceBible: await readOptionalFile(VOICE_BIBLE),
+    copySkill: await readOptionalFile(COPY_SKILL),
+    brandGuide: "",
+    projectContext: "",
+    workspaceName: "",
+  };
+
+  // Detect workspace from task description
+  try {
+    const config = await readWorkspaceConfig({ initializeIfMissing: false });
+    const detected = detectWorkspaceFromText(config, taskDescription);
+
+    if (detected.workspaceId) {
+      const workspace = findWorkspaceById(config, detected.workspaceId);
+      if (workspace) {
+        result.workspaceName = workspace.name;
+
+        // Search for brand guide in order of priority:
+        // 1. Workspace repo directory
+        // 2. ~/godmode/projects/{id}/
+        // 3. ~/godmode/clients/{id}/
+        const searchDirs = [
+          workspace.path,
+          path.join(GODMODE_ROOT, "projects", workspace.id),
+          path.join(GODMODE_ROOT, "clients", workspace.id),
+        ];
+
+        for (const dir of searchDirs) {
+          const found = await findBrandGuide(dir);
+          if (found) {
+            result.brandGuide = await readOptionalFile(found);
+            break;
+          }
+        }
+
+        // Look for project context (CONTEXT.md, 00-START-HERE.md)
+        for (const dir of searchDirs) {
+          for (const name of ["CONTEXT.md", "00-START-HERE.md"]) {
+            const p = path.join(dir, name);
+            const content = await readOptionalFile(p);
+            if (content) {
+              result.projectContext += `\n\n## ${name}\n\n${content}`;
+            }
+          }
+        }
+
+        // Check for project-specific copy skill
+        const projectCopySkill = path.join(GODMODE_ROOT, "skills", `${workspace.id}-copy`, "SKILL.md");
+        const projectCopy = await readOptionalFile(projectCopySkill);
+        if (projectCopy) {
+          result.copySkill = projectCopy;
+        }
+      }
+    }
+  } catch {
+    // Workspace detection is best-effort — proceed with global resources
+  }
+
+  // Fall back to global brand guide if no project-specific one found
+  if (!result.brandGuide) {
+    result.brandGuide = await readOptionalFile(BRAND_GUIDE_FALLBACK);
+  }
+
+  return result;
 }
 
 // ── Swarm stage order ──────────────────────────────────────────
@@ -282,19 +399,21 @@ export class SwarmPipeline {
     branch: string,
     scopeGlobs: string[],
   ): Promise<string> {
+    // Resolve workspace-specific resources from the task description
+    const res = await resolveWorkspaceResources(task);
+    const projectLabel = res.workspaceName ? ` for ${res.workspaceName}` : "";
+
     const env = [
       "## Environment",
       `- Working directory: ${worktreePath}`,
       `- Branch: ${branch}`,
       `- Scope: ${scopeGlobs.join(", ")}`,
-    ].join("\n");
+      res.workspaceName ? `- Project: ${res.workspaceName}` : "",
+    ].filter(Boolean).join("\n");
 
     if (stage === "design") {
-      const voiceBible = await readOptionalFile(VOICE_BIBLE);
-      const brandGuide = await readOptionalFile(BRAND_GUIDE);
-
       return [
-        "You are the DESIGN ARCHITECT in a multi-agent coding pipeline.",
+        `You are the DESIGN ARCHITECT in a multi-agent coding pipeline${projectLabel}.`,
         "Your job: analyze the codebase and make design decisions. Do NOT write implementation code.",
         "",
         "## Task",
@@ -320,18 +439,17 @@ export class SwarmPipeline {
         "DO NOT write any implementation code. Only decisions and specs.",
         "DO NOT commit. Just write the .swarm/design-brief.md file.",
         "",
-        voiceBible ? "## Voice Reference\n\n" + voiceBible + "\n" : "",
-        brandGuide ? "## Brand Guide\n\n" + brandGuide + "\n" : "",
+        res.voiceBible ? "## Voice Reference\n\n" + res.voiceBible + "\n" : "",
+        res.brandGuide ? "## Brand & Design Guide\n\n" + res.brandGuide + "\n" : "",
+        res.projectContext ? "## Project Context\n" + res.projectContext + "\n" : "",
       ].join("\n");
     }
 
     if (stage === "build") {
-      const voiceBible = await readOptionalFile(VOICE_BIBLE);
-      const copySkill = await readOptionalFile(COPY_SKILL);
       const designBrief = await readOptionalFile(path.join(worktreePath, ".swarm", "design-brief.md"));
 
       return [
-        "You are the BUILDER in a multi-agent coding pipeline.",
+        `You are the BUILDER in a multi-agent coding pipeline${projectLabel}.`,
         "A design architect has already made all architectural decisions. Follow the design brief.",
         "",
         "## Task",
@@ -352,18 +470,17 @@ export class SwarmPipeline {
         "",
         "## Copy Pipeline (for all user-facing text)",
         "Run this process for headlines, body copy, CTAs, and microcopy:",
-        copySkill || "(Copy skill not found — write in a direct, action-oriented voice)",
+        res.copySkill || "(Copy skill not found — write in a direct, action-oriented voice)",
         "",
-        voiceBible ? "## Voice Reference\n\n" + voiceBible + "\n" : "",
+        res.voiceBible ? "## Voice Reference\n\n" + res.voiceBible + "\n" : "",
       ].join("\n");
     }
 
     // QC stage
     const designBrief = await readOptionalFile(path.join(worktreePath, ".swarm", "design-brief.md"));
-    const copySkill = await readOptionalFile(COPY_SKILL);
 
     return [
-      "You are the QC REVIEWER in a multi-agent coding pipeline.",
+      `You are the QC REVIEWER in a multi-agent coding pipeline${projectLabel}.`,
       "A builder has implemented the task. Your job: fresh-eyes review and polish.",
       "",
       "## Task",
@@ -398,7 +515,7 @@ export class SwarmPipeline {
       "7. Synonym cycling: \"The product... The solution... The platform...\" — just say \"it\"",
       "8. Generic conclusions: \"The future looks bright\", \"Exciting times ahead\"",
       "",
-      copySkill ? "## Full Copy Pipeline Reference\n\n" + copySkill + "\n" : "",
+      res.copySkill ? "## Full Copy Pipeline Reference\n\n" + res.copySkill + "\n" : "",
     ].join("\n");
   }
 }
