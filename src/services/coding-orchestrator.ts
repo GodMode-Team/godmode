@@ -583,6 +583,11 @@ export class CodingOrchestrator {
     return { stdout: result.stdout ?? "", exitCode: result.code ?? 1 };
   };
 
+  /** Expose run helper for SwarmPipeline to reuse. */
+  async runCommand(argv: string[], opts: { timeoutMs: number; cwd?: string }): Promise<{ stdout: string; exitCode: number }> {
+    return this.run(argv, opts);
+  }
+
   async launchTask(params: LaunchTaskParams): Promise<LaunchTaskResult> {
     const { task, repoRoot } = params;
     const mode = params.mode ?? classifyTaskMode(task);
@@ -948,13 +953,21 @@ export class CodingOrchestrator {
     failedTasks: number;
   }> {
     const state = await readCodingTaskState();
+    const active = state.tasks.filter((t) => t.status === "running" || t.status === "validating");
+    const swarmActive = active.filter((t) => t.swarm?.enabled);
     return {
       enabled: this.isEnabled(),
       maxWriters: this.maxWriters(),
-      activeTasks: state.tasks.filter((t) => t.status === "running" || t.status === "validating").length,
+      activeTasks: active.length,
       queuedTasks: state.tasks.filter((t) => t.status === "queued").length,
       doneTasks: state.tasks.filter((t) => t.status === "done").length,
       failedTasks: state.tasks.filter((t) => t.status === "failed").length,
+      swarmTasks: swarmActive.length,
+      swarmStages: swarmActive.map((t) => ({
+        taskId: t.id,
+        currentStage: t.swarm!.currentStage,
+        stages: t.swarm!.stages,
+      })),
     };
   }
 
@@ -989,6 +1002,10 @@ export class CodingOrchestrator {
    * - Live process → poll until exit, then run handleTaskCompleted
    */
   async recoverOrphanedTasks(): Promise<{ recovered: number; reattached: number }> {
+    // Lazy import to avoid circular dependency
+    const { SwarmPipeline } = await import("./swarm-pipeline.js");
+    const pipeline = new SwarmPipeline(this, this.logger);
+
     const state = await readCodingTaskState();
     const active = state.tasks.filter(
       (t) => t.status === "running" || t.status === "validating",
@@ -1000,30 +1017,47 @@ export class CodingOrchestrator {
     let reattached = 0;
 
     for (const task of active) {
-      const alive = isProcessAlive(task.pid);
+      // For swarm tasks, check the current stage's PID
+      const pid = task.swarm?.enabled
+        ? task.swarm.stages[task.swarm.currentStage]?.pid ?? task.pid
+        : task.pid;
+      const alive = isProcessAlive(pid);
 
       if (!alive) {
-        // Process is dead — run completion flow (validation + PR)
         this.logger.info(
-          `[GodMode][Coding] Recovering orphaned task ${task.id} (pid ${task.pid ?? "unknown"} is dead)`,
+          `[GodMode][Coding] Recovering orphaned task ${task.id} (pid ${pid ?? "unknown"} is dead)${task.swarm?.enabled ? ` [swarm stage: ${task.swarm.currentStage}]` : ""}`,
         );
         try {
-          await this.handleTaskCompleted({
-            label: task.id,
-            outcome: "ok", // Assume success — agent may have finished before gateway died
-          });
+          if (task.swarm?.enabled) {
+            // Swarm task — advance the pipeline stage
+            await pipeline.handleStageCompleted({
+              taskId: task.id,
+              stage: task.swarm.currentStage,
+              exitCode: 0,
+            });
+          } else {
+            // Single-agent task — run completion flow
+            await this.handleTaskCompleted({
+              label: task.id,
+              outcome: "ok",
+            });
+          }
           recovered++;
         } catch (err) {
           this.logger.error(
             `[GodMode][Coding] Recovery failed for task ${task.id}: ${String(err)}`,
           );
         }
-      } else if (task.pid) {
+      } else if (pid) {
         // Process is still alive — poll until it exits, then complete
         this.logger.info(
-          `[GodMode][Coding] Re-attaching to live task ${task.id} (pid ${task.pid})`,
+          `[GodMode][Coding] Re-attaching to live task ${task.id} (pid ${pid})${task.swarm?.enabled ? ` [swarm stage: ${task.swarm.currentStage}]` : ""}`,
         );
-        this.pollUntilExit(task.id, task.pid);
+        if (task.swarm?.enabled) {
+          this.pollSwarmStageUntilExit(pipeline, task.id, task.swarm.currentStage, pid);
+        } else {
+          this.pollUntilExit(task.id, pid);
+        }
         reattached++;
       }
     }
@@ -1048,7 +1082,32 @@ export class CodingOrchestrator {
       }
     }, 5_000);
 
-    // Don't let the interval keep the process alive
+    if (interval.unref) interval.unref();
+  }
+
+  /** Poll a swarm stage PID every 5s until it exits, then advance the pipeline. */
+  private pollSwarmStageUntilExit(
+    pipeline: { handleStageCompleted: (p: { taskId: string; stage: string; exitCode: number }) => Promise<void> },
+    taskId: string,
+    stage: string,
+    pid: number,
+  ): void {
+    const interval = setInterval(() => {
+      if (!isProcessAlive(pid)) {
+        clearInterval(interval);
+        this.logger.info(`[GodMode][Coding] Polled swarm task ${taskId} stage "${stage}" — pid ${pid} exited`);
+        pipeline.handleStageCompleted({
+          taskId,
+          stage,
+          exitCode: 0,
+        }).catch((err) => {
+          this.logger.error(
+            `[GodMode][Coding] Swarm stage completion error for ${taskId}: ${String(err)}`,
+          );
+        });
+      }
+    }, 5_000);
+
     if (interval.unref) interval.unref();
   }
 }

@@ -5,6 +5,7 @@ import {
   validatePlanDoc,
   type CodingOrchestrator,
 } from "../services/coding-orchestrator.js";
+import { SwarmPipeline } from "../services/swarm-pipeline.js";
 
 type ToolContext = {
   sessionKey?: string;
@@ -12,7 +13,7 @@ type ToolContext = {
 
 export function createCodingTaskTool(
   _ctx: ToolContext,
-  opts: { orchestrator: CodingOrchestrator; workspaceDir?: string },
+  opts: { orchestrator: CodingOrchestrator; workspaceDir?: string; logger?: { info: (msg: string) => void; warn: (msg: string) => void; error: (msg: string) => void } },
 ): AnyAgentTool {
   return {
     label: "Coding",
@@ -112,8 +113,48 @@ export function createCodingTaskTool(
         });
       }
 
-      // Auto-spawn the coding agent for started tasks
+      // Auto-spawn for started tasks — swarm or single-agent
       if (result.status === "started") {
+        const useSwarm = complexity.level === "complex" && !!planDoc;
+
+        if (useSwarm && opts.logger) {
+          // Swarm pipeline: design → build → QC
+          const pipeline = new SwarmPipeline(opts.orchestrator, opts.logger);
+          const pipelineResult = await pipeline.startPipeline({
+            taskId: result.taskId,
+            task,
+            worktreePath: result.worktreePath,
+            branch: result.branch,
+            scopeGlobs: result.scopeGlobs,
+            model: typeof params.model === "string" ? params.model : undefined,
+            planDoc,
+          });
+
+          if (!pipelineResult.started) {
+            return jsonResult({
+              ...result,
+              status: "started",
+              message: `Worktree created but swarm pipeline failed to start: ${pipelineResult.error}.`,
+            });
+          }
+
+          return jsonResult({
+            ...result,
+            swarmMode: true,
+            message: [
+              "Swarm pipeline started (design → build → QC).",
+              `Worktree: ${result.worktreePath}`,
+              `Branch: ${result.branch}`,
+              `Scope: ${result.scopeGlobs.join(", ")}`,
+              "",
+              "Stage 1: Design agent is analyzing the codebase and writing a design brief.",
+              "The pipeline will auto-advance through build and QC stages.",
+              "Validation gates and PR creation run automatically on completion.",
+            ].join("\n"),
+          });
+        }
+
+        // Single-agent mode
         const spawnResult = await opts.orchestrator.spawnCodingAgent({
           taskId: result.taskId,
           task,

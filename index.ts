@@ -1111,7 +1111,7 @@ h1{color:#ff6b6b}code{background:#16213e;padding:2px 8px;border-radius:4px}a{col
     // Team + coding tools
     api.registerTool((ctx) => createTeamMessageTool(ctx));
     api.registerTool((ctx) => createTeamMemoryWriteTool(ctx));
-    api.registerTool((ctx) => createCodingTaskTool(ctx, { orchestrator: codingOrchestrator }));
+    api.registerTool((ctx) => createCodingTaskTool(ctx, { orchestrator: codingOrchestrator, logger: api.logger }));
     api.registerTool((ctx) => createTrustRateTool(ctx));
     api.registerTool((ctx) => createOnboardTool(ctx));
 

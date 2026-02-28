@@ -7,6 +7,21 @@ import { DATA_DIR } from "../data-paths.js";
 export type CodingTaskStatus = "queued" | "running" | "validating" | "done" | "failed";
 export type CodingTaskMode = "write" | "read";
 
+export type SwarmStage = "design" | "build" | "qc";
+
+export type SwarmStageState = {
+  status: "pending" | "running" | "done" | "failed";
+  pid?: number;
+  startedAt?: number;
+  completedAt?: number;
+};
+
+export type SwarmState = {
+  enabled: boolean;
+  currentStage: SwarmStage;
+  stages: Record<SwarmStage, SwarmStageState>;
+};
+
 export type CodingTask = {
   id: string;
   description: string;
@@ -24,6 +39,7 @@ export type CodingTask = {
   pid?: number;
   prNumber?: number;
   prUrl?: string;
+  swarm?: SwarmState;
   createdAt: number;
   startedAt?: number;
   completedAt?: number;
