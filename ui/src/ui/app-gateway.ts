@@ -21,12 +21,6 @@ import {
   parseExecApprovalResolved,
   removeExecApproval,
 } from "./controllers/exec-approval";
-import {
-  handleMissionAgentEvent,
-  handleMissionChatEvent,
-  updateMissionAgentStatus,
-  type MissionHost,
-} from "./controllers/mission";
 import { loadNodes } from "./controllers/nodes";
 import { autoTitleCache, loadSessions } from "./controllers/sessions";
 import { startUpdatePolling, stopUpdatePolling } from "./controllers/updates";
@@ -418,6 +412,11 @@ async function maybeAutoTitleSession(host: GatewayHost, sessionKey: string) {
     return;
   }
 
+  // Never auto-title private sessions — no server-side traces
+  if ((host as unknown as { privateSessions?: Map<string, number> }).privateSessions?.has(sessionKey)) {
+    return;
+  }
+
   // Don't retry if we already attempted for this session
   if (autoTitleAttempted.has(sessionKey)) {
     return;
@@ -486,7 +485,6 @@ export function connectGateway(host: GatewayHost) {
     skillsLoading?: boolean;
     debugLoading?: boolean;
     logsLoading?: boolean;
-    missionLoading?: boolean;
   };
   if ("sessionsLoading" in loadingHost) {
     loadingHost.sessionsLoading = false;
@@ -521,10 +519,6 @@ export function connectGateway(host: GatewayHost) {
   if ("logsLoading" in loadingHost) {
     loadingHost.logsLoading = false;
   }
-  if ("missionLoading" in loadingHost) {
-    loadingHost.missionLoading = false;
-  }
-
   // Clear reconnect timer if connecting manually
   if (reconnectTimer) {
     clearTimeout(reconnectTimer);
@@ -708,15 +702,12 @@ function handleGatewayEventUnsafe(host: GatewayHost, evt: GatewayEventFrame) {
         if (!host.workingSessions.has(toolSessionKey)) {
           host.workingSessions.add(toolSessionKey);
           (host as unknown as { requestUpdate?: () => void }).requestUpdate?.();
-          updateMissionAgentStatus(host as unknown as MissionHost, host.workingSessions);
         }
       }
       // Note: Don't remove on "result" - wait for chat final event to clear
     }
 
     handleAgentEvent(host as unknown as Parameters<typeof handleAgentEvent>[0], agentPayload);
-    // Update mission feed with agent events
-    handleMissionAgentEvent(host as unknown as MissionHost, agentPayload);
     return;
   }
 
@@ -738,7 +729,6 @@ function handleGatewayEventUnsafe(host: GatewayHost, evt: GatewayEventFrame) {
         if (!host.workingSessions.has(payload.sessionKey)) {
           host.workingSessions.add(payload.sessionKey);
           (host as unknown as { requestUpdate?: () => void }).requestUpdate?.();
-          updateMissionAgentStatus(host as unknown as MissionHost, host.workingSessions);
         }
       } else if (
         payload.state === "final" ||
@@ -757,7 +747,6 @@ function handleGatewayEventUnsafe(host: GatewayHost, evt: GatewayEventFrame) {
           }
           host.workingSessions.delete(payload.sessionKey);
           (host as unknown as { requestUpdate?: () => void }).requestUpdate?.();
-          updateMissionAgentStatus(host as unknown as MissionHost, host.workingSessions);
         }
       }
     }
@@ -768,8 +757,6 @@ function handleGatewayEventUnsafe(host: GatewayHost, evt: GatewayEventFrame) {
     }
     // Only process events for the current session
     const state = handleChatEvent(host as unknown as GodModeApp, payload);
-    // Update mission feed with chat events
-    handleMissionChatEvent(host as unknown as MissionHost, payload);
 
     // Auto-title and session refresh run for ANY session (not just the active one).
     // handleChatEvent returns null for non-active sessions, so we check payload.state

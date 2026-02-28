@@ -259,7 +259,9 @@ export function renderChatControls(state: AppViewState) {
         class="chat-toolbar__btn ${state.chatPrivateMode ? "active private-mode" : ""}"
         @click=${() => state.handlePrivateModeToggle()}
         aria-pressed=${state.chatPrivateMode ?? false}
-        title=${state.chatPrivateMode ? "Private mode ON — click to disable" : "Enable private mode (no memory/logging)"}
+        title=${state.chatPrivateMode
+          ? "Private mode ON — click to destroy session"
+          : "Start a private session (ephemeral, 24h auto-delete)"}
       >
         ${icons.lock}
       </button>

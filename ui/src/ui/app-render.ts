@@ -2,6 +2,7 @@ import { html, nothing } from "lit";
 import { repeat } from "lit/directives/repeat.js";
 import { unsafeHTML } from "lit/directives/unsafe-html.js";
 import { parseAgentSessionKey } from "../lib/session-key-utils.js";
+import { sanitizeHtmlFragment } from "./markdown";
 import { refreshChatAvatar, saveDraft, restoreDraft } from "./app-chat";
 import { findSessionByKey } from "./app-lifecycle";
 import { renderChatControls, renderTab, renderThemeToggle } from "./app-render.helpers";
@@ -74,8 +75,6 @@ import { renderInstances } from "./views/instances";
 import { renderLifetracks } from "./views/lifetracks";
 import { renderLogs } from "./views/logs";
 import { renderMarkdownSidebar } from "./views/markdown-sidebar";
-import { renderMissionControl } from "./views/mission-control";
-// Task modal removed — native tasks managed inline in Mission Control
 import { renderMyDay } from "./views/my-day";
 import { renderNodes } from "./views/nodes";
 import { renderOverview } from "./views/overview";
@@ -146,7 +145,7 @@ function renderDynamicSlot(state: AppViewState, tabId: string) {
           title="Reset to default view"
         >Reset to default</button>
       </div>
-      <div class="dynamic-slot__content">${unsafeHTML(slotHtml)}</div>
+      <div class="dynamic-slot__content">${unsafeHTML(sanitizeHtmlFragment(slotHtml))}</div>
     </div>
   `;
 }
@@ -463,7 +462,6 @@ export function renderApp(state: AppViewState) {
           <div>
             ${
               state.tab !== "chat" &&
-              state.tab !== "mission" &&
               state.tab !== "workspaces" &&
               state.tab !== "today" &&
               state.tab !== "my-day" &&
@@ -802,6 +800,8 @@ export function renderApp(state: AppViewState) {
                                   // Switch to this tab
                                   saveDraft(state);
                                   state.sessionKey = key;
+                                  // Sync private mode flag with session
+                                  state.chatPrivateMode = !!state.privateSessions?.has(key);
                                   restoreDraft(state, key);
                                   state.chatLoading = true;
                                   state.chatStream = null;
@@ -862,12 +862,19 @@ export function renderApp(state: AppViewState) {
                               })()
                         }
                         ${
-                          state.chatPrivateMode && key === state.sessionKey
-                            ? html`
-                                <span class="session-tab__lock" title="Private chat" style="font-size: 10px; margin-left: 2px"
-                                  >🔒</span
-                                >
-                              `
+                          state.privateSessions?.has(key)
+                            ? (() => {
+                                const expiresAt = state.privateSessions!.get(key)!;
+                                const remaining = Math.max(0, expiresAt - Date.now());
+                                const hours = Math.floor(remaining / 3_600_000);
+                                const mins = Math.floor((remaining % 3_600_000) / 60_000);
+                                const countdown = hours > 0 ? `${hours}h ${mins}m` : `${mins}m`;
+                                return html`
+                                  <span class="session-tab__private" title="Private session — expires in ${countdown}" style="font-size: 9px; margin-left: 3px; color: #f59e0b; white-space: nowrap;"
+                                    >🔒 ${countdown}</span
+                                  >
+                                `;
+                              })()
                             : nothing
                         }
                         ${
@@ -891,6 +898,11 @@ export function renderApp(state: AppViewState) {
                             class="session-tab__close"
                             @click=${(e: Event) => {
                               e.stopPropagation();
+                              // Private sessions get fully destroyed on close
+                              if (state.privateSessions?.has(key)) {
+                                void (state as import("./app").GodModeApp)._destroyPrivateSession(key);
+                                return;
+                              }
                               const newTabs = state.settings.openTabs.filter((t) => t !== key);
                               const wasActive = key === state.sessionKey;
                               state.applySettings({
@@ -906,7 +918,7 @@ export function renderApp(state: AppViewState) {
                                 void loadChatHistory(state);
                               }
                             }}
-                            title="Close tab"
+                            title=${state.privateSessions?.has(key) ? "Destroy private session" : "Close tab"}
                           >×</button>
                         `
                             : nothing
@@ -989,24 +1001,6 @@ export function renderApp(state: AppViewState) {
                 onUpdateNow: () => {
                   void runUpdate(state);
                 },
-              })
-            : nothing
-        }
-
-        ${
-          state.tab === "mission"
-            ? renderMissionControl({
-                connected: state.connected,
-                loading: state.missionLoading,
-                error: state.missionError,
-                agents: state.missionAgents,
-                activeRuns: state.missionActiveRuns,
-                subagentRuns: state.missionSubagentRuns,
-                tasks: state.missionTasks,
-                feedItems: state.missionFeedItems,
-                onRefresh: () => state.handleMissionRefresh(),
-                onTaskComplete: (taskId) => void state.handleMissionTaskComplete(taskId),
-                onOpenDeck: () => state.handleMissionOpenDeck(),
               })
             : nothing
         }
@@ -2227,7 +2221,6 @@ export function renderApp(state: AppViewState) {
       </main>
       ${renderExecApprovalPrompt(state)}
       ${renderGatewayUrlConfirmation(state)}
-      ${nothing /* Task modal removed — native tasks managed in Mission Control */}
       ${
         state.sidebarOpen && state.tab !== "chat"
           ? html`

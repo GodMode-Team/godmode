@@ -329,7 +329,7 @@ export async function sendChatMessage(
       deliver: false,
       idempotencyKey: runId,
       attachments: imageAttachments,
-      ...(state.chatPrivateMode ? { privateMode: true } : {}),
+      // privateMode is handled client-side only — do NOT send to gateway
     });
     return true;
   } catch (err) {

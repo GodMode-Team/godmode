@@ -62,7 +62,6 @@ import {
 import { loadAssistantIdentity as loadAssistantIdentityInternal } from "./controllers/assistant-identity";
 import type { FailedMessage } from "./controllers/chat";
 import { retryPendingMessage } from "./controllers/chat";
-// ClickUp task type removed — Mission Control uses native tasks
 import type { DevicePairingList } from "./controllers/devices";
 import type { ExecApprovalRequest } from "./controllers/exec-approval";
 import type { ExecApprovalsFile, ExecApprovalsSnapshot } from "./controllers/exec-approvals";
@@ -92,10 +91,6 @@ import {
   type LifetracksState,
 } from "./controllers/lifetracks";
 import { startMeetingNotifications, stopMeetingNotifications } from "./controllers/meeting-notify";
-import {
-  handleMissionRefresh as handleMissionRefreshInternal,
-  handleMissionTaskComplete as handleMissionTaskCompleteInternal,
-} from "./controllers/mission";
 // GodMode view controllers
 import {
   loadMyDay as loadMyDayInternal,
@@ -183,7 +178,6 @@ const CHAT_FILE_LINK_TAB_PREFIXES = new Set([
   "life",
   "data",
   "overview",
-  "mission",
   "channels",
   "instances",
   "sessions",
@@ -371,15 +365,6 @@ export class GodModeApp extends LitElement {
   @state() cronRuns: CronRunLogEntry[] = [];
   @state() cronBusy = false;
 
-  // Mission Control state
-  @state() missionLoading = false;
-  @state() missionError: string | null = null;
-  @state() missionAgents: import("./views/mission-types").MissionAgent[] = [];
-  @state() missionActiveRuns: import("./views/mission-types").ActiveRun[] = [];
-  @state() missionSubagentRuns: import("./views/mission-types").SubagentRun[] = [];
-  @state() missionTasks: import("./views/mission-types").NativeTask[] = [];
-  @state() missionFeedItems: import("./views/mission-types").FeedItem[] = [];
-
   // Workspace onboarding — true when ~/godmode/data/projects.json is empty/missing
   @state() workspaceNeedsSetup = false;
 
@@ -427,6 +412,9 @@ export class GodModeApp extends LitElement {
   @state() todayTasksLoading = false;
 
   @state() chatPrivateMode = false;
+  /** Maps private session keys → expiry timestamp (ms). Ephemeral sessions auto-delete. */
+  @state() privateSessions: Map<string, number> = new Map();
+  private _privateSessionTimer: ReturnType<typeof setInterval> | null = null;
 
   // Life subtab state
   @state() lifeSubtab: "vision-board" | "lifetracks" | "goals" | "wheel-of-life" = "vision-board";
@@ -621,7 +609,8 @@ export class GodModeApp extends LitElement {
     // Start meeting notifications (polls every 60s, fires toast 15 min before)
     startMeetingNotifications(this);
 
-
+    // Restore tracked private sessions from localStorage (expire stale ones)
+    this._restorePrivateSessions();
   }
 
   protected firstUpdated() {
@@ -630,6 +619,7 @@ export class GodModeApp extends LitElement {
 
   disconnectedCallback() {
     stopMeetingNotifications();
+    this._stopPrivateSessionTimer();
     if (this.agentLogPollInterval != null) {
       clearInterval(this.agentLogPollInterval);
       this.agentLogPollInterval = null;
@@ -724,10 +714,14 @@ export class GodModeApp extends LitElement {
   }
 
   async handleFocusPulseStartMorning() {
-    // Switch to chat and kick off the morning priority conversation
+    // Initialize backend state first — parse daily note, populate items, set active
+    await startMorningSetInternal(this);
+
+    // Then switch to chat and kick off the morning priority conversation in a new session
     this.setTab("chat" as import("./navigation").Tab);
     const prompt = "Let's do my morning set. Check my daily note for today's Win The Day items, then help me review priorities and pick my #1 focus to lock in.";
-    this.chatMessage = prompt;
+    const { createNewSession } = await import("./app-render.helpers.js");
+    createNewSession(this);
     void this.handleSendChat(prompt);
   }
 
@@ -1551,96 +1545,6 @@ export class GodModeApp extends LitElement {
     this.toasts = removeToast(this.toasts, id);
   }
 
-  // Mission Control handlers
-  async handleMissionRefresh() {
-    await handleMissionRefreshInternal(this);
-  }
-
-  async handleMissionTaskComplete(taskId: string) {
-    await handleMissionTaskCompleteInternal(this, taskId);
-  }
-
-  handleMissionTaskClick(task: import("./views/mission-types").NativeTask) {
-    this.openSessionForTask(task);
-  }
-
-  /**
-   * Opens (or navigates to) a chat session linked to a task.
-   * Calls tasks.openSession to get/create a session key, then
-   * switches to that session in the chat tab with a contextual prompt.
-   */
-  private async openSessionForTask(task: import("./views/mission-types").NativeTask) {
-    if (!this.client || !this.connected) {
-      this.showToast("Not connected to gateway", "error");
-      return;
-    }
-
-    try {
-      const result = await this.client.request<{
-        sessionId: string;
-        created: boolean;
-        task: import("./views/mission-types").NativeTask;
-      }>("tasks.openSession", { taskId: task.id });
-
-      if (!result.sessionId) {
-        this.showToast("Failed to open session for task", "error");
-        return;
-      }
-
-      // Navigate to the session
-      const { saveDraft } = await import("./app-chat.js");
-      const { syncUrlWithSessionKey } = await import("./app-settings.js");
-      const { loadChatHistory } = await import("./controllers/chat.js");
-
-      saveDraft(this);
-
-      // Add to open tabs if not already there
-      const openTabs = this.settings.openTabs.includes(result.sessionId)
-        ? this.settings.openTabs
-        : [...this.settings.openTabs, result.sessionId];
-
-      this.applySettings({
-        ...this.settings,
-        openTabs,
-        sessionKey: result.sessionId,
-        lastActiveSessionKey: result.sessionId,
-        tabLastViewed: {
-          ...this.settings.tabLastViewed,
-          [result.sessionId]: Date.now(),
-        },
-      });
-
-      this.sessionKey = result.sessionId;
-      this.setTab("chat" as import("./navigation").Tab);
-
-      // If this is a new session, pre-fill with a task context prompt
-      if (result.created) {
-        const projectCtx = task.project ? ` (project: ${task.project})` : "";
-        this.chatMessage = `Let's work on: ${task.title}${projectCtx}`;
-      } else {
-        this.chatMessage = "";
-      }
-
-      this.chatMessages = [];
-      this.chatStream = null;
-      this.chatStreamStartedAt = null;
-      this.chatRunId = null;
-      this.resetToolStream();
-      this.resetChatScroll();
-      void this.loadAssistantIdentity();
-      syncUrlWithSessionKey(this, result.sessionId, true);
-      void loadChatHistory(this);
-      this.requestUpdate();
-    } catch (err) {
-      console.error("[Mission] Failed to open session for task:", err);
-      this.showToast("Failed to open session for task", "error");
-    }
-  }
-
-  handleMissionOpenDeck() {
-    window.open("/deck/", "_blank", "noopener,noreferrer");
-  }
-
   // My Day handlers
   async handleMyDayRefresh() {
     if (this.todayViewMode === "agent-log") {
@@ -1787,29 +1691,139 @@ export class GodModeApp extends LitElement {
 
   handlePrivateModeToggle() {
     if (this.chatPrivateMode) {
-      // Turning off — just toggle the flag
+      // Turning off — destroy the private session entirely
+      const privateKey = this.sessionKey;
       this.chatPrivateMode = false;
-      this.showToast("Private mode OFF", "info", 2000);
+      void this._destroyPrivateSession(privateKey);
+      this.showToast("Private session destroyed", "info", 2000);
       return;
     }
-    // Turning on — create a new private chat session
+    // Turning on — create a new ephemeral session with 24h expiry
     this.chatPrivateMode = true;
     this.setTab("chat" as import("./navigation").Tab);
     void import("./app-render.helpers.js").then(({ createNewSession }) => {
       createNewSession(this);
+      // Track this session as private with 24h expiry
+      const expiresAt = Date.now() + 24 * 60 * 60 * 1000;
+      this.privateSessions = new Map(this.privateSessions).set(this.sessionKey, expiresAt);
+      this._persistPrivateSessions();
+      this._startPrivateSessionTimer();
       // Inject system-style notice as first message
       this.chatMessages = [
         {
           role: "assistant",
           content:
-            "This is a **private chat**. Nothing from this conversation will be saved to memory. " +
-            "The session will be deleted when you close it or after 24 hours.",
+            "This is a **private session**. Nothing will be saved to memory or logs.\n\n" +
+            "This session self-destructs when you close it or in **24 hours** — whichever comes first.",
           timestamp: Date.now(),
         },
       ];
       this.requestUpdate();
     });
-    this.showToast("Private mode ON — new private chat created", "info", 3000);
+    this.showToast("Private session created — 24h countdown started", "info", 3000);
+  }
+
+  /** Destroy a private session: remove tab, delete from gateway, clean up tracking. */
+  async _destroyPrivateSession(sessionKey: string) {
+    // Remove from private tracking
+    const next = new Map(this.privateSessions);
+    next.delete(sessionKey);
+    this.privateSessions = next;
+    this._persistPrivateSessions();
+
+    // If currently viewing the destroyed session, switch away
+    if (this.sessionKey === sessionKey) {
+      this.chatPrivateMode = false;
+      const remaining = this.settings.openTabs.filter((t) => t !== sessionKey);
+      const fallback = remaining[0] || "agent:main:main";
+      this.applySettings({
+        ...this.settings,
+        openTabs: remaining.length > 0 ? remaining : ["agent:main:main"],
+        sessionKey: fallback,
+        lastActiveSessionKey: fallback,
+      });
+      this.sessionKey = fallback;
+      void (await import("./controllers/chat.js")).loadChatHistory(this);
+    } else {
+      // Just remove from tabs
+      this.applySettings({
+        ...this.settings,
+        openTabs: this.settings.openTabs.filter((t) => t !== sessionKey),
+      });
+    }
+
+    // Delete from gateway (fire-and-forget, no confirmation prompt)
+    if (this.client && this.connected) {
+      this.client.request("sessions.delete", { key: sessionKey, deleteTranscript: true }).catch(() => {});
+    }
+
+    if (this.privateSessions.size === 0) {
+      this._stopPrivateSessionTimer();
+    }
+  }
+
+  /** Persist private session map to localStorage so it survives page reloads. */
+  private _persistPrivateSessions() {
+    const entries = Array.from(this.privateSessions.entries());
+    if (entries.length === 0) {
+      localStorage.removeItem("godmode.privateSessions");
+    } else {
+      localStorage.setItem("godmode.privateSessions", JSON.stringify(entries));
+    }
+  }
+
+  /** Restore private sessions from localStorage on startup. */
+  _restorePrivateSessions() {
+    try {
+      const raw = localStorage.getItem("godmode.privateSessions");
+      if (!raw) return;
+      const entries: [string, number][] = JSON.parse(raw);
+      const now = Date.now();
+      const valid = entries.filter(([, exp]) => exp > now);
+      this.privateSessions = new Map(valid);
+      if (valid.length !== entries.length) {
+        // Some expired while offline — destroy them
+        const expired = entries.filter(([, exp]) => exp <= now);
+        for (const [key] of expired) {
+          void this._destroyPrivateSession(key);
+        }
+      }
+      if (this.privateSessions.size > 0) {
+        // Check if current session is private
+        if (this.privateSessions.has(this.sessionKey)) {
+          this.chatPrivateMode = true;
+        }
+        this._startPrivateSessionTimer();
+      }
+      this._persistPrivateSessions();
+    } catch {
+      localStorage.removeItem("godmode.privateSessions");
+    }
+  }
+
+  /** Start periodic timer to check for expired private sessions and update countdown. */
+  private _startPrivateSessionTimer() {
+    if (this._privateSessionTimer) return;
+    this._privateSessionTimer = setInterval(() => {
+      const now = Date.now();
+      for (const [key, expiresAt] of this.privateSessions) {
+        if (expiresAt <= now) {
+          void this._destroyPrivateSession(key);
+          this.showToast("Private session expired and was destroyed", "info", 3000);
+        }
+      }
+      // Force re-render to update countdown display
+      if (this.privateSessions.size > 0) {
+        this.requestUpdate();
+      }
+    }, 30_000); // Check every 30 seconds
+  }
+
+  private _stopPrivateSessionTimer() {
+    if (this._privateSessionTimer) {
+      clearInterval(this._privateSessionTimer);
+      this._privateSessionTimer = null;
+    }
   }
 
   async handleBriefSave(content: string) {

@@ -33,7 +33,6 @@ import type { ChatAttachment, ChatQueueItem, CronFormState, FileTreeNode } from 
 import type { NostrProfileFormState } from "./views/channels.nostr-profile-form";
 import type { DataSource } from "./views/data";
 import type { Goal } from "./views/goals";
-import type { Agent, FeedItem, NativeTask } from "./views/mission-types";
 import type { AgentLogData, DailyBriefData } from "./views/my-day";
 import type { Person } from "./views/people";
 import type { Project } from "./views/work";
@@ -200,13 +199,6 @@ export type AppViewState = {
   logsLevelFilters: Record<LogLevel, boolean>;
   logsAutoFollow: boolean;
   logsTruncated: boolean;
-  // Mission Control state
-  missionLoading: boolean;
-  missionTasks: NativeTask[];
-  missionError: string | null;
-  missionAgents: Agent[];
-  missionFeedItems: FeedItem[];
-  missionSelectedTask: NativeTask | null;
   // Workspaces state
   workspaces?: WorkspaceSummary[];
   selectedWorkspace?: WorkspaceDetail | null;
@@ -239,6 +231,8 @@ export type AppViewState = {
   agentLogError?: string | null;
   // Private mode (no memory/learning from this chat)
   chatPrivateMode?: boolean;
+  /** Maps private session keys → expiry timestamp (ms). */
+  privateSessions?: Map<string, number>;
   // Work tab state
   workProjects?: Project[];
   workLoading?: boolean;
@@ -433,10 +427,6 @@ export type AppViewState = {
     duration?: number,
   ) => void;
   dismissToast: (id: string) => void;
-  // Mission Control handlers
-  handleMissionRefresh: () => Promise<void>;
-  handleMissionTaskClick: (task: NativeTask) => void;
-  handleMissionTaskStatusChange: (taskId: string, newStatus: string) => Promise<void>;
   // My Day handlers
   handleMyDayRefresh: () => Promise<void>;
   handleMyDayTaskStatusChange: (taskId: string, newStatus: "pending" | "complete") => Promise<void>;
