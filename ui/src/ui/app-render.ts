@@ -94,6 +94,7 @@ import { renderGuardrails } from "./views/guardrails";
 import { renderParallelSessions } from "./views/parallel-sessions";
 import { renderWork } from "./views/work";
 import { renderWorkspaces } from "./views/workspaces";
+import { renderCoretex } from "./views/coretex";
 import {
   renderOnboardingWelcome,
   renderOnboardingIdentity,
@@ -2104,6 +2105,35 @@ export function renderApp(state: AppViewState) {
                   openclawLatest: state.updateStatus.openclawLatest,
                   pluginLatest: state.updateStatus.pluginLatest,
                 } : null,
+              })
+            : nothing
+        }
+
+        ${
+          state.tab === "coretex"
+            ? renderCoretex({
+                connected: state.connected,
+                loading: state.coretexLoading ?? false,
+                error: state.coretexError ?? null,
+                subtab: state.coretexSubtab ?? "identity",
+                identity: state.coretexIdentity ?? null,
+                memoryBank: state.coretexMemoryBank ?? null,
+                aiPacket: state.coretexAiPacket ?? null,
+                sourcesData: state.coretexSourcesData ?? null,
+                selectedEntry: state.coretexSelectedEntry ?? null,
+                searchQuery: state.coretexSearchQuery ?? "",
+                syncing: state.coretexSyncing ?? false,
+                browsingFolder: state.coretexBrowsingFolder ?? null,
+                folderEntries: state.coretexFolderEntries ?? null,
+                folderName: state.coretexFolderName ?? null,
+                onSubtabChange: (subtab) => state.handleCoretexSubtabChange(subtab),
+                onSelectEntry: (path) => state.handleCoretexSelectEntry(path),
+                onBrowseFolder: (path) => state.handleCoretexBrowseFolder(path),
+                onBack: () => state.handleCoretexBack(),
+                onSearch: (query) => state.handleCoretexSearch(query),
+                onSync: () => state.handleCoretexSync(),
+                onRefresh: () => state.handleCoretexRefresh(),
+                onOpenSidebar: (content, opts) => state.handleOpenSidebar(content, opts),
               })
             : nothing
         }

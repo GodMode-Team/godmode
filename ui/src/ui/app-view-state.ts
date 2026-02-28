@@ -310,6 +310,20 @@ export type AppViewState = {
   updateLoading: boolean;
   updateError: string | null;
   updateLastChecked: number | null;
+  // CoreTex state
+  coretexSubtab?: import("./views/coretex").CoreTexSubtab;
+  coretexLoading?: boolean;
+  coretexError?: string | null;
+  coretexIdentity?: import("./views/coretex").CoreTexIdentityData | null;
+  coretexMemoryBank?: import("./views/coretex").CoreTexMemoryBankData | null;
+  coretexAiPacket?: import("./views/coretex").CoreTexAiPacketData | null;
+  coretexSourcesData?: import("./views/coretex").CoreTexSourcesData | null;
+  coretexSelectedEntry?: import("./views/coretex").CoreTexEntryDetail | null;
+  coretexSearchQuery?: string;
+  coretexSyncing?: boolean;
+  coretexBrowsingFolder?: string | null;
+  coretexFolderEntries?: import("./views/coretex").CoreTexMemoryEntry[] | null;
+  coretexFolderName?: string | null;
   // File explorer state
   explorerOpen: boolean;
   explorerPath: string;
@@ -493,4 +507,12 @@ export type AppViewState = {
   // Options handlers
   handleOptionsLoad: () => Promise<void>;
   handleOptionToggle: (key: string, value: unknown) => Promise<void>;
+  // CoreTex handlers
+  handleCoretexRefresh: () => Promise<void>;
+  handleCoretexSubtabChange: (subtab: import("./views/coretex").CoreTexSubtab) => void;
+  handleCoretexSelectEntry: (path: string) => Promise<void>;
+  handleCoretexBrowseFolder: (path: string) => Promise<void>;
+  handleCoretexBack: () => void;
+  handleCoretexSearch: (query: string) => void;
+  handleCoretexSync: () => Promise<void>;
 };

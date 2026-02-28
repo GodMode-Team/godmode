@@ -663,7 +663,7 @@ async function listWorkspaceSessions(
 
 function resolveWorkspaceSummary(
   workspace: WorkspaceConfigEntry,
-  artifactCount: number,
+  outputs: WorkspaceFileEntry[],
   sessions: WorkspaceSessionEntry[],
 ): {
   id: string;
@@ -677,12 +677,17 @@ function resolveWorkspaceSummary(
   lastScanned: number;
   legacyType: "projects" | "clients" | "vault" | "custom";
 } {
+  const artifactCount = outputs.length;
   const sessionCount = sessions.length;
   const sessionUpdated = sessions
     .map((entry) => Date.parse(entry.created))
     .filter((value) => Number.isFinite(value))
     .reduce((acc, value) => Math.max(acc, value), 0);
-  const lastUpdatedMs = sessionUpdated || Date.now();
+  const outputUpdated = outputs
+    .map((entry) => Date.parse(entry.modified))
+    .filter((value) => Number.isFinite(value) && value > 0)
+    .reduce((acc, value) => Math.max(acc, value), 0);
+  const lastUpdatedMs = sessionUpdated || outputUpdated || Date.now();
 
   return {
     id: workspace.id,
@@ -906,7 +911,7 @@ const list: GatewayRequestHandler = async ({ respond }) => {
     config.workspaces.map(async (workspace) => {
       const outputs = await listWorkspaceOutputs(workspace);
       const sessions = await listWorkspaceSessions(workspace.id, config);
-      const summary = resolveWorkspaceSummary(workspace, outputs.length, sessions);
+      const summary = resolveWorkspaceSummary(workspace, outputs, sessions);
       return {
         id: summary.id,
         name: summary.name,
@@ -947,7 +952,7 @@ const get: GatewayRequestHandler = async ({ params, respond }) => {
   const outputs = await enrichWorkspaceEntriesForSearch(workspace, rawOutputs);
   const sessions = await listWorkspaceSessions(workspace.id, config);
   const pinned = await getPinnedEntries(workspace, outputs);
-  const summary = resolveWorkspaceSummary(workspace, outputs.length, sessions);
+  const summary = resolveWorkspaceSummary(workspace, outputs, sessions);
 
   // Resolve pinned sessions
   const cfg = await loadConfig();
@@ -1249,6 +1254,12 @@ const createWorkspace: GatewayRequestHandler = async ({ params, respond }) => {
   config.workspaces.push(workspace);
   await writeWorkspaceConfig(config);
 
+  // Refresh IDE activity watcher with updated workspace list
+  try {
+    const { getIDEActivityWatcher } = await import("../services/ide-activity-watcher.js");
+    void getIDEActivityWatcher().refresh(config.workspaces);
+  } catch { /* non-fatal */ }
+
   respond(true, {
     workspace: {
       ...workspace,
@@ -1273,6 +1284,12 @@ const deleteWorkspace: GatewayRequestHandler = async ({ params, respond }) => {
 
   const removed = config.workspaces.splice(index, 1)[0];
   await writeWorkspaceConfig(config);
+
+  // Refresh IDE activity watcher with updated workspace list
+  try {
+    const { getIDEActivityWatcher } = await import("../services/ide-activity-watcher.js");
+    void getIDEActivityWatcher().refresh(config.workspaces);
+  } catch { /* non-fatal */ }
 
   respond(true, {
     deleted: { id: removed.id, name: removed.name },

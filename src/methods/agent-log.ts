@@ -21,6 +21,20 @@ import type { GatewayRequestHandler } from "openclaw/plugin-sdk";
 
 type GatewayRequestHandlers = Record<string, GatewayRequestHandler>;
 
+let broadcastWired = false;
+async function wireBroadcastToWatcher(
+  broadcast: (event: string, payload: unknown, opts?: { dropIfSlow?: boolean }) => void,
+): Promise<void> {
+  if (broadcastWired) return;
+  broadcastWired = true;
+  try {
+    const { getIDEActivityWatcher } = await import("../services/ide-activity-watcher.js");
+    getIDEActivityWatcher().setBroadcastFn(broadcast);
+  } catch {
+    // Watcher not started yet — that's fine, it'll work without broadcast
+  }
+}
+
 const AGENT_DAY_CANDIDATES = [
   path.join(os.homedir(), "godmode", "memory", "AGENT-DAY.md"),
   path.join(os.homedir(), "godmode", "AGENT-DAY.md"),
@@ -66,7 +80,9 @@ async function readLegacyAgentDay(): Promise<{
 }
 
 export const agentLogHandlers: GatewayRequestHandlers = {
-  "agentLog.get": async ({ params, respond }) => {
+  "agentLog.get": async ({ params, respond, context }) => {
+    void wireBroadcastToWatcher(context.broadcast);
+
     const p = params as { date?: string };
     const date = typeof p.date === "string" && p.date.trim() ? p.date.trim() : todayDate();
 
@@ -111,6 +127,8 @@ export const agentLogHandlers: GatewayRequestHandlers = {
   },
 
   "agentLog.append": async ({ params, respond, context }) => {
+    void wireBroadcastToWatcher(context.broadcast);
+
     const p = params as {
       category?: string;
       item?: string;

@@ -126,7 +126,24 @@ function renderBody(props: MarkdownSidebarProps) {
   }
 
   if (mimeType === "text/html" || mimeType === "application/xhtml+xml") {
-    return html`<div class="sidebar-html">${unsafeHTML(sanitizeHtmlFragment(content))}</div>`;
+    // Render full HTML pages in a sandboxed iframe so styles/layout are preserved
+    const blob = new Blob([content], { type: "text/html" });
+    const blobUrl = URL.createObjectURL(blob);
+    return html`<iframe
+      class="sidebar-html-frame"
+      src=${blobUrl}
+      sandbox="allow-same-origin"
+      @load=${(e: Event) => {
+        // Clean up blob URL after load
+        URL.revokeObjectURL(blobUrl);
+        // Auto-size iframe to content height
+        const iframe = e.target as HTMLIFrameElement;
+        try {
+          const h = iframe.contentDocument?.documentElement?.scrollHeight;
+          if (h) iframe.style.height = `${h}px`;
+        } catch { /* cross-origin fallback — keep default height */ }
+      }}
+    ></iframe>`;
   }
 
   if (mimeType === "text/markdown" || mimeType === "text/x-markdown") {

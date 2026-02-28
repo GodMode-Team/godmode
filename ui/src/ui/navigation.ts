@@ -1,7 +1,7 @@
 import type { IconName } from "./icons.js";
 
 export const TAB_GROUPS = [
-  { label: "", tabs: ["chat", "today", "workspaces"] },
+  { label: "", tabs: ["chat", "today", "workspaces", "coretex"] },
   {
     label: "Control",
     tabs: ["overview", "trust", "guardrails", "channels", "instances", "sessions", "cron", "options"],
@@ -37,7 +37,8 @@ export type Tab =
   | "config"
   | "trust"
   | "debug"
-  | "logs";
+  | "logs"
+  | "coretex";
 
 const TAB_PATHS: Record<Tab, string> = {
   options: "/options",
@@ -64,6 +65,7 @@ const TAB_PATHS: Record<Tab, string> = {
   config: "/config",
   debug: "/debug",
   logs: "/logs",
+  coretex: "/coretex",
 };
 
 const PATH_TO_TAB = new Map(Object.entries(TAB_PATHS).map(([tab, path]) => [path, tab as Tab]));
@@ -205,6 +207,8 @@ export function iconForTab(tab: Tab): IconName {
       return "shield";
     case "guardrails":
       return "shield";
+    case "coretex":
+      return "brain";
     case "config":
       return "settings";
     case "debug":
@@ -259,6 +263,8 @@ export function titleForTab(tab: Tab) {
       return "Trust";
     case "guardrails":
       return "Guardrails";
+    case "coretex":
+      return "CoreTex";
     case "config":
       return "Config";
     case "debug":
@@ -313,6 +319,8 @@ export function emojiForTab(tab: Tab): string {
       return "\u{1F6E1}\uFE0F";
     case "guardrails":
       return "\u{1F6A7}";
+    case "coretex":
+      return "\u{1F9E0}";
     case "config":
       return "\u{2699}\uFE0F";
     case "debug":
@@ -367,6 +375,8 @@ export function subtitleForTab(tab: Tab) {
       return "Scores build automatically as you use and rate skills.";
     case "guardrails":
       return "Safety gates that prevent runaway loops, bad searches, and lazy responses.";
+    case "coretex":
+      return "Your context profile — identity, memory bank, and live AI packet.";
     case "config":
       return "Edit ~/.openclaw/config.json safely.";
     case "debug":

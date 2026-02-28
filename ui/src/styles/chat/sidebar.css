@@ -120,6 +120,15 @@
   overflow-x: auto;
 }
 
+.sidebar-html-frame {
+  width: 100%;
+  min-height: 600px;
+  height: 100%;
+  border: none;
+  border-radius: var(--radius-sm, 6px);
+  background: #fff;
+}
+
 .sidebar-plain {
   margin: 0;
   white-space: pre-wrap;

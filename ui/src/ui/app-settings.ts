@@ -318,6 +318,12 @@ export async function refreshActiveTab(host: SettingsHost) {
       await app.handleGuardrailsLoad();
     }
   }
+  if (host.tab === "coretex") {
+    const app = host as unknown as GodModeApp;
+    if (typeof app.handleCoretexRefresh === "function") {
+      await app.handleCoretexRefresh();
+    }
+  }
   if (host.tab === "config") {
     await loadConfigSchema(host as unknown as GodModeApp);
     await loadConfig(host as unknown as GodModeApp);

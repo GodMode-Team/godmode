@@ -833,6 +833,15 @@ h1{color:#ff6b6b}code{background:#16213e;padding:2px 8px;border-radius:4px}a{col
         api.logger.warn(`[GodMode] Claude Code sync import failed: ${String(err)}`);
       }
 
+      // IDE Activity Watcher — real-time Claude Code + git commit tracking
+      try {
+        const { startIDEActivityWatcher } = await import("./src/services/ide-activity-watcher.js");
+        await startIDEActivityWatcher(api.logger);
+        api.logger.info("[GodMode] IDE activity watcher initialized");
+      } catch (err) {
+        api.logger.warn(`[GodMode] IDE activity watcher failed to start: ${String(err)}`);
+      }
+
       // Post-update compatibility check
       try {
         const { execSync } = await import("node:child_process");
@@ -877,6 +886,12 @@ h1{color:#ff6b6b}code{background:#16213e;padding:2px 8px;border-radius:4px}a{col
       try {
         const { stopAutoArchiveService } = await import("./src/services/session-archiver.js");
         stopAutoArchiveService();
+      } catch {
+        // Non-fatal
+      }
+      try {
+        const { getIDEActivityWatcher } = await import("./src/services/ide-activity-watcher.js");
+        await getIDEActivityWatcher().stop();
       } catch {
         // Non-fatal
       }

@@ -145,7 +145,7 @@ import type { ToolExecutionInfo } from "./types/chat-types";
 import { type ChatAttachment, type ChatQueueItem, type CronFormState } from "./ui-types";
 import type { NostrProfileFormState } from "./views/channels.nostr-profile-form";
 import type { LifetracksConfig } from "./views/lifetracks";
-import type { TaskFilter, WorkspaceDetail, WorkspaceSummary, WorkspaceTask } from "./views/workspaces";
+import type { TaskFilter, TaskSort, WorkspaceDetail, WorkspaceSummary, WorkspaceTask } from "./views/workspaces";
 
 declare global {
   interface Window {
@@ -403,6 +403,7 @@ export class GodModeApp extends LitElement {
   @state() workspaceExpandedFolders: Set<string> = new Set();
   @state() allTasks?: WorkspaceTask[];
   @state() taskFilter?: TaskFilter;
+  @state() taskSort?: TaskSort;
   @state() showCompletedTasks?: boolean;
   @state() editingTaskId: string | null = null;
 
@@ -537,6 +538,21 @@ export class GodModeApp extends LitElement {
   // GodMode Options state
   @state() godmodeOptions: Record<string, unknown> | null = null;
   @state() godmodeOptionsLoading = false;
+
+  // CoreTex state
+  @state() coretexSubtab: import("./views/coretex").CoreTexSubtab = "identity";
+  @state() coretexLoading = false;
+  @state() coretexError: string | null = null;
+  @state() coretexIdentity: import("./views/coretex").CoreTexIdentityData | null = null;
+  @state() coretexMemoryBank: import("./views/coretex").CoreTexMemoryBankData | null = null;
+  @state() coretexAiPacket: import("./views/coretex").CoreTexAiPacketData | null = null;
+  @state() coretexSourcesData: import("./views/coretex").CoreTexSourcesData | null = null;
+  @state() coretexSelectedEntry: import("./views/coretex").CoreTexEntryDetail | null = null;
+  @state() coretexSearchQuery = "";
+  @state() coretexSyncing = false;
+  @state() coretexBrowsingFolder: string | null = null;
+  @state() coretexFolderEntries: import("./views/coretex").CoreTexMemoryEntry[] | null = null;
+  @state() coretexFolderName: string | null = null;
 
   private nodesPollInterval: number | null = null;
   private logsPollInterval: number | null = null;
@@ -773,6 +789,79 @@ export class GodModeApp extends LitElement {
   async handleOptionToggle(key: string, value: unknown) {
     const { saveOption } = await import("./controllers/options.js");
     await saveOption(this, key, value);
+  }
+
+  // CoreTex handlers
+  async handleCoretexRefresh() {
+    const { loadCoretex } = await import("./controllers/coretex.js");
+    await loadCoretex(this);
+  }
+
+  handleCoretexSubtabChange(subtab: import("./views/coretex").CoreTexSubtab) {
+    this.coretexSubtab = subtab;
+    this.coretexLoading = false;
+    this.coretexSelectedEntry = null;
+    this.coretexSearchQuery = "";
+    this.coretexError = null;
+    this.coretexBrowsingFolder = null;
+    this.coretexFolderEntries = null;
+    this.coretexFolderName = null;
+    this.handleCoretexRefresh().catch((err) => {
+      console.error("[CoreTex] Refresh after subtab change failed:", err);
+      this.coretexError = err instanceof Error ? err.message : "Failed to load data";
+      this.coretexLoading = false;
+    });
+  }
+
+  async handleCoretexSelectEntry(path: string) {
+    const isHtml = path.endsWith(".html") || path.endsWith(".htm");
+
+    // HTML files open directly in sidebar — bypass panel loading state
+    if (isHtml) {
+      try {
+        const result = await this.client!.request<{ name: string; content: string }>(
+          "coretex.memoryBankEntry",
+          { path },
+        );
+        if (result?.content) {
+          this.handleOpenSidebar(result.content, {
+            mimeType: "text/html",
+            filePath: path,
+            title: result.name || path.split("/").pop() || "File",
+          });
+        }
+      } catch (err) {
+        console.error("[CoreTex] Failed to open HTML file:", err);
+      }
+      return;
+    }
+
+    const { loadCoretexEntry } = await import("./controllers/coretex.js");
+    await loadCoretexEntry(this, path);
+  }
+
+  async handleCoretexBrowseFolder(path: string) {
+    const { browseFolder } = await import("./controllers/coretex.js");
+    await browseFolder(this, path);
+  }
+
+  handleCoretexBack() {
+    if (this.coretexSelectedEntry) {
+      this.coretexSelectedEntry = null;
+    } else if (this.coretexBrowsingFolder) {
+      this.coretexBrowsingFolder = null;
+      this.coretexFolderEntries = null;
+      this.coretexFolderName = null;
+    }
+  }
+
+  handleCoretexSearch(query: string) {
+    this.coretexSearchQuery = query;
+  }
+
+  async handleCoretexSync() {
+    const { syncCoretex } = await import("./controllers/coretex.js");
+    await syncCoretex(this);
   }
 
   removeQueuedMessage(id: string) {
