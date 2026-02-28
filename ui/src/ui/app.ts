@@ -1743,6 +1743,22 @@ export class GodModeApp extends LitElement {
     }
   }
 
+  async handleBriefToggleCheckbox(index: number, checked: boolean) {
+    if (!this.client || !this.connected) {
+      return;
+    }
+    const date = this.dailyBrief?.date || this.todaySelectedDate;
+    try {
+      await this.client.request("dailyBrief.toggleCheckbox", { date, index, checked });
+      if (this.dailyBrief) {
+        this.dailyBrief = { ...this.dailyBrief, updatedAt: new Date().toISOString() };
+      }
+    } catch (err) {
+      console.error("[DailyBrief] Checkbox toggle error:", err);
+      this.showToast("Failed to toggle checkbox", "error");
+    }
+  }
+
 
   // Work tab handlers
   async handleWorkRefresh() {

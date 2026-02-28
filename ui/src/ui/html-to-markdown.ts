@@ -124,7 +124,10 @@ function convertNode(node: Node, ctx: ConvertContext): string {
     case "input": {
       if (el.getAttribute("type") === "checkbox") {
         const checked = (el as HTMLInputElement).checked;
-        return checked ? "[x] " : "[ ] ";
+        // No trailing space — marked always emits a space text node after
+        // the <input>, so adding one here would produce a double space that
+        // confuses Obsidian's checkbox parser.
+        return checked ? "[x]" : "[ ]";
       }
       return "";
     }

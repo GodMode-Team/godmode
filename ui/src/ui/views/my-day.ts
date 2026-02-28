@@ -31,6 +31,7 @@ export type MyDayProps = {
   onBriefRefresh?: () => void;
   onBriefOpenInObsidian?: () => void;
   onBriefSave?: (content: string) => void;
+  onBriefToggleCheckbox?: (index: number, checked: boolean) => void;
   onOpenFile?: (path: string) => void;
   // Date navigation props
   selectedDate?: string; // YYYY-MM-DD, defaults to today
@@ -170,6 +171,7 @@ export function renderMyDay(props: MyDayProps) {
     onRefresh: props.onBriefRefresh,
     onOpenInObsidian: props.onBriefOpenInObsidian,
     onSaveBrief: props.onBriefSave,
+    onToggleCheckbox: props.onBriefToggleCheckbox,
     onOpenFile: props.onOpenFile,
   };
 

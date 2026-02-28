@@ -27,6 +27,7 @@ export type DailyBriefProps = {
   onRefresh?: () => void;
   onOpenInObsidian?: () => void;
   onSaveBrief?: (content: string) => void;
+  onToggleCheckbox?: (index: number, checked: boolean) => void;
   onOpenFile?: (path: string) => void;
 };
 
@@ -134,6 +135,7 @@ export function renderDailyBrief(props: DailyBriefProps) {
     onRefresh,
     onOpenInObsidian,
     onSaveBrief,
+    onToggleCheckbox,
     onOpenFile,
   } = props;
 
@@ -297,16 +299,22 @@ export function renderDailyBrief(props: DailyBriefProps) {
   const handleClick = (e: Event) => {
     const target = e.target as HTMLElement;
 
-    // Checkbox toggle — flush save immediately (not debounced) so the
-    // task sync picks up the change before user navigates away
+    // Checkbox toggle — use surgical server-side read-modify-write so we
+    // never overwrite the full file from stale in-memory HTML.  This keeps
+    // Obsidian's file-watcher happy and avoids clobbering external edits.
     if (target.tagName === "INPUT" && target.getAttribute("type") === "checkbox") {
-      setTimeout(() => {
-        const container = e.currentTarget as HTMLElement;
-        if (onSaveBrief) {
-          const md = getEditableMarkdown(container);
-          flushSave(md, onSaveBrief);
+      const input = target as HTMLInputElement;
+      const container = e.currentTarget as HTMLElement;
+      if (onToggleCheckbox && container) {
+        // Count which checkbox this is (0-indexed)
+        const allCheckboxes = Array.from(
+          container.querySelectorAll('input[type="checkbox"]'),
+        );
+        const index = allCheckboxes.indexOf(input);
+        if (index >= 0) {
+          onToggleCheckbox(index, input.checked);
         }
-      }, 0);
+      }
       return;
     }
 

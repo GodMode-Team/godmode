@@ -1281,6 +1281,7 @@ export function renderApp(state: AppViewState) {
                   onBriefRefresh: () => state.handleDailyBriefRefresh(),
                   onBriefOpenInObsidian: () => state.handleDailyBriefOpenInObsidian(),
                   onBriefSave: (content: string) => state.handleBriefSave(content),
+                  onBriefToggleCheckbox: (index: number, checked: boolean) => state.handleBriefToggleCheckbox(index, checked),
                   onOpenFile: (path: string) => void state.handleOpenFile(path),
                   // Date navigation props
                   selectedDate: state.todaySelectedDate,

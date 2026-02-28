@@ -817,9 +817,86 @@ const syncTasksBidirectional: GatewayRequestHandler = async ({ params, respond }
   });
 };
 
+/**
+ * dailyBrief.toggleCheckbox — Surgical read-modify-write for a single checkbox.
+ *
+ * Instead of overwriting the entire file from the UI's in-memory HTML, this
+ * reads the CURRENT file from disk, finds the Nth checkbox (`[ ]` or `[x]`),
+ * toggles it, and writes back. This avoids clobbering Obsidian's state and
+ * keeps file diffs minimal so Obsidian's file-watcher stays happy.
+ */
+const toggleCheckbox: GatewayRequestHandler = async ({ params, respond }) => {
+  const vaultPath = getVaultPath();
+  if (!vaultPath) {
+    respond(false, null, { code: "INVALID_REQUEST", message: "OBSIDIAN_VAULT_PATH not configured" });
+    return;
+  }
+
+  const { date, index, checked } = params as {
+    date?: string;
+    index?: number;
+    checked?: boolean;
+  };
+
+  if (typeof index !== "number" || typeof checked !== "boolean") {
+    respond(false, null, {
+      code: "INVALID_REQUEST",
+      message: "Missing index (number) or checked (boolean) parameter",
+    });
+    return;
+  }
+
+  const briefDate = date || getTodayDate();
+  const filePath = join(vaultPath, getDailyFolder(), `${briefDate}.md`);
+
+  try {
+    const content = await readFile(filePath, "utf-8");
+
+    // Find all checkboxes in order: `[ ]` or `[x]` (case-insensitive x)
+    const checkboxPattern = /\[[xX ]\]/g;
+    let match: RegExpExecArray | null;
+    let currentIndex = 0;
+    let newContent = content;
+
+    while ((match = checkboxPattern.exec(content)) !== null) {
+      if (currentIndex === index) {
+        const replacement = checked ? "[x]" : "[ ]";
+        newContent =
+          content.substring(0, match.index) +
+          replacement +
+          content.substring(match.index + match[0].length);
+        break;
+      }
+      currentIndex++;
+    }
+
+    if (newContent === content) {
+      // No matching checkbox found at that index — still respond OK
+      respond(true, { date: briefDate, toggled: false, message: `No checkbox at index ${index}` });
+      return;
+    }
+
+    await writeFile(filePath, newContent, "utf-8");
+    console.log(`[DailyBrief] Toggled checkbox #${index} → ${checked ? "checked" : "unchecked"} for ${briefDate}`);
+    respond(true, { date: briefDate, toggled: true, checked });
+
+    // Sync the toggled checkbox to tasks.json (fire-and-forget)
+    syncTasksFromBrief(briefDate).catch((err) => {
+      console.error("[DailyBrief] Post-toggle task sync failed:", err);
+    });
+  } catch (err) {
+    console.error("[DailyBrief] Error toggling checkbox:", err);
+    respond(false, null, {
+      code: "UNAVAILABLE",
+      message: err instanceof Error ? err.message : "Failed to toggle checkbox",
+    });
+  }
+};
+
 export const dailyBriefHandlers: GatewayRequestHandlers = {
   "dailyBrief.get": getDailyBrief,
   "dailyBrief.update": updateDailyBrief,
+  "dailyBrief.toggleCheckbox": toggleCheckbox,
   "dailyBrief.eveningCapture": captureEveningReview,
   "dailyBrief.tasks": syncBriefTasks,
   "dailyBrief.syncTasks": syncTasksBidirectional,

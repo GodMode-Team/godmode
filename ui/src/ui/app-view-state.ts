@@ -435,6 +435,7 @@ export type AppViewState = {
   handleDailyBriefRefresh: () => Promise<void>;
   handleDailyBriefOpenInObsidian: () => void;
   handleBriefSave: (content: string) => Promise<void>;
+  handleBriefToggleCheckbox: (index: number, checked: boolean) => Promise<void>;
   // Today view mode handler
   handleTodayViewModeChange: (mode: "my-day" | "agent-log") => void;
   handlePrivateModeToggle: () => void;
