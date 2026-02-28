@@ -710,14 +710,26 @@ export class CodingOrchestrator {
     ].join("\n");
 
     try {
-      const args = ["-p", prompt, "--verbose"];
+      // Resolve full claude binary path so detached processes find it
+      // regardless of PATH inheritance (brew installs to /opt/homebrew/bin)
+      const claudeBin =
+        process.env.CLAUDE_BIN ??
+        "/opt/homebrew/bin/claude";
+
+      const args = ["-p", prompt, "--verbose", "--dangerously-skip-permissions"];
       if (model) args.push("--model", model);
 
-      const child = spawn("claude", args, {
+      // Ensure homebrew bin is in PATH for the child process
+      const childEnv = { ...process.env };
+      if (childEnv.PATH && !childEnv.PATH.includes("/opt/homebrew/bin")) {
+        childEnv.PATH = `/opt/homebrew/bin:${childEnv.PATH}`;
+      }
+
+      const child = spawn(claudeBin, args, {
         cwd: worktreePath,
         detached: true,
         stdio: "ignore",
-        env: { ...process.env },
+        env: childEnv,
       });
 
       const pid = child.pid;
