@@ -1,3 +1,4 @@
+import { spawn } from "node:child_process";
 import fs from "node:fs/promises";
 import path from "node:path";
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk";
@@ -408,8 +409,8 @@ export type LaunchTaskResult = {
   parallelSafe: boolean;
   scopeRationale: string;
   queuePosition?: number;
-  spawnInstructions?: string;
   setupInstructions?: string;
+  message?: string;
 };
 
 export class CodingOrchestrator {
@@ -630,25 +631,6 @@ export class CodingOrchestrator {
       }
     }
 
-    const spawnInstructions = result.decision.start
-      ? [
-          `Worktree ready at: ${worktreePath}`,
-          `Branch: ${branch}`,
-          `Scope: ${scope.scopeGlobs.join(", ")}`,
-          "",
-          `Now call sessions_spawn with:`,
-          `  task: "${task}"`,
-          `  label: "${taskId}"`,
-          params.model ? `  model: "${params.model}"` : undefined,
-          params.thinking ? `  thinking: "${params.thinking}"` : undefined,
-          "",
-          `The spawned agent should work exclusively in ${worktreePath}.`,
-          `When done, it should commit changes and push the branch.`,
-        ]
-          .filter(Boolean)
-          .join("\n")
-      : undefined;
-
     return {
       taskId,
       status: result.decision.start ? "started" : "queued",
@@ -659,8 +641,78 @@ export class CodingOrchestrator {
       parallelSafe: scope.parallelSafe,
       scopeRationale: scope.rationale,
       queuePosition: result.queuePosition,
-      spawnInstructions,
     };
+  }
+
+  /**
+   * Spawn a Claude Code agent in the worktree as a detached child process.
+   * On process exit, handleTaskCompleted runs validation gates, creates PR,
+   * and sends notifications automatically.
+   */
+  async spawnCodingAgent(params: {
+    taskId: string;
+    task: string;
+    worktreePath: string;
+    branch: string;
+    scopeGlobs: string[];
+    model?: string;
+  }): Promise<{ spawned: boolean; error?: string; pid?: number }> {
+    const { taskId, task, worktreePath, branch, scopeGlobs, model } = params;
+
+    const prompt = [
+      "You are a coding agent working in an isolated git worktree.",
+      "",
+      "## Task",
+      task,
+      "",
+      "## Environment",
+      `- Working directory: ${worktreePath}`,
+      `- Branch: ${branch}`,
+      `- Scope: ${scopeGlobs.join(", ")}`,
+      "",
+      "## Instructions",
+      "1. Complete the task above.",
+      "2. Keep changes within the specified scope.",
+      "3. Commit all changes with a clear, descriptive message.",
+      `4. Push the branch: \`git push -u origin ${branch}\``,
+      "5. When done, output a brief summary of what you built/changed.",
+    ].join("\n");
+
+    try {
+      const args = ["-p", prompt, "--verbose"];
+      if (model) args.push("--model", model);
+
+      const child = spawn("claude", args, {
+        cwd: worktreePath,
+        detached: true,
+        stdio: "ignore",
+        env: { ...process.env },
+      });
+
+      const pid = child.pid;
+
+      child.on("exit", (code) => {
+        this.logger.info(`[GodMode][Coding] Agent for task ${taskId} exited (code=${code})`);
+        this.handleTaskCompleted({
+          label: taskId,
+          outcome: code === 0 ? "ok" : "error",
+          error: code !== 0 ? `Agent exited with code ${code}` : undefined,
+        }).catch((err) => {
+          this.logger.error(`[GodMode][Coding] handleTaskCompleted error for ${taskId}: ${String(err)}`);
+        });
+      });
+
+      child.on("error", (err) => {
+        this.logger.error(`[GodMode][Coding] Agent spawn error for task ${taskId}: ${String(err)}`);
+        this.markTaskFailed(taskId, `spawn error: ${String(err)}`).catch(() => {});
+      });
+
+      child.unref();
+      this.logger.info(`[GodMode][Coding] Spawned coding agent for task ${taskId} (pid=${pid})`);
+      return { spawned: true, pid: pid ?? undefined };
+    } catch (err) {
+      return { spawned: false, error: String(err) };
+    }
   }
 
   async handleTaskCompleted(params: {

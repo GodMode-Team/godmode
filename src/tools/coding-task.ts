@@ -21,7 +21,7 @@ export function createCodingTaskTool(
       "Launch an isolated coding task with its own git worktree and branch.",
       "Use when the user asks to build, fix, refactor, or ship code.",
       "Each task gets a separate worktree so multiple tasks cannot overwrite each other.",
-      "After launching, follow the spawnInstructions to start the coding agent.",
+      "The coding agent runs automatically — no follow-up action needed.",
     ].join(" "),
     parameters: {
       type: "object" as const,
@@ -109,6 +109,38 @@ export function createCodingTaskTool(
           status: "setup_required",
           message: "I'd love to build that for you, but we need to connect GitHub first.",
           instructions: result.setupInstructions,
+        });
+      }
+
+      // Auto-spawn the coding agent for started tasks
+      if (result.status === "started") {
+        const spawnResult = await opts.orchestrator.spawnCodingAgent({
+          taskId: result.taskId,
+          task,
+          worktreePath: result.worktreePath,
+          branch: result.branch,
+          scopeGlobs: result.scopeGlobs,
+          model: typeof params.model === "string" ? params.model : undefined,
+        });
+
+        if (!spawnResult.spawned) {
+          return jsonResult({
+            ...result,
+            status: "started",
+            message: `Worktree created but agent spawn failed: ${spawnResult.error}. You can manually run a coding agent in ${result.worktreePath} on branch ${result.branch}.`,
+          });
+        }
+
+        return jsonResult({
+          ...result,
+          message: [
+            `Coding agent launched (pid ${spawnResult.pid ?? "unknown"}).`,
+            `Worktree: ${result.worktreePath}`,
+            `Branch: ${result.branch}`,
+            `Scope: ${result.scopeGlobs.join(", ")}`,
+            "",
+            "The agent will commit and push when done. Validation gates (lint, typecheck, test) run automatically on completion, then a PR is created.",
+          ].join("\n"),
         });
       }
 
