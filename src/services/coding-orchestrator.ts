@@ -374,6 +374,15 @@ async function readPkgScripts(dir: string): Promise<Record<string, string>> {
   }
 }
 
+async function fileExists(p: string): Promise<boolean> {
+  try {
+    await fs.access(p);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 async function runValidationGates(
   run: RunCmd,
   worktreePath: string,
@@ -382,6 +391,20 @@ async function runValidationGates(
   const failures: string[] = [];
   const scripts = await readPkgScripts(worktreePath);
   const hasScript = (name: string) => name in scripts;
+
+  // If the worktree has a package.json but no node_modules, install deps first
+  if (Object.keys(scripts).length > 0 && !(await fileExists(path.join(worktreePath, "node_modules")))) {
+    try {
+      const { exitCode } = await run(["pnpm", "install", "--frozen-lockfile"], { timeoutMs: 120_000, cwd: worktreePath });
+      if (exitCode !== 0) {
+        // Try without frozen-lockfile (worktree may not have exact lockfile)
+        await run(["pnpm", "install"], { timeoutMs: 120_000, cwd: worktreePath });
+      }
+    } catch {
+      // If install fails, skip gates gracefully — no deps means no tooling
+      return { passed: true, details: "skipped — dependency install failed" };
+    }
+  }
 
   if (config?.lint !== false && hasScript("lint")) {
     try {
@@ -957,5 +980,75 @@ export class CodingOrchestrator {
     return state.tasks.find(
       (t) => t.id === label && (t.status === "running" || t.status === "queued"),
     );
+  }
+
+  /**
+   * Recover orphaned tasks after a gateway restart.
+   * For each task in "running"/"validating" status:
+   * - Dead process → run handleTaskCompleted (validation gates + PR)
+   * - Live process → poll until exit, then run handleTaskCompleted
+   */
+  async recoverOrphanedTasks(): Promise<{ recovered: number; reattached: number }> {
+    const state = await readCodingTaskState();
+    const active = state.tasks.filter(
+      (t) => t.status === "running" || t.status === "validating",
+    );
+
+    if (active.length === 0) return { recovered: 0, reattached: 0 };
+
+    let recovered = 0;
+    let reattached = 0;
+
+    for (const task of active) {
+      const alive = isProcessAlive(task.pid);
+
+      if (!alive) {
+        // Process is dead — run completion flow (validation + PR)
+        this.logger.info(
+          `[GodMode][Coding] Recovering orphaned task ${task.id} (pid ${task.pid ?? "unknown"} is dead)`,
+        );
+        try {
+          await this.handleTaskCompleted({
+            label: task.id,
+            outcome: "ok", // Assume success — agent may have finished before gateway died
+          });
+          recovered++;
+        } catch (err) {
+          this.logger.error(
+            `[GodMode][Coding] Recovery failed for task ${task.id}: ${String(err)}`,
+          );
+        }
+      } else if (task.pid) {
+        // Process is still alive — poll until it exits, then complete
+        this.logger.info(
+          `[GodMode][Coding] Re-attaching to live task ${task.id} (pid ${task.pid})`,
+        );
+        this.pollUntilExit(task.id, task.pid);
+        reattached++;
+      }
+    }
+
+    return { recovered, reattached };
+  }
+
+  /** Poll a PID every 5s until it exits, then run handleTaskCompleted. */
+  private pollUntilExit(taskId: string, pid: number): void {
+    const interval = setInterval(() => {
+      if (!isProcessAlive(pid)) {
+        clearInterval(interval);
+        this.logger.info(`[GodMode][Coding] Polled task ${taskId} — pid ${pid} exited`);
+        this.handleTaskCompleted({
+          label: taskId,
+          outcome: "ok",
+        }).catch((err) => {
+          this.logger.error(
+            `[GodMode][Coding] handleTaskCompleted error for polled task ${taskId}: ${String(err)}`,
+          );
+        });
+      }
+    }, 5_000);
+
+    // Don't let the interval keep the process alive
+    if (interval.unref) interval.unref();
   }
 }

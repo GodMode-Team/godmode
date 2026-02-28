@@ -70,6 +70,7 @@ import {
 import { isGateEnabled } from "./src/services/guardrails.js";
 import { guardrailsHandlers } from "./src/methods/guardrails.js";
 import { imageCacheHandlers } from "./src/methods/image-cache.js";
+import { coretexHandlers } from "./src/methods/coretex.js";
 // Static file server for UIs
 import { createStaticFileHandler } from "./src/static-server.js";
 import { DATA_DIR } from "./src/data-paths.js";
@@ -569,6 +570,7 @@ const godmodePlugin = {
       ...systemUpdateHandlers,
       ...guardrailsHandlers,
       ...imageCacheHandlers,
+      ...coretexHandlers,
     };
 
     for (const [method, handler] of Object.entries(allHandlers)) {
@@ -843,6 +845,19 @@ h1{color:#ff6b6b}code{background:#16213e;padding:2px 8px;border-radius:4px}a{col
         runPostUpdateHealthCheck(currentOcVersion, Object.keys(allHandlers).length, api.logger);
       } catch (err) {
         api.logger.warn(`[GodMode] Post-update health check error: ${String(err)}`);
+      }
+
+      // Recover orphaned coding tasks from previous gateway instance
+      if (codingOrchestrator.isEnabled()) {
+        codingOrchestrator.recoverOrphanedTasks().then((result) => {
+          if (result.recovered > 0 || result.reattached > 0) {
+            api.logger.info(
+              `[GodMode] Coding task recovery: ${result.recovered} recovered, ${result.reattached} re-attached`,
+            );
+          }
+        }).catch((err) => {
+          api.logger.warn(`[GodMode] Coding task recovery failed: ${String(err)}`);
+        });
       }
     });
 
