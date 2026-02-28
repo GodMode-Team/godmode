@@ -4,6 +4,67 @@ This file tracks recent development changes so Atlas and other agents can quickl
 
 ---
 
+## 2026-02-28 — Coding Task Orchestration Fix (End-to-End)
+
+### Problem
+`coding_task` tool created a worktree and returned `spawnInstructions` telling the agent to call `sessions_spawn`. But `sessions_spawn` wasn't always available, so agents fell back to running `claude -p` via `exec`, bypassing worktree isolation, validation gates, PR creation, and notifications.
+
+### Fixes Applied (4 commits)
+
+1. **Auto-spawn from coding_task** (`079b870`) — `coding_task` now spawns the coding agent directly via `child_process.spawn()` instead of returning instructions. No second tool call needed.
+
+2. **Close escape hatches** (`2fc8ac1`) — Added exec bypass gate blocking `claude -p` / `--dangerously-skip-permissions` patterns in `before_tool_call`. Added stale task auto-reaping (>2h with dead PID). Removed dead `SWARM_ORCHESTRATION_HANDOFF` doc that referenced never-committed swarm files. Cleaned README.
+
+3. **Fix detached spawn** (`ff58528`) — Detached processes with `stdio: "ignore"` can't answer permission prompts, killing the agent after ~51s. Added `--dangerously-skip-permissions` flag. Resolved full binary path (`/opt/homebrew/bin/claude`) and PATH inheritance for homebrew.
+
+4. **Smart validation gates** (`bff06e0`) — Gates now read `package.json` scripts from the target worktree before running. If the repo has no `package.json` or is missing the relevant script (lint/typecheck/test), the gate is skipped instead of failing. Fixes coding_task marking external projects as failed.
+
+### Architecture After Fix
+- `coding_task` tool → creates worktree → spawns Claude Code as detached child process → on exit, runs validation gates → creates PR → sends notification
+- No dependency on `sessions_spawn` or any external tool
+- Validation gates auto-detect: only run lint/typecheck/test if the target repo has those scripts in package.json
+- Exec bypass gate prevents agents from manually running `claude -p` outside the orchestrator
+
+### Files Changed
+- `src/services/coding-orchestrator.ts` — `spawnCodingAgent()`, stale reaping, binary path fix, smart validation gates
+- `src/tools/coding-task.ts` — Auto-spawn integration, updated description
+- `src/lib/coding-task-state.ts` — Added `pid` field to `CodingTask`
+- `index.ts` — Exec bypass gate in `before_tool_call`
+- `README.md` — Replaced swarm docs with coding_task docs
+
+---
+
+## 2026-02-28 — Daily Brief Checkbox Persistence Fix
+
+### Problem
+Checking off tasks in the Today tab or Obsidian didn't persist — checkboxes reverted on refresh.
+
+### Root Causes Found & Fixed
+1. **`e.currentTarget` null in setTimeout** — The checkbox click handler read `e.currentTarget` inside a `setTimeout` callback, but DOM events clear `currentTarget` after the handler returns. Every checkbox save silently crashed with a TypeError. Fix: capture `currentTarget` synchronously before the setTimeout.
+
+2. **Full-file overwrites clobbered Obsidian** — GodMode saved the entire brief from in-memory HTML on every checkbox click, overwriting any changes Obsidian made. Fix: new `dailyBrief.toggleCheckbox` RPC that reads the current VAULT file from disk, toggles just the one checkbox (`[ ]` ↔ `[x]`), and writes back. 3-character diff instead of full-file overwrite.
+
+3. **Double-space in markdown round-trip** — `htmlToMarkdown` produced `[x]  text` (double space) because the checkbox handler added a trailing space AND the HTML text node had a leading space. Fixed to omit the trailing space.
+
+4. **Previous session fixes (also committed):** Removed `syncBriefFromTasks` from bidirectional sync (was overwriting brief checkboxes on page load), removed `userEdited` guard blocking brief→task completion sync, restricted `syncBriefFromTasks` to require explicit `taskTitle` parameter.
+
+### Architecture After Fix
+- **GodMode checkbox click** → surgical read-modify-write via `dailyBrief.toggleCheckbox` RPC
+- **GodMode text edit** → full content save via `dailyBrief.update` (unchanged)
+- **Obsidian → GodMode** → refresh reads VAULT file directly (works; Obsidian desktop checkbox toggles don't persist to disk — known Obsidian limitation)
+- **Brief is source of truth** for checkbox state; `tasks.json` is derived
+
+### Files Changed
+- `src/methods/daily-brief.ts` — New `toggleCheckbox` handler, sync fixes
+- `ui/src/ui/views/daily-brief.ts` — `e.currentTarget` fix, surgical checkbox wiring
+- `ui/src/ui/app.ts` — `handleBriefToggleCheckbox` method
+- `ui/src/ui/app-render.ts` — Pass `onBriefToggleCheckbox` prop
+- `ui/src/ui/app-view-state.ts` — Type addition
+- `ui/src/ui/views/my-day.ts` — Prop threading
+- `ui/src/ui/html-to-markdown.ts` — Double-space fix
+
+---
+
 ## 2026-02-28 — Lifetrack Theme (White & Gold + Quantum Particles)
 
 ### New Theme: Lifetrack
