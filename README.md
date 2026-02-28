@@ -43,29 +43,11 @@ Optional workspace root:
 openclaw config set plugins.entries.godmode.config.workspaceRoot "~/godmode"
 ```
 
-Enable swarm orchestration guardrails (safe defaults):
+Enable coding orchestration:
 
 ```bash
-openclaw config set plugins.entries.godmode.config.swarm.enabled true
-openclaw config set plugins.entries.godmode.config.swarm.hardEnforcement true
-openclaw config set plugins.entries.godmode.config.swarm.maxParallelWriters 1
-openclaw config set plugins.entries.godmode.config.swarm.maxParallelReaders 4
-```
-
-Enable iMessage completion notifications:
-
-```bash
-openclaw config set plugins.entries.godmode.config.swarm.notifications.enabled true
-openclaw config set plugins.entries.godmode.config.swarm.notifications.channel "imessage"
-openclaw config set plugins.entries.godmode.config.swarm.notifications.service "imessage"
-openclaw config set plugins.entries.godmode.config.swarm.notifications.onlyWhenDesktopIdle true
-openclaw config set plugins.entries.godmode.config.swarm.notifications.desktopIdleSeconds 120
-```
-
-Optional fixed recipient (otherwise GodMode infers recipient from the latest iMessage request in that workspace):
-
-```bash
-openclaw config set plugins.entries.godmode.config.swarm.notifications.to "+15551234567"
+openclaw config set plugins.entries.godmode.config.coding.enabled true
+openclaw config set plugins.entries.godmode.config.coding.maxParallelWriters 1
 ```
 
 Restart gateway after config changes:
@@ -144,51 +126,21 @@ By default in the GodMode runtime, `CONSCIOUSNESS.md` is refreshed by a
 separate heartbeat cron (typically hourly), while the gold icon forces an
 immediate sync on demand.
 
-## Swarm Orchestration (Natural Language)
+## Coding Orchestration
 
-GodMode now includes a coding swarm harness that layers on top of existing OpenClaw
-session/subagent tooling (no duplicate orchestration runtime).
+The `coding_task` agent tool is the single entry point for all code work. It:
 
-What it does:
+1. Creates an isolated git worktree and branch per task
+2. Spawns a Claude Code agent directly in the worktree
+3. Runs validation gates (lint, typecheck, test) on completion
+4. Creates a PR and optionally auto-merges
+5. Sends iMessage completion notifications
 
-- Queues natural-language coding ideas (`swarm.submitIdea`)
-- Claims and advances queued work (`swarm.claimNext`)
-- Enforces write guardrails through OpenClaw hooks:
-  - `before_tool_call`
-  - `subagent_spawning`
-  - `subagent_ended`
-- Keeps writer concurrency safe per workspace (default: one writer)
-- Sends completion notifications to iMessage when configured
-- Exposes an agent tool (`swarm_harness`) so Atlas can orchestrate without slash commands
+Agents must use `coding_task` — running `claude -p` via `exec` is blocked by the spawn gate.
 
-Swarm gateway methods:
-
-- `swarm.submitIdea`
-- `swarm.claimNext`
-- `swarm.list`
-- `swarm.setStatus`
-- `swarm.status`
-
-GitHub repo bootstrapping in one step:
-
-- `workspace.provisionTeam` creates a GitHub repo (private by default) and bootstraps the team workspace.
-
-Example:
+Check coding task status:
 
 ```bash
-openclaw rpc workspace.provisionTeam '{"name":"Client Demo Build","org":"godmode-team","privateRepo":true}'
+openclaw rpc coding.status '{}'
+openclaw rpc coding.list '{}'
 ```
-
-## Quick Test Flow
-
-1. Open GodMode Web UI and ask Atlas a natural-language coding request.
-2. Atlas should use `swarm_harness` to queue/claim work before spawning coding runs.
-3. Trigger multiple coding requests quickly; guardrails should cap write runs safely.
-4. Confirm swarm state:
-
-```bash
-openclaw rpc swarm.status '{}'
-openclaw rpc swarm.list '{"limit":20}'
-```
-
-5. Confirm iMessage notification is delivered when a subagent run ends.

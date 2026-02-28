@@ -21,6 +21,7 @@ export type CodingTask = {
   thinking?: string;
   runId?: string;
   childSessionKey?: string;
+  pid?: number;
   prNumber?: number;
   prUrl?: string;
   createdAt: number;

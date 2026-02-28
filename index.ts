@@ -817,6 +817,20 @@ h1{color:#ff6b6b}code{background:#16213e;padding:2px 8px;border-radius:4px}a{col
         api.logger.warn(`[GodMode] image cache cleanup failed: ${String(err)}`);
       }
 
+      // Claude Code session sync (populate agent log)
+      try {
+        const { syncClaudeCodeSessions } = await import("./src/services/claude-code-sync.js");
+        syncClaudeCodeSessions().then((result) => {
+          if (result.synced > 0) {
+            api.logger.info(`[GodMode] Claude Code sync: ${result.synced} sessions synced`);
+          }
+        }).catch((err) => {
+          api.logger.warn(`[GodMode] Claude Code sync failed: ${String(err)}`);
+        });
+      } catch (err) {
+        api.logger.warn(`[GodMode] Claude Code sync import failed: ${String(err)}`);
+      }
+
       // Post-update compatibility check
       try {
         const { execSync } = await import("node:child_process");
@@ -933,7 +947,7 @@ h1{color:#ff6b6b}code{background:#16213e;padding:2px 8px;border-radius:4px}a{col
         return { block: true, blockReason: loopCheck.reason };
       }
 
-      // Gate 2: Grep Blocker — block grep/find on memory paths
+      // Gate 2: Grep Blocker + Coding Bypass Blocker — exec/bash/shell commands
       if (name === "exec" || name === "bash" || name === "shell") {
         const command =
           typeof event.params?.command === "string"
@@ -946,6 +960,31 @@ h1{color:#ff6b6b}code{background:#16213e;padding:2px 8px;border-radius:4px}a{col
           if (grepBlock) {
             api.logger.warn(`[GodMode][SafetyGate] grep blocker fired`);
             return { block: true, blockReason: grepBlock };
+          }
+
+          // Gate 2b: Block exec-based coding agent bypass (claude -p, claude --dangerously-skip-permissions)
+          if (codingOrchestrator.isEnabled() && await isGateEnabled("spawnGate")) {
+            const lowerCmd = command.toLowerCase();
+            const isCodingBypass =
+              /\bclaude\b/.test(lowerCmd) &&
+              (/\s-p\s|\s-p$|\s--print\b|\s--dangerously-skip-permissions\b/.test(lowerCmd));
+            if (isCodingBypass) {
+              api.logger.warn(`[GodMode][SafetyGate] coding bypass blocked: ${command.slice(0, 100)}`);
+              return {
+                block: true,
+                blockReason: [
+                  "Running `claude -p` or `claude --dangerously-skip-permissions` via exec bypasses the coding orchestration layer.",
+                  "",
+                  "Use the `coding_task` tool instead. It handles everything:",
+                  "- Isolated git worktree and branch",
+                  "- Spawns the coding agent automatically",
+                  "- Validation gates (lint, typecheck, test) on completion",
+                  "- PR creation and notifications",
+                  "",
+                  "Example: coding_task({ task: \"Build the signup form\", repoRoot: \"/path/to/repo\" })",
+                ].join("\n"),
+              };
+            }
           }
         }
       }

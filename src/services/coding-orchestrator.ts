@@ -344,6 +344,21 @@ async function bootstrapRepo(
   }
 }
 
+// ── Process liveness ────────────────────────────────────────────
+
+function isProcessAlive(pid: number | undefined): boolean {
+  if (!pid) return false;
+  try {
+    process.kill(pid, 0); // signal 0 = existence check, no actual signal sent
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Max age (ms) for a "running" task with no live process before auto-reaping. */
+const STALE_TASK_MAX_AGE_MS = 2 * 60 * 60 * 1000; // 2 hours
+
 // ── Validation gates ────────────────────────────────────────────
 
 type GateResult = { passed: boolean; details: string };
@@ -580,6 +595,22 @@ export class CodingOrchestrator {
     }
 
     const { result } = await updateCodingTaskState((state) => {
+      // Reap stale tasks: "running" with no live process and older than threshold
+      const now = Date.now();
+      for (const t of state.tasks) {
+        if (
+          (t.status === "running" || t.status === "validating") &&
+          !isProcessAlive(t.pid) &&
+          t.startedAt &&
+          now - t.startedAt > STALE_TASK_MAX_AGE_MS
+        ) {
+          this.logger.warn(`[GodMode][Coding] Reaping stale task ${t.id} (started ${Math.round((now - t.startedAt) / 60000)}min ago, no live process)`);
+          t.status = "failed";
+          t.error = "stale — process not found, auto-reaped";
+          t.completedAt = now;
+        }
+      }
+
       const activeTasks = state.tasks.filter(
         (t) => t.status === "running" || t.status === "validating",
       );
@@ -690,6 +721,14 @@ export class CodingOrchestrator {
       });
 
       const pid = child.pid;
+
+      // Store PID in task state for liveness checks
+      if (pid) {
+        updateCodingTaskState((state) => {
+          const t = state.tasks.find((t) => t.id === taskId);
+          if (t) t.pid = pid;
+        }).catch(() => {});
+      }
 
       child.on("exit", (code) => {
         this.logger.info(`[GodMode][Coding] Agent for task ${taskId} exited (code=${code})`);
