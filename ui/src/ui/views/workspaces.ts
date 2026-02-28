@@ -966,7 +966,7 @@ export function renderWorkspaces(props: WorkspacesProps) {
               type="text"
               name="name"
               class="workspaces-create-input"
-              placeholder="New workspace name (e.g. Patient Autopilot)"
+              placeholder="New workspace name (e.g. Acme Corp)"
               required
             />
             <select name="type" class="workspaces-create-select">

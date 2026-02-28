@@ -12,6 +12,7 @@ import {
   type CodingTaskMode,
   type CodingTaskState,
   type CodingTaskStatus,
+  type SwarmStage,
 } from "../lib/coding-task-state.js";
 
 // ── Config ──────────────────────────────────────────────────────
@@ -178,7 +179,7 @@ export async function validatePlanDoc(planDocPath: string): Promise<{
       return { valid: true };
     }
     if (status === "draft") {
-      return { valid: false, error: "Plan doc is still in draft — needs Caleb's approval before dispatching" };
+      return { valid: false, error: "Plan doc is still in draft — needs the user's approval before dispatching" };
     }
     return { valid: false, error: `Plan doc status is "${status}" — must be "approved" to dispatch` };
   } catch {
@@ -760,10 +761,20 @@ export class CodingOrchestrator {
       const args = ["-p", prompt, "--verbose", "--dangerously-skip-permissions"];
       if (model) args.push("--model", model);
 
-      // Ensure homebrew bin is in PATH for the child process
-      const childEnv = { ...process.env };
-      if (childEnv.PATH && !childEnv.PATH.includes("/opt/homebrew/bin")) {
-        childEnv.PATH = `/opt/homebrew/bin:${childEnv.PATH}`;
+      // Whitelist env vars for the child process — avoid leaking all parent secrets
+      const parentPath = process.env.PATH ?? "";
+      const childEnv: Record<string, string> = {
+        PATH: parentPath.includes("/opt/homebrew/bin")
+          ? parentPath
+          : `/opt/homebrew/bin:${parentPath}`,
+        HOME: process.env.HOME ?? "",
+        USER: process.env.USER ?? "",
+        SHELL: process.env.SHELL ?? "/bin/zsh",
+        LANG: process.env.LANG ?? "en_US.UTF-8",
+        TERM: process.env.TERM ?? "xterm-256color",
+      };
+      if (process.env.ANTHROPIC_API_KEY) {
+        childEnv.ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
       }
 
       const child = spawn(claudeBin, args, {
@@ -951,6 +962,8 @@ export class CodingOrchestrator {
     queuedTasks: number;
     doneTasks: number;
     failedTasks: number;
+    swarmTasks: number;
+    swarmStages: Array<{ taskId: string; currentStage: string; stages: unknown }>;
   }> {
     const state = await readCodingTaskState();
     const active = state.tasks.filter((t) => t.status === "running" || t.status === "validating");
@@ -1087,9 +1100,9 @@ export class CodingOrchestrator {
 
   /** Poll a swarm stage PID every 5s until it exits, then advance the pipeline. */
   private pollSwarmStageUntilExit(
-    pipeline: { handleStageCompleted: (p: { taskId: string; stage: string; exitCode: number }) => Promise<void> },
+    pipeline: { handleStageCompleted: (p: { taskId: string; stage: SwarmStage; exitCode: number }) => Promise<void> },
     taskId: string,
-    stage: string,
+    stage: SwarmStage,
     pid: number,
   ): void {
     const interval = setInterval(() => {

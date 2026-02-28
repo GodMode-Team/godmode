@@ -51,7 +51,7 @@
     ],
     "setup-steps": [
       "1. Apply this ACL in Tailscale admin console",
-      "2. Tag Caleb's machine as godmode-support",
+      "2. Tag the support host machine as godmode-support",
       "3. Tag each customer machine as godmode-customer",
       "4. Enable Tailscale SSH on customer machines: tailscale set --ssh",
       "5. Customer must have Tailscale app installed to receive approval requests"

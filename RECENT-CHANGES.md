@@ -4,6 +4,43 @@ This file tracks recent development changes so Atlas and other agents can quickl
 
 ---
 
+## 2026-02-28 — Client Readiness Audit + Deployment Prep
+
+### Code Review & Hardening
+Full audit pass to prepare for first client deployment.
+
+**Mission Control Removal:**
+- Deleted 7 files (views, controllers, styles — ~2,000+ lines)
+- Removed all integration points across ~10 files (app.ts, app-render.ts, app-view-state.ts, app-gateway.ts, app-settings.ts, navigation.ts, styles.css, index.ts, options.ts)
+- Removed ~230 lines of ops proxy infrastructure from index.ts (was only used for mission control sidecar)
+
+**Security Fixes:**
+- XSS in dynamic slots: `unsafeHTML(slotHtml)` → `unsafeHTML(sanitizeHtmlFragment(slotHtml))` in app-render.ts
+- Env var leakage: child process spawns in swarm-pipeline.ts and coding-orchestrator.ts now use explicit whitelist (PATH, HOME, USER, SHELL, LANG, TERM, ANTHROPIC_API_KEY) instead of `...process.env`
+- Numeric bounds validation in daily-brief.ts toggleCheckbox (integer check + non-negative)
+
+**TypeScript Fixes:**
+- coding-orchestrator.ts: `statusSummary()` return type now includes `swarmTasks` and `swarmStages` fields
+- coding-orchestrator.ts: `pollSwarmStageUntilExit` stage param typed as `SwarmStage` (was `string`)
+
+### Onboarding Dependency Checks
+Added GitHub CLI and Obsidian vault detection to Phase 0 assessment so users see upfront what's missing.
+- `src/methods/onboarding-scanner.ts` — New `checkGitHubReady()` (runs `gh auth status`) and `checkObsidianVault()` (calls `resolveVaultPath()`)
+- `src/methods/onboarding-types.ts` — Added `githubReady` and `obsidianVaultConfigured` to `AssessmentResult`
+- `ui/src/ui/views/onboarding.ts` — Assessment dashboard now shows GitHub CLI and Obsidian vault status with helpful hints when missing
+- Health score unchanged (these are informational, not scored — user shouldn't feel penalized for skipping optional deps)
+
+### Graceful Degradation (verified existing paths)
+- Coding tasks: return `setup_required` with friendly setup instructions when `gh auth status` fails
+- Daily brief: returns null when no Obsidian vault; UI shows "No brief available"
+- Channels: fully functional without any connected; Settings → Channels tab for later setup
+- Cron: everything works on-demand without scheduled jobs
+
+### Deployment Guide
+- **New:** `docs/DEPLOYMENT-GUIDE.md` — Step-by-step setup for brand-new machine (prerequisites, OpenClaw install, auth, plugin install, license config, gateway config, onboarding walkthrough, troubleshooting)
+
+---
+
 ## 2026-02-28 — Swarm Pipeline + Workspace-Aware Resources
 
 ### What
@@ -21,13 +58,13 @@ Swarm activates when ALL of:
 - **QC Agent** — fresh-eyes review, kills AI-sounding copy (12 anti-patterns), fixes small issues, writes `.swarm/qc-report.md`
 
 ### Workspace-Aware Resources
-Each stage detects the target workspace (e.g., "TRP funnel" → TRP workspace) and resolves project-specific resources in priority order:
+Each stage detects the target workspace (e.g., "client funnel" → client workspace) and resolves project-specific resources in priority order:
 1. Workspace repo directory
 2. `~/godmode/projects/{id}/`
 3. `~/godmode/clients/{id}/`
 4. Falls back to global GodMode voice bible + brand guide
 
-This means "build a funnel for TRP" automatically gets TRP's brand strategy guide, copy direction, and project context — not generic GodMode defaults.
+This means "build a funnel for [client]" automatically gets the client's brand strategy guide, copy direction, and project context — not generic GodMode defaults.
 
 ### Orphan Recovery
 Gateway restarts no longer lose in-flight tasks. `recoverOrphanedTasks()` runs on startup:
@@ -248,7 +285,7 @@ Fixed the consciousness sync pipeline (gold icon + hourly heartbeat). Session ha
 Built a complete `dailyBrief.generate` RPC method that assembles the daily brief from multiple live data sources, replacing the deleted legacy orchestrator. Also restored X Intelligence and added action-item extraction from yesterday's notes.
 - `src/methods/brief-generator.ts` — **new file**: full brief generation engine with 6 parallel data sources: Calendar (gog CLI), Oura biometrics (REST API), Weather (wttr.in — no API key needed), X Intelligence (XAI Responses API with `grok-4-1-fast-non-reasoning` + `x_search` tool), Yesterday's carry-forward (unfinished tasks, Tomorrow Handoff, action items from Notes/brain dumps), and strategic context (CONTEXT.md, THESIS.md). Two RPC handlers: `dailyBrief.generate` (full brief assembly + vault write) and `dailyBrief.extractActions` (on-demand action-item extraction from any daily note). Supports `dryRun` mode to check data source health without writing.
 - `index.ts` — registered `briefGeneratorHandlers`
-- `~/godmode/.env` — added `GOG_CALENDAR_ACCOUNT=caleb@patientautopilot.com` and `GOG_CLIENT=godmode` for calendar integration
+- `~/godmode/.env` — added `GOG_CALENDAR_ACCOUNT` and `GOG_CLIENT=godmode` for calendar integration
 - **Action-item extraction**: Parses Notes, Meeting Notes, Brain Dump, and Captured sections from yesterday's daily note. Detects: unchecked checkboxes, labeled task blocks (FIXES:, EXTRA:, TODO:, ACTION ITEMS:), and prose with task-like patterns (need to, should, follow up with, send, fix, build, etc.)
 - **X Intelligence**: Uses XAI Responses API (`https://api.x.ai/v1/responses`) with `grok-4-1-fast-non-reasoning` model and `x_search` tool. Key from `~/.openclaw/.env` (XAI_API_KEY). Parses inline citation URLs from response text. bird CLI is deprecated.
 - **Weather**: Uses `wttr.in/Austin,TX?format=j1` (free, no API key). Returns temp, condition, weather code → emoji.

@@ -226,7 +226,17 @@ function broadcastState(
 
 // --- Gateway Methods ---
 
+// --- Heartbeat broadcast ref helper ---
+
+function refreshHeartbeatBroadcast(context: Parameters<GatewayRequestHandler>[0]["context"]): void {
+  if (!context?.broadcast) return;
+  import("../services/focus-pulse-heartbeat.js")
+    .then(({ setHeartbeatBroadcast }) => setHeartbeatBroadcast(context.broadcast!))
+    .catch(() => {});
+}
+
 const getState: GatewayRequestHandler = async ({ respond, context }) => {
+  refreshHeartbeatBroadcast(context);
   const state = await readState();
   const currentFocus = state.currentFocus;
   const lastCheck = state.pulseChecks[state.pulseChecks.length - 1];
@@ -245,6 +255,7 @@ const getState: GatewayRequestHandler = async ({ respond, context }) => {
 };
 
 const startMorningSet: GatewayRequestHandler = async ({ respond, context }) => {
+  refreshHeartbeatBroadcast(context);
   const today = getTodayDate();
   const noteContent = await readDailyNote(today);
 
@@ -325,6 +336,7 @@ const startMorningSet: GatewayRequestHandler = async ({ respond, context }) => {
 };
 
 const setFocus: GatewayRequestHandler = async ({ params, respond, context }) => {
+  refreshHeartbeatBroadcast(context);
   const { index, title } = params as { index?: number; title?: string };
   const state = await readState();
 
@@ -363,6 +375,14 @@ const setFocus: GatewayRequestHandler = async ({ params, respond, context }) => 
   await writeState(state);
   broadcastState(context, state);
 
+  // Start heartbeat timer for periodic pulse checks
+  try {
+    const { startHeartbeat } = await import("../services/focus-pulse-heartbeat.js");
+    startHeartbeat();
+  } catch {
+    // Heartbeat is best-effort
+  }
+
   respond(true, {
     currentFocus: focus,
     message: `Focus set: ${focus.title}`,
@@ -370,6 +390,7 @@ const setFocus: GatewayRequestHandler = async ({ params, respond, context }) => 
 };
 
 const pulseCheck: GatewayRequestHandler = async ({ respond, context }) => {
+  refreshHeartbeatBroadcast(context);
   const state = await readState();
 
   if (!state.active || !state.currentFocus) {
@@ -403,6 +424,7 @@ const pulseCheck: GatewayRequestHandler = async ({ respond, context }) => {
 };
 
 const completeFocus: GatewayRequestHandler = async ({ params, respond, context }) => {
+  refreshHeartbeatBroadcast(context);
   const state = await readState();
 
   if (!state.currentFocus) {
@@ -444,6 +466,7 @@ const completeFocus: GatewayRequestHandler = async ({ params, respond, context }
 };
 
 const endDay: GatewayRequestHandler = async ({ respond, context }) => {
+  refreshHeartbeatBroadcast(context);
   const state = await readState();
 
   const completedCount = state.items.filter((i) => i.completed).length;
@@ -465,6 +488,14 @@ const endDay: GatewayRequestHandler = async ({ respond, context }) => {
   state.streak = newStreak;
   state.active = false;
   await writeState(state);
+
+  // Stop heartbeat timer
+  try {
+    const { stopHeartbeat } = await import("../services/focus-pulse-heartbeat.js");
+    stopHeartbeat();
+  } catch {
+    // Non-fatal
+  }
 
   // Log summary to agent log
   try {
@@ -490,6 +521,103 @@ const endDay: GatewayRequestHandler = async ({ respond, context }) => {
       : `Day done. Score: ${finalScore}/100. Streak reset (primary task incomplete).`,
   });
 };
+
+// --- Exported helpers for morning-set tool ---
+
+export { readState, writeState, getTodayDate, parseWinTheDay, readDailyNote };
+export type { FocusPulseState };
+
+/**
+ * Rewrite the Win The Day section in the daily note with refined items.
+ * Preserves [x] state for items whose titles match existing completed items.
+ */
+export async function rewriteWinTheDay(
+  date: string,
+  items: FocusItem[],
+): Promise<{ rewritten: boolean; error?: string }> {
+  const vaultPath = getVaultPath();
+  if (!vaultPath) return { rewritten: false, error: "No vault path configured" };
+
+  const filePath = join(vaultPath, getDailyFolder(), `${date}.md`);
+  let content: string;
+  try {
+    content = await readFile(filePath, "utf-8");
+  } catch {
+    return { rewritten: false, error: "Daily note not found" };
+  }
+
+  // Parse existing items to detect already-completed titles
+  const existing = parseWinTheDay(content);
+  const completedTitles = new Set(
+    existing.filter((i) => i.completed).map((i) => i.title.toLowerCase()),
+  );
+
+  // Build replacement section body (not including the heading)
+  const lines = items.map((item, idx) => {
+    const checked = completedTitles.has(item.title.toLowerCase()) ? "x" : " ";
+    const ctx = item.context ? ` — ${item.context}` : "";
+    return `${idx + 1}. [${checked}] **${item.title}**${ctx}`;
+  });
+  const newBody = "\n" + lines.join("\n") + "\n";
+
+  // Find the section boundaries
+  const sectionRegex = /^(##\s*(?:\u{1F3AF}\s*)?(?:Win The Day|Today's Mission)[^\n]*)\n([\s\S]*?)(?=^##\s|$)/mu;
+  const sectionMatch = content.match(sectionRegex);
+
+  let updated: string;
+  if (sectionMatch) {
+    // Replace section body, keep the heading
+    const heading = sectionMatch[1];
+    const fullMatch = sectionMatch[0];
+    updated = content.replace(fullMatch, heading + newBody);
+  } else {
+    // No existing section — append after the first ## section
+    const firstH2 = content.match(/^##\s/m);
+    if (firstH2 && firstH2.index != null) {
+      // Find end of first section
+      const afterFirst = content.slice(firstH2.index);
+      const nextH2 = afterFirst.slice(1).search(/^##\s/m);
+      const insertPos = nextH2 >= 0 ? firstH2.index + 1 + nextH2 : content.length;
+      const newSection = "\n## Win The Day\n" + lines.join("\n") + "\n\n";
+      updated = content.slice(0, insertPos) + newSection + content.slice(insertPos);
+    } else {
+      // No sections at all — append
+      updated = content + "\n\n## Win The Day\n" + lines.join("\n") + "\n";
+    }
+  }
+
+  await writeFile(filePath, updated, "utf-8");
+  return { rewritten: true };
+}
+
+/**
+ * Scope today's tasks to only Win The Day items.
+ * Un-dates pending tasks for today that aren't in the WTD set (doesn't push to tomorrow).
+ */
+export async function scopeTasksToWinTheDay(
+  date: string,
+  winTheDayItems: FocusItem[],
+): Promise<{ deferred: number }> {
+  const { readTasks, writeTasks } = await import("./tasks.js");
+  const tasksData = await readTasks();
+
+  const wtdTitles = new Set(winTheDayItems.map((i) => i.title.toLowerCase()));
+  let deferred = 0;
+
+  for (const task of tasksData.tasks) {
+    if (task.status !== "pending" || task.dueDate !== date) continue;
+    if (wtdTitles.has(task.title.toLowerCase())) continue;
+    // Un-date: remove from today without pushing to tomorrow
+    task.dueDate = null;
+    deferred++;
+  }
+
+  if (deferred > 0) {
+    await writeTasks(tasksData);
+  }
+
+  return { deferred };
+}
 
 // --- Export ---
 

@@ -153,19 +153,19 @@ const identity: GatewayRequestHandler = async ({ respond }) => {
     }
   }
 
-  // Check for Caleb OS dashboard
-  const calebOsDashboard = join(MEMORY_DIR, "projects", "caleb-os", "final", "dashboard", "index.html");
-  const calebOsExists = existsSync(calebOsDashboard);
+  // Check for Identity OS dashboard
+  const identityOsDashboard = join(MEMORY_DIR, "projects", "identity-os", "final", "dashboard", "index.html");
+  const identityOsExists = existsSync(identityOsDashboard);
 
-  // Caleb OS final artifacts
-  const calebOsFinalPath = join(MEMORY_DIR, "projects", "caleb-os", "final");
-  const calebOsArtifacts = listEntries(calebOsFinalPath);
+  // Identity OS final artifacts
+  const identityOsFinalPath = join(MEMORY_DIR, "projects", "identity-os", "final");
+  const identityOsArtifacts = listEntries(identityOsFinalPath);
 
   respond(true, {
     files,
-    calebOs: calebOsExists ? {
-      dashboardPath: calebOsDashboard,
-      artifacts: calebOsArtifacts,
+    identityOs: identityOsExists ? {
+      dashboardPath: identityOsDashboard,
+      artifacts: identityOsArtifacts,
     } : null,
   });
 };
@@ -392,13 +392,13 @@ const KNOWN_SOURCES: Array<{
     },
   },
   {
-    id: "caleb-os",
-    name: "Caleb OS",
+    id: "identity-os",
+    name: "Identity OS",
     type: "identity",
     icon: "\u{1F4D6}",
-    description: "The Book of Caleb — voice, values, story, thinking patterns",
+    description: "Your identity extraction — voice, values, story, thinking patterns",
     detect: () => {
-      const finalPath = join(MEMORY_DIR, "projects", "caleb-os", "final");
+      const finalPath = join(MEMORY_DIR, "projects", "identity-os", "final");
       try {
         const items = readdirSync(finalPath).filter(f => !f.startsWith("."));
         return { connected: items.length > 0, stats: `${items.length} artifacts`, lastSync: safeFileMtime(finalPath) };
@@ -441,8 +441,8 @@ const KNOWN_SOURCES: Array<{
 
 /** Sources that come from data-sources.json (external integrations) */
 const EXTERNAL_SOURCE_META: Record<string, { icon: string; description: string }> = {
-  "google-calendar-trp": { icon: "\u{1F4C5}", description: "TRP calendar events and scheduling" },
-  "google-calendar-pa": { icon: "\u{1F4C5}", description: "Patient Autopilot calendar" },
+  "google-calendar-primary": { icon: "\u{1F4C5}", description: "Primary calendar events and scheduling" },
+  "google-calendar-secondary": { icon: "\u{1F4C5}", description: "Secondary calendar" },
   "google-contacts": { icon: "\u{1F465}", description: "Contact relationships and details" },
   "clickup": { icon: "\u{2705}", description: "Tasks, projects, and workflows" },
   "front-email": { icon: "\u{1F4E7}", description: "Email inbox and conversations" },
@@ -466,7 +466,7 @@ const sources: GatewayRequestHandler = async ({ respond }) => {
   const result: SourceEntry[] = [];
   const seenIds = new Set<string>();
 
-  // 1. Built-in GodMode sources (memory bank, caleb os, consciousness)
+  // 1. Built-in GodMode sources (memory bank, identity os, consciousness)
   for (const src of KNOWN_SOURCES) {
     const detection = src.detect();
     seenIds.add(src.id);

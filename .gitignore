@@ -5,3 +5,4 @@ ui/dist/
 *.log
 coverage/
 .tmp/
+.worktrees/

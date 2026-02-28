@@ -167,7 +167,7 @@ async function fetchCalendarEvents(): Promise<{
       return {
         events: [],
         error:
-          "Calendar token missing calendar scope. Fix: gog auth add caleb@patientautopilot.com --services calendar --client godmode",
+          "Calendar token missing calendar scope. Fix: gog auth add YOUR_EMAIL --services calendar --client godmode",
       };
     }
     return { events: [], error: msg };
@@ -177,10 +177,10 @@ async function fetchCalendarEvents(): Promise<{
 function formatCalendarSection(events: CalendarEvent[], error?: string): string {
   if (error && events.length === 0) {
     if (error.includes("not set")) {
-      return `> ⚠️ Calendar not connected. Run: \`gog auth add caleb@patientautopilot.com --services calendar --client godmode\`\n\nNo meetings scheduled.`;
+      return `> ⚠️ Calendar not connected. Run: \`gog auth add YOUR_EMAIL --services calendar --client godmode\`\n\nNo meetings scheduled.`;
     }
     if (error.includes("calendar scope") || error.includes("No auth for calendar")) {
-      return `> ⚠️ Calendar token exists but lacks calendar scope. Run:\n> \`gog auth add caleb@patientautopilot.com --services calendar --client godmode\`\n> *(The \`--services calendar\` flag is required — without it, gog only authorizes user-info scope)*\n\nNo meetings scheduled.`;
+      return `> ⚠️ Calendar token exists but lacks calendar scope. Run:\n> \`gog auth add YOUR_EMAIL --services calendar --client godmode\`\n> *(The \`--services calendar\` flag is required — without it, gog only authorizes user-info scope)*\n\nNo meetings scheduled.`;
     }
     return `> ⚠️ Calendar error: ${error}\n\nNo meetings scheduled.`;
   }
@@ -506,7 +506,7 @@ function getXaiApiKey(): string {
 
 /**
  * Fetch X intelligence via XAI Responses API with x_search tool.
- * Searches for AI/tech/business topics relevant to Caleb's work.
+ * Searches for AI/tech/business topics relevant to the user's work.
  */
 async function fetchXIntelligence(): Promise<{
   items: XIntelItem[];

@@ -97,9 +97,9 @@ describe("Workspaces tab", () => {
         name: "GodMode",
       }),
       makeWorkspaceSummary({
-        id: "patient-autopilot",
-        name: "Patient Autopilot",
-        emoji: "🏥",
+        id: "acme-corp",
+        name: "Acme Corp",
+        emoji: "🏢",
       }),
     ];
     app.workspacesLoading = false;
@@ -108,7 +108,7 @@ describe("Workspaces tab", () => {
     const cards = app.querySelectorAll(".workspace-card");
     expect(cards.length).toBe(2);
     expect(app.textContent).toContain("GodMode");
-    expect(app.textContent).toContain("Patient Autopilot");
+    expect(app.textContent).toContain("Acme Corp");
   });
 
   it("filters workspace cards by top-level search query", async () => {
@@ -118,15 +118,15 @@ describe("Workspaces tab", () => {
     app.connected = true;
     app.workspaces = [
       makeWorkspaceSummary({ id: "gm", name: "GodMode" }),
-      makeWorkspaceSummary({ id: "pa", name: "Patient Autopilot" }),
+      makeWorkspaceSummary({ id: "ac", name: "Acme Corp" }),
     ];
-    app.workspacesSearchQuery = "patient";
+    app.workspacesSearchQuery = "acme";
     app.workspacesLoading = false;
     await app.updateComplete;
 
     const cards = app.querySelectorAll(".workspace-card");
     expect(cards.length).toBe(1);
-    expect(cards[0]?.textContent).toContain("Patient Autopilot");
+    expect(cards[0]?.textContent).toContain("Acme Corp");
   });
 
   it("renders workspace detail sections for pinned/artifacts/sessions", async () => {
@@ -225,8 +225,8 @@ describe("Workspaces tab", () => {
 
     app.connected = true;
     app.selectedWorkspace = makeWorkspaceDetail({
-      id: "pa",
-      name: "Patient Autopilot",
+      id: "ac",
+      name: "Acme Corp",
       pinned: [
         {
           path: "outputs/proposal.md",

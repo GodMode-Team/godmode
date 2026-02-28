@@ -8,7 +8,7 @@ metadata: { "godmode": { "emoji": "🧚", "priority": "high" } }
 
 **Purpose:** Guide new team members through GodMode setup via Telegram or Slack, from first contact to fully operational system.
 
-**Invoke:** New user messages Atlas after being introduced by Caleb in a group chat (Telegram or Slack).
+**Invoke:** New user messages Atlas after being introduced by the admin in a group chat (Telegram or Slack).
 
 ---
 
@@ -28,7 +28,7 @@ claude setup-token
 
 ### 2. Team Members = 1Password
 
-Ashley, Iain, Titus get keys from 1Password vault "GodMode Team", not personal accounts.
+Team members get keys from 1Password vault "GodMode Team", not personal accounts.
 
 ### 3. OAuth Fails → setup-token (NOT API key)
 
@@ -86,7 +86,7 @@ Based on their subscription status:
 
 #### 5. ESCALATION PATH CLEAR
 
-- □ I know to escalate to Caleb if stuck >15 min on any step
+- □ I know to escalate to the admin if stuck >15 min on any step
 - □ I will NOT leave user hanging with no response >2 min
 
 ---
@@ -129,10 +129,10 @@ Atlas: "I notice we've been on [current step] for a while.
 **Normal onboarding duration:** 20-40 minutes
 **Maximum before escalation:** 60 minutes without completion
 
-If hitting 60 minutes, send to Caleb:
+If hitting 60 minutes, send to the admin:
 
 ```
-Atlas: "[To Caleb] Onboarding for [user] has exceeded 60 minutes.
+Atlas: "[To admin] Onboarding for [user] has exceeded 60 minutes.
        Currently stuck on: [phase/step]
        Attempted: [what you've tried]
 
@@ -276,7 +276,7 @@ Atlas: "Before we dive in — this usually takes 20-30 minutes, but there's
        no rush. If you need to stop halfway through, just say 'pause' and
        we can pick up exactly where we left off later.
 
-       And if at any point you'd rather just hop on a call with Caleb and
+       And if at any point you'd rather just hop on a call with the team and
        do this together, that's totally fine too. Just say the word!"
 ```
 
@@ -286,7 +286,7 @@ If they seem stuck or frustrated:
 Atlas: "Hey, I can tell this is getting frustrating. Totally valid options:
 
        1. 🧘 Take a 10-minute break (I'll be right here)
-       2. 📞 Schedule a call with Caleb to do this together
+       2. 📞 Schedule a call with the team to do this together
        3. 🔄 Start fresh tomorrow with clear eyes
        4. 💬 Tell me what's confusing and I'll explain differently
 
@@ -349,13 +349,13 @@ Designed to be:
 - **Step-by-step** - Never overwhelm, one thing at a time
 - **Patient** - Answer questions thoroughly, repeat if needed
 - **Encouraging** - Celebrate wins, normalize struggles
-- **Logged** - Caleb sees everything for UX research
+- **Logged** - The admin sees everything for UX research
 
 **Relationship to other skills:**
 
 - `godmode-support` handles allowlist management and support requests
 - This skill (`godmode-onboarding`) handles the actual onboarding flow
-- Both log to `~/godmode/support-logs/` for Caleb's visibility
+- Both log to `~/godmode/support-logs/` for admin visibility
 
 ---
 
@@ -365,8 +365,8 @@ Designed to be:
 
 **Flow:** Group chat → DM
 
-1. Caleb creates group with new person + @GodModeSupportBot
-2. Caleb @mentions bot to introduce
+1. Admin creates group with new person + @GodModeSupportBot
+2. Admin @mentions bot to introduce
 3. Atlas adds person to allowlist
 4. Atlas directs them to DM
 5. Onboarding happens in DM (no @mention needed)
@@ -377,8 +377,8 @@ Designed to be:
 
 **Flow:** Group DM → Same thread or 1:1 DM
 
-1. Caleb creates group DM with new person + @Atlas
-2. Caleb introduces them
+1. Admin creates group DM with new person + @Atlas
+2. Admin introduces them
 3. Atlas adds person to allowlist (if needed)
 4. Onboarding can happen right in the group DM (more natural for Slack)
 5. Or Atlas can suggest moving to 1:1 DM for focused setup
@@ -397,12 +397,12 @@ Designed to be:
 
 ### 1. Telegram - From Group Chat Introduction
 
-Caleb introduces new person in Telegram group, Atlas adds them to allowlist, they DM the bot.
+Admin introduces new person in Telegram group, Atlas adds them to allowlist, they DM the bot.
 
 **First message from user might be:**
 
 - "Hey"
-- "Caleb told me to message you"
+- "My team lead told me to message you"
 - "Help me set up GodMode"
 - Just a wave emoji
 
@@ -420,9 +420,9 @@ Ready to start? Just say "yes" or "let's go" and we'll begin!
 
 ### 2. Slack - From Group DM Introduction
 
-Caleb creates group DM with new person and Atlas. Onboarding can happen right there.
+Admin creates group DM with new person and Atlas. Onboarding can happen right there.
 
-**Caleb's intro:**
+**Admin's intro:**
 
 ```
 Hey @Atlas, meet Ty. He's joining the team and needs to get
@@ -473,7 +473,7 @@ Atlas: "Hey! I'm so excited to help you get set up. I'm Atlas, your AI
        ⏱️ This usually takes 20-30 minutes
        ☕ You can take breaks anytime — just say 'pause'
        ❓ There's no such thing as a dumb question
-       📞 If you'd rather do this on a call with Caleb, just say so!
+       📞 If you'd rather do this on a call with the team, just say so!
 
        First question: What's your name? And how did you hear about
        GodMode? (Just making sure I have the right context!)"
@@ -482,7 +482,7 @@ Atlas: "Hey! I'm so excited to help you get set up. I'm Atlas, your AI
 **Capture:**
 
 - Name
-- Relationship to Caleb (dad, friend, team member)
+- Relationship (friend, team member, customer)
 - Technical comfort level (ask naturally, don't quiz)
 
 **After they answer:**
@@ -571,7 +571,7 @@ Atlas: "I know 'cloud server' sounds techy, but I promise it's not scary.
 │    → If YES: You MUST use `claude setup-token` flow later       │
 │    → If NO: API key is acceptable                               │
 │                                                                 │
-│  □ Is user a team member (Ashley, Iain, Titus)?                 │
+│  □ Is user a team member?                                       │
 │    → If YES: Use 1Password credentials                          │
 │                                                                 │
 │  □ Record the auth method NOW before you forget:                │
@@ -925,7 +925,7 @@ Atlas: "Great, install finished! Let's do a quick check to make sure
 │  🛑 STOP — AUTH CHECKPOINT                                      │
 │                                                                 │
 │  You are about to set up authentication. This is where          │
-│  Ashley's onboarding went wrong. DO NOT PROCEED until you       │
+│  Previous onboardings went wrong here. DO NOT PROCEED until     │
 │  answer these questions:                                        │
 │                                                                 │
 │  1. Does this user have Claude Pro/Max?                         │
@@ -938,7 +938,7 @@ Atlas: "Great, install finished! Let's do a quick check to make sure
 │     □ No  → Use their own auth                                  │
 │                                                                 │
 │  3. Are you tempted to suggest "just use API key, it's easier"? │
-│     □ Yes → STOP. That thought cost Ashley 3 hours.             │
+│     □ Yes → STOP. That thought has cost users hours.            │
 │             Re-read the Hard Rules at the top of this file.     │
 │     □ No  → Proceed with correct auth method                    │
 │                                                                 │
@@ -1113,7 +1113,7 @@ This uses the team's shared API key with proper rate limits.
 └─────────────────────────────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────────────────────────┐
-│ User is TEAM MEMBER (Ashley, Iain, Titus, etc.) │
+│ User is TEAM MEMBER                              │
 │ ↓ │
 │ USE 1PASSWORD for team API keys: │
 │ 1. op signin --account team.1password.com │
@@ -1157,14 +1157,14 @@ claude setup-token
 
 ---
 
-### 🛑 ESCALATION TRIGGER: When to Stop and Ask Caleb
+### 🛑 ESCALATION TRIGGER: When to Stop and Escalate
 
 **If you find yourself thinking "let's just use API key, it's simpler" — STOP.**
 
-This is the exact reasoning pattern that cost Ashley 3 hours. Instead:
+This is the exact reasoning pattern that has cost users hours. Instead:
 
 ```
-Atlas: "[To Caleb] Auth is failing for [user]. I'm tempted to suggest API key
+Atlas: "[To admin] Auth is failing for [user]. I'm tempted to suggest API key
        fallback but that's marked as never-do. Options:
 
        1. Debug the CLI/OAuth issue
@@ -1462,7 +1462,7 @@ Atlas: "Let me just send you a longer message to make sure your rate
 │  □ No "10K tokens/min" warnings anywhere                        │
 │                                                                 │
 │  If ANY check fails → Fix it now. Do not proceed.               │
-│  If stuck for >15 min → Escalate to Caleb (see escalation       │
+│  If stuck for >15 min → Escalate to admin (see escalation        │
 │  trigger section above).                                        │
 └─────────────────────────────────────────────────────────────────┘
 ```
@@ -1532,7 +1532,7 @@ Atlas: "Hey, I can tell this is a lot. That's totally valid — this stuff
        Options:
        🧘 Take 10 minutes, grab coffee, come back fresh
        📅 Stop here and pick this up tomorrow
-       📞 Schedule a call with Caleb and do this together
+       📞 Schedule a call with the team and do this together
 
        What sounds good? No wrong answer."
 ```
@@ -1567,10 +1567,10 @@ Atlas: "Hmm, looks like something got tripped up. Don't worry — this happens
 **If can't resolve:**
 
 ```
-Atlas: "Okay, this one's being stubborn! I'm going to flag this for Caleb —
-       he's the wizard for the weird edge cases.
+Atlas: "Okay, this one's being stubborn! I'm going to flag this for the team —
+       they're the wizards for the weird edge cases.
 
-       He'll reach out to help you finish up. In the meantime, you've done
+       Someone will reach out to help you finish up. In the meantime, you've done
        great getting this far — the hard parts are behind you.
 
        Anything else I can help with while we wait?"
@@ -1791,7 +1791,7 @@ godmode channels status --probe
 - Name: {name}
 - Relationship: {dad/friend/team/customer}
 - Device: {Mac Mini M2 8GB}
-- Introduced by: Caleb via Telegram group
+- Introduced by: admin via Telegram group
 
 ### Progress
 
@@ -1863,9 +1863,9 @@ Atlas: "It's been a week since you joined GodMode! Here's what
 
 ---
 
-## Forwarding to Caleb
+## Forwarding to Admin
 
-After each onboarding session, send summary to Caleb:
+After each onboarding session, send summary to the admin:
 
 **Channel:** Slack DM or web UI notification
 
@@ -1874,7 +1874,7 @@ After each onboarding session, send summary to Caleb:
 ```
 New Onboarding Complete
 
-Who: Gil (Caleb's dad)
+Who: [User Name]
 When: Today, 3:45 PM CT
 Duration: 28 minutes
 Status: Fully set up
@@ -1884,8 +1884,8 @@ Highlights:
 - Asked about smart home control (interested in future features)
 - Brief set for 7:00 AM CT
 
-Questions for Caleb:
-- Gil asked about cost - I said "beta, no cost yet"
+Questions for admin:
+- User asked about cost - I said "beta, no cost yet"
 - Confirm that's still accurate?
 
 Next Steps:
@@ -1917,14 +1917,14 @@ Do NOT mark as complete based on vibes. The checklist must pass:
 - [ ] User has positive first experience
 - [ ] User knows how to get help
 - [ ] Everything is logged
-- [ ] Caleb received summary
+- [ ] Admin received summary
 - [ ] Follow-up check-ins scheduled
 
 ---
 
 ## Escalation
 
-**Escalate to Caleb when:**
+**Escalate to the admin when:**
 
 - Installation fails and can't be resolved
 - User has questions about pricing/business terms
@@ -1934,14 +1934,14 @@ Do NOT mark as complete based on vibes. The checklist must pass:
 **How to escalate:**
 
 ```
-Atlas: "Let me get Caleb involved - he'll be able to help with
-       this directly. I've shared our conversation with him and
-       he'll reach out [today/soon].
+Atlas: "Let me get the team involved - they'll be able to help with
+       this directly. I've shared our conversation with them and
+       someone will reach out [today/soon].
 
        Is there anything else I can help with in the meantime?"
 ```
 
-Then notify Caleb via Slack with full context.
+Then notify the admin via Slack with full context.
 
 ---
 

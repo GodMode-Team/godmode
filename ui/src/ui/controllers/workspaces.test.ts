@@ -303,11 +303,11 @@ describe("workspaces controller", () => {
     const client = mockClient({
       "workspaces.create": async () => ({
         workspace: {
-          id: "patient-autopilot",
-          name: "Patient Autopilot",
-          emoji: "🏥",
+          id: "acme-corp",
+          name: "Acme Corp",
+          emoji: "🏢",
           type: "team",
-          path: "~/godmode/clients/patient-autopilot",
+          path: "~/godmode/clients/acme-corp",
           artifactCount: 0,
           sessionCount: 0,
           lastUpdated: "2026-02-20T01:00:00.000Z",
@@ -317,18 +317,18 @@ describe("workspaces controller", () => {
     const state = makeState(client, true);
 
     const created = await createWorkspace(state, {
-      name: "Patient Autopilot",
+      name: "Acme Corp",
       type: "team",
-      path: "~/godmode/clients/patient-autopilot",
+      path: "~/godmode/clients/acme-corp",
     });
 
-    expect(created?.id).toBe("patient-autopilot");
+    expect(created?.id).toBe("acme-corp");
     expect(client.request).toHaveBeenCalledWith("workspaces.create", {
-      name: "Patient Autopilot",
+      name: "Acme Corp",
       type: "team",
-      path: "~/godmode/clients/patient-autopilot",
+      path: "~/godmode/clients/acme-corp",
     });
-    expect(state.workspaces?.some((workspace) => workspace.id === "patient-autopilot")).toBe(true);
+    expect(state.workspaces?.some((workspace) => workspace.id === "acme-corp")).toBe(true);
   });
 
   it("createWorkspace returns null when name is blank", async () => {

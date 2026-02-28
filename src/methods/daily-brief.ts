@@ -320,7 +320,7 @@ export async function captureEveningReviewToDailyBrief(
   if (finalReflection) {
     updated = upsertH2Section(updated, {
       heading: "Evening Reflection",
-      aliases: ["Reflection", "Caleb Reflection"],
+      aliases: ["Reflection", "User Reflection"],
       body: buildCapturedBody(finalReflection, capturedAt),
     });
     sectionsUpdated.push("Evening Reflection");
@@ -838,10 +838,10 @@ const toggleCheckbox: GatewayRequestHandler = async ({ params, respond }) => {
     checked?: boolean;
   };
 
-  if (typeof index !== "number" || typeof checked !== "boolean") {
+  if (typeof index !== "number" || !Number.isInteger(index) || index < 0 || typeof checked !== "boolean") {
     respond(false, null, {
       code: "INVALID_REQUEST",
-      message: "Missing index (number) or checked (boolean) parameter",
+      message: "Missing or invalid index (non-negative integer) or checked (boolean) parameter",
     });
     return;
   }

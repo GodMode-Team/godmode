@@ -92,7 +92,7 @@ Send the composed message using the `message` tool:
 
 The user's reply is automatically captured by the evening check-in system:
 
-- Their reflection is saved to the daily brief under "Caleb Reflection"
+- Their reflection is saved to the daily brief under "Evening Reflection"
 - If they don't include tomorrow priorities, a warm follow-up asks for a brain dump
 - After full capture, an evening lifetrack is generated and the link is texted
 
@@ -108,8 +108,8 @@ Hey — time for your evening review.
 Looked like a recovery day. I saw a couple GodMode sessions and some ClawVault work.
 
 From this morning's plan:
-- Seth Bolt proposal (overdue)
-- TRP funnel approval
+- Client proposal (overdue)
+- Marketing funnel approval
 - GodMode UI build
 
 Which of those moved? What carries over?
@@ -125,21 +125,21 @@ Good example (busy weekday):
 Hey — how'd today go?
 
 Today I saw:
-- TRP launch approval (2 sessions)
+- Product launch approval (2 sessions)
 - GodMode sidebar build
-- Meeting prep for Seth call
+- Meeting prep for client call
 
 Your plan this morning:
-- Ship TRP copy
-- Close Seth proposal
+- Ship marketing copy
+- Close client proposal
 - Soul review
 
 What got done? What carries over?
 
 Tomorrow:
 - 9:00 AM Daily Huddle
-- 2:00 PM Seth Bolt call
-- 4:00 PM TRP standup
+- 2:00 PM Client call
+- 4:00 PM Team standup
 
 Anything else on your mind? Brain dump welcome.
 ```
@@ -149,7 +149,7 @@ Good example (big day with external work):
 ```
 Hey — big day. How'd it go?
 
-From GodMode I saw you shipped the webhook fix and handled Ashley's reminder setup.
+From GodMode I saw you shipped the webhook fix and handled a team member's reminder setup.
 
 Anything else happen outside GodMode today? I know not everything runs through here yet.
 

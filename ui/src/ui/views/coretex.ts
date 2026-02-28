@@ -26,7 +26,7 @@ export type CoreTexIdentityFile = {
 
 export type CoreTexIdentityData = {
   files: CoreTexIdentityFile[];
-  calebOs: {
+  identityOs: {
     dashboardPath: string;
     artifacts: CoreTexMemoryEntry[];
   } | null;
@@ -153,23 +153,23 @@ function renderIdentityPanel(props: CoreTexProps) {
 
   return html`
     <div class="coretex-panel">
-      ${identity.calebOs ? html`
+      ${identity.identityOs ? html`
         <div
           class="coretex-hero"
           @click=${() => {
             // Read the HTML file and open in sidebar
-            const dashPath = identity.calebOs?.dashboardPath;
+            const dashPath = identity.identityOs?.dashboardPath;
             if (dashPath) {
               props.onSelectEntry(dashPath);
             }
           }}
         >
           <div class="coretex-hero-content">
-            <div class="coretex-hero-badge">CALEB OS</div>
-            <div class="coretex-hero-title">The Book of Caleb</div>
+            <div class="coretex-hero-badge">IDENTITY OS</div>
+            <div class="coretex-hero-title">Your Identity Profile</div>
             <div class="coretex-hero-desc">
               Your complete identity extraction — voice, values, story, thinking patterns, and life arc.
-              ${identity.calebOs.artifacts.length} artifacts compiled.
+              ${identity.identityOs.artifacts.length} artifacts compiled.
             </div>
           </div>
           <div class="coretex-hero-arrow">\u{2192}</div>
@@ -186,14 +186,14 @@ function renderIdentityPanel(props: CoreTexProps) {
         </div>
       `)}
 
-      ${identity.calebOs && identity.calebOs.artifacts.length > 0 ? html`
+      ${identity.identityOs && identity.identityOs.artifacts.length > 0 ? html`
         <div class="coretex-section">
           <div class="coretex-section-header">
-            <span class="coretex-section-title">Caleb OS Artifacts</span>
-            <span class="coretex-section-count">${identity.calebOs.artifacts.length}</span>
+            <span class="coretex-section-title">Identity OS Artifacts</span>
+            <span class="coretex-section-count">${identity.identityOs.artifacts.length}</span>
           </div>
           <div class="coretex-entry-list">
-            ${identity.calebOs.artifacts.map((a) => renderEntryRow(a, props))}
+            ${identity.identityOs.artifacts.map((a) => renderEntryRow(a, props))}
           </div>
         </div>
       ` : nothing}

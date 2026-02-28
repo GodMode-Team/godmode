@@ -86,7 +86,7 @@ This document describes the log directory structure for GodMode remote support.
 
 ### Follow-up
 
-[Any recommendations for customer or notes for Caleb]
+[Any recommendations for customer or notes for the support lead]
 ```
 
 ### Daily Digest (`daily-digests/YYYY-MM-DD.md`)
@@ -165,5 +165,5 @@ mkdir -p ~/godmode/support-logs/{conversations,ssh-sessions,daily-digests}
 
 - Logs may contain customer information (not secrets, those are redacted)
 - Do not commit logs to git
-- Logs are stored on Caleb's machine only
+- Logs are stored on the support host machine only
 - SSH session logs do NOT include full command output, only summaries

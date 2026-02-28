@@ -11,7 +11,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-VAULT_PATH="${OBSIDIAN_VAULT_PATH:-/Users/calebhodges/Documents/VAULT}"
+VAULT_PATH="${OBSIDIAN_VAULT_PATH:-$HOME/Documents/VAULT}"
 BRIEF_FOLDER="${DAILY_BRIEF_FOLDER:-01-Daily}"
 TODAY=$(date +%Y-%m-%d)
 BRIEF_FILE="$VAULT_PATH/$BRIEF_FOLDER/$TODAY.md"

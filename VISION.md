@@ -1,6 +1,6 @@
 # GodMode Vision & Product Strategy
 
-*Crystallized Feb 27, 2026 — from Caleb + Claude strategic session*
+*Crystallized Feb 27, 2026*
 
 ---
 
@@ -46,7 +46,7 @@ Think about hiring a new executive assistant:
 
 GodMode automates that entire training process. The onboarding IS the training. The Trust Tracker IS the correction loop. The daily operating rhythm IS the structure a good EA follows. People aren't buying software — they're skipping 3 weeks of self-surgery and getting a trained AI employee on Day 1.
 
-**Real example (Marshall Haas, Feb 26 2026):** Technically sophisticated user running OC on a Mac Mini. Burned weeks on gateway crash loops from config corruption, VS Code SSH setup, and wrong auth method (API key instead of Claude Max). All problems GodMode onboarding solves in 15 minutes.
+**Real example:** Technically sophisticated user running OC on a Mac Mini. Burned weeks on gateway crash loops from config corruption, VS Code SSH setup, and wrong auth method (API key instead of Claude Max). All problems GodMode onboarding solves in 15 minutes.
 
 ---
 
@@ -122,7 +122,7 @@ What's coming: coding task pipelines with validation gates, multi-agent coordina
 The plugin funnels people to the community. The community funnels people to the plugin. Flywheel.
 
 **Circle membership ($100/mo) includes:**
-- Weekly group call (30 min Caleb shares + 20 min member spotlight + 10 min Q&A)
+- Weekly group call (30 min team shares + 20 min member spotlight + 10 min Q&A)
 - Hive Mind RAG — chatbot trained on all community discussions, workflows, call transcripts
 - Curated daily feed from AI/productivity sources
 - Video library of tutorials and call recordings

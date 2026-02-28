@@ -113,7 +113,7 @@ can try yourself: [self-service steps]"
 
 ### 4. Escalation
 
-**Auto-escalate to Caleb when:**
+**Auto-escalate to the admin when:**
 
 - 2 failed fix attempts (restart didn't help, cache clear didn't help)
 - Issue requires non-allowlisted commands
@@ -124,7 +124,7 @@ can try yourself: [self-service steps]"
 **Escalation message to customer:**
 
 ```
-"This needs Caleb's attention. I've logged everything and he'll follow up
+"This needs the team's attention. I've logged everything and someone will follow up
 [today/tomorrow]. Is there anything else I can help with in the meantime?"
 ```
 
@@ -268,7 +268,7 @@ godmode-support update          # Pull latest GodMode version
 ### Daily Digest
 
 **Generated:** 6 PM Central daily
-**Delivered to:** Caleb via Slack DM
+**Delivered to:** Admin via Slack DM
 
 **Content:**
 
@@ -329,7 +329,7 @@ When setting up a new customer Mac Mini:
    > our support AI directly on Telegram. For complex issues, the AI may request
    > remote access to diagnose. You'll get a notification and must approve each
    > time. You can see everything it does. This is optional - you can always
-   > decline and we'll schedule a call with Caleb instead."
+   > decline and we'll schedule a call with the team instead."
 
 ---
 
@@ -338,8 +338,8 @@ When setting up a new customer Mac Mini:
 ### Customer Not Found
 
 ```
-"I don't recognize your Telegram account. Please contact Caleb at
-[email] to get set up with GodMode support."
+"I don't recognize your Telegram account. Please contact your GodMode admin
+to get set up with GodMode support."
 ```
 
 ### SSH Consent Not Granted
@@ -358,7 +358,7 @@ the steps for you to run yourself."
 2. Tailscale is running (check menu bar icon)
 3. Try 'tailscale status' in Terminal
 
-If all looks good, let me know and I'll escalate to Caleb."
+If all looks good, let me know and I'll escalate to the team."
 ```
 
 ### Command Failed
@@ -367,7 +367,7 @@ If all looks good, let me know and I'll escalate to Caleb."
 "The [command] didn't work as expected. Output:
 [sanitized output]
 
-Let me try [alternative] or I can escalate this to Caleb."
+Let me try [alternative] or I can escalate this to the team."
 ```
 
 ---
@@ -394,7 +394,7 @@ A good support interaction should:
 
 ## Team Onboarding via Telegram or Slack
 
-This workflow allows Caleb to introduce new team members to Atlas via group chat, then onboard them.
+This workflow allows the admin to introduce new team members to Atlas via group chat, then onboard them.
 
 **Supported channels:**
 
@@ -406,9 +406,9 @@ This workflow allows Caleb to introduce new team members to Atlas via group chat
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │ 1. INTRODUCTION (Group Chat)                                    │
-│    Caleb creates group: "Caleb & [Name], GodModeSupportBot"    │
-│    Caleb: "@GodModeSupportBot hey, meet my dad Gil"            │
-│    Atlas responds (Caleb is on allowlist, mentioned bot)        │
+│    Admin creates group: "Admin & [Name], GodModeSupportBot"    │
+│    Admin: "@GodModeSupportBot hey, meet [Name]"                │
+│    Atlas responds (admin is on allowlist, mentioned bot)        │
 └─────────────────────────────────────────────────────────────────┘
                               ↓
 ┌─────────────────────────────────────────────────────────────────┐
@@ -420,28 +420,28 @@ This workflow allows Caleb to introduce new team members to Atlas via group chat
                               ↓
 ┌─────────────────────────────────────────────────────────────────┐
 │ 3. HANDOFF TO DM                                               │
-│    Atlas: "Hey Gil! Great to meet you. Tap my name and send   │
-│    me a DM - I'll walk you through the full GodMode setup."   │
+│    Atlas: "Hey [Name]! Great to meet you. Tap my name and     │
+│    send me a DM - I'll walk you through the full setup."      │
 └─────────────────────────────────────────────────────────────────┘
                               ↓
 ┌─────────────────────────────────────────────────────────────────┐
 │ 4. ONBOARDING IN DM                                            │
-│    - Gil DMs @GodModeSupportBot (now on allowlist)            │
+│    - User DMs @GodModeSupportBot (now on allowlist)           │
 │    - Atlas runs godmode-onboarding skill                       │
 │    - Full installation, config, 3-day journey setup           │
 └─────────────────────────────────────────────────────────────────┘
                               ↓
 ┌─────────────────────────────────────────────────────────────────┐
-│ 5. VISIBILITY FOR CALEB                                        │
+│ 5. VISIBILITY FOR ADMIN                                        │
 │    - All DM conversations logged                               │
-│    - Atlas forwards summaries to Caleb (Slack/web UI)         │
+│    - Atlas forwards summaries to admin (Slack/web UI)         │
 │    - Daily digest includes onboarding progress                 │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
 ### Group Chat Requirements
 
-- **Caleb must @mention the bot** to trigger Atlas in groups (`requireMention: true`)
+- **The admin must @mention the bot** to trigger Atlas in groups (`requireMention: true`)
 - Group members who aren't on the allowlist can see the conversation but Atlas won't respond to them directly
 - After Atlas adds someone to the allowlist, they can trigger Atlas (with @mention in groups, no mention needed in DMs)
 
@@ -450,10 +450,10 @@ This workflow allows Caleb to introduce new team members to Atlas via group chat
 **In Group Chat:**
 
 ```
-Caleb: "@GodModeSupportBot hey, this is my dad Gil. He's getting
+Admin: "@GodModeSupportBot hey, this is Alex. He's getting
        set up with GodMode on his new Mac Mini."
 
-Atlas: "Hey Gil! Nice to meet you. I'm Atlas, your AI assistant
+Atlas: "Hey Alex! Nice to meet you. I'm Atlas, your AI assistant
        for GodMode. I've added you to my contacts.
 
        To get started with your full setup, tap my name and send
@@ -464,12 +464,12 @@ Atlas: "Hey Gil! Nice to meet you. I'm Atlas, your AI assistant
        Looking forward to helping you out!"
 ```
 
-**In DM (Gil → Atlas):**
+**In DM (User → Atlas):**
 
 ```
-Gil: "Hey, Caleb said you can help me set up GodMode?"
+Alex: "Hey, I was told you can help me set up GodMode?"
 
-Atlas: "Absolutely! Welcome to GodMode, Gil. Let's get you set up.
+Atlas: "Absolutely! Welcome to GodMode, Alex. Let's get you set up.
 
        First question: Is your Mac Mini already powered on and
        connected to the internet?
@@ -499,11 +499,11 @@ Atlas manages the Telegram allowlist by editing the gateway config file.
       "botToken": "...",
       "dmPolicy": "allowlist",
       "allowFrom": [
-        "1114020243" // Caleb
+        "YOUR_TELEGRAM_ID" // admin
       ],
       "groupPolicy": "allowlist",
       "groupAllowFrom": [
-        "1114020243" // Caleb
+        "YOUR_TELEGRAM_ID" // admin
       ],
       "groups": {
         "*": {
@@ -518,7 +518,7 @@ Atlas manages the Telegram allowlist by editing the gateway config file.
 
 ### Adding a New User
 
-When Caleb introduces someone in a group chat, Atlas:
+When the admin introduces someone in a group chat, Atlas:
 
 1. **Extracts the user ID** from the Telegram message metadata
 2. **Reads the config file**
@@ -532,20 +532,20 @@ When Caleb introduces someone in a group chat, Atlas:
 # Atlas uses the Edit tool to add new user ID
 # In allowFrom array:
 "allowFrom": [
-  "1114020243",
+  "ADMIN_TELEGRAM_ID",
   "987654321"    // ← New user added
 ]
 
 # In groupAllowFrom array:
 "groupAllowFrom": [
-  "1114020243",
+  "ADMIN_TELEGRAM_ID",
   "987654321"    // ← New user added
 ]
 ```
 
 ### Security Notes
 
-- Only Caleb can trigger the allowlist addition (he's the only one on the list who can @mention in groups)
+- Only the admin can trigger the allowlist addition (they're the only one on the list who can @mention in groups)
 - New users can only DM or participate in groups - they cannot trigger allowlist additions themselves
 - All allowlist changes are logged and visible in config file history
 
@@ -553,18 +553,18 @@ When Caleb introduces someone in a group chat, Atlas:
 
 ## Conversation Visibility
 
-Caleb wants to see all support/onboarding conversations for UX research and quality assurance.
+The admin wants to see all support/onboarding conversations for UX research and quality assurance.
 
 ### Real-Time Forwarding
 
-After each support or onboarding conversation, Atlas sends a summary to Caleb:
+After each support or onboarding conversation, Atlas sends a summary to the admin:
 
 **Via Slack DM:**
 
 ```
 📱 Support Conversation Summary
 
-Who: Gil (dad)
+Who: [User Name]
 Channel: Telegram DM
 Duration: 15 minutes
 Topic: Initial GodMode onboarding
@@ -580,10 +580,10 @@ Questions Asked:
 3. "What if I want you to do something automatically?"
 
 Next Steps:
-- Gil will complete Day 1 of onboarding tomorrow
+- User will complete Day 1 of onboarding tomorrow
 - Follow-up scheduled for Day 2 check-in
 
-Overall: Smooth onboarding, Gil is excited about the daily brief feature.
+Overall: Smooth onboarding, user is excited about the daily brief feature.
 ```
 
 ### Log Files
@@ -594,7 +594,7 @@ All conversations are logged to:
 ~/godmode/support-logs/conversations/{person-id}/YYYY-MM-DD.md
 ```
 
-Caleb can read these directly or Atlas can summarize on request.
+The admin can read these directly or Atlas can summarize on request.
 
 ### Daily Digest Enhancement
 
@@ -603,7 +603,7 @@ The 6 PM daily digest includes an onboarding section:
 ```markdown
 ## Onboarding Activity
 
-### Gil (dad) - Day 1
+### [User] - Day 1
 
 - Started: 3:45 PM CT
 - Duration: 25 minutes
@@ -614,8 +614,8 @@ The 6 PM daily digest includes an onboarding section:
 
 ### Upcoming
 
-- Gil: Day 2 check-in tomorrow
-- Ty: Intro scheduled for this weekend
+- [User]: Day 2 check-in tomorrow
+- [User2]: Intro scheduled for this weekend
 ```
 
 ---
@@ -644,7 +644,7 @@ A good onboarding interaction should:
 - Feel welcoming and low-friction
 - Guide user through setup step-by-step
 - Answer questions patiently
-- Log everything for Caleb's visibility
+- Log everything for admin visibility
 - Set clear expectations about GodMode capabilities
 
 ---

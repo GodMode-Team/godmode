@@ -72,7 +72,7 @@ export function createCodingTaskTool(
             "1. PM phase: problem, success criteria, scope, assumptions",
             "2. Architect phase: approach, files, interfaces, risks, tests",
             `3. Write plan doc to: ${getPlansDir()}/YYYY-MM-DD-slug.md`,
-            "4. Present summary to Caleb and wait for approval",
+            "4. Present summary to the user and wait for approval",
             "5. Once approved, call coding_task again with planDoc set to the plan path",
           ].join("\n"),
         });
