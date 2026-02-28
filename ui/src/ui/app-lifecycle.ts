@@ -20,6 +20,7 @@ import {
   syncThemeWithSettings,
   syncUrlWithSessionKey,
 } from "./app-settings";
+import { triggerImageResolve } from "./app-gateway";
 import { laneMessageCache, loadChatHistory, loadLaneHistory } from "./controllers/chat";
 import type { GatewayBrowserClient } from "./gateway";
 import type { Tab } from "./navigation";
@@ -180,7 +181,9 @@ export function handleConnected(host: LifecycleHost) {
       key,
       true,
     );
-    void loadChatHistory(host as unknown as Parameters<typeof loadChatHistory>[0]);
+    void loadChatHistory(host as unknown as Parameters<typeof loadChatHistory>[0]).then(() => {
+      triggerImageResolve(host as unknown as import("./app").GodModeApp);
+    });
   };
   window.addEventListener("keydown", host.keydownHandler);
 
@@ -465,7 +468,9 @@ export function handleUpdated(host: LifecycleHost, changed: Map<PropertyKey, unk
     host.tab === "chat" &&
     !host.chatLoading
   ) {
-    void loadChatHistory(host as unknown as Parameters<typeof loadChatHistory>[0]);
+    void loadChatHistory(host as unknown as Parameters<typeof loadChatHistory>[0]).then(() => {
+      triggerImageResolve(host as unknown as import("./app").GodModeApp);
+    });
   }
 
   // Safety net: when gateway connects while on a non-chat tab, load its data.

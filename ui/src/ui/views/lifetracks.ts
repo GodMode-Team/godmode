@@ -1,5 +1,6 @@
 import { html, nothing } from "lit";
 import type { LifetrackEntry } from "../controllers/lifetracks.js";
+import { localDateString } from "../format.js";
 
 // ===== Types =====
 
@@ -50,8 +51,7 @@ function formatDateShort(dateStr: string): string {
 }
 
 function isToday(dateStr: string): boolean {
-  const today = new Date().toISOString().split("T")[0];
-  return dateStr === today;
+  return dateStr === localDateString();
 }
 
 function getRelativeDate(dateStr: string): string {
@@ -75,7 +75,7 @@ function hasTodayTrack(tracks: LifetrackEntry[] | null): boolean {
   if (!tracks || tracks.length === 0) {
     return false;
   }
-  const today = new Date().toISOString().split("T")[0];
+  const today = localDateString();
   return tracks.some((t) => t.date === today);
 }
 

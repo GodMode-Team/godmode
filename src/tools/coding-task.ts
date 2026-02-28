@@ -1,5 +1,10 @@
 import { jsonResult, type AnyAgentTool } from "openclaw/plugin-sdk";
-import type { CodingOrchestrator } from "../services/coding-orchestrator.js";
+import {
+  classifyComplexity,
+  getPlansDir,
+  validatePlanDoc,
+  type CodingOrchestrator,
+} from "../services/coding-orchestrator.js";
 
 type ToolContext = {
   sessionKey?: string;
@@ -30,6 +35,10 @@ export function createCodingTaskTool(
           items: { type: "string" },
           description: "Optional file scope globs. Auto-inferred from task if omitted.",
         },
+        planDoc: {
+          type: "string",
+          description: "Path to an approved plan doc in ~/godmode/docs/plans/. Required for complex tasks (new features, multi-system work). The plan gate skill produces this.",
+        },
       },
       required: ["task"],
     },
@@ -42,6 +51,41 @@ export function createCodingTaskTool(
 
       if (!opts.orchestrator.isEnabled()) {
         return jsonResult({ error: "coding orchestration is disabled in plugin config" });
+      }
+
+      // ── Plan gate enforcement ──────────────────────────────────
+      const planDoc = typeof params.planDoc === "string" ? params.planDoc.trim() : "";
+      const complexity = classifyComplexity(task);
+
+      if (complexity.level === "complex" && !planDoc) {
+        return jsonResult({
+          status: "plan_required",
+          complexity: complexity.level,
+          reason: complexity.reason,
+          message: [
+            `This looks like a complex task (${complexity.reason}).`,
+            "",
+            "Before I can dispatch a builder, we need a plan.",
+            "",
+            "Run the plan gate skill (skills/plan-gate/SKILL.md):",
+            "1. PM phase: problem, success criteria, scope, assumptions",
+            "2. Architect phase: approach, files, interfaces, risks, tests",
+            `3. Write plan doc to: ${getPlansDir()}/YYYY-MM-DD-slug.md`,
+            "4. Present summary to Caleb and wait for approval",
+            "5. Once approved, call coding_task again with planDoc set to the plan path",
+          ].join("\n"),
+        });
+      }
+
+      if (planDoc) {
+        const planCheck = await validatePlanDoc(planDoc);
+        if (!planCheck.valid) {
+          return jsonResult({
+            status: "plan_required",
+            error: planCheck.error,
+            message: `Plan doc issue: ${planCheck.error}. Fix the plan and try again.`,
+          });
+        }
       }
 
       const repoRoot =

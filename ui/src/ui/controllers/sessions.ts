@@ -1,6 +1,6 @@
 import { toNumber } from "../format";
 import type { GatewayBrowserClient } from "../gateway";
-import type { SessionsListResult } from "../types";
+import type { ArchivedSessionEntry, SessionsListResult } from "../types";
 
 /**
  * Persistent cache of auto-generated titles.
@@ -19,6 +19,9 @@ export type SessionsState = {
   sessionsFilterLimit: string;
   sessionsIncludeGlobal: boolean;
   sessionsIncludeUnknown: boolean;
+  archivedSessions: ArchivedSessionEntry[];
+  archivedSessionsLoading: boolean;
+  archivedSessionsExpanded: boolean;
 };
 
 export async function loadSessions(
@@ -162,5 +165,69 @@ export async function deleteSession(state: SessionsState, key: string) {
     state.sessionsError = String(err);
   } finally {
     state.sessionsLoading = false;
+  }
+}
+
+// ── Archive operations ──────────────────────────────────────────────
+
+export async function loadArchivedSessions(state: SessionsState): Promise<void> {
+  if (!state.client || !state.connected) {
+    return;
+  }
+  state.archivedSessionsLoading = true;
+  try {
+    const res = await state.client.request("sessions.archived", {});
+    if (res?.archived) {
+      state.archivedSessions = res.archived as ArchivedSessionEntry[];
+    }
+  } catch {
+    // Non-fatal; archived list is supplementary
+  } finally {
+    state.archivedSessionsLoading = false;
+  }
+}
+
+export async function archiveSession(state: SessionsState, sessionKey: string): Promise<void> {
+  if (!state.client || !state.connected) {
+    return;
+  }
+  try {
+    await state.client.request("sessions.archive", { sessionKey });
+    // Refresh both lists so UI updates
+    await loadArchivedSessions(state);
+    await loadSessions(state);
+  } catch (err) {
+    state.sessionsError = `Archive failed: ${String(err)}`;
+  }
+}
+
+export async function unarchiveSession(state: SessionsState, sessionKey: string): Promise<void> {
+  if (!state.client || !state.connected) {
+    return;
+  }
+  try {
+    await state.client.request("sessions.unarchive", { sessionKey });
+    // Refresh both lists so UI updates
+    await loadArchivedSessions(state);
+    await loadSessions(state);
+  } catch (err) {
+    state.sessionsError = `Unarchive failed: ${String(err)}`;
+  }
+}
+
+export async function triggerAutoArchive(state: SessionsState): Promise<number> {
+  if (!state.client || !state.connected) {
+    return 0;
+  }
+  try {
+    const res = await state.client.request("sessions.autoArchive", {});
+    const count = (res?.archivedCount as number) ?? 0;
+    // Refresh lists after auto-archive
+    await loadArchivedSessions(state);
+    await loadSessions(state);
+    return count;
+  } catch (err) {
+    state.sessionsError = `Auto-archive failed: ${String(err)}`;
+    return 0;
   }
 }

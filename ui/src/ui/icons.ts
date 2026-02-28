@@ -336,6 +336,13 @@ export const icons = {
       <path d="M7 11V7a5 5 0 0 1 10 0v4" />
     </svg>
   `,
+  flask: html`
+    <svg viewBox="0 0 24 24">
+      <path d="M10 2v7.527a2 2 0 0 1-.211.896L4.72 20.55a1 1 0 0 0 .9 1.45h12.76a1 1 0 0 0 .9-1.45l-5.069-10.127A2 2 0 0 1 14 9.527V2" />
+      <path d="M8.5 2h7" />
+      <path d="M7 16.5h10" />
+    </svg>
+  `,
 } as const;
 
 export type IconName = keyof typeof icons;

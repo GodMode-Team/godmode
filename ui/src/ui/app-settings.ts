@@ -14,6 +14,7 @@ import { loadChannels } from "./controllers/channels";
 import { loadConfig, loadConfigSchema } from "./controllers/config";
 import { loadCronJobs, loadCronStatus } from "./controllers/cron";
 import { loadDebug } from "./controllers/debug";
+import { loadGuardrails } from "./controllers/guardrails";
 import { loadDevices } from "./controllers/devices";
 import { loadExecApprovals } from "./controllers/exec-approvals";
 import { loadLifetracks } from "./controllers/lifetracks";
@@ -23,7 +24,7 @@ import { loadMyDay } from "./controllers/my-day";
 import { loadNodes } from "./controllers/nodes";
 import { loadPeople } from "./controllers/people";
 import { loadPresence } from "./controllers/presence";
-import { loadSessions } from "./controllers/sessions";
+import { loadArchivedSessions, loadSessions } from "./controllers/sessions";
 import { loadSkills } from "./controllers/skills";
 import { loadVisionBoard } from "./controllers/vision-board";
 import { loadWheelOfLife } from "./controllers/wheel-of-life";
@@ -38,6 +39,7 @@ import {
   type Tab,
 } from "./navigation";
 import { saveSettings, type UiSettings } from "./storage";
+import { initParticles, destroyParticles } from "./particles";
 import { resolveTheme, type ResolvedTheme, type ThemeMode } from "./theme";
 import { startThemeTransition, type ThemeTransitionContext } from "./theme-transition";
 
@@ -273,6 +275,7 @@ export async function refreshActiveTab(host: SettingsHost) {
   }
   if (host.tab === "sessions") {
     await loadSessions(host as unknown as GodModeApp);
+    await loadArchivedSessions(host as unknown as GodModeApp);
   }
   if (host.tab === "cron") {
     await loadCron(host);
@@ -301,8 +304,18 @@ export async function refreshActiveTab(host: SettingsHost) {
   }
   if (host.tab === "trust") {
     const app = host as unknown as GodModeApp;
+    const loads: Promise<void>[] = [];
     if (typeof app.handleTrustLoad === "function") {
-      await app.handleTrustLoad();
+      loads.push(app.handleTrustLoad());
+    }
+    loads.push(loadGuardrails(app));
+    loads.push(loadSessions(app));
+    await Promise.all(loads);
+  }
+  if (host.tab === "guardrails") {
+    const app = host as unknown as GodModeApp;
+    if (typeof app.handleGuardrailsLoad === "function") {
+      await app.handleGuardrailsLoad();
     }
   }
   if (host.tab === "config") {
@@ -343,7 +356,14 @@ export function applyResolvedTheme(host: SettingsHost, resolved: ResolvedTheme) 
   }
   const root = document.documentElement;
   root.dataset.theme = resolved;
-  root.style.colorScheme = resolved;
+  root.style.colorScheme = resolved === "dark" ? "dark" : "light";
+
+  // Quantum particles — only active in lifetrack theme
+  if (resolved === "lifetrack") {
+    initParticles();
+  } else {
+    destroyParticles();
+  }
 }
 
 export function attachThemeListener(host: SettingsHost) {

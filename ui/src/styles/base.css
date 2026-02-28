@@ -213,6 +213,169 @@
   color-scheme: light;
 }
 
+/* Lifetrack theme — White and gold */
+:root[data-theme="lifetrack"] {
+  /* Background — Clean white with barely-there warmth */
+  --bg: #fefefe;
+  --bg-accent: #fafaf8;
+  --bg-elevated: #ffffff;
+  --bg-hover: #f5f4f1;
+  --bg-muted: #f5f4f1;
+
+  /* Card / Surface — Pure white */
+  --card: #ffffff;
+  --card-foreground: #2c2416;
+  --card-highlight: rgba(184, 148, 46, 0.06);
+  --popover: #ffffff;
+  --popover-foreground: #2c2416;
+
+  /* Panel — Near-white */
+  --panel: #fefefe;
+  --panel-strong: #fafaf8;
+  --panel-hover: #f5f4f1;
+  --chrome: rgba(254, 254, 254, 0.95);
+  --chrome-strong: rgba(254, 254, 254, 0.98);
+
+  /* Text — Neutral dark */
+  --text: #3f3f46;
+  --text-strong: #18181b;
+  --chat-text: #3f3f46;
+  --muted: #71717a;
+  --muted-strong: #52525b;
+  --muted-foreground: #71717a;
+  --text-muted: #71717a;
+
+  /* Border — Neutral with hint of gold */
+  --border: #e4e4e7;
+  --border-strong: #d4d4d8;
+  --border-hover: #a1a1aa;
+  --input: #e4e4e7;
+  --ring: #EB9E0F;
+
+  /* Accent — Honey gold */
+  --accent: #EB9E0F;
+  --accent-hover: #F0AD15;
+  --accent-muted: #EB9E0F;
+  --accent-subtle: rgba(235, 158, 15, 0.14);
+  --accent-foreground: #ffffff;
+  --accent-glow: rgba(235, 158, 15, 0.30);
+  --primary: #EB9E0F;
+  --primary-foreground: #ffffff;
+
+  /* Secondary — Neutral ivory */
+  --secondary: #f4f4f5;
+  --secondary-foreground: #3f3f46;
+  --accent-2: #DA9100;
+  --accent-2-muted: rgba(218, 145, 0, 0.7);
+  --accent-2-subtle: rgba(218, 145, 0, 0.12);
+
+  /* Semantic */
+  --ok: #16a34a;
+  --ok-muted: rgba(22, 163, 74, 0.75);
+  --ok-subtle: rgba(22, 163, 74, 0.1);
+  --destructive: #dc2626;
+  --destructive-foreground: #fafafa;
+  --warn: #d97706;
+  --warn-muted: rgba(217, 119, 6, 0.75);
+  --warn-subtle: rgba(217, 119, 6, 0.1);
+  --danger: #dc2626;
+  --danger-muted: rgba(220, 38, 38, 0.75);
+  --danger-subtle: rgba(220, 38, 38, 0.1);
+  --info: #2563eb;
+
+  /* Focus — Gold glow */
+  --focus: rgba(235, 158, 15, 0.2);
+  --focus-ring: 0 0 0 2px var(--bg), 0 0 0 4px var(--ring);
+  --focus-glow: 0 0 0 2px var(--bg), 0 0 0 4px var(--ring), 0 0 16px var(--accent-glow);
+
+  /* Glassmorphism — Light with gold edge */
+  --glass-blur: 8px;
+  --glass-saturate: 120%;
+  --glass-bg: rgba(255, 255, 255, 0.88);
+  --glass-bg-elevated: rgba(255, 255, 255, 0.92);
+  --glass-border: rgba(235, 158, 15, 0.15);
+  --glass-border-hover: rgba(235, 158, 15, 0.35);
+  --glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.6);
+
+  /* Ambient glow — Soft gold shimmer */
+  --ambient-warm: rgba(235, 158, 15, 0.08);
+  --ambient-cool: rgba(218, 145, 0, 0.05);
+
+  /* Grid */
+  --grid-line: rgba(0, 0, 0, 0.05);
+
+  /* Shadows — Clean light */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.06);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08), 0 0 0 1px rgba(235, 158, 15, 0.08);
+  --shadow-lg: 0 12px 28px rgba(0, 0, 0, 0.12), 0 0 0 1px rgba(235, 158, 15, 0.08);
+  --shadow-xl: 0 24px 48px rgba(0, 0, 0, 0.15), 0 0 0 1px rgba(235, 158, 15, 0.08);
+  --shadow-glow: 0 0 24px var(--accent-glow);
+
+  color-scheme: light;
+}
+
+/* Lifetrack — Reduce noise overlay to let gold particles shine */
+:root[data-theme="lifetrack"] body::after {
+  opacity: 0.025;
+}
+
+/* Lifetrack — Make content areas translucent so particles show behind */
+:root[data-theme="lifetrack"] godmode-app {
+  background: transparent;
+}
+
+:root[data-theme="lifetrack"] .shell {
+  background: rgba(254, 254, 254, 0.85);
+}
+
+:root[data-theme="lifetrack"] .content {
+  background: transparent;
+}
+
+:root[data-theme="lifetrack"] .chat-thread {
+  background: transparent;
+}
+
+:root[data-theme="lifetrack"] .nav {
+  background: rgba(254, 254, 254, 0.80);
+  backdrop-filter: saturate(120%) blur(12px);
+  -webkit-backdrop-filter: saturate(120%) blur(12px);
+}
+
+:root[data-theme="lifetrack"] .topbar {
+  background: rgba(254, 254, 254, 0.80);
+  backdrop-filter: saturate(120%) blur(12px);
+  -webkit-backdrop-filter: saturate(120%) blur(12px);
+}
+
+/* Lifetrack — Quantum particle keyframes */
+@keyframes quantum-float {
+  0% {
+    transform: translate(0, 0) scale(1);
+    opacity: 0;
+  }
+  10% {
+    opacity: var(--particle-opacity, 0.25);
+  }
+  50% {
+    transform: translate(var(--drift-x, 80px), var(--drift-y, -120px)) scale(var(--particle-scale-mid, 1.2));
+  }
+  90% {
+    opacity: var(--particle-opacity, 0.25);
+  }
+  100% {
+    transform: translate(var(--drift-end-x, 160px), var(--drift-end-y, -240px)) scale(1);
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .quantum-particle {
+    animation: none !important;
+    opacity: 0 !important;
+  }
+}
+
 * {
   box-sizing: border-box;
 }
@@ -306,10 +469,10 @@ select {
   color: var(--text-strong);
 }
 
-/* Scrollbar styling — slim, unobtrusive */
+/* Scrollbar styling */
 ::-webkit-scrollbar {
-  width: 4px;
-  height: 4px;
+  width: 8px;
+  height: 8px;
 }
 
 ::-webkit-scrollbar-track {
@@ -319,10 +482,14 @@ select {
 ::-webkit-scrollbar-thumb {
   background: var(--border);
   border-radius: var(--radius-full);
+  border: 2px solid transparent;
+  background-clip: padding-box;
 }
 
 ::-webkit-scrollbar-thumb:hover {
   background: var(--border-strong);
+  border: 2px solid transparent;
+  background-clip: padding-box;
 }
 
 /* Firefox slim scrollbar */

@@ -1,5 +1,6 @@
 import fs from "node:fs/promises";
 import path from "node:path";
+import { localDateString } from "../data-paths.js";
 import type { GatewayRequestHandler } from "openclaw/plugin-sdk";
 
 type GatewayRequestHandlers = Record<string, GatewayRequestHandler>;
@@ -73,7 +74,7 @@ function getVisionPath(): string {
 }
 
 const DEFAULT_WHEEL_OF_LIFE: WheelOfLifeData = {
-  asOf: new Date().toISOString().split("T")[0],
+  asOf: localDateString(),
   scores: Object.fromEntries(
     ["health", "wealth", "career", "relationships", "fun", "environment", "growth", "contribution"].map(
       (key) => [
@@ -82,7 +83,7 @@ const DEFAULT_WHEEL_OF_LIFE: WheelOfLifeData = {
           current: 5,
           target: 8,
           trend: "stable" as SpokeTrend,
-          lastUpdated: new Date().toISOString().split("T")[0],
+          lastUpdated: localDateString(),
         },
       ],
     ),
@@ -95,7 +96,7 @@ const DEFAULT_VISION_BOARD: VisionBoardData = {
     statement: "Define your Chief Definite Aim here.",
     deadline: "2030-12-31",
     progress: 0,
-    lastUpdated: new Date().toISOString().split("T")[0],
+    lastUpdated: localDateString(),
   },
   annualThemes: [],
   values: ["Value 1", "Value 2", "Value 3"],
@@ -156,7 +157,7 @@ const updateWheelOfLife: GatewayRequestHandler = async ({ params, respond }) => 
     return;
   }
   const data = await readJsonFile(getWheelPath(), DEFAULT_WHEEL_OF_LIFE);
-  const today = new Date().toISOString().split("T")[0];
+  const today = localDateString();
   const oldScores: Record<string, number> = {};
   for (const [key, val] of Object.entries(data.scores)) {
     oldScores[key] = val.current;
@@ -196,7 +197,7 @@ const getVisionBoard: GatewayRequestHandler = async ({ respond }) => {
 
 const updateVisionBoard: GatewayRequestHandler = async ({ params, respond }) => {
   const data = await readJsonFile(getVisionPath(), DEFAULT_VISION_BOARD);
-  const today = new Date().toISOString().split("T")[0];
+  const today = localDateString();
   const { chiefDefiniteAim, annualThemes, values, identityStatements, antiGoals } =
     params as Partial<VisionBoardData>;
   if (chiefDefiniteAim) {

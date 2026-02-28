@@ -2,7 +2,7 @@ import { html, nothing } from "lit";
 import { formatAgo } from "../format";
 import { pathForTab } from "../navigation";
 import { formatSessionTokens } from "../presenter";
-import type { GatewaySessionRow, SessionsListResult } from "../types";
+import type { ArchivedSessionEntry, GatewaySessionRow, SessionsListResult } from "../types";
 
 export type SessionsProps = {
   loading: boolean;
@@ -13,6 +13,9 @@ export type SessionsProps = {
   includeGlobal: boolean;
   includeUnknown: boolean;
   basePath: string;
+  archivedSessions: ArchivedSessionEntry[];
+  archivedSessionsLoading: boolean;
+  archivedSessionsExpanded: boolean;
   onFiltersChange: (next: {
     activeMinutes: string;
     limit: string;
@@ -30,6 +33,10 @@ export type SessionsProps = {
     },
   ) => void;
   onDelete: (key: string) => void;
+  onArchive: (key: string) => void;
+  onUnarchive: (key: string) => void;
+  onToggleArchived: () => void;
+  onAutoArchive: () => void;
 };
 
 const THINK_LEVELS = ["", "off", "minimal", "low", "medium", "high"] as const;
@@ -83,8 +90,55 @@ function resolveThinkLevelPatchValue(value: string, isBinary: boolean): string |
   return value;
 }
 
+function formatArchiveReason(reason: string): string {
+  switch (reason) {
+    case "idle-7d":
+      return "Idle > 7 days";
+    case "task-complete":
+      return "Task completed";
+    case "manual":
+      return "Manual";
+    default:
+      return reason;
+  }
+}
+
+/** Inline SVG: archive box-arrow-down icon (16x16). */
+function archiveIcon() {
+  return html`<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="2" y="3" width="20" height="5" rx="1"/>
+    <path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8"/>
+    <path d="M10 12h4"/>
+  </svg>`;
+}
+
+/** Inline SVG: restore / unarchive icon (16x16). */
+function restoreIcon() {
+  return html`<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <polyline points="9 14 4 9 9 4"/>
+    <path d="M20 20v-7a4 4 0 0 0-4-4H4"/>
+  </svg>`;
+}
+
+/** Inline SVG: chevron right / down for collapse toggle. */
+function chevronIcon(expanded: boolean) {
+  return html`<svg
+    width="12" height="12" viewBox="0 0 24 24" fill="none"
+    stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+    style="transition: transform 150ms ease; transform: rotate(${expanded ? "90deg" : "0deg"});"
+  >
+    <polyline points="9 18 15 12 9 6"/>
+  </svg>`;
+}
+
 export function renderSessions(props: SessionsProps) {
-  const rows = props.result?.sessions ?? [];
+  const allRows = props.result?.sessions ?? [];
+  const archivedKeys = new Set(props.archivedSessions.map((a) => a.sessionKey));
+
+  // Filter out archived sessions from the active list
+  const rows = allRows.filter((row) => !archivedKeys.has(row.key));
+  const archivedCount = props.archivedSessions.length;
+
   return html`
     <section class="card">
       <div class="row" style="justify-content: space-between;">
@@ -92,9 +146,19 @@ export function renderSessions(props: SessionsProps) {
           <div class="card-title">Sessions</div>
           <div class="card-sub">Active session keys and per-session overrides.</div>
         </div>
-        <button class="btn" ?disabled=${props.loading} @click=${props.onRefresh}>
-          ${props.loading ? "Loading…" : "Refresh"}
-        </button>
+        <div class="row" style="gap: 8px;">
+          <button
+            class="btn"
+            ?disabled=${props.loading}
+            @click=${props.onAutoArchive}
+            title="Run auto-archive: archive idle sessions and completed-task sessions"
+          >
+            Auto-archive
+          </button>
+          <button class="btn" ?disabled=${props.loading} @click=${props.onRefresh}>
+            ${props.loading ? "Loading..." : "Refresh"}
+          </button>
+        </div>
       </div>
 
       <div class="filters" style="margin-top: 14px;">
@@ -179,13 +243,65 @@ export function renderSessions(props: SessionsProps) {
         ${
           rows.length === 0
             ? html`
-                <div class="muted">No sessions found.</div>
+                <div class="muted">No active sessions found.</div>
               `
             : rows.map((row) =>
-                renderRow(row, props.basePath, props.onPatch, props.onDelete, props.loading),
+                renderRow(row, props.basePath, props.onPatch, props.onDelete, props.onArchive, props.loading),
               )
         }
       </div>
+    </section>
+
+    ${renderArchivedSection(props, archivedCount)}
+  `;
+}
+
+/** Collapsible archived sessions section. */
+function renderArchivedSection(props: SessionsProps, archivedCount: number) {
+  if (archivedCount === 0 && !props.archivedSessionsLoading) {
+    return nothing;
+  }
+
+  return html`
+    <section class="card archived-section">
+      <div
+        class="archived-section__header"
+        @click=${props.onToggleArchived}
+      >
+        <div class="row" style="gap: 8px; align-items: center;">
+          ${chevronIcon(props.archivedSessionsExpanded)}
+          <span class="archived-section__title">Archived</span>
+          ${archivedCount > 0
+            ? html`<span class="archived-badge">${archivedCount}</span>`
+            : nothing}
+        </div>
+        <span class="archived-section__hint">
+          Sessions removed from the active list
+        </span>
+      </div>
+
+      ${
+        props.archivedSessionsExpanded
+          ? html`
+              <div class="archived-table" style="margin-top: 12px;">
+                <div class="archived-table__head">
+                  <div>Session Key</div>
+                  <div>Archived</div>
+                  <div>Reason</div>
+                  <div>Linked Task</div>
+                  <div>Actions</div>
+                </div>
+                ${
+                  props.archivedSessionsLoading
+                    ? html`<div class="muted" style="padding: 12px;">Loading...</div>`
+                    : props.archivedSessions.length === 0
+                      ? html`<div class="muted" style="padding: 12px;">No archived sessions.</div>`
+                      : props.archivedSessions.map((entry) => renderArchivedRow(entry, props.onUnarchive, props.loading))
+                }
+              </div>
+            `
+          : nothing
+      }
     </section>
   `;
 }
@@ -195,6 +311,7 @@ function renderRow(
   basePath: string,
   onPatch: SessionsProps["onPatch"],
   onDelete: SessionsProps["onDelete"],
+  onArchive: SessionsProps["onArchive"],
   disabled: boolean,
 ) {
   const updated = row.updatedAt ? formatAgo(row.updatedAt) : "n/a";
@@ -271,9 +388,45 @@ function renderRow(
           )}
         </select>
       </div>
-      <div>
-        <button class="btn danger" ?disabled=${disabled} @click=${() => onDelete(row.key)}>
+      <div class="row" style="gap: 4px;">
+        <button
+          class="btn btn-icon"
+          ?disabled=${disabled}
+          @click=${() => onArchive(row.key)}
+          title="Archive this session"
+        >
+          ${archiveIcon()}
+        </button>
+        <button class="btn danger btn--sm" ?disabled=${disabled} @click=${() => onDelete(row.key)}>
           Delete
+        </button>
+      </div>
+    </div>
+  `;
+}
+
+function renderArchivedRow(
+  entry: ArchivedSessionEntry,
+  onUnarchive: SessionsProps["onUnarchive"],
+  disabled: boolean,
+) {
+  const archivedAgo = formatAgo(Date.parse(entry.archivedAt));
+  return html`
+    <div class="archived-table__row">
+      <div class="mono" style="opacity: 0.7;">${entry.sessionKey}</div>
+      <div>${archivedAgo}</div>
+      <div>${formatArchiveReason(entry.reason)}</div>
+      <div class="mono" style="font-size: 11px; opacity: 0.6;">
+        ${entry.linkedTaskId ? entry.linkedTaskId.slice(0, 8) : "--"}
+      </div>
+      <div>
+        <button
+          class="btn btn-icon"
+          ?disabled=${disabled}
+          @click=${() => onUnarchive(entry.sessionKey)}
+          title="Restore this session"
+        >
+          ${restoreIcon()}
         </button>
       </div>
     </div>

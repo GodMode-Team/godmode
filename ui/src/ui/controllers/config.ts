@@ -162,9 +162,7 @@ export async function runUpdate(state: ConfigState) {
   state.updateRunning = true;
   state.lastError = null;
   try {
-    await state.client.request("update.run", {
-      sessionKey: state.applySessionKey,
-    });
+    await state.client.request("godmode.update.run", {});
   } catch (err) {
     state.lastError = String(err);
   } finally {

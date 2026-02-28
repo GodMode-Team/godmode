@@ -1,5 +1,6 @@
 import { exec } from "node:child_process";
 import { promisify } from "node:util";
+import { localDateString } from "../data-paths.js";
 import type { GatewayRequestHandler } from "openclaw/plugin-sdk";
 
 type GatewayRequestHandlers = Record<string, GatewayRequestHandler>;
@@ -77,7 +78,7 @@ const eventsToday: GatewayRequestHandler = async ({ respond }) => {
     console.warn("[Calendar] GOG_CALENDAR_ACCOUNT not set — returning empty events");
     respond(true, {
       events: [],
-      date: now.toISOString().split("T")[0],
+      date: localDateString(now),
       source: "google",
       warning: "GOG_CALENDAR_ACCOUNT not configured",
     });
@@ -95,14 +96,14 @@ const eventsToday: GatewayRequestHandler = async ({ respond }) => {
 
     respond(true, {
       events: todayEvents,
-      date: now.toISOString().split("T")[0],
+      date: localDateString(now),
       source: "google",
     });
   } catch (err) {
     console.error("[Calendar] gog CLI error:", err);
     respond(true, {
       events: [],
-      date: now.toISOString().split("T")[0],
+      date: localDateString(now),
       source: "google",
       error: err instanceof Error ? err.message : "Failed to fetch calendar",
     });

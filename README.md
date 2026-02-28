@@ -98,23 +98,14 @@ Build outputs:
 
 1. `--ui-dir <path>` passed to `scripts/bundle-ui.mjs`
 2. `GODMODE_UI_DIR=<path>`
-3. `../godmode-ui/dist` (sibling source-of-truth repo)
-4. `godmode-ui/dist` in this repo
-5. `assets/godmode-ui` fallback snapshot
-6. `../../dist/control-ui` (legacy monorepo output)
+3. `ui/dist` (in-repo Vite build output)
+4. `assets/godmode-ui` (committed fallback snapshot)
 
-When a sibling `../godmode-ui` repo exists, fallback snapshots are blocked by default.
-Build the UI first:
+Build the UI:
 
 ```bash
-cd ~/Projects/godmode-ui && pnpm build
-cd ~/Projects/godmode-plugin && pnpm build
-```
-
-If you intentionally want to use fallback assets, set:
-
-```bash
-GODMODE_UI_ALLOW_FALLBACK=1 pnpm build
+pnpm build:ui
+pnpm build
 ```
 
 To refresh fallback assets (recommended before release):

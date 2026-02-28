@@ -12,6 +12,7 @@ import type { ThemeTransitionContext } from "./theme-transition";
 import type { Toast } from "./toast";
 import type {
   AgentsListResult,
+  ArchivedSessionEntry,
   ChannelsStatusSnapshot,
   ConfigSnapshot,
   CronJob,
@@ -26,6 +27,7 @@ import type {
   SkillStatusReport,
   StatusSummary,
 } from "./types";
+import type { LightboxImage, LightboxState } from "./chat/lightbox";
 import type { ToolExecutionInfo } from "./types/chat-types";
 import type { ChatAttachment, ChatQueueItem, CronFormState, FileTreeNode } from "./ui-types";
 import type { NostrProfileFormState } from "./views/channels.nostr-profile-form";
@@ -35,7 +37,7 @@ import type { Agent, FeedItem, NativeTask } from "./views/mission-types";
 import type { AgentLogData, DailyBriefData } from "./views/my-day";
 import type { Person } from "./views/people";
 import type { Project } from "./views/work";
-import type { TaskFilter, WorkspaceDetail, WorkspaceSummary, WorkspaceTask } from "./views/workspaces";
+import type { TaskFilter, TaskSort, WorkspaceDetail, WorkspaceSummary, WorkspaceTask } from "./views/workspaces";
 
 export type AppViewState = {
   settings: UiSettings;
@@ -105,6 +107,7 @@ export type AppViewState = {
   sidebarFilePath: string | null;
   sidebarTitle: string | null;
   splitRatio: number;
+  lightbox: LightboxState;
   nodesLoading: boolean;
   nodes: Array<Record<string, unknown>>;
   devicesLoading: boolean;
@@ -162,6 +165,9 @@ export type AppViewState = {
   sessionsFilterLimit: string;
   sessionsIncludeGlobal: boolean;
   sessionsIncludeUnknown: boolean;
+  archivedSessions: ArchivedSessionEntry[];
+  archivedSessionsLoading: boolean;
+  archivedSessionsExpanded: boolean;
   cronLoading: boolean;
   cronJobs: CronJob[];
   cronStatus: CronStatus | null;
@@ -212,6 +218,7 @@ export type AppViewState = {
   workspacesError?: string | null;
   allTasks?: WorkspaceTask[];
   taskFilter?: TaskFilter;
+  taskSort?: TaskSort;
   showCompletedTasks?: boolean;
   editingTaskId?: string | null;
   // My Day state
@@ -226,7 +233,6 @@ export type AppViewState = {
   dailyBrief?: DailyBriefData | null;
   dailyBriefLoading?: boolean;
   dailyBriefError?: string | null;
-  briefEditing?: boolean;
   // Agent Log state
   agentLog?: AgentLogData | null;
   agentLogLoading?: boolean;
@@ -266,6 +272,9 @@ export type AppViewState = {
   onboardingActive?: boolean;
   onboardingPhase?: import("./views/onboarding").OnboardingPhase;
   onboardingData?: import("./views/onboarding").OnboardingData | null;
+  // Memory onboarding wizard state
+  wizardActive?: boolean;
+  wizardState?: import("./views/onboarding-wizard").WizardState | null;
   // Focus Pulse state
   focusPulseData?: import("./controllers/focus-pulse").FocusPulseData | null;
   // Trust Tracker state
@@ -274,6 +283,13 @@ export type AppViewState = {
   handleTrustLoad: () => Promise<void>;
   handleTrustAddWorkflow: (workflow: string) => Promise<void>;
   handleTrustRemoveWorkflow: (workflow: string) => Promise<void>;
+  handleDailyRate: (rating: number, note?: string) => Promise<void>;
+  // Guardrails state
+  guardrailsData: import("./controllers/guardrails").GuardrailsViewData | null;
+  guardrailsLoading: boolean;
+  handleGuardrailsLoad: () => Promise<void>;
+  handleGuardrailToggle: (gateId: string, enabled: boolean) => Promise<void>;
+  handleGuardrailThresholdChange: (gateId: string, key: string, value: number) => Promise<void>;
   // GodMode Options state
   godmodeOptions: Record<string, unknown> | null;
   godmodeOptionsLoading: boolean;
@@ -281,13 +297,14 @@ export type AppViewState = {
   dynamicSlots: Record<string, string>;
   // Update check state
   updateStatus: {
-    version: string;
-    branch: string | null;
-    sha: string | null;
-    upstream: string | null;
-    ahead: number | null;
-    behind: number | null;
-    dirty: boolean | null;
+    openclawVersion: string;
+    openclawLatest: string | null;
+    openclawUpdateAvailable: boolean;
+    openclawInstallKind: string;
+    openclawChannel: string | null;
+    pluginVersion: string;
+    pluginLatest: string | null;
+    pluginUpdateAvailable: boolean;
     fetchOk: boolean | null;
   } | null;
   updateLoading: boolean;
@@ -386,6 +403,9 @@ export type AppViewState = {
   handleOpenMessageFileLink: (href: string) => Promise<boolean>;
   handleCloseSidebar: () => void;
   handleSplitRatioChange: (ratio: number) => void;
+  handleImageClick: (url: string, allImages: LightboxImage[], index: number) => void;
+  handleLightboxClose: () => void;
+  handleLightboxNav: (delta: number) => void;
   // File explorer handlers
   handleToggleExplorer: () => void;
   handleExplorerPathChange: (path: string) => void;
@@ -415,8 +435,6 @@ export type AppViewState = {
   handleDailyBriefRefresh: () => Promise<void>;
   handleDailyBriefOpenInObsidian: () => void;
   handleBriefSave: (content: string) => Promise<void>;
-  handleBriefEditStart: () => void;
-  handleBriefEditEnd: () => void;
   // Today view mode handler
   handleTodayViewModeChange: (mode: "my-day" | "agent-log") => void;
   handlePrivateModeToggle: () => void;
@@ -457,6 +475,13 @@ export type AppViewState = {
   handleOnboardingIdentitySubmit?: (identity: import("./views/onboarding").OnboardingIdentity) => Promise<void>;
   handleOnboardingSkipPhase?: () => void;
   handleOnboardingComplete?: () => void;
+  // Memory wizard handlers
+  handleWizardOpen?: () => void;
+  handleWizardClose?: () => void;
+  handleWizardStepChange?: (step: import("./views/onboarding-wizard").WizardStep) => void;
+  handleWizardAnswerChange?: (key: string, value: unknown) => void;
+  handleWizardPreview?: () => Promise<void>;
+  handleWizardGenerate?: () => Promise<void>;
   // Focus Pulse handlers
   loadFocusPulse: () => Promise<void>;
   handleFocusPulseStartMorning: () => Promise<void>;

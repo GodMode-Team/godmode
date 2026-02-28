@@ -1,5 +1,5 @@
 import { html, nothing } from "lit";
-import { formatAgo } from "../format";
+import { formatAgo, localDateString } from "../format";
 
 export type WorkspaceTask = {
   id: string;
@@ -10,6 +10,7 @@ export type WorkspaceTask = {
   priority: "high" | "medium" | "low";
   createdAt: string;
   completedAt: string | null;
+  briefSection?: string | null;
 };
 
 export type WorkspaceSummary = {
@@ -68,6 +69,7 @@ export type WorkspaceCreateRequest = {
 };
 
 export type TaskFilter = "all" | "outstanding" | "complete";
+export type TaskSort = "due" | "priority" | "newest";
 
 export type WorkspacesProps = {
   connected: boolean;
@@ -81,6 +83,7 @@ export type WorkspacesProps = {
   error?: string | null;
   allTasks?: WorkspaceTask[];
   taskFilter?: TaskFilter;
+  taskSort?: TaskSort;
   showCompletedTasks?: boolean;
   editingTaskId?: string | null;
   workspaceNames?: string[];
@@ -93,11 +96,13 @@ export type WorkspacesProps = {
   onPinToggle?: (workspaceId: string, filePath: string, pinned: boolean) => void;
   onPinSessionToggle?: (workspaceId: string, sessionKey: string, pinned: boolean) => void;
   onCreateWorkspace?: (input: WorkspaceCreateRequest) => Promise<boolean | void> | boolean | void;
+  onDeleteWorkspace?: (workspace: WorkspaceSummary) => void;
   onToggleFolder?: (folderPath: string) => void;
   onTeamSetup?: () => void;
   onToggleTaskComplete?: (taskId: string, currentStatus: string) => void;
   onCreateTask?: (title: string, project: string) => void;
   onSetTaskFilter?: (filter: TaskFilter) => void;
+  onSetTaskSort?: (sort: TaskSort) => void;
   onToggleCompletedTasks?: () => void;
   onStartTask?: (taskId: string) => void;
   onEditTask?: (taskId: string | null) => void;
@@ -156,7 +161,7 @@ function priorityLabel(priority: WorkspaceTask["priority"]): string {
 
 function formatDueDate(dueDate: string | null): string {
   if (!dueDate) return "";
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localDateString();
   if (dueDate === today) return "Today";
   if (dueDate < today) return `Overdue (${dueDate})`;
   return dueDate;
@@ -164,16 +169,28 @@ function formatDueDate(dueDate: string | null): string {
 
 function dueDateClass(dueDate: string | null): string {
   if (!dueDate) return "ws-task-due";
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localDateString();
   if (dueDate < today) return "ws-task-due ws-task-due--overdue";
   if (dueDate === today) return "ws-task-due ws-task-due--today";
   return "ws-task-due";
 }
 
-function sortTasks(tasks: WorkspaceTask[]): WorkspaceTask[] {
+function sortTasks(tasks: WorkspaceTask[], mode: TaskSort = "due"): WorkspaceTask[] {
+  const priorityOrder = { high: 0, medium: 1, low: 2 };
   return [...tasks].sort((a, b) => {
-    const priorityOrder = { high: 0, medium: 1, low: 2 };
-    // Due date first (soonest first, null last)
+    if (mode === "priority") {
+      const pCmp = priorityOrder[a.priority] - priorityOrder[b.priority];
+      if (pCmp !== 0) return pCmp;
+      // Then by due date
+      if (a.dueDate && b.dueDate) return a.dueDate.localeCompare(b.dueDate);
+      if (a.dueDate && !b.dueDate) return -1;
+      if (!a.dueDate && b.dueDate) return 1;
+      return 0;
+    }
+    if (mode === "newest") {
+      return (b.createdAt || "").localeCompare(a.createdAt || "");
+    }
+    // Default: "due" — soonest due first, null last, then priority
     if (a.dueDate && b.dueDate) {
       const cmp = a.dueDate.localeCompare(b.dueDate);
       if (cmp !== 0) return cmp;
@@ -182,7 +199,6 @@ function sortTasks(tasks: WorkspaceTask[]): WorkspaceTask[] {
     } else if (!a.dueDate && b.dueDate) {
       return 1;
     }
-    // Then priority
     return priorityOrder[a.priority] - priorityOrder[b.priority];
   });
 }
@@ -244,13 +260,14 @@ function renderTaskRow(
         @click=${() => onToggle?.(task.id, task.status)}
         title=${isComplete ? "Mark incomplete" : "Mark complete"}
       >
-        ${isComplete ? "&#10003;" : ""}
+        ${isComplete ? "\u2713" : ""}
       </button>
       <span
         class="ws-list-title ws-task-title-clickable ${isComplete ? "ws-task-title--done" : ""}"
         @click=${() => onEditTask?.(task.id)}
         title="Click to edit"
       >${task.title}</span>
+      ${task.briefSection ? html`<span class="ws-task-section">${task.briefSection}</span>` : nothing}
       <span class=${priorityBadgeClass(task.priority)}>${priorityLabel(task.priority)}</span>
       ${task.dueDate ? html`<span class=${dueDateClass(task.dueDate)}>${formatDueDate(task.dueDate)}</span>` : nothing}
       ${!isComplete && onStartTask
@@ -321,7 +338,7 @@ function renderAllTaskRow(
         @click=${() => onToggle?.(task.id, task.status)}
         title=${isComplete ? "Mark incomplete" : "Mark complete"}
       >
-        ${isComplete ? "&#10003;" : ""}
+        ${isComplete ? "\u2713" : ""}
       </button>
       <span
         class="ws-list-title ws-task-title-clickable ${isComplete ? "ws-task-title--done" : ""}"
@@ -329,6 +346,7 @@ function renderAllTaskRow(
         title="Click to edit"
       >${task.title}</span>
       ${task.project ? html`<span class="ws-task-project">${task.project}</span>` : nothing}
+      ${task.briefSection ? html`<span class="ws-task-section">${task.briefSection}</span>` : nothing}
       <span class=${priorityBadgeClass(task.priority)}>${priorityLabel(task.priority)}</span>
       ${task.dueDate ? html`<span class=${dueDateClass(task.dueDate)}>${formatDueDate(task.dueDate)}</span>` : nothing}
       ${!isComplete && onStartTask
@@ -486,25 +504,40 @@ function renderFolderNode(
 function renderWorkspaceCard(
   workspace: WorkspaceSummary,
   onSelect?: (workspace: WorkspaceSummary) => void,
+  onDelete?: (workspace: WorkspaceSummary) => void,
 ) {
   return html`
-    <button
-      class="workspace-card"
-      @click=${() => onSelect?.(workspace)}
-      title="Open workspace"
-    >
-      <div class="workspace-card-emoji">${workspace.emoji}</div>
-      <div class="workspace-card-content">
-        <div class="workspace-card-name">${workspace.name}</div>
-        <div class="workspace-card-meta">
-          <span>${workspace.artifactCount} artifacts</span>
-          <span class="workspace-card-separator">•</span>
-          <span>${workspace.sessionCount} sessions</span>
-          <span class="workspace-card-separator">•</span>
-          <span>${formatAgo(workspace.lastUpdated.getTime())}</span>
+    <div class="workspace-card-wrapper">
+      <button
+        class="workspace-card"
+        @click=${() => onSelect?.(workspace)}
+        title="Open workspace"
+      >
+        <div class="workspace-card-emoji">${workspace.emoji}</div>
+        <div class="workspace-card-content">
+          <div class="workspace-card-name">${workspace.name}</div>
+          <div class="workspace-card-meta">
+            <span>${workspace.artifactCount} artifacts</span>
+            <span class="workspace-card-separator">•</span>
+            <span>${workspace.sessionCount} sessions</span>
+            <span class="workspace-card-separator">•</span>
+            <span>${formatAgo(workspace.lastUpdated.getTime())}</span>
+          </div>
         </div>
-      </div>
-    </button>
+      </button>
+      ${onDelete
+        ? html`<button
+            class="workspace-card-delete"
+            title="Delete workspace"
+            @click=${(e: Event) => {
+              e.stopPropagation();
+              if (confirm(`Delete workspace "${workspace.name}"? This removes it from your list but does not delete any files.`)) {
+                onDelete(workspace);
+              }
+            }}
+          >&times;</button>`
+        : nothing}
+    </div>
   `;
 }
 
@@ -833,6 +866,7 @@ export function renderWorkspaces(props: WorkspacesProps) {
     error,
     allTasks = [],
     taskFilter = "all",
+    taskSort = "due" as TaskSort,
     showCompletedTasks = false,
     editingTaskId,
     workspaceNames = [],
@@ -845,11 +879,13 @@ export function renderWorkspaces(props: WorkspacesProps) {
     onPinToggle,
     onPinSessionToggle,
     onCreateWorkspace,
+    onDeleteWorkspace,
     onToggleFolder,
     onTeamSetup,
     onToggleTaskComplete,
     onCreateTask,
     onSetTaskFilter,
+    onSetTaskSort,
     onToggleCompletedTasks,
     onStartTask,
     onEditTask,
@@ -1001,7 +1037,7 @@ export function renderWorkspaces(props: WorkspacesProps) {
                           </div>
                         `
                       : filteredWorkspaces.map((workspace) =>
-                          renderWorkspaceCard(workspace, onSelectWorkspace),
+                          renderWorkspaceCard(workspace, onSelectWorkspace, onDeleteWorkspace),
                         )
                   }
                 </div>
@@ -1009,8 +1045,10 @@ export function renderWorkspaces(props: WorkspacesProps) {
                 ${renderAllTasksSection({
                   tasks: allTasks,
                   taskFilter,
+                  taskSort,
                   onToggleTaskComplete,
                   onSetTaskFilter,
+                  onSetTaskSort,
                   onCreateTask,
                   workspaceNames,
                   onStartTask,
@@ -1028,8 +1066,10 @@ export function renderWorkspaces(props: WorkspacesProps) {
 function renderAllTasksSection(props: {
   tasks: WorkspaceTask[];
   taskFilter: TaskFilter;
+  taskSort?: TaskSort;
   onToggleTaskComplete?: (taskId: string, currentStatus: string) => void;
   onSetTaskFilter?: (filter: TaskFilter) => void;
+  onSetTaskSort?: (sort: TaskSort) => void;
   onCreateTask?: (title: string, project: string) => void;
   workspaceNames?: string[];
   onStartTask?: (taskId: string) => void;
@@ -1038,7 +1078,7 @@ function renderAllTasksSection(props: {
   onUpdateTask?: (taskId: string, updates: { title?: string; dueDate?: string | null }) => void;
 }): ReturnType<typeof html> {
   const {
-    tasks, taskFilter, onToggleTaskComplete, onSetTaskFilter,
+    tasks, taskFilter, taskSort = "due", onToggleTaskComplete, onSetTaskFilter, onSetTaskSort,
     onCreateTask, workspaceNames = [], onStartTask, editingTaskId, onEditTask, onUpdateTask,
   } = props;
 
@@ -1054,32 +1094,38 @@ function renderAllTasksSection(props: {
   } else {
     filtered = tasks;
   }
-  const sorted = sortTasks(filtered);
+  const sorted = sortTasks(filtered, taskSort);
 
   return html`
     <div class="ws-all-tasks-section">
       <section class="ws-section">
         <div class="ws-section__header">
           <h3>All Tasks</h3>
-          <div class="ws-task-filters">
-            <button
-              class="ws-task-filter-btn ${taskFilter === "all" ? "active" : ""}"
-              @click=${() => onSetTaskFilter?.("all")}
-            >All</button>
-            <button
-              class="ws-task-filter-btn ${taskFilter === "outstanding" ? "active" : ""}"
-              @click=${() => onSetTaskFilter?.("outstanding")}
-            >Outstanding</button>
-            <button
-              class="ws-task-filter-btn ${taskFilter === "complete" ? "active" : ""}"
-              @click=${() => onSetTaskFilter?.("complete")}
-            >Complete</button>
+          <div class="ws-task-controls">
+            <div class="ws-task-filters">
+              <button
+                class="ws-task-filter-btn ${taskFilter === "all" ? "active" : ""}"
+                @click=${() => onSetTaskFilter?.("all")}
+              >All</button>
+              <button
+                class="ws-task-filter-btn ${taskFilter === "outstanding" ? "active" : ""}"
+                @click=${() => onSetTaskFilter?.("outstanding")}
+              >To Do</button>
+              <button
+                class="ws-task-filter-btn ${taskFilter === "complete" ? "active" : ""}"
+                @click=${() => onSetTaskFilter?.("complete")}
+              >Done</button>
+            </div>
+            <select
+              class="ws-task-sort"
+              .value=${taskSort}
+              @change=${(e: Event) => onSetTaskSort?.((e.target as HTMLSelectElement).value as TaskSort)}
+            >
+              <option value="due">Due Date</option>
+              <option value="priority">Priority</option>
+              <option value="newest">Newest</option>
+            </select>
           </div>
-        </div>
-        <div class="ws-list ws-list--scroll">
-          ${sorted.length === 0
-            ? html`<div class="ws-empty">No tasks</div>`
-            : sorted.map((task) => renderAllTaskRow(task, onToggleTaskComplete, onStartTask, editingTaskId, onEditTask, onUpdateTask))}
         </div>
         ${onCreateTask
           ? html`
@@ -1113,6 +1159,11 @@ function renderAllTasksSection(props: {
               </form>
             `
           : nothing}
+        <div class="ws-list ws-list--scroll">
+          ${sorted.length === 0
+            ? html`<div class="ws-empty">No tasks</div>`
+            : sorted.map((task) => renderAllTaskRow(task, onToggleTaskComplete, onStartTask, editingTaskId, onEditTask, onUpdateTask))}
+        </div>
       </section>
     </div>
   `;

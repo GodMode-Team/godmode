@@ -13,6 +13,7 @@ import { accessSync, constants as fsConstants, existsSync, readFileSync, statSyn
 import { join } from "node:path";
 import type { GatewayRequestHandler } from "openclaw/plugin-sdk";
 import { GODMODE_ROOT, MEMORY_DIR } from "../data-paths.js";
+import { syncClaudeCodeSessions } from "../services/claude-code-sync.js";
 
 type GatewayRequestHandlers = Record<string, GatewayRequestHandler>;
 
@@ -23,9 +24,13 @@ let flushInFlight: Promise<{ stdout: string; stderr: string }> | null = null;
 
 function runScript(): Promise<{ stdout: string; stderr: string }> {
   return new Promise((resolve, reject) => {
+    // Unset CLAUDECODE in the child env so nested `claude` CLI calls work.
+    const childEnv = { ...process.env, HOME: process.env.HOME } as Record<string, string | undefined>;
+    delete childEnv.CLAUDECODE;
+
     nodeExec(
       `bash "${CONSCIOUSNESS_SCRIPT}"`,
-      { timeout: EXEC_TIMEOUT_MS, env: { ...process.env, HOME: process.env.HOME } },
+      { timeout: EXEC_TIMEOUT_MS, env: childEnv },
       (err, stdout, stderr) => {
         if (err) {
           reject(new Error(`Script failed: ${stderr || err.message}`));
@@ -98,15 +103,27 @@ const flush: GatewayRequestHandler = async ({ respond, context }) => {
     // Broadcast "syncing" status so the UI shows loading state
     context?.broadcast?.("consciousness:status", { status: "syncing" }, { dropIfSlow: true });
 
-    const { stdout } = await runScriptWithLock();
+    const { stdout, stderr } = await runScriptWithLock();
     const content = readConsciousness();
     const lineCount = content ? content.split("\n").length : 0;
+
+    // Parse step statuses from stdout
+    const harvestOk = stdout.includes("Session harvest complete");
+    const harvestFailed = stdout.includes("Session harvest failed") || stderr.includes("Session harvest failed");
+    const steps = {
+      harvest: harvestOk ? "ok" : harvestFailed ? "failed" : "skipped",
+      clawvault: stdout.includes("ClawVault reflect complete") ? "ok" : "skipped",
+      sessionReflect: stdout.includes("ClawVault session reflect complete") ? "ok" : "skipped",
+      heartbeat: stdout.includes("CONSCIOUSNESS.md updated") ? "ok" : "failed",
+    };
+
     const result = {
       ok: true,
       message: stdout.trim() || `Consciousness updated (${lineCount} lines)`,
       content,
       lineCount,
       updatedAt: new Date().toISOString(),
+      steps,
     };
 
     // Broadcast success so the golden icon shows confirmation
@@ -114,7 +131,11 @@ const flush: GatewayRequestHandler = async ({ respond, context }) => {
       status: "ok",
       lineCount,
       updatedAt: result.updatedAt,
+      steps,
     }, { dropIfSlow: true });
+
+    // Fire-and-forget: sync Claude Code sessions into agent-log
+    syncClaudeCodeSessions().catch(() => {});
 
     respond(true, result);
   } catch (err) {

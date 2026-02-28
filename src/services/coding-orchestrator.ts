@@ -1,5 +1,7 @@
+import fs from "node:fs/promises";
 import path from "node:path";
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk";
+import { GODMODE_ROOT } from "../data-paths.js";
 import {
   classifyTaskMode,
   newTaskId,
@@ -100,6 +102,91 @@ export function inferScope(task: string, explicitScopes?: string[]): ScopeInfere
   const deduped = [...new Set(scopes)];
   const parallelSafe = matchCount === 1 && deduped.every((g) => !BROAD_SCOPES.has(g));
   return { scopeGlobs: deduped, parallelSafe, rationale: reasons.join(", ") };
+}
+
+// ── Plan gate — complexity classification ───────────────────────
+
+export type ComplexityLevel = "simple" | "complex";
+
+export type ComplexityAssessment = {
+  level: ComplexityLevel;
+  reason: string;
+};
+
+const SIMPLE_KEYWORDS =
+  /\b(fix|bug|typo|tweak|rename|update|change|toggle|config|patch|hotfix|bump|revert|rollback)\b/i;
+
+const COMPLEX_KEYWORDS =
+  /\b(build|create|implement|add|new|feature|redesign|refactor|migrate|replace|rewrite|overhaul|integrate|architect)\b/i;
+
+const MULTI_SYSTEM_KEYWORDS =
+  /\b(and|with|plus|also|across|end.to.end|full.stack|frontend.+backend|ui.+api|client.+server)\b/i;
+
+export function classifyComplexity(task: string): ComplexityAssessment {
+  const text = task.trim().toLowerCase();
+  if (!text) return { level: "simple", reason: "empty task" };
+
+  // Explicit plan request always complex
+  if (/\b(plan this|bmad|bmad this)\b/i.test(text)) {
+    return { level: "complex", reason: "explicit plan request" };
+  }
+
+  // Strong simple signals — bug fix, typo, config tweak
+  if (SIMPLE_KEYWORDS.test(text) && !COMPLEX_KEYWORDS.test(text)) {
+    return { level: "simple", reason: "bug fix / minor change" };
+  }
+
+  // Multi-system signals
+  if (MULTI_SYSTEM_KEYWORDS.test(text) && COMPLEX_KEYWORDS.test(text)) {
+    return { level: "complex", reason: "multi-system feature" };
+  }
+
+  // Strong complex signals — new feature, greenfield
+  if (COMPLEX_KEYWORDS.test(text)) {
+    // Check if it's a trivial "add" (e.g., "add a comment") vs real feature
+    const wordCount = text.split(/\s+/).length;
+    if (wordCount >= 10) {
+      return { level: "complex", reason: "new feature / substantial scope" };
+    }
+    // Short "add" requests are probably simple
+    return { level: "simple", reason: "small addition" };
+  }
+
+  return { level: "simple", reason: "no complexity signals detected" };
+}
+
+// ── Plan gate — plan doc validation ─────────────────────────────
+
+const PLANS_DIR = path.join(GODMODE_ROOT, "docs", "plans");
+
+export async function validatePlanDoc(planDocPath: string): Promise<{
+  valid: boolean;
+  error?: string;
+}> {
+  try {
+    const resolved = planDocPath.replace(/^~/, process.env.HOME ?? "");
+    const content = await fs.readFile(resolved, "utf-8");
+
+    // Check that the file has a status field and it's "approved" or "in-progress"
+    const statusMatch = content.match(/^Status:\s*(.+)$/m);
+    if (!statusMatch) {
+      return { valid: false, error: "Plan doc has no Status field" };
+    }
+    const status = statusMatch[1]!.trim().toLowerCase();
+    if (status === "approved" || status === "in-progress" || status === "complete") {
+      return { valid: true };
+    }
+    if (status === "draft") {
+      return { valid: false, error: "Plan doc is still in draft — needs Caleb's approval before dispatching" };
+    }
+    return { valid: false, error: `Plan doc status is "${status}" — must be "approved" to dispatch` };
+  } catch {
+    return { valid: false, error: `Plan doc not found at ${planDocPath}` };
+  }
+}
+
+export function getPlansDir(): string {
+  return PLANS_DIR;
 }
 
 // ── Scope overlap ───────────────────────────────────────────────
@@ -441,7 +528,7 @@ export class CodingOrchestrator {
       timeoutMs: opts.timeoutMs,
       cwd: opts.cwd,
     });
-    return { stdout: result.stdout ?? "", exitCode: result.exitCode ?? 1 };
+    return { stdout: result.stdout ?? "", exitCode: result.code ?? 1 };
   };
 
   async launchTask(params: LaunchTaskParams): Promise<LaunchTaskResult> {

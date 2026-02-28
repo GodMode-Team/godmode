@@ -3,6 +3,7 @@
  * Loads the daily brief for the Today tab
  */
 
+import { localDateString } from "../format";
 import type { GatewayBrowserClient } from "../gateway";
 import type { AgentLogData, DailyBriefData } from "../views/my-day";
 import type { WorkspaceTask } from "../views/workspaces";
@@ -35,7 +36,7 @@ export type MyDayState = {
 const AGENT_LOG_PATH_CANDIDATES = ["~/godmode/memory/AGENT-DAY.md", "~/godmode/AGENT-DAY.md"];
 
 function isTodayDate(date: string): boolean {
-  return date === new Date().toISOString().split("T")[0];
+  return date === localDateString();
 }
 
 function resolveAgentLogPaths(date: string): string[] {
@@ -105,7 +106,7 @@ async function loadAgentLog(
   date?: string,
   opts?: { refresh?: boolean },
 ): Promise<AgentLogData | null> {
-  const targetDate = date || new Date().toISOString().split("T")[0];
+  const targetDate = date || localDateString();
   // agentLog.refresh does not exist — always use agentLog.get.
   // Cache-busting happens server-side on every request.
   const method = "agentLog.get";
@@ -168,7 +169,7 @@ async function loadAgentLogFromFiles(
       // Skip stale legacy files — don't serve AGENT-DAY.md if it wasn't
       // modified on the date we're requesting.
       if (isLegacyPath(path) && typeof result.modifiedAt === "number") {
-        const fileDate = new Date(result.modifiedAt).toISOString().split("T")[0];
+        const fileDate = localDateString(new Date(result.modifiedAt));
         if (fileDate !== targetDate) {
           continue;
         }
@@ -235,7 +236,7 @@ export async function loadTodayTasks(state: MyDayState): Promise<WorkspaceTask[]
   try {
     const result = await state.client.request<{ tasks: GatewayTodayTask[] }>(
       "tasks.today",
-      {},
+      { date: state.todaySelectedDate ?? localDateString() },
     );
     const tasks: WorkspaceTask[] = (result.tasks ?? []).map((t) => ({
       id: t.id,
@@ -260,8 +261,8 @@ export async function loadTodayTasks(state: MyDayState): Promise<WorkspaceTask[]
 /**
  * Fire-and-forget: sync tasks between the daily brief and task system.
  */
-export function syncTodayTasks(client: GatewayBrowserClient) {
-  client.request("dailyBrief.syncTasks", {}).catch((err: unknown) => {
+export function syncTodayTasks(client: GatewayBrowserClient, date?: string) {
+  client.request("dailyBrief.syncTasks", date ? { date } : {}).catch((err: unknown) => {
     console.warn("[MyDay] dailyBrief.syncTasks failed (non-blocking):", err);
   });
 }
@@ -316,7 +317,7 @@ export async function loadAgentLogOnly(state: MyDayState, opts?: { refresh?: boo
  * Open the daily brief in Obsidian
  */
 export function openBriefInObsidian(date?: string) {
-  const briefDate = date || new Date().toISOString().split("T")[0];
+  const briefDate = date || localDateString();
   const vault = "VAULT"; // Could be made configurable
   const file = `01-Daily/${briefDate}`;
   const url = `obsidian://open?vault=${encodeURIComponent(vault)}&file=${encodeURIComponent(file)}`;
@@ -357,7 +358,7 @@ export async function loadMyDay(state: MyDayState) {
   // todayTasks is set inside loadTodayTasks — no extra assignment needed
 
   // Fire-and-forget: sync tasks between brief and task system
-  syncTodayTasks(state.client);
+  syncTodayTasks(state.client, state.todaySelectedDate);
 
   // Log failures but don't block the page
   const labels = ["Brief", "Brief Notes", "Agent Log", "Today Tasks"];

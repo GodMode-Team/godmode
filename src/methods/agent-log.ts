@@ -15,6 +15,8 @@ import {
   resolveQueueItem,
   type AppendCategory,
 } from "../lib/agent-log.js";
+import { localDateString } from "../data-paths.js";
+import { syncClaudeCodeSessions } from "../services/claude-code-sync.js";
 import type { GatewayRequestHandler } from "openclaw/plugin-sdk";
 
 type GatewayRequestHandlers = Record<string, GatewayRequestHandler>;
@@ -33,7 +35,7 @@ const VALID_CATEGORIES = new Set<AppendCategory>([
 ]);
 
 function todayDate(): string {
-  return new Date().toISOString().split("T")[0];
+  return localDateString();
 }
 
 async function readLegacyAgentDay(): Promise<{
@@ -175,5 +177,19 @@ export const agentLogHandlers: GatewayRequestHandlers = {
     }
 
     respond(true, { ok: true, resolved: false, reason: "item not found" }, undefined);
+  },
+
+  "agentLog.syncClaudeCode": async ({ respond, context }) => {
+    try {
+      const result = await syncClaudeCodeSessions();
+      if (result.synced > 0) {
+        const date = todayDate();
+        context.broadcast("agent-log:update", { date }, { dropIfSlow: true });
+      }
+      respond(true, { ok: true, ...result }, undefined);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      respond(false, undefined, { code: "SYNC_FAILED", message: msg });
+    }
   },
 };

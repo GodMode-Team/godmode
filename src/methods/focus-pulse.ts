@@ -8,7 +8,7 @@
 import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { join, dirname } from "node:path";
 import type { GatewayRequestHandler } from "openclaw/plugin-sdk";
-import { DATA_DIR, MEMORY_DIR } from "../data-paths.js";
+import { DATA_DIR, MEMORY_DIR, resolveVaultPath, DAILY_FOLDER } from "../data-paths.js";
 import { scorePulseCheck, calculateDailyScore, type FocusItem, type PulseCheckResult } from "./focus-pulse-scorer.js";
 import type { AgentLogState, CompletedItem, ActivityEntry } from "../lib/agent-log.js";
 
@@ -69,11 +69,11 @@ async function writeState(state: FocusPulseState): Promise<void> {
 }
 
 function getVaultPath(): string | null {
-  return process.env.OBSIDIAN_VAULT_PATH || null;
+  return resolveVaultPath();
 }
 
 function getDailyFolder(): string {
-  return process.env.DAILY_BRIEF_FOLDER || "01-Daily";
+  return DAILY_FOLDER;
 }
 
 /**
@@ -253,53 +253,46 @@ const startMorningSet: GatewayRequestHandler = async ({ respond, context }) => {
     items = parseWinTheDay(noteContent);
   }
 
-  // Sync daily brief tasks to native task list
+  // Delegate task sync to the canonical syncTasksFromBrief (dedup, normalize, etc.)
+  let syncResult = { added: 0, updated: 0, total: 0 };
   try {
-    const TASKS_FILE = join(DATA_DIR, "tasks.json");
-    const { readFile: rf, writeFile: wf, mkdir: mk } = await import("node:fs/promises");
-    const { dirname: dn } = await import("node:path");
-    const { randomUUID } = await import("node:crypto");
-
-    type SyncTask = {
-      id: string; title: string; status: "pending" | "complete";
-      project: string | null; dueDate: string | null;
-      priority: "high" | "medium" | "low"; createdAt: string;
-      completedAt: string | null; carryOver: boolean;
-      source: "chat" | "cron" | "import";
-    };
-    type TasksData = { tasks: SyncTask[]; updatedAt: string | null };
-
-    let tasksData: TasksData;
-    try {
-      tasksData = JSON.parse(await rf(TASKS_FILE, "utf-8")) as TasksData;
-    } catch {
-      tasksData = { tasks: [], updatedAt: null };
-    }
-
-    for (const item of items) {
-      const exists = tasksData.tasks.some(
-        (t) => t.title.toLowerCase() === item.title.toLowerCase() && t.dueDate === today,
-      );
-      if (!exists) {
-        tasksData.tasks.push({
-          id: randomUUID(),
-          title: item.title,
-          status: item.completed ? "complete" : "pending",
-          project: null,
-          dueDate: today,
-          priority: "high",
-          createdAt: new Date().toISOString(),
-          completedAt: item.completed ? new Date().toISOString() : null,
-          carryOver: false,
-          source: "import",
-        });
-      }
-    }
-    await mk(dn(TASKS_FILE), { recursive: true });
-    tasksData.updatedAt = new Date().toISOString();
-    await wf(TASKS_FILE, JSON.stringify(tasksData, null, 2), "utf-8");
+    const { syncTasksFromBrief } = await import("./daily-brief.js");
+    syncResult = await syncTasksFromBrief(today);
   } catch {
     // Task sync is best-effort — don't block morning set
+  }
+
+  // Morning set workflow: kick overdue items to tomorrow
+  let overdueKicked = 0;
+  try {
+    const { readTasks, writeTasks } = await import("./tasks.js");
+    const tasksData = await readTasks();
+    const tomorrow = (() => {
+      const d = new Date();
+      d.setDate(d.getDate() + 1);
+      return d.toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
+    })();
+
+    // Items from the Win The Day section are "today's confirmed priorities"
+    const winTheDayTitles = new Set(items.map((i) => i.title.toLowerCase()));
+
+    for (const task of tasksData.tasks) {
+      if (task.status !== "pending" || !task.dueDate) continue;
+      // Skip tasks that are part of today's Win The Day set
+      if (task.dueDate === today && winTheDayTitles.has(task.title.toLowerCase())) continue;
+      // Kick overdue tasks (dueDate < today) to tomorrow
+      if (task.dueDate < today) {
+        task.dueDate = tomorrow;
+        task.carryOver = true;
+        overdueKicked++;
+      }
+    }
+
+    if (overdueKicked > 0) {
+      await writeTasks(tasksData);
+    }
+  } catch {
+    // Overdue kick is best-effort
   }
 
   // Update state: morning set started, items loaded
@@ -321,10 +314,12 @@ const startMorningSet: GatewayRequestHandler = async ({ respond, context }) => {
   respond(true, {
     items,
     noteFound: noteContent !== null,
-    newSession: true, // Signal to UI: open a fresh session
+    newSession: true,
     sessionTitle: `Morning Set — ${today}`,
+    syncResult,
+    overdueKicked,
     message: items.length > 0
-      ? `Found ${items.length} Win The Day items. Review and pick your #1 focus.`
+      ? `Found ${items.length} Win The Day items. ${overdueKicked > 0 ? `${overdueKicked} overdue items moved to tomorrow. ` : ""}Review and pick your #1 focus.`
       : "No Win The Day items found in today's daily note. You can set priorities manually.",
   });
 };

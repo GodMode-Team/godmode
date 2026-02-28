@@ -45,6 +45,7 @@ export type OptionsProps = {
   options: Record<string, unknown> | null;
   onToggle: (key: string, value: unknown) => void;
   onRefresh: () => void;
+  onOpenWizard?: () => void;
 };
 
 // ===== Render =====
@@ -87,7 +88,7 @@ function renderFeatureCard(
 }
 
 export function renderOptions(props: OptionsProps) {
-  const { connected, loading, options, onToggle } = props;
+  const { connected, loading, options, onToggle, onOpenWizard } = props;
 
   if (!connected) {
     return html`
@@ -116,6 +117,28 @@ export function renderOptions(props: OptionsProps) {
         ? html`<div class="options-empty">
             No configurable features yet.
           </div>`
+        : nothing}
+      ${onOpenWizard
+        ? html`
+            <div class="options-wizard-section">
+              <div class="options-card card">
+                <div class="options-card-header">
+                  <div class="options-card-info">
+                    <span class="options-card-icon">Setup</span>
+                    <span class="options-card-name">Memory Setup Wizard</span>
+                  </div>
+                  <button
+                    class="options-wizard-btn"
+                    @click=${onOpenWizard}
+                  >Run Wizard</button>
+                </div>
+                <div class="options-card-description">
+                  Set up your GodMode workspace from scratch. Generates AGENTS.md, memory files,
+                  and patches your OC config with optimal settings. Takes about 5 minutes.
+                </div>
+              </div>
+            </div>
+          `
         : nothing}
     </section>
   `;

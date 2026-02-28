@@ -28,7 +28,7 @@ afterEach(() => {
 });
 
 describe("tab strip — 3 core tabs only", () => {
-  it("renders exactly Chat, Today, Workspaces as main nav items", async () => {
+  it("renders exactly Chat, Today, Work as main nav items", async () => {
     const app = mountApp("/chat");
     await app.updateComplete;
 
@@ -48,7 +48,7 @@ describe("tab strip — 3 core tabs only", () => {
     expect(mainTabs).toHaveLength(3);
     expect(mainTabs[0]).toEqual({ href: "/chat", text: "Chat" });
     expect(mainTabs[1]).toEqual({ href: "/today", text: "Today" });
-    expect(mainTabs[2]).toEqual({ href: "/work", text: "Workspaces" });
+    expect(mainTabs[2]).toEqual({ href: "/work", text: "Work" });
   });
 
   it("does NOT render People, Life, or Data tabs", async () => {

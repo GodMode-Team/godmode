@@ -5,13 +5,14 @@ import { formatNextRun } from "../presenter";
 import type { UiSettings } from "../storage";
 
 export type UpdateStatus = {
-  version: string;
-  branch: string | null;
-  sha: string | null;
-  upstream: string | null;
-  ahead: number | null;
-  behind: number | null;
-  dirty: boolean | null;
+  openclawVersion: string;
+  openclawLatest: string | null;
+  openclawUpdateAvailable: boolean;
+  openclawInstallKind: string;
+  openclawChannel: string | null;
+  pluginVersion: string;
+  pluginLatest: string | null;
+  pluginUpdateAvailable: boolean;
   fetchOk: boolean | null;
 };
 
@@ -260,29 +261,35 @@ export function renderOverview(props: OverviewProps) {
     <section class="grid grid-cols-2" style="margin-top: 18px;">
       <div class="card">
         <div class="card-title">Updates</div>
-        <div class="card-sub">Current version and available updates.</div>
+        <div class="card-sub">OpenClaw runtime and GodMode plugin versions.</div>
         <div class="stat-grid" style="margin-top: 16px;">
           <div class="stat">
-            <div class="stat-label">Version</div>
+            <div class="stat-label">OpenClaw</div>
             <div class="stat-value">
-              ${props.updateStatus?.version ?? props.hello?.server?.version ?? "n/a"}
+              ${props.updateStatus?.openclawVersion ?? props.hello?.server?.version ?? "n/a"}
+            </div>
+          </div>
+          <div class="stat">
+            <div class="stat-label">GodMode</div>
+            <div class="stat-value">
+              ${props.updateStatus?.pluginVersion ?? "n/a"}
             </div>
           </div>
           <div class="stat">
             <div class="stat-label">Status</div>
-            <div class="stat-value ${props.updateStatus?.behind ? "warn" : "ok"}">
+            <div class="stat-value ${
+              props.updateStatus?.openclawUpdateAvailable || props.updateStatus?.pluginUpdateAvailable
+                ? "warn"
+                : "ok"
+            }">
               ${
-                props.updateStatus?.behind
-                  ? `${props.updateStatus.behind} behind`
+                props.updateStatus?.openclawUpdateAvailable || props.updateStatus?.pluginUpdateAvailable
+                  ? "Update Available"
                   : props.updateStatus
-                    ? "Up to date"
+                    ? "Up to Date"
                     : "Unknown"
               }
             </div>
-          </div>
-          <div class="stat">
-            <div class="stat-label">Branch</div>
-            <div class="stat-value">${props.updateStatus?.branch ?? "n/a"}</div>
           </div>
           <div class="stat">
             <div class="stat-label">Last Checked</div>
@@ -301,11 +308,11 @@ export function renderOverview(props: OverviewProps) {
           </button>
         </div>
         ${
-          props.updateStatus?.behind
+          props.updateStatus?.openclawUpdateAvailable
             ? html`
               <div class="callout" style="margin-top: 14px;">
                 <div>
-                  <b>${props.updateStatus.behind} update${props.updateStatus.behind > 1 ? "s" : ""} available</b>
+                  <b>OpenClaw ${props.updateStatus.openclawVersion} \u2192 ${props.updateStatus.openclawLatest ?? "newer"}</b>
                 </div>
                 <div class="row" style="margin-top: 10px; gap: 8px;">
                   ${
@@ -319,18 +326,23 @@ export function renderOverview(props: OverviewProps) {
                         </button>`
                       : nothing
                   }
-                  <button
-                    class="btn"
-                    @click=${() => {
-                      void navigator.clipboard.writeText("./scripts/self-update.sh");
-                    }}
-                    title="Copy command to clipboard"
-                  >
-                    Copy Command
-                  </button>
                 </div>
                 <div class="muted" style="margin-top: 8px; font-size: 12px;">
-                  Or run manually: <span class="mono">./scripts/self-update.sh</span>
+                  Or run manually: <span class="mono">openclaw update</span>
+                </div>
+              </div>
+            `
+            : nothing
+        }
+        ${
+          props.updateStatus?.pluginUpdateAvailable
+            ? html`
+              <div class="callout" style="margin-top: ${props.updateStatus?.openclawUpdateAvailable ? "10" : "14"}px;">
+                <div>
+                  <b>GodMode ${props.updateStatus.pluginVersion} \u2192 ${props.updateStatus.pluginLatest ?? "newer"}</b>
+                </div>
+                <div class="muted" style="margin-top: 8px; font-size: 12px;">
+                  Run: <span class="mono">npm update -g @godmode-team/godmode</span>
                 </div>
               </div>
             `

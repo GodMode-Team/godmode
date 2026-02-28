@@ -1,16 +1,16 @@
 import { readFile, writeFile, stat } from "node:fs/promises";
 import { join } from "node:path";
 import type { GatewayRequestHandler } from "openclaw/plugin-sdk";
-import { DATA_DIR } from "../data-paths.js";
+import { DATA_DIR, MEMORY_DIR, resolveVaultPath, DAILY_FOLDER, localDateString } from "../data-paths.js";
 
 type GatewayRequestHandlers = Record<string, GatewayRequestHandler>;
 
 function getVaultPath(): string | null {
-  return process.env.OBSIDIAN_VAULT_PATH || null;
+  return resolveVaultPath();
 }
 
 function getDailyFolder(): string {
-  return process.env.DAILY_BRIEF_FOLDER || "01-Daily";
+  return DAILY_FOLDER;
 }
 
 type DailyBriefSummary = {
@@ -92,12 +92,9 @@ function parseWeather(content: string): DailyBriefSummary["weather"] {
 }
 
 function parseTasks(content: string): DailyBriefSummary["tasks"] {
-  const missionMatch = content.match(
-    /##\s*(?:\u{1F3AF}\s*)?(?:Win The Day|Today's Mission)([\s\S]*?)(?=^##\s|$)/mu,
-  );
-  const missionContent = missionMatch ? missionMatch[1] : content;
-  const unchecked = (missionContent.match(/- \[ \]/g) || []).length;
-  const checked = (missionContent.match(/- \[x\]/gi) || []).length;
+  // Count ALL checkboxes in the entire document
+  const unchecked = (content.match(/(?:^|\n)\s*(?:\d+\.|-|\*)\s*\[ \]/g) || []).length;
+  const checked = (content.match(/(?:^|\n)\s*(?:\d+\.|-|\*)\s*\[[xX]\]/g) || []).length;
   return { total: unchecked + checked, completed: checked };
 }
 
@@ -120,7 +117,51 @@ function parseSections(content: string): string[] {
 }
 
 function getTodayDate(): string {
-  return new Date().toISOString().split("T")[0];
+  return localDateString();
+}
+
+/**
+ * Detect and fix literal `\n` text (hex 5c 6e) in brief content.
+ * This occurs when the Claude CLI returns escaped newlines instead of real ones.
+ * Heuristic: if the content has literal `\n` sequences AND fewer than 5 real lines,
+ * it's corrupted and needs fixing.
+ */
+function sanitizeBriefContent(raw: string): string {
+  const realLineCount = raw.split("\n").length;
+  if (raw.includes("\\n") && realLineCount < 5) {
+    console.log("[DailyBrief] Sanitizing literal \\n in brief content");
+    return raw.replace(/\\n/g, "\n");
+  }
+  return raw;
+}
+
+/**
+ * Try reading a daily brief from ~/godmode/memory/daily/ as fallback
+ * when the VAULT file is missing. If found, also copy to VAULT so
+ * subsequent reads (and the UI) get it from the canonical location.
+ */
+async function tryMemoryDailyFallback(
+  briefDate: string,
+  vaultFilePath: string,
+): Promise<{ content: string; mtime: Date } | null> {
+  const memoryPath = join(MEMORY_DIR, "daily", `${briefDate}.md`);
+  try {
+    const memStats = await stat(memoryPath);
+    let content = await readFile(memoryPath, "utf-8");
+    content = sanitizeBriefContent(content);
+
+    // Auto-sync to VAULT (gateway process has FDA, unlike cron)
+    try {
+      await writeFile(vaultFilePath, content, "utf-8");
+      console.log(`[DailyBrief] Synced memory/daily/${briefDate}.md → VAULT`);
+    } catch (syncErr) {
+      console.warn("[DailyBrief] Failed to sync fallback to VAULT:", syncErr);
+    }
+
+    return { content, mtime: memStats.mtime };
+  } catch {
+    return null;
+  }
 }
 
 type MarkdownSection = { heading: string; start: number; end: number };
@@ -324,25 +365,53 @@ const getDailyBrief: GatewayRequestHandler = async ({ params, respond }) => {
   const briefDate = date || getTodayDate();
   const filePath = join(vaultPath, getDailyFolder(), `${briefDate}.md`);
 
-  try {
-    const stats = await stat(filePath);
-    const content = await readFile(filePath, "utf-8");
+  /**
+   * Build and return the DailyBriefData response from content + mtime.
+   * Applies literal-\n sanitization before parsing.
+   */
+  function buildBriefResponse(rawContent: string, mtime: Date): DailyBriefData {
+    const content = sanitizeBriefContent(rawContent);
     const { readiness, mode } = parseReadiness(content);
     const weather = parseWeather(content);
     const tasks = parseTasks(content);
     const sections = parseSections(content);
 
-    const briefData: DailyBriefData = {
+    return {
       date: briefDate,
       content,
       summary: { readiness, readinessMode: mode, weather, tasks },
       sections,
-      updatedAt: stats.mtime.toISOString(),
+      updatedAt: mtime.toISOString(),
     };
+  }
 
-    respond(true, briefData);
+  try {
+    const stats = await stat(filePath);
+    const content = await readFile(filePath, "utf-8");
+
+    // If the VAULT file looks incomplete (< 3 sections), check memory/daily for a richer version
+    const vaultSections = parseSections(sanitizeBriefContent(content));
+    if (vaultSections.length < 3) {
+      const fallback = await tryMemoryDailyFallback(briefDate, filePath);
+      if (fallback && parseSections(fallback.content).length > vaultSections.length) {
+        console.log(
+          `[DailyBrief] VAULT brief has ${vaultSections.length} sections, memory/daily has more — using fallback`,
+        );
+        respond(true, buildBriefResponse(fallback.content, fallback.mtime));
+        return;
+      }
+    }
+
+    respond(true, buildBriefResponse(content, stats.mtime));
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code === "ENOENT") {
+      // VAULT file missing — try memory/daily fallback
+      const fallback = await tryMemoryDailyFallback(briefDate, filePath);
+      if (fallback) {
+        console.log(`[DailyBrief] No VAULT file, using memory/daily fallback for ${briefDate}`);
+        respond(true, buildBriefResponse(fallback.content, fallback.mtime));
+        return;
+      }
       respond(true, null);
     } else {
       console.error("[DailyBrief] Error reading brief:", err);
@@ -378,6 +447,12 @@ const updateDailyBrief: GatewayRequestHandler = async ({ params, respond }) => {
     await writeFile(filePath, content, "utf-8");
     console.log(`[DailyBrief] Updated brief for ${briefDate}`);
     respond(true, { date: briefDate, updatedAt: new Date().toISOString() });
+
+    // Sync checkbox state to tasks.json so that checked items don't revert
+    // when syncBriefFromTasks runs later. Fire-and-forget (don't block response).
+    syncTasksFromBrief(briefDate).catch((err) => {
+      console.error("[DailyBrief] Post-save task sync failed:", err);
+    });
   } catch (err) {
     console.error("[DailyBrief] Error writing brief:", err);
     respond(false, null, {
@@ -405,43 +480,91 @@ const captureEveningReview: GatewayRequestHandler = async ({ params, respond }) 
 
 // ── Brief item parsing helpers ─────────────────────────────────────
 
-type BriefItem = { title: string; completed: boolean };
+type BriefItem = { title: string; completed: boolean; section: string };
+
+/** Emoji-removal pattern for cleaning section headings. */
+const EMOJI_RE =
+  /[\u{1F3AF}\u{1F4CA}\u26A1\u{1F4C5}\u{1F4F1}\u{1F4CB}\u{1F9ED}\u{1F3C3}\u{1F4DD}\u{1F3C1}\u{1F4DA}\u{1F6E0}\u{2705}\u{1F525}\u{1F680}\u{2B50}\u{1F31F}\u{1F4A1}\u{1F389}\u{1F4AC}\u{1F4E7}\u{1F4C8}\u{1F3AE}\u{1F30D}\u{1F4AA}\u{2764}\u{FE0F}?\u{1F49A}\u{1F499}\u{1F49B}\u{1F49C}\u200D?]+/gu;
+
+function cleanSectionName(heading: string): string {
+  return heading.replace(EMOJI_RE, "").trim() || heading.trim();
+}
+
+/** High-priority section names (case-insensitive check). */
+const HIGH_PRIORITY_SECTIONS = /win the day|today's mission|priority|urgent/i;
 
 /**
- * Parse Win The Day / Today's Mission checkbox items from a daily note.
- * Returns the raw section content and parsed items.
+ * Normalize a task title extracted from the daily brief:
+ * - Strip bold markers
+ * - Strip context after em dash / en dash (— – -)
+ * - Strip trailing comma / period
+ * - Collapse whitespace
  */
-function parseWinTheDayItems(content: string): { sectionContent: string; items: BriefItem[] } | null {
-  const missionMatch = content.match(
-    /##\s*(?:\u{1F3AF}\s*)?(?:Win The Day|Today's Mission)([\s\S]*?)(?=^##\s|$)/mu,
-  );
-  if (!missionMatch) {
-    return null;
-  }
+function normalizeTitle(raw: string): string {
+  let t = raw
+    // Remove bold markers
+    .replace(/\*\*(.+?)\*\*/g, "$1")
+    // Strip context after em dash / en dash (keep the core title)
+    .replace(/\s*[—–]\s+.+$/, "")
+    .trim();
+  // Remove trailing comma or period
+  t = t.replace(/[,.]$/, "").trim();
+  // Collapse multiple spaces
+  t = t.replace(/\s{2,}/g, " ");
+  return t;
+}
 
-  const sectionContent = missionMatch[1];
+/**
+ * Parse ALL checkbox items from the entire daily brief, tagged by section.
+ * Every `- [ ]`, `- [x]`, `1. [ ]`, etc. becomes a BriefItem.
+ *
+ * Titles are normalized (bold stripped, context after em dash stripped)
+ * to prevent duplicates.
+ */
+function parseAllBriefCheckboxes(content: string): BriefItem[] {
+  // Normalize NBSP → regular space so checkbox regexes match cleanly
+  content = content.replace(/\u00a0/g, " ");
+  const h2Sections = listH2Sections(content);
   const items: BriefItem[] = [];
 
-  // Parse numbered items: 1. [x] **Title**
-  const numberedRegex = /^\d+\.\s*\[([ x])\]\s*\*\*(.+?)\*\*/gm;
-  let match;
-  while ((match = numberedRegex.exec(sectionContent)) !== null) {
-    items.push({ title: match[2].trim(), completed: match[1] === "x" });
+  // Build section ranges including pre-heading content
+  type SectionRange = { name: string; text: string };
+  const ranges: SectionRange[] = [];
+
+  const firstStart = h2Sections.length > 0 ? h2Sections[0].start : content.length;
+  if (firstStart > 0) {
+    ranges.push({ name: "General", text: content.slice(0, firstStart) });
+  }
+  for (const sec of h2Sections) {
+    ranges.push({ name: cleanSectionName(sec.heading), text: content.slice(sec.start, sec.end) });
   }
 
-  // Fall back to bullet items: - [x] **Title**
-  if (items.length === 0) {
-    const bulletRegex = /^[-*]\s*\[([ x])\]\s*\*\*(.+?)\*\*/gm;
-    while ((match = bulletRegex.exec(sectionContent)) !== null) {
-      items.push({ title: match[2].trim(), completed: match[1] === "x" });
+  // Global dedup across all sections by normalized title
+  const globalSeen = new Set<string>();
+
+  for (const range of ranges) {
+    const sectionText = range.text;
+    let match;
+
+    // Single-pass regex: matches all checkbox items (numbered, bullet, bold or plain)
+    const checkboxRegex = /^(?:\d+\.|-|\*)\s*\[([ xX])\]\s+(.+)$/gm;
+    while ((match = checkboxRegex.exec(sectionText)) !== null) {
+      const title = normalizeTitle(match[2]);
+      if (!title) continue;
+      const key = title.toLowerCase();
+      if (!globalSeen.has(key)) {
+        items.push({ title, completed: match[1].trim() !== "", section: range.name });
+        globalSeen.add(key);
+      }
     }
   }
 
-  return { sectionContent, items };
+  return items;
 }
 
 /**
  * Case-insensitive substring match for deduplicating tasks against brief items.
+ * Used by syncBriefFromTasks where fuzzy matching is needed.
  */
 function titlesMatch(taskTitle: string, briefTitle: string): boolean {
   const a = taskTitle.toLowerCase().trim();
@@ -449,14 +572,21 @@ function titlesMatch(taskTitle: string, briefTitle: string): boolean {
   return a === b || a.includes(b) || b.includes(a);
 }
 
+/** Exact case-insensitive title match for dedup in syncTasksFromBrief.
+ *  Both sides are normalized to handle bold markers, em-dash context, etc. */
+function exactTitleMatch(a: string, b: string): boolean {
+  return normalizeTitle(a).toLowerCase() === normalizeTitle(b).toLowerCase();
+}
+
 // ── Exported sync functions (called from tasks.ts and RPC) ────────
 
 /**
- * syncTasksFromBrief — Reads Win The Day items and creates/updates tasks.
+ * syncTasksFromBrief — Reads ALL checkbox items from the daily brief
+ * and creates/updates tasks.
  *
- * - New items from the note are added as tasks (source: "import")
- * - Tasks already in the task list are NOT overwritten if user-edited
- * - Completed status syncs from brief to tasks
+ * - New items are added as tasks (source: "import") with briefSection tag
+ * - Existing tasks are NOT overwritten if user-edited
+ * - Completion AND un-completion syncs from brief to tasks
  */
 export async function syncTasksFromBrief(date: string): Promise<{
   added: number;
@@ -476,8 +606,8 @@ export async function syncTasksFromBrief(date: string): Promise<{
     return { added: 0, updated: 0, total: 0 };
   }
 
-  const parsed = parseWinTheDayItems(content);
-  if (!parsed || parsed.items.length === 0) {
+  const items = parseAllBriefCheckboxes(content);
+  if (items.length === 0) {
     return { added: 0, updated: 0, total: 0 };
   }
 
@@ -488,35 +618,52 @@ export async function syncTasksFromBrief(date: string): Promise<{
   let added = 0;
   let updated = 0;
 
-  for (const item of parsed.items) {
-    // Dedup by title similarity + same due date
+  for (const item of items) {
+    // Dedup: normalized title + same due date, ignoring section differences.
+    // This prevents the same task from appearing as a duplicate when it moves
+    // between sections (e.g. "Win The Day" vs "Win The Day 2").
     const existing = tasksData.tasks.find(
-      (t) => titlesMatch(t.title, item.title) && t.dueDate === date,
+      (t) => exactTitleMatch(t.title, item.title) && t.dueDate === date,
     );
 
     if (existing) {
-      // Only update completion status if user hasn't manually edited
-      const userEdited = (existing as Record<string, unknown>).userEdited;
-      if (!userEdited && item.completed && existing.status !== "complete") {
+      // Stamp section if missing (migration path for old tasks)
+      if (!(existing as Record<string, unknown>).briefSection) {
+        (existing as Record<string, unknown>).briefSection = item.section;
+      }
+      // Brief is authoritative for checkbox/completion state.
+      // userEdited is intentionally NOT checked here — if the user
+      // checked/unchecked a box in the brief (or Obsidian), that
+      // state always flows through to tasks.json.
+      if (item.completed && existing.status !== "complete") {
         existing.status = "complete";
         existing.completedAt = new Date().toISOString();
+        (existing as Record<string, unknown>).userEdited = false;
+        updated++;
+      }
+      if (!item.completed && existing.status === "complete") {
+        existing.status = "pending";
+        existing.completedAt = null;
+        (existing as Record<string, unknown>).userEdited = false;
         updated++;
       }
     } else {
       // Add new task from daily brief
       const { randomUUID } = await import("node:crypto");
+      const priority = HIGH_PRIORITY_SECTIONS.test(item.section) ? "high" : "medium";
       tasksData.tasks.push({
         id: randomUUID(),
         title: item.title,
         status: item.completed ? "complete" : "pending",
         project: null,
         dueDate: date,
-        priority: "high",
+        priority,
         createdAt: new Date().toISOString(),
         completedAt: item.completed ? new Date().toISOString() : null,
         carryOver: false,
         source: "import",
         sessionId: null,
+        briefSection: item.section,
       });
       added++;
     }
@@ -526,19 +673,29 @@ export async function syncTasksFromBrief(date: string): Promise<{
     await writeTasks(tasksData);
   }
 
-  return { added, updated, total: parsed.items.length };
+  return { added, updated, total: items.length };
 }
 
 /**
- * syncBriefFromTasks — Updates the Win The Day section in the daily note
- * to reflect current task completion state.
+ * syncBriefFromTasks — Updates a SINGLE checkbox in the daily note when a
+ * task is explicitly toggled via the task UI.
  *
- * Preserves all non-task content in the section. Only updates checkbox
- * state for items that match existing tasks.
+ * IMPORTANT: A `taskTitle` MUST be provided. Without it the function is a
+ * no-op. This prevents accidental bulk-rewrites of brief checkbox state —
+ * the brief markdown is the source of truth for checkboxes.
  */
-export async function syncBriefFromTasks(date: string): Promise<{
+export async function syncBriefFromTasks(
+  date: string,
+  opts?: { taskTitle?: string },
+): Promise<{
   updated: number;
 }> {
+  // Safety: only update the brief for a specific, explicitly-changed task.
+  // Without a taskTitle the function does nothing — brief is authoritative.
+  if (!opts?.taskTitle) {
+    return { updated: 0 };
+  }
+
   const vaultPath = getVaultPath();
   if (!vaultPath) {
     return { updated: 0 };
@@ -552,40 +709,53 @@ export async function syncBriefFromTasks(date: string): Promise<{
     return { updated: 0 };
   }
 
-  // Get today's tasks
+  // Normalize NBSP → regular space to prevent checkbox rendering bugs
+  const hadNbsp = content.includes("\u00a0");
+  if (hadNbsp) {
+    content = content.replace(/\u00a0/g, " ");
+  }
+
+  // Get the specific task that was just changed
   const { readTasks } = await import("./tasks.js");
   const tasksData = await readTasks();
-  const todayTasks = tasksData.tasks.filter(
-    (t) => t.dueDate === date || (t.dueDate != null && t.dueDate <= date && t.status === "pending"),
+  const targetTask = tasksData.tasks.find(
+    (t) =>
+      titlesMatch(t.title, opts.taskTitle!) &&
+      (t.dueDate === date || (t.dueDate != null && t.dueDate <= date)),
   );
 
-  if (todayTasks.length === 0) {
+  if (!targetTask) {
     return { updated: 0 };
   }
 
   let updatedCount = 0;
   let updatedContent = content;
 
-  // Update checkbox state for matching items in the markdown
-  // Match both numbered and bullet checkbox items
-  const checkboxRegex = /^(\s*(?:\d+\.|-|\*)\s*)\[([ x])\](\s*\*\*(.+?)\*\*)/gm;
-  updatedContent = updatedContent.replace(checkboxRegex, (fullMatch, prefix, currentCheck, rest, title) => {
-    const matchingTask = todayTasks.find((t) => titlesMatch(t.title, title.trim()));
-    if (!matchingTask) {
+  // Update ONLY the checkbox matching the target task
+  const checkboxRegex = /^(\s*(?:\d+\.|-|\*)\s*)\[([ xX])\](\s*(?:\*\*(.+?)\*\*|(.+)))/gm;
+  updatedContent = updatedContent.replace(
+    checkboxRegex,
+    (fullMatch, prefix, currentCheck, rest, boldTitle, plainTitle) => {
+      const title = (boldTitle || plainTitle || "").trim();
+      if (!title) return fullMatch;
+
+      // Only update the specific task that was toggled
+      if (!titlesMatch(opts.taskTitle!, title)) {
+        return fullMatch;
+      }
+
+      const shouldBeChecked = targetTask.status === "complete";
+      const isChecked = currentCheck.trim() !== "";
+
+      if (shouldBeChecked !== isChecked) {
+        updatedCount++;
+        return `${prefix}[${shouldBeChecked ? "x" : " "}]${rest}`;
+      }
       return fullMatch;
-    }
+    },
+  );
 
-    const shouldBeChecked = matchingTask.status === "complete";
-    const isChecked = currentCheck === "x";
-
-    if (shouldBeChecked !== isChecked) {
-      updatedCount++;
-      return `${prefix}[${shouldBeChecked ? "x" : " "}]${rest}`;
-    }
-    return fullMatch;
-  });
-
-  if (updatedCount > 0) {
+  if (updatedCount > 0 || hadNbsp) {
     await writeFile(filePath, updatedContent, "utf-8");
   }
 
@@ -607,7 +777,7 @@ const syncBriefTasks: GatewayRequestHandler = async ({ params, respond }) => {
       respond(true, { synced: 0, message: "No Obsidian vault configured" });
       return;
     }
-    respond(true, { synced: 0, message: "No task items found in Win The Day section" });
+    respond(true, { synced: 0, message: "No checkbox items found in daily brief" });
     return;
   }
 
@@ -621,20 +791,21 @@ const syncBriefTasks: GatewayRequestHandler = async ({ params, respond }) => {
 };
 
 /**
- * dailyBrief.syncTasks — Bidirectional sync between tasks and daily brief.
+ * dailyBrief.syncTasks — Sync brief checkbox state to the task system.
  *
- * Calls syncTasksFromBrief (brief -> tasks) then syncBriefFromTasks
- * (tasks -> brief) for the given date.
+ * Reads checkboxes from the daily brief and creates/updates tasks in
+ * tasks.json. The brief is the source of truth for checkbox state.
+ * The reverse direction (task -> brief) only runs when a task is
+ * explicitly toggled via the task UI (see tasks.ts updateTask handler).
  */
 const syncTasksBidirectional: GatewayRequestHandler = async ({ params, respond }) => {
   const { date } = params as { date?: string };
   const briefDate = date || getTodayDate();
 
-  // Phase 1: Brief -> Tasks (import new items, update completion)
+  // Brief -> Tasks only. The brief markdown is the source of truth for
+  // checkbox state. syncBriefFromTasks is only triggered explicitly when a
+  // task is toggled via the task UI (see tasks.ts updateTask handler).
   const fromBrief = await syncTasksFromBrief(briefDate);
-
-  // Phase 2: Tasks -> Brief (write task completion back to markdown)
-  const toBrief = await syncBriefFromTasks(briefDate);
 
   respond(true, {
     fromBrief: {
@@ -642,10 +813,7 @@ const syncTasksBidirectional: GatewayRequestHandler = async ({ params, respond }
       updated: fromBrief.updated,
       total: fromBrief.total,
     },
-    toBrief: {
-      updated: toBrief.updated,
-    },
-    message: `Brief->Tasks: ${fromBrief.added} added, ${fromBrief.updated} updated. Tasks->Brief: ${toBrief.updated} checkboxes updated.`,
+    message: `Brief->Tasks: ${fromBrief.added} added, ${fromBrief.updated} updated.`,
   });
 };
 

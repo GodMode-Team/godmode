@@ -27,6 +27,7 @@ import { calendarHandlers } from "./src/methods/calendar.js";
 // clickup removed — stub, not shipping
 import { consciousnessHandlers } from "./src/methods/consciousness.js";
 import { dailyBriefHandlers } from "./src/methods/daily-brief.js";
+import { briefGeneratorHandlers } from "./src/methods/brief-generator.js";
 import { dataSourcesHandlers } from "./src/methods/data-sources.js";
 import { goalsHandlers } from "./src/methods/goals.js";
 // inner-work removed — stub, not shipping
@@ -50,10 +51,25 @@ import { workspacesHandlers } from "./src/methods/workspaces.js";
 import { focusPulseHandlers } from "./src/methods/focus-pulse.js";
 import { optionsHandlers } from "./src/methods/options.js";
 import { trustTrackerHandlers } from "./src/methods/trust-tracker.js";
+import { sessionArchiveHandlers } from "./src/methods/session-archive.js";
+import { systemUpdateHandlers, setPluginVersion, runPostUpdateHealthCheck } from "./src/methods/system-update.js";
 import { createTrustRateTool } from "./src/tools/trust-rate.js";
+import { createOnboardTool } from "./src/tools/onboard.js";
 import { initAgentLogWriter } from "./src/services/agent-log-writer.js";
 import { CodingOrchestrator } from "./src/services/coding-orchestrator.js";
 import { CodingNotificationService } from "./src/services/coding-notification.js";
+import {
+  trackToolCall,
+  checkGrepOnMemory,
+  cleanWorkingMd,
+  trackSearchUsage,
+  checkLazyRefusal,
+  consumeSearchGateNudge,
+  resetSearchTracking,
+} from "./src/hooks/safety-gates.js";
+import { isGateEnabled } from "./src/services/guardrails.js";
+import { guardrailsHandlers } from "./src/methods/guardrails.js";
+import { imageCacheHandlers } from "./src/methods/image-cache.js";
 // Static file server for UIs
 import { createStaticFileHandler } from "./src/static-server.js";
 import { DATA_DIR } from "./src/data-paths.js";
@@ -102,6 +118,7 @@ try {
 } catch {
   // Bundled installs may not have package.json alongside index.js
 }
+setPluginVersion(pluginVersion);
 
 // ── License validation ─────────────────────────────────────────────
 // Each installation requires a valid license key in openclaw.json:
@@ -404,7 +421,7 @@ a{color:#67e8f9}
 <p>The Mission tab proxies <code>/ops</code> to <code>${OPS_PROXY_ORIGIN}</code>. Start the dashboard sidecar, then reload this page.</p>
 ${detail}
 <p>Start command:</p>
-<pre>~/Projects/GodMode/scripts/start-ops-dashboard.sh</pre>
+<pre>~/Projects/godmode-plugin/scripts/start-ops-dashboard.sh</pre>
 <p>If the dashboard is already running, verify it is reachable at <a href="${OPS_PROXY_ORIGIN}" target="_blank" rel="noreferrer">${OPS_PROXY_ORIGIN}</a>.</p>
 </body>
 </html>`;
@@ -527,6 +544,7 @@ const godmodePlugin = {
       ...tasksHandlers,
       ...workspacesHandlers,
       ...dailyBriefHandlers,
+      ...briefGeneratorHandlers,
       ...lifeDashboardsHandlers,
       // lifetracks + inner-work removed from registration
       ...goalsHandlers,
@@ -546,7 +564,11 @@ const godmodePlugin = {
       ...focusPulseHandlers,
       ...optionsHandlers,
       ...trustTrackerHandlers,
+      ...sessionArchiveHandlers,
       ...codingHandlers,
+      ...systemUpdateHandlers,
+      ...guardrailsHandlers,
+      ...imageCacheHandlers,
     };
 
     for (const [method, handler] of Object.entries(allHandlers)) {
@@ -774,6 +796,40 @@ h1{color:#ff6b6b}code{background:#16213e;padding:2px 8px;border-radius:4px}a{col
       } catch (err) {
         api.logger.warn(`[GodMode] curation service failed to start: ${String(err)}`);
       }
+
+      // Session auto-archive service
+      try {
+        const { startAutoArchiveService } = await import("./src/services/session-archiver.js");
+        await startAutoArchiveService(api.logger);
+        api.logger.info("[GodMode] session auto-archive service initialized");
+      } catch (err) {
+        api.logger.warn(`[GodMode] session auto-archive service failed to start: ${String(err)}`);
+      }
+
+      // Image cache cleanup
+      try {
+        const { cleanupCache } = await import("./src/services/image-cache.js");
+        const cacheResult = await cleanupCache();
+        if (cacheResult.removed > 0) {
+          api.logger.info(`[GodMode] image cache cleanup: removed ${cacheResult.removed} entries`);
+        }
+      } catch (err) {
+        api.logger.warn(`[GodMode] image cache cleanup failed: ${String(err)}`);
+      }
+
+      // Post-update compatibility check
+      try {
+        const { execSync } = await import("node:child_process");
+        let currentOcVersion = "unknown";
+        try {
+          currentOcVersion = execSync("openclaw --version 2>/dev/null", { timeout: 5000 }).toString().trim();
+        } catch {
+          // openclaw not on PATH in this context
+        }
+        runPostUpdateHealthCheck(currentOcVersion, Object.keys(allHandlers).length, api.logger);
+      } catch (err) {
+        api.logger.warn(`[GodMode] Post-update health check error: ${String(err)}`);
+      }
     });
 
     api.on("gateway_stop", async () => {
@@ -786,6 +842,12 @@ h1{color:#ff6b6b}code{background:#16213e;padding:2px 8px;border-radius:4px}a{col
       try {
         const { getWorkspaceSyncService } = await import("./src/lib/workspace-sync-service.js");
         await getWorkspaceSyncService().stop();
+      } catch {
+        // Non-fatal
+      }
+      try {
+        const { stopAutoArchiveService } = await import("./src/services/session-archiver.js");
+        stopAutoArchiveService();
       } catch {
         // Non-fatal
       }
@@ -803,8 +865,16 @@ h1{color:#ff6b6b}code{background:#16213e;padding:2px 8px;border-radius:4px}a{col
       } catch (err) {
         api.logger.warn(`[GodMode] team bootstrap hook error: ${String(err)}`);
       }
-      // Trust context injection removed — feedback now happens at skill
-      // completion boundaries via trust.postSkillPrompt / trust_rate tool.
+      // Trust feedback injection — append pending post-skill feedback prompt
+      try {
+        const { consumePendingTrustFeedback } = await import("./src/hooks/trust-feedback.js");
+        const trustPrompt = consumePendingTrustFeedback(ctx?.sessionKey);
+        if (trustPrompt) {
+          prependChunks.push(trustPrompt);
+        }
+      } catch (err) {
+        api.logger.warn(`[GodMode] trust feedback hook error: ${String(err)}`);
+      }
       try {
         const { loadOnboardingContext } = await import("./src/hooks/onboarding-context.js");
         const onboardingResult = await loadOnboardingContext();
@@ -814,14 +884,35 @@ h1{color:#ff6b6b}code{background:#16213e;padding:2px 8px;border-radius:4px}a{col
       } catch (err) {
         api.logger.warn(`[GodMode] onboarding context hook error: ${String(err)}`);
       }
+      // Exhaustive search gate nudge — injected after a lazy refusal was blocked
+      const searchNudge = consumeSearchGateNudge(ctx?.sessionKey);
+      if (searchNudge) {
+        prependChunks.push(searchNudge);
+      }
       if (prependChunks.length === 0) {
         return;
       }
       return { prependContext: prependChunks.join("\n\n---\n\n") };
     });
 
-    // Team memory routing — write session memory to team workspace on reset
+    // ── Safety Gates: before_reset — session hygiene ───────────────
     api.on("before_reset", async (event, ctx) => {
+      // Clean WORKING.md on session end
+      try {
+        const result = await cleanWorkingMd();
+        if (result.cleaned) {
+          api.logger.info(
+            `[GodMode][SafetyGate] session hygiene: removed ${result.removedDone} [DONE] items, trimmed ${result.trimmedLines} lines`,
+          );
+        }
+      } catch (err) {
+        api.logger.warn(`[GodMode] session hygiene error: ${String(err)}`);
+      }
+
+      // Reset search tracking for this session
+      resetSearchTracking(ctx?.sessionKey);
+
+      // Team memory routing — write session memory to team workspace on reset
       try {
         const { handleTeamMemoryRoute } = await import("./src/hooks/team-memory-route.js");
         await handleTeamMemoryRoute(event, ctx);
@@ -830,23 +921,49 @@ h1{color:#ff6b6b}code{background:#16213e;padding:2px 8px;border-radius:4px}a{col
       }
     });
 
-    // Coding orchestration — enforce worktree isolation on all coding spawns
-    api.on("before_tool_call", async (event) => {
+    // ── Safety Gates: before_tool_call ──────────────────────────────
+    api.on("before_tool_call", async (event, ctx) => {
       const name = event.toolName?.trim().toLowerCase() ?? "";
+      const sessionKey = ctx?.sessionKey;
+
+      // Gate 1: Loop Breaker — block any tool called too many times
+      const loopCheck = await trackToolCall(sessionKey, name);
+      if (loopCheck.blocked) {
+        api.logger.warn(`[GodMode][SafetyGate] loop breaker fired: ${name}`);
+        return { block: true, blockReason: loopCheck.reason };
+      }
+
+      // Gate 2: Grep Blocker — block grep/find on memory paths
+      if (name === "exec" || name === "bash" || name === "shell") {
+        const command =
+          typeof event.params?.command === "string"
+            ? event.params.command
+            : typeof event.params?.cmd === "string"
+              ? event.params.cmd
+              : "";
+        if (command) {
+          const grepBlock = await checkGrepOnMemory(command, sessionKey);
+          if (grepBlock) {
+            api.logger.warn(`[GodMode][SafetyGate] grep blocker fired`);
+            return { block: true, blockReason: grepBlock };
+          }
+        }
+      }
+
+      // Gate 3: Coding spawn isolation
       const isSpawn = name === "sessions_spawn" || name === "task" || name.endsWith(".sessions_spawn");
       if (!isSpawn || !codingOrchestrator.isEnabled()) return;
+      if (!(await isGateEnabled("spawnGate"))) return;
 
       const params = event.params ?? {};
       const label = typeof params.label === "string" ? params.label : undefined;
 
-      // Check if this spawn was set up through the coding_task orchestrator
       const task = await codingOrchestrator.findTaskForSpawn(label);
       if (task) {
         api.logger.info(`[GodMode][Coding] spawn allowed for task ${task.id}`);
         return;
       }
 
-      // No matching task — block and instruct
       api.logger.info(`[GodMode][Coding] spawn blocked — no matching coding_task (label=${label ?? "none"})`);
       return {
         block: true,
@@ -861,6 +978,30 @@ h1{color:#ff6b6b}code{background:#16213e;padding:2px 8px;border-radius:4px}a{col
           "Then use the returned spawn instructions to call sessions_spawn.",
         ].join("\n"),
       };
+    });
+
+    // ── Safety Gates: after_tool_call — search tracking ────────────
+    api.on("after_tool_call", async (event, ctx) => {
+      // Track search tool usage for the exhaustive search gate
+      trackSearchUsage(ctx?.sessionKey, event.toolName ?? "");
+
+      // Trust feedback — detect skill completion and queue feedback prompt
+      try {
+        const { handlePostToolFeedback } = await import("./src/hooks/trust-feedback.js");
+        await handlePostToolFeedback(event.toolName, ctx?.sessionKey, event.error);
+      } catch (err) {
+        api.logger.warn(`[GodMode] trust after_tool_call hook error: ${String(err)}`);
+      }
+    });
+
+    // ── Safety Gates: message_sending — exhaustive search gate ───
+    api.on("message_sending", async (event, ctx) => {
+      const sessionKey = (ctx as Record<string, unknown>)?.sessionKey as string | undefined;
+      const content = event.content ?? "";
+      if (await checkLazyRefusal(sessionKey, content)) {
+        api.logger.warn(`[GodMode][SafetyGate] exhaustive search gate fired — lazy refusal blocked`);
+        return { cancel: true };
+      }
     });
 
     api.on("subagent_spawning", async (event) => {
@@ -903,6 +1044,7 @@ h1{color:#ff6b6b}code{background:#16213e;padding:2px 8px;border-radius:4px}a{col
     api.registerTool((ctx) => createTeamMemoryWriteTool(ctx));
     api.registerTool((ctx) => createCodingTaskTool(ctx, { orchestrator: codingOrchestrator }));
     api.registerTool((ctx) => createTrustRateTool(ctx));
+    api.registerTool((ctx) => createOnboardTool(ctx));
 
     // ── 6. Register CLI commands ──────────────────────────────────
     api.registerCli(

@@ -55,6 +55,20 @@
   --mc-accent: #dc2626;
 }
 
+:root[data-theme="lifetrack"] {
+  --mc-bg: #fefefe;
+  --mc-bg-secondary: #ffffff;
+  --mc-bg-tertiary: #fafaf8;
+  --mc-bg-card: #ffffff;
+  --mc-text: #3f3f46;
+  --mc-text-secondary: #71717a;
+  --mc-text-muted: #a1a1aa;
+  --mc-border: #e4e4e7;
+  --mc-border-light: #f0f0f0;
+  --mc-bg-hover: #f5f4f1;
+  --mc-accent: #EB9E0F;
+}
+
 /* Unified Header Bar */
 .mission-control-header {
   display: flex;

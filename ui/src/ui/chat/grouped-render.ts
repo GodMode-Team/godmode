@@ -11,6 +11,7 @@ import {
   formatReasoningMarkdown,
 } from "./message-extract";
 import { isToolResultMessage, normalizeRoleForGrouping } from "./message-normalizer";
+import type { LightboxImage } from "./lightbox";
 import { extractToolCards, renderToolCardSidebar } from "./tool-cards";
 
 // Fun verbs for different tool types
@@ -36,7 +37,7 @@ function getWorkingVerb(toolName: string): string {
   return verbs[idx];
 }
 
-type ImageBlock = {
+export type ImageBlock = {
   url?: string;
   alt?: string;
   omitted?: boolean;
@@ -255,7 +256,7 @@ function formatImageSize(bytes?: number): string | null {
   return `${Math.round(bytes)} B`;
 }
 
-function extractImages(message: unknown): ImageBlock[] {
+export function extractImages(message: unknown): ImageBlock[] {
   const m = message as Record<string, unknown>;
   const content = m.content;
   const images: ImageBlock[] = [];
@@ -460,6 +461,9 @@ export function renderReadingIndicatorGroup(
             <span></span><span></span><span></span>
           </span>
         </div>
+        <div class="chat-group-footer">
+          <span class="chat-sender-name">${assistant?.name ?? "Assistant"}</span>
+        </div>
       </div>
     </div>
   `;
@@ -527,6 +531,8 @@ export function renderMessageGroup(
   group: MessageGroup,
   opts: {
     onOpenSidebar?: (content: string) => void;
+    onImageClick?: (url: string, allImages: LightboxImage[], index: number) => void;
+    resolveImageUrl?: (messageIndex: number, imageIndex: number) => string | null;
     showReasoning: boolean;
     assistantName?: string;
     assistantAvatar?: string | null;
@@ -567,6 +573,8 @@ export function renderMessageGroup(
               showReasoning: opts.showReasoning,
             },
             opts.onOpenSidebar,
+            opts.onImageClick,
+            opts.resolveImageUrl,
           ),
         )}
         <div class="chat-group-footer">
@@ -652,15 +660,35 @@ function isAvatarUrl(value: string): boolean {
   );
 }
 
-function renderMessageImages(images: ImageBlock[]) {
+function renderMessageImages(
+  images: ImageBlock[],
+  onImageClick?: (url: string, allImages: LightboxImage[], index: number) => void,
+  resolveUrl?: (imgIndex: number) => string | null,
+) {
   if (images.length === 0) {
     return nothing;
   }
 
+  // Resolve omitted images from cache where possible
+  const resolved: Array<ImageBlock & { resolvedUrl?: string }> = images.map((img, i) => {
+    if ((img.omitted || !img.url) && resolveUrl) {
+      const url = resolveUrl(i);
+      if (url) return { ...img, resolvedUrl: url };
+    }
+    return img;
+  });
+
+  // Collect all clickable images for lightbox navigation
+  const clickable: LightboxImage[] = resolved
+    .filter((img) => (img.resolvedUrl || img.url) && !img.omitted || img.resolvedUrl)
+    .map((img) => ({ url: (img.resolvedUrl || img.url)!, alt: img.alt }));
+
   return html`
     <div class="chat-message-images">
-      ${images.map((img) => {
-        if (img.omitted || !img.url) {
+      ${resolved.map((img) => {
+        const displayUrl = img.resolvedUrl || img.url;
+        if (!displayUrl) {
+          // Still omitted, no cached version available
           const sizeLabel = formatImageSize(img.bytes);
           const typeLabel = img.mimeType ? img.mimeType.replace("image/", "").toUpperCase() : null;
           const meta = [typeLabel, sizeLabel, "preview omitted"].filter(Boolean).join(" - ");
@@ -676,17 +704,21 @@ function renderMessageImages(images: ImageBlock[]) {
           `;
         }
 
+        const clickableIdx = clickable.findIndex((c) => c.url === displayUrl);
         return html`
           <img
-            src=${img.url}
+            src=${displayUrl}
             alt=${img.alt ?? "Attached image"}
             class="chat-message-image"
             @error=${(e: Event) => {
-              // Hide broken/corrupt images gracefully
               const target = e.target as HTMLImageElement;
               target.style.display = "none";
             }}
-            @click=${() => window.open(img.url, "_blank")}
+            @click=${() => {
+              if (onImageClick) {
+                onImageClick(displayUrl, clickable, Math.max(0, clickableIdx));
+              }
+            }}
           />
         `;
       })}
@@ -723,9 +755,11 @@ function renderGroupedMessage(
   message: unknown,
   opts: { isStreaming: boolean; showReasoning: boolean },
   onOpenSidebar?: (content: string) => void,
+  onImageClick?: (url: string, allImages: LightboxImage[], index: number) => void,
+  resolveImageUrl?: (messageIndex: number, imageIndex: number) => string | null,
 ) {
   try {
-    return renderGroupedMessageUnsafe(message, opts, onOpenSidebar);
+    return renderGroupedMessageUnsafe(message, opts, onOpenSidebar, onImageClick, resolveImageUrl);
   } catch (err) {
     console.error("[chat] message render error:", err);
     return html`
@@ -740,6 +774,8 @@ function renderGroupedMessageUnsafe(
   message: unknown,
   opts: { isStreaming: boolean; showReasoning: boolean },
   onOpenSidebar?: (content: string) => void,
+  onImageClick?: (url: string, allImages: LightboxImage[], index: number) => void,
+  resolveImageUrl?: (messageIndex: number, imageIndex: number) => string | null,
 ) {
   const m = message as Record<string, unknown>;
   const role = typeof m.role === "string" ? m.role : "unknown";
@@ -754,6 +790,12 @@ function renderGroupedMessageUnsafe(
   const hasToolCards = toolCards.length > 0;
   const images = extractImages(message);
   const hasImages = images.length > 0;
+
+  // Create a per-image resolver bound to this message's index in the chat history
+  const msgIdx = typeof m._chatIdx === "number" ? m._chatIdx : -1;
+  const boundResolver = resolveImageUrl && msgIdx >= 0
+    ? (imgIdx: number) => resolveImageUrl(msgIdx, imgIdx)
+    : undefined;
   const fileAttachments = extractFileAttachments(message);
   const hasFiles = fileAttachments.length > 0;
 
@@ -794,7 +836,7 @@ function renderGroupedMessageUnsafe(
   // The text is available via the "View" button in the card.
   if (hasToolCards && isToolResult) {
     return html`
-      ${hasImages ? renderMessageImages(images) : nothing}
+      ${hasImages ? renderMessageImages(images, onImageClick, boundResolver) : nothing}
       ${toolCards.map((card) => renderToolCardSidebar(card, onOpenSidebar))}
     `;
   }
@@ -832,7 +874,7 @@ function renderGroupedMessageUnsafe(
     <div class="${bubbleClasses}">
       ${canCopyMarkdown ? renderCopyAsMarkdownButton(markdown!) : nothing}
       ${hasFileUploads ? renderFileUploadCards(parsedFileUploads) : nothing}
-      ${renderMessageImages(images)}
+      ${renderMessageImages(images, onImageClick, boundResolver)}
       ${renderFileAttachments(fileAttachments)}
       ${
         reasoningMarkdown

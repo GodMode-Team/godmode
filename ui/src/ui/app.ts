@@ -28,6 +28,7 @@ import {
   handleUpdated,
 } from "./app-lifecycle";
 import { renderApp } from "./app-render";
+import { localDateString } from "./format";
 import {
   exportLogs as exportLogsInternal,
   handleChatScroll as handleChatScrollInternal,
@@ -50,6 +51,14 @@ import {
   resolveInjectedAssistantIdentity,
   resolveInjectedUserIdentity,
 } from "./assistant-identity";
+import {
+  type LightboxImage,
+  type LightboxState,
+  createLightboxState,
+  openLightbox,
+  closeLightbox,
+  lightboxNav,
+} from "./chat/lightbox";
 import { loadAssistantIdentity as loadAssistantIdentityInternal } from "./controllers/assistant-identity";
 import type { FailedMessage } from "./controllers/chat";
 import { retryPendingMessage } from "./controllers/chat";
@@ -70,8 +79,10 @@ import {
   loadTrustTracker as loadTrustTrackerInternal,
   addTrustWorkflow as addTrustWorkflowInternal,
   removeTrustWorkflow as removeTrustWorkflowInternal,
+  submitDailyRating as submitDailyRatingInternal,
   type TrustTrackerData,
 } from "./controllers/trust-tracker";
+import type { GuardrailsViewData } from "./controllers/guardrails";
 import {
   loadLifetracks as loadLifetracksInternal,
   selectLifetrack as selectLifetrackInternal,
@@ -114,6 +125,7 @@ import type { Toast } from "./toast";
 import { addToast, createToast, removeToast } from "./toast";
 import type {
   AgentsListResult,
+  ArchivedSessionEntry,
   ConfigSnapshot,
   ConfigUiHints,
   CronJob,
@@ -260,16 +272,18 @@ export class GodModeApp extends LitElement {
   @state() sidebarFilePath: string | null = null;
   @state() sidebarTitle: string | null = null;
   @state() splitRatio = this.settings.splitRatio;
+  @state() lightbox: LightboxState = createLightboxState();
 
   // Update check state
   @state() updateStatus: {
-    version: string;
-    branch: string | null;
-    sha: string | null;
-    upstream: string | null;
-    ahead: number | null;
-    behind: number | null;
-    dirty: boolean | null;
+    openclawVersion: string;
+    openclawLatest: string | null;
+    openclawUpdateAvailable: boolean;
+    openclawInstallKind: string;
+    openclawChannel: string | null;
+    pluginVersion: string;
+    pluginLatest: string | null;
+    pluginUpdateAvailable: boolean;
     fetchOk: boolean | null;
   } | null = null;
   @state() updateLoading = false;
@@ -344,6 +358,9 @@ export class GodModeApp extends LitElement {
   @state() sessionsFilterLimit = "120";
   @state() sessionsIncludeGlobal = true;
   @state() sessionsIncludeUnknown = false;
+  @state() archivedSessions: ArchivedSessionEntry[] = [];
+  @state() archivedSessionsLoading = false;
+  @state() archivedSessionsExpanded = false;
 
   @state() cronLoading = false;
   @state() cronJobs: CronJob[] = [];
@@ -371,6 +388,10 @@ export class GodModeApp extends LitElement {
   @state() onboardingData: import("./views/onboarding").OnboardingData | null = null;
   @state() onboardingActive = false;
 
+  // Memory onboarding wizard state
+  @state() wizardActive = false;
+  @state() wizardState: import("./views/onboarding-wizard").WizardState | null = null;
+
   // Workspaces state
   @state() workspaces?: WorkspaceSummary[];
   @state() selectedWorkspace: WorkspaceDetail | null = null;
@@ -388,7 +409,7 @@ export class GodModeApp extends LitElement {
   // My Day state
   @state() myDayLoading = false;
   @state() myDayError: string | null = null;
-  @state() todaySelectedDate: string = new Date().toISOString().split("T")[0];
+  @state() todaySelectedDate: string = localDateString();
   @state() todayViewMode: "my-day" | "agent-log" = "my-day";
 
   // Daily Brief state
@@ -399,7 +420,6 @@ export class GodModeApp extends LitElement {
   @state() agentLogLoading = false;
   @state() agentLogError: string | null = null;
   @state() briefNotes: Record<string, string> = {};
-  @state() briefEditing = false;
 
   // Today tasks state
   @state() todayTasks: import("./views/workspaces").WorkspaceTask[] = [];
@@ -498,7 +518,7 @@ export class GodModeApp extends LitElement {
   private chatScrollFrame: number | null = null;
   private chatScrollTimeout: number | null = null;
   private chatHasAutoScrolled = false;
-  private chatUserNearBottom = true;
+  @state() private chatUserNearBottom = true;
   private chatIsAutoScrolling = false;
   @state() private chatNewMessagesBelow = false;
   @state() consciousnessStatus: "idle" | "loading" | "ok" | "error" = "idle";
@@ -509,6 +529,10 @@ export class GodModeApp extends LitElement {
   // Trust Tracker state
   @state() trustTrackerData: TrustTrackerData | null = null;
   @state() trustTrackerLoading = false;
+
+  // Guardrails state
+  @state() guardrailsData: GuardrailsViewData | null = null;
+  @state() guardrailsLoading = false;
 
   // GodMode Options state
   @state() godmodeOptions: Record<string, unknown> | null = null;
@@ -718,6 +742,26 @@ export class GodModeApp extends LitElement {
 
   async handleTrustRemoveWorkflow(workflow: string) {
     await removeTrustWorkflowInternal(this, workflow);
+  }
+
+  async handleDailyRate(rating: number, note?: string) {
+    await submitDailyRatingInternal(this, rating, note);
+  }
+
+  // Guardrails handlers
+  async handleGuardrailsLoad() {
+    const { loadGuardrails } = await import("./controllers/guardrails.js");
+    await loadGuardrails(this);
+  }
+
+  async handleGuardrailToggle(gateId: string, enabled: boolean) {
+    const { toggleGuardrail } = await import("./controllers/guardrails.js");
+    await toggleGuardrail(this, gateId, enabled);
+  }
+
+  async handleGuardrailThresholdChange(gateId: string, key: string, value: number) {
+    const { updateGuardrailThreshold } = await import("./controllers/guardrails.js");
+    await updateGuardrailThreshold(this, gateId, key, value);
   }
 
   // Options handlers
@@ -1072,6 +1116,18 @@ export class GodModeApp extends LitElement {
     const newRatio = Math.max(0.4, Math.min(0.7, ratio));
     this.splitRatio = newRatio;
     this.applySettings({ ...this.settings, splitRatio: newRatio });
+  }
+
+  handleImageClick(url: string, allImages: LightboxImage[], index: number) {
+    this.lightbox = openLightbox(url, allImages, index);
+  }
+
+  handleLightboxClose() {
+    this.lightbox = closeLightbox();
+  }
+
+  handleLightboxNav(delta: number) {
+    this.lightbox = lightboxNav(this.lightbox, delta);
   }
 
   private normalizeWorkspacePathCandidate(
@@ -1559,7 +1615,7 @@ export class GodModeApp extends LitElement {
   handleDatePrev() {
     const d = new Date(this.todaySelectedDate + "T12:00:00");
     d.setDate(d.getDate() - 1);
-    this.todaySelectedDate = d.toISOString().split("T")[0];
+    this.todaySelectedDate = localDateString(d);
     if (this.todayViewMode === "agent-log") {
       void loadAgentLogOnlyInternal(this);
       return;
@@ -1570,9 +1626,9 @@ export class GodModeApp extends LitElement {
   handleDateNext() {
     const d = new Date(this.todaySelectedDate + "T12:00:00");
     d.setDate(d.getDate() + 1);
-    const today = new Date().toISOString().split("T")[0];
+    const today = localDateString();
     // Don't go past today
-    const next = d.toISOString().split("T")[0];
+    const next = localDateString(d);
     if (next > today) {
       return;
     }
@@ -1585,7 +1641,7 @@ export class GodModeApp extends LitElement {
   }
 
   handleDateToday() {
-    this.todaySelectedDate = new Date().toISOString().split("T")[0];
+    this.todaySelectedDate = localDateString();
     void loadMyDayInternal(this);
   }
 
@@ -1674,23 +1730,19 @@ export class GodModeApp extends LitElement {
     const date = this.dailyBrief?.date || this.todaySelectedDate;
     try {
       await this.client.request("dailyBrief.update", { date, content });
-      // Update local data without full refresh (avoids resetting textarea)
+      // Update only metadata — do NOT update content to avoid re-rendering
+      // the contenteditable div and losing cursor position during auto-save.
       if (this.dailyBrief) {
-        this.dailyBrief = { ...this.dailyBrief, content, updatedAt: new Date().toISOString() };
+        this.dailyBrief = { ...this.dailyBrief, updatedAt: new Date().toISOString() };
       }
+      // Note: syncTasksFromBrief runs server-side inside dailyBrief.update
+      // (fire-and-forget). No need for a separate client-side sync call.
     } catch (err) {
       console.error("[DailyBrief] Save error:", err);
       this.showToast("Failed to save brief", "error");
     }
   }
 
-  handleBriefEditStart() {
-    this.briefEditing = true;
-  }
-
-  handleBriefEditEnd() {
-    this.briefEditing = false;
-  }
 
   // Work tab handlers
   async handleWorkRefresh() {
@@ -1933,6 +1985,89 @@ export class GodModeApp extends LitElement {
       this.chatMessage = prompt;
       this.requestUpdate();
     });
+  }
+
+  // ── Memory Onboarding Wizard handlers ─────────────────────────
+
+  handleWizardOpen() {
+    void import("./views/onboarding-wizard.js").then(({ emptyWizardState }) => {
+      this.wizardState = emptyWizardState();
+      this.wizardActive = true;
+      this.requestUpdate();
+    });
+  }
+
+  handleWizardClose() {
+    this.wizardActive = false;
+    this.wizardState = null;
+    this.requestUpdate();
+  }
+
+  handleWizardStepChange(step: import("./views/onboarding-wizard").WizardStep) {
+    if (!this.wizardState) return;
+    this.wizardState = { ...this.wizardState, step };
+    this.requestUpdate();
+  }
+
+  handleWizardAnswerChange(key: string, value: unknown) {
+    if (!this.wizardState) return;
+    this.wizardState = {
+      ...this.wizardState,
+      answers: { ...this.wizardState.answers, [key]: value },
+    };
+    this.requestUpdate();
+  }
+
+  async handleWizardPreview() {
+    if (!this.client || !this.wizardState) return;
+    try {
+      const result = await this.client.request<{
+        files: Array<{ path: string; exists: boolean; wouldCreate: boolean }>;
+      }>("onboarding.wizard.preview", this.wizardState.answers);
+      this.wizardState = { ...this.wizardState, preview: result.files ?? [] };
+      this.requestUpdate();
+    } catch (err) {
+      console.error("[Wizard] Preview failed:", err);
+    }
+  }
+
+  async handleWizardGenerate() {
+    if (!this.client || !this.wizardState) return;
+    this.wizardState = { ...this.wizardState, generating: true, error: null };
+    this.requestUpdate();
+    try {
+      const result = await this.client.request<{
+        success: boolean;
+        filesCreated: number;
+        filesSkipped: number;
+        configPatched: boolean;
+        workspacePath: string;
+        configError?: string;
+      }>("onboarding.wizard.generate", this.wizardState.answers);
+
+      this.wizardState = {
+        ...this.wizardState,
+        generating: false,
+        step: 9 as import("./views/onboarding-wizard").WizardStep,
+        result: {
+          filesCreated: result.filesCreated,
+          filesSkipped: result.filesSkipped,
+          configPatched: result.configPatched,
+          workspacePath: result.workspacePath,
+        },
+      };
+      this.requestUpdate();
+      this.showToast("Memory system generated!", "success", 4000);
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : "Failed to generate workspace";
+      this.wizardState = {
+        ...this.wizardState,
+        generating: false,
+        error: errorMsg,
+      };
+      this.requestUpdate();
+      this.showToast(errorMsg, "error");
+    }
   }
 
   // Data tab handlers

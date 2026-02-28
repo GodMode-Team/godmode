@@ -8,9 +8,10 @@ import {
   type AgentEventPayload,
   type CompactionStatus,
 } from "./app-tool-stream";
+import { extractImages, type ImageBlock } from "./chat/grouped-render";
 import { loadAgents } from "./controllers/agents";
 import { loadAssistantIdentity } from "./controllers/assistant-identity";
-import { loadChatHistory } from "./controllers/chat";
+import { loadChatHistory, getPendingImageCache } from "./controllers/chat";
 import { handleChatEvent, type ChatEventPayload } from "./controllers/chat";
 import { loadDevices } from "./controllers/devices";
 import type { ExecApprovalRequest } from "./controllers/exec-approval";
@@ -40,6 +41,149 @@ import type {
   StatusSummary,
   SessionsListResult,
 } from "./types";
+
+// ── Image cache helpers ──────────────────────────────────────────────
+
+/** In-memory cache of resolved image URLs: "sessionKey:msgIdx:imgIdx" → dataUrl */
+const resolvedImageUrls = new Map<string, string>();
+let lastResolvedSessionKey: string | null = null;
+let resolving = false;
+
+export function getResolvedImageUrl(
+  sessionKey: string,
+  msgIdx: number,
+  imgIdx: number,
+): string | null {
+  return resolvedImageUrls.get(`${sessionKey}:${msgIdx}:${imgIdx}`) ?? null;
+}
+
+/**
+ * Cache images that have data (from current session) and resolve omitted images
+ * from the server-side cache. Triggers a re-render when omitted images are resolved.
+ */
+async function cacheAndResolveImages(app: GodModeApp): Promise<void> {
+  if (!app.client || !app.chatMessages?.length) return;
+  const sessionKey = app.sessionKey;
+
+  // Phase 1: Cache any images that currently have data URLs (before they get stripped)
+  const imagesToCache: Array<{
+    data: string;
+    mimeType: string;
+    messageIndex: number;
+    imageIndex: number;
+    role: string;
+    timestamp?: number;
+  }> = [];
+
+  for (let i = 0; i < app.chatMessages.length; i++) {
+    const msg = app.chatMessages[i] as Record<string, unknown>;
+    const images = extractImages(msg);
+    for (let j = 0; j < images.length; j++) {
+      if (images[j].url && !images[j].omitted) {
+        const match = /^data:([^;]+);base64,(.+)$/.exec(images[j].url!);
+        if (match) {
+          imagesToCache.push({
+            data: match[2],
+            mimeType: match[1],
+            messageIndex: i,
+            imageIndex: j,
+            role: (msg.role as string) || "unknown",
+            timestamp: typeof msg.timestamp === "number" ? msg.timestamp : undefined,
+          });
+        }
+      }
+    }
+  }
+
+  if (imagesToCache.length > 0) {
+    try {
+      const result = await app.client.request<{
+        cached?: Array<{ hash: string; mimeType: string; bytes: number }>;
+      }>("images.cache", {
+        images: imagesToCache.map((i) => ({ data: i.data, mimeType: i.mimeType })),
+        sessionKey,
+      });
+      if (result?.cached) {
+        const indexEntries = imagesToCache
+          .map((img, idx) => ({
+            messageIndex: img.messageIndex,
+            imageIndex: img.imageIndex,
+            hash: result.cached![idx]?.hash,
+            mimeType: img.mimeType,
+            bytes: result.cached![idx]?.bytes ?? 0,
+            role: img.role,
+            timestamp: img.timestamp,
+          }))
+          .filter((e): e is typeof e & { hash: string } => Boolean(e.hash));
+
+        if (indexEntries.length > 0) {
+          await app.client.request("images.updateIndex", {
+            sessionKey,
+            images: indexEntries,
+          });
+        }
+      }
+    } catch {
+      // Best effort
+    }
+  }
+
+  // Phase 2: Resolve omitted images from the server-side cache.
+  // Wait for any in-flight cache+index writes from sendChatMessage so the
+  // session index is up-to-date before we try to resolve.
+  if (resolving) return;
+  resolving = true;
+  try {
+    const pending = getPendingImageCache();
+    if (pending) {
+      await pending.catch(() => {});
+    }
+
+    const doResolve = async () => {
+      const result = await app.client!.request<{
+        images?: Record<string, string>;
+      }>("images.resolve", { sessionKey });
+      if (result?.images && Object.keys(result.images).length > 0) {
+        // Clear old session's resolved URLs
+        if (lastResolvedSessionKey !== sessionKey) {
+          resolvedImageUrls.clear();
+        }
+        for (const [key, dataUrl] of Object.entries(result.images)) {
+          resolvedImageUrls.set(`${sessionKey}:${key}`, dataUrl);
+        }
+        lastResolvedSessionKey = sessionKey;
+        // Trigger re-render — reassigning chatMessages causes LitElement to update
+        app.chatMessages = [...app.chatMessages];
+        return true;
+      }
+      return false;
+    };
+
+    const resolved = await doResolve();
+
+    // If nothing was resolved but there are omitted images, retry once after
+    // a short delay — the session index write may still be in flight.
+    if (!resolved && app.chatMessages?.some((m) => {
+      const imgs = extractImages(m);
+      return imgs.some((img) => img.omitted || !img.url);
+    })) {
+      await new Promise((r) => setTimeout(r, 500));
+      await doResolve();
+    }
+  } catch {
+    // Cache miss is fine
+  } finally {
+    resolving = false;
+  }
+}
+
+/**
+ * Trigger image resolution for the current session.
+ * Called after history loads to resolve omitted images from cache.
+ */
+export function triggerImageResolve(app: GodModeApp): void {
+  void cacheAndResolveImages(app);
+}
 
 // Non-reactive ring buffer for event log — only flushed to reactive state when debug tab is open
 const eventLogRing: EventLogEntry[] = [];
@@ -667,7 +811,9 @@ function handleGatewayEventUnsafe(host: GatewayHost, evt: GatewayEventFrame) {
       host.refreshSessionsAfterChat = false;
     }
     if (state === "final") {
-      void loadChatHistory(host as unknown as GodModeApp);
+      void loadChatHistory(host as unknown as GodModeApp).then(() => {
+        void cacheAndResolveImages(host as unknown as GodModeApp);
+      });
     }
     return;
   }
@@ -805,6 +951,15 @@ function handleGatewayEventUnsafe(host: GatewayHost, evt: GatewayEventFrame) {
       const app = host as unknown as { focusPulseData?: unknown; requestUpdate?: () => void };
       app.focusPulseData = payload;
       app.requestUpdate?.();
+    }
+    return;
+  }
+
+  // Guardrails live updates
+  if (evt.event === "guardrails:update") {
+    const app = host as unknown as GodModeApp;
+    if (typeof app.handleGuardrailsLoad === "function") {
+      void app.handleGuardrailsLoad();
     }
     return;
   }

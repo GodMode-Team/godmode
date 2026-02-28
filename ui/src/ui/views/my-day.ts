@@ -1,5 +1,6 @@
 import { html, nothing } from "lit";
 import { unsafeHTML } from "lit/directives/unsafe-html.js";
+import { localDateString } from "../format.js";
 import { toSanitizedMarkdownHtml } from "../markdown.js";
 import { extractOpenablePathFromEventTarget } from "../openable-file-path.js";
 import type { DailyBriefData, DailyBriefProps } from "./daily-brief.js";
@@ -31,9 +32,6 @@ export type MyDayProps = {
   onBriefOpenInObsidian?: () => void;
   onBriefSave?: (content: string) => void;
   onOpenFile?: (path: string) => void;
-  briefEditing?: boolean;
-  onBriefEditStart?: () => void;
-  onBriefEditEnd?: () => void;
   // Date navigation props
   selectedDate?: string; // YYYY-MM-DD, defaults to today
   onDatePrev?: () => void;
@@ -60,7 +58,7 @@ export type MyDayProps = {
 // ===== Helper Functions =====
 
 function isToday(dateStr: string): boolean {
-  return dateStr === new Date().toISOString().split("T")[0];
+  return dateStr === localDateString();
 }
 
 function formatDateFromString(dateStr: string): string {
@@ -126,69 +124,10 @@ function sourcePathLabel(sourcePath?: string): string {
   return parts[parts.length - 1] || sourcePath;
 }
 
-// ===== Today Tasks Section =====
-
-function renderTodayTasks(props: MyDayProps) {
-  const tasks = props.todayTasks ?? [];
-  const pendingTasks = tasks.filter((t) => t.status === "pending");
-  const count = pendingTasks.length;
-
-  if (props.todayTasksLoading && tasks.length === 0) {
-    return html`
-      <div class="today-tasks">
-        <div class="today-tasks-header">
-          <span class="today-tasks-title">Today's Tasks</span>
-          <span class="today-tasks-count">loading...</span>
-        </div>
-      </div>
-    `;
-  }
-
-  return html`
-    <div class="today-tasks">
-      <div class="today-tasks-header">
-        <span class="today-tasks-title">Today's Tasks</span>
-        <span class="today-tasks-count">${count > 0 ? `${count} open` : "All done!"}</span>
-      </div>
-      ${count === 0 && !props.todayTasksLoading
-        ? html`<div class="today-tasks-empty">No pending tasks for today.</div>`
-        : html`
-          <div class="today-tasks-list">
-            ${pendingTasks.map(
-              (task) => html`
-                <div class="today-task-row">
-                  <button
-                    class="today-task-check"
-                    @click=${() => props.onToggleTaskComplete?.(task.id, task.status)}
-                    title="Complete task"
-                  ></button>
-                  <div class="today-task-info">
-                    <span class="today-task-title">${task.title}</span>
-                    ${task.dueDate
-                      ? html`<span class="today-task-due">${task.dueDate}</span>`
-                      : nothing}
-                    ${task.project
-                      ? html`<span class="today-task-project">${task.project}</span>`
-                      : nothing}
-                  </div>
-                  <button
-                    class="today-task-start"
-                    @click=${() => props.onStartTask?.(task.id)}
-                    title="Start a session for this task"
-                  >Start</button>
-                </div>
-              `,
-            )}
-          </div>
-        `}
-    </div>
-  `;
-}
-
 // ===== Main Render Function =====
 
 export function renderMyDay(props: MyDayProps) {
-  const todayStr = new Date().toISOString().split("T")[0];
+  const todayStr = localDateString();
   const selectedDate = props.selectedDate ?? todayStr;
   const viewingToday = isToday(selectedDate);
   const displayDate = formatDateFromString(selectedDate);
@@ -232,9 +171,6 @@ export function renderMyDay(props: MyDayProps) {
     onOpenInObsidian: props.onBriefOpenInObsidian,
     onSaveBrief: props.onBriefSave,
     onOpenFile: props.onOpenFile,
-    editing: props.briefEditing,
-    onEditStart: props.onBriefEditStart,
-    onEditEnd: props.onBriefEditEnd,
   };
 
   const handleAgentLogClick = (event: Event) => {
@@ -301,9 +237,6 @@ export function renderMyDay(props: MyDayProps) {
           }
         </div>
       </div>
-
-      <!-- Today Tasks (above brief, only in my-day mode) -->
-      ${viewMode === "my-day" ? renderTodayTasks(props) : nothing}
 
       <!-- Content: Brief or Agent Log -->
       <div class="today-content">

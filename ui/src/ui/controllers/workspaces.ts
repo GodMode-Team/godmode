@@ -425,6 +425,29 @@ export async function createWorkspace(
   }
 }
 
+export async function deleteWorkspace(
+  state: WorkspacesState,
+  workspaceId: string,
+): Promise<boolean> {
+  if (!state.client || !state.connected) {
+    return false;
+  }
+
+  try {
+    await state.client.request("workspaces.delete", { id: workspaceId });
+    state.workspaces = (state.workspaces ?? []).filter((w) => w.id !== workspaceId);
+    if (state.selectedWorkspace?.id === workspaceId) {
+      state.selectedWorkspace = null;
+    }
+    state.workspacesError = null;
+    return true;
+  } catch (err) {
+    console.error("[Workspaces] delete failed:", err);
+    state.workspacesError = err instanceof Error ? err.message : "Failed to delete workspace";
+    return false;
+  }
+}
+
 export function setWorkspacesSearchQuery(state: WorkspacesState, query: string) {
   state.workspacesSearchQuery = query;
 }

@@ -103,6 +103,31 @@
   padding: 40px 16px;
 }
 
+/* Wizard section in options */
+.options-wizard-section {
+  margin-top: 24px;
+  border-top: 1px solid var(--border);
+  padding-top: 24px;
+}
+
+.options-wizard-btn {
+  padding: 6px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: inherit;
+  color: var(--primary-foreground, #fff);
+  background: var(--accent);
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.2s, opacity 0.2s;
+  flex-shrink: 0;
+}
+
+.options-wizard-btn:hover {
+  background: var(--accent-hover);
+}
+
 /* Focus Pulse topbar widget */
 .focus-pulse-widget {
   display: flex;

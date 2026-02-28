@@ -7,6 +7,14 @@ import { generateUUID } from "../uuid";
 // Module-level storage for pending message (for retry on context overflow)
 let pendingSendMessage: { message: string; attachments?: ChatAttachment[] } | null = null;
 
+/** Pending image cache promise — image resolution should wait for this before resolving. */
+let _pendingImageCache: Promise<unknown> | null = null;
+
+/** Returns the pending image cache promise (if any), so resolve can wait for it. */
+export function getPendingImageCache(): Promise<unknown> | null {
+  return _pendingImageCache;
+}
+
 /** Turn count cache: session key → number of user messages. */
 export const sessionTurnCounts = new Map<string, number>();
 
@@ -233,25 +241,86 @@ export async function sendChatMessage(
   // Save message for potential retry on context overflow
   pendingSendMessage = { message: msg, attachments: hasAttachments ? attachments : undefined };
 
-  // Convert attachments to API format
-  const apiAttachments = hasAttachments
-    ? attachments
-        .map((att) => {
-          const parsed = dataUrlToBase64(att.dataUrl);
-          if (!parsed) {
-            return null;
-          }
-          // Determine attachment type based on mime type
-          const isImage = parsed.mimeType.startsWith("image/");
-          return {
-            type: isImage ? "image" : "file",
-            mimeType: parsed.mimeType,
-            content: parsed.content,
-            fileName: att.fileName,
-          };
+  // Convert attachments to API format.
+  // The gateway only supports image attachments — non-image files (PDFs, etc.)
+  // are dropped by the gateway's parseMessageWithAttachments(). To work around
+  // this, we inline non-image file content into the message text as base64.
+  let imageAttachments: Array<{
+    type: string;
+    mimeType: string;
+    content: string;
+    fileName?: string;
+  }> | undefined;
+  if (hasAttachments) {
+    const images: typeof imageAttachments = [];
+    const fileParts: string[] = [];
+    for (const att of attachments) {
+      const parsed = dataUrlToBase64(att.dataUrl);
+      if (!parsed) continue;
+      if (parsed.mimeType.startsWith("image/")) {
+        images.push({
+          type: "image",
+          mimeType: parsed.mimeType,
+          content: parsed.content,
+          fileName: att.fileName,
+        });
+      } else {
+        // Inline non-image files as base64 document blocks in the message
+        const label = att.fileName || "file";
+        fileParts.push(
+          `<document>\n<source>${label}</source>\n<mime_type>${parsed.mimeType}</mime_type>\n<content encoding="base64">\n${parsed.content}\n</content>\n</document>`,
+        );
+      }
+    }
+    if (images.length > 0) imageAttachments = images;
+    if (fileParts.length > 0) {
+      msg = `${fileParts.join("\n\n")}\n\n${msg}`;
+    }
+
+    // Cache images server-side before gateway strips them.
+    // Capture msgIdx NOW (before any async work) so the index is correct
+    // even if loadChatHistory replaces chatMessages before the callback runs.
+    if (images.length > 0) {
+      const cachedMsgIdx = state.chatMessages.length - 1;
+      const cachedSessionKey = state.sessionKey;
+      const cachePromise = state.client
+        .request("images.cache", {
+          images: images.map((img) => ({
+            data: img.content,
+            mimeType: img.mimeType,
+            fileName: img.fileName,
+          })),
+          sessionKey: cachedSessionKey,
         })
-        .filter((a): a is NonNullable<typeof a> => a !== null)
-    : undefined;
+        .then((result: { cached?: Array<{ hash: string; mimeType: string; bytes: number }> }) => {
+          if (result?.cached && result.cached.length > 0) {
+            const entries = result.cached.map(
+              (c: { hash: string; mimeType: string; bytes: number }, i: number) => ({
+                messageIndex: cachedMsgIdx,
+                imageIndex: i,
+                hash: c.hash,
+                mimeType: c.mimeType,
+                bytes: c.bytes,
+                role: "user",
+                timestamp: now,
+              }),
+            );
+            return state.client!
+              .request("images.updateIndex", {
+                sessionKey: cachedSessionKey,
+                images: entries,
+              })
+              .catch(() => {});
+          }
+        })
+        .catch(() => {}); // Non-blocking best-effort
+      // Track pending cache so image resolution can wait for it
+      _pendingImageCache = cachePromise;
+      cachePromise.finally(() => {
+        if (_pendingImageCache === cachePromise) _pendingImageCache = null;
+      });
+    }
+  }
 
   try {
     await state.client.request("chat.send", {
@@ -259,7 +328,7 @@ export async function sendChatMessage(
       message: msg,
       deliver: false,
       idempotencyKey: runId,
-      attachments: apiAttachments,
+      attachments: imageAttachments,
       ...(state.chatPrivateMode ? { privateMode: true } : {}),
     });
     return true;

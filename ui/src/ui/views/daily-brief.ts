@@ -1,6 +1,7 @@
 import { html, nothing } from "lit";
 import { unsafeHTML } from "lit/directives/unsafe-html.js";
-import { toSanitizedMarkdownHtml } from "../markdown.js";
+import { htmlToMarkdown } from "../html-to-markdown.js";
+import { toEditableMarkdownHtml } from "../markdown.js";
 import { extractOpenablePathFromEventTarget } from "../openable-file-path.js";
 
 // ===== Types =====
@@ -27,9 +28,6 @@ export type DailyBriefProps = {
   onOpenInObsidian?: () => void;
   onSaveBrief?: (content: string) => void;
   onOpenFile?: (path: string) => void;
-  editing?: boolean;
-  onEditStart?: () => void;
-  onEditEnd?: () => void;
 };
 
 // ===== Helper Functions =====
@@ -101,9 +99,30 @@ function flushSave(content: string, onSave: (c: string) => void) {
   }
 }
 
-// ===== Scroll position tracking =====
+// ===== Contenteditable helpers =====
 
-let _savedScrollTop = 0;
+/**
+ * Get the current markdown content from the contenteditable container
+ * by converting its innerHTML back to markdown.
+ *
+ * IMPORTANT: Before reading innerHTML, sync every checkbox's `.checked`
+ * DOM property to its HTML `checked` attribute.  Browsers toggle the
+ * property on click but do NOT update the attribute, and innerHTML
+ * serialises attributes — so without this step the serialised HTML
+ * would contain stale checkbox state and the save would silently
+ * revert user toggles.
+ */
+function getEditableMarkdown(container: HTMLElement): string {
+  for (const cb of container.querySelectorAll('input[type="checkbox"]')) {
+    const input = cb as HTMLInputElement;
+    if (input.checked) {
+      input.setAttribute("checked", "");
+    } else {
+      input.removeAttribute("checked");
+    }
+  }
+  return htmlToMarkdown(container.innerHTML);
+}
 
 // ===== Main Render Function =====
 
@@ -116,9 +135,6 @@ export function renderDailyBrief(props: DailyBriefProps) {
     onOpenInObsidian,
     onSaveBrief,
     onOpenFile,
-    editing,
-    onEditStart,
-    onEditEnd,
   } = props;
 
   if (loading) {
@@ -189,75 +205,120 @@ export function renderDailyBrief(props: DailyBriefProps) {
     _lastSavedContent = data.content;
   }
 
-  // --- Click rendered markdown to enter edit mode ---
-  const handleReadClick = (e: Event) => {
+  // --- Always-live contenteditable: input handler with auto-save ---
+  const handleInput = (e: Event) => {
+    const container = e.currentTarget as HTMLElement;
+    if (onSaveBrief) {
+      const md = getEditableMarkdown(container);
+      debounceSave(md, onSaveBrief);
+    }
+  };
+
+  // --- Keyboard shortcuts ---
+  const handleKeydown = (e: KeyboardEvent) => {
+    // Ctrl/Cmd + S = save immediately
+    if ((e.ctrlKey || e.metaKey) && e.key === "s") {
+      e.preventDefault();
+      const container = e.currentTarget as HTMLElement;
+      if (onSaveBrief) {
+        const md = getEditableMarkdown(container);
+        flushSave(md, onSaveBrief);
+      }
+    }
+
+    // Ctrl/Cmd + L = toggle checkbox on current line (Obsidian-style)
+    if ((e.ctrlKey || e.metaKey) && e.key === "l") {
+      e.preventDefault();
+      const sel = window.getSelection();
+      if (!sel || sel.rangeCount === 0) return;
+      const node = sel.focusNode;
+      const li = node instanceof HTMLElement
+        ? node.closest("li")
+        : node?.parentElement?.closest("li");
+      if (li) {
+        const existingCb = li.querySelector('input[type="checkbox"]');
+        if (existingCb) {
+          // Remove checkbox (toggle off)
+          existingCb.nextSibling?.nodeType === Node.TEXT_NODE &&
+            existingCb.nextSibling.textContent === " " &&
+            existingCb.nextSibling.remove();
+          existingCb.remove();
+        } else {
+          // Add checkbox (toggle on)
+          const cb = document.createElement("input");
+          cb.type = "checkbox";
+          li.insertBefore(document.createTextNode(" "), li.firstChild);
+          li.insertBefore(cb, li.firstChild);
+        }
+        // Trigger save
+        const container = e.currentTarget as HTMLElement;
+        if (onSaveBrief) {
+          const md = getEditableMarkdown(container);
+          debounceSave(md, onSaveBrief);
+        }
+      }
+    }
+
+    // Enter in a checkbox list = auto-continue with checkbox
+    if (e.key === "Enter" && !e.shiftKey) {
+      const sel = window.getSelection();
+      if (!sel || sel.rangeCount === 0) return;
+      const node = sel.focusNode;
+      const li = node instanceof HTMLElement
+        ? node.closest("li")
+        : node?.parentElement?.closest("li");
+      if (li && li.querySelector('input[type="checkbox"]')) {
+        // Let browser create the new <li>, then inject a checkbox into it
+        setTimeout(() => {
+          const newSel = window.getSelection();
+          if (!newSel || newSel.rangeCount === 0) return;
+          const newNode = newSel.focusNode;
+          const newLi = newNode instanceof HTMLElement
+            ? newNode.closest("li")
+            : newNode?.parentElement?.closest("li");
+          if (newLi && newLi !== li && !newLi.querySelector('input[type="checkbox"]')) {
+            const cb = document.createElement("input");
+            cb.type = "checkbox";
+            newLi.insertBefore(cb, newLi.firstChild);
+            newLi.insertBefore(document.createTextNode(" "), cb.nextSibling);
+            // Place cursor after the checkbox + space
+            const range = document.createRange();
+            range.setStartAfter(cb.nextSibling!);
+            range.collapse(true);
+            newSel.removeAllRanges();
+            newSel.addRange(range);
+          }
+        }, 0);
+      }
+    }
+  };
+
+  // --- Handle clicks: checkboxes + file links ---
+  const handleClick = (e: Event) => {
+    const target = e.target as HTMLElement;
+
+    // Checkbox toggle — flush save immediately (not debounced) so the
+    // task sync picks up the change before user navigates away
+    if (target.tagName === "INPUT" && target.getAttribute("type") === "checkbox") {
+      setTimeout(() => {
+        const container = e.currentTarget as HTMLElement;
+        if (onSaveBrief) {
+          const md = getEditableMarkdown(container);
+          flushSave(md, onSaveBrief);
+        }
+      }, 0);
+      return;
+    }
+
+    // File links
     const localPath = extractOpenablePathFromEventTarget(e.target);
     if (localPath && onOpenFile) {
       e.preventDefault();
       void onOpenFile(localPath);
-      return;
-    }
-    const container = e.currentTarget as HTMLElement;
-    _savedScrollTop = container.scrollTop;
-    onEditStart?.();
-    // After Lit re-renders with the textarea, restore scroll + focus
-    setTimeout(() => {
-      const card = container.closest(".brief-editor") ?? container.parentElement;
-      const newContainer = card?.querySelector(".brief-content") as HTMLElement | null;
-      if (newContainer) {
-        newContainer.scrollTop = _savedScrollTop;
-      }
-      const textarea = card?.querySelector(".brief-editor-textarea") as HTMLTextAreaElement | null;
-      if (textarea) {
-        textarea.style.height = "auto";
-        textarea.style.height = `${textarea.scrollHeight}px`;
-        textarea.focus();
-      }
-    }, 0);
-  };
-
-  // --- Edit mode handlers ---
-  const handleInput = (e: Event) => {
-    const textarea = e.target as HTMLTextAreaElement;
-    if (onSaveBrief) {
-      debounceSave(textarea.value, onSaveBrief);
     }
   };
 
-  const handleBlur = (e: Event) => {
-    const textarea = e.target as HTMLTextAreaElement;
-    const container = textarea.closest(".brief-content");
-    if (container) {
-      _savedScrollTop = container.scrollTop;
-    }
-    if (onSaveBrief) {
-      flushSave(textarea.value, onSaveBrief);
-    }
-    onEditEnd?.();
-  };
-
-  const renderContent = () => {
-    if (editing) {
-      return html`
-        <div class="brief-content brief-content--edit">
-          <textarea
-            class="brief-editor-textarea"
-            .value=${data.content}
-            @input=${handleInput}
-            @blur=${handleBlur}
-            spellcheck="false"
-          ></textarea>
-        </div>
-      `;
-    }
-    return html`
-      <div class="brief-content brief-content--read" @click=${handleReadClick}>
-        <div class="brief-rendered">
-          ${unsafeHTML(toSanitizedMarkdownHtml(normalizeBriefNewlines(data.content)))}
-        </div>
-      </div>
-    `;
-  };
+  const editableHtml = toEditableMarkdownHtml(normalizeBriefNewlines(data.content));
 
   return html`
     <div class="my-day-card brief-section brief-editor">
@@ -298,7 +359,16 @@ export function renderDailyBrief(props: DailyBriefProps) {
       </div>
 
       <div class="my-day-card-content">
-        ${renderContent()}
+        <div class="brief-content brief-content--live">
+          <div
+            class="brief-rendered brief-editable"
+            contenteditable="true"
+            spellcheck="false"
+            @input=${handleInput}
+            @keydown=${handleKeydown}
+            @click=${handleClick}
+          >${unsafeHTML(editableHtml)}</div>
+        </div>
       </div>
     </div>
   `;

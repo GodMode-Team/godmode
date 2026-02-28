@@ -9,7 +9,7 @@ export function createCodingTaskHandlers(
       const p = params as Record<string, unknown>;
       const task = typeof p.task === "string" ? p.task.trim() : "";
       if (!task) {
-        respond({ error: "task is required" });
+        respond(false, undefined, { code: "INVALID_REQUEST", message: "task is required" });
         return;
       }
 
@@ -19,7 +19,7 @@ export function createCodingTaskHandlers(
           : undefined;
 
       if (!repoRoot) {
-        respond({ error: "repoRoot is required" });
+        respond(false, undefined, { code: "INVALID_REQUEST", message: "repoRoot is required" });
         return;
       }
 
@@ -33,7 +33,7 @@ export function createCodingTaskHandlers(
           : undefined,
       });
 
-      respond(result);
+      respond(true, result);
     },
 
     "coding.list": async ({ params, respond }) => {
@@ -43,23 +43,23 @@ export function createCodingTaskHandlers(
       const tasks = await orchestrator.listTasks(
         status && validStatuses.includes(status) ? (status as "queued") : undefined,
       );
-      respond({ tasks });
+      respond(true, { tasks });
     },
 
     "coding.status": async ({ respond }) => {
       const summary = await orchestrator.statusSummary();
-      respond(summary);
+      respond(true, summary);
     },
 
     "coding.cancel": async ({ params, respond }) => {
       const p = params as Record<string, unknown>;
       const taskId = typeof p.taskId === "string" ? p.taskId.trim() : "";
       if (!taskId) {
-        respond({ error: "taskId is required" });
+        respond(false, undefined, { code: "INVALID_REQUEST", message: "taskId is required" });
         return;
       }
       const cancelled = await orchestrator.cancelTask(taskId);
-      respond({ cancelled, taskId });
+      respond(true, { cancelled, taskId });
     },
   };
 }

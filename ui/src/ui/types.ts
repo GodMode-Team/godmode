@@ -515,6 +515,13 @@ export type StatusSummary = Record<string, unknown>;
 
 export type HealthSnapshot = Record<string, unknown>;
 
+export type ArchivedSessionEntry = {
+  sessionKey: string;
+  archivedAt: string;
+  reason: "idle-7d" | "task-complete" | "manual";
+  linkedTaskId: string | null;
+};
+
 export type LogLevel = "trace" | "debug" | "info" | "warn" | "error" | "fatal";
 
 export type LogEntry = {

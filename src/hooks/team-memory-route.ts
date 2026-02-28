@@ -1,5 +1,6 @@
 import fs from "node:fs/promises";
 import path from "node:path";
+import { localDateString } from "../data-paths.js";
 import {
   loadCombinedSessionStoreForGateway,
   loadConfig,
@@ -36,7 +37,7 @@ export async function handleTeamMemoryRoute(
   if (!entry) return;
 
   const now = new Date();
-  const dateStr = now.toISOString().slice(0, 10);
+  const dateStr = localDateString(now);
   const timeStr = now.toISOString().slice(11, 19).replace(/:/g, "");
   const fileName = `${dateStr}-${timeStr}-session.md`;
   const memoryDir = path.join(workspace.path, "memory");

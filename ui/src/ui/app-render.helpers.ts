@@ -679,7 +679,7 @@ function renderSessionPickerDropdown(state: AppViewState) {
   `;
 }
 
-const THEME_ORDER: ThemeMode[] = ["system", "light", "dark"];
+const THEME_ORDER: ThemeMode[] = ["system", "light", "dark", "lifetrack"];
 
 export function renderThemeToggle(state: AppViewState) {
   const index = Math.max(0, THEME_ORDER.indexOf(state.theme));
@@ -724,6 +724,15 @@ export function renderThemeToggle(state: AppViewState) {
         >
           ${renderMoonIcon()}
         </button>
+        <button
+          class="theme-toggle__button ${state.theme === "lifetrack" ? "active" : ""}"
+          @click=${applyTheme("lifetrack")}
+          aria-pressed=${state.theme === "lifetrack"}
+          aria-label="Lifetrack theme"
+          title="Lifetrack"
+        >
+          ${renderSparkleIcon()}
+        </button>
       </div>
     </div>
   `;
@@ -761,6 +770,15 @@ function renderMonitorIcon() {
       <rect width="20" height="14" x="2" y="3" rx="2"></rect>
       <line x1="8" x2="16" y1="21" y2="21"></line>
       <line x1="12" x2="12" y1="17" y2="21"></line>
+    </svg>
+  `;
+}
+
+function renderSparkleIcon() {
+  return html`
+    <svg class="theme-icon" viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M12 3l1.5 5.5L19 10l-5.5 1.5L12 17l-1.5-5.5L5 10l5.5-1.5L12 3z"></path>
+      <path d="M19 15l.67 2.33L22 18l-2.33.67L19 21l-.67-2.33L16 18l2.33-.67L19 15z"></path>
     </svg>
   `;
 }

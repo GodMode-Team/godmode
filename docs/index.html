@@ -1,0 +1,996 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GodMode Plugin Documentation</title>
+<style>
+:root {
+  --bg: #0b1120;
+  --bg-card: #111827;
+  --bg-sidebar: #0f172a;
+  --bg-code: #1e293b;
+  --text: #e2e8f0;
+  --text-muted: #94a3b8;
+  --text-dim: #64748b;
+  --accent: #38bdf8;
+  --accent-dim: #0ea5e9;
+  --border: #1e293b;
+  --green: #34d399;
+  --yellow: #fbbf24;
+  --red: #f87171;
+  --purple: #a78bfa;
+  --sidebar-w: 280px;
+  --topbar-h: 56px;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html { scroll-behavior: smooth; font-size: 15px; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.65;
+}
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+code {
+  font-family: 'SF Mono', 'Fira Code', 'JetBrains Mono', monospace;
+  font-size: 0.88em;
+  background: var(--bg-code);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+pre {
+  background: var(--bg-code);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px;
+  overflow-x: auto;
+  font-size: 0.88em;
+  line-height: 1.5;
+  margin: 12px 0;
+}
+pre code { background: none; padding: 0; }
+h1 { font-size: 2rem; font-weight: 700; margin-bottom: 12px; color: #f1f5f9; }
+h2 { font-size: 1.5rem; font-weight: 600; margin: 40px 0 16px; padding-bottom: 8px; border-bottom: 1px solid var(--border); color: #f1f5f9; }
+h3 { font-size: 1.15rem; font-weight: 600; margin: 28px 0 10px; color: var(--accent); }
+h4 { font-size: 1rem; font-weight: 600; margin: 20px 0 8px; color: var(--text-muted); }
+p { margin: 8px 0; }
+ul, ol { padding-left: 24px; margin: 8px 0; }
+li { margin: 4px 0; }
+table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 0.92em; }
+th { text-align: left; padding: 10px 12px; background: var(--bg-code); border: 1px solid var(--border); color: var(--accent); font-weight: 600; }
+td { padding: 8px 12px; border: 1px solid var(--border); vertical-align: top; }
+tr:hover td { background: rgba(56, 189, 248, 0.03); }
+.badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 0.78em; font-weight: 600; }
+.badge--green { background: rgba(52, 211, 153, 0.15); color: var(--green); }
+.badge--yellow { background: rgba(251, 191, 36, 0.15); color: var(--yellow); }
+.badge--red { background: rgba(248, 113, 113, 0.15); color: var(--red); }
+.badge--blue { background: rgba(56, 189, 248, 0.15); color: var(--accent); }
+.badge--purple { background: rgba(167, 139, 250, 0.15); color: var(--purple); }
+
+/* Layout */
+.topbar {
+  position: fixed; top: 0; left: 0; right: 0; height: var(--topbar-h);
+  background: var(--bg-sidebar); border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; padding: 0 24px; z-index: 100;
+  gap: 16px;
+}
+.topbar-title { font-weight: 700; font-size: 1.1rem; color: #f1f5f9; }
+.topbar-version { color: var(--text-dim); font-size: 0.85em; }
+.topbar-search {
+  margin-left: auto; position: relative;
+}
+.topbar-search input {
+  background: var(--bg-code); border: 1px solid var(--border); color: var(--text);
+  padding: 6px 12px 6px 32px; border-radius: 6px; width: 260px; font-size: 0.9em;
+  outline: none;
+}
+.topbar-search input:focus { border-color: var(--accent); }
+.topbar-search svg { position: absolute; left: 8px; top: 50%; transform: translateY(-50%); color: var(--text-dim); }
+
+.sidebar {
+  position: fixed; top: var(--topbar-h); left: 0; bottom: 0; width: var(--sidebar-w);
+  background: var(--bg-sidebar); border-right: 1px solid var(--border);
+  overflow-y: auto; padding: 16px 0; z-index: 90;
+}
+.sidebar a {
+  display: block; padding: 6px 20px; color: var(--text-muted); font-size: 0.88em;
+  transition: color 0.15s, background 0.15s;
+}
+.sidebar a:hover { color: var(--accent); background: rgba(56, 189, 248, 0.05); text-decoration: none; }
+.sidebar a.active { color: var(--accent); background: rgba(56, 189, 248, 0.08); font-weight: 600; }
+.sidebar .nav-group { margin: 16px 0 4px; padding: 0 20px; font-size: 0.72em; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-dim); }
+
+.content {
+  margin-left: var(--sidebar-w); margin-top: var(--topbar-h);
+  padding: 32px 48px 80px; max-width: 960px;
+}
+
+.diagram {
+  background: var(--bg-code); border: 1px solid var(--border);
+  border-radius: 8px; padding: 20px; margin: 16px 0;
+  font-family: 'SF Mono', monospace; font-size: 0.82em; line-height: 1.4;
+  white-space: pre; overflow-x: auto;
+}
+
+.callout {
+  border-left: 3px solid var(--accent); background: rgba(56, 189, 248, 0.05);
+  padding: 12px 16px; margin: 12px 0; border-radius: 0 6px 6px 0;
+}
+.callout--warn { border-left-color: var(--yellow); background: rgba(251, 191, 36, 0.05); }
+
+.collapse-toggle {
+  cursor: pointer; user-select: none; display: flex; align-items: center; gap: 8px;
+}
+.collapse-toggle::before { content: ''; display: inline-block; width: 0; height: 0; border: 5px solid transparent; border-left: 7px solid var(--text-dim); transition: transform 0.2s; }
+.collapse-toggle.open::before { transform: rotate(90deg); }
+.collapse-content { display: none; }
+.collapse-content.open { display: block; }
+
+/* Responsive */
+@media (max-width: 900px) {
+  .sidebar { display: none; }
+  .content { margin-left: 0; padding: 24px 16px 60px; }
+}
+@media print {
+  .sidebar, .topbar { display: none; }
+  .content { margin: 0; padding: 20px; max-width: none; }
+  body { background: #fff; color: #000; }
+  pre, code, .diagram { background: #f5f5f5; border-color: #ddd; }
+  a { color: #0066cc; }
+}
+/* Search results */
+.search-results {
+  position: absolute; top: 100%; right: 0; width: 400px; max-height: 400px; overflow-y: auto;
+  background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.4); display: none; z-index: 200;
+}
+.search-results.visible { display: block; }
+.search-result { padding: 10px 16px; cursor: pointer; border-bottom: 1px solid var(--border); }
+.search-result:hover { background: rgba(56, 189, 248, 0.08); }
+.search-result-title { font-weight: 600; font-size: 0.9em; }
+.search-result-context { font-size: 0.8em; color: var(--text-dim); margin-top: 2px; }
+mark { background: rgba(56, 189, 248, 0.25); color: var(--text); border-radius: 2px; }
+</style>
+</head>
+<body>
+
+<!-- Topbar -->
+<div class="topbar">
+  <span class="topbar-title">GodMode Documentation</span>
+  <span class="topbar-version">v1.0.0</span>
+  <div class="topbar-search">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+    <input type="text" id="searchInput" placeholder="Search docs... (Cmd+K)" autocomplete="off">
+    <div class="search-results" id="searchResults"></div>
+  </div>
+</div>
+
+<!-- Sidebar -->
+<nav class="sidebar" id="sidebar">
+  <div class="nav-group">Overview</div>
+  <a href="#architecture">Architecture</a>
+  <a href="#data-flow">Data Flow</a>
+  <a href="#directory-structure">Directory Structure</a>
+
+  <div class="nav-group">RPC Reference</div>
+  <a href="#rpc-overview">Method Overview</a>
+  <a href="#rpc-onboarding">Onboarding</a>
+  <a href="#rpc-consciousness">Consciousness</a>
+  <a href="#rpc-daily-brief">Daily Brief</a>
+  <a href="#rpc-tasks">Tasks</a>
+  <a href="#rpc-workspaces">Workspaces</a>
+  <a href="#rpc-agent-log">Agent Log</a>
+  <a href="#rpc-focus-pulse">Focus Pulse</a>
+  <a href="#rpc-trust-tracker">Trust Tracker</a>
+  <a href="#rpc-guardrails">Guardrails</a>
+  <a href="#rpc-coding">Coding</a>
+  <a href="#rpc-updates">Updates</a>
+  <a href="#rpc-other">Other Methods</a>
+
+  <div class="nav-group">UI Architecture</div>
+  <a href="#ui-components">Component Tree</a>
+  <a href="#ui-state">State Management</a>
+  <a href="#ui-controllers">Controllers</a>
+  <a href="#ui-navigation">Navigation</a>
+
+  <div class="nav-group">Features</div>
+  <a href="#feat-onboarding">Onboarding</a>
+  <a href="#feat-daily-brief">Daily Brief</a>
+  <a href="#feat-consciousness">Consciousness Sync</a>
+  <a href="#feat-tasks">Task System</a>
+  <a href="#feat-focus-pulse">Focus Pulse</a>
+  <a href="#feat-trust-tracker">Trust Tracker</a>
+  <a href="#feat-guardrails">Guardrails</a>
+  <a href="#feat-updates">Update System</a>
+  <a href="#feat-license">License Gate</a>
+  <a href="#feat-toggles">Feature Toggles</a>
+  <a href="#feat-coding">Coding Harness</a>
+  <a href="#feat-chat">Chat</a>
+
+  <div class="nav-group">Data & Config</div>
+  <a href="#data-model">Data Model</a>
+  <a href="#configuration">Configuration</a>
+  <a href="#environment">Environment Variables</a>
+
+  <div class="nav-group">Development</div>
+  <a href="#dev-setup">Setup</a>
+  <a href="#dev-new-handler">Add RPC Handler</a>
+  <a href="#dev-new-view">Add UI View</a>
+  <a href="#dev-new-toggle">Add Feature Toggle</a>
+  <a href="#dev-release">Release Process</a>
+
+  <div class="nav-group">Changelog</div>
+  <a href="#changelog">Recent Changes</a>
+</nav>
+
+<!-- Content -->
+<main class="content" id="content">
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<h1>GodMode Plugin</h1>
+<p>Personal AI Operating System plugin for <a href="https://github.com/openclaw/openclaw">OpenClaw</a>. GodMode transforms the AI gateway into a full life operating system with daily briefs, task management, consciousness sync, coding harness, and more.</p>
+
+<div class="callout">
+  <strong>Package:</strong> <code>@godmode-team/godmode</code><br>
+  <strong>Entry:</strong> <code>index.ts</code> &rarr; <code>dist/index.js</code><br>
+  <strong>127 RPC methods</strong> &middot; <strong>5 agent tools</strong> &middot; <strong>9 lifecycle hooks</strong>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<h2 id="architecture">Architecture Overview</h2>
+
+<div class="diagram">
+                        OpenClaw Gateway
+                    ┌────────────────────────┐
+                    │  HTTP Server  │  WS Hub │
+                    │               │         │
+                    └───────┬───────┴────┬────┘
+                            │            │
+              ┌─────────────┘            └──────────────┐
+              │                                         │
+     ┌────────┴────────┐                    ┌───────────┴──────────┐
+     │  Static Files   │                    │  RPC Method Dispatch │
+     │  /godmode/*     │                    │                      │
+     │  /deck/*        │                    │  127 methods         │
+     │  /ops/* (proxy) │                    │  license-gated       │
+     │  /godmode/health│                    │                      │
+     └─────────────────┘                    └──────────┬───────────┘
+                                                       │
+            ┌──────────────────────────────────────────┤
+            │              │              │             │
+     ┌──────┴──────┐ ┌────┴────┐ ┌──────┴──────┐ ┌───┴───────┐
+     │ src/methods/ │ │src/lib/ │ │src/services/│ │src/hooks/  │
+     │             │ │         │ │             │ │            │
+     │ 23 handler  │ │ shared  │ │ background  │ │ lifecycle  │
+     │ modules     │ │ helpers │ │ services    │ │ hooks      │
+     └──────┬──────┘ └────┬────┘ └──────┬──────┘ └───┬───────┘
+            │              │              │             │
+            └──────────────┴──────┬───────┴─────────────┘
+                                  │
+                         ┌────────┴────────┐
+                         │  ~/godmode/     │
+                         │  data/  memory/ │
+                         │  scripts/       │
+                         └─────────────────┘
+</div>
+
+<h3>How GodMode Fits Into OpenClaw</h3>
+<p>GodMode is a standalone plugin loaded by the OpenClaw gateway through the plugin system. It registers itself synchronously in <code>register()</code>, then defers license validation to the first RPC call. The plugin provides:</p>
+<ul>
+  <li><strong>RPC Methods</strong> &mdash; 127 gateway methods for all GodMode features</li>
+  <li><strong>Agent Tools</strong> &mdash; 5 tools (team_message, team_memory_write, coding_task, trust_rate, godmode_onboard)</li>
+  <li><strong>HTTP Routes</strong> &mdash; Static file serving for GodMode UI, Deck, Mission Control proxy, and health endpoint</li>
+  <li><strong>Lifecycle Hooks</strong> &mdash; 9 hooks for safety gates, team context injection, and service management</li>
+  <li><strong>CLI Commands</strong> &mdash; <code>openclaw godmode status|activate|doctor|workspace|comms|curation</code></li>
+</ul>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<h2 id="data-flow">Data Flow</h2>
+
+<div class="diagram">
+User (Browser)                                Gateway (Node.js)
+     │                                              │
+     │  WebSocket: RPC request                      │
+     │──────────────────────────────────────────────>│
+     │                                              │
+     │            ┌─────────────────────────┐       │
+     │            │ License Gate Check      │       │
+     │            │ (cached 24h)            │       │
+     │            └────────────┬────────────┘       │
+     │                         │                    │
+     │            ┌────────────▼────────────┐       │
+     │            │ RPC Handler             │       │
+     │            │ (src/methods/*.ts)       │       │
+     │            └────────────┬────────────┘       │
+     │                         │                    │
+     │            ┌────────────▼────────────┐       │
+     │            │ File System             │       │
+     │            │ ~/godmode/data/*.json   │       │
+     │            │ ~/godmode/memory/*.md   │       │
+     │            └────────────┬────────────┘       │
+     │                         │                    │
+     │  WebSocket: RPC response                     │
+     │<─────────────────────────────────────────────│
+     │                                              │
+     │  WebSocket: broadcast event                  │
+     │<─────────────────────────────────────────────│
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<h2 id="directory-structure">Directory Structure</h2>
+<pre><code>godmode-plugin/
+├── index.ts                  # Plugin entry: registration, license gate, HTTP routes
+├── package.json              # @godmode-team/godmode
+├── openclaw.plugin.json      # Plugin metadata + config schema
+├── tsconfig.json             # TypeScript strict mode
+├── tsup.config.ts            # Build config (ESM, node22)
+│
+├── src/
+│   ├── data-paths.ts         # Centralized path constants (GODMODE_ROOT, DATA_DIR, etc.)
+│   ├── static-server.ts      # Static file handler for UI assets
+│   │
+│   ├── methods/              # RPC handler modules (23 files)
+│   │   ├── agent-log.ts      # Agent activity log
+│   │   ├── brief-generator.ts # Brief generation engine
+│   │   ├── brief-notes.ts    # Date-keyed notes
+│   │   ├── calendar.ts       # Calendar integration (gog CLI)
+│   │   ├── coding-tasks.ts   # Coding task orchestration RPC
+│   │   ├── consciousness.ts  # Consciousness sync
+│   │   ├── daily-brief.ts    # Daily brief CRUD + task sync
+│   │   ├── data-sources.ts   # Data source config
+│   │   ├── focus-pulse.ts    # Focus tracking
+│   │   ├── goals.ts          # Goals management
+│   │   ├── guardrails.ts     # Safety gate config
+│   │   ├── life-dashboards.ts # Wheel of Life + Vision Board
+│   │   ├── onboarding.ts     # 7-phase onboarding
+│   │   ├── options.ts        # Feature toggles
+│   │   ├── people-data.ts    # People/contacts
+│   │   ├── projects.ts       # Project management
+│   │   ├── session-archive.ts # Session archival
+│   │   ├── system-update.ts  # Update check/run
+│   │   ├── tasks.ts          # Task CRUD + sync
+│   │   ├── team-comms.ts     # Team feed messaging
+│   │   ├── team-curation.ts  # Workspace curation
+│   │   ├── team-workspace.ts # Team workspace setup
+│   │   ├── trust-tracker.ts  # Trust score tracking
+│   │   ├── ui-slots.ts       # Dynamic UI slot updates
+│   │   └── workspaces.ts     # Workspace browser
+│   │
+│   ├── services/             # Background services
+│   │   ├── agent-log-writer.ts    # Optional log writer integration
+│   │   ├── claude-code-sync.ts    # Claude Code session sync
+│   │   ├── coding-notification.ts # iMessage coding notifications
+│   │   ├── coding-orchestrator.ts # Worktree-based coding engine
+│   │   ├── curation-agent.ts      # LLM-based memory curation
+│   │   ├── guardrails.ts         # Gate config management
+│   │   ├── onboarding.ts         # File generation + config patching
+│   │   └── session-archiver.ts   # Auto-archive idle sessions
+│   │
+│   ├── lib/                  # Shared libraries
+│   │   ├── agent-log.ts           # Log read/write/render
+│   │   ├── coding-task-state.ts   # Atomic task state with file lock
+│   │   ├── openclaw-state.ts      # OC state dir resolution
+│   │   ├── team-feed.ts           # JSONL feed operations
+│   │   ├── team-workspace-scaffold.ts # Workspace scaffolding
+│   │   ├── workspace-session-store.ts # Session store management
+│   │   ├── workspace-sync-service.ts  # Git auto-sync
+│   │   └── workspaces-config.ts   # Workspace config R/W
+│   │
+│   ├── hooks/                # Lifecycle hooks
+│   │   ├── onboarding-context.ts  # Phase-specific prompt injection
+│   │   ├── safety-gates.ts        # 4 safety gates
+│   │   ├── team-bootstrap.ts      # Team context injection
+│   │   ├── team-memory-route.ts   # Session memory routing
+│   │   └── trust-feedback.ts      # Post-skill feedback
+│   │
+│   └── tools/                # Agent tools
+│       ├── coding-task.ts    # coding_task tool
+│       ├── onboard.ts        # godmode_onboard tool
+│       ├── team-memory.ts    # team_memory_write tool
+│       ├── team-message.ts   # team_message tool
+│       └── trust-rate.ts     # trust_rate tool
+│
+├── ui/                       # UI source (Lit web components)
+│   ├── src/
+│   │   ├── ui/
+│   │   │   ├── app.ts            # Main GodModeApp class
+│   │   │   ├── app-render.ts     # Render orchestrator
+│   │   │   ├── app-view-state.ts # State interface (300+ props)
+│   │   │   ├── app-gateway.ts    # WebSocket connection
+│   │   │   ├── app-settings.ts   # Settings/tab management
+│   │   │   ├── navigation.ts     # Tab routing
+│   │   │   ├── views/            # 51 view files
+│   │   │   └── controllers/      # 15 controller files
+│   │   └── styles/               # 28 CSS files
+│   └── vite.config.ts
+│
+├── assets/godmode-ui/        # Committed fallback snapshot
+├── scripts/                  # Build & utility scripts
+└── docs/                     # This documentation
+</code></pre>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<h2 id="rpc-overview">RPC Method Reference</h2>
+<p>All methods are license-gated except <code>godmode.status</code>. The respond signature is:</p>
+<pre><code>respond(ok: boolean, payload?: unknown, error?: { code: string, message: string })</code></pre>
+
+<!-- Onboarding -->
+<h3 id="rpc-onboarding">Onboarding</h3>
+<p><span class="badge badge--purple">src/methods/onboarding.ts</span></p>
+<table>
+<tr><th>Method</th><th>Description</th><th>Params</th></tr>
+<tr><td><code>onboarding.checklist</code></td><td>Structured milestone view with completion %</td><td>&mdash;</td></tr>
+<tr><td><code>onboarding.status</code></td><td>Full onboarding state (phase, completedPhases, etc.)</td><td>&mdash;</td></tr>
+<tr><td><code>onboarding.update</code></td><td>Deep-merge partial state update</td><td><code>{ phase?, completedPhases?, interview?, ... }</code></td></tr>
+<tr><td><code>onboarding.complete</code></td><td>Mark onboarding done (phase 6)</td><td>&mdash;</td></tr>
+<tr><td><code>onboarding.reset</code></td><td>Reset to empty state</td><td>&mdash;</td></tr>
+<tr><td><code>onboarding.assess</code></td><td>Run config health assessment</td><td>&mdash;</td></tr>
+<tr><td><code>onboarding.recommend</code></td><td>Map workflows to capabilities</td><td><code>{ workflows: string[] }</code></td></tr>
+<tr><td><code>onboarding.configAudit</code></td><td>Generate config recommendations</td><td>&mdash;</td></tr>
+<tr><td><code>onboarding.wizard.status</code></td><td>Check which memory files exist</td><td>&mdash;</td></tr>
+<tr><td><code>onboarding.wizard.preview</code></td><td>Preview what would be generated</td><td><code>{ answers: OnboardingAnswers }</code></td></tr>
+<tr><td><code>onboarding.wizard.generate</code></td><td>Generate workspace files + patch config</td><td><code>{ answers: OnboardingAnswers }</code></td></tr>
+</table>
+
+<!-- Consciousness -->
+<h3 id="rpc-consciousness">Consciousness</h3>
+<p><span class="badge badge--purple">src/methods/consciousness.ts</span></p>
+<table>
+<tr><th>Method</th><th>Description</th><th>Params</th></tr>
+<tr><td><code>godmode.consciousness.flush</code></td><td>Run consciousness-sync.sh, return generated CONSCIOUSNESS.md</td><td>&mdash;</td></tr>
+<tr><td><code>godmode.consciousness.read</code></td><td>Read current CONSCIOUSNESS.md without regenerating</td><td>&mdash;</td></tr>
+</table>
+
+<!-- Daily Brief -->
+<h3 id="rpc-daily-brief">Daily Brief</h3>
+<p><span class="badge badge--purple">src/methods/daily-brief.ts</span> + <span class="badge badge--purple">src/methods/brief-generator.ts</span></p>
+<table>
+<tr><th>Method</th><th>Description</th><th>Params</th></tr>
+<tr><td><code>dailyBrief.get</code></td><td>Get brief content for a date</td><td><code>{ date? }</code></td></tr>
+<tr><td><code>dailyBrief.update</code></td><td>Save brief content (triggers task sync)</td><td><code>{ date?, content }</code></td></tr>
+<tr><td><code>dailyBrief.generate</code></td><td>Generate brief from 6 data sources</td><td><code>{ date?, dryRun? }</code></td></tr>
+<tr><td><code>dailyBrief.extractActions</code></td><td>Extract action items from a daily note</td><td><code>{ date }</code></td></tr>
+<tr><td><code>dailyBrief.syncTasks</code></td><td>Bidirectional task &harr; brief sync</td><td><code>{ date? }</code></td></tr>
+<tr><td><code>dailyBrief.eveningCapture</code></td><td>Append evening review to brief</td><td><code>{ date?, content }</code></td></tr>
+<tr><td><code>eveningReview.capture</code></td><td>Alias for dailyBrief.eveningCapture</td><td><code>{ date?, content }</code></td></tr>
+<tr><td><code>briefNotes.get</code></td><td>Get notes for a date</td><td><code>{ date }</code></td></tr>
+<tr><td><code>briefNotes.update</code></td><td>Update notes for a date/section</td><td><code>{ date, section?, content }</code></td></tr>
+</table>
+
+<!-- Tasks -->
+<h3 id="rpc-tasks">Tasks</h3>
+<p><span class="badge badge--purple">src/methods/tasks.ts</span></p>
+<table>
+<tr><th>Method</th><th>Description</th><th>Params</th></tr>
+<tr><td><code>tasks.list</code></td><td>List tasks with optional filters</td><td><code>{ status?, project?, limit? }</code></td></tr>
+<tr><td><code>tasks.today</code></td><td>Tasks due today or earlier (pending only)</td><td>&mdash;</td></tr>
+<tr><td><code>tasks.upcoming</code></td><td>Upcoming tasks</td><td><code>{ days? }</code></td></tr>
+<tr><td><code>tasks.get</code></td><td>Get task by ID</td><td><code>{ id }</code></td></tr>
+<tr><td><code>tasks.create</code></td><td>Create a new task</td><td><code>{ title, project?, dueDate?, priority? }</code></td></tr>
+<tr><td><code>tasks.update</code></td><td>Update task (triggers brief sync)</td><td><code>{ id, title?, status?, dueDate?, ... }</code></td></tr>
+<tr><td><code>tasks.delete</code></td><td>Delete task by ID</td><td><code>{ id }</code></td></tr>
+</table>
+
+<!-- Workspaces -->
+<h3 id="rpc-workspaces">Workspaces</h3>
+<p><span class="badge badge--purple">src/methods/workspaces.ts</span></p>
+<table>
+<tr><th>Method</th><th>Description</th><th>Params</th></tr>
+<tr><td><code>workspaces.list</code></td><td>List all workspaces</td><td>&mdash;</td></tr>
+<tr><td><code>workspaces.get</code></td><td>Workspace details with files and sessions</td><td><code>{ id }</code></td></tr>
+<tr><td><code>workspaces.create</code></td><td>Create a new workspace</td><td><code>{ name, path, type? }</code></td></tr>
+<tr><td><code>workspaces.readFile</code></td><td>Read a file from workspace</td><td><code>{ workspaceId, path }</code></td></tr>
+<tr><td><code>workspaces.search</code></td><td>Search workspace content</td><td><code>{ workspaceId, query }</code></td></tr>
+</table>
+
+<!-- Agent Log -->
+<h3 id="rpc-agent-log">Agent Log</h3>
+<p><span class="badge badge--purple">src/methods/agent-log.ts</span></p>
+<table>
+<tr><th>Method</th><th>Description</th><th>Params</th></tr>
+<tr><td><code>agentLog.get</code></td><td>Retrieve log entries for a date</td><td><code>{ date? }</code></td></tr>
+<tr><td><code>agentLog.append</code></td><td>Append a new entry</td><td><code>{ category, content, ... }</code></td></tr>
+<tr><td><code>agentLog.resolve</code></td><td>Mark review/queue item as resolved</td><td><code>{ itemName }</code></td></tr>
+<tr><td><code>agentLog.syncClaudeCode</code></td><td>Sync Claude Code sessions to log</td><td>&mdash;</td></tr>
+</table>
+
+<!-- Focus Pulse -->
+<h3 id="rpc-focus-pulse">Focus Pulse</h3>
+<p><span class="badge badge--purple">src/methods/focus-pulse.ts</span></p>
+<table>
+<tr><th>Method</th><th>Description</th><th>Params</th></tr>
+<tr><td><code>focusPulse.getState</code></td><td>Current focus state</td><td>&mdash;</td></tr>
+<tr><td><code>focusPulse.startMorningSet</code></td><td>Start morning focus set from brief</td><td>&mdash;</td></tr>
+<tr><td><code>focusPulse.setFocus</code></td><td>Set current focus item</td><td><code>{ focus }</code></td></tr>
+<tr><td><code>focusPulse.pulseCheck</code></td><td>Score alignment with focus</td><td><code>{ activity }</code></td></tr>
+<tr><td><code>focusPulse.complete</code></td><td>Mark focus item complete</td><td>&mdash;</td></tr>
+<tr><td><code>focusPulse.endDay</code></td><td>End day and calculate score</td><td>&mdash;</td></tr>
+</table>
+
+<!-- Trust Tracker -->
+<h3 id="rpc-trust-tracker">Trust Tracker</h3>
+<p><span class="badge badge--purple">src/methods/trust-tracker.ts</span></p>
+<table>
+<tr><th>Method</th><th>Description</th><th>Params</th></tr>
+<tr><td><code>trust.dashboard</code></td><td>Dashboard with all workflow scores</td><td>&mdash;</td></tr>
+<tr><td><code>trust.history</code></td><td>Rating history for a workflow</td><td><code>{ workflow }</code></td></tr>
+<tr><td><code>trust.workflows.set</code></td><td>Configure tracked workflows</td><td><code>{ workflows: string[] }</code></td></tr>
+<tr><td><code>trust.rate</code></td><td>Rate a workflow (1-10)</td><td><code>{ workflow, rating, note? }</code></td></tr>
+</table>
+
+<!-- Guardrails -->
+<h3 id="rpc-guardrails">Guardrails</h3>
+<p><span class="badge badge--purple">src/methods/guardrails.ts</span></p>
+<table>
+<tr><th>Method</th><th>Description</th><th>Params</th></tr>
+<tr><td><code>guardrails.list</code></td><td>All safety gates and their status</td><td>&mdash;</td></tr>
+<tr><td><code>guardrails.set</code></td><td>Toggle or configure a gate</td><td><code>{ gateId, enabled?, threshold? }</code></td></tr>
+<tr><td><code>guardrails.history</code></td><td>Activity history for gates</td><td><code>{ limit? }</code></td></tr>
+</table>
+
+<!-- Coding -->
+<h3 id="rpc-coding">Coding</h3>
+<p><span class="badge badge--purple">src/methods/coding-tasks.ts</span></p>
+<table>
+<tr><th>Method</th><th>Description</th><th>Params</th></tr>
+<tr><td><code>coding.launch</code></td><td>Launch isolated coding task</td><td><code>{ task, repoRoot, model?, scopeGlobs? }</code></td></tr>
+<tr><td><code>coding.list</code></td><td>List coding tasks by status</td><td><code>{ status? }</code></td></tr>
+<tr><td><code>coding.status</code></td><td>Orchestrator status summary</td><td>&mdash;</td></tr>
+<tr><td><code>coding.cancel</code></td><td>Cancel a task</td><td><code>{ taskId }</code></td></tr>
+</table>
+
+<!-- Updates -->
+<h3 id="rpc-updates">Updates</h3>
+<p><span class="badge badge--purple">src/methods/system-update.ts</span></p>
+<table>
+<tr><th>Method</th><th>Description</th><th>Params</th></tr>
+<tr><td><code>godmode.update.check</code></td><td>Check for OpenClaw + plugin updates</td><td>&mdash;</td></tr>
+<tr><td><code>godmode.update.run</code></td><td>Run update with checkpoint</td><td>&mdash;</td></tr>
+<tr><td><code>godmode.update.pluginCheck</code></td><td>Check plugin updates on npm</td><td>&mdash;</td></tr>
+</table>
+
+<!-- Other -->
+<h3 id="rpc-other">Other Methods</h3>
+<table>
+<tr><th>Method</th><th>File</th><th>Description</th></tr>
+<tr><td><code>godmode.status</code></td><td>index.ts</td><td>Plugin status (version, license, methods) &mdash; <em>not license-gated</em></td></tr>
+<tr><td><code>godmode.options.get/set</code></td><td>options.ts</td><td>Feature toggle read/write</td></tr>
+<tr><td><code>calendar.events.today/range</code></td><td>calendar.ts</td><td>Calendar events via gog CLI</td></tr>
+<tr><td><code>sessions.archive/unarchive/archived/autoArchive</code></td><td>session-archive.ts</td><td>Session archival</td></tr>
+<tr><td><code>subagents.list/countDescendants</code></td><td>subagent-runs.ts</td><td>Subagent task listing</td></tr>
+<tr><td><code>ui.slot.update/clear</code></td><td>ui-slots.ts</td><td>Dynamic UI slots</td></tr>
+<tr><td><code>dataSources.list/get/update</code></td><td>data-sources.ts</td><td>Data source config</td></tr>
+<tr><td><code>goals.get/update</code></td><td>goals.ts</td><td>Goals management</td></tr>
+<tr><td><code>people.list/get/search</code></td><td>people-data.ts</td><td>People directory</td></tr>
+<tr><td><code>projects.list/get/create/update</code></td><td>projects.ts</td><td>Project management</td></tr>
+<tr><td><code>wheelOfLife.get/update/history</code></td><td>life-dashboards.ts</td><td>Wheel of Life</td></tr>
+<tr><td><code>visionBoard.get/update/identityToday</code></td><td>life-dashboards.ts</td><td>Vision Board</td></tr>
+<tr><td><code>workspace.createTeam/addMember/members</code></td><td>team-workspace.ts</td><td>Team workspace setup</td></tr>
+<tr><td><code>comms.send/feed/unread/markRead</code></td><td>team-comms.ts</td><td>Team feed messaging</td></tr>
+<tr><td><code>curation.run/status/candidates</code></td><td>team-curation.ts</td><td>Workspace curation</td></tr>
+</table>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<h2 id="ui-components">UI Architecture</h2>
+
+<h3>Component Tree</h3>
+<div class="diagram">
+&lt;godmode-app&gt;  (app.ts — LitElement)
+  │
+  ├── Topbar
+  │   ├── Consciousness Button
+  │   ├── Focus Pulse Widget
+  │   ├── Update Pill
+  │   └── User Avatar
+  │
+  ├── Sidebar Navigation
+  │   ├── Tab Groups (My Day, Chat, Workspaces, ...)
+  │   ├── Session Tabs (draggable, reorderable)
+  │   └── Feature-gated items (Deck, Mission Control)
+  │
+  └── Content Area (app-render.ts)
+      ├── renderMyDay()        → My Day view
+      ├── renderChat()         → Chat interface
+      ├── renderWorkspaces()   → Workspace browser
+      ├── renderOverview()     → System health
+      ├── renderOptions()      → Feature toggles
+      ├── renderTrustTracker() → Trust dashboard
+      ├── renderGuardrails()   → Safety gates
+      ├── renderLifetracks()   → Audio tracks
+      ├── renderConfig()       → Config editor
+      └── ... (51 view files total)
+</div>
+
+<h3 id="ui-state">State Management</h3>
+<p>GodMode uses Lit's reactive properties (<code>@state()</code> decorator) on the <code>GodModeApp</code> class. All state is defined in <code>AppViewState</code> (300+ properties). State mutations trigger automatic re-renders via Lit's update cycle.</p>
+
+<h3 id="ui-controllers">Controllers</h3>
+<p>Controllers (<code>ui/src/ui/controllers/*.ts</code>) handle RPC calls and state updates. Each controller function takes the app state as a parameter and mutates it directly:</p>
+<pre><code>export async function loadMyDay(state: MyDayState) {
+  state.myDayLoading = true;
+  try {
+    const res = await state.client.request("dailyBrief.get", { date });
+    state.dailyBrief = res;
+  } finally {
+    state.myDayLoading = false;
+  }
+}</code></pre>
+<p>15 controller files: chat, config, my-day, sessions, workspaces, updates, trust-tracker, guardrails, focus-pulse, options, lifetracks, calendar, people, agents, mission.</p>
+
+<h3 id="ui-navigation">Navigation</h3>
+<p>Tabs are defined in <code>navigation.ts</code> as <code>TAB_GROUPS</code>. The <code>Tab</code> type is a union of 24 tab names. URL routing maps paths like <code>/godmode/chat</code> to tabs via <code>TAB_PATHS</code> and <code>PATH_TO_TAB</code>.</p>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<h2>Features</h2>
+
+<h3 id="feat-onboarding">Onboarding (7-Phase + Wizard)</h3>
+<p><strong>What it does:</strong> Guides new users through setting up GodMode with a conversational 7-phase flow plus an 8-step memory wizard.</p>
+<p><strong>How it works:</strong></p>
+<ol>
+  <li><strong>Phase 0:</strong> Assessment &mdash; scans current config, produces health score (0-100)</li>
+  <li><strong>Phase 1:</strong> Identity &mdash; collects name, timezone, focus, communication style</li>
+  <li><strong>Phase 2:</strong> Second Brain &mdash; sets up memory structure and daily briefs</li>
+  <li><strong>Phase 3:</strong> Workflow Audit &mdash; maps user workflows to OpenClaw capabilities</li>
+  <li><strong>Phase 4:</strong> Configuration &mdash; audits and applies recommended settings</li>
+  <li><strong>Phase 5:</strong> First Win &mdash; live demo of a key feature</li>
+  <li><strong>Phase 6:</strong> Grand Reveal &mdash; summary of what was set up</li>
+</ol>
+<p><strong>Key files:</strong> <code>src/methods/onboarding.ts</code>, <code>src/services/onboarding.ts</code>, <code>src/hooks/onboarding-context.ts</code>, <code>src/tools/onboard.ts</code>, <code>ui/src/ui/views/onboarding.ts</code>, <code>ui/src/ui/views/onboarding-wizard.ts</code></p>
+
+<h3 id="feat-daily-brief">Daily Brief</h3>
+<p><strong>What it does:</strong> Auto-generated daily brief with calendar, weather, tasks, carry-forward, and X Intelligence. Always-editable like Obsidian with live checkboxes that sync to tasks.</p>
+<p><strong>Technical flow:</strong></p>
+<ol>
+  <li><code>dailyBrief.generate</code> fetches 6 data sources in parallel (calendar, Oura, weather, X Intelligence, carry-forward, context)</li>
+  <li>Writes markdown to Obsidian vault: <code>{VAULT}/01-Daily/{date}.md</code></li>
+  <li>UI renders via <code>toEditableMarkdownHtml()</code> with enabled checkboxes</li>
+  <li>Edits convert back via <code>htmlToMarkdown()</code>, debounced save (1500ms)</li>
+  <li>Checkbox toggle flushes immediately, triggers <code>syncTasksFromBrief()</code></li>
+  <li>Task updates trigger <code>syncBriefFromTasks()</code> (no feedback loop due to fire-and-forget)</li>
+</ol>
+<p><strong>NBSP handling:</strong> Stripped at 3 layers &mdash; html-to-markdown, brief parse, brief sync.</p>
+<p><strong>Key files:</strong> <code>src/methods/daily-brief.ts</code>, <code>src/methods/brief-generator.ts</code>, <code>ui/src/ui/views/daily-brief.ts</code>, <code>ui/src/ui/html-to-markdown.ts</code></p>
+
+<h3 id="feat-consciousness">Consciousness Sync</h3>
+<p><strong>What it does:</strong> Golden sync button that runs session harvest, ClawVault sync, and heartbeat generation. Produces <code>CONSCIOUSNESS.md</code> in memory.</p>
+<p><strong>UI states:</strong> 4-state feedback (idle/loading/ok/error) with animated icon, green glow on success, red glow on error, auto-reset after 3s.</p>
+<p><strong>Claude Code sync:</strong> After consciousness sync, <code>syncClaudeCodeSessions()</code> scans <code>~/.claude/projects/</code> JSONL files and appends summaries to agent-log.</p>
+<p><strong>Key files:</strong> <code>src/methods/consciousness.ts</code>, <code>src/services/claude-code-sync.ts</code></p>
+
+<h3 id="feat-tasks">Task System</h3>
+<p><strong>What it does:</strong> Native task management with bidirectional sync to daily brief checkboxes.</p>
+<p><strong>Dedup rules:</strong> Same normalized title + same date = same task. <code>normalizeTitle()</code> strips bold markers, em-dash context, and trailing punctuation.</p>
+<p><strong>Sync triggers:</strong></p>
+<ul>
+  <li><code>dailyBrief.update</code> &rarr; <code>syncTasksFromBrief()</code> (fire-and-forget)</li>
+  <li><code>tasks.update</code> (status change) &rarr; <code>syncBriefFromTasks()</code> (fire-and-forget)</li>
+  <li><code>focusPulse.startMorningSet</code> &rarr; <code>syncTasksFromBrief()</code></li>
+</ul>
+<p><strong>Key files:</strong> <code>src/methods/tasks.ts</code>, <code>src/methods/daily-brief.ts</code>, <code>ui/src/ui/views/workspaces.ts</code></p>
+
+<h3 id="feat-focus-pulse">Focus Pulse</h3>
+<p><strong>What it does:</strong> Morning set workflow &mdash; extracts focus items from daily brief, tracks alignment throughout the day, calculates daily score.</p>
+<p><strong>Lifecycle:</strong> Start morning set &rarr; set focus &rarr; pulse checks (scored) &rarr; complete items &rarr; end day with score.</p>
+<p><strong>Feature toggle:</strong> <code>focusPulse.enabled</code> (default: true) controls topbar widget visibility.</p>
+
+<h3 id="feat-trust-tracker">Trust Tracker</h3>
+<p><strong>What it does:</strong> Skill-level trust scoring where users rate agent performance (1-10) after each workflow. Tracks running average, provides feedback to improve.</p>
+<p><strong>Integration:</strong> After each tool call, <code>trust-feedback.ts</code> hook detects skill completion and queues a feedback prompt via <code>before_prompt_build</code>.</p>
+
+<h3 id="feat-guardrails">Guardrails (Safety Gates)</h3>
+<p><strong>What it does:</strong> 7 configurable safety gates enforced via lifecycle hooks.</p>
+<table>
+<tr><th>Gate</th><th>Hook</th><th>Purpose</th></tr>
+<tr><td>loopBreaker</td><td>before_tool_call</td><td>Block tools called too many times in a window</td></tr>
+<tr><td>grepBlocker</td><td>before_tool_call</td><td>Block grep/find on protected memory paths</td></tr>
+<tr><td>sessionHygiene</td><td>before_reset</td><td>Clean WORKING.md on session end</td></tr>
+<tr><td>exhaustiveSearch</td><td>message_sending</td><td>Block lazy refusals when no search was attempted</td></tr>
+<tr><td>planGate</td><td>before_tool_call</td><td>Require plan doc for complex coding tasks</td></tr>
+<tr><td>spawnGate</td><td>before_tool_call</td><td>Require coding_task before sessions_spawn</td></tr>
+<tr><td>validationGate</td><td>after_tool_call</td><td>Coding validation (lint/typecheck/test)</td></tr>
+</table>
+
+<h3 id="feat-updates">Update System</h3>
+<p><strong>What it does:</strong> Checks npm for OpenClaw and GodMode plugin updates. "Update Now" runs <code>openclaw update --yes</code> with pre-update checkpoint and post-update health check.</p>
+<p><strong>Flow:</strong> Poll (30min) &rarr; topbar pill &rarr; click Update &rarr; checkpoint write &rarr; <code>openclaw update</code> &rarr; gateway restart &rarr; health check &rarr; checkpoint cleanup.</p>
+
+<h3 id="feat-license">License Gate</h3>
+<p><strong>What it does:</strong> Every RPC method is wrapped with <code>withLicenseGate()</code>. License key from <code>openclaw.json</code> plugin config.</p>
+<ul>
+  <li>Dev keys (<code>GM-DEV-*</code>, <code>GM-INTERNAL</code>) bypass remote validation</li>
+  <li>Production keys validated against <code>lifeongodmode.com/api/v1/license/validate</code></li>
+  <li>24-hour cache with grace period on network errors</li>
+  <li>Concurrent callers share a single validation promise</li>
+</ul>
+
+<h3 id="feat-toggles">Feature Toggles</h3>
+<p><strong>What it does:</strong> 3 toggles in the Lab tab, persisted to <code>~/godmode/data/godmode-options.json</code>.</p>
+<table>
+<tr><th>Toggle</th><th>Default</th><th>Effects</th></tr>
+<tr><td><code>focusPulse.enabled</code></td><td>true</td><td>Topbar widget, morning set availability</td></tr>
+<tr><td><code>deck.enabled</code></td><td>false</td><td>Deck nav link, /deck HTTP route</td></tr>
+<tr><td><code>missionControl.enabled</code></td><td>false</td><td>Mission Control nav item, /ops proxy</td></tr>
+</table>
+
+<h3 id="feat-coding">Coding Harness</h3>
+<p><strong>What it does:</strong> Worktree-isolated coding tasks with parallel write limits, validation gates, GitHub PR creation, and iMessage notifications.</p>
+<p><strong>Flow:</strong> <code>coding_task</code> tool &rarr; complexity classification &rarr; scope inference &rarr; git worktree creation &rarr; subagent spawn &rarr; validation (lint/typecheck/test) &rarr; PR creation &rarr; optional auto-merge.</p>
+
+<h3 id="feat-chat">Chat</h3>
+<p><strong>What it does:</strong> Full chat interface with streaming, attachments, session management, auto-compaction, and private mode.</p>
+<ul>
+  <li><strong>Streaming:</strong> Block-level memoization prevents re-parsing entire message on each delta</li>
+  <li><strong>Attachments:</strong> Images via gateway attachments; non-images inlined as base64 document blocks</li>
+  <li><strong>Sessions:</strong> Draggable tabs with reorder, rename, close, archive</li>
+  <li><strong>Auto-compact:</strong> Triggers at 90% context window usage</li>
+  <li><strong>Private mode:</strong> Toggle prevents session from being saved to memory</li>
+  <li><strong>Queue mode:</strong> Cmd+Enter queues messages; auto-flushes on completion</li>
+</ul>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<h2 id="data-model">Data Model Reference</h2>
+<h3>JSON State Files (~/godmode/data/)</h3>
+<table>
+<tr><th>File</th><th>Purpose</th><th>Schema</th></tr>
+<tr><td><code>tasks.json</code></td><td>Task list</td><td><code>{ tasks: [{ id, title, status, dueDate, project, briefSection, ... }] }</code></td></tr>
+<tr><td><code>godmode-options.json</code></td><td>Feature toggles</td><td><code>{ "focusPulse.enabled": bool, "deck.enabled": bool, "missionControl.enabled": bool }</code></td></tr>
+<tr><td><code>onboarding.json</code></td><td>Onboarding state</td><td><code>{ phase, completedPhases, interview, assessment, ... }</code></td></tr>
+<tr><td><code>focus-pulse.json</code></td><td>Focus pulse state</td><td><code>{ active, currentFocus, items, score, ... }</code></td></tr>
+<tr><td><code>trust-tracker.json</code></td><td>Trust scores</td><td><code>{ workflows: [...], ratings: [...], ... }</code></td></tr>
+<tr><td><code>guardrails.json</code></td><td>Safety gate config</td><td><code>{ gates: { [id]: { enabled, threshold } }, activity: [...] }</code></td></tr>
+<tr><td><code>coding-tasks.json</code></td><td>Coding task state</td><td><code>{ version, tasks: [...], updatedAt }</code></td></tr>
+<tr><td><code>archived-sessions.json</code></td><td>Archived sessions</td><td><code>{ sessions: [{ key, archivedAt, reason }] }</code></td></tr>
+<tr><td><code>claude-code-sync.json</code></td><td>CC sync state</td><td><code>{ [filePath]: { lastSize, lastSyncedAt } }</code></td></tr>
+<tr><td><code>update-checkpoint.json</code></td><td>Pre-update checkpoint</td><td><code>{ openclawVersion, pluginVersion, timestamp }</code></td></tr>
+<tr><td><code>workspaces.json5</code></td><td>Workspace config</td><td><code>{ workspaces: [{ id, name, path, type, ... }] }</code></td></tr>
+</table>
+
+<h3>Markdown Files (~/godmode/memory/)</h3>
+<table>
+<tr><th>File</th><th>Purpose</th></tr>
+<tr><td><code>CONSCIOUSNESS.md</code></td><td>Generated consciousness state (heartbeat output)</td></tr>
+<tr><td><code>WORKING.md</code></td><td>Active session working notes (cleaned on reset)</td></tr>
+<tr><td><code>MISTAKES.md</code></td><td>Learned mistakes and failure modes</td></tr>
+<tr><td><code>agent-log/{date}.md</code></td><td>Daily activity log (auto-rendered from JSON)</td></tr>
+</table>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<h2 id="configuration">Configuration Reference</h2>
+
+<h3>openclaw.plugin.json</h3>
+<pre><code>{
+  "id": "godmode",
+  "name": "GodMode",
+  "version": "1.0.0",
+  "configSchema": {
+    "type": "object",
+    "properties": {
+      "licenseKey": { "type": "string" },
+      "workspaceRoot": { "type": "string", "default": "~/godmode" },
+      "coding": {
+        "enabled": true,
+        "maxParallelWriters": 2,
+        "autoMerge": false,
+        "validation": { "lint": true, "typecheck": true, "test": true }
+      }
+    },
+    "required": ["licenseKey"]
+  }
+}</code></pre>
+
+<h3 id="environment">Environment Variables</h3>
+<table>
+<tr><th>Variable</th><th>Default</th><th>Description</th></tr>
+<tr><td><code>GODMODE_ROOT</code></td><td><code>~/godmode</code></td><td>Workspace root directory</td></tr>
+<tr><td><code>OBSIDIAN_VAULT_PATH</code></td><td><em>auto-detected</em></td><td>Obsidian vault path for daily briefs</td></tr>
+<tr><td><code>OPENCLAW_STATE_DIR</code></td><td><code>~/.openclaw</code></td><td>OpenClaw state directory</td></tr>
+<tr><td><code>OPENCLAW_CONFIG_PATH</code></td><td><code>~/.openclaw/openclaw.json</code></td><td>OpenClaw config file path</td></tr>
+<tr><td><code>XAI_API_KEY</code></td><td>&mdash;</td><td>XAI API key for X Intelligence (in ~/.openclaw/.env)</td></tr>
+<tr><td><code>GOG_CALENDAR_ACCOUNT</code></td><td>&mdash;</td><td>Google account for calendar (in ~/godmode/.env)</td></tr>
+<tr><td><code>GOG_CLIENT</code></td><td>&mdash;</td><td>gog CLI client name (in ~/godmode/.env)</td></tr>
+</table>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<h2 id="dev-setup">Development Guide</h2>
+
+<h3>Setup</h3>
+<pre><code># Install dependencies
+pnpm install
+
+# Build everything (UI + backend + bundle)
+pnpm build
+
+# Development (UI only, with hot reload)
+pnpm dev:ui
+
+# Type check
+pnpm typecheck
+
+# Clean build artifacts
+pnpm clean</code></pre>
+
+<h3 id="dev-new-handler">Adding a New RPC Handler</h3>
+<ol>
+  <li>Create <code>src/methods/my-feature.ts</code></li>
+  <li>Export a <code>Record&lt;string, GatewayRequestHandler&gt;</code>:
+<pre><code>import type { GatewayRequestHandler } from "openclaw/plugin-sdk";
+
+export const myFeatureHandlers: Record&lt;string, GatewayRequestHandler&gt; = {
+  "myFeature.get": async ({ params, respond }) => {
+    // validate params, do work
+    respond(true, { data: "result" });
+  },
+};</code></pre>
+  </li>
+  <li>Import and spread in <code>index.ts</code>:
+<pre><code>import { myFeatureHandlers } from "./src/methods/my-feature.js";
+// In allHandlers:
+...myFeatureHandlers,</code></pre>
+  </li>
+  <li>Build and verify: <code>pnpm build && pnpm typecheck</code></li>
+</ol>
+
+<h3 id="dev-new-view">Adding a New UI View</h3>
+<ol>
+  <li>Create <code>ui/src/ui/views/my-view.ts</code> with render function and props type</li>
+  <li>Add tab to <code>navigation.ts</code> TAB_GROUPS</li>
+  <li>Add render case in <code>app-render.ts</code></li>
+  <li>Add controller in <code>ui/src/ui/controllers/my-view.ts</code> if needed</li>
+  <li>Add styles in <code>ui/src/styles/my-view.css</code> and import in <code>styles.css</code></li>
+</ol>
+
+<h3 id="dev-new-toggle">Adding a Feature Toggle</h3>
+<ol>
+  <li>Add default to <code>OPTIONS_DEFAULTS</code> in both <code>index.ts</code> and <code>src/methods/options.ts</code></li>
+  <li>Add UI entry in <code>ui/src/ui/views/options.ts</code> FEATURES array</li>
+  <li>Add conditional rendering in <code>app-render.ts</code> where the feature appears</li>
+</ol>
+
+<h3 id="dev-release">Release Process</h3>
+<ol>
+  <li>Run pre-ship checklist: <code>pnpm clean && pnpm build && pnpm typecheck</code></li>
+  <li>Sync UI snapshot: <code>pnpm ui:sync</code></li>
+  <li>Check forbidden imports: <code>rg "\.\./\.\./\.\./\.\./src/" -n</code></li>
+  <li>Bump version in <code>package.json</code> and <code>openclaw.plugin.json</code></li>
+  <li>Publish: <code>npm publish</code></li>
+</ol>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<h2 id="changelog">Changelog</h2>
+
+<h3>2026-02-28</h3>
+<ul>
+  <li><strong>Claude Code &rarr; Agent Log Integration:</strong> New service syncs Claude Code sessions into agent-log</li>
+  <li><strong>Ship Readiness Sprint:</strong> All major systems verified production-ready</li>
+  <li><strong>Task Dedup Fix:</strong> Single-pass regex + normalizeTitle, global dedup across sections</li>
+  <li><strong>Consciousness Sync Fix:</strong> CLAUDECODE env unset, API-first session harvest</li>
+  <li><strong>Brief Generator Deep Repair:</strong> 6-source generation engine with calendar, weather, X Intelligence</li>
+  <li><strong>NBSP Checkbox Fix:</strong> 3-layer fix for paste-induced NBSP breaking task lists</li>
+  <li><strong>Memory Consolidation:</strong> Memory hierarchy, staleness checks, thesis sync</li>
+</ul>
+
+<h3>2026-02-27</h3>
+<ul>
+  <li><strong>Update System Overhaul:</strong> Converted from git-sync to npm-based OpenClaw updater</li>
+  <li><strong>File Upload Fix:</strong> Non-image files inlined as base64 document blocks</li>
+  <li><strong>Brief-Wide Checkbox Sync:</strong> Every checkbox in brief syncs as task (not just Win The Day)</li>
+  <li><strong>Checkbox Creation UX:</strong> Cmd+L toggles checkbox, Enter auto-continues list</li>
+  <li><strong>Daily Brief Live Editing:</strong> Always-editable contenteditable, no read/edit mode split</li>
+</ul>
+
+<h3>2026-02-26</h3>
+<ul>
+  <li><strong>Task UI Refinements:</strong> Add Task button, inline editing, Start button, Today tab</li>
+  <li><strong>Task Display Fixes:</strong> Tasks above artifacts, folder expand/collapse, scroll</li>
+  <li><strong>Task UI in Workspaces:</strong> All-tasks view, folder display, session linking</li>
+  <li><strong>Tasks Wired to Workspaces:</strong> Session linking, daily rhythm sync</li>
+  <li><strong>Trust Tracker Refactor:</strong> Skill-level feedback, removed global prompt injection</li>
+</ul>
+
+</main>
+
+<!-- Search + Navigation JS -->
+<script>
+(function() {
+  // Search
+  const input = document.getElementById('searchInput');
+  const resultsEl = document.getElementById('searchResults');
+  const content = document.getElementById('content');
+
+  // Build search index from headings and paragraphs
+  const sections = [];
+  content.querySelectorAll('h2, h3, h4').forEach(el => {
+    const id = el.id || el.closest('[id]')?.id;
+    const title = el.textContent.trim();
+    let context = '';
+    let next = el.nextElementSibling;
+    while (next && !['H2','H3','H4'].includes(next.tagName)) {
+      if (next.textContent) context += next.textContent.trim() + ' ';
+      next = next.nextElementSibling;
+    }
+    sections.push({ id, title, context: context.slice(0, 300), el });
+  });
+
+  // Also index table cells
+  content.querySelectorAll('td code').forEach(el => {
+    const row = el.closest('tr');
+    const section = el.closest('table')?.previousElementSibling;
+    if (row && section) {
+      const id = section.id || section.closest('[id]')?.id;
+      sections.push({
+        id,
+        title: el.textContent.trim(),
+        context: row.textContent.trim().slice(0, 200),
+        el: section
+      });
+    }
+  });
+
+  let debounce;
+  input.addEventListener('input', () => {
+    clearTimeout(debounce);
+    debounce = setTimeout(doSearch, 150);
+  });
+
+  function doSearch() {
+    const q = input.value.trim().toLowerCase();
+    if (!q) { resultsEl.classList.remove('visible'); return; }
+    const matches = sections.filter(s =>
+      s.title.toLowerCase().includes(q) || s.context.toLowerCase().includes(q)
+    ).slice(0, 12);
+    if (!matches.length) { resultsEl.classList.remove('visible'); return; }
+    resultsEl.innerHTML = matches.map(m => {
+      const hl = (text) => text.replace(new RegExp(`(${q.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')})`, 'gi'), '<mark>$1</mark>');
+      return `<div class="search-result" data-id="${m.id}">
+        <div class="search-result-title">${hl(m.title)}</div>
+        <div class="search-result-context">${hl(m.context.slice(0, 120))}</div>
+      </div>`;
+    }).join('');
+    resultsEl.classList.add('visible');
+  }
+
+  resultsEl.addEventListener('click', e => {
+    const result = e.target.closest('.search-result');
+    if (result?.dataset.id) {
+      document.getElementById(result.dataset.id)?.scrollIntoView({ behavior: 'smooth' });
+      resultsEl.classList.remove('visible');
+      input.value = '';
+    }
+  });
+
+  document.addEventListener('click', e => {
+    if (!e.target.closest('.topbar-search')) resultsEl.classList.remove('visible');
+  });
+
+  // Cmd+K shortcut
+  document.addEventListener('keydown', e => {
+    if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+      e.preventDefault();
+      input.focus();
+    }
+    if (e.key === 'Escape') {
+      resultsEl.classList.remove('visible');
+      input.blur();
+    }
+  });
+
+  // Active sidebar link tracking
+  const sidebar = document.getElementById('sidebar');
+  const links = sidebar.querySelectorAll('a[href^="#"]');
+  const observer = new IntersectionObserver(entries => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        links.forEach(l => l.classList.remove('active'));
+        const link = sidebar.querySelector(`a[href="#${entry.target.id}"]`);
+        if (link) link.classList.add('active');
+      }
+    });
+  }, { rootMargin: '-80px 0px -70% 0px' });
+
+  document.querySelectorAll('h2[id], h3[id]').forEach(el => observer.observe(el));
+})();
+</script>
+</body>
+</html>

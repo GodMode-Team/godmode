@@ -62,7 +62,8 @@ export function renderToolCardSidebar(card: ToolCard, onOpenSidebar?: (content: 
 
   const canClick = Boolean(onOpenSidebar);
   const handleClick = canClick
-    ? () => {
+    ? (e: Event) => {
+        e.stopPropagation();
         if (hasText) {
           onOpenSidebar!(formatToolOutputForSidebar(card.text!));
           return;
@@ -95,7 +96,8 @@ export function renderToolCardSidebar(card: ToolCard, onOpenSidebar?: (content: 
                 return;
               }
               e.preventDefault();
-              handleClick?.();
+              e.stopPropagation();
+              handleClick?.(e);
             }
           : nothing
       }

@@ -4,16 +4,17 @@ export const TAB_GROUPS = [
   { label: "", tabs: ["chat", "today", "workspaces"] },
   {
     label: "Control",
-    tabs: ["overview", "channels", "instances", "sessions", "cron"],
+    tabs: ["overview", "trust", "guardrails", "channels", "instances", "sessions", "cron", "options"],
   },
   { label: "Agent", tabs: ["skills", "nodes"] },
-  { label: "Settings", tabs: ["options", "trust", "config", "debug", "logs"] },
+  { label: "Settings", tabs: ["config", "debug", "logs"] },
 ] as const;
 
 // Mission Control hidden from sidebar — code kept for future rebuild.
 // To re-enable: add "mission" back to first TAB_GROUPS entry.
 
 export type Tab =
+  | "guardrails"
   | "options"
   | "overview"
   | "mission"
@@ -59,6 +60,7 @@ const TAB_PATHS: Record<Tab, string> = {
   nodes: "/nodes",
   chat: "/chat",
   trust: "/trust",
+  guardrails: "/guardrails",
   config: "/config",
   debug: "/debug",
   logs: "/logs",
@@ -198,8 +200,10 @@ export function iconForTab(tab: Tab): IconName {
     case "nodes":
       return "monitor";
     case "options":
-      return "wrench";
+      return "flask";
     case "trust":
+      return "shield";
+    case "guardrails":
       return "shield";
     case "config":
       return "settings";
@@ -220,7 +224,7 @@ export function titleForTab(tab: Tab) {
     case "my-day":
       return "Today";
     case "work":
-      return "Workspaces";
+      return "Work";
     case "people":
       return "People";
     case "life":
@@ -232,7 +236,7 @@ export function titleForTab(tab: Tab) {
     case "mission":
       return "Mission Control";
     case "workspaces":
-      return "Workspaces";
+      return "Work";
     case "wheel-of-life":
       return "Wheel of Life";
     case "vision-board":
@@ -250,9 +254,11 @@ export function titleForTab(tab: Tab) {
     case "nodes":
       return "Nodes";
     case "options":
-      return "Options";
+      return "Lab";
     case "trust":
       return "Trust";
+    case "guardrails":
+      return "Guardrails";
     case "config":
       return "Config";
     case "debug":
@@ -302,9 +308,11 @@ export function emojiForTab(tab: Tab): string {
     case "nodes":
       return "\u{1F5A5}\uFE0F";
     case "options":
-      return "\u{2699}\uFE0F";
+      return "\u{1F9EA}";
     case "trust":
       return "\u{1F6E1}\uFE0F";
+    case "guardrails":
+      return "\u{1F6A7}";
     case "config":
       return "\u{2699}\uFE0F";
     case "debug":
@@ -354,9 +362,11 @@ export function subtitleForTab(tab: Tab) {
     case "nodes":
       return "Paired devices, capabilities, and command exposure.";
     case "options":
-      return "Toggle GodMode features on and off.";
+      return "Toggle experimental features and modules on and off.";
     case "trust":
-      return "Track how well your AI handles specific workflows.";
+      return "Scores build automatically as you use and rate skills.";
+    case "guardrails":
+      return "Safety gates that prevent runaway loops, bad searches, and lazy responses.";
     case "config":
       return "Edit ~/.openclaw/config.json safely.";
     case "debug":

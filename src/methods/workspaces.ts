@@ -1257,6 +1257,28 @@ const createWorkspace: GatewayRequestHandler = async ({ params, respond }) => {
   });
 };
 
+const deleteWorkspace: GatewayRequestHandler = async ({ params, respond }) => {
+  const id = typeof params.id === "string" ? String(params.id).trim() : "";
+  if (!id) {
+    respond(false, undefined, errorShape(ErrorCodes.INVALID_REQUEST, "id is required"));
+    return;
+  }
+
+  const config = await readWorkspaceConfig();
+  const index = config.workspaces.findIndex((w) => w.id === id);
+  if (index === -1) {
+    respond(false, undefined, errorShape(ErrorCodes.INVALID_REQUEST, `workspace not found: ${id}`));
+    return;
+  }
+
+  const removed = config.workspaces.splice(index, 1)[0];
+  await writeWorkspaceConfig(config);
+
+  respond(true, {
+    deleted: { id: removed.id, name: removed.name },
+  });
+};
+
 const scan: GatewayRequestHandler = async ({ respond }) => {
   const config = await readWorkspaceConfig();
 
@@ -1389,6 +1411,7 @@ export const workspacesHandlers: GatewayRequestHandlers = {
   "workspaces.fileSession": fileSession,
   "workspaces.detectFromMessage": detectFromMessage,
   "workspaces.create": createWorkspace,
+  "workspaces.delete": deleteWorkspace,
   "workspaces.teamSetupPrompt": teamSetupPrompt,
 };
 

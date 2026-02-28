@@ -76,8 +76,7 @@
   flex: 1 1 0;
   overflow-y: auto;
   overflow-x: hidden;
-  padding: 6px 6px 4px;
-  margin: 0 -4px;
+  padding: 6px 2px 4px;
   min-height: 0;
   border-radius: var(--radius-lg);
   background: linear-gradient(
@@ -188,6 +187,29 @@
 :root[data-theme="light"] .chat-scroll-bottom:hover {
   background: var(--accent);
   border-color: var(--accent);
+}
+
+/* New-messages badge on scroll button */
+.chat-scroll-bottom__badge {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 2px solid var(--panel);
+  box-shadow: 0 0 6px var(--accent-glow);
+  animation: badge-pulse 2s ease-in-out infinite;
+}
+
+@keyframes badge-pulse {
+  0%, 100% { box-shadow: 0 0 6px var(--accent-glow); }
+  50% { box-shadow: 0 0 12px var(--accent-glow); }
+}
+
+:root[data-theme="light"] .chat-scroll-bottom__badge {
+  border-color: #ffffff;
 }
 
 /* "New messages" button removed — user prefers clean scroll */

@@ -2,7 +2,7 @@ import { existsSync } from "node:fs";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { GODMODE_ROOT } from "../data-paths.js";
+import { GODMODE_ROOT, localDateString } from "../data-paths.js";
 import { STATE_DIR } from "../lib/openclaw-state.js";
 import type { GatewayRequestHandler } from "openclaw/plugin-sdk";
 
@@ -345,7 +345,7 @@ async function parseDailyLog(dateStr: string): Promise<DailyLogContext> {
 }
 
 async function buildGenerationContext(): Promise<LifeTrackContext> {
-  const today = new Date().toISOString().split("T")[0];
+  const today = localDateString();
   const [wheelData, visionData, dailyLog] = await Promise.all([
     readJsonFile<WheelOfLifeData>(WHEEL_OF_LIFE_PATH, { scores: {} }),
     readJsonFile<VisionBoardData>(VISION_BOARD_PATH, {}),
@@ -508,7 +508,7 @@ const generateLifetrack: GatewayRequestHandler = async ({ params, respond }) => 
         customTopic?: string;
         customDuration?: number;
       };
-      const targetDate = date || new Date().toISOString().split("T")[0];
+      const targetDate = date || localDateString();
 
       const config = await mod.readConfig();
       if (!config.enabled) {

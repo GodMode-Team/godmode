@@ -8,6 +8,7 @@ import {
   renderCompactionSummary,
   isCompactionSummary,
 } from "../chat/grouped-render";
+import type { LightboxImage } from "../chat/lightbox";
 import { normalizeMessage, normalizeRoleForGrouping } from "../chat/message-normalizer";
 import type { FailedMessage } from "../controllers/chat";
 import { icons } from "../icons";
@@ -67,6 +68,7 @@ export type ChatProps = {
   currentToolInfo?: ToolExecutionInfo | null;
   isWorking?: boolean; // True when session is actively processing
   // Scroll state
+  showScrollButton?: boolean;
   showNewMessages?: boolean;
   onScrollToBottom?: () => void;
   // Image attachments
@@ -90,6 +92,8 @@ export type ChatProps = {
   onMessageLinkClick?: (href: string) => boolean | Promise<boolean>;
   onCloseSidebar?: () => void;
   onSplitRatioChange?: (ratio: number) => void;
+  onImageClick?: (url: string, allImages: LightboxImage[], index: number) => void;
+  resolveImageUrl?: (messageIndex: number, imageIndex: number) => string | null;
   onChatScroll?: (event: Event) => void;
   // Retry after context overflow
   pendingRetry?: FailedMessage | null;
@@ -498,7 +502,12 @@ function extractPathCandidateFromCode(text: string): string | null {
   ) {
     return candidate;
   }
+  // Relative path with slashes and a file extension
   if (/^[^:\s]+\/[^\s]+$/.test(candidate) && /\.[a-z0-9]{1,12}$/i.test(candidate)) {
+    return candidate;
+  }
+  // Bare filename with extension (e.g. "godmode-v5.png", "report.pdf")
+  if (/^[^\s/\\:*?"<>|]+\.[a-z0-9]{1,12}$/i.test(candidate) && candidate.length <= 100) {
     return candidate;
   }
   return null;
@@ -614,8 +623,14 @@ export function renderChat(props: ChatProps) {
             }
 
             if (item.kind === "group") {
+              // Create a resolver that maps (messageIndex, imageIndex) for each message in this group
+              const resolveImageUrl = props.resolveImageUrl
+                ? (msgIdx: number, imgIdx: number) => props.resolveImageUrl!(msgIdx, imgIdx)
+                : undefined;
               return renderMessageGroup(item, {
                 onOpenSidebar: props.onOpenSidebar,
+                onImageClick: props.onImageClick,
+                resolveImageUrl,
                 showReasoning,
                 assistantName: props.assistantName,
                 assistantAvatar: assistantIdentity.avatar,
@@ -704,8 +719,31 @@ export function renderChat(props: ChatProps) {
         <div
           class="chat-main"
           style="flex: ${sidebarOpen ? `0 0 ${splitRatio * 100}%` : "1 1 100%"}"
+          @click=${sidebarOpen ? () => props.onCloseSidebar?.() : nothing}
         >
           ${thread}
+          ${
+            props.showScrollButton
+              ? html`
+                <button
+                  class="chat-scroll-bottom"
+                  type="button"
+                  aria-label="Scroll to bottom"
+                  title="Scroll to bottom"
+                  @click=${() => props.onScrollToBottom?.()}
+                >
+                  ${
+                    props.showNewMessages
+                      ? html`<span class="chat-scroll-bottom__badge"></span>`
+                      : nothing
+                  }
+                  <svg width="20" height="20" viewBox="0 0 24 24">
+                    <path d="m6 9 6 6 6-6" />
+                  </svg>
+                </button>
+              `
+              : nothing
+          }
         </div>
 
         ${
@@ -957,7 +995,9 @@ function buildChatItems(props: ChatProps): Array<ChatItem | MessageGroup> {
     });
   }
   for (let i = historyStart; i < history.length; i++) {
-    const msg = history[i];
+    const msg = history[i] as Record<string, unknown>;
+    // Tag message with its original array index for image cache resolution
+    msg._chatIdx = i;
 
     // Handle compaction summary messages with special rendering
     if (isCompactionSummary(msg)) {

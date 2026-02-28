@@ -36,6 +36,7 @@ const allowedTags = [
   "hr",
   "img",
   "i",
+  "input",
   "li",
   "main",
   "nav",
@@ -59,8 +60,10 @@ const allowedTags = [
 
 const allowedAttrs = [
   "alt",
+  "checked",
   "class",
   "decoding",
+  "disabled",
   "height",
   "href",
   "loading",
@@ -70,6 +73,7 @@ const allowedAttrs = [
   "start",
   "target",
   "title",
+  "type",
   "width",
 ];
 
@@ -157,6 +161,26 @@ export function toSanitizedMarkdownHtml(markdown: string): string {
     setCachedMarkdown(input, sanitized);
   }
   return sanitized;
+}
+
+/**
+ * Render markdown to sanitized HTML suitable for contenteditable editing.
+ * Unlike toSanitizedMarkdownHtml, this version does NOT cache and leaves
+ * checkbox inputs enabled (no `disabled` attr) so users can toggle them.
+ */
+export function toEditableMarkdownHtml(markdown: string): string {
+  const input = markdown.trim();
+  if (!input) {
+    return "";
+  }
+  installHooks();
+  const rendered = marked.parse(input) as string;
+  const sanitized = DOMPurify.sanitize(rendered, {
+    ALLOWED_TAGS: allowedTags,
+    ALLOWED_ATTR: allowedAttrs,
+  });
+  // Remove disabled attr from checkboxes so they are interactive
+  return sanitized.replace(/<input([^>]*)\bdisabled\b([^>]*)>/g, "<input$1$2>");
 }
 
 export function sanitizeHtmlFragment(markup: string): string {

@@ -21,6 +21,7 @@ type GatewayRequestHandlers = Record<string, GatewayRequestHandler>;
 const STATE_FILE = join(DATA_DIR, "trust-tracker.json");
 export const MAX_WORKFLOWS = 5;
 const MAX_RATINGS = 500;
+const MAX_DAILY_RATINGS = 90; // ~3 months of daily ratings
 /** Number of ratings needed before a trust score is assigned. */
 export const SCORE_THRESHOLD = 10;
 /** Trust score below this triggers feedback collection. */
@@ -38,9 +39,18 @@ export type TrustRating = {
   timestamp: string;
 };
 
+export type DailyRating = {
+  id: string;
+  date: string; // YYYY-MM-DD
+  rating: number; // 1-10
+  note?: string;
+  timestamp: string;
+};
+
 export type TrustTrackerState = {
   workflows: string[];
   ratings: TrustRating[];
+  dailyRatings?: DailyRating[];
   /** Per-workflow feedback that gets injected into skill context. */
   workflowFeedback: Record<string, string[]>;
   createdAt: string;
@@ -372,6 +382,113 @@ export const trustTrackerHandlers: GatewayRequestHandlers = {
     const state = await readState();
     const summaries = computeSummary(state, daysBack ?? 30);
     respond(true, { summaries, workflows: state.workflows });
+  },
+
+  /**
+   * Dashboard-optimized endpoint: returns per-workflow summaries with
+   * trust scores, trends, and an overall weighted trust score.
+   */
+  "trust.dashboard": async ({ params, respond }) => {
+    const { daysBack } = (params ?? {}) as { daysBack?: number };
+    const state = await readState();
+    const summaries = computeSummary(state, daysBack ?? 30);
+
+    // Compute overall trust score (weighted by count)
+    const scored = summaries.filter((s) => s.trustScore !== null && s.count > 0);
+    let overallScore: number | null = null;
+    if (scored.length > 0) {
+      const totalWeight = scored.reduce((s, w) => s + w.count, 0);
+      const weightedSum = scored.reduce((s, w) => s + (w.trustScore ?? 0) * w.count, 0);
+      overallScore = Math.round((weightedSum / totalWeight) * 10) / 10;
+    }
+
+    const totalRatings = state.ratings.length;
+    const totalUses = summaries.reduce((s, w) => s + w.count, 0);
+
+    // Daily rating data
+    const daily = (state.dailyRatings ?? []).slice().sort((a, b) => a.date.localeCompare(b.date));
+    const today = new Date().toISOString().slice(0, 10);
+    const todayRating = daily.find((r) => r.date === today) ?? null;
+    const recentDaily = daily.slice(-7);
+
+    // 7-day rolling average
+    let dailyAverage: number | null = null;
+    if (recentDaily.length > 0) {
+      const sum = recentDaily.reduce((s, r) => s + r.rating, 0);
+      dailyAverage = Math.round((sum / recentDaily.length) * 10) / 10;
+    }
+
+    // Consecutive days streak (counting back from today)
+    let dailyStreak = 0;
+    const dayMs = 86_400_000;
+    const dailyDates = new Set(daily.map((r) => r.date));
+    for (let d = new Date(today); ; d = new Date(d.getTime() - dayMs)) {
+      const key = d.toISOString().slice(0, 10);
+      if (dailyDates.has(key)) {
+        dailyStreak++;
+      } else {
+        break;
+      }
+    }
+
+    respond(true, {
+      workflows: state.workflows,
+      summaries,
+      overallScore,
+      totalRatings,
+      totalUses,
+      todayRating,
+      dailyAverage,
+      dailyStreak,
+      recentDaily,
+    });
+  },
+
+  "trust.dailyRate": async ({ params, respond, context }) => {
+    const { rating, note } = (params ?? {}) as { rating?: number; note?: string };
+
+    if (!rating || typeof rating !== "number" || rating < 1 || rating > 10 || !Number.isInteger(rating)) {
+      respond(false, undefined, { code: "INVALID_PARAMS", message: "rating must be an integer 1-10" });
+      return;
+    }
+
+    const state = await readState();
+    if (!state.dailyRatings) state.dailyRatings = [];
+
+    const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+
+    // Overwrite if already rated today
+    const existingIdx = state.dailyRatings.findIndex((r) => r.date === today);
+    const entry: DailyRating = {
+      id: existingIdx >= 0 ? state.dailyRatings[existingIdx].id : randomUUID(),
+      date: today,
+      rating,
+      ...(note ? { note: note.trim() } : {}),
+      timestamp: new Date().toISOString(),
+    };
+
+    if (existingIdx >= 0) {
+      state.dailyRatings[existingIdx] = entry;
+    } else {
+      state.dailyRatings.push(entry);
+    }
+
+    // Cap at MAX_DAILY_RATINGS (keep most recent)
+    if (state.dailyRatings.length > MAX_DAILY_RATINGS) {
+      state.dailyRatings = state.dailyRatings.slice(-MAX_DAILY_RATINGS);
+    }
+
+    await writeState(state);
+
+    const needsFeedback = rating < FEEDBACK_THRESHOLD;
+    context?.broadcast?.("trust:dailyUpdate", { entry });
+    respond(true, {
+      entry,
+      needsFeedback,
+      message: needsFeedback
+        ? `Rated ${rating}/10 today. What could make GodMode better?`
+        : `Rated ${rating}/10 today. Thanks for the feedback!`,
+    });
   },
 
   /**

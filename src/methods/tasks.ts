@@ -3,7 +3,7 @@ import { execFile as execFileCb } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { join, dirname } from "node:path";
 import { promisify } from "node:util";
-import { DATA_DIR } from "../data-paths.js";
+import { DATA_DIR, localDateString } from "../data-paths.js";
 import {
   findWorkspaceById,
   readWorkspaceConfig,
@@ -32,6 +32,8 @@ type NativeTask = {
   source: "chat" | "cron" | "import";
   /** Linked chat session key for task-session linking */
   sessionId: string | null;
+  /** Section heading from the daily brief this task was imported from */
+  briefSection?: string | null;
 };
 
 type TasksData = {
@@ -55,7 +57,7 @@ async function writeTasks(data: TasksData): Promise<void> {
 }
 
 function todayDateStr(): string {
-  return new Date().toISOString().slice(0, 10);
+  return localDateString();
 }
 
 const listTasks: GatewayRequestHandler = async ({ params, respond }) => {
@@ -88,18 +90,20 @@ const listTasks: GatewayRequestHandler = async ({ params, respond }) => {
   respond(true, { tasks: filtered, updatedAt: data.updatedAt });
 };
 
-const todayTasks: GatewayRequestHandler = async ({ respond }) => {
+const todayTasks: GatewayRequestHandler = async ({ params, respond }) => {
+  const { date } = params as { date?: string };
   const data = await readTasks();
-  const today = todayDateStr();
+  const today = date || todayDateStr();
   const tasks = data.tasks.filter(
     (t) => t.status === "pending" && t.dueDate != null && t.dueDate <= today,
   );
   respond(true, { tasks });
 };
 
-const upcomingTasks: GatewayRequestHandler = async ({ respond }) => {
+const upcomingTasks: GatewayRequestHandler = async ({ params, respond }) => {
+  const { date } = params as { date?: string };
   const data = await readTasks();
-  const today = todayDateStr();
+  const today = date || todayDateStr();
   const tasks = data.tasks.filter(
     (t) => t.status === "pending" && t.dueDate != null && t.dueDate > today,
   );
@@ -178,6 +182,7 @@ const updateTask: GatewayRequestHandler = async ({ params, respond }) => {
     "carryOver",
     "source",
     "sessionId",
+    "briefSection",
   ];
   for (const key of allowedKeys) {
     if (key in updates) {
@@ -192,11 +197,14 @@ const updateTask: GatewayRequestHandler = async ({ params, respond }) => {
   data.tasks[idx] = task;
   await writeTasks(data);
 
-  // If a task was just completed, trigger a brief sync for today
-  if (updates.status === "complete") {
+  // Sync brief checkbox when task status changes (complete or un-complete).
+  // Only updates the specific task that was changed — brief is authoritative
+  // for all other checkboxes.
+  if (updates.status === "complete" || updates.status === "pending") {
     try {
       const { syncBriefFromTasks } = await import("./daily-brief.js");
-      await syncBriefFromTasks(todayDateStr());
+      const syncDate = task.dueDate || todayDateStr();
+      await syncBriefFromTasks(syncDate, { taskTitle: task.title });
     } catch {
       // Brief sync is best-effort; don't fail the task update
     }
@@ -236,9 +244,10 @@ const byProject: GatewayRequestHandler = async ({ params, respond }) => {
   respond(true, { tasks, updatedAt: data.updatedAt });
 };
 
-const carryOverTasks: GatewayRequestHandler = async ({ respond }) => {
+const carryOverTasks: GatewayRequestHandler = async ({ params, respond }) => {
+  const { date } = params as { date?: string };
   const data = await readTasks();
-  const today = todayDateStr();
+  const today = date || todayDateStr();
   let count = 0;
   for (const task of data.tasks) {
     if (task.status === "pending" && task.dueDate != null && task.dueDate < today) {

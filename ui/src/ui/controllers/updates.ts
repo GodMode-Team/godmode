@@ -3,6 +3,53 @@ import type { GodModeApp } from "../app.js";
 /** How often to check for updates in the background (30 minutes). */
 const UPDATE_POLL_INTERVAL_MS = 30 * 60 * 1000;
 
+type GodModeUpdateCheckResult = {
+  openclaw: {
+    version: string;
+    latest: string | null;
+    updateAvailable: boolean;
+    installKind: string;
+    channel: string;
+  };
+  plugin: {
+    version: string;
+    latest: string | null;
+    updateAvailable: boolean;
+  };
+  fetchOk: boolean;
+};
+
+/** Map the backend response to the UI UpdateStatus shape. */
+function mapToUpdateStatus(result: GodModeUpdateCheckResult) {
+  return {
+    openclawVersion: result.openclaw.version,
+    openclawLatest: result.openclaw.latest,
+    openclawUpdateAvailable: result.openclaw.updateAvailable,
+    openclawInstallKind: result.openclaw.installKind,
+    openclawChannel: result.openclaw.channel,
+    pluginVersion: result.plugin.version,
+    pluginLatest: result.plugin.latest,
+    pluginUpdateAvailable: result.plugin.updateAvailable,
+    fetchOk: result.fetchOk,
+  };
+}
+
+/** Fallback: map the legacy system.checkUpdates response. */
+function mapLegacyStatus(result: Record<string, unknown>) {
+  const behind = typeof result.behind === "number" ? result.behind : null;
+  return {
+    openclawVersion: String(result.version ?? "unknown"),
+    openclawLatest: null,
+    openclawUpdateAvailable: (behind ?? 0) > 0,
+    openclawInstallKind: "unknown",
+    openclawChannel: null,
+    pluginVersion: "unknown",
+    pluginLatest: null,
+    pluginUpdateAvailable: false,
+    fetchOk: result.fetchOk as boolean | null,
+  };
+}
+
 export async function checkForUpdates(app: GodModeApp) {
   if (!app.client || !app.connected) return;
 
@@ -10,28 +57,30 @@ export async function checkForUpdates(app: GodModeApp) {
   app.updateError = null;
 
   try {
-    const result = (await app.client.request("system.checkUpdates", {
-      fetch: true,
-    })) as {
-      version: string;
-      branch: string | null;
-      sha: string | null;
-      upstream: string | null;
-      ahead: number | null;
-      behind: number | null;
-      dirty: boolean | null;
-      fetchOk: boolean | null;
-      error?: string;
-    };
+    // Try the new GodMode RPC method first
+    const result = (await app.client.request(
+      "godmode.update.check",
+      {},
+    )) as GodModeUpdateCheckResult;
 
-    if (result.error) {
-      app.updateError = result.error;
-    }
-
-    app.updateStatus = result;
+    app.updateStatus = mapToUpdateStatus(result);
     app.updateLastChecked = Date.now();
-  } catch (err) {
-    app.updateError = String(err);
+  } catch {
+    // Fallback to legacy OpenClaw core RPC
+    try {
+      const legacy = (await app.client.request("system.checkUpdates", {
+        fetch: true,
+      })) as Record<string, unknown>;
+
+      if (legacy.error) {
+        app.updateError = String(legacy.error);
+      }
+
+      app.updateStatus = mapLegacyStatus(legacy);
+      app.updateLastChecked = Date.now();
+    } catch (err) {
+      app.updateError = String(err);
+    }
   } finally {
     app.updateLoading = false;
   }
@@ -42,24 +91,25 @@ async function checkForUpdatesQuiet(app: GodModeApp) {
   if (!app.client || !app.connected) return;
 
   try {
-    const result = (await app.client.request("system.checkUpdates", {
-      fetch: true,
-    })) as {
-      version: string;
-      branch: string | null;
-      sha: string | null;
-      upstream: string | null;
-      ahead: number | null;
-      behind: number | null;
-      dirty: boolean | null;
-      fetchOk: boolean | null;
-      error?: string;
-    };
+    const result = (await app.client.request(
+      "godmode.update.check",
+      {},
+    )) as GodModeUpdateCheckResult;
 
-    app.updateStatus = result;
+    app.updateStatus = mapToUpdateStatus(result);
     app.updateLastChecked = Date.now();
   } catch {
-    // Silently ignore — heartbeat failures shouldn't disturb the user
+    // Fallback to legacy
+    try {
+      const legacy = (await app.client.request("system.checkUpdates", {
+        fetch: true,
+      })) as Record<string, unknown>;
+
+      app.updateStatus = mapLegacyStatus(legacy);
+      app.updateLastChecked = Date.now();
+    } catch {
+      // Silently ignore — background check failures shouldn't disturb the user
+    }
   }
 }
 

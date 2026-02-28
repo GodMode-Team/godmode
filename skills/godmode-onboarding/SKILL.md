@@ -1648,19 +1648,13 @@ Atlas: "Important: if you ever need to remove a Tailscale route, use
 
 **The Trap:** Running the wrong build command for UI.
 
-**Reality:** There are two UIs:
-
-- **GodMode UI** (`godmode-ui/`) - The real dashboard you use
-- **OpenClaw UI** (`ui/`) - Legacy control panel (rarely used)
+**Reality:** The GodMode UI lives at `ui/` inside the plugin repo.
 
 **Correct build:**
 
 ```bash
-# GodMode UI (what you actually want)
-cd godmode-ui && pnpm build
-
-# NOT this (wrong UI):
-pnpm ui:build  # ⚠️ Builds the wrong one
+# GodMode UI
+pnpm build:ui
 ```
 
 ### 4. Telegram Config Schema

@@ -41,7 +41,16 @@ import {
 import { loadLogs } from "./controllers/logs";
 import { loadNodes } from "./controllers/nodes";
 import { loadPresence } from "./controllers/presence";
-import { autoTitleCache, deleteSession, loadSessions, patchSession } from "./controllers/sessions";
+import {
+  archiveSession,
+  autoTitleCache,
+  deleteSession,
+  loadArchivedSessions,
+  loadSessions,
+  patchSession,
+  triggerAutoArchive,
+  unarchiveSession,
+} from "./controllers/sessions";
 import {
   installSkill,
   loadSkills,
@@ -73,11 +82,15 @@ import { renderOverview } from "./views/overview";
 import { renderPeople } from "./views/people";
 import { renderSessions } from "./views/sessions";
 import { renderSkills } from "./views/skills";
+import { renderLightbox } from "./chat/lightbox";
+import { getResolvedImageUrl } from "./app-gateway";
 import { renderToasts } from "./views/toast";
 import { renderVisionBoard } from "./views/vision-board";
 import { renderWheelOfLife } from "./views/wheel-of-life";
 import { renderOptions } from "./views/options";
+import { renderOnboardingWizard, type WizardStep } from "./views/onboarding-wizard";
 import { renderTrustTracker } from "./views/trust-tracker";
+import { renderGuardrails } from "./views/guardrails";
 import { renderParallelSessions } from "./views/parallel-sessions";
 import { renderWork } from "./views/work";
 import { renderWorkspaces } from "./views/workspaces";
@@ -248,6 +261,27 @@ export function renderApp(state: AppViewState) {
     );
   }
 
+  // ── Memory Onboarding Wizard (full-screen takeover) ────────
+  if (state.wizardActive && state.wizardState) {
+    return renderOnboardingWizard(state.wizardState, {
+      onStepChange: (step: WizardStep) => {
+        state.handleWizardStepChange?.(step);
+      },
+      onAnswerChange: (key: string, value: unknown) => {
+        state.handleWizardAnswerChange?.(key, value);
+      },
+      onPreview: () => {
+        void state.handleWizardPreview?.();
+      },
+      onGenerate: () => {
+        void state.handleWizardGenerate?.();
+      },
+      onClose: () => {
+        state.handleWizardClose?.();
+      },
+    });
+  }
+
   const presenceCount = state.presenceEntries.length;
   const sessionsCount = state.sessionsResult?.count ?? null;
   const cronNext = state.cronStatus?.nextWakeAtMs ?? null;
@@ -304,11 +338,11 @@ export function renderApp(state: AppViewState) {
         </div>
         <div class="topbar-status">
           ${
-            state.updateStatus?.behind
+            state.updateStatus?.openclawUpdateAvailable || state.updateStatus?.pluginUpdateAvailable
               ? html`<a
                   class="pill pill--update"
                   href="#"
-                  title="${state.updateStatus.behind} update${state.updateStatus.behind > 1 ? "s" : ""} available — click to view"
+                  title="${state.updateStatus?.openclawUpdateAvailable ? "OpenClaw update available" : "GodMode plugin update available"} — click to view"
                   @click=${(e: Event) => {
                     e.preventDefault();
                     state.setTab("overview" as Tab);
@@ -1008,6 +1042,17 @@ export function renderApp(state: AppViewState) {
                     state.workspacesCreateLoading = false;
                   }
                 },
+                onDeleteWorkspace: async (workspace) => {
+                  const { deleteWorkspace, loadAllTasks } =
+                    await import("./controllers/workspaces");
+                  const ok = await deleteWorkspace(state, workspace.id);
+                  if (!ok) {
+                    state.showToast(`Failed to delete ${workspace.name}`, "error");
+                    return;
+                  }
+                  state.showToast(`Deleted workspace: ${workspace.name}`, "success");
+                  state.allTasks = await loadAllTasks(state);
+                },
                 onSelectWorkspace: async (workspace) => {
                   state.workspaceItemSearchQuery = ""; // Clear item search when selecting workspace
                   const { selectWorkspace } = await import("./controllers/workspaces");
@@ -1098,6 +1143,7 @@ export function renderApp(state: AppViewState) {
                 },
                 allTasks: state.allTasks ?? [],
                 taskFilter: state.taskFilter ?? "all",
+                taskSort: state.taskSort ?? "due",
                 showCompletedTasks: state.showCompletedTasks ?? false,
                 onToggleTaskComplete: async (taskId, currentStatus) => {
                   const { toggleTaskComplete, loadAllTasks, getWorkspace } =
@@ -1136,6 +1182,9 @@ export function renderApp(state: AppViewState) {
                 },
                 onSetTaskFilter: (filter) => {
                   state.taskFilter = filter;
+                },
+                onSetTaskSort: (sort) => {
+                  state.taskSort = sort;
                 },
                 onToggleCompletedTasks: () => {
                   state.showCompletedTasks = !(state.showCompletedTasks ?? false);
@@ -1233,9 +1282,6 @@ export function renderApp(state: AppViewState) {
                   onBriefOpenInObsidian: () => state.handleDailyBriefOpenInObsidian(),
                   onBriefSave: (content: string) => state.handleBriefSave(content),
                   onOpenFile: (path: string) => void state.handleOpenFile(path),
-                  briefEditing: state.briefEditing ?? false,
-                  onBriefEditStart: () => state.handleBriefEditStart(),
-                  onBriefEditEnd: () => state.handleBriefEditEnd(),
                   // Date navigation props
                   selectedDate: state.todaySelectedDate,
                   onDatePrev: () => state.handleDatePrev(),
@@ -1560,13 +1606,19 @@ export function renderApp(state: AppViewState) {
                 includeGlobal: state.sessionsIncludeGlobal,
                 includeUnknown: state.sessionsIncludeUnknown,
                 basePath: state.basePath,
+                archivedSessions: state.archivedSessions,
+                archivedSessionsLoading: state.archivedSessionsLoading,
+                archivedSessionsExpanded: state.archivedSessionsExpanded,
                 onFiltersChange: (next) => {
                   state.sessionsFilterActive = next.activeMinutes;
                   state.sessionsFilterLimit = next.limit;
                   state.sessionsIncludeGlobal = next.includeGlobal;
                   state.sessionsIncludeUnknown = next.includeUnknown;
                 },
-                onRefresh: () => loadSessions(state),
+                onRefresh: () => {
+                  loadSessions(state);
+                  loadArchivedSessions(state);
+                },
                 onPatch: async (key, patch) => {
                   const result = await patchSession(state, key, patch);
                   // Update openTabs with canonical key if it differs
@@ -1600,6 +1652,15 @@ export function renderApp(state: AppViewState) {
                   }
                 },
                 onDelete: (key) => deleteSession(state, key),
+                onArchive: (key) => archiveSession(state, key),
+                onUnarchive: (key) => unarchiveSession(state, key),
+                onToggleArchived: () => {
+                  state.archivedSessionsExpanded = !state.archivedSessionsExpanded;
+                  if (state.archivedSessionsExpanded && state.archivedSessions.length === 0) {
+                    loadArchivedSessions(state);
+                  }
+                },
+                onAutoArchive: () => triggerAutoArchive(state),
               })
             : nothing
         }
@@ -1967,6 +2028,10 @@ export function renderApp(state: AppViewState) {
                 onMessageLinkClick: (href: string) => state.handleOpenMessageFileLink(href),
                 onCloseSidebar: () => state.handleCloseSidebar(),
                 onSplitRatioChange: (ratio: number) => state.handleSplitRatioChange(ratio),
+                onImageClick: (url: string, allImages: import("./chat/lightbox").LightboxImage[], index: number) =>
+                  state.handleImageClick(url, allImages, index),
+                resolveImageUrl: (msgIdx: number, imgIdx: number) =>
+                  getResolvedImageUrl(state.sessionKey, msgIdx, imgIdx),
                 assistantName: state.assistantName,
                 assistantAvatar: state.assistantAvatar,
                 userName: state.userName,
@@ -1975,6 +2040,7 @@ export function renderApp(state: AppViewState) {
                 currentToolInfo: state.currentToolInfo,
                 isWorking: state.workingSessions.has(state.sessionKey),
                 // Scroll state
+                showScrollButton: !state.chatUserNearBottom,
                 showNewMessages: state.chatNewMessagesBelow,
                 onScrollToBottom: () => {
                   const container = document.querySelector(".chat-thread");
@@ -1996,6 +2062,21 @@ export function renderApp(state: AppViewState) {
                 options: state.godmodeOptions,
                 onToggle: (key, value) => state.handleOptionToggle(key, value),
                 onRefresh: () => state.handleOptionsLoad(),
+                onOpenWizard: state.handleWizardOpen ? () => state.handleWizardOpen?.() : undefined,
+              })
+            : nothing
+        }
+
+        ${
+          state.tab === "guardrails"
+            ? renderGuardrails({
+                connected: state.connected,
+                loading: state.guardrailsLoading,
+                data: state.guardrailsData,
+                onToggle: (gateId, enabled) => state.handleGuardrailToggle(gateId, enabled),
+                onThresholdChange: (gateId, key, value) =>
+                  state.handleGuardrailThresholdChange(gateId, key, value),
+                onRefresh: () => state.handleGuardrailsLoad(),
               })
             : nothing
         }
@@ -2009,6 +2090,19 @@ export function renderApp(state: AppViewState) {
                 onAddWorkflow: (w) => state.handleTrustAddWorkflow(w),
                 onRemoveWorkflow: (w) => state.handleTrustRemoveWorkflow(w),
                 onRefresh: () => state.handleTrustLoad(),
+                guardrailsData: state.guardrailsData,
+                consciousnessStatus: state.consciousnessStatus,
+                sessionsCount,
+                gatewayUptimeMs: (state.hello?.snapshot as { uptimeMs?: number } | undefined)?.uptimeMs ?? null,
+                onDailyRate: (rating: number, note?: string) => state.handleDailyRate(rating, note),
+                updateStatus: state.updateStatus ? {
+                  openclawUpdateAvailable: state.updateStatus.openclawUpdateAvailable,
+                  pluginUpdateAvailable: state.updateStatus.pluginUpdateAvailable,
+                  openclawVersion: state.updateStatus.openclawVersion,
+                  pluginVersion: state.updateStatus.pluginVersion,
+                  openclawLatest: state.updateStatus.openclawLatest,
+                  pluginLatest: state.updateStatus.pluginLatest,
+                } : null,
               })
             : nothing
         }
@@ -2135,6 +2229,10 @@ export function renderApp(state: AppViewState) {
       ${renderToasts({
         toasts: state.toasts,
         onDismiss: (id) => state.dismissToast(id),
+      })}
+      ${renderLightbox(state.lightbox, {
+        onClose: () => state.handleLightboxClose(),
+        onNav: (delta: number) => state.handleLightboxNav(delta),
       })}
     </div>
   `;

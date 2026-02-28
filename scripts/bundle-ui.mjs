@@ -14,7 +14,6 @@
  * 4) <plugin>/assets/deck (committed fallback snapshot)
  * 5) sibling workspaces:
  *    - ../openclaw-deck/dist
- *    - ../GodMode/dist/deck
  *
  * Missing assets fail the build by default to avoid shipping a plugin without UIs.
  * Set GODMODE_UI_OPTIONAL=1 or GODMODE_DECK_OPTIONAL=1 to skip a missing bundle.
@@ -206,7 +205,6 @@ const deckCandidates = [
   join(pluginRoot, "deck", "dist"),
   join(pluginRoot, "assets", "deck"),
   join(pluginRoot, "..", "openclaw-deck", "dist"),
-  join(pluginRoot, "..", "GodMode", "dist", "deck"),
 ].filter(Boolean);
 
 copyBundle({

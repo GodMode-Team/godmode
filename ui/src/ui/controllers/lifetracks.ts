@@ -1,3 +1,4 @@
+import { localDateString } from "../format.js";
 import type { GatewayBrowserClient } from "../gateway.js";
 import type { LifetracksConfig } from "../views/lifetracks.js";
 
@@ -70,7 +71,7 @@ export async function loadLifetracks(state: LifetracksState): Promise<void> {
 
       // Set current track to today's or most recent
       if (result.lifetracks.length > 0) {
-        const today = new Date().toISOString().split("T")[0];
+        const today = localDateString();
         const todayTrack = result.lifetracks.find((t) => t.date === today);
         state.lifetracksCurrentTrack = todayTrack || result.lifetracks[0];
       } else {

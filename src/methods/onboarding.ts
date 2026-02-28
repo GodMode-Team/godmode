@@ -15,7 +15,7 @@
 
 import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { join } from "node:path";
-import { DATA_DIR } from "../data-paths.js";
+import { DATA_DIR, GODMODE_ROOT } from "../data-paths.js";
 import type { GatewayRequestHandler } from "openclaw/plugin-sdk";
 import {
   type OnboardingState,
@@ -23,6 +23,14 @@ import {
   emptyOnboardingState,
 } from "./onboarding-types.js";
 import { runAssessment, generateConfigRecommendations } from "./onboarding-scanner.js";
+import {
+  generateWorkspaceFiles,
+  patchOCConfig,
+  checkOnboardingStatus,
+  previewOnboarding,
+  sanitizeAnswers,
+  type OnboardingAnswers,
+} from "../services/onboarding.js";
 
 // ── Checklist Types ─────────────────────────────────────────────
 
@@ -531,9 +539,9 @@ export const onboardingHandlers: GatewayRequestHandlers = {
     // Deep onboarding: firstWin
     if (params.firstWin && typeof params.firstWin === "object") {
       state.firstWin = deepMerge(
-        state.firstWin ?? { demoType: "daily-brief", completed: false },
+        state.firstWin ?? { demoType: "daily-brief" as const, completed: false },
         params.firstWin as Record<string, unknown>,
-      );
+      ) as typeof state.firstWin;
     }
 
     // Deep onboarding: grandReveal
@@ -741,4 +749,113 @@ export const onboardingHandlers: GatewayRequestHandlers = {
           : "Your config looks good! No changes needed.",
     });
   },
+
+  // ── Memory Onboarding Wizard Handlers ───────────────────────────
+
+  /**
+   * Check workspace status: which memory files exist/are missing.
+   * Used by the UI wizard to detect if onboarding is needed.
+   */
+  "onboarding.wizard.status": async ({ respond }) => {
+    const status = await checkOnboardingStatus(GODMODE_ROOT);
+    respond(true, { ...status, workspacePath: GODMODE_ROOT });
+  },
+
+  /**
+   * Preview what the wizard would generate (without writing anything).
+   * Returns a list of files + config changes for the review screen.
+   */
+  "onboarding.wizard.preview": async ({ params, respond }) => {
+    const answers = parseWizardAnswers(params);
+    const preview = await previewOnboarding(answers, GODMODE_ROOT);
+    respond(true, preview);
+  },
+
+  /**
+   * Run the wizard: generate all workspace files and patch OC config.
+   * Accepts the 8 onboarding answers from the UI form.
+   */
+  "onboarding.wizard.generate": async ({ params, respond, context }) => {
+    const answers = parseWizardAnswers(params);
+    const force = Boolean(params.force);
+    const shouldPatchConfig = params.patchConfig !== false;
+
+    // Generate workspace files
+    const fileResults = await generateWorkspaceFiles(answers, GODMODE_ROOT, { force });
+    const created = fileResults.filter((f) => f.created).length;
+    const skipped = fileResults.filter((f) => f.skipped).length;
+
+    // Patch OC config
+    let configResult: { patched: boolean; error?: string } = { patched: false };
+    if (shouldPatchConfig) {
+      configResult = await patchOCConfig(answers);
+    }
+
+    // Update onboarding state to reflect wizard completion
+    const state = await readOnboarding();
+    state.interview = {
+      name: answers.name,
+      role: answers.focus,
+      mission: answers.focus,
+      workflows: answers.projects,
+      completed: true,
+    };
+    state.secondBrain = {
+      memorySeeded: true,
+      dailyBriefConfigured: false,
+      completed: true,
+    };
+    state.identity = {
+      name: answers.name,
+      mission: answers.focus,
+      emoji: "\u{1F680}",
+    };
+    if (!state.completedPhases.includes(1)) state.completedPhases.push(1);
+    if (!state.completedPhases.includes(2)) state.completedPhases.push(2);
+    state.completedPhases.sort();
+    if (state.phase < 3) state.phase = 3 as OnboardingPhase;
+    await writeOnboarding(state);
+
+    try {
+      context?.broadcast?.("onboarding:update", state);
+      context?.broadcast?.("onboarding:wizard-complete", {
+        filesCreated: created,
+        filesSkipped: skipped,
+        configPatched: configResult.patched,
+      });
+    } catch {}
+
+    respond(true, {
+      success: true,
+      filesCreated: created,
+      filesSkipped: skipped,
+      files: fileResults.map((f) => ({
+        path: f.path,
+        created: f.created,
+        skipped: f.skipped,
+      })),
+      configPatched: configResult.patched,
+      configError: configResult.error,
+      workspacePath: GODMODE_ROOT,
+    });
+  },
 };
+
+// ── Wizard Param Parser ──────────────────────────────────────────
+
+/**
+ * Extract OnboardingAnswers from raw RPC params, delegating all
+ * validation, defaults, and length limits to sanitizeAnswers().
+ */
+function parseWizardAnswers(params: Record<string, unknown>): OnboardingAnswers {
+  return sanitizeAnswers({
+    name: typeof params.name === "string" ? params.name : undefined,
+    timezone: typeof params.timezone === "string" ? params.timezone : undefined,
+    focus: typeof params.focus === "string" ? params.focus : undefined,
+    projects: Array.isArray(params.projects) ? (params.projects as string[]) : undefined,
+    commStyle: typeof params.commStyle === "string" ? params.commStyle : undefined,
+    hardRules: Array.isArray(params.hardRules) ? (params.hardRules as string[]) : undefined,
+    keyPeople: Array.isArray(params.keyPeople) ? (params.keyPeople as string[]) : undefined,
+    defaultModel: typeof params.defaultModel === "string" ? params.defaultModel : undefined,
+  });
+}
