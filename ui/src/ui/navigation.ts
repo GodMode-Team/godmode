@@ -10,14 +10,10 @@ export const TAB_GROUPS = [
   { label: "Settings", tabs: ["config", "debug", "logs"] },
 ] as const;
 
-// Mission Control hidden from sidebar — code kept for future rebuild.
-// To re-enable: add "mission" back to first TAB_GROUPS entry.
-
 export type Tab =
   | "guardrails"
   | "options"
   | "overview"
-  | "mission"
   | "workspaces"
   | "today"
   | "work"
@@ -43,7 +39,6 @@ export type Tab =
 const TAB_PATHS: Record<Tab, string> = {
   options: "/options",
   overview: "/overview",
-  mission: "/mission",
   workspaces: "/workspaces",
   today: "/today",
   work: "/work",
@@ -181,8 +176,6 @@ export function iconForTab(tab: Tab): IconName {
       return "barChart";
     case "overview":
       return "barChart";
-    case "mission":
-      return "zap";
     case "workspaces":
       return "folder";
     case "wheel-of-life":
@@ -237,8 +230,6 @@ export function titleForTab(tab: Tab) {
       return "Data";
     case "overview":
       return "Overview";
-    case "mission":
-      return "Mission Control";
     case "workspaces":
       return "Work";
     case "wheel-of-life":
@@ -293,8 +284,6 @@ export function emojiForTab(tab: Tab): string {
       return "\u{1F4CA}";
     case "overview":
       return "\u{1F3AF}";
-    case "mission":
-      return "\u{26A1}";
     case "workspaces":
       return "\u{1F4C2}";
     case "wheel-of-life":
@@ -349,8 +338,6 @@ export function subtitleForTab(tab: Tab) {
       return "Connected integrations, data sources, and query interface.";
     case "overview":
       return "Gateway status, entry points, and a fast health read.";
-    case "mission":
-      return "Agent orchestration — active runs, fleet status, and task queue.";
     case "workspaces":
       return "Content explorer organized by project and client.";
     case "wheel-of-life":

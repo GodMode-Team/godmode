@@ -55,6 +55,7 @@ import { sessionArchiveHandlers } from "./src/methods/session-archive.js";
 import { systemUpdateHandlers, setPluginVersion, runPostUpdateHealthCheck } from "./src/methods/system-update.js";
 import { createTrustRateTool } from "./src/tools/trust-rate.js";
 import { createOnboardTool } from "./src/tools/onboard.js";
+import { createMorningSetTool } from "./src/tools/morning-set.js";
 import { initAgentLogWriter } from "./src/services/agent-log-writer.js";
 import { CodingOrchestrator } from "./src/services/coding-orchestrator.js";
 import { CodingNotificationService } from "./src/services/coding-notification.js";
@@ -856,6 +857,16 @@ h1{color:#ff6b6b}code{background:#16213e;padding:2px 8px;border-radius:4px}a{col
         api.logger.warn(`[GodMode] Post-update health check error: ${String(err)}`);
       }
 
+      // Focus Pulse heartbeat service — init and resume if active
+      try {
+        const { initHeartbeat, resumeHeartbeatIfActive } = await import("./src/services/focus-pulse-heartbeat.js");
+        initHeartbeat(api.logger);
+        await resumeHeartbeatIfActive();
+        api.logger.info("[GodMode] Focus Pulse heartbeat service ready");
+      } catch (err) {
+        api.logger.warn(`[GodMode] Focus Pulse heartbeat failed to init: ${String(err)}`);
+      }
+
       // Recover orphaned coding tasks from previous gateway instance
       if (codingOrchestrator.isEnabled()) {
         codingOrchestrator.recoverOrphanedTasks().then((result) => {
@@ -892,6 +903,12 @@ h1{color:#ff6b6b}code{background:#16213e;padding:2px 8px;border-radius:4px}a{col
       try {
         const { getIDEActivityWatcher } = await import("./src/services/ide-activity-watcher.js");
         await getIDEActivityWatcher().stop();
+      } catch {
+        // Non-fatal
+      }
+      try {
+        const { stopHeartbeat } = await import("./src/services/focus-pulse-heartbeat.js");
+        stopHeartbeat();
       } catch {
         // Non-fatal
       }
@@ -1114,6 +1131,7 @@ h1{color:#ff6b6b}code{background:#16213e;padding:2px 8px;border-radius:4px}a{col
     api.registerTool((ctx) => createCodingTaskTool(ctx, { orchestrator: codingOrchestrator, logger: api.logger }));
     api.registerTool((ctx) => createTrustRateTool(ctx));
     api.registerTool((ctx) => createOnboardTool(ctx));
+    api.registerTool((ctx) => createMorningSetTool(ctx));
 
     // ── 6. Register CLI commands ──────────────────────────────────
     api.registerCli(

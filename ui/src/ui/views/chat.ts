@@ -540,6 +540,20 @@ async function handleChatThreadLinkClick(event: MouseEvent, props: ChatProps) {
       return;
     }
 
+    // External URLs: open synchronously via window.open BEFORE any await.
+    // Calling window.open after an await breaks the user-gesture chain and
+    // gets silently blocked by popup blockers / webview security.
+    try {
+      const url = new URL(href, window.location.href);
+      if (/^https?:$/.test(url.protocol) && url.origin !== window.location.origin) {
+        event.preventDefault();
+        window.open(url.href, "_blank", "noopener,noreferrer");
+        return;
+      }
+    } catch {
+      // Not a valid URL — fall through to workspace file handler
+    }
+
     event.preventDefault();
     const handled = await props.onMessageLinkClick(href);
     if (!handled) {
@@ -553,7 +567,16 @@ async function handleChatThreadLinkClick(event: MouseEvent, props: ChatProps) {
     return;
   }
 
-  const pathCandidate = extractPathCandidateFromCode(code.textContent ?? "");
+  const codeText = (code.textContent ?? "").trim();
+
+  // URLs inside <code> blocks — open in browser directly
+  if (/^https?:\/\/\S+$/i.test(codeText)) {
+    event.preventDefault();
+    window.open(codeText, "_blank", "noopener,noreferrer");
+    return;
+  }
+
+  const pathCandidate = extractPathCandidateFromCode(codeText);
   if (!pathCandidate) {
     return;
   }

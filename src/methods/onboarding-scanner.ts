@@ -5,10 +5,12 @@
  * the agent and the UI how well the user's setup is configured.
  */
 
+import { execFile } from "node:child_process";
 import { readFile, readdir, stat } from "node:fs/promises";
 import { join, extname } from "node:path";
 import { homedir } from "node:os";
 import type { AssessmentResult, FeatureCheck } from "./onboarding-types.js";
+import { resolveVaultPath } from "../data-paths.js";
 
 const OC_DIR = join(homedir(), ".openclaw");
 const OC_CONFIG = join(OC_DIR, "openclaw.json");
@@ -173,6 +175,27 @@ function checkFeatures(config: Record<string, unknown>): FeatureCheck[] {
   }
 
   return checks;
+}
+
+// ── GitHub CLI Check ─────────────────────────────────────────────
+
+async function checkGitHubReady(): Promise<boolean> {
+  try {
+    const exitCode = await new Promise<number>((resolve) => {
+      execFile("gh", ["auth", "status"], { timeout: 5_000 }, (err) => {
+        resolve(err ? 1 : 0);
+      });
+    });
+    return exitCode === 0;
+  } catch {
+    return false;
+  }
+}
+
+// ── Obsidian Vault Check ────────────────────────────────────────
+
+function checkObsidianVault(): boolean {
+  return resolveVaultPath() !== null;
 }
 
 // ── Health Score ─────────────────────────────────────────────────
@@ -447,6 +470,10 @@ export async function runAssessment(): Promise<AssessmentResult> {
   const dataDir = join(GODMODE_ROOT, "data");
   const workspaceConfigured = await dirExists(dataDir);
 
+  // Check key dependencies
+  const githubReady = await checkGitHubReady();
+  const obsidianVaultConfigured = checkObsidianVault();
+
   const partial = {
     configExists,
     authMethod,
@@ -460,6 +487,8 @@ export async function runAssessment(): Promise<AssessmentResult> {
     skillsInstalled,
     features,
     workspaceConfigured,
+    githubReady,
+    obsidianVaultConfigured,
   };
 
   return {

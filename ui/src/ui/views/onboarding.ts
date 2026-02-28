@@ -55,6 +55,8 @@ export type AssessmentResult = {
 	skillsInstalled: string[];
 	features: { key: string; label: string; enabled: boolean }[];
 	workspaceConfigured: boolean;
+	githubReady: boolean;
+	obsidianVaultConfigured: boolean;
 	timestamp: string;
 };
 
@@ -235,6 +237,14 @@ function renderAssessmentDashboard(assessment: AssessmentResult): TemplateResult
 				<div class="assessment-item ${assessment.channelsConnected.length > 0 ? "ok" : "gap"}">
 					<span class="assessment-icon">${assessment.channelsConnected.length > 0 ? "\u2705" : "\u274C"}</span>
 					<span>Channels: ${assessment.channelsConnected.length > 0 ? assessment.channelsConnected.join(", ") : "none"}</span>
+				</div>
+				<div class="assessment-item ${assessment.githubReady ? "ok" : "gap"}">
+					<span class="assessment-icon">${assessment.githubReady ? "\u2705" : "\u274C"}</span>
+					<span>GitHub CLI${assessment.githubReady ? "" : " (needed for coding + workspaces)"}</span>
+				</div>
+				<div class="assessment-item ${assessment.obsidianVaultConfigured ? "ok" : "gap"}">
+					<span class="assessment-icon">${assessment.obsidianVaultConfigured ? "\u2705" : "\u274C"}</span>
+					<span>Obsidian vault${assessment.obsidianVaultConfigured ? "" : " (needed for daily brief)"}</span>
 				</div>
 				<div class="assessment-item ${assessment.skillsInstalled.length > 0 ? "ok" : "gap"}">
 					<span class="assessment-icon">${assessment.skillsInstalled.length > 0 ? "\u2705" : "\u274C"}</span>

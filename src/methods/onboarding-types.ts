@@ -35,6 +35,10 @@ export type AssessmentResult = {
   skillsInstalled: string[];
   features: FeatureCheck[];
   workspaceConfigured: boolean;
+  /** GitHub CLI installed and authenticated (needed for coding tasks + team workspaces) */
+  githubReady: boolean;
+  /** Obsidian vault path resolved (needed for daily brief) */
+  obsidianVaultConfigured: boolean;
   timestamp: string;
 };
 

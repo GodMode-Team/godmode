@@ -19,7 +19,6 @@ type GodModeOptions = Record<string, unknown>;
 const DEFAULTS: GodModeOptions = {
   "focusPulse.enabled": true,
   "deck.enabled": false,
-  "missionControl.enabled": false,
 };
 
 async function readOptions(): Promise<GodModeOptions> {

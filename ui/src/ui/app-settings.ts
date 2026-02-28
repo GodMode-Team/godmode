@@ -19,7 +19,6 @@ import { loadDevices } from "./controllers/devices";
 import { loadExecApprovals } from "./controllers/exec-approvals";
 import { loadLifetracks } from "./controllers/lifetracks";
 import { loadLogs } from "./controllers/logs";
-import { loadMission } from "./controllers/mission";
 import { loadMyDay } from "./controllers/my-day";
 import { loadNodes } from "./controllers/nodes";
 import { loadPeople } from "./controllers/people";
@@ -233,9 +232,6 @@ export async function refreshActiveTab(host: SettingsHost) {
   }
   if (host.tab === "people") {
     await loadPeople(host as unknown as GodModeApp);
-  }
-  if (host.tab === "mission") {
-    await loadMission(host as unknown as GodModeApp);
   }
   if (host.tab === "workspaces") {
     await loadWorkspaces(host as unknown as GodModeApp);

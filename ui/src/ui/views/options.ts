@@ -27,14 +27,6 @@ const FEATURES: FeatureDescriptor[] = [
       "Parallel agent session manager. Opens in a separate tab for multi-agent workflows.",
     default: false,
   },
-  {
-    key: "missionControl.enabled",
-    icon: "\uD83D\uDCE1",
-    name: "Mission Control",
-    description:
-      "Ops dashboard for gateway health, feed activity, and task queue. Under reconstruction.",
-    default: false,
-  },
 ];
 
 // ===== Types =====

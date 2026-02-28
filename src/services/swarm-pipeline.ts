@@ -339,9 +339,20 @@ export class SwarmPipeline {
       const args = ["-p", prompt, "--verbose", "--dangerously-skip-permissions"];
       if (model) args.push("--model", model);
 
-      const childEnv = { ...process.env };
-      if (childEnv.PATH && !childEnv.PATH.includes("/opt/homebrew/bin")) {
-        childEnv.PATH = `/opt/homebrew/bin:${childEnv.PATH}`;
+      const parentPath = process.env.PATH ?? "";
+      const childEnv: Record<string, string> = {
+        PATH: parentPath.includes("/opt/homebrew/bin")
+          ? parentPath
+          : `/opt/homebrew/bin:${parentPath}`,
+        HOME: process.env.HOME ?? "",
+        USER: process.env.USER ?? "",
+        SHELL: process.env.SHELL ?? "/bin/zsh",
+        LANG: process.env.LANG ?? "en_US.UTF-8",
+        TERM: process.env.TERM ?? "xterm-256color",
+      };
+      // Forward ANTHROPIC_API_KEY if set (required by claude CLI)
+      if (process.env.ANTHROPIC_API_KEY) {
+        childEnv.ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
       }
 
       const child = spawn(claudeBin, args, {
