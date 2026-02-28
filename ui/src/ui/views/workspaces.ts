@@ -865,7 +865,7 @@ export function renderWorkspaces(props: WorkspacesProps) {
     createLoading,
     error,
     allTasks = [],
-    taskFilter = "all",
+    taskFilter = "outstanding",
     taskSort = "due" as TaskSort,
     showCompletedTasks = false,
     editingTaskId,

@@ -1131,13 +1131,19 @@ export function renderApp(state: AppViewState) {
                     state.requestUpdate();
                   });
                 },
-                onTeamSetup: () => {
-                  import("./controllers/workspaces").then(({ startTeamSetup }) => {
-                    void startTeamSetup(state);
-                  });
+                onTeamSetup: async () => {
+                  let prompt = "I want to set up a Team Workspace so my team can collaborate. Please walk me through it step by step, keeping it simple.";
+                  try {
+                    const res = await state.client?.request<{ prompt?: string }>(
+                      "workspaces.teamSetupPrompt",
+                      {},
+                    );
+                    if (res?.prompt) prompt = res.prompt;
+                  } catch { /* use default prompt */ }
+                  state.handleStartChatWithPrompt(prompt);
                 },
                 allTasks: state.allTasks ?? [],
-                taskFilter: state.taskFilter ?? "all",
+                taskFilter: state.taskFilter ?? "outstanding",
                 taskSort: state.taskSort ?? "due",
                 showCompletedTasks: state.showCompletedTasks ?? false,
                 onToggleTaskComplete: async (taskId, currentStatus) => {

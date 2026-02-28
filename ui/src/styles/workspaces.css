@@ -187,8 +187,7 @@
 
 .workspace-card-wrapper {
   position: relative;
-  min-width: 220px;
-  max-width: 260px;
+  width: 220px;
   flex-shrink: 0;
   scroll-snap-align: start;
 }
