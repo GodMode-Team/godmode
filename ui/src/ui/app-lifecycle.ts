@@ -9,7 +9,7 @@ import {
   stopDebugPolling,
 } from "./app-polling";
 import { createNewSession } from "./app-render.helpers";
-import { observeTopbar, scheduleChatScroll, scheduleLogsScroll } from "./app-scroll";
+import { observeTopbar, resetChatScroll, scheduleChatScroll, scheduleLogsScroll } from "./app-scroll";
 import {
   applySettingsFromUrl,
   attachThemeListener,
@@ -510,6 +510,9 @@ export function handleUpdated(host: LifecycleHost, changed: Map<PropertyKey, unk
     if (changed.has("chatStream")) {
       // Don't force, but ensure scheduleChatScroll runs so it can decide based on userNearBottom
       forceScroll = false;
+    }
+    if (forcedByTab || forcedByLoad) {
+      resetChatScroll(host as unknown as Parameters<typeof resetChatScroll>[0]);
     }
     scheduleChatScroll(
       host as unknown as Parameters<typeof scheduleChatScroll>[0],
