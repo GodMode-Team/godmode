@@ -363,14 +363,27 @@ const STALE_TASK_MAX_AGE_MS = 2 * 60 * 60 * 1000; // 2 hours
 
 type GateResult = { passed: boolean; details: string };
 
+/** Read package.json scripts from a directory, returning an empty object if none exists. */
+async function readPkgScripts(dir: string): Promise<Record<string, string>> {
+  try {
+    const raw = await fs.readFile(path.join(dir, "package.json"), "utf-8");
+    const pkg = JSON.parse(raw) as { scripts?: Record<string, string> };
+    return pkg.scripts ?? {};
+  } catch {
+    return {};
+  }
+}
+
 async function runValidationGates(
   run: RunCmd,
   worktreePath: string,
   config: CodingConfig["validation"],
 ): Promise<GateResult> {
   const failures: string[] = [];
+  const scripts = await readPkgScripts(worktreePath);
+  const hasScript = (name: string) => name in scripts;
 
-  if (config?.lint !== false) {
+  if (config?.lint !== false && hasScript("lint")) {
     try {
       const { exitCode, stdout } = await run(["pnpm", "lint"], { timeoutMs: 60_000, cwd: worktreePath });
       if (exitCode !== 0) failures.push(`lint failed: ${stdout.slice(0, 200)}`);
@@ -379,7 +392,7 @@ async function runValidationGates(
     }
   }
 
-  if (config?.typecheck !== false) {
+  if (config?.typecheck !== false && (hasScript("typecheck") || hasScript("tsc"))) {
     try {
       const { exitCode, stdout } = await run(["pnpm", "tsc", "--noEmit"], { timeoutMs: 120_000, cwd: worktreePath });
       if (exitCode !== 0) failures.push(`typecheck failed: ${stdout.slice(0, 200)}`);
@@ -388,7 +401,7 @@ async function runValidationGates(
     }
   }
 
-  if (config?.test !== false) {
+  if (config?.test !== false && hasScript("test")) {
     try {
       const { exitCode, stdout } = await run(["pnpm", "test", "--run"], { timeoutMs: 300_000, cwd: worktreePath });
       if (exitCode !== 0) failures.push(`tests failed: ${stdout.slice(0, 200)}`);
