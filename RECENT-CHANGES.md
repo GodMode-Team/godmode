@@ -4,6 +4,46 @@ This file tracks recent development changes so Atlas and other agents can quickl
 
 ---
 
+## 2026-02-28 — Swarm Pipeline + Workspace-Aware Resources
+
+### What
+Complex coding tasks now run through a 3-stage sequential pipeline: **Design → Build → QC**. Each stage is a specialized Claude Code agent that writes to `.swarm/` coordination files in the worktree.
+
+### Swarm Activation
+Swarm activates when ALL of:
+1. `classifyComplexity(task)` returns `"complex"`
+2. A plan doc exists and is approved
+3. Simple tasks still use single-agent flow unchanged
+
+### Pipeline Stages
+- **Design Agent** — reads codebase + brand guide + voice bible, writes `.swarm/design-brief.md` (no code)
+- **Build Agent** — follows design brief, runs the copy skill's 3-stage pipeline for all user-facing text, commits and pushes
+- **QC Agent** — fresh-eyes review, kills AI-sounding copy (12 anti-patterns), fixes small issues, writes `.swarm/qc-report.md`
+
+### Workspace-Aware Resources
+Each stage detects the target workspace (e.g., "TRP funnel" → TRP workspace) and resolves project-specific resources in priority order:
+1. Workspace repo directory
+2. `~/godmode/projects/{id}/`
+3. `~/godmode/clients/{id}/`
+4. Falls back to global GodMode voice bible + brand guide
+
+This means "build a funnel for TRP" automatically gets TRP's brand strategy guide, copy direction, and project context — not generic GodMode defaults.
+
+### Orphan Recovery
+Gateway restarts no longer lose in-flight tasks. `recoverOrphanedTasks()` runs on startup:
+- Dead PID → runs `handleTaskCompleted` immediately (validation gates → PR)
+- Live PID → polls every 5s until exit
+- Swarm-aware: checks current stage PID and advances pipeline appropriately
+
+### Files
+- `src/services/swarm-pipeline.ts` — **New** pipeline orchestration, stage prompts, workspace resource resolution
+- `src/lib/coding-task-state.ts` — Added `SwarmStage`, `SwarmStageState`, `SwarmState` types
+- `src/tools/coding-task.ts` — Swarm/single-agent branching
+- `src/services/coding-orchestrator.ts` — Orphan recovery, dep install before gates, `runCommand` exposure
+- `index.ts` — Logger passing, orphan recovery on startup
+
+---
+
 ## 2026-02-28 — Coding Task Orchestration Fix (End-to-End)
 
 ### Problem
