@@ -1,15 +1,15 @@
 /**
- * GodMode — CoreTex
+ * GodMode — Second Brain
  *
  * Read-only window into the user's accumulated AI context.
  * Reads from ~/godmode/memory/ and ~/godmode/ files.
  *
  * RPC methods:
- *   coretex.identity        — USER.md, SOUL.md, VISION.md, opinions.md, THESIS.md
- *   coretex.memoryBank      — file/folder listings from bank/, projects/
- *   coretex.memoryBankEntry — single file content
- *   coretex.aiPacket        — CONSCIOUSNESS.md + WORKING.md
- *   coretex.sync            — trigger consciousness-sync.sh
+ *   secondBrain.identity        — USER.md, SOUL.md, VISION.md, opinions.md, THESIS.md
+ *   secondBrain.memoryBank      — file/folder listings from bank/, projects/
+ *   secondBrain.memoryBankEntry — single file content
+ *   secondBrain.aiPacket        — CONSCIOUSNESS.md + WORKING.md
+ *   secondBrain.sync            — trigger consciousness-sync.sh
  */
 
 import { exec as nodeExec } from "node:child_process";
@@ -21,10 +21,10 @@ import {
   readFileSync,
   statSync,
 } from "node:fs";
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { basename, extname, join, relative } from "node:path";
 import type { GatewayRequestHandler } from "openclaw/plugin-sdk";
-import { GODMODE_ROOT, MEMORY_DIR } from "../data-paths.js";
+import { DATA_DIR, GODMODE_ROOT, MEMORY_DIR } from "../data-paths.js";
 
 type GatewayRequestHandlers = Record<string, GatewayRequestHandler>;
 
@@ -300,7 +300,7 @@ const sync: GatewayRequestHandler = async ({ respond, context }) => {
     return;
   }
 
-  context?.broadcast?.("coretex:sync-status", { status: "syncing" }, { dropIfSlow: true });
+  context?.broadcast?.("secondBrain:sync-status", { status: "syncing" }, { dropIfSlow: true });
 
   try {
     const childEnv = { ...process.env, HOME: process.env.HOME } as Record<string, string | undefined>;
@@ -323,7 +323,7 @@ const sync: GatewayRequestHandler = async ({ respond, context }) => {
     const working = safeReadFile(workingPath);
 
     context?.broadcast?.(
-      "coretex:sync-status",
+      "secondBrain:sync-status",
       { status: "ok", updatedAt: new Date().toISOString() },
       { dropIfSlow: true },
     );
@@ -340,7 +340,7 @@ const sync: GatewayRequestHandler = async ({ respond, context }) => {
     });
   } catch (err) {
     context?.broadcast?.(
-      "coretex:sync-status",
+      "secondBrain:sync-status",
       { status: "error", message: String(err) },
       { dropIfSlow: true },
     );
@@ -354,14 +354,14 @@ type SourceEntry = {
   id: string;
   name: string;
   type: string;
-  status: "connected" | "available" | "coming-soon";
+  status: "connected" | "available";
   icon: string;
   description: string;
   stats?: string;
   lastSync?: string | null;
 };
 
-/** All sources that CoreTex knows about. Connected ones are populated from data-sources.json + filesystem probes. */
+/** All sources that Second Brain knows about. Connected ones are populated from data-sources.json + filesystem probes. */
 const KNOWN_SOURCES: Array<{
   id: string;
   name: string;
@@ -454,15 +454,6 @@ const EXTERNAL_SOURCE_META: Record<string, { icon: string; description: string }
   "obsidian": { icon: "\u{1F4D3}", description: "Your second brain — daily notes, projects, references" },
 };
 
-/** Future sources that aren't available yet */
-const FUTURE_SOURCES: SourceEntry[] = [
-  { id: "apple-notes", name: "Apple Notes", type: "notes", status: "coming-soon", icon: "\u{1F34E}", description: "Notes and quick captures from iOS/macOS" },
-  { id: "google-drive", name: "Google Drive", type: "documents", status: "coming-soon", icon: "\u{1F4C1}", description: "Documents, spreadsheets, and shared files" },
-  { id: "photos", name: "Photos", type: "media", status: "coming-soon", icon: "\u{1F4F8}", description: "Photo metadata, locations, and memories" },
-  { id: "apple-health", name: "Apple Health", type: "health", status: "coming-soon", icon: "\u{1F3CB}\u{FE0F}", description: "Activity, workouts, and health trends" },
-  { id: "gmail", name: "Gmail", type: "email", status: "coming-soon", icon: "\u{2709}\u{FE0F}", description: "Personal email archive and threads" },
-];
-
 const sources: GatewayRequestHandler = async ({ respond }) => {
   const result: SourceEntry[] = [];
   const seenIds = new Set<string>();
@@ -506,12 +497,25 @@ const sources: GatewayRequestHandler = async ({ respond }) => {
     }
   } catch { /* empty */ }
 
-  // 3. Future sources
-  for (const fs of FUTURE_SOURCES) {
-    if (!seenIds.has(fs.id)) {
-      result.push(fs);
+  // 3. Community resources (agent-discoverable bookmarks)
+  try {
+    const communityData = await readCommunityResources();
+    if (communityData.resources.length > 0) {
+      const crId = "community-resources";
+      if (!seenIds.has(crId)) {
+        seenIds.add(crId);
+        result.push({
+          id: crId,
+          name: "Community Resources",
+          type: "community",
+          status: "connected",
+          icon: "\u{1F310}",
+          description: `${communityData.resources.length} curated open-source repos and tools for agents to reference`,
+          stats: communityData.resources.map(r => r.label).join(", "),
+        });
+      }
     }
-  }
+  } catch { /* non-critical */ }
 
   const connectedCount = result.filter(s => s.status === "connected").length;
   respond(true, { sources: result, connectedCount, totalCount: result.length });
@@ -751,16 +755,134 @@ const researchCategories: GatewayRequestHandler = async ({ respond }) => {
   respond(true, { categories: [...cats].sort() });
 };
 
+// ── Community Resources ──────────────────────────────────────────────
+
+const COMMUNITY_RESOURCES_FILE = join(DATA_DIR, "community-resources.json");
+
+type CommunityResource = {
+  id: string;
+  url: string;
+  label: string;
+  description: string;
+  tags: string[];
+  addedAt: number;
+};
+
+type CommunityResourcesData = {
+  version: 1;
+  resources: CommunityResource[];
+};
+
+const SEED_RESOURCES: CommunityResource[] = [
+  {
+    id: "hesamsheikh/awesome-openclaw-usecases",
+    url: "https://github.com/hesamsheikh/awesome-openclaw-usecases",
+    label: "Awesome OpenClaw Use Cases",
+    description: "Community collection of 34+ OpenClaw use cases — productivity, creative, devops, research, finance, and more.",
+    tags: ["use-cases", "prompts", "workflows", "community"],
+    addedAt: Date.now(),
+  },
+];
+
+async function readCommunityResources(): Promise<CommunityResourcesData> {
+  try {
+    const raw = await readFile(COMMUNITY_RESOURCES_FILE, "utf-8");
+    return JSON.parse(raw) as CommunityResourcesData;
+  } catch {
+    // First access — seed with defaults
+    const data: CommunityResourcesData = { version: 1, resources: SEED_RESOURCES };
+    await mkdir(DATA_DIR, { recursive: true });
+    await writeFile(COMMUNITY_RESOURCES_FILE, JSON.stringify(data, null, 2) + "\n");
+    return data;
+  }
+}
+
+async function writeCommunityResources(data: CommunityResourcesData): Promise<void> {
+  await mkdir(DATA_DIR, { recursive: true });
+  await writeFile(COMMUNITY_RESOURCES_FILE, JSON.stringify(data, null, 2) + "\n");
+}
+
+const communityResourcesList: GatewayRequestHandler = async ({ respond }) => {
+  try {
+    const data = await readCommunityResources();
+    respond(true, { resources: data.resources, count: data.resources.length });
+  } catch (err) {
+    respond(false, undefined, {
+      code: "COMMUNITY_RESOURCES_ERROR",
+      message: err instanceof Error ? err.message : String(err),
+    });
+  }
+};
+
+const communityResourcesAdd: GatewayRequestHandler = async ({ params, respond }) => {
+  const p = params as { url?: string; label?: string; description?: string; tags?: string[] };
+  const url = typeof p.url === "string" ? p.url.trim() : "";
+  if (!url) {
+    respond(false, undefined, { code: "INVALID_REQUEST", message: "url is required" });
+    return;
+  }
+  const label = typeof p.label === "string" ? p.label.trim() : url.split("/").slice(-2).join("/");
+  const description = typeof p.description === "string" ? p.description.trim() : "";
+  const tags = Array.isArray(p.tags) ? p.tags.filter(t => typeof t === "string" && t.trim()) : [];
+
+  // Derive ID from URL (owner/repo for GitHub, or full URL)
+  const ghMatch = url.match(/github\.com\/([^/]+\/[^/]+)/);
+  const id = ghMatch ? ghMatch[1] : url;
+
+  try {
+    const data = await readCommunityResources();
+    if (data.resources.some(r => r.id === id)) {
+      respond(false, undefined, { code: "DUPLICATE", message: `Resource already exists: ${id}` });
+      return;
+    }
+    data.resources.push({ id, url, label, description, tags, addedAt: Date.now() });
+    await writeCommunityResources(data);
+    respond(true, { ok: true, id, count: data.resources.length });
+  } catch (err) {
+    respond(false, undefined, {
+      code: "COMMUNITY_RESOURCES_ERROR",
+      message: err instanceof Error ? err.message : String(err),
+    });
+  }
+};
+
+const communityResourcesRemove: GatewayRequestHandler = async ({ params, respond }) => {
+  const { id } = params as { id?: string };
+  if (!id || typeof id !== "string") {
+    respond(false, undefined, { code: "INVALID_REQUEST", message: "id is required" });
+    return;
+  }
+  try {
+    const data = await readCommunityResources();
+    const before = data.resources.length;
+    data.resources = data.resources.filter(r => r.id !== id);
+    if (data.resources.length === before) {
+      respond(false, undefined, { code: "NOT_FOUND", message: `Resource not found: ${id}` });
+      return;
+    }
+    await writeCommunityResources(data);
+    respond(true, { ok: true, removed: id, count: data.resources.length });
+  } catch (err) {
+    respond(false, undefined, {
+      code: "COMMUNITY_RESOURCES_ERROR",
+      message: err instanceof Error ? err.message : String(err),
+    });
+  }
+};
+
 // ── Export ────────────────────────────────────────────────────────────
 
-export const coretexHandlers: GatewayRequestHandlers = {
-  "coretex.identity": identity,
-  "coretex.memoryBank": memoryBank,
-  "coretex.memoryBankEntry": memoryBankEntry,
-  "coretex.aiPacket": aiPacket,
-  "coretex.sync": sync,
-  "coretex.sources": sources,
-  "coretex.research": research,
-  "coretex.addResearch": addResearch,
-  "coretex.researchCategories": researchCategories,
+export const secondBrainHandlers: GatewayRequestHandlers = {
+  "secondBrain.identity": identity,
+  "secondBrain.memoryBank": memoryBank,
+  "secondBrain.memoryBankEntry": memoryBankEntry,
+  "secondBrain.aiPacket": aiPacket,
+  "secondBrain.sync": sync,
+  "secondBrain.sources": sources,
+  "secondBrain.research": research,
+  "secondBrain.addResearch": addResearch,
+  "secondBrain.researchCategories": researchCategories,
+  "secondBrain.communityResources": communityResourcesList,
+  "secondBrain.communityResourcesAdd": communityResourcesAdd,
+  "secondBrain.communityResourcesRemove": communityResourcesRemove,
 };

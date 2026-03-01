@@ -324,24 +324,27 @@ export type AppViewState = {
   updateLoading: boolean;
   updateError: string | null;
   updateLastChecked: number | null;
-  // CoreTex state
-  coretexSubtab?: import("./views/coretex").CoreTexSubtab;
-  coretexLoading?: boolean;
-  coretexError?: string | null;
-  coretexIdentity?: import("./views/coretex").CoreTexIdentityData | null;
-  coretexMemoryBank?: import("./views/coretex").CoreTexMemoryBankData | null;
-  coretexAiPacket?: import("./views/coretex").CoreTexAiPacketData | null;
-  coretexSourcesData?: import("./views/coretex").CoreTexSourcesData | null;
-  coretexResearchData?: import("./views/coretex").CoreTexResearchData | null;
-  coretexResearchAddFormOpen?: boolean;
-  coretexResearchAddForm?: import("./views/coretex").ResearchAddForm;
-  coretexResearchCategories?: string[];
-  coretexSelectedEntry?: import("./views/coretex").CoreTexEntryDetail | null;
-  coretexSearchQuery?: string;
-  coretexSyncing?: boolean;
-  coretexBrowsingFolder?: string | null;
-  coretexFolderEntries?: import("./views/coretex").CoreTexMemoryEntry[] | null;
-  coretexFolderName?: string | null;
+  // SecondBrain state
+  secondBrainSubtab?: import("./views/second-brain").SecondBrainSubtab;
+  secondBrainLoading?: boolean;
+  secondBrainError?: string | null;
+  secondBrainIdentity?: import("./views/second-brain").SecondBrainIdentityData | null;
+  secondBrainMemoryBank?: import("./views/second-brain").SecondBrainMemoryBankData | null;
+  secondBrainAiPacket?: import("./views/second-brain").SecondBrainAiPacketData | null;
+  secondBrainSourcesData?: import("./views/second-brain").SecondBrainSourcesData | null;
+  secondBrainResearchData?: import("./views/second-brain").SecondBrainResearchData | null;
+  secondBrainResearchAddFormOpen?: boolean;
+  secondBrainResearchAddForm?: import("./views/second-brain").ResearchAddForm;
+  secondBrainResearchCategories?: string[];
+  secondBrainSelectedEntry?: import("./views/second-brain").SecondBrainEntryDetail | null;
+  secondBrainSearchQuery?: string;
+  secondBrainSyncing?: boolean;
+  secondBrainBrowsingFolder?: string | null;
+  secondBrainFolderEntries?: import("./views/second-brain").SecondBrainMemoryEntry[] | null;
+  secondBrainFolderName?: string | null;
+  secondBrainCommunityResources?: import("./views/second-brain").CommunityResourcesData | null;
+  secondBrainCommunityResourceAddFormOpen?: boolean;
+  secondBrainCommunityResourceAddForm?: import("./views/second-brain").CommunityResourceAddForm;
   // Proactive Intel state
   intelInsights: import("./controllers/proactive-intel").IntelInsight[];
   intelDiscoveries: import("./controllers/proactive-intel").ScoutFinding[];
@@ -533,19 +536,23 @@ export type AppViewState = {
   // Options handlers
   handleOptionsLoad: () => Promise<void>;
   handleOptionToggle: (key: string, value: unknown) => Promise<void>;
-  // CoreTex handlers
-  handleCoretexRefresh: () => Promise<void>;
-  handleCoretexSubtabChange: (subtab: import("./views/coretex").CoreTexSubtab) => void;
-  handleCoretexSelectEntry: (path: string) => Promise<void>;
-  handleCoretexOpenInBrowser: (path: string) => Promise<void>;
-  handleCoretexBrowseFolder: (path: string) => Promise<void>;
-  handleCoretexBack: () => void;
-  handleCoretexSearch: (query: string) => void;
-  handleCoretexSync: () => Promise<void>;
+  // SecondBrain handlers
+  handleSecondBrainRefresh: () => Promise<void>;
+  handleSecondBrainSubtabChange: (subtab: import("./views/second-brain").SecondBrainSubtab) => void;
+  handleSecondBrainSelectEntry: (path: string) => Promise<void>;
+  handleSecondBrainOpenInBrowser: (path: string) => Promise<void>;
+  handleSecondBrainBrowseFolder: (path: string) => Promise<void>;
+  handleSecondBrainBack: () => void;
+  handleSecondBrainSearch: (query: string) => void;
+  handleSecondBrainSync: () => Promise<void>;
   handleResearchAddFormToggle: () => void;
   handleResearchAddFormChange: (field: string, value: string) => void;
   handleResearchAddSubmit: () => Promise<void>;
   handleResearchSaveViaChat: () => Promise<void>;
+  handleCommunityResourceAdd: () => Promise<void>;
+  handleCommunityResourceRemove: (id: string) => Promise<void>;
+  handleCommunityResourceAddFormToggle: () => void;
+  handleCommunityResourceAddFormChange: (field: string, value: string) => void;
   // Proactive Intel handlers
   handleIntelLoad: () => Promise<void>;
   handleIntelDismiss: (id: string) => Promise<void>;

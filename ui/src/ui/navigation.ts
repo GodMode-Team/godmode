@@ -1,7 +1,7 @@
 import type { IconName } from "./icons.js";
 
 export const TAB_GROUPS = [
-  { label: "", tabs: ["chat", "today", "workspaces", "coretex"] },
+  { label: "", tabs: ["chat", "today", "workspaces", "second-brain"] },
   { label: "Toolkit", tabs: ["skills", "trust", "guardrails", "options"] },
   { label: "Settings", tabs: ["config", "debug", "logs"] },
   { label: "System", tabs: ["overview", "channels", "instances", "sessions", "cron", "nodes"] },
@@ -32,7 +32,7 @@ export type Tab =
   | "trust"
   | "debug"
   | "logs"
-  | "coretex"
+  | "second-brain"
   | "intel";
 
 const TAB_PATHS: Record<Tab, string> = {
@@ -60,7 +60,7 @@ const TAB_PATHS: Record<Tab, string> = {
   config: "/config",
   debug: "/debug",
   logs: "/logs",
-  coretex: "/coretex",
+  "second-brain": "/second-brain",
   intel: "/intel",
 };
 
@@ -203,7 +203,7 @@ export function iconForTab(tab: Tab): IconName {
       return "shield";
     case "guardrails":
       return "shield";
-    case "coretex":
+    case "second-brain":
       return "brain";
     case "intel":
       return "radio";
@@ -261,8 +261,8 @@ export function titleForTab(tab: Tab) {
       return "Trust";
     case "guardrails":
       return "Guardrails";
-    case "coretex":
-      return "CoreTex";
+    case "second-brain":
+      return "Second Brain";
     case "intel":
       return "Intel";
     case "config":
@@ -319,7 +319,7 @@ export function emojiForTab(tab: Tab): string {
       return "\u{1F6E1}\uFE0F";
     case "guardrails":
       return "\u{1F6A7}";
-    case "coretex":
+    case "second-brain":
       return "\u{1F9E0}";
     case "intel":
       return "\u{1F4E1}";
@@ -377,7 +377,7 @@ export function subtitleForTab(tab: Tab) {
       return "Scores build automatically as you use and rate skills.";
     case "guardrails":
       return "Safety gates that prevent runaway loops, bad searches, and lazy responses.";
-    case "coretex":
+    case "second-brain":
       return "Your context profile — identity, memory bank, and live AI packet.";
     case "intel":
       return "Proactive intelligence — discoveries, insights, and pattern analysis.";

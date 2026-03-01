@@ -46,6 +46,37 @@ export type AssessmentResult = {
 
 // ── Phase 1: Interview ───────────────────────────────────────────
 
+/** Soul profile data collected during deep conversational onboarding. */
+export type SoulProfileData = {
+  // Block 1: The Ground
+  ground?: string;
+  anchor?: string;
+  atMyBest?: string;
+  // Block 2: Their Modes
+  flowState?: string;
+  depletedState?: string;
+  shadowState?: string;
+  // Block 3: Pattern Tendencies
+  recurringPattern?: string;
+  disguisedDistraction?: string;
+  blindSpot?: string;
+  // Block 4: Truth + Love Calibration
+  challengeLevel?: string;
+  offLimits?: string;
+  correctionStyle?: string;
+  // Block 5: What's Sacred
+  nonNegotiables?: string[];
+  importantPeople?: Array<{ name: string; context: string }>;
+  goodDay?: string;
+  // Block 6: What Annoys Them
+  annoyingAiBehavior?: string;
+  trustBreakingPhrases?: string[];
+  justGetItDone?: string;
+  // Block 7: What Should Be Running
+  desiredWorkflows?: string[];       // 3-5 things they want automated
+  confirmBeforeActions?: string[];   // Actions that always need confirmation
+};
+
 export type InterviewData = {
   name: string;
   role?: string;
@@ -56,6 +87,7 @@ export type InterviewData = {
   painPoints?: string[];
   teamOrSolo?: "team" | "solo" | "both";
   workflows?: string[];
+  soulProfile?: SoulProfileData;
   completed: boolean;
 };
 
@@ -103,6 +135,7 @@ export type ConfigurationApplied = {
 export type FirstWinResult = {
   demoType: "daily-brief" | "focus-pulse" | "morning-routine" | "other";
   outcome?: string;
+  firstFiveCommands?: string[];
   completed: boolean;
 };
 

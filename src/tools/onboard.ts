@@ -17,6 +17,7 @@ import {
   patchOCConfig,
   checkOnboardingStatus,
   sanitizeAnswers,
+  type SoulProfile,
 } from "../services/onboarding.js";
 
 type ToolContext = {
@@ -37,6 +38,8 @@ export function createOnboardTool(_ctx: ToolContext): AnyAgentTool {
       "Call this when the user says things like 'set up GodMode', 'onboard me', " +
       "'initialize my workspace', or 'set up my memory system'. " +
       "Provide user answers from the onboarding conversation. " +
+      "If soul profile data was collected during the deep onboarding conversation, " +
+      "pass it via the soulProfile parameter for a deeply personalized SOUL.md. " +
       "If the workspace already exists, skipped files are reported (use force=true to overwrite).",
     parameters: {
       type: "object" as const,
@@ -76,6 +79,15 @@ export function createOnboardTool(_ctx: ToolContext): AnyAgentTool {
         defaultModel: {
           type: "string",
           description: "Preferred AI model (e.g. 'sonnet', 'opus', 'haiku')",
+        },
+        soulProfile: {
+          type: "object",
+          description:
+            "Deep identity data from the soul interview. Fields: ground, anchor, atMyBest, " +
+            "flowState, depletedState, shadowState, recurringPattern, disguisedDistraction, " +
+            "blindSpot, challengeLevel, offLimits, correctionStyle, nonNegotiables (string[]), " +
+            "importantPeople ({name, context}[]), goodDay, annoyingAiBehavior, " +
+            "trustBreakingPhrases (string[]), justGetItDone",
         },
         force: {
           type: "boolean",
@@ -118,6 +130,10 @@ export function createOnboardTool(_ctx: ToolContext): AnyAgentTool {
           keyPeople: Array.isArray(params.keyPeople) ? (params.keyPeople as string[]) : undefined,
           defaultModel:
             typeof params.defaultModel === "string" ? params.defaultModel : undefined,
+          soulProfile:
+            params.soulProfile && typeof params.soulProfile === "object"
+              ? (params.soulProfile as SoulProfile)
+              : undefined,
         });
 
         const force = Boolean(params.force);

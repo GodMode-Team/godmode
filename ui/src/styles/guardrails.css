@@ -228,3 +228,234 @@
   padding: 1.5rem 1rem;
   font-style: italic;
 }
+
+/* ── Custom Rules Section ── */
+
+.guardrails-summary-sep {
+  color: var(--text-muted, var(--muted));
+  font-size: 1.25rem;
+  margin: 0 0.25rem;
+  opacity: 0.5;
+}
+
+.guardrails-summary-count--custom {
+  font-size: 1.25rem;
+}
+
+.guardrails-custom-section {
+  margin-top: 0.5rem;
+  margin-bottom: 1.25rem;
+}
+
+.guardrails-custom-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.75rem;
+}
+
+.guardrails-custom-title {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  margin: 0;
+  color: var(--text);
+}
+
+.guardrails-add-btn {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent);
+  background: transparent;
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  padding: 4px 12px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.guardrails-add-btn:hover {
+  background: var(--accent);
+  color: var(--bg, #000);
+}
+
+.guardrails-custom-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.guardrails-custom-card {
+  padding: 14px 18px;
+}
+
+.guardrails-custom-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.guardrails-delete-btn {
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-muted, var(--muted));
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  opacity: 0.5;
+  transition: opacity 0.15s, color 0.15s;
+}
+
+.guardrails-delete-btn:hover {
+  opacity: 1;
+  color: var(--danger, #ef4444);
+}
+
+.guardrails-action-tag {
+  font-size: 10px !important;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.guardrails-action-tag--block {
+  color: var(--danger, #ef4444);
+  background: rgba(239, 68, 68, 0.12);
+}
+
+.guardrails-action-tag--redirect {
+  color: #3b82f6;
+  background: rgba(59, 130, 246, 0.12);
+}
+
+.guardrails-custom-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.guardrails-custom-tool {
+  font-size: 11px;
+  font-weight: 600;
+  font-family: var(--font-mono, monospace);
+  color: var(--accent);
+  background: rgba(99, 102, 241, 0.1);
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+.guardrails-pattern-tag {
+  font-size: 11px;
+  font-family: var(--font-mono, monospace);
+  color: var(--text-muted, var(--muted));
+  background: var(--bg-hover, rgba(255, 255, 255, 0.06));
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+.guardrails-custom-empty {
+  text-align: center;
+  color: var(--text-muted, var(--muted));
+  font-size: 13px;
+  padding: 1.25rem 1rem;
+  font-style: italic;
+}
+
+/* ── Add Rule Form ── */
+
+.guardrails-add-form {
+  padding: 16px 20px;
+  margin-bottom: 12px;
+}
+
+.guardrails-add-form-title {
+  font-size: 14px;
+  font-weight: 600;
+  margin: 0 0 12px;
+  color: var(--text);
+}
+
+.guardrails-add-form-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.guardrails-add-form-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.guardrails-add-form-row label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-muted, var(--muted));
+}
+
+.guardrails-add-input {
+  padding: 6px 10px;
+  font-size: 13px;
+  background: var(--bg-hover, rgba(255, 255, 255, 0.06));
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  outline: none;
+  font-family: inherit;
+  transition: border-color 0.15s;
+}
+
+.guardrails-add-input:focus {
+  border-color: var(--accent);
+}
+
+.guardrails-add-textarea {
+  resize: vertical;
+  min-height: 40px;
+}
+
+.guardrails-add-form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.guardrails-add-cancel {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-muted, var(--muted));
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 14px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.guardrails-add-cancel:hover {
+  background: var(--bg-hover, rgba(255, 255, 255, 0.06));
+}
+
+.guardrails-add-submit {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--bg, #000);
+  background: var(--accent);
+  border: none;
+  border-radius: 6px;
+  padding: 6px 16px;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.guardrails-add-submit:hover {
+  opacity: 0.85;
+}

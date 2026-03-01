@@ -101,7 +101,7 @@ import { renderGuardrails } from "./views/guardrails";
 import { renderParallelSessions } from "./views/parallel-sessions";
 import { renderWork } from "./views/work";
 import { renderWorkspaces } from "./views/workspaces";
-import { renderCoretex } from "./views/coretex";
+import { renderSecondBrain } from "./views/second-brain";
 import {
   renderOnboardingWelcome,
   renderOnboardingIdentity,
@@ -2146,10 +2146,15 @@ export function renderApp(state: AppViewState) {
                 connected: state.connected,
                 loading: state.guardrailsLoading,
                 data: state.guardrailsData,
+                showAddForm: state.guardrailsShowAddForm,
                 onToggle: (gateId, enabled) => state.handleGuardrailToggle(gateId, enabled),
                 onThresholdChange: (gateId, key, value) =>
                   state.handleGuardrailThresholdChange(gateId, key, value),
                 onRefresh: () => state.handleGuardrailsLoad(),
+                onCustomToggle: (id, enabled) => state.handleCustomGuardrailToggle(id, enabled),
+                onCustomDelete: (id) => state.handleCustomGuardrailDelete(id),
+                onCustomAdd: (input) => state.handleCustomGuardrailAdd(input),
+                onToggleAddForm: () => state.handleToggleGuardrailAddForm(),
               })
             : nothing
         }
@@ -2181,40 +2186,48 @@ export function renderApp(state: AppViewState) {
         }
 
         ${
-          state.tab === "coretex"
-            ? renderCoretex({
+          state.tab === "second-brain"
+            ? renderSecondBrain({
                 connected: state.connected,
-                loading: state.coretexLoading ?? false,
-                error: state.coretexError ?? null,
-                subtab: state.coretexSubtab ?? "identity",
-                identity: state.coretexIdentity ?? null,
-                memoryBank: state.coretexMemoryBank ?? null,
-                aiPacket: state.coretexAiPacket ?? null,
-                sourcesData: state.coretexSourcesData ?? null,
-                selectedEntry: state.coretexSelectedEntry ?? null,
-                searchQuery: state.coretexSearchQuery ?? "",
-                syncing: state.coretexSyncing ?? false,
-                browsingFolder: state.coretexBrowsingFolder ?? null,
-                folderEntries: state.coretexFolderEntries ?? null,
-                folderName: state.coretexFolderName ?? null,
-                onSubtabChange: (subtab) => state.handleCoretexSubtabChange(subtab),
-                onSelectEntry: (path) => state.handleCoretexSelectEntry(path),
-                onOpenInBrowser: (path) => state.handleCoretexOpenInBrowser(path),
-                onBrowseFolder: (path) => state.handleCoretexBrowseFolder(path),
-                onBack: () => state.handleCoretexBack(),
-                onSearch: (query) => state.handleCoretexSearch(query),
-                onSync: () => state.handleCoretexSync(),
-                onRefresh: () => state.handleCoretexRefresh(),
+                loading: state.secondBrainLoading ?? false,
+                error: state.secondBrainError ?? null,
+                subtab: state.secondBrainSubtab ?? "identity",
+                identity: state.secondBrainIdentity ?? null,
+                memoryBank: state.secondBrainMemoryBank ?? null,
+                aiPacket: state.secondBrainAiPacket ?? null,
+                sourcesData: state.secondBrainSourcesData ?? null,
+                selectedEntry: state.secondBrainSelectedEntry ?? null,
+                searchQuery: state.secondBrainSearchQuery ?? "",
+                syncing: state.secondBrainSyncing ?? false,
+                browsingFolder: state.secondBrainBrowsingFolder ?? null,
+                folderEntries: state.secondBrainFolderEntries ?? null,
+                folderName: state.secondBrainFolderName ?? null,
+                onSubtabChange: (subtab) => state.handleSecondBrainSubtabChange(subtab),
+                onSelectEntry: (path) => state.handleSecondBrainSelectEntry(path),
+                onOpenInBrowser: (path) => state.handleSecondBrainOpenInBrowser(path),
+                onBrowseFolder: (path) => state.handleSecondBrainBrowseFolder(path),
+                onBack: () => state.handleSecondBrainBack(),
+                onSearch: (query) => state.handleSecondBrainSearch(query),
+                onSync: () => state.handleSecondBrainSync(),
+                onRefresh: () => state.handleSecondBrainRefresh(),
                 onOpenSidebar: (content, opts) => state.handleOpenSidebar(content, opts),
-                researchData: state.coretexResearchData ?? null,
-                researchAddFormOpen: state.coretexResearchAddFormOpen ?? false,
-                researchAddForm: state.coretexResearchAddForm,
-                researchCategories: state.coretexResearchCategories ?? [],
+                researchData: state.secondBrainResearchData ?? null,
+                researchAddFormOpen: state.secondBrainResearchAddFormOpen ?? false,
+                researchAddForm: state.secondBrainResearchAddForm,
+                researchCategories: state.secondBrainResearchCategories ?? [],
                 onResearchAddFormToggle: () => state.handleResearchAddFormToggle(),
                 onResearchAddFormChange: (field: any, value: string) => state.handleResearchAddFormChange(field, value),
                 onResearchAddSubmit: () => state.handleResearchAddSubmit(),
                 onSaveViaChat: () => state.handleResearchSaveViaChat(),
-                intelProps: (state.coretexSubtab ?? "identity") === "intel" ? {
+                communityResources: state.secondBrainCommunityResources ?? null,
+                communityResourceAddFormOpen: state.secondBrainCommunityResourceAddFormOpen ?? false,
+                communityResourceAddForm: state.secondBrainCommunityResourceAddForm,
+                onCommunityResourceAdd: () => state.handleCommunityResourceAdd(),
+                onCommunityResourceRemove: (id: string) => state.handleCommunityResourceRemove(id),
+                onCommunityResourceAddFormToggle: () => state.handleCommunityResourceAddFormToggle(),
+                onCommunityResourceAddFormChange: (field: any, value: string) => state.handleCommunityResourceAddFormChange(field, value),
+                onAddSource: () => state.handleAddSource(),
+                intelProps: (state.secondBrainSubtab ?? "identity") === "intel" ? {
                   insights: state.intelInsights ?? [],
                   discoveries: state.intelDiscoveries ?? [],
                   patterns: state.intelPatterns ?? null,

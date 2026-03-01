@@ -994,8 +994,8 @@ function handleGatewayEventUnsafe(host: GatewayHost, evt: GatewayEventFrame) {
   }
   if (evt.event === "proactiveIntel:update") {
     const app = host as unknown as GodModeApp;
-    const subtab = (app as unknown as { coretexSubtab?: string }).coretexSubtab;
-    if (typeof app.handleIntelLoad === "function" && host.tab === "coretex" && subtab === "intel") {
+    const subtab = (app as unknown as { secondBrainSubtab?: string }).secondBrainSubtab;
+    if (typeof app.handleIntelLoad === "function" && host.tab === "second-brain" && subtab === "intel") {
       void app.handleIntelLoad();
     }
     return;

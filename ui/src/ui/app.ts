@@ -543,29 +543,30 @@ export class GodModeApp extends LitElement {
   // Guardrails state
   @state() guardrailsData: GuardrailsViewData | null = null;
   @state() guardrailsLoading = false;
+  @state() guardrailsShowAddForm = false;
 
   // GodMode Options state
   @state() godmodeOptions: Record<string, unknown> | null = null;
   @state() godmodeOptionsLoading = false;
 
-  // CoreTex state
-  @state() coretexSubtab: import("./views/coretex").CoreTexSubtab = "identity";
-  @state() coretexLoading = false;
-  @state() coretexError: string | null = null;
-  @state() coretexIdentity: import("./views/coretex").CoreTexIdentityData | null = null;
-  @state() coretexMemoryBank: import("./views/coretex").CoreTexMemoryBankData | null = null;
-  @state() coretexAiPacket: import("./views/coretex").CoreTexAiPacketData | null = null;
-  @state() coretexSourcesData: import("./views/coretex").CoreTexSourcesData | null = null;
-  @state() coretexResearchData: import("./views/coretex").CoreTexResearchData | null = null;
-  @state() coretexResearchAddFormOpen = false;
-  @state() coretexResearchAddForm: import("./views/coretex").ResearchAddForm = { title: "", url: "", category: "", tags: "", notes: "" };
-  @state() coretexResearchCategories: string[] = [];
-  @state() coretexSelectedEntry: import("./views/coretex").CoreTexEntryDetail | null = null;
-  @state() coretexSearchQuery = "";
-  @state() coretexSyncing = false;
-  @state() coretexBrowsingFolder: string | null = null;
-  @state() coretexFolderEntries: import("./views/coretex").CoreTexMemoryEntry[] | null = null;
-  @state() coretexFolderName: string | null = null;
+  // Second Brain state
+  @state() secondBrainSubtab: import("./views/second-brain").SecondBrainSubtab = "identity";
+  @state() secondBrainLoading = false;
+  @state() secondBrainError: string | null = null;
+  @state() secondBrainIdentity: import("./views/second-brain").SecondBrainIdentityData | null = null;
+  @state() secondBrainMemoryBank: import("./views/second-brain").SecondBrainMemoryBankData | null = null;
+  @state() secondBrainAiPacket: import("./views/second-brain").SecondBrainAiPacketData | null = null;
+  @state() secondBrainSourcesData: import("./views/second-brain").SecondBrainSourcesData | null = null;
+  @state() secondBrainResearchData: import("./views/second-brain").SecondBrainResearchData | null = null;
+  @state() secondBrainResearchAddFormOpen = false;
+  @state() secondBrainResearchAddForm: import("./views/second-brain").ResearchAddForm = { title: "", url: "", category: "", tags: "", notes: "" };
+  @state() secondBrainResearchCategories: string[] = [];
+  @state() secondBrainSelectedEntry: import("./views/second-brain").SecondBrainEntryDetail | null = null;
+  @state() secondBrainSearchQuery = "";
+  @state() secondBrainSyncing = false;
+  @state() secondBrainBrowsingFolder: string | null = null;
+  @state() secondBrainFolderEntries: import("./views/second-brain").SecondBrainMemoryEntry[] | null = null;
+  @state() secondBrainFolderName: string | null = null;
 
   // Proactive Intel state
   @state() intelInsights: import("./controllers/proactive-intel").IntelInsight[] = [];
@@ -807,6 +808,26 @@ export class GodModeApp extends LitElement {
     await updateGuardrailThreshold(this, gateId, key, value);
   }
 
+  async handleCustomGuardrailToggle(id: string, enabled: boolean) {
+    const { toggleCustomGuardrail } = await import("./controllers/guardrails.js");
+    await toggleCustomGuardrail(this, id, enabled);
+  }
+
+  async handleCustomGuardrailDelete(id: string) {
+    const { deleteCustomGuardrail } = await import("./controllers/guardrails.js");
+    await deleteCustomGuardrail(this, id);
+  }
+
+  async handleCustomGuardrailAdd(input: import("./controllers/guardrails").AddCustomGuardrailInput) {
+    const { addCustomGuardrailFromUI } = await import("./controllers/guardrails.js");
+    await addCustomGuardrailFromUI(this, input);
+    this.guardrailsShowAddForm = false;
+  }
+
+  handleToggleGuardrailAddForm() {
+    this.guardrailsShowAddForm = !this.guardrailsShowAddForm;
+  }
+
   // Options handlers
   async handleOptionsLoad() {
     const { loadOptions } = await import("./controllers/options.js");
@@ -818,21 +839,21 @@ export class GodModeApp extends LitElement {
     await saveOption(this, key, value);
   }
 
-  // CoreTex handlers
-  async handleCoretexRefresh() {
-    const { loadCoretex } = await import("./controllers/coretex.js");
-    await loadCoretex(this);
+  // Second Brain handlers
+  async handleSecondBrainRefresh() {
+    const { loadSecondBrain } = await import("./controllers/second-brain.js");
+    await loadSecondBrain(this);
   }
 
-  handleCoretexSubtabChange(subtab: import("./views/coretex").CoreTexSubtab) {
-    this.coretexSubtab = subtab;
-    this.coretexLoading = false;
-    this.coretexSelectedEntry = null;
-    this.coretexSearchQuery = "";
-    this.coretexError = null;
-    this.coretexBrowsingFolder = null;
-    this.coretexFolderEntries = null;
-    this.coretexFolderName = null;
+  handleSecondBrainSubtabChange(subtab: import("./views/second-brain").SecondBrainSubtab) {
+    this.secondBrainSubtab = subtab;
+    this.secondBrainLoading = false;
+    this.secondBrainSelectedEntry = null;
+    this.secondBrainSearchQuery = "";
+    this.secondBrainError = null;
+    this.secondBrainBrowsingFolder = null;
+    this.secondBrainFolderEntries = null;
+    this.secondBrainFolderName = null;
     if (subtab === "intel") {
       // Intel subtab loads its own data
       this.handleIntelLoad().catch((err) => {
@@ -840,22 +861,22 @@ export class GodModeApp extends LitElement {
         this.intelError = err instanceof Error ? err.message : "Failed to load intel data";
       });
     } else {
-      this.handleCoretexRefresh().catch((err) => {
-        console.error("[CoreTex] Refresh after subtab change failed:", err);
-        this.coretexError = err instanceof Error ? err.message : "Failed to load data";
-        this.coretexLoading = false;
+      this.handleSecondBrainRefresh().catch((err) => {
+        console.error("[SecondBrain] Refresh after subtab change failed:", err);
+        this.secondBrainError = err instanceof Error ? err.message : "Failed to load data";
+        this.secondBrainLoading = false;
       });
     }
   }
 
-  async handleCoretexSelectEntry(path: string) {
+  async handleSecondBrainSelectEntry(path: string) {
     const isHtml = path.endsWith(".html") || path.endsWith(".htm");
 
     // HTML files open directly in sidebar — bypass panel loading state
     if (isHtml) {
       try {
         const result = await this.client!.request<{ name: string; content: string }>(
-          "coretex.memoryBankEntry",
+          "secondBrain.memoryBankEntry",
           { path },
         );
         if (result?.content) {
@@ -866,19 +887,19 @@ export class GodModeApp extends LitElement {
           });
         }
       } catch (err) {
-        console.error("[CoreTex] Failed to open HTML file:", err);
+        console.error("[SecondBrain] Failed to open HTML file:", err);
       }
       return;
     }
 
-    const { loadCoretexEntry } = await import("./controllers/coretex.js");
-    await loadCoretexEntry(this, path);
+    const { loadSecondBrainEntry } = await import("./controllers/second-brain.js");
+    await loadSecondBrainEntry(this, path);
   }
 
-  async handleCoretexOpenInBrowser(path: string) {
+  async handleSecondBrainOpenInBrowser(path: string) {
     try {
       const result = await this.client!.request<{ name: string; content: string }>(
-        "coretex.memoryBankEntry",
+        "secondBrain.memoryBankEntry",
         { path },
       );
       if (result?.content) {
@@ -887,47 +908,47 @@ export class GodModeApp extends LitElement {
         window.open(url, "_blank", "noopener,noreferrer");
       }
     } catch (err) {
-      console.error("[CoreTex] Failed to open in browser:", err);
+      console.error("[SecondBrain] Failed to open in browser:", err);
     }
   }
 
-  async handleCoretexBrowseFolder(path: string) {
-    const { browseFolder } = await import("./controllers/coretex.js");
+  async handleSecondBrainBrowseFolder(path: string) {
+    const { browseFolder } = await import("./controllers/second-brain.js");
     await browseFolder(this, path);
   }
 
-  handleCoretexBack() {
-    if (this.coretexSelectedEntry) {
-      this.coretexSelectedEntry = null;
-    } else if (this.coretexBrowsingFolder) {
-      this.coretexBrowsingFolder = null;
-      this.coretexFolderEntries = null;
-      this.coretexFolderName = null;
+  handleSecondBrainBack() {
+    if (this.secondBrainSelectedEntry) {
+      this.secondBrainSelectedEntry = null;
+    } else if (this.secondBrainBrowsingFolder) {
+      this.secondBrainBrowsingFolder = null;
+      this.secondBrainFolderEntries = null;
+      this.secondBrainFolderName = null;
     }
   }
 
-  handleCoretexSearch(query: string) {
-    this.coretexSearchQuery = query;
+  handleSecondBrainSearch(query: string) {
+    this.secondBrainSearchQuery = query;
   }
 
-  async handleCoretexSync() {
-    const { syncCoretex } = await import("./controllers/coretex.js");
-    await syncCoretex(this);
+  async handleSecondBrainSync() {
+    const { syncSecondBrain } = await import("./controllers/second-brain.js");
+    await syncSecondBrain(this);
   }
 
   handleResearchAddFormToggle() {
-    this.coretexResearchAddFormOpen = !this.coretexResearchAddFormOpen;
-    if (this.coretexResearchAddFormOpen) {
-      this.coretexResearchAddForm = { title: "", url: "", category: "", tags: "", notes: "" };
+    this.secondBrainResearchAddFormOpen = !this.secondBrainResearchAddFormOpen;
+    if (this.secondBrainResearchAddFormOpen) {
+      this.secondBrainResearchAddForm = { title: "", url: "", category: "", tags: "", notes: "" };
     }
   }
 
   handleResearchAddFormChange(field: string, value: string) {
-    this.coretexResearchAddForm = { ...this.coretexResearchAddForm, [field]: value };
+    this.secondBrainResearchAddForm = { ...this.secondBrainResearchAddForm, [field]: value };
   }
 
   async handleResearchAddSubmit() {
-    const { addResearch } = await import("./controllers/coretex.js");
+    const { addResearch } = await import("./controllers/second-brain.js");
     await addResearch(this);
   }
 
@@ -938,6 +959,37 @@ export class GodModeApp extends LitElement {
     void this.handleSendChat(
       "I want to save some research. I'll paste links, bookmarks, or notes — please organize them into ~/godmode/memory/research/ with proper frontmatter (title, url, category, tags, date). Ask me what I'd like to save.",
     );
+  }
+
+  async handleAddSource() {
+    this.setTab("chat" as import("./navigation").Tab);
+    const { createNewSession } = await import("./app-render.helpers.js");
+    createNewSession(this);
+    void this.handleSendChat(
+      "I want to add a new data source to my Second Brain. Help me figure out what I need — whether it's an API integration, a local file sync, or a new skill. Ask me what source I'd like to connect.",
+    );
+  }
+
+  // Community Resources handlers
+  async handleCommunityResourceAdd() {
+    const { addCommunityResource } = await import("./controllers/second-brain.js");
+    await addCommunityResource(this);
+  }
+
+  async handleCommunityResourceRemove(id: string) {
+    const { removeCommunityResource } = await import("./controllers/second-brain.js");
+    await removeCommunityResource(this, id);
+  }
+
+  handleCommunityResourceAddFormToggle() {
+    this.secondBrainCommunityResourceAddFormOpen = !this.secondBrainCommunityResourceAddFormOpen;
+    if (this.secondBrainCommunityResourceAddFormOpen) {
+      this.secondBrainCommunityResourceAddForm = { url: "", label: "", description: "", tags: "" };
+    }
+  }
+
+  handleCommunityResourceAddFormChange(field: string, value: string) {
+    this.secondBrainCommunityResourceAddForm = { ...this.secondBrainCommunityResourceAddForm, [field]: value };
   }
 
   // Proactive Intel handlers

@@ -18,9 +18,13 @@ export type GuardrailGateId =
   | "grepBlocker"
   | "sessionHygiene"
   | "exhaustiveSearch"
+  | "selfServiceGate"
   | "planGate"
   | "spawnGate"
-  | "validationGate";
+  | "validationGate"
+  | "promptShield"
+  | "outputShield"
+  | "configShield";
 
 export type GateConfig = {
   enabled: boolean;
@@ -36,8 +40,9 @@ export type CustomGuardrail = {
     tool: string;
     patterns: string[];
   };
-  action: "block";
+  action: "block" | "redirect";
   message: string;
+  redirectTo?: string;
   createdAt: string;
 };
 
@@ -72,9 +77,13 @@ export const GATE_DEFAULTS: Record<GuardrailGateId, GateConfig> = {
   grepBlocker: { enabled: true },
   sessionHygiene: { enabled: true, thresholds: { maxWorkingLines: 100 } },
   exhaustiveSearch: { enabled: true },
+  selfServiceGate: { enabled: true },
   planGate: { enabled: true },
   spawnGate: { enabled: true },
   validationGate: { enabled: true },
+  promptShield: { enabled: true },
+  outputShield: { enabled: true },
+  configShield: { enabled: true },
 };
 
 export const GATE_DESCRIPTORS: Record<GuardrailGateId, GateDescriptor> = {
@@ -107,6 +116,13 @@ export const GATE_DESCRIPTORS: Record<GuardrailGateId, GateDescriptor> = {
     icon: "\u{1F50D}",
     hook: "message_sending",
   },
+  selfServiceGate: {
+    name: "Self-Service Gate",
+    description:
+      "Blocks messages that ask the user about code, implementation, or architecture when the agent hasn't used read/search tools first. Forces agents to look things up themselves.",
+    icon: "\u{1F9E0}",
+    hook: "message_sending",
+  },
   planGate: {
     name: "Plan Gate",
     description:
@@ -128,22 +144,44 @@ export const GATE_DESCRIPTORS: Record<GuardrailGateId, GateDescriptor> = {
     icon: "\u2705",
     hook: "subagent_ended",
   },
+  promptShield: {
+    name: "Prompt Shield",
+    description:
+      "Detects prompt injection attempts in user messages and injects counter-instructions. Catches jailbreaks, role overrides, fake system messages, encoded payloads, and social engineering.",
+    icon: "\u{1F6E1}",
+    hook: "message_received + before_prompt_build",
+  },
+  outputShield: {
+    name: "Output Shield",
+    description:
+      "Prevents outbound messages from leaking system prompts, config files, API keys, tool listings, or internal instructions. Defense-in-depth layer.",
+    icon: "\u{1F512}",
+    hook: "message_sending",
+  },
+  configShield: {
+    name: "Config Shield",
+    description:
+      "Blocks tool calls (bash, read) that would access sensitive config files like openclaw.json, .env, AGENTS.md, SOUL.md, or SSH keys.",
+    icon: "\u{1F5C4}",
+    hook: "before_tool_call",
+  },
 };
 
 // ── Custom guardrail defaults ────────────────────────────────────────
 
 export const CUSTOM_DEFAULTS: CustomGuardrail[] = [
   {
-    id: "block-x-webfetch",
-    name: "Block X/Twitter web_fetch",
-    description: "web_fetch returns garbage on x.com — use browser tool instead",
+    id: "redirect-x-research",
+    name: "Redirect X/Twitter research",
+    description: "web_fetch returns garbage on x.com — use XAI API with x_search instead",
     enabled: true,
     trigger: {
       tool: "web_fetch",
       patterns: ["x.com", "twitter.com", "t.co"],
     },
-    action: "block",
-    message: "Use browser tool for X/Twitter research — web_fetch fails on x.com",
+    action: "redirect",
+    message: "Do NOT use web_fetch for X/Twitter. Instead use the XAI Responses API (x_search tool) to search X. The endpoint is https://api.x.ai/v1/responses with model grok-4-1-fast-non-reasoning and tool x_search.",
+    redirectTo: "x_search",
     createdAt: "2026-02-28T00:00:00.000Z",
   },
 ];
@@ -169,12 +207,20 @@ export async function readGuardrailsState(): Promise<GuardrailsState> {
   try {
     const raw = await readFile(STATE_FILE, "utf-8");
     const parsed = JSON.parse(raw) as Partial<GuardrailsState>;
+    let custom = parsed.custom === undefined ? [...CUSTOM_DEFAULTS] : parsed.custom;
+
+    // Migrate: replace old "block-x-webfetch" with new "redirect-x-research"
+    if (custom.some((g) => g.id === "block-x-webfetch")) {
+      custom = custom.filter((g) => g.id !== "block-x-webfetch");
+      if (!custom.some((g) => g.id === "redirect-x-research")) {
+        custom.push(CUSTOM_DEFAULTS[0]);
+      }
+    }
+
     return {
       gates: { ...GATE_DEFAULTS, ...(parsed.gates ?? {}) },
       activity: parsed.activity ?? [],
-      // Seed custom defaults on first read (undefined = never initialized).
-      // An explicit empty array means the user cleared them — respect that.
-      custom: parsed.custom === undefined ? [...CUSTOM_DEFAULTS] : parsed.custom,
+      custom,
       updatedAt: parsed.updatedAt ?? new Date().toISOString(),
     };
   } catch {
@@ -244,7 +290,7 @@ export async function logGateActivity(
 
 type CustomCheckResult =
   | { blocked: false }
-  | { blocked: true; guardrailId: string; message: string };
+  | { blocked: true; guardrailId: string; message: string; action: "block" | "redirect"; redirectTo?: string };
 
 /**
  * Check all enabled custom guardrails against a tool call.
@@ -269,7 +315,7 @@ export async function checkCustomGuardrails(
       paramsStr.includes(p.toLowerCase()),
     );
     if (matched) {
-      return { blocked: true, guardrailId: g.id, message: g.message };
+      return { blocked: true, guardrailId: g.id, message: g.message, action: g.action, redirectTo: g.redirectTo };
     }
   }
 
@@ -302,6 +348,7 @@ export async function addCustomGuardrail(
     trigger: input.trigger,
     action: input.action,
     message: input.message,
+    ...(input.redirectTo ? { redirectTo: input.redirectTo } : {}),
     createdAt: new Date().toISOString(),
   };
 
@@ -334,7 +381,8 @@ export async function formatGuardrailsForPrompt(): Promise<string> {
     lines.push("");
     lines.push("### Custom Rules");
     for (const g of customs) {
-      lines.push(`- **${g.name}** (${g.trigger.tool} → ${g.trigger.patterns.join(", ")}): ${g.message}`);
+      const tag = g.action === "redirect" ? "REDIRECT" : "BLOCK";
+      lines.push(`- **${g.name}** [${tag}] (${g.trigger.tool} → ${g.trigger.patterns.join(", ")}): ${g.message}`);
     }
   }
 

@@ -54,6 +54,7 @@ import { trustTrackerHandlers } from "./src/methods/trust-tracker.js";
 import { sessionArchiveHandlers } from "./src/methods/session-archive.js";
 import { systemUpdateHandlers, setPluginVersion, runPostUpdateHealthCheck } from "./src/methods/system-update.js";
 import { createTrustRateTool } from "./src/tools/trust-rate.js";
+import { createGuardrailTool } from "./src/tools/guardrail.js";
 import { createOnboardTool } from "./src/tools/onboard.js";
 import { createMorningSetTool } from "./src/tools/morning-set.js";
 import { initAgentLogWriter } from "./src/services/agent-log-writer.js";
@@ -64,15 +65,25 @@ import {
   checkGrepOnMemory,
   cleanWorkingMd,
   trackSearchUsage,
+  trackCodeToolUsage,
   checkLazyRefusal,
+  checkLazyQuestion,
   consumeSearchGateNudge,
+  consumeSelfServiceNudge,
   resetSearchTracking,
+  scanForInjection,
+  consumePromptShieldNudge,
+  checkOutputLeak,
+  consumeOutputShieldNudge,
+  checkConfigAccess,
+  resetPromptShieldTracking,
 } from "./src/hooks/safety-gates.js";
 import { isGateEnabled, checkCustomGuardrails, logGateActivity } from "./src/services/guardrails.js";
 import { guardrailsHandlers } from "./src/methods/guardrails.js";
 import { imageCacheHandlers } from "./src/methods/image-cache.js";
 import { clawhubHandlers } from "./src/methods/clawhub.js";
-import { coretexHandlers } from "./src/methods/coretex.js";
+import { secondBrainHandlers } from "./src/methods/second-brain.js";
+import { securityAuditHandlers } from "./src/methods/security-audit.js";
 import { proactiveIntelHandlers } from "./src/methods/proactive-intel.js";
 // Static file server for UIs
 import { createStaticFileHandler } from "./src/static-server.js";
@@ -587,8 +598,9 @@ const godmodePlugin = {
       ...guardrailsHandlers,
       ...imageCacheHandlers,
       ...clawhubHandlers,
-      ...coretexHandlers,
+      ...secondBrainHandlers,
       ...proactiveIntelHandlers,
+      ...securityAuditHandlers,
     };
 
     // Methods that must work before a license is configured (setup flow)
@@ -915,6 +927,20 @@ h1{color:#ff6b6b}code{background:#16213e;padding:2px 8px;border-radius:4px}a{col
       }
     });
 
+    // ── Safety Gates: message_received — Prompt Shield input detection ──
+    api.on("message_received", async (event, ctx) => {
+      const sessionKey = ctx?.sessionKey;
+      const content = event.content ?? "";
+      if (content) {
+        const result = await scanForInjection(sessionKey, content);
+        if (result.flagged) {
+          api.logger.warn(
+            `[GodMode][SafetyGate] prompt shield flagged session: ${result.categories.join(", ")}`,
+          );
+        }
+      }
+    });
+
     // Team workspace bootstrap — inject shared context
     api.on("before_prompt_build", async (event, ctx) => {
       const prependChunks: string[] = [];
@@ -951,6 +977,21 @@ h1{color:#ff6b6b}code{background:#16213e;padding:2px 8px;border-radius:4px}a{col
       if (searchNudge) {
         prependChunks.push(searchNudge);
       }
+      // Self-service gate nudge — injected after a lazy question was blocked
+      const selfServiceNudge = consumeSelfServiceNudge(ctx?.sessionKey);
+      if (selfServiceNudge) {
+        prependChunks.push(selfServiceNudge);
+      }
+      // Output Shield nudge — injected after an output leak was blocked
+      const outputNudge = consumeOutputShieldNudge(ctx?.sessionKey);
+      if (outputNudge) {
+        prependChunks.push(outputNudge);
+      }
+      // Prompt Shield nudge — injected when injection detected (HIGHEST PRIORITY — unshift)
+      const promptNudge = consumePromptShieldNudge(ctx?.sessionKey);
+      if (promptNudge) {
+        prependChunks.unshift(promptNudge);
+      }
       if (prependChunks.length === 0) {
         return;
       }
@@ -973,6 +1014,9 @@ h1{color:#ff6b6b}code{background:#16213e;padding:2px 8px;border-radius:4px}a{col
 
       // Reset search tracking for this session
       resetSearchTracking(ctx?.sessionKey);
+
+      // Reset prompt shield / output shield tracking for this session
+      resetPromptShieldTracking(ctx?.sessionKey);
 
       // Team memory routing — write session memory to team workspace on reset
       try {
@@ -1006,6 +1050,13 @@ h1{color:#ff6b6b}code{background:#16213e;padding:2px 8px;border-radius:4px}a{col
           sessionKey,
         );
         return { block: true, blockReason: customCheck.message };
+      }
+
+      // Gate 1c: Config Shield — block tool access to sensitive config files
+      const configBlock = await checkConfigAccess(name, event.params ?? {}, sessionKey);
+      if (configBlock) {
+        api.logger.warn(`[GodMode][SafetyGate] config shield fired: ${name}`);
+        return { block: true, blockReason: configBlock };
       }
 
       // Gate 2: Grep Blocker + Coding Bypass Blocker — exec/bash/shell commands
@@ -1084,6 +1135,8 @@ h1{color:#ff6b6b}code{background:#16213e;padding:2px 8px;border-radius:4px}a{col
     api.on("after_tool_call", async (event, ctx) => {
       // Track search tool usage for the exhaustive search gate
       trackSearchUsage(ctx?.sessionKey, event.toolName ?? "");
+      // Track code-reading tool usage for the self-service gate
+      trackCodeToolUsage(ctx?.sessionKey, event.toolName ?? "");
 
       // Trust feedback — detect skill completion and queue feedback prompt
       try {
@@ -1100,6 +1153,15 @@ h1{color:#ff6b6b}code{background:#16213e;padding:2px 8px;border-radius:4px}a{col
       const content = event.content ?? "";
       if (await checkLazyRefusal(sessionKey, content)) {
         api.logger.warn(`[GodMode][SafetyGate] exhaustive search gate fired — lazy refusal blocked`);
+        return { cancel: true };
+      }
+      if (await checkLazyQuestion(sessionKey, content)) {
+        api.logger.warn(`[GodMode][SafetyGate] self-service gate fired — lazy question blocked`);
+        return { cancel: true };
+      }
+      // Output Shield — block messages that leak system prompts, keys, or config
+      if (await checkOutputLeak(sessionKey, content)) {
+        api.logger.warn(`[GodMode][SafetyGate] output shield fired — leak blocked`);
         return { cancel: true };
       }
     });
@@ -1146,6 +1208,7 @@ h1{color:#ff6b6b}code{background:#16213e;padding:2px 8px;border-radius:4px}a{col
     api.registerTool((ctx) => createTrustRateTool(ctx));
     api.registerTool((ctx) => createOnboardTool(ctx));
     api.registerTool((ctx) => createMorningSetTool(ctx));
+    api.registerTool((ctx) => createGuardrailTool(ctx));
 
     // ── 6. Register CLI commands ──────────────────────────────────
     api.registerCli(

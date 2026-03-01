@@ -320,15 +320,15 @@ export async function refreshActiveTab(host: SettingsHost) {
       app.handleLoadSetupChecklist();
     }
   }
-  if (host.tab === "coretex") {
+  if (host.tab === "second-brain") {
     const app = host as unknown as GodModeApp;
-    const subtab = (app as unknown as { coretexSubtab?: string }).coretexSubtab;
+    const subtab = (app as unknown as { secondBrainSubtab?: string }).secondBrainSubtab;
     if (subtab === "intel") {
       if (typeof app.handleIntelLoad === "function") {
         await app.handleIntelLoad();
       }
-    } else if (typeof app.handleCoretexRefresh === "function") {
-      await app.handleCoretexRefresh();
+    } else if (typeof app.handleSecondBrainRefresh === "function") {
+      await app.handleSecondBrainRefresh();
     }
   }
   if (host.tab === "config") {

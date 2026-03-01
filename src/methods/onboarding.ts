@@ -161,6 +161,7 @@ function buildPhase0Steps(state: OnboardingState): ChecklistStep[] {
 
 function buildPhase1Steps(state: OnboardingState): ChecklistStep[] {
   const i = state.interview;
+  const sp = i?.soulProfile;
   return [
     {
       id: "p1-name",
@@ -169,45 +170,46 @@ function buildPhase1Steps(state: OnboardingState): ChecklistStep[] {
       detail: i?.name ? `${i.name}${i.role ? ` (${i.role})` : ""}` : undefined,
     },
     {
-      id: "p1-mission",
-      label: "Your mission",
-      completed: Boolean(i?.mission),
-      detail: i?.mission ? truncate(i.mission, 60) : undefined,
+      id: "p1-ground",
+      label: "The Ground",
+      completed: Boolean(sp?.ground && sp?.anchor && sp?.atMyBest),
+      detail: sp?.ground ? truncate(sp.ground, 50) : undefined,
     },
     {
-      id: "p1-routine",
-      label: "Daily routine",
-      completed: Boolean(i?.dailyRoutine),
+      id: "p1-modes",
+      label: "Your Modes",
+      completed: Boolean(sp?.flowState && sp?.depletedState),
+      detail: sp?.flowState ? "Flow + depleted mapped" : undefined,
     },
     {
-      id: "p1-tools",
-      label: "Tools you use",
-      completed: Boolean(i?.tools && i.tools.length > 0),
-      detail: i?.tools && i.tools.length > 0 ? i.tools.slice(0, 4).join(", ") : undefined,
+      id: "p1-patterns",
+      label: "Pattern Tendencies",
+      completed: Boolean(sp?.recurringPattern || sp?.disguisedDistraction),
+      detail: sp?.recurringPattern ? truncate(sp.recurringPattern, 40) : undefined,
     },
     {
-      id: "p1-pain",
-      label: "Pain points",
-      completed: Boolean(i?.painPoints && i.painPoints.length > 0),
-      detail:
-        i?.painPoints && i.painPoints.length > 0
-          ? `${i.painPoints.length} identified`
-          : undefined,
+      id: "p1-truth",
+      label: "Truth + Love Calibration",
+      completed: Boolean(sp?.challengeLevel && sp?.correctionStyle),
+      detail: sp?.challengeLevel ? truncate(sp.challengeLevel, 40) : undefined,
+    },
+    {
+      id: "p1-sacred",
+      label: "What's Sacred",
+      completed: Boolean(sp?.nonNegotiables && sp.nonNegotiables.length > 0),
+      detail: sp?.nonNegotiables ? `${sp.nonNegotiables.length} non-negotiables` : undefined,
+    },
+    {
+      id: "p1-voice",
+      label: "Voice Tuning",
+      completed: Boolean(sp?.annoyingAiBehavior && sp?.justGetItDone),
+      detail: sp?.annoyingAiBehavior ? "AI preferences set" : undefined,
     },
     {
       id: "p1-workflows",
-      label: "Key workflows",
-      completed: Boolean(i?.workflows && i.workflows.length > 0),
-      detail:
-        i?.workflows && i.workflows.length > 0
-          ? i.workflows.slice(0, 3).join(", ")
-          : undefined,
-    },
-    {
-      id: "p1-team",
-      label: "Team setup",
-      completed: Boolean(i?.teamOrSolo),
-      detail: i?.teamOrSolo ?? undefined,
+      label: "What Should Be Running",
+      completed: Boolean(sp?.desiredWorkflows && sp.desiredWorkflows.length > 0),
+      detail: sp?.desiredWorkflows ? `${sp.desiredWorkflows.length} automations` : undefined,
     },
   ];
 }
@@ -951,6 +953,12 @@ export const onboardingHandlers: GatewayRequestHandlers = {
     const answers = parseWizardAnswers(params);
     const force = Boolean(params.force);
     const shouldPatchConfig = params.patchConfig !== false;
+
+    // If soul profile data exists in onboarding state, merge it into answers
+    const state0 = await readOnboarding();
+    if (state0.interview?.soulProfile && !answers.soulProfile) {
+      answers.soulProfile = state0.interview.soulProfile as OnboardingAnswers["soulProfile"];
+    }
 
     // Generate workspace files
     const fileResults = await generateWorkspaceFiles(answers, GODMODE_ROOT, { force });

@@ -96,8 +96,12 @@ const addCustomGuardrailHandler: GatewayRequestHandler = async ({ params, respon
     respond(false, null, { code: "INVALID_REQUEST", message: "trigger.patterns must be a non-empty array" });
     return;
   }
-  if (input.action !== "block") {
-    respond(false, null, { code: "INVALID_REQUEST", message: 'action must be "block"' });
+  if (input.action !== "block" && input.action !== "redirect") {
+    respond(false, null, { code: "INVALID_REQUEST", message: 'action must be "block" or "redirect"' });
+    return;
+  }
+  if (input.action === "redirect" && (!input.redirectTo || typeof input.redirectTo !== "string")) {
+    respond(false, null, { code: "INVALID_REQUEST", message: "redirectTo is required for redirect action" });
     return;
   }
   if (!input.message || typeof input.message !== "string") {
@@ -112,8 +116,9 @@ const addCustomGuardrailHandler: GatewayRequestHandler = async ({ params, respon
       description: input.description ?? "",
       enabled: input.enabled ?? true,
       trigger: { tool: input.trigger.tool, patterns: input.trigger.patterns },
-      action: "block",
+      action: input.action,
       message: input.message,
+      ...(input.redirectTo ? { redirectTo: input.redirectTo } : {}),
     });
     context?.broadcast?.("guardrails:update", {}, { dropIfSlow: true });
     respond(true, { guardrail });
@@ -122,6 +127,33 @@ const addCustomGuardrailHandler: GatewayRequestHandler = async ({ params, respon
     const message = err instanceof Error ? err.message : String(err);
     respond(false, null, { code, message });
   }
+};
+
+const setCustomGuardrailHandler: GatewayRequestHandler = async ({ params, respond, context }) => {
+  const { id, enabled } = (params ?? {}) as { id?: string; enabled?: boolean };
+
+  if (!id || typeof id !== "string") {
+    respond(false, null, { code: "INVALID_REQUEST", message: "id is required" });
+    return;
+  }
+
+  const state = await readGuardrailsState();
+  if (!state.custom) {
+    respond(false, null, { code: "NOT_FOUND", message: `Custom guardrail "${id}" not found` });
+    return;
+  }
+
+  const guardrail = state.custom.find((g) => g.id === id);
+  if (!guardrail) {
+    respond(false, null, { code: "NOT_FOUND", message: `Custom guardrail "${id}" not found` });
+    return;
+  }
+
+  if (typeof enabled === "boolean") guardrail.enabled = enabled;
+
+  await writeGuardrailsState(state);
+  context?.broadcast?.("guardrails:update", {}, { dropIfSlow: true });
+  respond(true, { guardrail });
 };
 
 const removeCustomGuardrailHandler: GatewayRequestHandler = async ({ params, respond, context }) => {
@@ -142,6 +174,7 @@ const removeCustomGuardrailHandler: GatewayRequestHandler = async ({ params, res
 export const guardrailsHandlers: GatewayRequestHandlers = {
   "guardrails.list": listGuardrails,
   "guardrails.set": setGuardrail,
+  "guardrails.setCustom": setCustomGuardrailHandler,
   "guardrails.history": getGuardrailsHistory,
   "guardrails.addCustom": addCustomGuardrailHandler,
   "guardrails.removeCustom": removeCustomGuardrailHandler,

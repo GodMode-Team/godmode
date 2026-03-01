@@ -4,6 +4,91 @@ This file tracks recent development changes so Atlas and other agents can quickl
 
 ---
 
+## 2026-02-28 — Prompt Injection Defense System (Three Security Shields)
+
+### Why
+Red-team audit scored 1/10 on prompt injection tests. GodMode had strong tool-level gates (loop breaker, grep blocker, spawn gate) but zero message-level defenses. Any user message reached the agent unfiltered, and outbound messages could leak system prompts, config files, API keys, and tool listings.
+
+### What Was Built
+Three new deterministic security gates plus an automated red-team audit system:
+
+**Prompt Shield** (input detection + counter-injection)
+- Hook: `message_received` (detect) + `before_prompt_build` (inject counter-instructions)
+- Scans inbound messages for 5 categories of injection: instruction overrides, prompt extraction, fake authority claims, encoded payloads (including base64 decode), social engineering
+- When detected, flags session and injects strong system-level counter-instructions that override the injection attempt
+- Zero overhead on normal messages — counter-instructions only added when threat detected
+
+**Output Shield** (leak prevention)
+- Hook: `message_sending` (cancel) + `before_prompt_build` (nudge)
+- Blocks outbound messages that contain: API keys (sk-*, xai-*, ghp_*), system prompt recitation (3+ structural markers), config file JSON (license keys, tokens), tool listing dumps (5+ tools), SOUL.md/AGENTS.md content
+- Canceled messages get a nudge on next prompt cycle to rephrase without sensitive data
+
+**Config Shield** (file access protection)
+- Hook: `before_tool_call` (block)
+- Blocks bash commands (cat/head/tail/etc.) and read tool calls targeting sensitive paths: `.openclaw/openclaw.json`, `.openclaw/.env`, `AGENTS.md`, `SOUL.md`, `.ssh/`, `.aws/credentials`, `.npmrc`, `.netrc`, `guardrails.json`
+- Internal Node.js reads (team-bootstrap, onboarding) are unaffected — only tool-based access is blocked
+
+**Red Team Audit System**
+- `security.audit` RPC with 26 test cases (12 prompt shield, 6 output shield, 8 config shield)
+- Includes false positive checks to ensure normal operations aren't blocked
+- Generates graded reports (A+ through F) saved to `~/godmode/data/security-audits/`
+- `skills/red-team-audit/SKILL.md` — agent-invokable audit skill
+
+### Modified Files
+- `src/services/guardrails.ts` — Added `promptShield`, `outputShield`, `configShield` gate IDs, defaults, and descriptors
+- `src/hooks/safety-gates.ts` — Three new gate implementations (~300 lines): Prompt Shield (pattern matching + base64 decode), Output Shield (6 leak checks), Config Shield (sensitive path blocking)
+- `index.ts` — Wired all hooks: new `message_received` handler, extended `before_prompt_build` with shield nudges, extended `before_tool_call` with config shield, extended `message_sending` with output shield, extended `before_reset` with tracking cleanup
+- `src/methods/security-audit.ts` — NEW: Red-team audit RPC handler with 26 test battery
+- `skills/red-team-audit/SKILL.md` — NEW: Agent-invokable security audit skill
+
+### Design Principles
+- All detection is pure in-memory regex — microseconds, no API calls
+- Zero tokens added to context during normal conversation
+- All three gates toggleable via guardrails dashboard (enabled by default)
+- Defense-in-depth: Prompt Shield catches input, Output Shield catches output, Config Shield catches file access
+- False positive mitigation: markers require 3+ hits for system prompt/SOUL/AGENTS detection; short messages skip checks
+
+---
+
+## 2026-02-28 — Gateway Token Auto-Generation + Prosper X Sandbox
+
+### Gateway Token Security (GodMode Plugin)
+Added automatic gateway auth token generation to both onboarding paths (in-app and CLI script). This was the #1 recommendation from the security audit — high-value, zero-friction for clients.
+
+**What it does:**
+When a new user activates their license (via `onboarding.activateLicense` RPC or `scripts/team-setup.mjs`), the system now auto-generates a 256-bit gateway auth token if one doesn't already exist. This prevents unauthorized local processes from sending commands to the agent via the WebSocket port.
+
+**Modified files:**
+- `src/methods/onboarding.ts` — Added `randomBytes` import, gateway token auto-generation during `activateLicense`. Checks both `gateway.token` (legacy) and `gateway.auth.token` (standard path).
+- `scripts/team-setup.mjs` — Added Step 7 "Securing gateway" with token generation (reads/writes `~/.openclaw/openclaw.json`).
+- `src/methods/onboarding-scanner.ts` — Added gateway token check to health assessment. Missing token is flagged as `priority: "critical"` in config recommendations.
+- `src/methods/onboarding-types.ts` — Added `gatewayTokenSet: boolean` to `AssessmentResult`.
+
+**Audit finding fixed:**
+Atlas originally reported the gateway token as missing because the audit checked `gateway.token` (flat key) while the actual config uses `gateway.auth.token` (nested). All code now checks both paths.
+
+### Prosper X Sandbox (Separate Local Project)
+Built a fully sandboxed X/Twitter agent architecture at `~/Projects/prosper-x-sandbox/`. This is local infrastructure, NOT part of the GodMode plugin. Follows Meta's Rule of Two — Prosper processes untrusted inputs (A) and accesses sensitive data (B), so external actions (C) require human approval.
+
+**Architecture:**
+- `src/sanitize.ts` — Input sanitizer with 4 defense layers: Unicode normalization (homoglyphs, zero-width chars, NBSP), injection pattern detection (8 categories: direct injection, role manipulation, output control, delimiter injection, data exfiltration, encoded payloads, multi-step manipulation, jailbreak keywords), length enforcement, structural wrapping (`[EXTERNAL_TWEET]` delimiters).
+- `src/drafts.ts` — File-based draft queue. Lifecycle: `data/drafts/` → `data/approved/` or `data/rejected/` → `data/posted/`. Each draft gets a UUID. Approval writes a SHA-256 signature proving human review.
+- `src/ingest.ts` — X API v2 reader with cursor-based pagination. All content sanitized before hitting inbox. Supports manual ingest for testing.
+- `src/poster.ts` — The ONLY code path that can publish. Requires approval signature, rate-limited (48/day, 5min cooldown), full audit trail in `post-log.json`.
+- `src/review-server.ts` — Local web UI at `127.0.0.1:18800` for reviewing drafts. Approve/reject/edit interface with dark theme. Binds to localhost only.
+- `src/cli.ts` — CLI for all operations: `status`, `review`, `ingest`, `inbox`, `drafts`, `approve`, `reject`, `post`.
+
+**Security invariants:**
+1. No auto-posting — every post requires human approval signature (SHA-256)
+2. All ingested content sanitized and structurally wrapped before agent sees it
+3. Rate limiting: 48/day max, 5-minute cooldown between posts
+4. Draft output validation detects credential leaks (API keys, tokens)
+5. Review server binds to 127.0.0.1 only — never exposed to network
+
+**Setup:** `cd ~/Projects/prosper-x-sandbox && cp .env.example .env` and add X API credentials. `npm run review` starts the review UI.
+
+---
+
 ## 2026-02-28 — Agent Coding Pipeline Safety Overhaul
 
 ### Problem
