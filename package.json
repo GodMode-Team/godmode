@@ -1,6 +1,6 @@
 {
   "name": "@godmode-team/godmode",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "private": false,
   "description": "GodMode - Personal AI Operating System plugin for OpenClaw",
   "type": "module",
