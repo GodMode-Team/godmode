@@ -71,7 +71,9 @@ import {
 import { isGateEnabled, checkCustomGuardrails, logGateActivity } from "./src/services/guardrails.js";
 import { guardrailsHandlers } from "./src/methods/guardrails.js";
 import { imageCacheHandlers } from "./src/methods/image-cache.js";
+import { clawhubHandlers } from "./src/methods/clawhub.js";
 import { coretexHandlers } from "./src/methods/coretex.js";
+import { proactiveIntelHandlers } from "./src/methods/proactive-intel.js";
 // Static file server for UIs
 import { createStaticFileHandler } from "./src/static-server.js";
 import { DATA_DIR } from "./src/data-paths.js";
@@ -84,8 +86,8 @@ let optionsCachedAt = 0;
 
 const OPTIONS_DEFAULTS: Record<string, unknown> = {
   "focusPulse.enabled": true,
-  "deck.enabled": false,
   "missionControl.enabled": false,
+  "proactiveIntel.enabled": true,
 };
 
 function readOptionsSync(): Record<string, unknown> {
@@ -539,6 +541,19 @@ const godmodePlugin = {
     // ── 1. Register all gateway RPC methods (license-gated) ───────
     const codingOrchestrator = new CodingOrchestrator(api);
     const codingNotification = new CodingNotificationService(api);
+
+    // Wire up completion notifications for detached agent processes.
+    // Without this, tasks completed by spawned CLI agents never send notifications.
+    codingOrchestrator.onTaskCompleted(async (task) => {
+      await codingNotification.sendCompletionNotification({
+        taskId: task.id,
+        description: task.description,
+        outcome: task.status === "done" ? "completed" : "failed",
+        prUrl: task.prUrl,
+        error: task.error,
+      });
+    });
+
     const codingHandlers = createCodingTaskHandlers(codingOrchestrator);
 
     const allHandlers: Record<string, unknown> = {
@@ -571,12 +586,26 @@ const godmodePlugin = {
       ...systemUpdateHandlers,
       ...guardrailsHandlers,
       ...imageCacheHandlers,
+      ...clawhubHandlers,
       ...coretexHandlers,
+      ...proactiveIntelHandlers,
     };
 
+    // Methods that must work before a license is configured (setup flow)
+    const ungatedMethods = new Set([
+      "onboarding.quickSetup",
+      "onboarding.activateLicense",
+      "onboarding.status",
+      "onboarding.checklist",
+    ]);
+
     for (const [method, handler] of Object.entries(allHandlers)) {
-      const gated = withLicenseGate(licenseKey, api.logger, handler as Function);
-      api.registerGatewayMethod(method, gated as Parameters<typeof api.registerGatewayMethod>[1]);
+      if (ungatedMethods.has(method)) {
+        api.registerGatewayMethod(method, handler as Parameters<typeof api.registerGatewayMethod>[1]);
+      } else {
+        const gated = withLicenseGate(licenseKey, api.logger, handler as Function);
+        api.registerGatewayMethod(method, gated as Parameters<typeof api.registerGatewayMethod>[1]);
+      }
     }
 
     api.logger.info(
@@ -605,31 +634,10 @@ const godmodePlugin = {
       }
     });
 
-    const deckUiCandidates = [
-      join(pluginRoot, "dist", "deck"),
-      join(pluginRoot, "assets", "deck"),
-      join(pluginRoot, "deck", "dist"),
-      join(pluginRoot, "..", "openclaw-deck", "dist"),
-    ];
-    const deckUiRoot = deckUiCandidates.find((p) => {
-      const index = join(p, "index.html");
-      if (!existsSync(index)) {
-        return false;
-      }
-      try {
-        const html = readFileSync(index, "utf8");
-        // Reject dev-source HTML (e.g. <script src="/src/main.tsx">)
-        return !/\/src\/main\.[jt]sx?/.test(html);
-      } catch {
-        return false;
-      }
-    });
-
     // ── 3. Serve UIs + health endpoint via HTTP ───────────────────
     const godmodeHandler = godmodeUiRoot
       ? createStaticFileHandler(godmodeUiRoot, "/godmode")
       : null;
-    const deckHandler = deckUiRoot ? createStaticFileHandler(deckUiRoot, "/deck") : null;
 
     api.registerHttpHandler(async (req, res) => {
       const url = req.url ?? "/";
@@ -646,7 +654,6 @@ const godmodePlugin = {
             ...(licenseState.error ? { error: licenseState.error } : {}),
           },
           ui: godmodeUiRoot ? "available" : "not-built",
-          deck: deckUiRoot ? "available" : "not-built",
           methods: Object.keys(allHandlers).length,
         };
         res.writeHead(200, { "Content-Type": "application/json", "Cache-Control": "no-cache" });
@@ -701,38 +708,6 @@ h1{color:#ff6b6b}code{background:#16213e;padding:2px 8px;border-radius:4px}a{col
         return true;
       }
 
-      // Deck UI
-      if (pathname === "/deck" || pathname.startsWith("/deck/")) {
-        const opts = readOptionsSync();
-        if (!opts["deck.enabled"]) {
-          res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
-          res.end(`<!DOCTYPE html>
-<html><head><title>Deck — Disabled</title>
-<style>body{font-family:system-ui;max-width:600px;margin:80px auto;padding:0 20px;color:#e0e0e0;background:#1a1a2e}
-h1{color:#a0a0a0}code{background:#16213e;padding:2px 8px;border-radius:4px}a{color:#4ecdc4}</style></head>
-<body><h1>Deck is disabled</h1>
-<p>Deck is disabled. Enable it in GodMode Settings &gt; Options.</p>
-<p><a href="/godmode">Back to GodMode</a></p>
-</body></html>`);
-          return true;
-        }
-        if (deckHandler) {
-          deckHandler(req, res);
-        } else {
-          res.writeHead(503, { "Content-Type": "text/html; charset=utf-8" });
-          res.end(`<!DOCTYPE html>
-<html><head><title>Deck — UI Not Built</title>
-<style>body{font-family:system-ui;max-width:600px;margin:80px auto;padding:0 20px;color:#e0e0e0;background:#1a1a2e}
-h1{color:#ff6b6b}code{background:#16213e;padding:2px 8px;border-radius:4px}a{color:#4ecdc4}</style></head>
-<body><h1>Deck UI Not Available</h1>
-<p>The GodMode plugin is loaded but Deck assets haven't been bundled yet.</p>
-<p>Run: <code>pnpm build</code> in <code>~/Projects/godmode-plugin</code>, then restart gateway.</p>
-<p><a href="/godmode/health">Check plugin health →</a></p>
-</body></html>`);
-        }
-        return true;
-      }
-
       return false;
     });
 
@@ -740,12 +715,6 @@ h1{color:#ff6b6b}code{background:#16213e;padding:2px 8px;border-radius:4px}a{col
       api.logger.info(`[GodMode] Serving UI at /godmode from ${godmodeUiRoot}`);
     } else {
       api.logger.warn("[GodMode] No built UI found. Run 'pnpm build' in the plugin repo.");
-    }
-
-    if (deckUiRoot) {
-      api.logger.info(`[GodMode] Serving Deck at /deck from ${deckUiRoot}`);
-    } else {
-      api.logger.warn("[GodMode] No built Deck found. Run 'pnpm deck:build' first.");
     }
 
     // ── 4. Plugin status RPC (not license-gated — for diagnostics) ─
@@ -761,7 +730,6 @@ h1{color:#ff6b6b}code{background:#16213e;padding:2px 8px;border-radius:4px}a{col
         },
         methods: methodCount + 1,
         ui: godmodeUiRoot ? "available" : "not built",
-        deck: deckUiRoot ? "available" : "not built",
         source: "plugin",
       });
     }) as Parameters<typeof api.registerGatewayMethod>[1]);
@@ -867,6 +835,27 @@ h1{color:#ff6b6b}code{background:#16213e;padding:2px 8px;border-radius:4px}a{col
         api.logger.warn(`[GodMode] Focus Pulse heartbeat failed to init: ${String(err)}`);
       }
 
+      // Consciousness heartbeat — hourly auto-sync of CONSCIOUSNESS.md
+      try {
+        const { initConsciousnessHeartbeat, startConsciousnessHeartbeat } = await import("./src/services/consciousness-heartbeat.js");
+        initConsciousnessHeartbeat(api.logger);
+        startConsciousnessHeartbeat();
+        api.logger.info("[GodMode] Consciousness heartbeat service started");
+      } catch (err) {
+        api.logger.warn(`[GodMode] Consciousness heartbeat failed to start: ${String(err)}`);
+      }
+
+      // Proactive Intelligence service
+      try {
+        const { getProactiveIntelService } = await import("./src/services/proactive-intel.js");
+        const intel = getProactiveIntelService(api.logger);
+        // Broadcast fn wired lazily on first proactiveIntel RPC call (same pattern as focus-pulse)
+        await intel.start();
+        api.logger.info("[GodMode] Proactive Intelligence service initialized");
+      } catch (err) {
+        api.logger.warn(`[GodMode] Proactive Intelligence failed to start: ${String(err)}`);
+      }
+
       // Recover orphaned coding tasks from previous gateway instance
       if (codingOrchestrator.isEnabled()) {
         codingOrchestrator.recoverOrphanedTasks().then((result) => {
@@ -909,6 +898,18 @@ h1{color:#ff6b6b}code{background:#16213e;padding:2px 8px;border-radius:4px}a{col
       try {
         const { stopHeartbeat } = await import("./src/services/focus-pulse-heartbeat.js");
         stopHeartbeat();
+      } catch {
+        // Non-fatal
+      }
+      try {
+        const { stopConsciousnessHeartbeat } = await import("./src/services/consciousness-heartbeat.js");
+        stopConsciousnessHeartbeat();
+      } catch {
+        // Non-fatal
+      }
+      try {
+        const { stopProactiveIntelService } = await import("./src/services/proactive-intel.js");
+        stopProactiveIntelService();
       } catch {
         // Non-fatal
       }
@@ -1166,7 +1167,6 @@ h1{color:#ff6b6b}code{background:#16213e;padding:2px 8px;border-radius:4px}a{col
               },
               methods: methodCount,
               ui: godmodeUiRoot ? "available" : "not built",
-              deck: deckUiRoot ? "available" : "not built",
             };
 
             if (opts.json) {
@@ -1180,7 +1180,6 @@ h1{color:#ff6b6b}code{background:#16213e;padding:2px 8px;border-radius:4px}a{col
             console.log(`  License:  ${status.license.status} (${status.license.tier})`);
             console.log(`  Methods:  ${status.methods}`);
             console.log(`  UI:       ${status.ui}`);
-            console.log(`  Deck:     ${status.deck}`);
           });
 
         godmode
@@ -1278,14 +1277,7 @@ h1{color:#ff6b6b}code{background:#16213e;padding:2px 8px;border-radius:4px}a{col
               detail: godmodeUiRoot ?? "Not found — run: pnpm build (plugin repo)",
             });
 
-            // 4. Deck assets
-            checks.push({
-              name: "Deck UI built",
-              ok: !!deckUiRoot,
-              detail: deckUiRoot ?? "Not found — run: pnpm deck:build",
-            });
-
-            // 5. Data directory
+            // 4. Data directory
             const workspaceRoot =
               (api.pluginConfig as { workspaceRoot?: string } | undefined)?.workspaceRoot ??
               "~/godmode";

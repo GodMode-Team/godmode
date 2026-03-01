@@ -14,6 +14,7 @@ import { join } from "node:path";
 import type { GatewayRequestHandler } from "openclaw/plugin-sdk";
 import { GODMODE_ROOT, MEMORY_DIR } from "../data-paths.js";
 import { syncClaudeCodeSessions } from "../services/claude-code-sync.js";
+import { setConsciousnessHeartbeatBroadcast } from "../services/consciousness-heartbeat.js";
 
 type GatewayRequestHandlers = Record<string, GatewayRequestHandler>;
 
@@ -77,7 +78,18 @@ async function runScriptWithLock(): Promise<{ stdout: string; stderr: string }> 
   }
 }
 
+/** Wire the heartbeat's broadcast ref lazily on first RPC call. */
+function refreshHeartbeatBroadcast(context: Parameters<GatewayRequestHandler>[0]["context"]): void {
+  if (!context?.broadcast) return;
+  try {
+    setConsciousnessHeartbeatBroadcast(context.broadcast);
+  } catch {
+    // Heartbeat may not be initialized yet — non-fatal
+  }
+}
+
 const flush: GatewayRequestHandler = async ({ respond, context }) => {
+  refreshHeartbeatBroadcast(context);
   const scriptReady = assertScriptReady();
   if (!scriptReady.ok) {
     // Graceful fallback: if script doesn't exist, just read existing file
@@ -152,7 +164,8 @@ const flush: GatewayRequestHandler = async ({ respond, context }) => {
   }
 };
 
-const read: GatewayRequestHandler = async ({ respond }) => {
+const read: GatewayRequestHandler = async ({ respond, context }) => {
+  refreshHeartbeatBroadcast(context);
   const content = readConsciousness();
   if (!content) {
     respond(false, undefined, {
