@@ -4,6 +4,8 @@ import path from "node:path";
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk";
 import { GODMODE_ROOT } from "../data-paths.js";
 import { formatGuardrailsForPrompt } from "./guardrails.js";
+import { resolveClaudeBin, resolveAgentBin, isEngineAvailable } from "../lib/resolve-claude-bin.js";
+import type { AgentEngine } from "../lib/agent-roster.js";
 import {
   classifyTaskMode,
   newTaskId,
@@ -13,6 +15,7 @@ import {
   type CodingTaskMode,
   type CodingTaskState,
   type CodingTaskStatus,
+  type ReviewResult,
   type SwarmStage,
 } from "../lib/coding-task-state.js";
 
@@ -450,6 +453,188 @@ async function runValidationGates(
   return { passed: true, details: "all gates passed" };
 }
 
+// ── Multi-Model Code Review ──────────────────────────────────────
+
+/**
+ * Run adversarial code reviews on a PR using multiple AI engines in parallel.
+ * Each available engine reviews the diff and posts a comment on the PR.
+ * Returns results from all reviewers — failures are informational, not blocking.
+ */
+async function runAdversarialReviews(
+  run: RunCmd,
+  worktreePath: string,
+  prNumber: number,
+  description: string,
+  logger: { info(m: string): void; warn(m: string): void; error(m: string): void },
+): Promise<ReviewResult[]> {
+  const engines: AgentEngine[] = ["codex", "claude", "gemini"];
+  const available = engines.filter((e) => isEngineAvailable(e));
+
+  if (available.length === 0) {
+    logger.warn("[GodMode][Coding] No AI reviewers available for adversarial review");
+    return [];
+  }
+
+  // Fetch the PR diff once for all reviewers
+  let diff = "";
+  try {
+    const { stdout, exitCode } = await run(
+      ["gh", "pr", "diff", String(prNumber)],
+      { timeoutMs: 30_000, cwd: worktreePath },
+    );
+    if (exitCode === 0) diff = stdout;
+  } catch {
+    logger.warn("[GodMode][Coding] Could not fetch PR diff for review");
+    return [];
+  }
+
+  if (!diff || diff.trim().length < 10) {
+    return [{ engine: "claude", status: "skipped", comment: "Empty diff" }];
+  }
+
+  // Truncate diff to avoid blowing context windows (keep first ~8000 lines)
+  const diffLines = diff.split("\n");
+  const truncatedDiff = diffLines.length > 8000
+    ? diffLines.slice(0, 8000).join("\n") + "\n\n[... diff truncated ...]"
+    : diff;
+
+  const reviewPrompt = [
+    `Review this pull request (#${prNumber}): ${description}`,
+    "",
+    "Focus on:",
+    "- Logic errors, bugs, race conditions",
+    "- Security issues (injection, auth bypass, data leaks)",
+    "- Missing error handling for edge cases",
+    "- Performance problems (N+1 queries, unnecessary re-renders, memory leaks)",
+    "",
+    "DO NOT comment on style, formatting, naming, or minor suggestions.",
+    "Only flag issues that would cause bugs or security problems in production.",
+    "",
+    "If you find critical issues, start your response with CRITICAL: followed by the issue.",
+    "If you find no significant issues, respond with: LGTM - No critical issues found.",
+    "",
+    "Be concise. Max 500 words.",
+    "",
+    "```diff",
+    truncatedDiff,
+    "```",
+  ].join("\n");
+
+  // Run all available reviewers in parallel
+  const reviewPromises = available.map(async (engine): Promise<ReviewResult> => {
+    try {
+      const bin = resolveAgentBin(engine);
+      let args: string[];
+
+      switch (engine) {
+        case "codex":
+          // Codex has a dedicated review command
+          args = ["exec", "review", "--", `--pr=${prNumber}`];
+          try {
+            const { exitCode } = await run(
+              [bin, ...args],
+              { timeoutMs: 180_000, cwd: worktreePath },
+            );
+            // Codex review posts directly to the PR
+            return {
+              engine,
+              status: exitCode === 0 ? "passed" : "failed",
+              comment: exitCode === 0 ? "Codex review posted to PR" : "Codex review failed",
+            };
+          } catch {
+            // Fall back to prompt-based review
+            args = ["exec", reviewPrompt];
+          }
+          break;
+        case "claude":
+          args = ["-p", reviewPrompt, "--dangerously-skip-permissions"];
+          break;
+        case "gemini":
+          args = ["-p", reviewPrompt];
+          break;
+      }
+
+      // Run the review agent and capture output
+      const reviewOutput = await new Promise<string>((resolve) => {
+        let output = "";
+        const child = spawn(bin, args, {
+          cwd: worktreePath,
+          stdio: ["ignore", "pipe", "pipe"],
+          env: {
+            ...buildReviewEnv(),
+            ...(engine === "codex" && process.env.OPENAI_API_KEY
+              ? { OPENAI_API_KEY: process.env.OPENAI_API_KEY }
+              : {}),
+            ...(engine === "gemini" && process.env.GEMINI_API_KEY
+              ? { GEMINI_API_KEY: process.env.GEMINI_API_KEY }
+              : {}),
+          },
+        });
+
+        child.stdout?.on("data", (d: Buffer) => { output += d.toString(); });
+        child.stderr?.on("data", (d: Buffer) => { output += d.toString(); });
+
+        const timeout = setTimeout(() => {
+          try { child.kill(); } catch { /* */ }
+          resolve(output || "Review timed out");
+        }, 180_000);
+
+        child.on("exit", () => {
+          clearTimeout(timeout);
+          resolve(output);
+        });
+
+        child.on("error", () => {
+          clearTimeout(timeout);
+          resolve("Review spawn failed");
+        });
+      });
+
+      // Post the review as a comment on the PR
+      const commentBody = `## ${engine.charAt(0).toUpperCase() + engine.slice(1)} Code Review\n\n${reviewOutput.slice(0, 4000)}`;
+      try {
+        await run(
+          ["gh", "pr", "comment", String(prNumber), "--body", commentBody],
+          { timeoutMs: 15_000, cwd: worktreePath },
+        );
+      } catch {
+        // Comment posting failed — log but don't fail
+        logger.warn(`[GodMode][Coding] Failed to post ${engine} review comment on PR #${prNumber}`);
+      }
+
+      const hasCritical = reviewOutput.toLowerCase().includes("critical:");
+      return {
+        engine,
+        status: hasCritical ? "failed" : "passed",
+        comment: reviewOutput.slice(0, 500),
+      };
+    } catch (err) {
+      return { engine, status: "skipped", comment: String(err).slice(0, 200) };
+    }
+  });
+
+  const results = await Promise.allSettled(reviewPromises);
+  return results.map((r) =>
+    r.status === "fulfilled" ? r.value : { engine: "claude" as AgentEngine, status: "skipped" as const },
+  );
+}
+
+function buildReviewEnv(): Record<string, string> {
+  const parentPath = process.env.PATH ?? "";
+  const env: Record<string, string> = {
+    PATH: parentPath.includes("/opt/homebrew/bin")
+      ? parentPath
+      : `/opt/homebrew/bin:${parentPath}`,
+    HOME: process.env.HOME ?? "",
+    USER: process.env.USER ?? "",
+    SHELL: process.env.SHELL ?? "/bin/zsh",
+    LANG: process.env.LANG ?? "en_US.UTF-8",
+    TERM: process.env.TERM ?? "xterm-256color",
+  };
+  if (process.env.ANTHROPIC_API_KEY) env.ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
+  return env;
+}
+
 // ── Orchestrator ────────────────────────────────────────────────
 
 export type LaunchTaskParams = {
@@ -801,9 +986,7 @@ export class CodingOrchestrator {
     try {
       // Resolve full claude binary path so detached processes find it
       // regardless of PATH inheritance (brew installs to /opt/homebrew/bin)
-      const claudeBin =
-        process.env.CLAUDE_BIN ??
-        "/opt/homebrew/bin/claude";
+      const claudeBin = resolveClaudeBin();
 
       const args = ["-p", prompt, "--verbose", "--dangerously-skip-permissions"];
       if (model) args.push("--model", model);
@@ -894,26 +1077,59 @@ export class CodingOrchestrator {
             task.prNumber = pr.prNumber;
             task.prUrl = pr.prUrl;
 
-            // Auto-merge if configured — but only if main's working tree is clean.
-            // If there are uncommitted changes, skip merge to avoid stashing/losing work.
-            if (this.config().autoMerge) {
+            // Run adversarial reviews — BLOCKING. Results gate merge.
+            const reviews = await runAdversarialReviews(
+              this.run, task.worktreePath, pr.prNumber, task.description, this.logger,
+            );
+            task.reviews = reviews;
+
+            const reviewPassed = reviews.filter((r) => r.status === "passed").length;
+            const reviewFailed = reviews.filter((r) => r.status === "failed").length;
+            const reviewSkipped = reviews.filter((r) => r.status === "skipped").length;
+            this.logger.info(
+              `[GodMode][Coding] Adversarial reviews for PR #${pr.prNumber}: ${reviewPassed} passed, ${reviewFailed} critical, ${reviewSkipped} skipped`,
+            );
+
+            if (reviewFailed > 0) {
+              // CRITICAL issues found — do NOT merge, task fails
+              task.status = "failed";
+              task.error = `PR #${pr.prNumber} blocked: ${reviewFailed} reviewer(s) found CRITICAL issues`;
+              this.logger.warn(`[GodMode][Coding] Task ${task.id} blocked by reviews: ${reviewFailed} critical`);
+            } else {
+              // Reviews passed — approve and merge
+              try {
+                await this.run(
+                  ["gh", "pr", "review", String(pr.prNumber), "--approve", "--body", "All automated reviews passed. Approved by GodMode."],
+                  { timeoutMs: 15_000, cwd: task.worktreePath },
+                );
+              } catch {
+                this.logger.warn(`[GodMode][Coding] gh pr review --approve failed for PR #${pr.prNumber}, continuing to merge`);
+              }
+
+              // Merge — only if main is clean to avoid losing uncommitted work
               const mainClean = await isWorkingTreeClean(this.run, task.repoRoot);
               if (!mainClean) {
                 this.logger.warn(
-                  `[GodMode][Coding] Skipping auto-merge for PR #${pr.prNumber} — main has uncommitted changes. PR remains open for manual merge.`,
+                  `[GodMode][Coding] Skipping merge for PR #${pr.prNumber} — main has uncommitted changes. PR remains open.`,
                 );
               } else {
                 const merged = await mergePullRequest(this.run, task.worktreePath, pr.prNumber);
                 if (merged) {
-                  this.logger.info(`[GodMode][Coding] Auto-merged PR #${pr.prNumber} for task ${task.id}`);
+                  this.logger.info(`[GodMode][Coding] Merged PR #${pr.prNumber} for task ${task.id}`);
                 } else {
-                  this.logger.warn(`[GodMode][Coding] Auto-merge failed for PR #${pr.prNumber}, PR remains open`);
+                  this.logger.warn(`[GodMode][Coding] Merge failed for PR #${pr.prNumber}, PR remains open`);
                 }
               }
+
+              // Task enters "review" — human must verify and click Done
+              task.status = "review";
+              this.logger.info(`[GodMode][Coding] Task ${task.id} awaiting human review. PR: ${pr.prUrl}`);
             }
+          } else {
+            // No PR created — still mark as review for human to check
+            task.status = "review";
+            this.logger.info(`[GodMode][Coding] Task ${task.id} completed (no PR). Awaiting human review.`);
           }
-          task.status = "done";
-          this.logger.info(`[GodMode][Coding] Task ${task.id} completed. PR: ${pr?.prUrl ?? "none"}`);
         } else {
           task.status = "failed";
           task.error = gateResult.details;
@@ -932,7 +1148,7 @@ export class CodingOrchestrator {
     });
 
     // Fire completion callbacks (notifications, etc.)
-    if (result.task && (result.task.status === "done" || result.task.status === "failed")) {
+    if (result.task && (result.task.status === "done" || result.task.status === "failed" || result.task.status === "review")) {
       this.fireTaskCompleted(result.task).catch(() => {});
     }
 
@@ -1009,6 +1225,20 @@ export class CodingOrchestrator {
     return result;
   }
 
+  async approveTask(taskId: string): Promise<{ approved: boolean; error?: string }> {
+    const { result } = await updateCodingTaskState((state) => {
+      const task = state.tasks.find((t) => t.id === taskId);
+      if (!task) return { approved: false, error: "Task not found" };
+      if (task.status !== "review") {
+        return { approved: false, error: `Cannot approve task with status "${task.status}". Only "review" tasks can be approved.` };
+      }
+      task.status = "done";
+      task.completedAt = Date.now();
+      return { approved: true };
+    });
+    return result;
+  }
+
   async listTasks(status?: CodingTaskStatus): Promise<CodingTask[]> {
     const state = await readCodingTaskState();
     if (status) return state.tasks.filter((t) => t.status === status);
@@ -1021,6 +1251,7 @@ export class CodingOrchestrator {
     activeTasks: number;
     queuedTasks: number;
     doneTasks: number;
+    reviewTasks: number;
     failedTasks: number;
     swarmTasks: number;
     swarmStages: Array<{ taskId: string; currentStage: string; stages: unknown }>;
@@ -1034,6 +1265,7 @@ export class CodingOrchestrator {
       activeTasks: active.length,
       queuedTasks: state.tasks.filter((t) => t.status === "queued").length,
       doneTasks: state.tasks.filter((t) => t.status === "done").length,
+      reviewTasks: state.tasks.filter((t) => t.status === "review").length,
       failedTasks: state.tasks.filter((t) => t.status === "failed").length,
       swarmTasks: swarmActive.length,
       swarmStages: swarmActive.map((t) => ({

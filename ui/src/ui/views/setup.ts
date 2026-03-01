@@ -43,6 +43,7 @@ export type SetupViewProps = {
   onOpenWizard: () => void;
   onNavigate: (tab: Tab) => void;
   onRunAssessment: () => void;
+  onOpenSupportChat: () => void;
 };
 
 // ── Intel Chips ─────────────────────────────────────────────────
@@ -151,7 +152,7 @@ function renderQuickStart(props: SetupViewProps) {
             id="setup-intel"
             name="dailyIntel"
             rows="2"
-            placeholder="e.g., dental SaaS competitors, real estate trends Austin TX"
+            placeholder="e.g., AI industry news, SaaS competitor analysis, market trends"
             .value=${intelValue}
           ></textarea>
           <span class="setup-hint">
@@ -163,6 +164,13 @@ function renderQuickStart(props: SetupViewProps) {
           Get Started
         </button>
       </form>
+
+      <div class="setup-help-banner">
+        <span class="setup-help-banner__text">Stuck? Our AI support agent can walk you through it.</span>
+        <button class="setup-help-banner__btn" @click=${() => props.onOpenSupportChat()}>
+          Open Support Chat
+        </button>
+      </div>
     </div>
   `;
 }
@@ -240,6 +248,13 @@ function renderChecklist(props: SetupViewProps) {
         </button>
         <button class="setup-action-btn setup-action-btn--text" @click=${onHideSetup}>
           Hide Setup
+        </button>
+      </div>
+
+      <div class="setup-help-banner">
+        <span class="setup-help-banner__text">Need help with setup? Chat with our AI support agent.</span>
+        <button class="setup-help-banner__btn" @click=${() => props.onOpenSupportChat()}>
+          Open Support Chat
         </button>
       </div>
     </div>

@@ -8,6 +8,7 @@
 import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { join, dirname } from "node:path";
 import { DATA_DIR, MEMORY_DIR } from "../data-paths.js";
+import { getUserTimezone } from "../lib/user-config.js";
 import {
   scorePulseCheck,
   calculateDailyScore,
@@ -43,7 +44,7 @@ const STATE_FILE = join(DATA_DIR, "focus-pulse.json");
 const INTERVAL_MS = 30 * 60 * 1000; // 30 minutes
 
 function getTodayDate(): string {
-  return new Date().toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
+  return new Date().toLocaleDateString("en-CA", { timeZone: getUserTimezone() });
 }
 
 // --- Singleton ---

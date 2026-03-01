@@ -75,6 +75,7 @@ const allowedAttrs = [
   "title",
   "type",
   "width",
+  "style",
 ];
 
 let hooksInstalled = false;
@@ -194,6 +195,257 @@ export function sanitizeHtmlFragment(markup: string): string {
     ALLOWED_ATTR: allowedAttrs,
     FORBID_TAGS: ["base", "iframe", "link", "meta", "object", "script"],
   });
+}
+
+// ── Dashboard-specific sanitizer ──────────────────────────────────────
+// Allows <style> blocks (auto-scoped to .dashboards-content) and SVG
+// elements so agent-generated dashboards render with full visual fidelity.
+
+const dashboardTags = [
+  ...allowedTags,
+  // SVG elements
+  "svg",
+  "path",
+  "circle",
+  "ellipse",
+  "rect",
+  "line",
+  "polyline",
+  "polygon",
+  "text",
+  "tspan",
+  "g",
+  "defs",
+  "linearGradient",
+  "radialGradient",
+  "stop",
+  "clipPath",
+  "mask",
+  "use",
+  "symbol",
+  "marker",
+  "pattern",
+  "animate",
+  "animateTransform",
+];
+
+const dashboardAttrs = [
+  ...allowedAttrs,
+  // SVG attributes
+  "viewBox",
+  "xmlns",
+  "preserveAspectRatio",
+  "d",
+  "cx",
+  "cy",
+  "r",
+  "rx",
+  "ry",
+  "x",
+  "x1",
+  "x2",
+  "y",
+  "y1",
+  "y2",
+  "dx",
+  "dy",
+  "fill",
+  "stroke",
+  "stroke-width",
+  "stroke-dasharray",
+  "stroke-dashoffset",
+  "stroke-linecap",
+  "stroke-linejoin",
+  "transform",
+  "opacity",
+  "points",
+  "text-anchor",
+  "dominant-baseline",
+  "font-size",
+  "font-weight",
+  "offset",
+  "stop-color",
+  "stop-opacity",
+  "gradientUnits",
+  "gradientTransform",
+  "marker-start",
+  "marker-mid",
+  "marker-end",
+  "clip-path",
+  "patternUnits",
+  "patternTransform",
+  "rotate",
+  "textLength",
+  "lengthAdjust",
+  "values",
+  "dur",
+  "repeatCount",
+  "attributeName",
+  "from",
+  "to",
+  "begin",
+  "calcMode",
+  "keySplines",
+  "keyTimes",
+];
+
+export function sanitizeDashboardHtml(markup: string): string {
+  const input = markup.trim();
+  if (!input) {
+    return "";
+  }
+  installHooks();
+
+  // Strategy: extract CSS *before* DOMPurify touches it, sanitize only
+  // the HTML elements, then scope + re-inject the CSS ourselves.
+  // DOMPurify mangles <style> content — we handle CSS separately.
+  const { styles, html: bodyHtml } = extractDashboardParts(input);
+
+  // Sanitize only the HTML (no <style> tags to worry about)
+  const sanitized = DOMPurify.sanitize(bodyHtml, {
+    ALLOWED_TAGS: dashboardTags,
+    ALLOWED_ATTR: dashboardAttrs,
+    FORBID_TAGS: ["base", "iframe", "link", "meta", "object", "script", "style"],
+  });
+
+  // Scope extracted CSS to inner render wrapper (not .dashboards-content
+  // which has its own app-level styles that would conflict)
+  const scope = ".dashboard-render";
+  const scopedStyles = styles
+    .map((css) => `<style>${scopeCss(css, scope)}</style>`)
+    .join("\n");
+
+  return scopedStyles + sanitized;
+}
+
+function extractDashboardParts(markup: string): { styles: string[]; html: string } {
+  const styles: string[] = [];
+
+  // Extract ALL <style> blocks from anywhere in the document
+  const withoutStyles = markup.replace(/<style[^>]*>([\s\S]*?)<\/style>/gi, (_, css: string) => {
+    styles.push(css);
+    return "";
+  });
+
+  // Extract body content if present, otherwise use entire content
+  const bodyMatch = withoutStyles.match(/<body[^>]*>([\s\S]*)<\/body>/i);
+  const content = bodyMatch ? bodyMatch[1] : withoutStyles;
+
+  // Strip document wrapper tags
+  const html = content
+    .replace(/<!DOCTYPE[^>]*>/gi, "")
+    .replace(/<\/?html[^>]*>/gi, "")
+    .replace(/<\/?head[^>]*>/gi, "")
+    .replace(/<\/?body[^>]*>/gi, "")
+    .replace(/<title[^>]*>[\s\S]*?<\/title>/gi, "")
+    .replace(/<meta[^>]*\/?>/gi, "")
+    .replace(/<link[^>]*\/?>/gi, "");
+
+  return { styles, html };
+}
+
+// ── CSS Scoping ───────────────────────────────────────────────────────
+
+function findBlockEnd(text: string, start: number): number {
+  let depth = 0;
+  for (let i = start; i < text.length; i++) {
+    if (text[i] === "{") depth++;
+    else if (text[i] === "}") {
+      depth--;
+      if (depth === 0) return i + 1;
+    }
+  }
+  return text.length;
+}
+
+function scopeCss(css: string, scope: string): string {
+  // Strip @import (security: no external resource loading)
+  const text = css.replace(/@import\b[^;]*;/gi, "");
+
+  const output: string[] = [];
+  let i = 0;
+
+  while (i < text.length) {
+    // Skip whitespace
+    if (/\s/.test(text[i])) {
+      output.push(text[i]);
+      i++;
+      continue;
+    }
+
+    // Skip CSS comments
+    if (text[i] === "/" && text[i + 1] === "*") {
+      const end = text.indexOf("*/", i + 2);
+      const to = end === -1 ? text.length : end + 2;
+      output.push(text.slice(i, to));
+      i = to;
+      continue;
+    }
+
+    // Closing brace from wrapper (@media etc.)
+    if (text[i] === "}") {
+      output.push("}");
+      i++;
+      continue;
+    }
+
+    // @keyframes — pass entire block through unscoped
+    if (/^@(-webkit-)?keyframes\s/.test(text.slice(i, i + 30))) {
+      const end = findBlockEnd(text, i);
+      output.push(text.slice(i, end));
+      i = end;
+      continue;
+    }
+
+    // @media / @supports / @container — pass header, inner rules scoped on next iterations
+    if (/^@(media|supports|container|layer)\b/.test(text.slice(i, i + 20))) {
+      const brace = text.indexOf("{", i);
+      if (brace === -1) {
+        output.push(text.slice(i));
+        break;
+      }
+      output.push(text.slice(i, brace + 1));
+      i = brace + 1;
+      continue;
+    }
+
+    // Regular CSS rule: selectors { declarations }
+    const brace = text.indexOf("{", i);
+    if (brace === -1) {
+      output.push(text.slice(i));
+      break;
+    }
+
+    const selectorText = text.slice(i, brace).trim();
+    const close = text.indexOf("}", brace);
+    if (close === -1) {
+      output.push(text.slice(i));
+      break;
+    }
+
+    const declarations = text.slice(brace + 1, close);
+
+    // Scope each comma-separated selector
+    const scoped = selectorText
+      .split(",")
+      .map((s) => {
+        const sel = s.trim();
+        if (!sel) return s;
+        // Universal selector: scope to container and all descendants
+        if (sel === "*") return `${scope}, ${scope} *`;
+        // Root-level selectors: replace with container scope
+        if (/^(html|body|:root)$/i.test(sel)) return scope;
+        // Strip body/html/:root prefix from compound selectors
+        const stripped = sel.replace(/^(html|body|:root)\s+/i, "");
+        return `${scope} ${stripped}`;
+      })
+      .join(", ");
+
+    output.push(`${scoped} {${declarations}}`);
+    i = close + 1;
+  }
+
+  return output.join("");
 }
 
 function escapeHtml(value: string): string {

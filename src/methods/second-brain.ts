@@ -1,15 +1,18 @@
 /**
  * GodMode — Second Brain
  *
- * Read-only window into the user's accumulated AI context.
- * Reads from ~/godmode/memory/ and ~/godmode/ files.
+ * Vault-first window into the user's Obsidian-driven second brain.
+ * Reads from Obsidian vault (PARA structure) with fallback to ~/godmode/memory/.
  *
  * RPC methods:
  *   secondBrain.identity        — USER.md, SOUL.md, VISION.md, opinions.md, THESIS.md
- *   secondBrain.memoryBank      — file/folder listings from bank/, projects/
+ *   secondBrain.memoryBank      — file/folder listings from Brain/, Projects/
  *   secondBrain.memoryBankEntry — single file content
  *   secondBrain.aiPacket        — CONSCIOUSNESS.md + WORKING.md
  *   secondBrain.sync            — trigger consciousness-sync.sh
+ *   secondBrain.vaultHealth     — vault stats and recent activity
+ *   secondBrain.inboxItems      — vault inbox listing
+ *   secondBrain.migrateToVault  — trigger migration from ~/godmode/memory/ to vault
  */
 
 import { exec as nodeExec } from "node:child_process";
@@ -25,6 +28,27 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { basename, extname, join, relative } from "node:path";
 import type { GatewayRequestHandler } from "openclaw/plugin-sdk";
 import { DATA_DIR, GODMODE_ROOT, MEMORY_DIR } from "../data-paths.js";
+import {
+  getVaultPath,
+  isVaultAvailable,
+  resolveIdentityDir,
+  resolvePeoplePath,
+  resolveCompaniesPath,
+  resolveProjectsPath,
+  resolveResearchDir,
+  resolveConsciousnessPath,
+  resolveWorkingPath,
+  resolveCuratedPath,
+  resolveKnowledgePath,
+  resolveOpinionsPath,
+  resolveInboxPath,
+  resolveWritePath,
+  getVaultHealth,
+  isAllowedPath,
+  VAULT_FOLDERS,
+  BRAIN_SUBFOLDERS,
+} from "../lib/vault-paths.js";
+import { autoMigrateIfNeeded, migrateToVault } from "../lib/vault-migrate.js";
 
 type GatewayRequestHandlers = Record<string, GatewayRequestHandler>;
 
@@ -127,22 +151,46 @@ type IdentityFile = {
   updatedAt: string | null;
 };
 
-const IDENTITY_FILES: Array<{ key: string; label: string; filename: string; dir: "root" | "memory" }> = [
-  { key: "user", label: "Profile", filename: "USER.md", dir: "root" },
-  { key: "soul", label: "Soul", filename: "SOUL.md", dir: "root" },
-  { key: "vision", label: "Vision", filename: "VISION.md", dir: "root" },
-  { key: "identity", label: "Identity", filename: "IDENTITY.md", dir: "root" },
-  { key: "principles", label: "Principles", filename: "PRINCIPLES.md", dir: "root" },
-  { key: "thesis", label: "Thesis", filename: "THESIS.md", dir: "memory" },
-  { key: "opinions", label: "Opinions & Rules", filename: "bank/opinions.md", dir: "memory" },
+/** Identity file specs — resolved vault-first at read time. */
+const IDENTITY_FILE_SPECS: Array<{
+  key: string;
+  label: string;
+  filename: string;
+  vaultFilename: string;
+  localDir: "root" | "memory";
+}> = [
+  { key: "user", label: "Profile", filename: "USER.md", vaultFilename: "USER.md", localDir: "root" },
+  { key: "soul", label: "Soul", filename: "SOUL.md", vaultFilename: "SOUL.md", localDir: "root" },
+  { key: "vision", label: "Vision", filename: "VISION.md", vaultFilename: "VISION.md", localDir: "root" },
+  { key: "identity", label: "Identity", filename: "IDENTITY.md", vaultFilename: "IDENTITY.md", localDir: "root" },
+  { key: "principles", label: "Principles", filename: "PRINCIPLES.md", vaultFilename: "PRINCIPLES.md", localDir: "root" },
+  { key: "thesis", label: "Thesis", filename: "THESIS.md", vaultFilename: "THESIS.md", localDir: "memory" },
+  { key: "opinions", label: "Opinions & Rules", filename: "bank/opinions.md", vaultFilename: "opinions.md", localDir: "memory" },
 ];
 
+function resolveIdentityFilePath(spec: typeof IDENTITY_FILE_SPECS[number]): string {
+  // Try vault first
+  const vault = getVaultPath();
+  if (vault) {
+    // Opinions goes to Brain/Knowledge, everything else to Identity folder
+    const vaultPath = spec.key === "opinions"
+      ? resolveOpinionsPath().path
+      : join(vault, VAULT_FOLDERS.identity, spec.vaultFilename);
+    if (existsSync(vaultPath)) return vaultPath;
+  }
+  // Fallback to local
+  return spec.localDir === "root"
+    ? join(GODMODE_ROOT, spec.filename)
+    : join(MEMORY_DIR, spec.filename);
+}
+
 const identity: GatewayRequestHandler = async ({ respond }) => {
+  // Auto-migrate on first access
+  await autoMigrateIfNeeded();
+
   const files: IdentityFile[] = [];
-  for (const spec of IDENTITY_FILES) {
-    const filePath = spec.dir === "root"
-      ? join(GODMODE_ROOT, spec.filename)
-      : join(MEMORY_DIR, spec.filename);
+  for (const spec of IDENTITY_FILE_SPECS) {
+    const filePath = resolveIdentityFilePath(spec);
     const content = safeReadFile(filePath);
     if (content) {
       files.push({
@@ -179,9 +227,9 @@ const memoryBank: GatewayRequestHandler = async ({ params, respond }) => {
 
   // If a subfolder is requested, list its contents
   if (folder) {
-    // Security: must be under GODMODE_ROOT
-    if (!folder.startsWith(GODMODE_ROOT)) {
-      respond(false, undefined, { code: "INVALID_REQUEST", message: "Path must be within godmode directory" });
+    // Security: must be under GODMODE_ROOT or vault
+    if (!isAllowedPath(folder)) {
+      respond(false, undefined, { code: "INVALID_REQUEST", message: "Path must be within godmode directory or vault" });
       return;
     }
     const entries = listEntries(folder);
@@ -194,24 +242,24 @@ const memoryBank: GatewayRequestHandler = async ({ params, respond }) => {
     return;
   }
 
-  // Top-level: list all sections
-  const peoplePath = join(MEMORY_DIR, "bank", "people");
-  const companiesPath = join(MEMORY_DIR, "bank", "companies");
-  const projectsPath = join(MEMORY_DIR, "projects");
+  // Top-level: list all sections (vault-first with fallback)
+  const { path: peoplePath } = resolvePeoplePath();
+  const { path: companiesPath } = resolveCompaniesPath();
+  const { path: projectsPath } = resolveProjectsPath();
 
   const people = listEntries(peoplePath);
   const companies = listEntries(companiesPath);
   const projects = listEntries(projectsPath);
 
-  // Curated facts
-  const curatedPath = join(MEMORY_DIR, "curated.md");
+  // Curated facts (vault-first)
+  const { path: curatedPath } = resolveCuratedPath();
   const curated = safeReadFile(curatedPath);
 
-  // Extra toplevel memory files
+  // Extra toplevel memory/knowledge files (vault-first)
   const extraFiles: FileEntry[] = [];
   const EXTRA_MEMORY_FILES = ["tacit.md", "topics.md", "golden-rules-definitions.md", "known-issues.md"];
   for (const f of EXTRA_MEMORY_FILES) {
-    const fp = join(MEMORY_DIR, f);
+    const { path: fp } = resolveKnowledgePath(f);
     const content = safeReadFile(fp);
     if (content) {
       extraFiles.push({
@@ -246,9 +294,9 @@ const memoryBankEntry: GatewayRequestHandler = async ({ params, respond }) => {
     respond(false, undefined, { code: "INVALID_REQUEST", message: "Missing required parameter: path" });
     return;
   }
-  const resolved = join(filePath);
-  if (!resolved.startsWith(GODMODE_ROOT)) {
-    respond(false, undefined, { code: "INVALID_REQUEST", message: "Path must be within godmode directory" });
+  const resolved = filePath.startsWith("/") ? filePath : join(GODMODE_ROOT, filePath);
+  if (!isAllowedPath(resolved)) {
+    respond(false, undefined, { code: "INVALID_REQUEST", message: "Path must be within godmode directory or vault" });
     return;
   }
   const content = safeReadFile(resolved);
@@ -256,19 +304,24 @@ const memoryBankEntry: GatewayRequestHandler = async ({ params, respond }) => {
     respond(false, undefined, { code: "NOT_FOUND", message: `File not found: ${basename(filePath)}` });
     return;
   }
+  // Show vault-relative path if in vault, otherwise godmode-relative
+  const vault = getVaultPath();
+  const relPath = vault && resolved.startsWith(vault)
+    ? relative(vault, resolved)
+    : relative(GODMODE_ROOT, resolved);
   respond(true, {
     name: basename(filePath, extname(filePath)),
     content,
     updatedAt: safeFileMtime(resolved),
-    relativePath: relative(GODMODE_ROOT, resolved),
+    relativePath: relPath,
   });
 };
 
 // ── AI Packet ────────────────────────────────────────────────────────
 
 const aiPacket: GatewayRequestHandler = async ({ respond }) => {
-  const consciousnessPath = join(MEMORY_DIR, "CONSCIOUSNESS.md");
-  const workingPath = join(MEMORY_DIR, "WORKING.md");
+  const { path: consciousnessPath } = resolveConsciousnessPath();
+  const { path: workingPath } = resolveWorkingPath();
 
   const consciousness = safeReadFile(consciousnessPath);
   const working = safeReadFile(workingPath);
@@ -317,8 +370,23 @@ const sync: GatewayRequestHandler = async ({ respond, context }) => {
       );
     });
 
-    const consciousnessPath = join(MEMORY_DIR, "CONSCIOUSNESS.md");
-    const workingPath = join(MEMORY_DIR, "WORKING.md");
+    // Mirror to vault after sync (script writes to ~/godmode/memory/, we copy to vault)
+    const vault = getVaultPath();
+    const localConsciousnessPath = join(MEMORY_DIR, "CONSCIOUSNESS.md");
+    const localWorkingPath = join(MEMORY_DIR, "WORKING.md");
+    if (vault) {
+      try {
+        const { copyFile } = await import("node:fs/promises");
+        const vaultConsciousness = join(vault, VAULT_FOLDERS.system, "CONSCIOUSNESS.md");
+        const vaultWorking = join(vault, VAULT_FOLDERS.system, "WORKING.md");
+        if (existsSync(localConsciousnessPath)) await copyFile(localConsciousnessPath, vaultConsciousness);
+        if (existsSync(localWorkingPath)) await copyFile(localWorkingPath, vaultWorking);
+      } catch { /* non-fatal — vault mirror is best-effort */ }
+    }
+
+    // Read from vault-first paths for the response
+    const { path: consciousnessPath } = resolveConsciousnessPath();
+    const { path: workingPath } = resolveWorkingPath();
     const consciousness = safeReadFile(consciousnessPath);
     const working = safeReadFile(workingPath);
 
@@ -361,7 +429,7 @@ type SourceEntry = {
   lastSync?: string | null;
 };
 
-/** All sources that Second Brain knows about. Connected ones are populated from data-sources.json + filesystem probes. */
+/** All sources that Second Brain knows about. Vault-first detection. */
 const KNOWN_SOURCES: Array<{
   id: string;
   name: string;
@@ -371,15 +439,33 @@ const KNOWN_SOURCES: Array<{
   detect: () => { connected: boolean; stats?: string; lastSync?: string | null };
 }> = [
   {
+    id: "obsidian-vault",
+    name: "Obsidian Vault",
+    type: "vault",
+    icon: "\u{1F4D3}",
+    description: "Your second brain — the canonical data store for all knowledge",
+    detect: () => {
+      const vault = getVaultPath();
+      if (!vault) return { connected: false };
+      const health = getVaultHealth();
+      if (!health) return { connected: false };
+      return {
+        connected: true,
+        stats: `${health.totalNotes} notes · ${health.inboxCount} in inbox · ${health.brainCount} in brain`,
+        lastSync: health.lastActivity,
+      };
+    },
+  },
+  {
     id: "memory-bank",
-    name: "Memory Bank",
+    name: "Brain (People & Companies)",
     type: "memory",
     icon: "\u{1F9E0}",
-    description: "People, companies, projects, and curated facts",
+    description: "People, companies, projects, and curated knowledge",
     detect: () => {
-      const peoplePath = join(MEMORY_DIR, "bank", "people");
-      const companiesPath = join(MEMORY_DIR, "bank", "companies");
-      const projectsPath = join(MEMORY_DIR, "projects");
+      const { path: peoplePath } = resolvePeoplePath();
+      const { path: companiesPath } = resolveCompaniesPath();
+      const { path: projectsPath } = resolveProjectsPath();
       let people = 0, companies = 0, projects = 0;
       try { people = readdirSync(peoplePath).filter(f => !f.startsWith(".")).length; } catch { /* empty */ }
       try { companies = readdirSync(companiesPath).filter(f => !f.startsWith(".")).length; } catch { /* empty */ }
@@ -388,7 +474,7 @@ const KNOWN_SOURCES: Array<{
       return {
         connected: total > 0,
         stats: total > 0 ? `${people} people, ${companies} companies, ${projects} projects` : undefined,
-        lastSync: safeFileMtime(join(MEMORY_DIR, "bank")),
+        lastSync: safeFileMtime(peoplePath),
       };
     },
   },
@@ -411,31 +497,15 @@ const KNOWN_SOURCES: Array<{
     name: "Consciousness",
     type: "ai-context",
     icon: "\u{26A1}",
-    description: "Live AI context injection — CONSCIOUSNESS.md + WORKING.md",
+    description: "Live AI context — CONSCIOUSNESS.md + WORKING.md",
     detect: () => {
-      const cp = join(MEMORY_DIR, "CONSCIOUSNESS.md");
+      const { path: cp } = resolveConsciousnessPath();
       const content = safeReadFile(cp);
       return {
         connected: content !== null,
         stats: content ? `${content.split("\n").length} lines` : undefined,
         lastSync: safeFileMtime(cp),
       };
-    },
-  },
-  {
-    id: "obsidian",
-    name: "Obsidian Vault",
-    type: "notes",
-    icon: "\u{1F4D3}",
-    description: "Your second brain — daily notes, projects, references",
-    detect: () => {
-      const vaultPath = process.env.OBSIDIAN_VAULT_PATH || join(require("node:os").homedir(), "Documents", "VAULT");
-      try {
-        if (existsSync(vaultPath) && statSync(vaultPath).isDirectory()) {
-          return { connected: true, stats: "Local vault linked", lastSync: safeFileMtime(vaultPath) };
-        }
-      } catch { /* empty */ }
-      return { connected: false };
     },
   },
 ];
@@ -523,8 +593,12 @@ const sources: GatewayRequestHandler = async ({ respond }) => {
 
 // ── Research ─────────────────────────────────────────────────────────
 
-const RESEARCH_DIR = join(MEMORY_DIR, "research");
-const RESEARCH_DIR_ALT = join(GODMODE_ROOT, "research");  // ~/godmode/research/
+/** Resolve the primary research directory (vault-first). */
+function getResearchDir(): string {
+  const { path } = resolveResearchDir();
+  return path;
+}
+const RESEARCH_DIR_ALT = join(GODMODE_ROOT, "research");  // ~/godmode/research/ (legacy)
 
 type ResearchFrontmatter = {
   title?: string;
@@ -646,8 +720,8 @@ const research: GatewayRequestHandler = async ({ params, respond }) => {
 
   // Subfolder browsing
   if (folder) {
-    if (!folder.startsWith(GODMODE_ROOT)) {
-      respond(false, undefined, { code: "INVALID_REQUEST", message: "Path must be within godmode directory" });
+    if (!isAllowedPath(folder)) {
+      respond(false, undefined, { code: "INVALID_REQUEST", message: "Path must be within godmode directory or vault" });
       return;
     }
     const entries = listResearchEntries(folder);
@@ -660,7 +734,7 @@ const research: GatewayRequestHandler = async ({ params, respond }) => {
   let totalEntries = 0;
 
   // 1. ~/godmode/memory/research/ — user-saved research (primary)
-  const memRes = scanResearchDir(RESEARCH_DIR, "Saved Research", "saved");
+  const memRes = scanResearchDir(getResearchDir(), "Saved Research", "saved");
   categories.push(...memRes.categories);
   totalEntries += memRes.count;
 
@@ -705,7 +779,8 @@ const addResearch: GatewayRequestHandler = async ({ params, respond }) => {
   }
 
   const category = typeof p.category === "string" ? sanitizeSlug(p.category) : "";
-  const targetDir = category ? join(RESEARCH_DIR, category) : RESEARCH_DIR;
+  const researchDir = getResearchDir();
+  const targetDir = category ? join(researchDir, category) : researchDir;
   await mkdir(targetDir, { recursive: true });
 
   // Generate filename, handle collisions
@@ -741,7 +816,7 @@ const addResearch: GatewayRequestHandler = async ({ params, respond }) => {
 
 const researchCategories: GatewayRequestHandler = async ({ respond }) => {
   const cats = new Set<string>();
-  for (const dir of [RESEARCH_DIR, RESEARCH_DIR_ALT]) {
+  for (const dir of [getResearchDir(), RESEARCH_DIR_ALT]) {
     if (!existsSync(dir)) continue;
     try {
       const entries = readdirSync(dir, { withFileTypes: true });
@@ -870,6 +945,611 @@ const communityResourcesRemove: GatewayRequestHandler = async ({ params, respond
   }
 };
 
+// ── File Tree ────────────────────────────────────────────────────────
+
+type BrainTreeNode = {
+  name: string;
+  path: string;
+  type: "folder" | "file";
+  size?: number;
+  updatedAt?: string;
+  childCount?: number;
+  children?: BrainTreeNode[];
+};
+
+const TREE_SKIP = new Set(["node_modules", "__pycache__", "venv", ".git", "dist", "build"]);
+const TREE_EXTENSIONS = new Set([".md", ".txt", ".json", ".json5", ".yaml", ".yml", ".html", ".htm", ".csv", ".pdf"]);
+
+function buildFileTree(dirPath: string, currentDepth: number, maxDepth: number): BrainTreeNode[] {
+  if (currentDepth >= maxDepth) return [];
+  let entries: import("node:fs").Dirent[];
+  try {
+    entries = readdirSync(dirPath, { withFileTypes: true });
+  } catch {
+    return [];
+  }
+
+  const nodes: BrainTreeNode[] = [];
+  const filtered = entries
+    .filter(e => !e.name.startsWith(".") && !e.name.startsWith("_") && !TREE_SKIP.has(e.name))
+    .sort((a, b) => {
+      if (a.isDirectory() && !b.isDirectory()) return -1;
+      if (!a.isDirectory() && b.isDirectory()) return 1;
+      return a.name.localeCompare(b.name);
+    });
+
+  for (const entry of filtered) {
+    const fullPath = join(dirPath, entry.name);
+    if (entry.isDirectory()) {
+      let childCount = 0;
+      try {
+        childCount = readdirSync(fullPath).filter(f => !f.startsWith(".") && !f.startsWith("_")).length;
+      } catch { /* empty */ }
+      const children = currentDepth + 1 < maxDepth ? buildFileTree(fullPath, currentDepth + 1, maxDepth) : undefined;
+      nodes.push({
+        name: entry.name,
+        path: relative(GODMODE_ROOT, fullPath),
+        type: "folder",
+        childCount,
+        children,
+      });
+    } else {
+      const ext = extname(entry.name).toLowerCase();
+      if (!TREE_EXTENSIONS.has(ext)) continue;
+      try {
+        const st = statSync(fullPath);
+        nodes.push({
+          name: entry.name,
+          path: relative(GODMODE_ROOT, fullPath),
+          type: "file",
+          size: st.size,
+          updatedAt: st.mtime.toISOString(),
+        });
+      } catch { /* skip unreadable */ }
+    }
+  }
+
+  return nodes;
+}
+
+const fileTree: GatewayRequestHandler = async ({ params, respond }) => {
+  const p = params as { root?: string; depth?: number };
+  const maxDepth = typeof p.depth === "number" ? Math.min(Math.max(p.depth, 1), 5) : 3;
+
+  // Validate root is within GODMODE_ROOT or vault
+  let rootPath = MEMORY_DIR;
+  if (typeof p.root === "string" && p.root.trim()) {
+    const candidate = p.root.startsWith("/") ? p.root : join(GODMODE_ROOT, p.root);
+    if (!isAllowedPath(candidate)) {
+      respond(false, undefined, { code: "INVALID_REQUEST", message: "Root must be within godmode directory or vault" });
+      return;
+    }
+    rootPath = candidate;
+  }
+
+  const tree = buildFileTree(rootPath, 0, maxDepth);
+  respond(true, {
+    root: relative(GODMODE_ROOT, rootPath) || ".",
+    rootAbsolute: rootPath,
+    tree,
+    nodeCount: countNodes(tree),
+  });
+};
+
+function countNodes(nodes: BrainTreeNode[]): number {
+  let count = nodes.length;
+  for (const n of nodes) {
+    if (n.children) count += countNodes(n.children);
+  }
+  return count;
+}
+
+// ── Brain Search ─────────────────────────────────────────────────────
+
+const brainSearch: GatewayRequestHandler = async ({ params, respond }) => {
+  const p = params as { query?: string; scope?: string; limit?: number };
+  const query = typeof p.query === "string" ? p.query.trim() : "";
+  const scope = typeof p.scope === "string" ? p.scope.trim() : "all";
+  const limit = typeof p.limit === "number" ? Math.min(p.limit, 100) : 50;
+
+  if (!query) {
+    respond(false, undefined, { code: "INVALID_REQUEST", message: "query is required" });
+    return;
+  }
+
+  // Determine which directories to search (vault-first)
+  const searchDirs: Array<{ dir: string; label: string }> = [];
+  if (scope === "all" || scope === "research") {
+    searchDirs.push({ dir: getResearchDir(), label: "research" });
+    if (existsSync(join(GODMODE_ROOT, "research"))) {
+      searchDirs.push({ dir: join(GODMODE_ROOT, "research"), label: "analysis" });
+    }
+  }
+  if (scope === "all" || scope === "bank") {
+    const { path: peoplePath } = resolvePeoplePath();
+    const { path: companiesPath } = resolveCompaniesPath();
+    searchDirs.push({ dir: peoplePath, label: "people" });
+    searchDirs.push({ dir: companiesPath, label: "companies" });
+  }
+  if (scope === "all" || scope === "projects") {
+    const { path: projectsPath } = resolveProjectsPath();
+    searchDirs.push({ dir: projectsPath, label: "projects" });
+  }
+  if (scope === "all") {
+    // Also search identity and knowledge
+    const vault = getVaultPath();
+    if (vault) {
+      searchDirs.push({ dir: join(vault, VAULT_FOLDERS.identity), label: "identity" });
+      searchDirs.push({ dir: join(vault, VAULT_FOLDERS.brain, BRAIN_SUBFOLDERS.knowledge), label: "knowledge" });
+    } else {
+      searchDirs.push({ dir: MEMORY_DIR, label: "memory" });
+    }
+  }
+
+  const q = query.toLowerCase();
+  type SearchResult = {
+    path: string;
+    name: string;
+    section: string;
+    excerpt: string;
+    matchContext?: string;
+    updatedAt?: string;
+  };
+
+  const results: SearchResult[] = [];
+
+  function searchDir(dirPath: string, section: string, depth: number) {
+    if (depth > 4 || results.length >= limit) return;
+    let entries: import("node:fs").Dirent[];
+    try {
+      entries = readdirSync(dirPath, { withFileTypes: true });
+    } catch { return; }
+
+    for (const entry of entries) {
+      if (results.length >= limit) break;
+      if (entry.name.startsWith(".") || entry.name.startsWith("_")) continue;
+      const fullPath = join(dirPath, entry.name);
+
+      if (entry.isDirectory()) {
+        if (!TREE_SKIP.has(entry.name)) {
+          searchDir(fullPath, section, depth + 1);
+        }
+        continue;
+      }
+
+      const ext = extname(entry.name).toLowerCase();
+      if (![".md", ".txt", ".json", ".html"].includes(ext)) continue;
+
+      const nameMatch = entry.name.toLowerCase().includes(q);
+      let contentMatch = false;
+      let matchContext: string | undefined;
+
+      // Only read file content for text search if name doesn't match (perf optimization)
+      if (!nameMatch) {
+        try {
+          const content = readFileSync(fullPath, "utf-8");
+          if (content.length > 64_000) continue; // skip huge files
+          const lc = content.toLowerCase();
+          const idx = lc.indexOf(q);
+          if (idx >= 0) {
+            contentMatch = true;
+            const start = Math.max(0, idx - 60);
+            const end = Math.min(content.length, idx + query.length + 60);
+            matchContext =
+              (start > 0 ? "..." : "") +
+              content.slice(start, end).replace(/\n/g, " ") +
+              (end < content.length ? "..." : "");
+          }
+        } catch { continue; }
+      }
+
+      if (nameMatch || contentMatch) {
+        const relativePath = relative(GODMODE_ROOT, fullPath);
+        let updatedAt: string | undefined;
+        try { updatedAt = statSync(fullPath).mtime.toISOString(); } catch { /* skip */ }
+
+        const displayName = basename(entry.name, ext);
+        const excerpt = nameMatch && !matchContext
+          ? extractExcerpt(safeReadFile(fullPath) ?? "")
+          : "";
+
+        results.push({
+          path: relativePath,
+          name: displayName,
+          section,
+          excerpt,
+          matchContext,
+          updatedAt,
+        });
+      }
+    }
+  }
+
+  for (const { dir, label } of searchDirs) {
+    if (results.length >= limit) break;
+    searchDir(dir, label, 0);
+  }
+
+  respond(true, { results, query, total: results.length });
+};
+
+// ── Consolidate Research ─────────────────────────────────────────────
+
+const consolidateResearch: GatewayRequestHandler = async ({ params, respond }) => {
+  const p = params as { execute?: boolean };
+  const dryRun = !p.execute;
+
+  type MoveAction = { source: string; destination: string; reason: string };
+  const actions: MoveAction[] = [];
+
+  // 1. Scan ~/godmode/research/* -> ~/godmode/memory/research/*
+  const altDir = join(GODMODE_ROOT, "research");
+  if (existsSync(altDir)) {
+    try {
+      const walk = (dir: string, relativeBase: string) => {
+        const entries = readdirSync(dir, { withFileTypes: true });
+        for (const e of entries) {
+          if (e.name.startsWith(".")) continue;
+          const srcPath = join(dir, e.name);
+          const relPath = relativeBase ? `${relativeBase}/${e.name}` : e.name;
+          if (e.isDirectory()) {
+            walk(srcPath, relPath);
+          } else {
+            const destPath = join(getResearchDir(), relPath);
+            if (!existsSync(destPath)) {
+              actions.push({
+                source: relative(GODMODE_ROOT, srcPath),
+                destination: relative(GODMODE_ROOT, destPath),
+                reason: "Move from ~/godmode/research/ to canonical location",
+              });
+            }
+          }
+        }
+      };
+      walk(altDir, "");
+    } catch { /* skip inaccessible */ }
+  }
+
+  // 2. Scan ~/godmode/*.html -> ~/godmode/memory/research/proposals/*
+  try {
+    const rootEntries = readdirSync(GODMODE_ROOT, { withFileTypes: true });
+    for (const e of rootEntries) {
+      if (e.isDirectory() || !e.name.endsWith(".html") || e.name.startsWith(".")) continue;
+      const srcPath = join(GODMODE_ROOT, e.name);
+      const destPath = join(getResearchDir(), "proposals", e.name);
+      if (!existsSync(destPath)) {
+        actions.push({
+          source: relative(GODMODE_ROOT, srcPath),
+          destination: relative(GODMODE_ROOT, destPath),
+          reason: "Move HTML doc to research/proposals/",
+        });
+      }
+    }
+  } catch { /* skip */ }
+
+  // Execute if not dry run
+  if (!dryRun && actions.length > 0) {
+    for (const action of actions) {
+      const src = join(GODMODE_ROOT, action.source);
+      const dest = join(GODMODE_ROOT, action.destination);
+      try {
+        const destDir = dest.substring(0, dest.lastIndexOf("/"));
+        await mkdir(destDir, { recursive: true });
+        // Copy instead of move to be safe
+        const content = await readFile(src);
+        await writeFile(dest, content);
+      } catch { /* skip individual failures */ }
+    }
+  }
+
+  respond(true, {
+    actions,
+    executed: !dryRun,
+    count: actions.length,
+    message: dryRun
+      ? `Found ${actions.length} files to consolidate. Call with execute: true to move them.`
+      : `Consolidated ${actions.length} files to canonical research location.`,
+  });
+};
+
+// ── Vault Health ──────────────────────────────────────────────────────
+
+const vaultHealth: GatewayRequestHandler = async ({ respond }) => {
+  const vault = getVaultPath();
+  const health = getVaultHealth();
+  const manifest = await (await import("../lib/vault-paths.js")).readVaultManifest();
+
+  if (!vault || !health) {
+    respond(true, {
+      available: false,
+      vaultPath: null,
+      migrated: false,
+      stats: null,
+      recentActivity: [],
+    });
+    return;
+  }
+
+  // Gather recent activity (last 10 modified .md files across vault)
+  const recentActivity: Array<{ name: string; path: string; updatedAt: string; folder: string }> = [];
+  const foldersToScan = [
+    VAULT_FOLDERS.inbox,
+    VAULT_FOLDERS.daily,
+    VAULT_FOLDERS.brain,
+    VAULT_FOLDERS.discoveries,
+    VAULT_FOLDERS.resources,
+    VAULT_FOLDERS.projects,
+    VAULT_FOLDERS.identity,
+  ];
+
+  for (const folder of foldersToScan) {
+    const dirPath = join(vault, folder);
+    if (!existsSync(dirPath)) continue;
+    try {
+      const entries = readdirSync(dirPath, { withFileTypes: true });
+      for (const e of entries) {
+        if (e.name.startsWith(".") || e.name.startsWith("_")) continue;
+        const full = join(dirPath, e.name);
+        if (e.isDirectory()) {
+          // One level deep for subdirs (People/, Companies/, etc.)
+          try {
+            const subs = readdirSync(full, { withFileTypes: true });
+            for (const s of subs) {
+              if (s.name.startsWith(".") || !s.name.endsWith(".md")) continue;
+              const subFull = join(full, s.name);
+              try {
+                const st = statSync(subFull);
+                recentActivity.push({
+                  name: basename(s.name, ".md"),
+                  path: subFull,
+                  updatedAt: st.mtime.toISOString(),
+                  folder: `${folder}/${e.name}`,
+                });
+              } catch { /* skip */ }
+            }
+          } catch { /* skip */ }
+        } else if (e.name.endsWith(".md")) {
+          try {
+            const st = statSync(full);
+            recentActivity.push({
+              name: basename(e.name, ".md"),
+              path: full,
+              updatedAt: st.mtime.toISOString(),
+              folder,
+            });
+          } catch { /* skip */ }
+        }
+      }
+    } catch { /* skip */ }
+  }
+
+  // Sort by most recent, take top 10
+  recentActivity.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  const topRecent = recentActivity.slice(0, 10);
+
+  respond(true, {
+    available: true,
+    vaultPath: vault,
+    migrated: manifest?.migratedAt !== null && manifest?.migratedAt !== undefined,
+    stats: health,
+    recentActivity: topRecent,
+  });
+};
+
+// ── Inbox Items ──────────────────────────────────────────────────────
+
+const inboxItems: GatewayRequestHandler = async ({ respond }) => {
+  const inboxPath = resolveInboxPath();
+  if (!inboxPath || !existsSync(inboxPath)) {
+    respond(true, { items: [], count: 0, available: isVaultAvailable() });
+    return;
+  }
+
+  const items: Array<{
+    name: string;
+    path: string;
+    updatedAt: string | null;
+    excerpt: string;
+    source?: string;
+  }> = [];
+
+  try {
+    const entries = readdirSync(inboxPath, { withFileTypes: true });
+    for (const e of entries) {
+      if (e.name.startsWith(".") || e.name.startsWith("_") || e.isDirectory()) continue;
+      if (!e.name.endsWith(".md") && !e.name.endsWith(".txt")) continue;
+      const fullPath = join(inboxPath, e.name);
+      const content = safeReadFile(fullPath);
+      const frontmatter = content ? parseFrontmatter(content) : null;
+      items.push({
+        name: frontmatter?.title || basename(e.name, extname(e.name)),
+        path: fullPath,
+        updatedAt: safeFileMtime(fullPath),
+        excerpt: content ? extractExcerpt(content) : "",
+        source: frontmatter?.source,
+      });
+    }
+  } catch { /* skip */ }
+
+  items.sort((a, b) => {
+    if (!a.updatedAt || !b.updatedAt) return 0;
+    return b.updatedAt.localeCompare(a.updatedAt);
+  });
+
+  respond(true, { items, count: items.length, available: true });
+};
+
+// ── Migrate to Vault ─────────────────────────────────────────────────
+
+const migrateToVaultRpc: GatewayRequestHandler = async ({ respond }) => {
+  if (!isVaultAvailable()) {
+    respond(false, undefined, {
+      code: "VAULT_UNAVAILABLE",
+      message: "Obsidian vault not found. Set OBSIDIAN_VAULT_PATH or ensure ~/Documents/VAULT exists.",
+    });
+    return;
+  }
+
+  try {
+    const result = await migrateToVault();
+    respond(true, {
+      ok: result.ok,
+      copied: result.copied,
+      skipped: result.skipped,
+      errors: result.errors,
+      summary: result.summary,
+      message: result.copied > 0
+        ? `Migrated ${result.copied} files to vault (${result.skipped} already existed)`
+        : `All files already in vault (${result.skipped} skipped)`,
+    });
+  } catch (err) {
+    respond(false, undefined, {
+      code: "MIGRATION_ERROR",
+      message: err instanceof Error ? err.message : String(err),
+    });
+  }
+};
+
+// ── Obsidian Sync Status ─────────────────────────────────────────────
+
+const obsidianSyncStatus: GatewayRequestHandler = async ({ respond }) => {
+  try {
+    const { getObsidianSync } = await import("../services/obsidian-sync.js");
+    const sync = getObsidianSync();
+    if (!sync) {
+      respond(true, {
+        available: false,
+        running: false,
+        linked: false,
+        lastSync: null,
+        lastError: null,
+        vaultPath: getVaultPath(),
+        mode: "disabled",
+      });
+      return;
+    }
+    const status = await sync.getStatus();
+    respond(true, status);
+  } catch (err) {
+    respond(false, undefined, {
+      code: "SYNC_ERROR",
+      message: err instanceof Error ? err.message : String(err),
+    });
+  }
+};
+
+const obsidianSyncTrigger: GatewayRequestHandler = async ({ params, respond }) => {
+  try {
+    const { getObsidianSync } = await import("../services/obsidian-sync.js");
+    const sync = getObsidianSync();
+    if (!sync) {
+      respond(false, undefined, {
+        code: "SYNC_NOT_AVAILABLE",
+        message: "Obsidian Sync service not initialized. Install: npm install -g obsidian-headless",
+      });
+      return;
+    }
+    const result = await sync.syncOnce();
+    respond(true, result);
+  } catch (err) {
+    respond(false, undefined, {
+      code: "SYNC_ERROR",
+      message: err instanceof Error ? err.message : String(err),
+    });
+  }
+};
+
+const obsidianSyncSetMode: GatewayRequestHandler = async ({ params, respond }) => {
+  const p = params as { mode?: string };
+  const mode = p.mode;
+  if (mode !== "continuous" && mode !== "manual" && mode !== "disabled") {
+    respond(false, undefined, {
+      code: "INVALID_MODE",
+      message: "Mode must be 'continuous', 'manual', or 'disabled'",
+    });
+    return;
+  }
+
+  try {
+    const { getObsidianSync } = await import("../services/obsidian-sync.js");
+    const sync = getObsidianSync();
+    if (!sync) {
+      respond(false, undefined, {
+        code: "SYNC_NOT_AVAILABLE",
+        message: "Obsidian Sync service not initialized",
+      });
+      return;
+    }
+    await sync.setMode(mode);
+    const status = await sync.getStatus();
+    respond(true, status);
+  } catch (err) {
+    respond(false, undefined, {
+      code: "SYNC_ERROR",
+      message: err instanceof Error ? err.message : String(err),
+    });
+  }
+};
+
+// ── Vault Capture Status ─────────────────────────────────────────────
+
+const vaultCaptureStatus: GatewayRequestHandler = async ({ respond }) => {
+  try {
+    const statePath = join(DATA_DIR, "vault-capture-state.json");
+    let state = { capturedScoutIds: [], capturedSessionPaths: [], processedInboxFiles: [], summarizedNotes: {}, lastRun: "" };
+    try {
+      const raw = readFileSync(statePath, "utf-8");
+      state = JSON.parse(raw);
+    } catch { /* first run */ }
+
+    respond(true, {
+      lastRun: state.lastRun || null,
+      scoutFindings: (state.capturedScoutIds as string[]).length,
+      sessionsCaptured: (state.capturedSessionPaths as string[]).length,
+      inboxProcessed: (state.processedInboxFiles as string[]).length,
+      notesSummarized: Object.keys(state.summarizedNotes as Record<string, unknown>).length,
+      pipelines: {
+        scoutToInbox: true,
+        sessionsToDailyNotes: true,
+        queueOutputsToVault: true,
+        inboxAutoProcessing: true,
+        progressiveSummarization: true,
+      },
+    });
+  } catch (err) {
+    respond(false, undefined, {
+      code: "CAPTURE_ERROR",
+      message: err instanceof Error ? err.message : String(err),
+    });
+  }
+};
+
+const vaultCaptureRunNow: GatewayRequestHandler = async ({ respond }) => {
+  try {
+    const { runAllCapturePipelines } = await import("../services/vault-capture.js");
+    const logger = {
+      info: (msg: string) => console.log(msg),
+      warn: (msg: string) => console.warn(msg),
+      error: (msg: string) => console.error(msg),
+    };
+    const result = await runAllCapturePipelines(logger);
+    respond(true, {
+      totalCaptured: result.totalCaptured,
+      totalProcessed: result.totalProcessed,
+      scout: result.scout,
+      sessions: result.sessions,
+      queueOutputs: result.queueOutputs,
+      inbox: result.inbox,
+      summarization: result.summarization,
+    });
+  } catch (err) {
+    respond(false, undefined, {
+      code: "CAPTURE_ERROR",
+      message: err instanceof Error ? err.message : String(err),
+    });
+  }
+};
+
 // ── Export ────────────────────────────────────────────────────────────
 
 export const secondBrainHandlers: GatewayRequestHandlers = {
@@ -885,4 +1565,15 @@ export const secondBrainHandlers: GatewayRequestHandlers = {
   "secondBrain.communityResources": communityResourcesList,
   "secondBrain.communityResourcesAdd": communityResourcesAdd,
   "secondBrain.communityResourcesRemove": communityResourcesRemove,
+  "secondBrain.fileTree": fileTree,
+  "secondBrain.search": brainSearch,
+  "secondBrain.consolidateResearch": consolidateResearch,
+  "secondBrain.vaultHealth": vaultHealth,
+  "secondBrain.inboxItems": inboxItems,
+  "secondBrain.migrateToVault": migrateToVaultRpc,
+  "secondBrain.obsidianSyncStatus": obsidianSyncStatus,
+  "secondBrain.obsidianSyncTrigger": obsidianSyncTrigger,
+  "secondBrain.obsidianSyncSetMode": obsidianSyncSetMode,
+  "secondBrain.captureStatus": vaultCaptureStatus,
+  "secondBrain.captureRunNow": vaultCaptureRunNow,
 };

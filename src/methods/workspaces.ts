@@ -50,7 +50,7 @@ const MAX_IMAGE_READ_SIZE = 8_000_000;
 const STAT_CONCURRENCY = 20;
 
 /** Keep workspace sections compact; this is not a full file explorer. */
-const MAX_WORKSPACE_SECTION_ITEMS = 200;
+const MAX_WORKSPACE_SECTION_ITEMS = 500;
 /** Bound text indexing for workspace search. */
 const MAX_SEARCH_TEXT_FILES = 120;
 const MAX_SEARCH_TEXT_BYTES = 16_000;
@@ -532,7 +532,7 @@ async function listWorkspaceOutputs(
 
   for (const dir of workspace.artifactDirs) {
     const dirPath = path.join(workspace.path, dir);
-    const items = await scanDirectory(dirPath, 4);
+    const items = await scanDirectory(dirPath, 6);
     allArtifacts.push(...flattenArtifactItems(workspace.path, items));
   }
 
@@ -1416,6 +1416,247 @@ const teamSetupPrompt: GatewayRequestHandler = async ({ respond }) => {
   respond(true, { prompt });
 };
 
+// ── Browse Folder ────────────────────────────────────────────────────
+
+const browseFolder: GatewayRequestHandler = async ({ params, respond }) => {
+  const workspaceId = typeof params.workspaceId === "string" ? params.workspaceId.trim() : "";
+  const folderPath = typeof params.folderPath === "string" ? params.folderPath.trim() : "";
+
+  if (!workspaceId) {
+    respond(false, undefined, errorShape(ErrorCodes.INVALID_REQUEST, "workspaceId is required"));
+    return;
+  }
+
+  const config = await readWorkspaceConfig();
+  const workspace = findWorkspaceById(config, workspaceId);
+  if (!workspace) {
+    respond(false, undefined, errorShape(ErrorCodes.INVALID_REQUEST, "Workspace not found"));
+    return;
+  }
+
+  // Default to workspace root when no folderPath
+  const targetDir = folderPath
+    ? resolvePathInWorkspace(workspace.path, folderPath)
+    : workspace.path;
+  if (!targetDir) {
+    respond(false, undefined, errorShape(ErrorCodes.INVALID_REQUEST, "Path outside workspace"));
+    return;
+  }
+
+  // Scan immediate children only (depth=1)
+  const items = await scanDirectory(targetDir, 1);
+  const entries: Array<{
+    path: string;
+    name: string;
+    type: string;
+    size: number;
+    modified: string;
+    isDirectory: boolean;
+  }> = [];
+
+  for (const item of items) {
+    const absolutePath = expandPath(item.path);
+    const relative = path.relative(workspace.path, absolutePath).split(path.sep).join("/");
+    entries.push({
+      path: relative,
+      name: item.name,
+      type: item.type === "directory" ? "folder" : inferFileType(item.name, false),
+      size: item.size ?? 0,
+      modified: new Date(item.modifiedAt ?? Date.now()).toISOString(),
+      isDirectory: item.type === "directory",
+    });
+  }
+
+  // Build breadcrumbs
+  const segments = folderPath ? folderPath.split("/").filter(Boolean) : [];
+  const breadcrumbs = [
+    { name: workspace.name, path: "" },
+    ...segments.map((seg, i) => ({
+      name: seg,
+      path: segments.slice(0, i + 1).join("/"),
+    })),
+  ];
+
+  respond(true, {
+    folderPath: folderPath || "",
+    folderName: segments.length > 0 ? segments[segments.length - 1] : workspace.name,
+    entries,
+    breadcrumbs,
+    parentPath: segments.length > 0 ? segments.slice(0, -1).join("/") || null : null,
+  });
+};
+
+// ── Search Workspace ─────────────────────────────────────────────────
+
+const searchWorkspace: GatewayRequestHandler = async ({ params, respond }) => {
+  const workspaceId = typeof params.workspaceId === "string" ? params.workspaceId.trim() : "";
+  const query = typeof params.query === "string" ? params.query.trim() : "";
+  const limit = typeof params.limit === "number" ? Math.min(params.limit, 100) : 50;
+
+  if (!workspaceId || !query) {
+    respond(false, undefined, errorShape(ErrorCodes.INVALID_REQUEST, "workspaceId and query are required"));
+    return;
+  }
+
+  const config = await readWorkspaceConfig();
+  const workspace = findWorkspaceById(config, workspaceId);
+  if (!workspace) {
+    respond(false, undefined, errorShape(ErrorCodes.INVALID_REQUEST, "Workspace not found"));
+    return;
+  }
+
+  const outputs = await listWorkspaceOutputs(workspace);
+  const enriched = await enrichWorkspaceEntriesForSearch(workspace, outputs);
+  const q = query.toLowerCase();
+
+  type SearchResult = WorkspaceFileEntry & { matchContext?: string };
+  const results: SearchResult[] = [];
+
+  for (const entry of enriched) {
+    if (results.length >= limit) break;
+    const nameMatch = entry.name.toLowerCase().includes(q);
+    const pathMatch = entry.path.toLowerCase().includes(q);
+    const contentMatch = entry.searchText?.toLowerCase().includes(q);
+
+    if (nameMatch || pathMatch || contentMatch) {
+      let matchContext: string | undefined;
+      if (contentMatch && entry.searchText) {
+        const idx = entry.searchText.toLowerCase().indexOf(q);
+        const start = Math.max(0, idx - 60);
+        const end = Math.min(entry.searchText.length, idx + query.length + 60);
+        matchContext =
+          (start > 0 ? "..." : "") +
+          entry.searchText.slice(start, end) +
+          (end < entry.searchText.length ? "..." : "");
+      }
+      const { searchText: _unused, ...rest } = entry;
+      results.push({ ...rest, matchContext });
+    }
+  }
+
+  respond(true, { results, query, total: results.length });
+};
+
+// ── Create Folder ────────────────────────────────────────────────────
+
+const createFolder: GatewayRequestHandler = async ({ params, respond }) => {
+  const workspaceId = typeof params.workspaceId === "string" ? params.workspaceId.trim() : "";
+  const folderPath = typeof params.folderPath === "string" ? params.folderPath.trim() : "";
+
+  if (!workspaceId || !folderPath) {
+    respond(false, undefined, errorShape(ErrorCodes.INVALID_REQUEST, "workspaceId and folderPath are required"));
+    return;
+  }
+
+  const config = await readWorkspaceConfig();
+  const workspace = findWorkspaceById(config, workspaceId);
+  if (!workspace) {
+    respond(false, undefined, errorShape(ErrorCodes.INVALID_REQUEST, "Workspace not found"));
+    return;
+  }
+
+  const absolutePath = resolvePathInWorkspace(workspace.path, folderPath);
+  if (!absolutePath) {
+    respond(false, undefined, errorShape(ErrorCodes.INVALID_REQUEST, "Path outside workspace"));
+    return;
+  }
+
+  await fs.mkdir(absolutePath, { recursive: true });
+  respond(true, { ok: true, path: folderPath });
+};
+
+// ── Move File ────────────────────────────────────────────────────────
+
+const moveFile: GatewayRequestHandler = async ({ params, respond }) => {
+  const workspaceId = typeof params.workspaceId === "string" ? params.workspaceId.trim() : "";
+  const sourcePath = typeof params.sourcePath === "string" ? params.sourcePath.trim() : "";
+  const destPath = typeof params.destPath === "string" ? params.destPath.trim() : "";
+
+  if (!workspaceId || !sourcePath || !destPath) {
+    respond(false, undefined, errorShape(ErrorCodes.INVALID_REQUEST, "workspaceId, sourcePath, and destPath are required"));
+    return;
+  }
+
+  const config = await readWorkspaceConfig();
+  const workspace = findWorkspaceById(config, workspaceId);
+  if (!workspace) {
+    respond(false, undefined, errorShape(ErrorCodes.INVALID_REQUEST, "Workspace not found"));
+    return;
+  }
+
+  const absoluteSource = resolvePathInWorkspace(workspace.path, sourcePath);
+  const absoluteDest = resolvePathInWorkspace(workspace.path, destPath);
+  if (!absoluteSource || !absoluteDest) {
+    respond(false, undefined, errorShape(ErrorCodes.INVALID_REQUEST, "Path outside workspace"));
+    return;
+  }
+
+  // Ensure destination parent exists
+  await fs.mkdir(path.dirname(absoluteDest), { recursive: true });
+  await fs.rename(absoluteSource, absoluteDest);
+
+  // Update pinned paths if the moved file was pinned
+  const sourceNormalized = sourcePath.split(path.sep).join("/");
+  if (workspace.pinned.includes(sourceNormalized)) {
+    const destNormalized = destPath.split(path.sep).join("/");
+    workspace.pinned = workspace.pinned.map(p => p === sourceNormalized ? destNormalized : p);
+    await writeWorkspaceConfig(config);
+  }
+
+  respond(true, { ok: true, from: sourcePath, to: destPath });
+};
+
+// ── Rename File ──────────────────────────────────────────────────────
+
+const renameFile: GatewayRequestHandler = async ({ params, respond }) => {
+  const workspaceId = typeof params.workspaceId === "string" ? params.workspaceId.trim() : "";
+  const filePath = typeof params.filePath === "string" ? params.filePath.trim() : "";
+  const newName = typeof params.newName === "string" ? params.newName.trim() : "";
+
+  if (!workspaceId || !filePath || !newName) {
+    respond(false, undefined, errorShape(ErrorCodes.INVALID_REQUEST, "workspaceId, filePath, and newName are required"));
+    return;
+  }
+
+  // Security: prevent path traversal in newName
+  if (newName.includes("/") || newName.includes("\\") || newName.includes("..")) {
+    respond(false, undefined, errorShape(ErrorCodes.INVALID_REQUEST, "newName must not contain path separators"));
+    return;
+  }
+
+  const config = await readWorkspaceConfig();
+  const workspace = findWorkspaceById(config, workspaceId);
+  if (!workspace) {
+    respond(false, undefined, errorShape(ErrorCodes.INVALID_REQUEST, "Workspace not found"));
+    return;
+  }
+
+  const absoluteOld = resolvePathInWorkspace(workspace.path, filePath);
+  if (!absoluteOld) {
+    respond(false, undefined, errorShape(ErrorCodes.INVALID_REQUEST, "Path outside workspace"));
+    return;
+  }
+
+  const newPath = path.join(path.dirname(filePath), newName);
+  const absoluteNew = resolvePathInWorkspace(workspace.path, newPath);
+  if (!absoluteNew) {
+    respond(false, undefined, errorShape(ErrorCodes.INVALID_REQUEST, "New path outside workspace"));
+    return;
+  }
+
+  await fs.rename(absoluteOld, absoluteNew);
+
+  // Update pinned paths
+  const oldNormalized = filePath.split(path.sep).join("/");
+  if (workspace.pinned.includes(oldNormalized)) {
+    const newNormalized = newPath.split(path.sep).join("/");
+    workspace.pinned = workspace.pinned.map(p => p === oldNormalized ? newNormalized : p);
+    await writeWorkspaceConfig(config);
+  }
+
+  respond(true, { ok: true, oldPath: filePath, newPath });
+};
+
 export const workspacesHandlers: GatewayRequestHandlers = {
   "workspaces.list": list,
   "workspaces.get": get,
@@ -1430,6 +1671,11 @@ export const workspacesHandlers: GatewayRequestHandlers = {
   "workspaces.create": createWorkspace,
   "workspaces.delete": deleteWorkspace,
   "workspaces.teamSetupPrompt": teamSetupPrompt,
+  "workspaces.browseFolder": browseFolder,
+  "workspaces.search": searchWorkspace,
+  "workspaces.createFolder": createFolder,
+  "workspaces.moveFile": moveFile,
+  "workspaces.renameFile": renameFile,
 };
 
 export { expandPath };

@@ -1,13 +1,18 @@
 .workspaces-container {
   display: flex;
   flex-direction: column;
-  flex: 1;
   min-height: 0;
-  background: var(--bg);
-  color: var(--text);
-  overflow: hidden;
 }
 
+.workspaces-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  flex-shrink: 0;
+}
+
+/* Detail view header (when viewing a specific workspace) */
 .workspaces-header {
   display: flex;
   justify-content: space-between;
@@ -17,21 +22,6 @@
   background: var(--card);
   gap: 16px;
   flex-shrink: 0;
-}
-
-.workspaces-header-left {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  min-width: 0;
-}
-
-.workspaces-header-right {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
-  justify-content: flex-end;
 }
 
 .workspaces-create-form {
@@ -605,50 +595,32 @@
   background: transparent;
 }
 
-/* Team setup bar */
-.ws-team-setup-bar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 10px 20px;
-  border-bottom: 1px solid var(--border);
-  background: var(--bg-elevated);
-}
-
-.ws-team-setup-text {
-  font-size: 13px;
-  color: var(--muted);
-}
-
-.btn.ws-team-setup-btn,
+/* Team setup button (inline in toolbar) */
 .ws-team-setup-btn {
-  padding: 8px 16px;
-  border: 1px solid var(--ok);
-  border-radius: var(--radius-md);
-  background: var(--ok);
-  color: #fff;
-  font-weight: 600;
-  font-size: 13px;
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md, 6px);
+  background: none;
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 500;
   cursor: pointer;
   white-space: nowrap;
+  transition: border-color 0.15s, background 0.15s;
 }
 
-.btn.ws-team-setup-btn:hover,
 .ws-team-setup-btn:hover {
-  background: var(--ok);
-  color: #fff;
-  border-color: var(--ok);
-  opacity: 0.9;
+  background: var(--bg-hover);
+  border-color: var(--accent);
+  color: var(--accent);
 }
 
 @media (max-width: 900px) {
-  .workspaces-header {
+  .workspaces-toolbar {
     flex-direction: column;
     align-items: stretch;
   }
 
-  .workspaces-header-right,
   .workspace-detail-search {
     justify-content: flex-start;
   }
@@ -921,6 +893,47 @@
   color: #fff;
 }
 
+/* ── Queue-aware agent status ─────────────────────────────────────── */
+
+.ws-task-agent-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-secondary, var(--text-muted));
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.ws-task-agent-status--processing {
+  color: #22c55e;
+}
+
+.ws-task-agent-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #22c55e;
+  animation: ws-agent-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes ws-agent-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+.ws-task-start-btn--review {
+  border-color: #14b8a6;
+  background: rgba(20, 184, 166, 0.12);
+  color: #14b8a6;
+}
+
+.ws-task-start-btn--review:hover {
+  background: #14b8a6;
+  color: #fff;
+}
+
 /* ── Inline edit mode ──────────────────────────────────────────────── */
 
 .ws-task-edit-row {
@@ -1020,4 +1033,169 @@
   outline: none;
   border-color: var(--ring);
   box-shadow: var(--focus-ring);
+}
+
+/* ── Workspace Browser ────────────────────────────────────────────────── */
+
+.workspace-browser {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.workspace-browser-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.workspace-browse-back {
+  padding: 4px 10px;
+  font-size: 0.8125rem;
+  background: var(--bg-elevated, var(--bg-hover));
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm, 6px);
+  cursor: pointer;
+  color: var(--text);
+}
+.workspace-browse-back:hover {
+  background: var(--bg-hover);
+}
+
+.workspace-breadcrumbs {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+  overflow-x: auto;
+  font-size: 0.8125rem;
+}
+
+.breadcrumb-item {
+  background: none;
+  border: none;
+  color: var(--accent);
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 3px;
+  font-size: 0.8125rem;
+  white-space: nowrap;
+}
+.breadcrumb-item:hover {
+  background: var(--bg-hover);
+}
+.breadcrumb-current {
+  color: var(--text);
+  font-weight: 600;
+  cursor: default;
+}
+.breadcrumb-current:hover {
+  background: none;
+}
+
+.breadcrumb-sep {
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+.workspace-browse-search {
+  padding: 4px 10px;
+  font-size: 0.8125rem;
+  background: var(--bg-elevated, var(--card));
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm, 6px);
+  color: var(--text);
+  width: 160px;
+}
+.workspace-browse-search:focus {
+  border-color: var(--accent);
+  outline: none;
+}
+
+.workspace-browse-new-folder {
+  padding: 4px 10px;
+  font-size: 0.8125rem;
+  background: var(--bg-elevated, var(--bg-hover));
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm, 6px);
+  cursor: pointer;
+  color: var(--text);
+}
+.workspace-browse-new-folder:hover {
+  background: var(--bg-hover);
+}
+
+.workspace-browse-list {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md, 8px);
+  overflow: hidden;
+}
+
+.workspace-browse-entry {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: none;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+}
+.workspace-browse-entry:last-child {
+  border-bottom: none;
+}
+.workspace-browse-entry:hover {
+  background: var(--bg-hover);
+}
+
+.browse-entry-icon {
+  flex-shrink: 0;
+  font-size: 1rem;
+}
+
+.browse-entry-name {
+  flex: 1;
+  font-size: 0.875rem;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.browse-entry-excerpt {
+  font-size: 0.75rem;
+  color: var(--muted);
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.workspace-browse-empty {
+  padding: 24px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+
+.workspace-browse-btn {
+  padding: 4px 10px;
+  font-size: 0.8125rem;
+  background: var(--bg-elevated, var(--bg-hover));
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm, 6px);
+  cursor: pointer;
+  color: var(--text);
+  transition: background 0.15s;
+}
+.workspace-browse-btn:hover {
+  background: var(--bg-hover);
 }

@@ -99,7 +99,25 @@ export type SecondBrainSourcesData = {
   totalCount: number;
 };
 
-export type SecondBrainSubtab = "identity" | "memory-bank" | "ai-packet" | "sources" | "research" | "intel" | "resources";
+export type SecondBrainSubtab = "identity" | "memory-bank" | "ai-packet" | "sources" | "research" | "intel" | "resources" | "files";
+
+export type BrainTreeNode = {
+  name: string;
+  path: string;
+  type: "folder" | "file";
+  size?: number;
+  updatedAt?: string;
+  childCount?: number;
+  children?: BrainTreeNode[];
+};
+
+export type BrainSearchResult = {
+  path: string;
+  name: string;
+  type: string;
+  excerpt?: string;
+  matchContext?: string;
+};
 
 export type ResearchFrontmatter = {
   title?: string;
@@ -155,6 +173,23 @@ export type CommunityResourceAddForm = {
   tags: string;
 };
 
+export type VaultHealthData = {
+  available: boolean;
+  vaultPath: string | null;
+  migrated: boolean;
+  stats: {
+    totalNotes: number;
+    inboxCount: number;
+    brainCount: number;
+    discoveryCount: number;
+    projectCount: number;
+    resourceCount: number;
+    dailyCount: number;
+    lastActivity: string | null;
+  } | null;
+  recentActivity: Array<{ name: string; path: string; updatedAt: string; folder: string }>;
+};
+
 export type SecondBrainProps = {
   connected: boolean;
   loading?: boolean;
@@ -187,6 +222,14 @@ export type SecondBrainProps = {
   onResearchAddFormChange: (field: keyof ResearchAddForm, value: string) => void;
   onResearchAddSubmit: () => void;
   onSaveViaChat: () => void;
+  // Files tab props
+  fileTree?: BrainTreeNode[] | null;
+  fileTreeLoading?: boolean;
+  fileSearchQuery?: string;
+  fileSearchResults?: BrainSearchResult[] | null;
+  onFileTreeRefresh?: () => Promise<void>;
+  onFileSearch?: (query: string) => void;
+  onFileSelect?: (path: string) => void;
   // Proactive Intel props (for intel subtab)
   intelProps?: ProactiveIntelProps;
   // Community Resources props (for resources subtab)
@@ -198,6 +241,8 @@ export type SecondBrainProps = {
   onCommunityResourceAddFormToggle: () => void;
   onCommunityResourceAddFormChange: (field: keyof CommunityResourceAddForm, value: string) => void;
   onAddSource: () => void;
+  // Vault health
+  vaultHealth?: VaultHealthData | null;
 };
 
 // ── Helpers ──────────────────────────────────────────────────────────
@@ -769,6 +814,110 @@ function renderResearchPanel(props: SecondBrainProps) {
   `;
 }
 
+// ── Files Tab ────────────────────────────────────────────────────────
+
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes}B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)}K`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)}M`;
+}
+
+function renderFilesTab(props: SecondBrainProps) {
+  return html`
+    <div class="sb-files-container">
+      <div class="sb-files-search-bar">
+        <input
+          type="text"
+          class="sb-files-search-input"
+          placeholder="Search across your Second Brain..."
+          .value=${props.fileSearchQuery ?? ""}
+          @input=${(e: InputEvent) => {
+            const target = e.target as HTMLInputElement;
+            props.onFileSearch?.(target.value);
+          }}
+        />
+      </div>
+
+      ${props.fileSearchResults
+        ? renderFileSearchResults(props)
+        : props.fileTreeLoading
+          ? html`<div class="sb-files-loading">Loading file tree...</div>`
+          : props.fileTree
+            ? renderFileTree(props.fileTree, props)
+            : html`<div class="sb-files-empty">No files found</div>`}
+    </div>
+  `;
+}
+
+function renderFileSearchResults(props: SecondBrainProps) {
+  const results = props.fileSearchResults ?? [];
+  if (results.length === 0) {
+    return html`<div class="sb-files-empty">No results found</div>`;
+  }
+  return html`
+    <div class="sb-files-results">
+      ${results.map(
+        (r) => html`
+          <button
+            class="sb-files-result-item"
+            @click=${() => props.onFileSelect?.(r.path)}
+          >
+            <span class="sb-file-icon">${r.type === "folder" ? "\u{1F4C1}" : "\u{1F4C4}"}</span>
+            <div class="sb-file-info">
+              <span class="sb-file-name">${r.name}</span>
+              <span class="sb-file-path">${r.path}</span>
+              ${r.matchContext || r.excerpt
+                ? html`<span class="sb-file-excerpt">${r.matchContext ?? r.excerpt}</span>`
+                : nothing}
+            </div>
+          </button>
+        `,
+      )}
+    </div>
+  `;
+}
+
+function renderFileTree(
+  nodes: BrainTreeNode[],
+  props: SecondBrainProps,
+  depth = 0,
+) {
+  return html`
+    <div class="sb-file-tree" style="padding-left: ${depth * 16}px">
+      ${nodes.map((node) => {
+        if (node.type === "folder") {
+          return html`
+            <details class="sb-tree-folder">
+              <summary class="sb-tree-item sb-tree-folder-name">
+                <span class="sb-file-icon">\u{1F4C1}</span>
+                <span>${node.name}</span>
+                ${node.childCount != null
+                  ? html`<span class="sb-tree-count">${node.childCount}</span>`
+                  : nothing}
+              </summary>
+              ${node.children
+                ? renderFileTree(node.children, props, depth + 1)
+                : nothing}
+            </details>
+          `;
+        }
+        return html`
+          <button
+            class="sb-tree-item sb-tree-file"
+            @click=${() => props.onFileSelect?.(node.path)}
+          >
+            <span class="sb-file-icon">\u{1F4C4}</span>
+            <span class="sb-file-name">${node.name}</span>
+            ${node.size != null
+              ? html`<span class="sb-tree-size">${formatFileSize(node.size)}</span>`
+              : nothing}
+          </button>
+        `;
+      })}
+    </div>
+  `;
+}
+
 // ── Empty state ──────────────────────────────────────────────────────
 
 function renderEmpty(title: string, hint: string) {
@@ -783,11 +932,49 @@ function renderEmpty(title: string, hint: string) {
 
 // ── Main render ──────────────────────────────────────────────────────
 
+// ── Vault Health Bar ────────────────────────────────────────────────
+
+function renderVaultHealthBar(vaultHealth?: VaultHealthData | null) {
+  if (!vaultHealth) return nothing;
+
+  if (!vaultHealth.available) {
+    return html`
+      <div class="vault-health-bar vault-health-disconnected">
+        <span class="vault-health-status">\u26A0\uFE0F Vault not connected</span>
+        <span class="vault-health-detail">Using local storage. Set OBSIDIAN_VAULT_PATH to connect your Obsidian vault.</span>
+      </div>
+    `;
+  }
+
+  const stats = vaultHealth.stats;
+  if (!stats) return nothing;
+
+  const lastActivityStr = stats.lastActivity ? fmtUpdated(stats.lastActivity) : "never";
+  const inboxBadge = stats.inboxCount > 0
+    ? html`<span class="vault-health-inbox-badge">${stats.inboxCount} in inbox</span>`
+    : nothing;
+
+  return html`
+    <div class="vault-health-bar vault-health-connected">
+      <span class="vault-health-status">\u{1F7E2} Vault Connected</span>
+      <span class="vault-health-detail">
+        ${stats.totalNotes} notes \u00B7
+        ${stats.brainCount} brain \u00B7
+        ${stats.dailyCount} daily \u00B7
+        ${stats.projectCount} projects \u00B7
+        Last activity: ${lastActivityStr}
+      </span>
+      ${inboxBadge}
+    </div>
+  `;
+}
+
 export function renderSecondBrain(props: SecondBrainProps) {
-  const { subtab, loading } = props;
+  const { subtab, loading, vaultHealth } = props;
 
   return html`
     <section class="second-brain-container">
+      ${renderVaultHealthBar(vaultHealth)}
       <div class="second-brain-tabs">
         <button
           class="second-brain-tab ${subtab === "identity" ? "active" : ""}"
@@ -826,6 +1013,12 @@ export function renderSecondBrain(props: SecondBrainProps) {
           \u{1F4E6} Resources
         </button>
         <button
+          class="second-brain-tab ${subtab === "files" ? "active" : ""}"
+          @click=${() => props.onSubtabChange("files")}
+        >
+          \u{1F5C2}\uFE0F Files
+        </button>
+        <button
           class="second-brain-tab ${subtab === "intel" ? "active" : ""}"
           @click=${() => props.onSubtabChange("intel")}
         >
@@ -849,7 +1042,9 @@ export function renderSecondBrain(props: SecondBrainProps) {
                   ? renderSourcesPanel(props)
                   : subtab === "resources"
                     ? renderResourcesPanel(props)
-                    : renderResearchPanel(props)}
+                    : subtab === "files"
+                      ? renderFilesTab(props)
+                      : renderResearchPanel(props)}
     </section>
   `;
 }

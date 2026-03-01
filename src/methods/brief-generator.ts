@@ -8,7 +8,7 @@
  *   - Yesterday's brief (carry-forward tasks, Tomorrow Handoff, action items from Notes)
  *   - X/Twitter intelligence (bird CLI bookmarks)
  *   - Goals / Chief Aim (~/godmode/data/goals.json)
- *   - CONTEXT.md (sobriety start date, strategic context)
+ *   - CONTEXT.md (streak counter, strategic context)
  *
  * Exposed as `dailyBrief.generate` RPC handler.
  */
@@ -27,6 +27,7 @@ import {
   DAILY_FOLDER,
   localDateString,
 } from "../data-paths.js";
+import { getUserTimezone, getUserLocation, getTempUnit } from "../lib/user-config.js";
 
 type GatewayRequestHandlers = Record<string, GatewayRequestHandler>;
 
@@ -72,7 +73,7 @@ function yesterdayDate(): string {
 function dayOfWeek(): string {
   return new Date().toLocaleDateString("en-US", {
     weekday: "long",
-    timeZone: "America/Chicago",
+    timeZone: getUserTimezone(),
   });
 }
 
@@ -82,7 +83,7 @@ function formattedDate(): string {
     year: "numeric",
     month: "long",
     day: "numeric",
-    timeZone: "America/Chicago",
+    timeZone: getUserTimezone(),
   });
 }
 
@@ -206,7 +207,7 @@ function formatCalendarSection(events: CalendarEvent[], error?: string): string 
     const time = new Date(evt.startTime).toLocaleTimeString("en-US", {
       hour: "numeric",
       minute: "2-digit",
-      timeZone: "America/Chicago",
+      timeZone: getUserTimezone(),
     });
     const duration = evt.duration ? ` (${evt.duration}min)` : "";
     lines.push(`- **${time}** — ${evt.title}${duration}`);
@@ -236,7 +237,46 @@ function formatCalendarSection(events: CalendarEvent[], error?: string): string 
   return lines.join("\n");
 }
 
-function formatMeetingPrepSection(events: CalendarEvent[]): string {
+async function lookupPersonContext(name: string): Promise<string | null> {
+  const slug = name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
+
+  const peopleDir = join(MEMORY_DIR, "bank", "people");
+  const candidates = [
+    join(peopleDir, `${slug}.md`),
+  ];
+
+  // Also try first-last.md format (split on space)
+  const parts = name.trim().split(/\s+/);
+  if (parts.length >= 2) {
+    const firstLast = `${parts[0].toLowerCase()}-${parts[parts.length - 1].toLowerCase()}`;
+    if (firstLast !== slug) {
+      candidates.push(join(peopleDir, `${firstLast}.md`));
+    }
+  }
+
+  for (const filePath of candidates) {
+    try {
+      const raw = await readFile(filePath, "utf-8");
+      const contextLines = raw
+        .split("\n")
+        .map((l) => l.trim())
+        .filter((l) => l.length > 0 && !l.startsWith("#"));
+      const top = contextLines.slice(0, 3);
+      if (top.length > 0) {
+        return top.join(" | ");
+      }
+    } catch {
+      // File not found — try next candidate
+    }
+  }
+
+  return null;
+}
+
+async function formatMeetingPrepSection(events: CalendarEvent[]): Promise<string> {
   const todayStart = new Date();
   todayStart.setHours(0, 0, 0, 0);
   const todayEnd = new Date(todayStart.getTime() + 86_400_000);
@@ -254,13 +294,19 @@ function formatMeetingPrepSection(events: CalendarEvent[]): string {
     const time = new Date(evt.startTime).toLocaleTimeString("en-US", {
       hour: "numeric",
       minute: "2-digit",
-      timeZone: "America/Chicago",
+      timeZone: getUserTimezone(),
     });
     lines.push(`**${evt.title}** at ${time}`);
     if (evt.attendees && evt.attendees.length > 0) {
-      lines.push(`- Attendees: ${evt.attendees.join(", ")}`);
+      for (const attendee of evt.attendees) {
+        const context = await lookupPersonContext(attendee);
+        if (context) {
+          lines.push(`- **${attendee}** — ${context}`);
+        } else {
+          lines.push(`- ${attendee} — *No prior context*`);
+        }
+      }
     }
-    lines.push(`- Review: Check ~/godmode/data/people/ for attendee context`);
     lines.push("");
   }
 
@@ -438,13 +484,20 @@ type WeatherData = {
 
 async function fetchWeather(): Promise<WeatherData> {
   // Use wttr.in — free, no API key needed
+  const location = getUserLocation();
+  if (!location) {
+    // No location configured — skip weather
+    return { temp: null, condition: "Unknown", icon: "🌤️" };
+  }
   try {
-    const resp = await fetch("https://wttr.in/Austin,TX?format=j1", {
+    const encoded = encodeURIComponent(location);
+    const resp = await fetch(`https://wttr.in/${encoded}?format=j1`, {
       signal: AbortSignal.timeout(8_000),
     });
     const data = (await resp.json()) as {
       current_condition?: Array<{
         temp_F?: string;
+        temp_C?: string;
         weatherDesc?: Array<{ value?: string }>;
         humidity?: string;
         weatherCode?: string;
@@ -453,7 +506,9 @@ async function fetchWeather(): Promise<WeatherData> {
     const current = data.current_condition?.[0];
     if (!current) return { temp: null, condition: "Unknown", icon: "🌤️" };
 
-    const temp = current.temp_F ? parseInt(current.temp_F, 10) : null;
+    const unit = getTempUnit();
+    const tempRaw = unit === "C" ? current.temp_C : current.temp_F;
+    const temp = tempRaw ? parseInt(tempRaw, 10) : null;
     const condition = current.weatherDesc?.[0]?.value ?? "Unknown";
     const code = parseInt(current.weatherCode ?? "0", 10);
 
@@ -727,6 +782,56 @@ async function formatIntelligenceSection(): Promise<string | null> {
   }
 }
 
+// ── Data source: Overnight Agent Work (queue processor) ──────────────────────
+
+async function formatOvernightWorkSection(): Promise<string | null> {
+  const { readQueueState } = await import("../lib/queue-state.js");
+  const state = await readQueueState();
+
+  const cutoff = Date.now() - 24 * 60 * 60 * 1000;
+  const recentItems = state.items.filter(
+    (item) =>
+      (item.status === "review" || item.status === "done") &&
+      item.completedAt != null &&
+      item.completedAt >= cutoff,
+  );
+
+  if (recentItems.length === 0) return null;
+
+  const lines: string[] = [];
+  let reviewCount = 0;
+
+  for (const item of recentItems) {
+    const statusLabel = item.status === "review" ? "Ready for review" : "Approved";
+    lines.push(`**${item.title}** — ${statusLabel}`);
+
+    if (item.result?.summary) {
+      const truncated =
+        item.result.summary.length > 150
+          ? item.result.summary.slice(0, 150) + "..."
+          : item.result.summary;
+      lines.push(`  ${truncated}`);
+    }
+    if (item.result?.outputPath) {
+      lines.push(`  Output: \`${item.result.outputPath}\``);
+    }
+    if (item.result?.prUrl) {
+      lines.push(`  PR: ${item.result.prUrl}`);
+    }
+
+    if (item.status === "review") reviewCount++;
+    lines.push("");
+  }
+
+  if (reviewCount > 0) {
+    lines.push(
+      `**${reviewCount} item${reviewCount === 1 ? "" : "s"} awaiting your review** — check Mission Control`,
+    );
+  }
+
+  return lines.join("\n");
+}
+
 // ── Data source: Yesterday's brief (carry-forward + action items) ────────────
 
 type CarryForwardResult = {
@@ -936,8 +1041,9 @@ function isActionItem(text: string): boolean {
 
 type ContextData = {
   chiefAim: string;
-  sobrietyDay: number;
-  sobrietyStart: string;
+  streakDay: number | null;
+  streakLabel: string;
+  streakStart: string | null;
   carryForwardLines: string[];
 };
 
@@ -945,7 +1051,8 @@ async function readContextData(): Promise<ContextData> {
   // Read CONTEXT.md for strategic carry-forward
   const contextPath = join(MEMORY_DIR, "CONTEXT.md");
   let contextLines: string[] = [];
-  let sobrietyStart = "2026-01-01"; // default
+  let streakStart: string | null = null;
+  let streakLabel = "Streak";
 
   try {
     const raw = await readFile(contextPath, "utf-8");
@@ -954,27 +1061,32 @@ async function readContextData(): Promise<ContextData> {
       .filter((l) => l.startsWith("- "))
       .map((l) => l.slice(2).trim());
 
-    // Extract sobriety start if present
-    const sobMatch = raw.match(/sobriety[^:]*:\s*(\d{4}-\d{2}-\d{2})/i);
-    if (sobMatch) sobrietyStart = sobMatch[1];
+    // Extract optional streak counter (user-defined label + start date)
+    // Supports: "streak: 2026-01-01", "fitness start: 2026-01-01", "meditation streak: 2026-01-01"
+    const streakMatch = raw.match(/(?:(\w[\w\s]*?)\s+)?(?:streak|start)[:\s]+(\d{4}-\d{2}-\d{2})/i);
+    if (streakMatch) {
+      if (streakMatch[1]) streakLabel = streakMatch[1].trim();
+      streakStart = streakMatch[2];
+    }
   } catch {
     // CONTEXT.md not found
   }
 
-  // Read chief aim from goals.json or THESIS.md
-  let chiefAim = "GodMode — 1 Million Daily Active Users, $1B Valuation by 2030";
+  // Read chief aim from THESIS.md (no hardcoded fallback)
+  let chiefAim = "";
   try {
     const thesis = await readFile(join(MEMORY_DIR, "THESIS.md"), "utf-8");
     const aimMatch = thesis.match(/(?:chief\s*aim|vision|mission)[:\s]*>?\s*(.+)/i);
     if (aimMatch) chiefAim = aimMatch[1].trim();
   } catch {
-    // Use default
+    // No THESIS.md — chief aim stays empty
   }
 
   return {
     chiefAim,
-    sobrietyDay: daysSince(sobrietyStart),
-    sobrietyStart,
+    streakDay: streakStart ? daysSince(streakStart) : null,
+    streakLabel,
+    streakStart,
     carryForwardLines: contextLines,
   };
 }
@@ -1053,10 +1165,14 @@ async function generateDailyBrief(date?: string): Promise<GenerateResult> {
         : "**Meeting Day** — Execution between calls";
 
   // Weather line
+  const userLocation = getUserLocation();
+  const unit = getTempUnit();
   const weatherLine =
-    weather.temp !== null
-      ? `${weather.icon} ${weather.condition} ${weather.temp}°F · Austin, TX`
-      : "Austin, TX";
+    weather.temp !== null && userLocation
+      ? `${weather.icon} ${weather.condition} ${weather.temp}°${unit} · ${userLocation}`
+      : userLocation
+        ? userLocation
+        : "";
 
   // Build carry-forward section for Win The Day
   const allCarryItems = [
@@ -1066,11 +1182,46 @@ async function generateDailyBrief(date?: string): Promise<GenerateResult> {
     ),
   ];
 
-  // Win The Day: carry-forward items as numbered checkboxes
+  // Win The Day: carry-forward items as numbered checkboxes + session links
+  // Load tasks and queue data for session linking
+  let tasksForLinking: { id: string; title: string; sessionId: string | null; status: string }[] = [];
+  let queueItemsForLinking: { sourceTaskId?: string; status: string }[] = [];
+  const godmodeHost = process.env.GODMODE_WEB_HOST ?? process.env.TAILSCALE_HOSTNAME ?? "";
+  try {
+    const { readTasks } = await import("./tasks.js");
+    const tasksData = await readTasks();
+    tasksForLinking = tasksData.tasks.filter(t => t.status === "pending");
+  } catch { /* non-fatal */ }
+  try {
+    const { readQueueState } = await import("../lib/queue-state.js");
+    const queueState = await readQueueState();
+    queueItemsForLinking = queueState.items;
+  } catch { /* non-fatal */ }
+
   const winTheDayLines: string[] = [];
   let idx = 1;
   for (const item of allCarryItems.slice(0, 6)) {
-    winTheDayLines.push(`${idx}. [ ] **${item}**`);
+    let sessionLink = "";
+    if (godmodeHost) {
+      // Try to match carry-forward item to a tasks.json task
+      const matchedTask = tasksForLinking.find(
+        t => t.title.toLowerCase() === item.toLowerCase() ||
+             item.toLowerCase().includes(t.title.toLowerCase()),
+      );
+      if (matchedTask) {
+        const hasWork = queueItemsForLinking.some(
+          qi => qi.sourceTaskId === matchedTask.id && (qi.status === "review" || qi.status === "done"),
+        );
+        if (hasWork && matchedTask.sessionId) {
+          sessionLink = ` [→ Review](${godmodeHost}/godmode/chat?session=${encodeURIComponent(matchedTask.sessionId)})`;
+        } else if (matchedTask.sessionId) {
+          sessionLink = ` [→ Open](${godmodeHost}/godmode/chat?session=${encodeURIComponent(matchedTask.sessionId)})`;
+        } else {
+          sessionLink = ` [→ Open](${godmodeHost}/godmode/chat?openTask=${encodeURIComponent(matchedTask.id)})`;
+        }
+      }
+    }
+    winTheDayLines.push(`${idx}. [ ] **${item}**${sessionLink}`);
     idx++;
   }
   if (winTheDayLines.length === 0) {
@@ -1089,38 +1240,19 @@ async function generateDailyBrief(date?: string): Promise<GenerateResult> {
   const sections: string[] = [];
   const brief: string[] = [];
 
-  // Header
+  // Header — compact context line
   brief.push(`# Daily Brief — ${formattedDate()}`);
-  brief.push("");
-  brief.push(`**Day ${context.sobrietyDay}** · ${weatherLine}`);
-  brief.push("");
-  brief.push("---");
+  const headerParts = [weatherLine, dayType].filter(Boolean);
+  brief.push(headerParts.join(" · "));
   brief.push("");
 
-  // Chief Aim
-  sections.push("Chief Aim");
-  brief.push("## Chief Aim");
-  brief.push("");
-  brief.push(`> ${context.chiefAim}`);
-  brief.push("");
-  brief.push(`**Sobriety:** Day ${context.sobrietyDay} 🔥`);
-  brief.push(dayType);
-  brief.push("");
-  brief.push("---");
-  brief.push("");
+  // Chief Aim — single blockquote (only if configured)
+  if (context.chiefAim) {
+    brief.push(`> ${context.chiefAim}`);
+    brief.push("");
+  }
 
-  // LifeTrack
-  sections.push("LifeTrack");
-  brief.push("## LifeTrack");
-  brief.push("");
-  brief.push(
-    `**[▶️ Play Today's Meditation](https://lifetrack-ai.vercel.app)** — Day ${context.sobrietyDay} Identity Activation`,
-  );
-  brief.push("");
-  brief.push("---");
-  brief.push("");
-
-  // Win The Day
+  // Win The Day — the core of the brief, first real content
   sections.push("Win The Day");
   brief.push("## Win The Day");
   brief.push("");
@@ -1136,29 +1268,49 @@ async function generateDailyBrief(date?: string): Promise<GenerateResult> {
     brief.push("");
   }
 
+  // Streak counter — only shown if user has configured a streak in CONTEXT.md
+  if (context.streakDay !== null) {
+    brief.push(`**${context.streakLabel}:** Day ${context.streakDay}`);
+    brief.push("");
+  }
   brief.push("---");
   brief.push("");
 
-  // Calendar
-  sections.push("Calendar");
-  brief.push("## Calendar");
+  // Overnight Work (from queue processor)
+  try {
+    const overnightSection = await formatOvernightWorkSection();
+    if (overnightSection) {
+      sections.push("Your Agents Overnight");
+      brief.push("## Your Agents Overnight");
+      brief.push("");
+      brief.push(overnightSection);
+      brief.push("");
+      brief.push("---");
+      brief.push("");
+    }
+  } catch {
+    // Queue not available — skip silently
+  }
+
+  // Calendar & Comms — merged section for external inputs
+  sections.push("Calendar & Comms");
+  brief.push("## Calendar & Comms");
   brief.push("");
+  brief.push("**Schedule:**");
   brief.push(formatCalendarSection(calendar.events, calendar.error));
   brief.push("");
 
   // Meeting Prep
-  sections.push("Meeting Prep");
-  brief.push("### Meeting Prep");
-  brief.push("");
-  brief.push(formatMeetingPrepSection(calendar.events));
-  brief.push("");
-  brief.push("---");
-  brief.push("");
+  const meetingPrep = await formatMeetingPrepSection(calendar.events);
+  if (meetingPrep && meetingPrep !== "_No external meetings today._") {
+    brief.push("### Meeting Prep");
+    brief.push("");
+    brief.push(meetingPrep);
+    brief.push("");
+  }
 
-  // Communications (placeholder — requires Front API integration)
-  sections.push("Communications");
-  brief.push("## Communications");
-  brief.push("");
+  // Communications
+  brief.push("**Comms — Action Needed:**");
   brief.push("*Check Front inbox for urgent items.*");
   brief.push("");
   brief.push("---");
@@ -1200,7 +1352,16 @@ async function generateDailyBrief(date?: string): Promise<GenerateResult> {
     // Proactive Intel not available — skip silently
   }
 
-  // Body Check
+  // Notes — user's notebook, never touched by AI
+  sections.push("Notes");
+  brief.push("## Notes");
+  brief.push("");
+  brief.push("*(Your notebook — never touched by AI)*");
+  brief.push("");
+  brief.push("---");
+  brief.push("");
+
+  // Body Check — below the fold, informational not motivational
   sections.push("Body Check");
   brief.push("## Body Check");
   brief.push("");
@@ -1209,9 +1370,27 @@ async function generateDailyBrief(date?: string): Promise<GenerateResult> {
   brief.push("---");
   brief.push("");
 
-  // Notes (empty section for the day)
-  sections.push("Notes");
-  brief.push("## Notes");
+  // Today's Impact (Evening) — filled at end of day
+  sections.push("Today's Impact");
+  brief.push("## Today's Impact (Evening)");
+  brief.push("");
+  brief.push("");
+
+  // Evening Review — filled at 9PM
+  sections.push("Evening Review");
+  brief.push("## Evening Review");
+  brief.push("");
+  brief.push("");
+
+  // Streak reminder in evening (only if configured)
+  if (context.streakDay !== null) {
+    brief.push(`**${context.streakLabel}:** Day ${context.streakDay} — Well done.`);
+    brief.push("");
+  }
+
+  // Retain — session harvests
+  sections.push("Retain");
+  brief.push("## Retain");
   brief.push("");
   brief.push("");
 
@@ -1220,7 +1399,7 @@ async function generateDailyBrief(date?: string): Promise<GenerateResult> {
   const timeStr = now.toLocaleTimeString("en-US", {
     hour: "numeric",
     minute: "2-digit",
-    timeZone: "America/Chicago",
+    timeZone: getUserTimezone(),
   });
   brief.push("---");
   brief.push("");

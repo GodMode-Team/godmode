@@ -220,6 +220,11 @@ export type AppViewState = {
   workspacesSearchQuery?: string;
   workspaceItemSearchQuery?: string;
   workspaceExpandedFolders?: Set<string>;
+  workspaceBrowsePath?: string | null;
+  workspaceBrowseEntries?: import("./controllers/workspaces").BrowseEntry[] | null;
+  workspaceBreadcrumbs?: Array<{ name: string; path: string }> | null;
+  workspaceBrowseSearchQuery?: string;
+  workspaceBrowseSearchResults?: Array<{ path: string; name: string; type: string; excerpt?: string }> | null;
   workspacesLoading?: boolean;
   workspacesCreateLoading?: boolean;
   workspacesError?: string | null;
@@ -236,6 +241,8 @@ export type AppViewState = {
   // Today tasks
   todayTasks?: WorkspaceTask[];
   todayTasksLoading?: boolean;
+  todayEditingTaskId?: string | null;
+  todayShowCompleted?: boolean;
   // Daily Brief state
   dailyBrief?: DailyBriefData | null;
   dailyBriefLoading?: boolean;
@@ -244,6 +251,10 @@ export type AppViewState = {
   agentLog?: AgentLogData | null;
   agentLogLoading?: boolean;
   agentLogError?: string | null;
+  // Mission Control state
+  missionControlData?: import("./controllers/mission-control").MissionControlData | null;
+  missionControlLoading?: boolean;
+  missionControlError?: string | null;
   // Private mode (no memory/learning from this chat)
   chatPrivateMode?: boolean;
   /** Maps private session keys → expiry timestamp (ms). */
@@ -304,6 +315,18 @@ export type AppViewState = {
   handleGuardrailsLoad: () => Promise<void>;
   handleGuardrailToggle: (gateId: string, enabled: boolean) => Promise<void>;
   handleGuardrailThresholdChange: (gateId: string, key: string, value: number) => Promise<void>;
+  // Mission Control handlers
+  handleMissionControlRefresh: () => Promise<void>;
+  handleMissionControlCancelTask: (taskId: string) => Promise<void>;
+  handleMissionControlApproveItem: (id: string) => Promise<void>;
+  handleMissionControlRetryItem: (id: string) => Promise<void>;
+  handleMissionControlViewDetail: (agent: import("./controllers/mission-control").AgentRunView) => Promise<void>;
+  handleMissionControlAddToQueue: (type: string, title: string) => Promise<void>;
+  handleMissionControlOpenSession: (sessionKey: string) => Promise<void>;
+  handleMissionControlOpenTaskSession: (sourceTaskId: string) => Promise<void>;
+  handleMissionControlStartQueueItem: (itemId: string) => Promise<void>;
+  handleOpenSupportChat: () => void;
+  seedSessionWithAgentOutput: (taskTitle: string, output: string, agentPrompt?: string) => Promise<void>;
   // GodMode Options state
   godmodeOptions: Record<string, unknown> | null;
   godmodeOptionsLoading: boolean;
@@ -324,6 +347,13 @@ export type AppViewState = {
   updateLoading: boolean;
   updateError: string | null;
   updateLastChecked: number | null;
+  // Dashboards state
+  dashboardsList?: import("./controllers/dashboards").DashboardManifest[];
+  dashboardsLoading?: boolean;
+  dashboardsError?: string | null;
+  activeDashboardId?: string | null;
+  activeDashboardHtml?: string | null;
+  activeDashboardManifest?: import("./controllers/dashboards").DashboardManifest | null;
   // SecondBrain state
   secondBrainSubtab?: import("./views/second-brain").SecondBrainSubtab;
   secondBrainLoading?: boolean;
@@ -345,6 +375,12 @@ export type AppViewState = {
   secondBrainCommunityResources?: import("./views/second-brain").CommunityResourcesData | null;
   secondBrainCommunityResourceAddFormOpen?: boolean;
   secondBrainCommunityResourceAddForm?: import("./views/second-brain").CommunityResourceAddForm;
+  secondBrainVaultHealth?: import("./views/second-brain").VaultHealthData | null;
+  // Second Brain Files tab state
+  secondBrainFileTree?: import("./views/second-brain").BrainTreeNode[] | null;
+  secondBrainFileTreeLoading?: boolean;
+  secondBrainFileSearchQuery?: string;
+  secondBrainFileSearchResults?: import("./views/second-brain").BrainSearchResult[] | null;
   // Proactive Intel state
   intelInsights: import("./controllers/proactive-intel").IntelInsight[];
   intelDiscoveries: import("./controllers/proactive-intel").ScoutFinding[];
@@ -465,6 +501,10 @@ export type AppViewState = {
   handleMyDayRefresh: () => Promise<void>;
   handleMyDayTaskStatusChange: (taskId: string, newStatus: "pending" | "complete") => Promise<void>;
   handleTodayStartTask: (taskId: string) => Promise<void>;
+  handleTodayCreateTask: (title: string) => Promise<void>;
+  handleTodayEditTask: (taskId: string | null) => void;
+  handleTodayUpdateTask: (taskId: string, updates: { title?: string; dueDate?: string | null }) => Promise<void>;
+  handleTodayToggleCompleted: () => void;
   // Date navigation handlers
   handleDatePrev: () => void;
   handleDateNext: () => void;
@@ -493,6 +533,10 @@ export type AppViewState = {
   handlePeopleSearch: (query: string) => void;
   // Workspaces handlers
   handleWorkspacesRefresh: () => Promise<void>;
+  handleWorkspaceBrowse: (folderPath: string) => Promise<void>;
+  handleWorkspaceBrowseSearch: (query: string) => Promise<void>;
+  handleWorkspaceBrowseBack: () => void;
+  handleWorkspaceCreateFolder: (folderPath: string) => Promise<void>;
   // Lifetracks handlers
   handleLifetracksRefresh: () => Promise<void>;
   handleLifetracksSelectTrack: (track: import("./controllers/lifetracks").LifetrackEntry) => void;
@@ -553,6 +597,19 @@ export type AppViewState = {
   handleCommunityResourceRemove: (id: string) => Promise<void>;
   handleCommunityResourceAddFormToggle: () => void;
   handleCommunityResourceAddFormChange: (field: string, value: string) => void;
+  // Second Brain Files tab handlers
+  handleSecondBrainFileTreeRefresh: () => Promise<void>;
+  handleSecondBrainFileSearch: (query: string) => void;
+  handleSecondBrainFileSelect: (path: string) => Promise<void>;
+  // Dashboards state + handlers
+  dashboardChatOpen?: boolean;
+  dashboardPreviousSessionKey?: string | null;
+  handleDashboardsRefresh: () => Promise<void>;
+  handleDashboardSelect: (id: string) => Promise<void>;
+  handleDashboardDelete: (id: string) => Promise<void>;
+  handleDashboardCreateViaChat: () => void;
+  handleDashboardBack: () => void;
+  handleDashboardOpenSession: (dashboardId: string) => Promise<void>;
   // Proactive Intel handlers
   handleIntelLoad: () => Promise<void>;
   handleIntelDismiss: (id: string) => Promise<void>;

@@ -23,24 +23,36 @@ import {
 //
 // Problem: Ralph ran 94 executions in 5 hours. $50-150 wasted.
 // Rule: No tool should be called > maxCalls times in windowMinutes per session.
+//
+// v2: Raised threshold from 15→50 and added warning tier + burst detection.
+// 15/30min was too aggressive — agents investigating real issues (e.g. Stripe
+// webhooks, debugging) regularly hit 20-30 exec calls in a session.
+// Now: warn at 40, block at 50, and also detect rapid bursts (10+ calls
+// of the same tool in under 2 minutes — a clear runaway loop).
 
 type CallRecord = { tool: string; ts: number };
 const callHistory = new Map<string, CallRecord[]>();
+/** Track which session+tool combos have already been warned (avoid spam). */
+const warnedTools = new Map<string, Set<string>>();
 
 /**
  * Track a tool call. Returns a block object if the tool has been
  * called too many times in the window. Reads thresholds from config.
+ * Includes a warning tier and burst detection for runaway loops.
  */
 export async function trackToolCall(
   sessionKey: string | undefined,
   toolName: string,
-): Promise<{ blocked: boolean; reason?: string }> {
+): Promise<{ blocked: boolean; reason?: string; warning?: string }> {
   const config = await readGuardrailsStateCached();
   if (!config.gates.loopBreaker?.enabled) return { blocked: false };
 
   const maxCalls =
     config.gates.loopBreaker?.thresholds?.maxCalls ??
     GATE_DEFAULTS.loopBreaker.thresholds!.maxCalls;
+  const warnAt =
+    config.gates.loopBreaker?.thresholds?.warnAt ??
+    Math.round(maxCalls * 0.8);
   const windowMs =
     (config.gates.loopBreaker?.thresholds?.windowMinutes ??
       GATE_DEFAULTS.loopBreaker.thresholds!.windowMinutes) *
@@ -53,8 +65,34 @@ export async function trackToolCall(
 
   let records = callHistory.get(key) ?? [];
   records = records.filter((r) => r.ts > cutoff);
-  const toolCount = records.filter((r) => r.tool === toolName).length;
+  const toolRecords = records.filter((r) => r.tool === toolName);
+  const toolCount = toolRecords.length;
 
+  // Burst detection: 10+ calls of the same tool in under 2 minutes = runaway loop
+  const BURST_WINDOW_MS = 2 * 60 * 1000;
+  const BURST_THRESHOLD = 10;
+  const burstCutoff = now - BURST_WINDOW_MS;
+  const recentBurst = toolRecords.filter((r) => r.ts > burstCutoff).length;
+
+  if (recentBurst >= BURST_THRESHOLD) {
+    void logGateActivity(
+      "loopBreaker",
+      "fired",
+      `Burst detected: ${toolName} called ${recentBurst} times in <2min`,
+      sessionKey,
+    );
+    return {
+      blocked: true,
+      reason: [
+        `Runaway loop detected: \`${toolName}\` has been called ${recentBurst} times in under 2 minutes.`,
+        "",
+        "This is rapid-fire repetition — likely a stuck retry loop.",
+        "Pause, review what's happening, and try a different approach.",
+      ].join("\n"),
+    };
+  }
+
+  // Hard block at maxCalls
   if (toolCount >= maxCalls) {
     const windowMin = Math.round(windowMs / 60000);
     void logGateActivity(
@@ -66,16 +104,41 @@ export async function trackToolCall(
     return {
       blocked: true,
       reason: [
-        `Loop detected: \`${toolName}\` has been called ${toolCount} times in the last ${windowMin} minutes.`,
+        `Loop breaker: \`${toolName}\` has been called ${toolCount} times in the last ${windowMin} minutes.`,
         "",
-        "This looks like an infinite loop. Stopping to prevent cost bleed.",
-        "Review what's happening and try a different approach.",
+        "You've hit the safety limit. This might be legitimate heavy usage or a loop.",
+        "If you're debugging, try a different tool or approach. The limit resets as older calls age out.",
       ].join("\n"),
     };
   }
 
+  // Record the call before checking warning (so count is accurate)
   records.push({ tool: toolName, ts: now });
   callHistory.set(key, records);
+
+  // Warning tier — log once per session+tool
+  if (toolCount >= warnAt) {
+    const warned = warnedTools.get(key) ?? new Set();
+    if (!warned.has(toolName)) {
+      warned.add(toolName);
+      warnedTools.set(key, warned);
+      const windowMin = Math.round(windowMs / 60000);
+      void logGateActivity(
+        "loopBreaker",
+        "fired",
+        `Warning: ${toolName} at ${toolCount}/${maxCalls} in ${windowMin}min`,
+        sessionKey,
+      );
+      return {
+        blocked: false,
+        warning: [
+          `Heads up: \`${toolName}\` has been called ${toolCount} times in the last ${windowMin} minutes (limit: ${maxCalls}).`,
+          "Consider whether you're making progress or stuck in a loop.",
+        ].join("\n"),
+      };
+    }
+  }
+
   return { blocked: false };
 }
 
@@ -304,40 +367,53 @@ export function resetSearchTracking(sessionKey: string | undefined): void {
   searchGateBlocked.delete(key);
   codeToolUsage.delete(key);
   selfServiceBlocked.delete(key);
+  investigationToolCount.delete(key);
+  persistenceBlocked.delete(key);
 }
 
 // ── Self-Service Gate ────────────────────────────────────────────
 //
-// Problem: Prosper asks the user "how does X work in the codebase?"
-// instead of reading the code itself. This wastes the user's time
-// and violates core agent behavior: never ask about things you can
-// look up yourself.
+// Problem: Agents punt investigative work to the user instead of
+// using their tools. This includes:
+//   - Asking about code/architecture without reading it first
+//   - Asking the user to "confirm", "verify", or "check" things
+//   - Delegating investigation ("let me know", "can you check")
+//   - Surfacing problems without attempting resolution
+//   - Asking "where" things are when they have search tools
 //
-// Rule: Block messages containing implementation questions about
-// code/architecture if no code-reading tools were used first.
+// v2: Massively broadened from code-only questions. Now catches ALL
+// forms of delegation — operational, investigative, and technical.
+// The agent has tools. It should use them before asking the human.
 
-/** Tools that count as "reading the code yourself" */
-const CODE_TOOLS = new Set([
+/** Tools that count as "doing your own investigation" */
+const INVESTIGATION_TOOLS = new Set([
   "read",
   "glob",
   "grep",
-  "exec",       // bash/shell reads
+  "exec",
   "bash",
   "shell",
   "read_file",
   "search_files",
   "list_files",
+  "web_search",
+  "web_fetch",
   "mcp__filesystem__read_file",
+  "mcp__qmd__search",
+  "mcp__qmd__vsearch",
+  "qmd_search",
+  "qmd_vsearch",
+  "memory_search",
 ]);
 
-/** Per-session: has a code-reading tool been used? */
+/** Per-session: has an investigation tool been used? */
 const codeToolUsage = new Map<string, boolean>();
 
 /** Per-session: was the last response blocked by self-service gate? */
 const selfServiceBlocked = new Map<string, boolean>();
 
 /**
- * Record that a code-reading tool was used in this session.
+ * Record that an investigation tool was used in this session.
  * Call from after_tool_call for every tool invocation.
  */
 export function trackCodeToolUsage(
@@ -346,22 +422,85 @@ export function trackCodeToolUsage(
 ): void {
   const key = sessionKey ?? "__default__";
   const normalized = toolName.trim().toLowerCase();
-  if (CODE_TOOLS.has(normalized)) {
+  if (INVESTIGATION_TOOLS.has(normalized)) {
     codeToolUsage.set(key, true);
   }
 }
 
-/**
- * Patterns that indicate the agent is asking the user about
- * code/implementation/architecture instead of reading it.
- */
-const QUESTION_PATTERNS =
-  /\b(how does .{3,40} work|how is .{3,40} (implemented|structured|configured|set up|wired)|can you (explain|tell me|describe|walk me through) .{3,40} (implementation|architecture|code|codebase|integration|setup)|what does .{3,40} (look like|do) in the (code|codebase|repo)|is it (pulling from|using|built with|connected to)|quick question.{0,50}(how|what|where|is it)|before I .{3,40}, .{0,30}(how|what|where|is it))\b/i;
+// ── Self-Service Gate: Detection Patterns ────────────────────────
+//
+// Three categories of lazy delegation, ordered by severity.
+
+/** Category 1: Direct delegation — asking the user to do something */
+const DELEGATION_PATTERNS: RegExp[] = [
+  // "can you check/verify/confirm/look into/investigate..."
+  /\b(can|could|would) you (check|verify|confirm|look into|investigate|find out|test|review|inspect|examine|trace|debug|dig into|look at|pull up|take a look)\b/i,
+  // "would you like me to..." (asking permission instead of acting)
+  /\bwould you like me to\b.{0,40}\b(check|look|investigate|find|search|try|explore|dig|review|fix|update|change)\b/i,
+  // "let me know if/when/where/whether..."
+  /\blet me know\b.{0,30}\b(if|when|where|whether|what|how|which)\b/i,
+  // "confirm that/whether/if..." (agent delegating verification)
+  /\b(confirm|verify|double[- ]?check|validate)\b.{0,20}\b(that|whether|if|it'?s|this|the)\b/i,
+  // "tell me where/how/what..." (asking user to locate things)
+  /\btell me\b.{0,15}\b(where|how|what|which|whether)\b/i,
+  // "I need you to..." / "you'll need to..."
+  /\b(I need you to|you'?ll need to|you should|you could|you might want to)\b.{0,40}\b(check|verify|confirm|look|find|investigate|test|review)\b/i,
+  // "check with..." / "reach out to..." (delegating to human network)
+  /\b(check with|reach out to|ask|contact|ping|message|email|text|call)\b.{0,30}\b(and (confirm|verify|check|ask|find out)|to (confirm|verify|check|see|find out))\b/i,
+];
+
+/** Category 2: Passive delegation — surfacing problems without acting */
+const PASSIVE_DELEGATION_PATTERNS: RegExp[] = [
+  // "if it's something directed at you" / "if this is X, let me know"
+  /\bif it'?s\b.{0,40}\blet me know\b/i,
+  // "you may want to..." / "you might want to..."
+  /\byou (may|might) want to\b.{0,40}\b(check|verify|look|investigate|confirm|review)\b/i,
+  // "I'd recommend checking..." (agent telling user to investigate)
+  /\b(I'?d recommend|I suggest|my suggestion is|my recommendation is)\b.{0,30}\b(check|verif|look|investigat|confirm|review)/i,
+  // "it would be worth..." (hedging delegation)
+  /\b(it would be|it'?d be|might be) worth\b.{0,30}\b(check|verif|look|investigat|confirm|review)/i,
+  // "one thing to check/verify..." (subtle delegation)
+  /\b(one thing|something) to\b.{0,15}\b(check|verify|confirm|look into|investigate|keep an eye on)\b/i,
+  // "here are some options..." (presenting options instead of acting)
+  /\bhere are\b.{0,15}\b(some|a few|several|the) (options|approaches|possibilities|alternatives|ways)\b/i,
+  // "one approach would be..." (hedging instead of executing)
+  /\b(one|another) (approach|option|possibility|alternative) (would be|is to|could be)\b/i,
+  // "it's up to you..." / "I'll leave it to you..." (abdicating decision-making)
+  /\b(it'?s up to you|that'?s (your|a) (call|decision|choice)|I'?ll leave (it|that) to you)\b/i,
+];
+
+/** Category 3: Information-seeking that should be self-served */
+const QUESTION_PATTERNS: RegExp[] = [
+  // Original code/architecture patterns
+  /\bhow does .{3,40} work\b/i,
+  /\bhow is .{3,40} (implemented|structured|configured|set up|wired)\b/i,
+  /\bwhat does .{3,40} (look like|do) in the (code|codebase|repo)\b/i,
+  /\bis it (pulling from|using|built with|connected to)\b/i,
+  // Operational investigation questions
+  /\bwhere (do|does|did|are|is) .{3,60} (come from|coming from|show up|showing up|land|landing|go|going|get sent|arrive|arriving)\b/i,
+  /\bwhere (do|does|did|are|is) .{3,60} (configured|set up|defined|stored|logged|recorded)\b/i,
+  // "is this X or Y?" when the agent could check
+  /\bis (this|it|that) .{3,40} or .{3,40}\?\s*$/im,
+  // "do you know if/where/how..."
+  /\bdo you know\b.{0,20}\b(if|where|how|what|which|whether)\b/i,
+  // "are you seeing..." / "are you getting..."
+  /\bare you (seeing|getting|receiving|experiencing)\b/i,
+];
+
+/** All pattern categories combined with labels for logging */
+const ALL_DELEGATION_CHECKS: { patterns: RegExp[]; category: string }[] = [
+  { patterns: DELEGATION_PATTERNS, category: "direct_delegation" },
+  { patterns: PASSIVE_DELEGATION_PATTERNS, category: "passive_delegation" },
+  { patterns: QUESTION_PATTERNS, category: "investigation_question" },
+];
 
 /**
- * Check if an outbound message is asking the user about code/implementation
- * when the agent hasn't used code-reading tools first.
- * Returns true (cancel) if lazy question detected.
+ * Check if an outbound message is delegating work to the user
+ * when the agent hasn't used investigation tools first.
+ * Returns true (cancel) if lazy delegation detected.
+ *
+ * v2: Catches ALL forms of delegation, not just code questions.
+ * The agent should never punt to the user without trying first.
  */
 export async function checkLazyQuestion(
   sessionKey: string | undefined,
@@ -372,25 +511,29 @@ export async function checkLazyQuestion(
 
   const key = sessionKey ?? "__default__";
 
-  // If code tools have been used, allow the question
+  // If investigation tools have been used, allow the message
   if (codeToolUsage.get(key)) return false;
 
-  // Only check shorter messages (questions, not long analysis)
-  if (content.length > 800) return false;
+  // Skip very long messages — likely detailed analysis, not delegation
+  if (content.length > 2000) return false;
 
-  // Must contain a question mark to be a question
-  if (!content.includes("?")) return false;
+  // Check all delegation categories
+  for (const { patterns, category } of ALL_DELEGATION_CHECKS) {
+    for (const pattern of patterns) {
+      if (pattern.test(content)) {
+        selfServiceBlocked.set(key, true);
+        void logGateActivity(
+          "selfServiceGate",
+          "fired",
+          `Blocked ${category}: "${content.slice(0, 120)}..."`,
+          sessionKey,
+        );
+        return true;
+      }
+    }
+  }
 
-  if (!QUESTION_PATTERNS.test(content)) return false;
-
-  selfServiceBlocked.set(key, true);
-  void logGateActivity(
-    "selfServiceGate",
-    "fired",
-    `Blocked lazy question: "${content.slice(0, 100)}..."`,
-    sessionKey,
-  );
-  return true;
+  return false;
 }
 
 /**
@@ -407,19 +550,162 @@ export function consumeSelfServiceNudge(
   return [
     "[ENFORCEMENT: Self-Service Gate]",
     "",
-    "Your previous response was blocked because you asked the user a question",
-    "about code, implementation, or architecture — but you haven't used any",
-    "code-reading tools (read, glob, grep, bash) in this session.",
+    "Your previous response was blocked because you tried to delegate",
+    "investigation or verification to the user — without using your",
+    "own tools first.",
     "",
-    "CORE RULE: Never ask the user about things you can look up yourself.",
-    "You have full access to the codebase. Use your tools:",
-    "1. `read` — read files directly",
-    "2. `glob` — find files by pattern",
-    "3. `grep` — search file contents",
-    "4. `bash` — run commands, list directories",
+    "CORE RULE: Never ask the user to check, confirm, verify, investigate,",
+    "or look into ANYTHING that you could look up or figure out yourself.",
+    "You are the agent. You have the tools. USE THEM.",
     "",
-    "Read the code first. If you still have questions after that, ask specific",
-    "questions that demonstrate you've already done your homework.",
+    "Before asking the user anything, you MUST exhaust your resources:",
+    "1. `read` / `glob` / `grep` — read code and search the codebase",
+    "2. `bash` — run commands, check APIs, inspect logs, query databases",
+    "3. `web_search` / `web_fetch` — research external systems",
+    "4. `qmd search` / `memory_search` — check notes and memory",
+    "",
+    "If after using your tools you genuinely need human-only input",
+    "(a password, a physical confirmation, a business decision),",
+    "THEN you may ask — but state what you already tried and found.",
+    "",
+    "Do not surface problems without attempting solutions.",
+    "Do not ask where things are — search for them.",
+    "Do not ask the user to confirm facts — verify them yourself.",
+  ].join("\n");
+}
+
+// ── Persistence Gate ─────────────────────────────────────────────
+//
+// Problem: Agent gives up at first obstacle. Says "I can't", "this
+// requires human intervention", "you'll need to do this manually"
+// without having tried enough approaches.
+// Rule: Block surrender messages if fewer than N distinct investigation
+// tools have been called in the session.
+//
+// Flow: after_tool_call tracks distinct tools (via trackInvestigationDepth)
+//       → message_sending cancels premature surrender
+//       → before_prompt_build injects "push harder" nudge.
+
+/** Per-session: set of distinct investigation tools used */
+const investigationToolCount = new Map<string, Set<string>>();
+
+/** Per-session: was the last response blocked by persistence gate? */
+const persistenceBlocked = new Map<string, boolean>();
+
+/** Default minimum distinct investigation tools before surrender is allowed */
+const MIN_INVESTIGATION_TOOLS = 3;
+
+/**
+ * Track distinct investigation tool usage for persistence gate.
+ * Call from after_tool_call alongside trackCodeToolUsage.
+ */
+export function trackInvestigationDepth(
+  sessionKey: string | undefined,
+  toolName: string,
+): void {
+  const key = sessionKey ?? "__default__";
+  const normalized = toolName.trim().toLowerCase();
+  if (INVESTIGATION_TOOLS.has(normalized)) {
+    const tools = investigationToolCount.get(key) ?? new Set<string>();
+    tools.add(normalized);
+    investigationToolCount.set(key, tools);
+  }
+}
+
+// ── Persistence Gate: Detection Patterns ─────────────────────────
+
+const SURRENDER_PATTERNS: RegExp[] = [
+  // Direct inability claims
+  /\b(I can'?t|I'?m not able to|I'?m unable to|I don'?t have the ability to)\b.{0,60}\b(do this|help with|accomplish|complete|perform|handle)\b/i,
+  // Capability disclaimers
+  /\b(this is beyond|this exceeds|outside) (my|the) (capabilities|ability|scope)\b/i,
+  // Telling user to do it themselves
+  /\b(you'?ll need to|you need to|you have to)\b.{0,40}\b(do this|handle this|do it|this yourself|manually|on your own)\b/i,
+  // Requires human intervention
+  /\b(this requires|this needs|will require)\b.{0,30}\b(human|manual|your) (intervention|action|involvement|input|attention)\b/i,
+  // Stuck/wall language
+  /\b(I'?ve hit a wall|I'?m stuck|I'?ve reached (a|the) limit|I'?ve exhausted)\b/i,
+  // "Unfortunately I cannot" pattern
+  /\b(unfortunately|I'?m afraid|I regret)\b.{0,15}\b(I can'?t|I'?m unable|I cannot|I won'?t be able)\b/i,
+  // "This isn't something I can..."
+  /\b(this isn'?t something|that'?s not something|not something)\b.{0,20}\b(I can|I'?m able to)\b/i,
+  // Telling user to try themselves
+  /\byou should try\b.{0,30}\b(yourself|on your own|manually)\b/i,
+  // "There's nothing more I can do"
+  /\b(there'?s nothing (more|else)|I'?ve done (all|everything))\b.{0,20}\b(I can|I'?m able)\b/i,
+];
+
+/**
+ * Check if an outbound message is a premature surrender.
+ * Returns true (cancel) if surrender detected AND the agent hasn't
+ * used enough investigation tools.
+ */
+export async function checkPrematureSurrender(
+  sessionKey: string | undefined,
+  content: string,
+): Promise<boolean> {
+  const config = await readGuardrailsStateCached();
+  if (!config.gates.persistenceGate?.enabled) return false;
+
+  const key = sessionKey ?? "__default__";
+
+  // If agent has used enough investigation tools, allow surrender
+  const toolsUsed = investigationToolCount.get(key)?.size ?? 0;
+  const minTools = config.gates.persistenceGate?.thresholds?.minInvestigationTools ?? MIN_INVESTIGATION_TOOLS;
+  if (toolsUsed >= minTools) return false;
+
+  // Skip very long messages — likely detailed analysis with partial results
+  if (content.length > 1500) return false;
+
+  // Check surrender patterns
+  for (const pattern of SURRENDER_PATTERNS) {
+    if (pattern.test(content)) {
+      persistenceBlocked.set(key, true);
+      void logGateActivity(
+        "persistenceGate",
+        "fired",
+        `Blocked premature surrender (${toolsUsed}/${minTools} tools used): "${content.slice(0, 120)}..."`,
+        sessionKey,
+      );
+      return true;
+    }
+  }
+
+  return false;
+}
+
+/**
+ * If the persistence gate blocked the last response, return a nudge
+ * to inject via before_prompt_build.
+ */
+export function consumePersistenceNudge(
+  sessionKey: string | undefined,
+): string | undefined {
+  const key = sessionKey ?? "__default__";
+  if (!persistenceBlocked.get(key)) return undefined;
+
+  persistenceBlocked.delete(key);
+
+  const toolsUsed = investigationToolCount.get(key)?.size ?? 0;
+
+  return [
+    "[ENFORCEMENT: Persistence Gate]",
+    "",
+    "Your previous response was blocked because you tried to give up",
+    `after using only ${toolsUsed} investigation tool(s). That's not enough.`,
+    "",
+    "CORE RULE: Never surrender without exhausting your resources.",
+    "You have powerful tools — USE THEM before saying you can't.",
+    "",
+    "Try these approaches:",
+    "1. `bash` — run different commands, check logs, query APIs",
+    "2. `read` / `glob` / `grep` — search the codebase or filesystem",
+    "3. `web_search` / `web_fetch` — research solutions online",
+    "4. `qmd search` / `memory_search` — check notes and memory",
+    "",
+    "When something fails, diagnose WHY and try a different approach.",
+    "Tell the user what you've tried so far and what you'll try next.",
+    "Do NOT tell them you can't — tell them what's next.",
   ].join("\n");
 }
 
@@ -662,7 +948,7 @@ const OUTPUT_LEAK_CHECKS: { name: string; check: (content: string) => boolean }[
         const keys = ["apiKey", "apiSecret", "secretKey", "privateKey", "licenseKey", "authToken", "accessToken"];
         return keys.filter((k) => text.includes(`"${k}"`)).length >= 2;
       };
-      const envPattern = /(?:ANTHROPIC_API_KEY|XAI_API_KEY|OPENCLAW_|GOG_KEYRING|X_API_KEY|X_BEARER_TOKEN)\s*=\s*\S+/;
+      const envPattern = /(?:ANTHROPIC_API_KEY|XAI_API_KEY|OPENCLAW_|X_API_KEY|X_BEARER_TOKEN)\s*=\s*\S+/;
       return godmodeKeys.test(content) || multiSensitiveKeys(content) || envPattern.test(content);
     },
   },
@@ -889,4 +1175,133 @@ export function resetPromptShieldTracking(sessionKey: string | undefined): void 
   const key = sessionKey ?? "__default__";
   injectionFlags.delete(key);
   outputShieldFired.delete(key);
+}
+
+// ── Context Pressure Gate ─────────────────────────────────────────
+//
+// Problem: An agent hit 201K tokens in a Slack session (20+ exchanges)
+// with no warning. Auto-compaction is reactive (triggers ON overflow).
+// Slack has no visual context badge. The agent needs a proactive nudge.
+//
+// Flow: llm_output tracks input token usage per session
+//       → before_prompt_build injects "compact now" nudge when >70%
+//       → after_compaction / before_reset clears tracking state.
+
+type ContextPressureState = {
+  lastInputTokens: number;
+  contextTokens: number;
+  tier: "ok" | "warning" | "critical";
+  nudgeQueued: boolean;
+  lastWarnedAt: number;
+};
+
+const contextPressure = new Map<string, ContextPressureState>();
+
+/** Cooldown: don't re-warn more than once per 5 minutes */
+const WARN_COOLDOWN_MS = 5 * 60 * 1000;
+
+/**
+ * Track context pressure from llm_output usage data.
+ * Queues a nudge when utilization crosses warning or critical thresholds.
+ */
+export async function trackContextPressure(
+  sessionKey: string | undefined,
+  usage: { input?: number; output?: number; total?: number } | undefined,
+): Promise<void> {
+  if (!usage?.input) return;
+
+  const config = await readGuardrailsStateCached();
+  if (!config.gates.contextPressure?.enabled) return;
+
+  const warningPct =
+    config.gates.contextPressure?.thresholds?.warningPercent ??
+    GATE_DEFAULTS.contextPressure.thresholds!.warningPercent;
+  const criticalPct =
+    config.gates.contextPressure?.thresholds?.criticalPercent ??
+    GATE_DEFAULTS.contextPressure.thresholds!.criticalPercent;
+  const maxTokens =
+    config.gates.contextPressure?.thresholds?.maxContextTokens ??
+    GATE_DEFAULTS.contextPressure.thresholds!.maxContextTokens;
+
+  const key = sessionKey ?? "__default__";
+  const now = Date.now();
+  const inputTokens = usage.input;
+  const utilization = (inputTokens / maxTokens) * 100;
+
+  const existing = contextPressure.get(key);
+
+  let tier: "ok" | "warning" | "critical" = "ok";
+  if (utilization >= criticalPct) tier = "critical";
+  else if (utilization >= warningPct) tier = "warning";
+
+  const shouldNudge =
+    tier !== "ok" &&
+    (!existing?.lastWarnedAt || now - existing.lastWarnedAt > WARN_COOLDOWN_MS || tier === "critical" && existing?.tier !== "critical");
+
+  if (shouldNudge) {
+    void logGateActivity(
+      "contextPressure",
+      "fired",
+      `Context at ${Math.round(utilization)}% (${inputTokens.toLocaleString()} / ${maxTokens.toLocaleString()} tokens) [${tier}]`,
+      sessionKey,
+    );
+  }
+
+  contextPressure.set(key, {
+    lastInputTokens: inputTokens,
+    contextTokens: maxTokens,
+    tier,
+    nudgeQueued: shouldNudge || (existing?.nudgeQueued ?? false),
+    lastWarnedAt: shouldNudge ? now : (existing?.lastWarnedAt ?? 0),
+  });
+}
+
+/**
+ * If context pressure was detected, return a nudge to inject
+ * via before_prompt_build. Clears the nudge flag after consumption.
+ */
+export function consumeContextPressureNudge(
+  sessionKey: string | undefined,
+): string | undefined {
+  const key = sessionKey ?? "__default__";
+  const state = contextPressure.get(key);
+  if (!state?.nudgeQueued) return undefined;
+
+  state.nudgeQueued = false;
+
+  const pct = Math.round((state.lastInputTokens / state.contextTokens) * 100);
+  const used = state.lastInputTokens.toLocaleString();
+  const max = state.contextTokens.toLocaleString();
+
+  if (state.tier === "critical") {
+    return [
+      "[CONTEXT PRESSURE: Critical]",
+      "",
+      `Your session context is at ~${pct}% capacity (${used} of ~${max} tokens).`,
+      "You are about to overflow. Your next response may fail.",
+      "",
+      "IMMEDIATE ACTION: Run /compact RIGHT NOW before doing anything else.",
+      "If you continue without compacting, the session will hit context overflow",
+      "and your response will be lost.",
+    ].join("\n");
+  }
+
+  return [
+    "[CONTEXT PRESSURE: Warning]",
+    "",
+    `Your session context is at ~${pct}% capacity (${used} of ~${max} tokens).`,
+    "Context will overflow soon if not managed.",
+    "",
+    "ACTION REQUIRED: Run /compact now to summarize older messages and free context space.",
+    "Do not wait \u2014 compaction takes a turn to process, and overflow will block your next response.",
+  ].join("\n");
+}
+
+/**
+ * Reset context pressure tracking for a session.
+ * Call on before_reset and after_compaction.
+ */
+export function resetContextPressure(sessionKey: string | undefined): void {
+  const key = sessionKey ?? "__default__";
+  contextPressure.delete(key);
 }

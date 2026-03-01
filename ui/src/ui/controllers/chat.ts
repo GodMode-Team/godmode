@@ -160,6 +160,37 @@ export async function loadChatHistory(state: ChatState): Promise<void> {
   }
 }
 
+/**
+ * Load chat history after a "final" stream event, with floor preservation.
+ *
+ * When the gateway exits before flushing the session JSONL, the server
+ * returns empty/partial history. This wrapper preserves the locally-held
+ * messages (including the temporary assistant message from the stream) if
+ * the server response would erase them, then retries once after a short
+ * delay in case the file was still being flushed.
+ */
+export async function loadChatHistoryAfterFinal(
+  state: ChatState,
+  opts?: { allowShrink?: boolean },
+): Promise<void> {
+  const snapshot = [...state.chatMessages];
+  const snapshotLen = snapshot.length;
+
+  await loadChatHistory(state);
+
+  if (
+    !opts?.allowShrink &&
+    snapshotLen > 0 &&
+    state.chatMessages.length < snapshotLen
+  ) {
+    state.chatMessages = snapshot;
+    // Retry once after a short delay — the file may still be flushing
+    setTimeout(() => {
+      void loadChatHistory(state);
+    }, 2000);
+  }
+}
+
 function dataUrlToBase64(dataUrl: string): { content: string; mimeType: string } | null {
   const match = /^data:([^;]+);base64,(.+)$/.exec(dataUrl);
   if (!match) {

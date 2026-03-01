@@ -91,13 +91,21 @@ const listTasks: GatewayRequestHandler = async ({ params, respond }) => {
 };
 
 const todayTasks: GatewayRequestHandler = async ({ params, respond }) => {
-  const { date } = params as { date?: string };
+  const { date, includeCompleted } = params as { date?: string; includeCompleted?: boolean };
   const data = await readTasks();
   const today = date || todayDateStr();
-  const tasks = data.tasks.filter(
+  const pending = data.tasks.filter(
     (t) => t.status === "pending" && t.dueDate != null && t.dueDate <= today,
   );
-  respond(true, { tasks });
+  if (!includeCompleted) {
+    respond(true, { tasks: pending });
+    return;
+  }
+  const completedToday = data.tasks.filter((t) => {
+    if (t.status !== "complete" || !t.completedAt) return false;
+    return t.completedAt.slice(0, 10) === today;
+  });
+  respond(true, { tasks: [...pending, ...completedToday] });
 };
 
 const upcomingTasks: GatewayRequestHandler = async ({ params, respond }) => {
@@ -267,6 +275,9 @@ const carryOverTasks: GatewayRequestHandler = async ({ params, respond }) => {
  * If the task already has a sessionId, returns it.
  * Otherwise, generates a new session key (webchat format), stores it on
  * the task, and returns it. The UI navigates to the returned session key.
+ *
+ * When creating a new session for a task that has agent output from a queue
+ * item, includes the output content so the frontend can seed the session.
  */
 const openSession: GatewayRequestHandler = async ({ params, respond }) => {
   const { taskId } = params as { taskId?: string };
@@ -281,19 +292,40 @@ const openSession: GatewayRequestHandler = async ({ params, respond }) => {
     return;
   }
 
-  // Return existing linked session
-  if (task.sessionId) {
-    respond(true, { sessionId: task.sessionId, created: false, task });
-    return;
+  let created = false;
+  let sessionId = task.sessionId;
+
+  if (!sessionId) {
+    // Generate a new session key and link it to the task
+    const uuid = randomUUID();
+    sessionId = `agent:main:webchat-${uuid.slice(0, 8)}`;
+    task.sessionId = sessionId;
+    await writeTasks(data);
+    created = true;
   }
 
-  // Generate a new session key and link it to the task
-  const uuid = randomUUID();
-  const sessionId = `agent:main:webchat-${uuid.slice(0, 8)}`;
-  task.sessionId = sessionId;
-  await writeTasks(data);
+  // Always check for queue output — the frontend will seed the session
+  // if the chat history is empty (handles both new and pre-existing empty sessions)
+  let queueOutput: string | null = null;
+  let agentPrompt: string | null = null;
+  try {
+    const { readQueueState } = await import("../lib/queue-state.js");
+    const queueState = await readQueueState();
+    const queueItem = queueState.items.find(
+      (qi) => qi.sourceTaskId === taskId &&
+        (qi.result?.outputPath || qi.status === "review" || qi.status === "done"),
+    );
+    if (queueItem) {
+      agentPrompt = queueItem.agentPrompt ?? null;
+      if (queueItem.result?.outputPath) {
+        queueOutput = await readFile(queueItem.result.outputPath, "utf-8");
+      }
+    }
+  } catch {
+    // Non-fatal — session will just be empty
+  }
 
-  respond(true, { sessionId, created: true, task });
+  respond(true, { sessionId, created, task, queueOutput, agentPrompt });
 };
 
 /**
@@ -579,5 +611,23 @@ export const tasksHandlers: GatewayRequestHandlers = {
   "tasks.linkSession": linkSession,
   "tasks.syncTeam": syncTeamHandler,
 };
+
+/**
+ * Ensures a task has a linked session. Called by the queue processor when
+ * starting work so the task always has a consistent session from the start.
+ * Returns the session key (existing or newly created).
+ */
+export async function ensureTaskSession(taskId: string): Promise<string | null> {
+  const data = await readTasks();
+  const task = data.tasks.find((t) => t.id === taskId);
+  if (!task) return null;
+  if (task.sessionId) return task.sessionId;
+
+  const uuid = randomUUID();
+  const sessionId = `agent:main:webchat-${uuid.slice(0, 8)}`;
+  task.sessionId = sessionId;
+  await writeTasks(data);
+  return sessionId;
+}
 
 export { readTasks, writeTasks, syncTeamTasks, type NativeTask, type TasksData };

@@ -28,7 +28,7 @@ claude setup-token
 
 ### 2. Team Members = 1Password
 
-Team members get keys from 1Password vault "GodMode Team", not personal accounts.
+Team members get keys from the team's shared password manager, not personal accounts.
 
 ### 3. OAuth Fails → setup-token (NOT API key)
 
@@ -425,14 +425,14 @@ Admin creates group DM with new person and Atlas. Onboarding can happen right th
 **Admin's intro:**
 
 ```
-Hey @Atlas, meet Ty. He's joining the team and needs to get
+Hey @Atlas, meet Alex. They're joining the team and need to get
 set up with GodMode.
 ```
 
 **Atlas response:**
 
 ```
-Hey Ty! Great to meet you. I'm Atlas, your AI assistant.
+Hey Alex! Great to meet you. I'm Atlas, your AI assistant.
 
 I'll help you get GodMode set up on your machine. Should we
 do this here, or would you prefer I DM you directly so we
@@ -1068,18 +1068,12 @@ A raw API key from console.anthropic.com:
 
 ```
 Atlas: "Since you're on the GodMode team, you can use our shared
-       API credentials from 1Password.
+       API credentials from the team password manager.
 
-       1. Install 1Password CLI:
-          brew install --cask 1password-cli
+       1. Get the shared Anthropic API key from your team lead
+          or your team's password manager.
 
-       2. Sign in to 1Password:
-          op signin
-
-       3. Get the Anthropic key:
-          op item get 'Anthropic API Key' --vault 'GodMode Team' --fields password
-
-       4. Add it to your config:
+       2. Add it to your config:
           echo 'ANTHROPIC_API_KEY=<paste-key>' >> ~/.openclaw/.env"
 ```
 
@@ -1115,9 +1109,9 @@ This uses the team's shared API key with proper rate limits.
 ┌─────────────────────────────────────────────────────────────────┐
 │ User is TEAM MEMBER                              │
 │ ↓ │
-│ USE 1PASSWORD for team API keys: │
-│ 1. op signin --account team.1password.com │
-│ 2. op inject -i .env.template -o ~/.openclaw/.env │
+│ USE team password manager for API keys: │
+│ 1. Get the shared key from your team lead │
+│ 2. Add to ~/.openclaw/.env │
 │ ↓ │
 │ Team keys have proper rate limits. Personal keys do NOT. │
 └─────────────────────────────────────────────────────────────────┘
@@ -1789,8 +1783,8 @@ godmode channels status --probe
 ### Context
 
 - Name: {name}
-- Relationship: {dad/friend/team/customer}
-- Device: {Mac Mini M2 8GB}
+- Relationship: {team/customer/beta-tester}
+- Device: {device model and specs}
 - Introduced by: admin via Telegram group
 
 ### Progress
@@ -1803,7 +1797,7 @@ godmode channels status --probe
   - GodMode: installed successfully
 - [x] Phase 4: Configuration
   - Brief time: 7:00 AM
-  - Timezone: America/Chicago
+  - Timezone: {detected timezone}
 - [x] Phase 5: First Experience
   - Tried: calendar check
   - Reaction: "that's really cool"

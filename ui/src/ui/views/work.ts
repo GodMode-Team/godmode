@@ -385,25 +385,16 @@ export function renderWork(props: WorkProps) {
 
   return html`
     <div class="my-day-container">
-      <div class="my-day-header">
-        <div class="my-day-header-left">
-          <h1 class="my-day-title">Work</h1>
-          <p class="my-day-subtitle">Your projects and workspaces.</p>
+      <div class="my-day-toolbar">
+        <div class="my-day-summary-stat">
+          <span class="summary-value">${activeProjects.length}</span>
+          <span class="summary-label">Projects</span>
         </div>
-        <div class="my-day-header-right">
-          <div class="my-day-summary-stat">
-            <span class="summary-value">${activeProjects.length}</span>
-            <span class="summary-label">Projects</span>
-          </div>
-          ${
-            onRefresh
-              ? html`
-                <div class="my-day-summary-divider"></div>
-                <button class="my-day-refresh-btn" @click=${onRefresh} title="Refresh">↻</button>
-              `
-              : nothing
-          }
-        </div>
+        ${
+          onRefresh
+            ? html`<button class="my-day-refresh-btn" @click=${onRefresh} title="Refresh">↻</button>`
+            : nothing
+        }
       </div>
 
       <!-- Workspaces Section -->

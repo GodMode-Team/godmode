@@ -6,6 +6,7 @@ import { extractOpenablePathFromEventTarget } from "../openable-file-path.js";
 import type { DailyBriefData, DailyBriefProps } from "./daily-brief.js";
 import { renderDailyBrief } from "./daily-brief.js";
 import type { WorkspaceTask } from "./workspaces.js";
+import { renderAllTaskRow, sortTasks } from "./workspaces.js";
 
 // Re-export for convenience
 export type { DailyBriefData } from "./daily-brief.js";
@@ -54,6 +55,13 @@ export type MyDayProps = {
   todayTasksLoading?: boolean;
   onToggleTaskComplete?: (taskId: string, currentStatus: string) => void;
   onStartTask?: (taskId: string) => void;
+  // Task panel additions
+  onCreateTask?: (title: string) => void;
+  onEditTask?: (taskId: string | null) => void;
+  onUpdateTask?: (taskId: string, updates: { title?: string; dueDate?: string | null }) => void;
+  editingTaskId?: string | null;
+  showCompletedTasks?: boolean;
+  onToggleCompletedTasks?: () => void;
 };
 
 // ===== Helper Functions =====
@@ -125,13 +133,186 @@ function sourcePathLabel(sourcePath?: string): string {
   return parts[parts.length - 1] || sourcePath;
 }
 
+// ===== Agent Log Renderer =====
+
+function renderAgentLog(
+  props: MyDayProps,
+  agentLog: AgentLogData | null,
+  displayDate: string,
+) {
+  const handleAgentLogClick = (event: Event) => {
+    if (!props.onOpenFile) return;
+    const localPath = extractOpenablePathFromEventTarget(event.target);
+    if (!localPath) return;
+    event.preventDefault();
+    props.onOpenFile(localPath);
+  };
+
+  return html`
+    <div class="my-day-card agent-log-section brief-editor">
+      <div class="my-day-card-header">
+        <div class="my-day-card-title">
+          <span class="my-day-card-icon">&#x26A1;</span>
+          <span>AGENT LOG</span>
+        </div>
+        <div class="agent-log-header-actions">
+          ${agentLog?.updatedAt
+            ? html`<span class="brief-updated">${formatUpdatedAt(agentLog.updatedAt)}</span>`
+            : nothing}
+          ${agentLog?.sourcePath
+            ? html`<span class="agent-log-file" title=${agentLog.sourcePath}>
+                ${sourcePathLabel(agentLog.sourcePath)}
+              </span>`
+            : nothing}
+          ${props.onAgentLogRefresh
+            ? html`<button class="brief-refresh-btn agent-log-refresh-btn"
+                @click=${props.onAgentLogRefresh} title="Refresh agent log">&#x21BB;</button>`
+            : nothing}
+        </div>
+      </div>
+      <div class="my-day-card-content agent-log-content">
+        ${props.agentLogLoading
+          ? html`<div class="brief-loading"><div class="spinner"></div><span>Loading agent day...</span></div>`
+          : props.agentLogError
+            ? html`<div class="brief-error"><span class="error-icon">&#x26A0;&#xFE0F;</span><span>${props.agentLogError}</span></div>`
+            : !agentLog?.content?.trim()
+              ? html`<div class="my-day-empty">No agent day entry found for ${displayDate}. Create/update <code>AGENT-DAY.md</code> and refresh.</div>`
+              : html`<div class="brief-content brief-content--read agent-log-readonly" @click=${handleAgentLogClick}>
+                  <div class="brief-rendered agent-log-rendered">${unsafeHTML(toSanitizedMarkdownHtml(agentLog.content))}</div>
+                </div>`}
+      </div>
+    </div>
+  `;
+}
+
+// ===== Add Task Form =====
+
+function renderAddTaskForm(onCreateTask: (title: string) => void) {
+  return html`
+    <form class="ws-task-create-form" @submit=${(e: Event) => {
+      e.preventDefault();
+      const form = e.currentTarget as HTMLFormElement;
+      const input = form.querySelector("input") as HTMLInputElement;
+      const title = input.value.trim();
+      if (!title) return;
+      onCreateTask(title);
+      input.value = "";
+    }}>
+      <input type="text" class="ws-task-create-input" placeholder="Add a task for today..." />
+      <button type="submit" class="ws-task-create-btn">Add</button>
+    </form>
+  `;
+}
+
+// ===== Task Panel =====
+
+function renderTaskPanel(props: MyDayProps) {
+  const tasks = sortTasks(props.todayTasks ?? [], "due");
+  const pendingTasks = tasks.filter((t) => t.status === "pending");
+  const completedTasks = tasks.filter((t) => t.status === "complete");
+
+  return html`
+    <div class="my-day-card today-tasks-panel">
+      <div class="my-day-card-header">
+        <div class="my-day-card-title">
+          <span class="my-day-card-icon">&#x2705;</span>
+          <span>TODAY'S TASKS</span>
+        </div>
+        <span class="today-tasks-count">
+          ${pendingTasks.length} open${completedTasks.length > 0 ? html`, ${completedTasks.length} done` : nothing}
+        </span>
+      </div>
+      <div class="my-day-card-content">
+        ${props.todayTasksLoading
+          ? html`<div class="brief-loading"><div class="spinner"></div><span>Loading tasks...</span></div>`
+          : html`
+              ${props.onCreateTask ? renderAddTaskForm(props.onCreateTask) : nothing}
+              <div class="today-tasks-list">
+                ${pendingTasks.length === 0 && completedTasks.length === 0
+                  ? html`<div class="today-tasks-empty">No tasks for today. Add one above or drop tasks in your daily brief.</div>`
+                  : pendingTasks.map((task) =>
+                      renderAllTaskRow(
+                        task,
+                        props.onToggleTaskComplete,
+                        props.onStartTask,
+                        props.editingTaskId,
+                        props.onEditTask,
+                        props.onUpdateTask,
+                      ),
+                    )}
+              </div>
+              ${completedTasks.length > 0
+                ? html`
+                    <button class="today-completed-toggle" @click=${() => props.onToggleCompletedTasks?.()}>
+                      ${props.showCompletedTasks ? "Hide" : "Show"} ${completedTasks.length} completed
+                    </button>
+                    ${props.showCompletedTasks
+                      ? html`<div class="today-tasks-list today-tasks-list--completed">
+                          ${completedTasks.map((task) =>
+                            renderAllTaskRow(
+                              task,
+                              props.onToggleTaskComplete,
+                              props.onStartTask,
+                              props.editingTaskId,
+                              props.onEditTask,
+                              props.onUpdateTask,
+                            ),
+                          )}
+                        </div>`
+                      : nothing}
+                  `
+                : nothing}
+            `}
+      </div>
+    </div>
+  `;
+}
+
+// ===== Toolbar (rendered in page header) =====
+
+export function renderMyDayToolbar(props: MyDayProps) {
+  const todayStr = localDateString();
+  const selectedDate = props.selectedDate ?? todayStr;
+  const viewingToday = isToday(selectedDate);
+  const displayDate = formatDateFromString(selectedDate);
+  const viewMode = props.viewMode ?? "my-day";
+
+  return html`
+    <div class="my-day-toolbar">
+      <div class="today-date-nav">
+        ${props.onDatePrev
+          ? html`<button class="today-date-btn" @click=${props.onDatePrev} title="Previous day">&#x2039;</button>`
+          : nothing}
+        <span class="today-date-label ${viewingToday ? "" : "past-date"}">${displayDate}</span>
+        ${props.onDateNext
+          ? html`<button class="today-date-btn" @click=${props.onDateNext} title="Next day">&#x203A;</button>`
+          : nothing}
+        ${!viewingToday && props.onDateToday
+          ? html`<button class="today-date-today-btn" @click=${props.onDateToday}>Today</button>`
+          : nothing}
+      </div>
+      <div class="today-view-toggle">
+        <button class="${viewMode === "my-day" ? "active" : ""}"
+          @click=${() => props.onViewModeChange?.("my-day")}>My Day</button>
+        <button class="${viewMode === "agent-log" ? "active" : ""}"
+          @click=${() => props.onViewModeChange?.("agent-log")}>Agent Log</button>
+      </div>
+      ${!props.focusPulseActive && props.onStartMorningSet
+        ? html`<button class="today-morning-set-btn" @click=${props.onStartMorningSet}
+            title="Start your morning focus ritual">\u2600\uFE0F Start Morning Set</button>`
+        : nothing}
+      ${props.onRefresh
+        ? html`<button class="my-day-refresh-btn" @click=${props.onRefresh} title="Refresh">&#x21BB;</button>`
+        : null}
+    </div>
+  `;
+}
+
 // ===== Main Render Function =====
 
 export function renderMyDay(props: MyDayProps) {
   const todayStr = localDateString();
   const selectedDate = props.selectedDate ?? todayStr;
-  const viewingToday = isToday(selectedDate);
-  const displayDate = formatDateFromString(selectedDate);
   const viewMode = props.viewMode ?? "my-day";
   const agentLog = props.agentLog ?? null;
 
@@ -150,13 +331,11 @@ export function renderMyDay(props: MyDayProps) {
     return html`
       <div class="my-day-container">
         <div class="my-day-error">
-          <span class="error-icon">⚠</span>
+          <span class="error-icon">&#x26A0;</span>
           <span>${props.error}</span>
-          ${
-            props.onRefresh
-              ? html`<button class="retry-button" @click=${props.onRefresh}>Retry</button>`
-              : null
-          }
+          ${props.onRefresh
+            ? html`<button class="retry-button" @click=${props.onRefresh}>Retry</button>`
+            : null}
         </div>
       </div>
     `;
@@ -175,147 +354,18 @@ export function renderMyDay(props: MyDayProps) {
     onOpenFile: props.onOpenFile,
   };
 
-  const handleAgentLogClick = (event: Event) => {
-    if (!props.onOpenFile) {
-      return;
-    }
-
-    const localPath = extractOpenablePathFromEventTarget(event.target);
-    if (!localPath) {
-      return;
-    }
-
-    event.preventDefault();
-    props.onOpenFile(localPath);
-  };
-
   return html`
     <div class="my-day-container">
-      <!-- Header: Title + Date Nav + View Toggle -->
-      <div class="my-day-header">
-        <div class="my-day-header-left">
-          <h1 class="my-day-title">Today</h1>
-          <div class="my-day-header-nav-row">
-            <div class="today-date-nav">
-              ${
-                props.onDatePrev
-                  ? html`<button class="today-date-btn" @click=${props.onDatePrev} title="Previous day">‹</button>`
-                  : nothing
-              }
-              <span class="today-date-label ${viewingToday ? "" : "past-date"}">${displayDate}</span>
-              ${
-                props.onDateNext
-                  ? html`<button class="today-date-btn" @click=${props.onDateNext} title="Next day">›</button>`
-                  : nothing
-              }
-              ${
-                !viewingToday && props.onDateToday
-                  ? html`<button class="today-date-today-btn" @click=${props.onDateToday}>Today</button>`
-                  : nothing
-              }
-            </div>
-            <div class="today-view-toggle">
-              <button
-                class="${viewMode === "my-day" ? "active" : ""}"
-                @click=${() => props.onViewModeChange?.("my-day")}
-              >My Day</button>
-              <button
-                class="${viewMode === "agent-log" ? "active" : ""}"
-                @click=${() => props.onViewModeChange?.("agent-log")}
-              >Agent Log</button>
-            </div>
-            ${!props.focusPulseActive && props.onStartMorningSet
-              ? html`<button class="today-morning-set-btn" @click=${props.onStartMorningSet} title="Start your morning focus ritual">\u2600\uFE0F Start Morning Set</button>`
-              : nothing}
-          </div>
+      <!-- Two-column layout: Tasks (left) + Brief/AgentLog (right) -->
+      <div class="my-day-columns">
+        <div class="my-day-tasks-col">
+          ${renderTaskPanel(props)}
         </div>
-        <div class="my-day-header-right">
-          ${
-            props.onRefresh
-              ? html`<button class="my-day-refresh-btn" @click=${props.onRefresh} title="Refresh">
-                ↻
-              </button>`
-              : null
-          }
-        </div>
-      </div>
-
-      <!-- Content: Brief or Agent Log -->
-      <div class="today-content">
-        ${
-          viewMode === "my-day"
+        <div class="my-day-brief-col">
+          ${viewMode === "my-day"
             ? renderDailyBrief(briefProps)
-            : html`
-                <div class="my-day-card agent-log-section brief-editor">
-                  <div class="my-day-card-header">
-                    <div class="my-day-card-title">
-                      <span class="my-day-card-icon">⚡</span>
-                      <span>AGENT LOG</span>
-                    </div>
-                    <div class="agent-log-header-actions">
-                      ${
-                        agentLog?.updatedAt
-                          ? html`<span class="brief-updated">${formatUpdatedAt(agentLog.updatedAt)}</span>`
-                          : nothing
-                      }
-                      ${
-                        agentLog?.sourcePath
-                          ? html`<span class="agent-log-file" title=${agentLog.sourcePath}>
-                              ${sourcePathLabel(agentLog.sourcePath)}
-                            </span>`
-                          : nothing
-                      }
-                      ${
-                        props.onAgentLogRefresh
-                          ? html`<button
-                              class="brief-refresh-btn agent-log-refresh-btn"
-                              @click=${props.onAgentLogRefresh}
-                              title="Refresh agent log"
-                            >
-                              ↻
-                            </button>`
-                          : nothing
-                      }
-                    </div>
-                  </div>
-                  <div class="my-day-card-content agent-log-content">
-                    ${
-                      props.agentLogLoading
-                        ? html`
-                            <div class="brief-loading">
-                              <div class="spinner"></div>
-                              <span>Loading agent day...</span>
-                            </div>
-                          `
-                        : props.agentLogError
-                          ? html`
-                              <div class="brief-error">
-                                <span class="error-icon">⚠️</span>
-                                <span>${props.agentLogError}</span>
-                              </div>
-                            `
-                          : !agentLog?.content?.trim()
-                            ? html`
-                                <div class="my-day-empty">
-                                  No agent day entry found for ${displayDate}. Create/update
-                                  <code>AGENT-DAY.md</code> and refresh.
-                                </div>
-                              `
-                            : html`
-                                <div
-                                  class="brief-content brief-content--read agent-log-readonly"
-                                  @click=${handleAgentLogClick}
-                                >
-                                  <div class="brief-rendered agent-log-rendered">
-                                    ${unsafeHTML(toSanitizedMarkdownHtml(agentLog.content))}
-                                  </div>
-                                </div>
-                              `
-                    }
-                  </div>
-                </div>
-              `
-        }
+            : renderAgentLog(props, agentLog, formatDateFromString(selectedDate))}
+        </div>
       </div>
     </div>
   `;

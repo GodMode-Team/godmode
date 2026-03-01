@@ -83,7 +83,7 @@ import { renderInstances } from "./views/instances";
 import { renderLifetracks } from "./views/lifetracks";
 import { renderLogs } from "./views/logs";
 import { renderMarkdownSidebar } from "./views/markdown-sidebar";
-import { renderMyDay } from "./views/my-day";
+import { renderMyDay, renderMyDayToolbar } from "./views/my-day";
 import { renderNodes } from "./views/nodes";
 import { renderOverview } from "./views/overview";
 import { renderPeople } from "./views/people";
@@ -98,10 +98,12 @@ import { renderOptions } from "./views/options";
 import { renderOnboardingWizard, type WizardStep } from "./views/onboarding-wizard";
 import { renderTrustTracker } from "./views/trust-tracker";
 import { renderGuardrails } from "./views/guardrails";
+import { renderMissionControl } from "./views/mission-control";
 import { renderParallelSessions } from "./views/parallel-sessions";
 import { renderWork } from "./views/work";
 import { renderWorkspaces } from "./views/workspaces";
 import { renderSecondBrain } from "./views/second-brain";
+import { renderDashboards } from "./views/dashboards";
 import {
   renderOnboardingWelcome,
   renderOnboardingIdentity,
@@ -364,25 +366,17 @@ export function renderApp(state: AppViewState) {
                 </a>`
               : nothing
           }
-          <a
-            class="pill pill--guide"
-            href="/how-to-godmode.html"
-            target="_blank"
-            title="Learn how to get the most out of GodMode"
+          <button
+            class="pill pill--support"
+            @click=${(e: Event) => {
+              e.preventDefault();
+              state.handleOpenSupportChat();
+            }}
+            title="Open support chat"
           >
-            <span class="pill__icon">${icons.book}</span>
-            <span>How to GodMode</span>
-          </a>
-          <a
-            class="pill pill--help"
-            href="https://t.me/GodModeSupportBot"
-            target="_blank"
-            rel="noreferrer"
-            title="Get help from Atlas via Telegram"
-          >
-            <span class="pill__icon">${icons.messageCircle}</span>
-            <span>Get Help</span>
-          </a>
+            <span class="pill__icon">${icons.headphones}</span>
+            <span>Support</span>
+          </button>
           <div class="pill ${state.reconnecting ? "reconnecting" : ""}">
             <span class="statusDot ${state.connected ? "ok" : ""}"></span>
             <span>Gateway</span>
@@ -479,10 +473,6 @@ export function renderApp(state: AppViewState) {
             ${
               state.tab !== "chat" &&
               state.tab !== "setup" &&
-              state.tab !== "workspaces" &&
-              state.tab !== "today" &&
-              state.tab !== "my-day" &&
-              state.tab !== "work" &&
               state.tab !== "people" &&
               state.tab !== "life" &&
               state.tab !== "data" &&
@@ -517,6 +507,9 @@ export function renderApp(state: AppViewState) {
                         return collapseRepeatedLabel(session.label);
                       }
                       // Generate clean fallback name from key
+                      if (key === "agent:main:support") {
+                        return "Support";
+                      }
                       if (key.includes("webchat")) {
                         const match = key.match(/webchat[:-](\d+)/);
                         return match ? `Chat ${match[1]}` : "Chat";
@@ -664,8 +657,21 @@ export function renderApp(state: AppViewState) {
                               state.editingTabKey = null;
                               const currentName = session?.displayName ?? session?.label ?? "";
                               if (newName !== currentName) {
-                                // Clear auto-title cache so manual rename takes precedence
-                                autoTitleCache.delete(key);
+                                // Store manual name in cache so it survives loadSessions race conditions
+                                if (newName) {
+                                  autoTitleCache.set(key, newName);
+                                } else {
+                                  autoTitleCache.delete(key);
+                                }
+                                // Optimistically update local session state for immediate UI feedback
+                                if (state.sessionsResult?.sessions) {
+                                  state.sessionsResult = {
+                                    ...state.sessionsResult,
+                                    sessions: state.sessionsResult.sessions.map((s) =>
+                                      s.key === key ? { ...s, displayName: newName || undefined } : s,
+                                    ),
+                                  };
+                                }
                                 const result = await patchSession(state, key, {
                                   displayName: newName || null,
                                 });
@@ -726,8 +732,21 @@ export function renderApp(state: AppViewState) {
                                 state.editingTabKey = null;
                                 const currentName = session?.displayName ?? session?.label ?? "";
                                 if (newName !== currentName) {
-                                  // Clear auto-title cache so manual rename takes precedence
-                                  autoTitleCache.delete(key);
+                                  // Store manual name in cache so it survives loadSessions race conditions
+                                  if (newName) {
+                                    autoTitleCache.set(key, newName);
+                                  } else {
+                                    autoTitleCache.delete(key);
+                                  }
+                                  // Optimistically update local session state for immediate UI feedback
+                                  if (state.sessionsResult?.sessions) {
+                                    state.sessionsResult = {
+                                      ...state.sessionsResult,
+                                      sessions: state.sessionsResult.sessions.map((s) =>
+                                        s.key === key ? { ...s, displayName: newName || undefined } : s,
+                                      ),
+                                    };
+                                  }
                                   const result = await patchSession(state, key, {
                                     displayName: newName || null,
                                   });
@@ -960,6 +979,20 @@ export function renderApp(state: AppViewState) {
                   : nothing
             }
             ${isChat ? renderChatControls(state) : nothing}
+            ${(state.tab === "today" || state.tab === "my-day") && !state.dynamicSlots["today"]
+              ? renderMyDayToolbar({
+                  connected: state.connected,
+                  onRefresh: () => state.handleMyDayRefresh(),
+                  selectedDate: state.todaySelectedDate,
+                  onDatePrev: () => state.handleDatePrev(),
+                  onDateNext: () => state.handleDateNext(),
+                  onDateToday: () => state.handleDateToday(),
+                  viewMode: state.todayViewMode ?? "my-day",
+                  onViewModeChange: (mode) => state.handleTodayViewModeChange(mode),
+                  focusPulseActive: focusPulseActive,
+                  onStartMorningSet: focusPulseEnabled ? () => state.handleFocusPulseStartMorning() : undefined,
+                })
+              : nothing}
           </div>
         </section>
 
@@ -991,6 +1024,7 @@ export function renderApp(state: AppViewState) {
                 onOpenWizard: () => state.handleWizardOpen?.(),
                 onNavigate: (tab) => state.setTab(tab),
                 onRunAssessment: () => state.handleRunAssessment?.(),
+                onOpenSupportChat: () => state.handleOpenSupportChat(),
               })
             : nothing
         }
@@ -1072,7 +1106,7 @@ export function renderApp(state: AppViewState) {
                   }
                 },
                 onDeleteWorkspace: async (workspace) => {
-                  const { deleteWorkspace, loadAllTasks } =
+                  const { deleteWorkspace, loadAllTasksWithQueueStatus } =
                     await import("./controllers/workspaces");
                   const ok = await deleteWorkspace(state, workspace.id);
                   if (!ok) {
@@ -1080,7 +1114,7 @@ export function renderApp(state: AppViewState) {
                     return;
                   }
                   state.showToast(`Deleted workspace: ${workspace.name}`, "success");
-                  state.allTasks = await loadAllTasks(state);
+                  state.allTasks = await loadAllTasksWithQueueStatus(state);
                 },
                 onSelectWorkspace: async (workspace) => {
                   state.workspaceItemSearchQuery = ""; // Clear item search when selecting workspace
@@ -1181,7 +1215,7 @@ export function renderApp(state: AppViewState) {
                 taskSort: state.taskSort ?? "due",
                 showCompletedTasks: state.showCompletedTasks ?? false,
                 onToggleTaskComplete: async (taskId, currentStatus) => {
-                  const { toggleTaskComplete, loadAllTasks, getWorkspace } =
+                  const { toggleTaskComplete, loadAllTasksWithQueueStatus, getWorkspace } =
                     await import("./controllers/workspaces");
                   const result = await toggleTaskComplete(state, taskId, currentStatus);
                   if (!result) {
@@ -1189,7 +1223,7 @@ export function renderApp(state: AppViewState) {
                     return;
                   }
                   // Refresh tasks
-                  state.allTasks = await loadAllTasks(state);
+                  state.allTasks = await loadAllTasksWithQueueStatus(state);
                   if (state.selectedWorkspace) {
                     const refreshed = await getWorkspace(state, state.selectedWorkspace.id);
                     if (refreshed) {
@@ -1198,7 +1232,7 @@ export function renderApp(state: AppViewState) {
                   }
                 },
                 onCreateTask: async (title, project) => {
-                  const { createTask, loadAllTasks, getWorkspace } =
+                  const { createTask, loadAllTasksWithQueueStatus, getWorkspace } =
                     await import("./controllers/workspaces");
                   const result = await createTask(state, title, project);
                   if (!result) {
@@ -1207,7 +1241,7 @@ export function renderApp(state: AppViewState) {
                   }
                   state.showToast(`Task created: ${result.title}`, "success");
                   // Refresh tasks
-                  state.allTasks = await loadAllTasks(state);
+                  state.allTasks = await loadAllTasksWithQueueStatus(state);
                   if (state.selectedWorkspace) {
                     const refreshed = await getWorkspace(state, state.selectedWorkspace.id);
                     if (refreshed) {
@@ -1227,7 +1261,7 @@ export function renderApp(state: AppViewState) {
                 editingTaskId: state.editingTaskId ?? null,
                 workspaceNames: (state.workspaces ?? []).map((w) => w.name),
                 onStartTask: async (taskId) => {
-                  const { startTask, loadAllTasks } =
+                  const { startTask, loadAllTasksWithQueueStatus } =
                     await import("./controllers/workspaces");
                   const result = await startTask(state, taskId);
                   if (!result?.sessionId) {
@@ -1237,6 +1271,10 @@ export function renderApp(state: AppViewState) {
                   // Navigate to the session
                   saveDraft(state);
                   const nextKey = result.sessionId;
+                  // Set the tab title to the task name
+                  if (result.task?.title) {
+                    autoTitleCache.set(nextKey, result.task.title);
+                  }
                   const openTabs = state.settings.openTabs.includes(nextKey)
                     ? state.settings.openTabs
                     : [...state.settings.openTabs, nextKey];
@@ -1253,7 +1291,7 @@ export function renderApp(state: AppViewState) {
                   state.sessionKey = nextKey;
                   state.setTab("chat" as Tab);
                   // Find the task for context prompt on new sessions
-                  if (result.created) {
+                  if (result.created && !result.queueOutput) {
                     const allTasks = state.allTasks ?? [];
                     const wsTasks = state.selectedWorkspace?.tasks ?? [];
                     const task = [...allTasks, ...wsTasks].find((t) => t.id === taskId);
@@ -1270,16 +1308,24 @@ export function renderApp(state: AppViewState) {
                   state.resetChatScroll();
                   void state.loadAssistantIdentity();
                   syncUrlWithSessionKey(state, nextKey, true);
-                  void loadChatHistory(state);
+                  await loadChatHistory(state);
+                  // Seed empty sessions with agent output (handles new + pre-existing empty sessions)
+                  if (result.queueOutput && state.chatMessages.length === 0) {
+                    void state.seedSessionWithAgentOutput(
+                      result.task?.title ?? "this task",
+                      result.queueOutput,
+                      result.agentPrompt ?? undefined,
+                    );
+                  }
                   // Refresh tasks
-                  state.allTasks = await loadAllTasks(state);
+                  state.allTasks = await loadAllTasksWithQueueStatus(state);
                   state.requestUpdate();
                 },
                 onEditTask: (taskId) => {
                   state.editingTaskId = taskId;
                 },
                 onUpdateTask: async (taskId, updates) => {
-                  const { updateTask, loadAllTasks, getWorkspace } =
+                  const { updateTask, loadAllTasksWithQueueStatus, getWorkspace } =
                     await import("./controllers/workspaces");
                   const result = await updateTask(state, taskId, updates);
                   if (!result) {
@@ -1288,7 +1334,7 @@ export function renderApp(state: AppViewState) {
                   }
                   state.editingTaskId = null;
                   // Refresh tasks
-                  state.allTasks = await loadAllTasks(state);
+                  state.allTasks = await loadAllTasksWithQueueStatus(state);
                   if (state.selectedWorkspace) {
                     const refreshed = await getWorkspace(state, state.selectedWorkspace.id);
                     if (refreshed) {
@@ -1296,6 +1342,15 @@ export function renderApp(state: AppViewState) {
                     }
                   }
                 },
+                browsePath: state.workspaceBrowsePath ?? null,
+                browseEntries: state.workspaceBrowseEntries ?? null,
+                breadcrumbs: state.workspaceBreadcrumbs ?? null,
+                browseSearchQuery: state.workspaceBrowseSearchQuery ?? "",
+                browseSearchResults: state.workspaceBrowseSearchResults ?? null,
+                onBrowseFolder: (path: string) => state.handleWorkspaceBrowse(path),
+                onBrowseSearch: (query: string) => state.handleWorkspaceBrowseSearch(query),
+                onBrowseBack: () => state.handleWorkspaceBrowseBack(),
+                onCreateFolder: (path: string) => state.handleWorkspaceCreateFolder(path),
               })
             : nothing
         }
@@ -1343,6 +1398,14 @@ export function renderApp(state: AppViewState) {
                       currentStatus === "complete" ? "pending" : "complete",
                     ),
                   onStartTask: (taskId: string) => state.handleTodayStartTask(taskId),
+                  // Task panel additions
+                  onCreateTask: (title: string) => state.handleTodayCreateTask(title),
+                  onEditTask: (taskId: string | null) => state.handleTodayEditTask(taskId),
+                  onUpdateTask: (taskId: string, updates: { title?: string; dueDate?: string | null }) =>
+                    state.handleTodayUpdateTask(taskId, updates),
+                  editingTaskId: state.todayEditingTaskId,
+                  showCompletedTasks: state.todayShowCompleted,
+                  onToggleCompletedTasks: () => state.handleTodayToggleCompleted(),
                 })
             : nothing
         }
@@ -2160,6 +2223,26 @@ export function renderApp(state: AppViewState) {
         }
 
         ${
+          state.tab === "mission-control"
+            ? renderMissionControl({
+                connected: state.connected,
+                loading: state.missionControlLoading,
+                error: state.missionControlError,
+                data: state.missionControlData ?? null,
+                onRefresh: () => state.handleMissionControlRefresh(),
+                onCancelTask: (id) => state.handleMissionControlCancelTask(id),
+                onApproveItem: (id) => state.handleMissionControlApproveItem(id),
+                onRetryItem: (id) => state.handleMissionControlRetryItem(id),
+                onViewDetail: (agent) => state.handleMissionControlViewDetail(agent),
+                onAddToQueue: (type, title) => state.handleMissionControlAddToQueue(type, title),
+                onOpenSession: (key) => state.handleMissionControlOpenSession(key),
+                onOpenTaskSession: (taskId) => state.handleMissionControlOpenTaskSession(taskId),
+                onStartQueueItem: (id) => state.handleMissionControlStartQueueItem(id),
+              })
+            : nothing
+        }
+
+        ${
           state.tab === "trust"
             ? renderTrustTracker({
                 connected: state.connected,
@@ -2227,6 +2310,13 @@ export function renderApp(state: AppViewState) {
                 onCommunityResourceAddFormToggle: () => state.handleCommunityResourceAddFormToggle(),
                 onCommunityResourceAddFormChange: (field: any, value: string) => state.handleCommunityResourceAddFormChange(field, value),
                 onAddSource: () => state.handleAddSource(),
+                fileTree: state.secondBrainFileTree ?? null,
+                fileTreeLoading: state.secondBrainFileTreeLoading ?? false,
+                fileSearchQuery: state.secondBrainFileSearchQuery ?? "",
+                fileSearchResults: state.secondBrainFileSearchResults ?? null,
+                onFileTreeRefresh: () => state.handleSecondBrainFileTreeRefresh(),
+                onFileSearch: (query: string) => state.handleSecondBrainFileSearch(query),
+                onFileSelect: (path: string) => state.handleSecondBrainFileSelect(path),
                 intelProps: (state.secondBrainSubtab ?? "identity") === "intel" ? {
                   insights: state.intelInsights ?? [],
                   discoveries: state.intelDiscoveries ?? [],
@@ -2238,7 +2328,52 @@ export function renderApp(state: AppViewState) {
                   onAct: (id: string) => state.handleIntelAct(id),
                   onRefresh: () => state.handleIntelRefresh(),
                 } : undefined,
+                vaultHealth: state.secondBrainVaultHealth ?? null,
               })
+            : nothing
+        }
+
+        ${
+          state.tab === "dashboards"
+            ? state.dynamicSlots["dashboards"]
+              ? html`<div class="dynamic-slot">${unsafeHTML(sanitizeHtmlFragment(state.dynamicSlots["dashboards"]))}</div>`
+              : renderDashboards({
+                  connected: state.connected,
+                  loading: state.dashboardsLoading ?? false,
+                  error: state.dashboardsError ?? null,
+                  dashboards: state.dashboardsList,
+                  activeDashboardId: state.activeDashboardId ?? null,
+                  activeDashboardHtml: state.activeDashboardHtml ?? null,
+                  activeDashboardManifest: state.activeDashboardManifest ?? null,
+                  isWorking: state.activeDashboardManifest?.sessionId
+                    ? state.workingSessions.has(state.activeDashboardManifest.sessionId)
+                    : false,
+                  onSelectDashboard: (id) => state.handleDashboardSelect(id),
+                  onDeleteDashboard: (id) => state.handleDashboardDelete(id),
+                  onCreateViaChat: () => state.handleDashboardCreateViaChat(),
+                  onBack: () => state.handleDashboardBack(),
+                  onRefresh: () => state.handleDashboardsRefresh(),
+                  onOpenSession: (id) => state.handleDashboardOpenSession(id),
+                  // Inline chat — powered by the dashboard's persistent session
+                  chatOpen: (state as unknown as { dashboardChatOpen?: boolean }).dashboardChatOpen ?? false,
+                  chatMessages: state.activeDashboardManifest ? state.chatMessages : [],
+                  chatStream: state.activeDashboardManifest ? state.chatStream : null,
+                  chatMessage: state.chatMessage,
+                  chatSending: state.chatSending,
+                  assistantName: state.assistantName,
+                  assistantAvatar: state.assistantAvatar,
+                  onToggleChat: () => {
+                    const app = state as unknown as { dashboardChatOpen: boolean; requestUpdate: () => void };
+                    app.dashboardChatOpen = !app.dashboardChatOpen;
+                    app.requestUpdate();
+                  },
+                  onChatMessageChange: (value: string) => {
+                    state.setChatMessage(value);
+                  },
+                  onChatSend: () => {
+                    void state.handleSendChat();
+                  },
+                })
             : nothing
         }
 

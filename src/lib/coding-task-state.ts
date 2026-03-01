@@ -4,7 +4,7 @@ import path from "node:path";
 import { withFileLock } from "openclaw/plugin-sdk";
 import { DATA_DIR } from "../data-paths.js";
 
-export type CodingTaskStatus = "queued" | "running" | "validating" | "done" | "failed";
+export type CodingTaskStatus = "queued" | "running" | "validating" | "review" | "done" | "failed";
 export type CodingTaskMode = "write" | "read";
 
 export type SwarmStage = "design" | "build" | "qc";
@@ -20,6 +20,12 @@ export type SwarmState = {
   enabled: boolean;
   currentStage: SwarmStage;
   stages: Record<SwarmStage, SwarmStageState>;
+};
+
+export type ReviewResult = {
+  engine: string;
+  status: "passed" | "failed" | "skipped";
+  comment?: string;
 };
 
 export type CodingTask = {
@@ -40,6 +46,7 @@ export type CodingTask = {
   prNumber?: number;
   prUrl?: string;
   swarm?: SwarmState;
+  reviews?: ReviewResult[];
   createdAt: number;
   startedAt?: number;
   completedAt?: number;

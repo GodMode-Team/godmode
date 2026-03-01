@@ -20,4 +20,6 @@
 @import "./styles/options.css";
 @import "./styles/trust-tracker.css";
 @import "./styles/guardrails.css";
+@import "./styles/mission-control.css";
 @import "./styles/second-brain.css";
+@import "./styles/dashboards.css";

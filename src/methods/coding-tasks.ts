@@ -39,7 +39,7 @@ export function createCodingTaskHandlers(
     "coding.list": async ({ params, respond }) => {
       const p = params as Record<string, unknown>;
       const status = typeof p.status === "string" ? p.status.trim() : undefined;
-      const validStatuses = ["queued", "running", "validating", "done", "failed"];
+      const validStatuses = ["queued", "running", "validating", "review", "done", "failed"];
       const tasks = await orchestrator.listTasks(
         status && validStatuses.includes(status) ? (status as "queued") : undefined,
       );
@@ -60,6 +60,21 @@ export function createCodingTaskHandlers(
       }
       const cancelled = await orchestrator.cancelTask(taskId);
       respond(true, { cancelled, taskId });
+    },
+
+    "coding.approve": async ({ params, respond }) => {
+      const p = params as Record<string, unknown>;
+      const taskId = typeof p.taskId === "string" ? p.taskId.trim() : "";
+      if (!taskId) {
+        respond(false, undefined, { code: "INVALID_REQUEST", message: "taskId is required" });
+        return;
+      }
+      const result = await orchestrator.approveTask(taskId);
+      if (!result.approved) {
+        respond(false, undefined, { code: "INVALID_REQUEST", message: result.error ?? "Cannot approve" });
+        return;
+      }
+      respond(true, { approved: true, taskId });
     },
   };
 }

@@ -1,6 +1,7 @@
 /**
  * Second Brain Controller
- * Loads context profile data from ~/godmode/memory/ via gateway RPC
+ * Loads context profile data from Obsidian vault (PARA structure) via gateway RPC.
+ * Falls back to ~/godmode/memory/ when vault is unavailable.
  */
 
 import type { GatewayBrowserClient } from "../gateway";
@@ -15,6 +16,7 @@ import type {
   ResearchAddForm,
   CommunityResourcesData,
   CommunityResourceAddForm,
+  VaultHealthData,
 } from "../views/second-brain";
 
 export type SecondBrainState = {
@@ -40,7 +42,19 @@ export type SecondBrainState = {
   secondBrainCommunityResources?: CommunityResourcesData | null;
   secondBrainCommunityResourceAddFormOpen?: boolean;
   secondBrainCommunityResourceAddForm?: CommunityResourceAddForm;
+  secondBrainVaultHealth?: VaultHealthData | null;
 };
+
+/** Load vault health stats (called alongside any subtab load). */
+export async function loadVaultHealth(state: SecondBrainState): Promise<void> {
+  if (!state.client || !state.connected) return;
+  try {
+    const result = await state.client.request<VaultHealthData>("secondBrain.vaultHealth", {});
+    state.secondBrainVaultHealth = result;
+  } catch {
+    // Non-critical — vault health is supplemental
+  }
+}
 
 export async function loadSecondBrain(state: SecondBrainState): Promise<void> {
   if (!state.client || !state.connected) return;
@@ -48,6 +62,9 @@ export async function loadSecondBrain(state: SecondBrainState): Promise<void> {
   const subtab = state.secondBrainSubtab ?? "identity";
   state.secondBrainLoading = true;
   state.secondBrainError = null;
+
+  // Always load vault health alongside the current subtab
+  loadVaultHealth(state).catch(() => {});
 
   try {
     if (subtab === "identity") {

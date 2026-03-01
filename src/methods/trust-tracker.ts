@@ -548,6 +548,59 @@ export function generatePostSkillFeedbackPrompt(skillName: string): string {
   );
 }
 
+// --- Programmatic rating submission (for queue auto-rating) ---
+
+/**
+ * Submit a trust rating programmatically (no RPC context needed).
+ * Used by the queue processor to auto-rate agent personas on task completion.
+ */
+export async function submitTrustRating(
+  workflow: string,
+  rating: number,
+  note?: string,
+): Promise<{ trustScore: number | null; count: number }> {
+  const state = await readState();
+  const normalized = workflow.trim();
+
+  // Auto-add workflow if not tracked and under limit
+  if (!state.workflows.includes(normalized) && state.workflows.length < MAX_WORKFLOWS) {
+    state.workflows.push(normalized);
+  }
+
+  state.ratings.push({
+    id: randomUUID(),
+    workflow: normalized,
+    rating: Math.max(1, Math.min(10, Math.round(rating))),
+    ...(note ? { note } : {}),
+    timestamp: new Date().toISOString(),
+  });
+
+  if (state.ratings.length > MAX_RATINGS) {
+    state.ratings = state.ratings.slice(-MAX_RATINGS);
+  }
+
+  await writeState(state);
+
+  const workflowRatings = state.ratings.filter((r) => r.workflow === normalized);
+  const count = workflowRatings.length;
+  const avg = workflowRatings.reduce((s, r) => s + r.rating, 0) / count;
+  const trustScore = count >= SCORE_THRESHOLD ? Math.round(avg * 10) / 10 : null;
+
+  return { trustScore, count };
+}
+
+/**
+ * Get trust score for a specific workflow/persona.
+ * Returns null if not enough ratings yet.
+ */
+export async function getTrustScore(workflow: string): Promise<number | null> {
+  const state = await readState();
+  const ratings = state.ratings.filter((r) => r.workflow === workflow.trim());
+  if (ratings.length < SCORE_THRESHOLD) return null;
+  const avg = ratings.reduce((s, r) => s + r.rating, 0) / ratings.length;
+  return Math.round(avg * 10) / 10;
+}
+
 // --- Exported for prompt hook (legacy, kept for compatibility) ---
 
 export { readState as readTrustState, computeSummary as computeTrustSummary };

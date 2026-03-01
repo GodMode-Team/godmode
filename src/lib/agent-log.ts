@@ -1,6 +1,7 @@
 import fsp from "node:fs/promises";
 import path from "node:path";
 import { GODMODE_ROOT } from "../data-paths.js";
+import { getUserTimezone } from "./user-config.js";
 
 const AGENT_LOG_DIR = path.join(GODMODE_ROOT, "memory", "agent-log");
 
@@ -82,7 +83,7 @@ export type AppendEntryParams = {
 };
 
 function todayDate(): string {
-  return new Date().toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
+  return new Date().toLocaleDateString("en-CA", { timeZone: getUserTimezone() });
 }
 
 function formatTime(ts: number): string {
@@ -90,8 +91,23 @@ function formatTime(ts: number): string {
     hour: "numeric",
     minute: "2-digit",
     hour12: true,
-    timeZone: "America/Chicago",
+    timeZone: getUserTimezone(),
   });
+}
+
+/** Derive a short timezone abbreviation (e.g. "CST", "CDT", "UTC") from the user's IANA timezone. */
+function getTimezoneAbbreviation(): string {
+  try {
+    const tz = getUserTimezone();
+    const parts = new Intl.DateTimeFormat("en-US", {
+      timeZone: tz,
+      timeZoneName: "short",
+    }).formatToParts(new Date());
+    const tzPart = parts.find((p) => p.type === "timeZoneName");
+    return tzPart?.value ?? tz;
+  } catch {
+    return "UTC";
+  }
 }
 
 function jsonFilePath(date: string): string {
@@ -137,7 +153,7 @@ function renderMarkdown(state: AgentLogState, activeRuns: ActiveRun[]): string {
 
   lines.push(`# Agent Log — ${dayLabel}`);
   lines.push("");
-  lines.push(`*Last updated: ${formatTime(Date.now())} CT — Auto-managed by GodMode.*`);
+  lines.push(`*Last updated: ${formatTime(Date.now())} ${getTimezoneAbbreviation()} — Auto-managed by GodMode.*`);
   lines.push("");
 
   lines.push("### Today at a Glance");

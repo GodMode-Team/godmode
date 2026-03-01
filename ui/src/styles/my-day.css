@@ -20,10 +20,8 @@
 .my-day-container {
   display: flex;
   flex-direction: column;
-  height: 100%;
-  background: var(--mc-bg);
-  color: var(--mc-text);
-  overflow: hidden;
+  gap: 0;
+  min-height: 0;
 }
 
 /* ===== Loading & Error States ===== */
@@ -52,7 +50,17 @@
   font-size: 2rem;
 }
 
-/* ===== Header ===== */
+/* ===== Toolbar (rendered inside page-meta, right-aligned in header) ===== */
+
+.my-day-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: nowrap;
+  flex-shrink: 0;
+}
+
+/* ===== Legacy header (used by People, Data, Goals, Life views) ===== */
 
 .my-day-header {
   display: flex;
@@ -92,14 +100,6 @@
   font-size: 13px;
   color: var(--muted, var(--mc-text-secondary));
   font-weight: 400;
-}
-
-/* Nav row: date nav + view toggle side by side */
-.my-day-header-nav-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-top: 4px;
 }
 
 /* Date navigation bar */
@@ -293,39 +293,42 @@
   box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
 }
 
-/* ===== Content Grid ===== */
+/* ===== Two-Column Layout ===== */
 
-.my-day-grid {
+.my-day-columns {
   display: grid;
-  /* Brief (40%) | Schedule (25%) | Tasks (35%) */
-  grid-template-columns: 2fr 1.25fr 1.75fr;
-  gap: 20px;
-  padding: 24px;
+  grid-template-columns: 3fr 2fr;
+  gap: 16px;
   flex: 1;
+  min-height: 0;
   overflow: hidden;
 }
 
-/* ===== Today Tasks Section (above brief) ===== */
-
-.today-tasks {
-  flex-shrink: 0;
-  padding: 0 24px;
-  margin-bottom: 4px;
-}
-
-.today-tasks-header {
+.my-day-tasks-col {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 10px 0 8px;
+  flex-direction: column;
+  min-height: 0;
+  overflow-y: auto;
 }
 
-.today-tasks-title {
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.6px;
-  text-transform: uppercase;
-  color: var(--mc-text-secondary);
+.my-day-brief-col {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+/* Task panel fills its column */
+.today-tasks-panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.today-tasks-panel .my-day-card-content {
+  flex: 1;
+  overflow-y: auto;
 }
 
 .today-tasks-count {
@@ -334,132 +337,57 @@
   color: var(--mc-text-muted);
 }
 
+.today-tasks-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.today-tasks-list--completed {
+  opacity: 0.7;
+}
+
 .today-tasks-empty {
   font-size: 13px;
   color: var(--mc-text-muted);
   font-style: italic;
-  padding: 8px 0;
+  padding: 24px 8px;
+  text-align: center;
 }
 
-.today-tasks-list {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.today-task-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 8px 12px;
-  background: var(--mc-bg-card);
-  border-radius: 8px;
-  transition: background 0.15s;
-}
-
-.today-task-row:hover {
-  background: var(--mc-bg-tertiary);
-}
-
-.today-task-check {
-  flex-shrink: 0;
-  width: 20px;
-  height: 20px;
-  border: 2px solid var(--mc-border);
-  border-radius: 50%;
-  background: transparent;
-  cursor: pointer;
-  padding: 0;
-  transition:
-    border-color 0.15s,
-    transform 0.15s;
-}
-
-.today-task-check:hover {
-  border-color: #8b5cf6;
-  transform: scale(1.1);
-  box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.2);
-}
-
-.today-task-info {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-}
-
-.today-task-title {
-  font-size: 13px;
+.today-completed-toggle {
+  font-size: 12px;
   font-weight: 500;
-  color: var(--mc-text);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.today-task-due {
-  font-size: 11px;
-  color: var(--mc-text-muted);
-  white-space: nowrap;
-  flex-shrink: 0;
-}
-
-.today-task-project {
-  font-size: 10px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.3px;
-  padding: 2px 8px;
-  border-radius: 10px;
-  background: rgba(59, 130, 246, 0.12);
-  color: #3b82f6;
-  white-space: nowrap;
-  flex-shrink: 0;
-}
-
-:root[data-theme="light"] .today-task-project {
-  background: rgba(59, 130, 246, 0.08);
-  color: #2563eb;
-}
-
-.today-task-start {
-  flex-shrink: 0;
+  color: var(--mc-accent, var(--accent));
   background: transparent;
-  border: 1px solid var(--mc-border);
-  border-radius: 6px;
-  color: var(--mc-text-secondary);
-  font-size: 11px;
-  font-weight: 600;
-  padding: 4px 10px;
+  border: none;
+  padding: 8px 0;
+  margin-top: 4px;
   cursor: pointer;
-  transition:
-    background 0.15s,
-    color 0.15s,
-    border-color 0.15s;
 }
 
-.today-task-start:hover {
-  background: var(--mc-accent, #ff6b6b);
-  border-color: var(--mc-accent, #ff6b6b);
-  color: #fff;
+.today-completed-toggle:hover {
+  text-decoration: underline;
 }
 
-/* ===== Today Content: Full-width brief ===== */
+@media (max-width: 900px) {
+  .my-day-toolbar {
+    flex-wrap: wrap;
+  }
 
-.today-content {
-  flex: 1;
-  padding: 18px 0 0;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-}
+  .my-day-columns {
+    grid-template-columns: 1fr;
+    overflow-y: auto;
+  }
 
-.today-content > .brief-editor,
-.today-content > .agent-log-section {
-  flex: 1;
-  min-height: 0;
+  .my-day-tasks-col {
+    overflow-y: visible;
+    max-height: 50vh;
+  }
+
+  .my-day-brief-col {
+    overflow-y: visible;
+  }
 }
 
 /* ===== Calendar Toggle Button ===== */
@@ -1322,6 +1250,11 @@
 }
 
 @media (max-width: 768px) {
+  .my-day-toolbar {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
   .my-day-header {
     flex-direction: column;
     align-items: flex-start;
@@ -1346,7 +1279,7 @@
   }
 
   .today-content {
-    padding-top: 14px;
+    padding-top: 0;
   }
 
   .my-day-summary {
@@ -1751,15 +1684,12 @@
 .brief-editor {
   display: flex;
   flex-direction: column;
-  height: 100%;
 }
 
 .brief-editor .my-day-card-content {
-  flex: 1;
   display: flex;
   flex-direction: column;
   padding: 0;
-  overflow: hidden;
 }
 
 /* Read mode (legacy) */

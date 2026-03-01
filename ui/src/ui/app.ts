@@ -402,6 +402,13 @@ export class GodModeApp extends LitElement {
   @state() showCompletedTasks?: boolean;
   @state() editingTaskId: string | null = null;
 
+  // Workspace browsing state
+  @state() workspaceBrowsePath: string | null = null;
+  @state() workspaceBrowseEntries: import("./controllers/workspaces.js").BrowseEntry[] | null = null;
+  @state() workspaceBreadcrumbs: Array<{ name: string; path: string }> | null = null;
+  @state() workspaceBrowseSearchQuery = "";
+  @state() workspaceBrowseSearchResults: Array<{ path: string; name: string; type: string; excerpt?: string }> | null = null;
+
   // My Day state
   @state() myDayLoading = false;
   @state() myDayError: string | null = null;
@@ -420,6 +427,8 @@ export class GodModeApp extends LitElement {
   // Today tasks state
   @state() todayTasks: import("./views/workspaces").WorkspaceTask[] = [];
   @state() todayTasksLoading = false;
+  @state() todayEditingTaskId: string | null = null;
+  @state() todayShowCompleted = false;
 
   @state() chatPrivateMode = false;
   /** Maps private session keys → expiry timestamp (ms). Ephemeral sessions auto-delete. */
@@ -545,9 +554,27 @@ export class GodModeApp extends LitElement {
   @state() guardrailsLoading = false;
   @state() guardrailsShowAddForm = false;
 
+  // Mission Control state
+  @state() missionControlData: import("./controllers/mission-control.js").MissionControlData | null = null;
+  @state() missionControlLoading = false;
+  @state() missionControlError: string | null = null;
+  missionControlPollInterval: number | null = null;
+
   // GodMode Options state
   @state() godmodeOptions: Record<string, unknown> | null = null;
   @state() godmodeOptionsLoading = false;
+
+  // Dashboards state
+  @state() dashboardsList: import("./controllers/dashboards.js").DashboardManifest[] | undefined;
+  @state() dashboardsLoading = false;
+  @state() dashboardsError: string | null = null;
+  @state() activeDashboardId: string | null = null;
+  @state() activeDashboardHtml: string | null = null;
+  @state() activeDashboardManifest: import("./controllers/dashboards.js").DashboardManifest | null = null;
+  /** Stashed session key to restore when leaving an active dashboard */
+  dashboardPreviousSessionKey: string | null = null;
+  /** Whether the inline chat panel is expanded */
+  @state() dashboardChatOpen = false;
 
   // Second Brain state
   @state() secondBrainSubtab: import("./views/second-brain").SecondBrainSubtab = "identity";
@@ -567,6 +594,11 @@ export class GodModeApp extends LitElement {
   @state() secondBrainBrowsingFolder: string | null = null;
   @state() secondBrainFolderEntries: import("./views/second-brain").SecondBrainMemoryEntry[] | null = null;
   @state() secondBrainFolderName: string | null = null;
+  // Second Brain Files tab state
+  @state() secondBrainFileTree: import("./views/second-brain").BrainTreeNode[] | null = null;
+  @state() secondBrainFileTreeLoading = false;
+  @state() secondBrainFileSearchQuery = "";
+  @state() secondBrainFileSearchResults: import("./views/second-brain").BrainSearchResult[] | null = null;
 
   // Proactive Intel state
   @state() intelInsights: import("./controllers/proactive-intel").IntelInsight[] = [];
@@ -828,6 +860,290 @@ export class GodModeApp extends LitElement {
     this.guardrailsShowAddForm = !this.guardrailsShowAddForm;
   }
 
+  // Mission Control handlers
+  async handleMissionControlRefresh() {
+    const { loadMissionControl } = await import("./controllers/mission-control.js");
+    await loadMissionControl(this);
+  }
+
+  async handleMissionControlCancelTask(taskId: string) {
+    const { cancelCodingTask } = await import("./controllers/mission-control.js");
+    await cancelCodingTask(this, taskId);
+  }
+
+  async handleMissionControlApproveItem(itemId: string) {
+    // Try coding task approval first; fall back to queue item approval
+    const { approveCodingTask, approveQueueItem } = await import("./controllers/mission-control.js");
+    const wasCodingTask = await approveCodingTask(this, itemId);
+    if (!wasCodingTask) {
+      await approveQueueItem(this, itemId);
+    }
+  }
+
+  async handleMissionControlRetryItem(itemId: string) {
+    const { retryQueueItem } = await import("./controllers/mission-control.js");
+    await retryQueueItem(this, itemId);
+  }
+
+  async handleMissionControlViewDetail(agent: import("./controllers/mission-control.js").AgentRunView) {
+    const { loadAgentDetail } = await import("./controllers/mission-control.js");
+    const detail = await loadAgentDetail(this, agent);
+    this.handleOpenSidebar(detail.content, {
+      mimeType: detail.mimeType,
+      title: detail.title,
+    });
+  }
+
+  async handleMissionControlOpenSession(sessionKey: string) {
+    const openTabs = this.settings.openTabs.includes(sessionKey)
+      ? this.settings.openTabs
+      : [...this.settings.openTabs, sessionKey];
+    this.applySettings({
+      ...this.settings,
+      openTabs,
+      sessionKey,
+      lastActiveSessionKey: sessionKey,
+      tabLastViewed: {
+        ...this.settings.tabLastViewed,
+        [sessionKey]: Date.now(),
+      },
+    });
+    this.sessionKey = sessionKey;
+    this.setTab("chat" as import("./navigation.js").Tab);
+    this.chatMessages = [];
+    this.chatStream = null;
+    this.chatStreamStartedAt = null;
+    this.chatRunId = null;
+    this.resetToolStream();
+    this.resetChatScroll();
+    void this.loadAssistantIdentity();
+    const { loadChatHistory } = await import("./controllers/chat.js");
+    await loadChatHistory(this);
+  }
+
+  async handleMissionControlOpenTaskSession(sourceTaskId: string) {
+    if (!this.client || !this.connected) return;
+    try {
+      const result = await this.client.request<{
+        sessionId: string;
+        created: boolean;
+        task?: { title?: string };
+        queueOutput?: string | null;
+        agentPrompt?: string | null;
+      }>(
+        "tasks.openSession",
+        { taskId: sourceTaskId },
+      );
+      if (result?.sessionId) {
+        // Set the tab title to the task name (not the auto-generated one from message content)
+        if (result.task?.title) {
+          const { autoTitleCache } = await import("./controllers/sessions.js");
+          autoTitleCache.set(result.sessionId, result.task.title);
+        }
+        await this.handleMissionControlOpenSession(result.sessionId);
+        // Seed empty sessions with agent output so the user has full context.
+        // Check chatMessages after load — handles both new and pre-existing empty sessions.
+        if (result.queueOutput && this.chatMessages.length === 0) {
+          await this.seedSessionWithAgentOutput(
+            result.task?.title ?? "task",
+            result.queueOutput,
+            result.agentPrompt ?? undefined,
+          );
+        }
+      }
+    } catch (err) {
+      console.error("[MissionControl] Failed to open task session:", err);
+      this.showToast("Failed to open session", "error");
+    }
+  }
+
+  async handleMissionControlStartQueueItem(itemId: string) {
+    // Open a session for this queue item so the user can spec it out before processing
+    await this.handleMissionControlOpenTaskSession(itemId);
+  }
+
+  /**
+   * Seeds a newly opened session with agent output so the user has the
+   * full context from the agent that worked on the task.
+   * Sends the output as a user message so it becomes part of the session
+   * history — the assistant will respond with awareness of the agent's work.
+   */
+  async seedSessionWithAgentOutput(taskTitle: string, output: string, agentPrompt?: string) {
+    if (!this.client || !this.connected) return;
+    const parts: string[] = [
+      `A GodMode agent already worked on this task: **${taskTitle}**`,
+    ];
+
+    if (agentPrompt) {
+      // Extract just the task section from the prompt (skip system boilerplate)
+      const taskMatch = agentPrompt.match(/## Task\n([\s\S]*?)(?=\n## |$)/);
+      if (taskMatch) {
+        parts.push("", "**What the agent was asked to do:**", taskMatch[1].trim());
+      }
+    }
+
+    parts.push(
+      "",
+      "**Agent's output:**",
+      "",
+      output,
+      "",
+      "---",
+      "",
+      "I'm reviewing this. Help me understand the output, flag anything that needs attention, and suggest what to do next.",
+    );
+
+    const contextMessage = parts.join("\n");
+    try {
+      const { sendChatMessage } = await import("./controllers/chat.js");
+      await sendChatMessage(this as any, contextMessage);
+    } catch (err) {
+      console.error("[Session] Failed to seed session with agent output:", err);
+    }
+  }
+
+  async handleMissionControlAddToQueue(type: string, title: string) {
+    if (!this.client || !this.connected) return;
+    try {
+      await this.client.request("queue.add", { type, title, priority: "normal" });
+      this.showToast("Added to queue", "success", 2000);
+      const { loadMissionControl } = await import("./controllers/mission-control.js");
+      await loadMissionControl(this);
+    } catch {
+      this.showToast("Failed to add to queue", "error");
+    }
+  }
+
+  // Dashboards handlers
+  async handleDashboardsRefresh() {
+    const { loadDashboards } = await import("./controllers/dashboards.js");
+    await loadDashboards(this);
+  }
+
+  async handleDashboardSelect(id: string) {
+    const { loadDashboard } = await import("./controllers/dashboards.js");
+    await loadDashboard(this, id);
+
+    // Open/get the persistent session for this dashboard and switch to it
+    // so inline chat panel is powered by the real session
+    if (this.client && this.connected) {
+      try {
+        const result = await this.client.request<{
+          sessionId: string;
+          created: boolean;
+          manifest: { title: string; id: string; widgets?: string[] };
+        }>("dashboards.openSession", { dashboardId: id });
+
+        if (result?.sessionId) {
+          // Stash the current session so we can restore it when leaving
+          this.dashboardPreviousSessionKey = this.sessionKey;
+
+          const nextKey = result.sessionId;
+          const { autoTitleCache } = await import("./controllers/sessions.js");
+          autoTitleCache.set(nextKey, result.manifest.title);
+
+          // Update manifest with sessionId if it was just created
+          if (this.activeDashboardManifest) {
+            this.activeDashboardManifest = {
+              ...this.activeDashboardManifest,
+              sessionId: nextKey,
+            };
+          }
+
+          // Switch session context
+          const { saveDraft } = await import("./app-chat.js");
+          saveDraft(this);
+          this.sessionKey = nextKey;
+
+          // Load the chat history for inline display
+          this.chatMessages = [];
+          this.chatStream = null;
+          this.chatStreamStartedAt = null;
+          this.chatRunId = null;
+          this.resetToolStream();
+          const { loadChatHistory } = await import("./controllers/chat.js");
+          await loadChatHistory(this);
+
+          // Default open the chat panel for dashboards
+          this.dashboardChatOpen = true;
+        }
+      } catch (err) {
+        console.error("[Dashboards] Failed to init session on select:", err);
+        // Non-critical — dashboard still renders, just no inline chat
+      }
+    }
+  }
+
+  async handleDashboardDelete(id: string) {
+    const { deleteDashboard } = await import("./controllers/dashboards.js");
+    await deleteDashboard(this, id);
+  }
+
+  async handleDashboardCreateViaChat() {
+    this.setTab("chat" as import("./navigation").Tab);
+    const { createNewSession } = await import("./app-render.helpers.js");
+    createNewSession(this);
+    void this.handleSendChat(
+      "I want to create a custom dashboard. Ask me what data I want to see and design it for me. You can use any of GodMode's data — tasks, calendar, focus pulse, goals, trust scores, agent activity, queue status, coding tasks, workspace stats, and more.",
+    );
+  }
+
+  handleDashboardBack() {
+    this.activeDashboardId = null;
+    this.activeDashboardHtml = null;
+    this.activeDashboardManifest = null;
+    this.dashboardChatOpen = false;
+
+    // Restore previous session
+    if (this.dashboardPreviousSessionKey) {
+      const prev = this.dashboardPreviousSessionKey;
+      this.dashboardPreviousSessionKey = null;
+      void import("./app-chat.js").then(({ saveDraft }) => {
+        saveDraft(this);
+        this.sessionKey = prev;
+        void import("./controllers/chat.js").then(({ loadChatHistory }) => {
+          void loadChatHistory(this);
+        });
+      });
+    }
+  }
+
+  async handleDashboardOpenSession(dashboardId: string) {
+    // Session is already active from handleDashboardSelect — just navigate to chat tab
+    const sessionId = this.activeDashboardManifest?.sessionId;
+    if (!sessionId) {
+      this.showToast("No session for this dashboard", "error");
+      return;
+    }
+
+    // Clear the stashed key — user is intentionally leaving to chat
+    this.dashboardPreviousSessionKey = null;
+    this.activeDashboardId = null;
+    this.activeDashboardHtml = null;
+    this.activeDashboardManifest = null;
+    this.dashboardChatOpen = false;
+
+    // Ensure session is in open tabs
+    const openTabs = this.settings.openTabs.includes(sessionId)
+      ? this.settings.openTabs
+      : [...this.settings.openTabs, sessionId];
+
+    this.applySettings({
+      ...this.settings,
+      openTabs,
+      sessionKey: sessionId,
+      lastActiveSessionKey: sessionId,
+      tabLastViewed: {
+        ...this.settings.tabLastViewed,
+        [sessionId]: Date.now(),
+      },
+    });
+
+    this.setTab("chat" as import("./navigation").Tab);
+    const { syncUrlWithSessionKey } = await import("./app-settings.js");
+    syncUrlWithSessionKey(this, sessionId, true);
+  }
+
   // Options handlers
   async handleOptionsLoad() {
     const { loadOptions } = await import("./controllers/options.js");
@@ -859,6 +1175,11 @@ export class GodModeApp extends LitElement {
       this.handleIntelLoad().catch((err) => {
         console.error("[Intel] Load after subtab change failed:", err);
         this.intelError = err instanceof Error ? err.message : "Failed to load intel data";
+      });
+    } else if (subtab === "files") {
+      // Files subtab loads its own data
+      this.handleSecondBrainFileTreeRefresh().catch((err) => {
+        console.error("[SecondBrain] File tree load after subtab change failed:", err);
       });
     } else {
       this.handleSecondBrainRefresh().catch((err) => {
@@ -934,6 +1255,69 @@ export class GodModeApp extends LitElement {
   async handleSecondBrainSync() {
     const { syncSecondBrain } = await import("./controllers/second-brain.js");
     await syncSecondBrain(this);
+  }
+
+  // Second Brain Files tab handlers
+
+  async handleSecondBrainFileTreeRefresh() {
+    if (!this.client || !this.connected) return;
+    this.secondBrainFileTreeLoading = true;
+    try {
+      const result = await this.client.request<{
+        tree: import("./views/second-brain").BrainTreeNode[];
+      }>("secondBrain.fileTree", { depth: 4 });
+      this.secondBrainFileTree = result.tree ?? [];
+    } catch (err) {
+      console.error("[SecondBrain] fileTree failed:", err);
+    } finally {
+      this.secondBrainFileTreeLoading = false;
+    }
+  }
+
+  handleSecondBrainFileSearch(query: string) {
+    this.secondBrainFileSearchQuery = query;
+    if (!query.trim()) {
+      this.secondBrainFileSearchResults = null;
+      return;
+    }
+    // Fire search request (simple debounce: last-write-wins)
+    void this._doSecondBrainFileSearch(query);
+  }
+
+  private async _doSecondBrainFileSearch(query: string) {
+    if (!this.client || !this.connected) return;
+    try {
+      const result = await this.client.request<{
+        results: import("./views/second-brain").BrainSearchResult[];
+      }>("secondBrain.search", { query, limit: 50 });
+      // Only update if query hasn't changed during the request
+      if (this.secondBrainFileSearchQuery === query) {
+        this.secondBrainFileSearchResults = result.results ?? [];
+      }
+    } catch (err) {
+      console.error("[SecondBrain] search failed:", err);
+    }
+  }
+
+  async handleSecondBrainFileSelect(path: string) {
+    if (!this.client || !this.connected) return;
+    try {
+      const result = await this.client.request<{ name: string; content: string; updatedAt?: string }>(
+        "secondBrain.memoryBankEntry",
+        { path },
+      );
+      if (result?.content) {
+        const isHtml = path.endsWith(".html") || path.endsWith(".htm");
+        this.handleOpenSidebar(result.content, {
+          mimeType: isHtml ? "text/html" : "text/markdown",
+          filePath: path,
+          title: result.name || path.split("/").pop() || "File",
+        });
+      }
+    } catch (err) {
+      console.error("[SecondBrain] Failed to open file:", err);
+      this.showToast("Failed to open file", "error");
+    }
   }
 
   handleResearchAddFormToggle() {
@@ -1771,17 +2155,53 @@ export class GodModeApp extends LitElement {
     try {
       await this.client.request("tasks.update", {
         id: taskId,
-        updates: {
-          status: newStatus,
-          completedAt: newStatus === "complete" ? new Date().toISOString() : null,
-        },
+        status: newStatus,
+        completedAt: newStatus === "complete" ? new Date().toISOString() : null,
       });
       // Refresh today tasks so the UI updates
-      const { loadTodayTasks } = await import("./controllers/my-day.js");
-      await loadTodayTasks(this);
+      const { loadTodayTasksWithQueueStatus } = await import("./controllers/my-day.js");
+      await loadTodayTasksWithQueueStatus(this);
     } catch (err) {
       console.error("[MyDay] Failed to update task status:", err);
     }
+  }
+
+  async handleTodayCreateTask(title: string) {
+    if (!this.client || !this.connected) return;
+    try {
+      await this.client.request("tasks.create", {
+        title,
+        dueDate: localDateString(),
+        priority: "medium",
+        source: "chat",
+      });
+      const { loadTodayTasksWithQueueStatus } = await import("./controllers/my-day.js");
+      await loadTodayTasksWithQueueStatus(this);
+    } catch (err) {
+      console.error("[MyDay] Failed to create task:", err);
+      this.showToast("Failed to create task", "error");
+    }
+  }
+
+  handleTodayEditTask(taskId: string | null) {
+    this.todayEditingTaskId = taskId;
+  }
+
+  async handleTodayUpdateTask(taskId: string, updates: { title?: string; dueDate?: string | null }) {
+    if (!this.client || !this.connected) return;
+    try {
+      await this.client.request("tasks.update", { id: taskId, ...updates });
+      this.todayEditingTaskId = null;
+      const { loadTodayTasksWithQueueStatus } = await import("./controllers/my-day.js");
+      await loadTodayTasksWithQueueStatus(this);
+    } catch (err) {
+      console.error("[MyDay] Failed to update task:", err);
+      this.showToast("Failed to update task", "error");
+    }
+  }
+
+  handleTodayToggleCompleted() {
+    this.todayShowCompleted = !this.todayShowCompleted;
   }
 
   async handleTodayStartTask(taskId: string) {
@@ -1789,23 +2209,53 @@ export class GodModeApp extends LitElement {
       return;
     }
     try {
-      const result = await this.client.request<{ sessionKey: string }>(
+      const result = await this.client.request<{
+        sessionId: string;
+        sessionKey?: string;
+        created: boolean;
+        task?: { title?: string };
+        queueOutput?: string | null;
+        agentPrompt?: string | null;
+      }>(
         "tasks.openSession",
         { taskId },
       );
-      if (result?.sessionKey) {
+      const key = result?.sessionId ?? result?.sessionKey;
+      if (key) {
+        // Set the tab title to the task name
+        if (result.task?.title) {
+          const { autoTitleCache } = await import("./controllers/sessions.js");
+          autoTitleCache.set(key, result.task.title);
+        }
         this.setTab("chat" as import("./navigation").Tab);
-        this.sessionKey = result.sessionKey;
+        this.sessionKey = key;
         // Ensure session is in open tabs
-        const openTabs = this.settings.openTabs.includes(result.sessionKey)
+        const openTabs = this.settings.openTabs.includes(key)
           ? this.settings.openTabs
-          : [...this.settings.openTabs, result.sessionKey];
+          : [...this.settings.openTabs, key];
         this.applySettings({
           ...this.settings,
-          sessionKey: result.sessionKey,
-          lastActiveSessionKey: result.sessionKey,
+          sessionKey: key,
+          lastActiveSessionKey: key,
           openTabs,
         });
+        this.chatMessages = [];
+        this.chatStream = null;
+        this.chatStreamStartedAt = null;
+        this.chatRunId = null;
+        this.resetToolStream();
+        this.resetChatScroll();
+        void this.loadAssistantIdentity();
+        const { loadChatHistory } = await import("./controllers/chat.js");
+        await loadChatHistory(this);
+        // Seed empty sessions with agent output (handles new + pre-existing empty sessions)
+        if (result.queueOutput && this.chatMessages.length === 0) {
+          void this.seedSessionWithAgentOutput(
+            result.task?.title ?? "this task",
+            result.queueOutput,
+            result.agentPrompt ?? undefined,
+          );
+        }
         this.requestUpdate();
       }
     } catch (err) {
@@ -2162,6 +2612,51 @@ export class GodModeApp extends LitElement {
     await loadWorkspacesInternal(this);
   }
 
+  async handleWorkspaceBrowse(folderPath: string) {
+    if (!this.selectedWorkspace) return;
+    const { browseWorkspaceFolder } = await import("./controllers/workspaces.js");
+    const result = await browseWorkspaceFolder(this, this.selectedWorkspace.id, folderPath);
+    if (result) {
+      this.workspaceBrowsePath = folderPath;
+      this.workspaceBrowseEntries = result.entries;
+      this.workspaceBreadcrumbs = result.breadcrumbs;
+    }
+  }
+
+  async handleWorkspaceBrowseSearch(query: string) {
+    this.workspaceBrowseSearchQuery = query;
+    if (!query.trim() || !this.selectedWorkspace) {
+      this.workspaceBrowseSearchResults = null;
+      return;
+    }
+    const { searchWorkspaceFiles } = await import("./controllers/workspaces.js");
+    this.workspaceBrowseSearchResults = await searchWorkspaceFiles(
+      this,
+      this.selectedWorkspace.id,
+      query,
+    );
+  }
+
+  handleWorkspaceBrowseBack() {
+    this.workspaceBrowsePath = null;
+    this.workspaceBrowseEntries = null;
+    this.workspaceBreadcrumbs = null;
+    this.workspaceBrowseSearchQuery = "";
+    this.workspaceBrowseSearchResults = null;
+  }
+
+  async handleWorkspaceCreateFolder(folderPath: string) {
+    if (!this.selectedWorkspace) return;
+    const { createWorkspaceFolder } = await import("./controllers/workspaces.js");
+    const ok = await createWorkspaceFolder(this, this.selectedWorkspace.id, folderPath);
+    if (ok && this.workspaceBrowsePath) {
+      await this.handleWorkspaceBrowse(this.workspaceBrowsePath);
+    }
+    if (ok) {
+      this.showToast("Folder created", "success", 2000);
+    }
+  }
+
   // Wheel of Life handlers
   async handleWheelOfLifeRefresh() {
     await loadWheelOfLifeInternal(this);
@@ -2313,6 +2808,76 @@ export class GodModeApp extends LitElement {
       createNewSession(this);
       this.chatMessage = prompt;
       this.requestUpdate();
+    });
+  }
+
+  handleOpenSupportChat() {
+    const supportKey = "agent:main:support";
+
+    // If already on the support session, just switch to chat tab
+    if (this.sessionKey === supportKey) {
+      this.setTab("chat" as import("./navigation").Tab);
+      return;
+    }
+
+    // Save current draft before switching
+    void import("./app-chat.js").then(({ saveDraft }) => saveDraft(this));
+
+    // Add to open tabs if not already present
+    const alreadyOpen = this.settings.openTabs.includes(supportKey);
+    const openTabs = alreadyOpen
+      ? this.settings.openTabs
+      : [...this.settings.openTabs, supportKey];
+
+    this.applySettings({
+      ...this.settings,
+      openTabs,
+      sessionKey: supportKey,
+      lastActiveSessionKey: supportKey,
+      tabLastViewed: {
+        ...this.settings.tabLastViewed,
+        [supportKey]: Date.now(),
+      },
+    });
+    this.sessionKey = supportKey;
+    this.setTab("chat" as import("./navigation").Tab);
+    this.chatMessages = [];
+    this.chatStream = null;
+    this.chatStreamStartedAt = null;
+    this.chatRunId = null;
+    this.resetToolStream();
+    this.resetChatScroll();
+    void this.loadAssistantIdentity();
+
+    // Set auto-title so the tab shows "Support" immediately
+    void import("./controllers/sessions.js").then(({ autoTitleCache }) => {
+      autoTitleCache.set(supportKey, "Support");
+    });
+
+    void import("./controllers/chat.js").then(({ loadChatHistory }) => {
+      loadChatHistory(this).then(() => {
+        // If this is a fresh support session (no history), seed with welcome message
+        if (this.chatMessages.length === 0 && this.sessionKey === supportKey) {
+          this.chatMessages = [
+            {
+              role: "assistant",
+              content:
+                "**Welcome to GodMode Support**\n\n" +
+                "I have full access to your system diagnostics and GodMode knowledge base. " +
+                "I can help with:\n\n" +
+                "- Troubleshooting issues\n" +
+                "- Feature questions and configuration\n" +
+                "- Setup guidance\n" +
+                "- Escalation to the team if needed\n\n" +
+                "What can I help you with?",
+              timestamp: Date.now(),
+            } as unknown,
+          ];
+          this.requestUpdate();
+        }
+      }).catch((err: unknown) => {
+        console.error("[Support] Failed to load chat history:", err);
+      });
     });
   }
 

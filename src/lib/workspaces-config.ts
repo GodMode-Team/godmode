@@ -313,7 +313,7 @@ function normalizeWorkspaceEntry(
       Array.isArray(raw.pinnedSessions) ? (raw.pinnedSessions as unknown[]) : [],
     ),
     artifactDirs: dedupeNonEmpty(
-      Array.isArray(raw.artifactDirs) ? (raw.artifactDirs as unknown[]) : ["outputs"],
+      Array.isArray(raw.artifactDirs) ? (raw.artifactDirs as unknown[]) : ["."],
     ),
     sync: normalizeWorkspaceSyncConfig(raw.sync),
     team: normalizeTeamConfig(raw.team),

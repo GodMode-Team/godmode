@@ -11,6 +11,7 @@ import type { GatewayRequestHandler } from "openclaw/plugin-sdk";
 import { DATA_DIR, MEMORY_DIR, resolveVaultPath, DAILY_FOLDER } from "../data-paths.js";
 import { scorePulseCheck, calculateDailyScore, type FocusItem, type PulseCheckResult } from "./focus-pulse-scorer.js";
 import type { AgentLogState, CompletedItem, ActivityEntry } from "../lib/agent-log.js";
+import { getUserTimezone } from "../lib/user-config.js";
 
 type GatewayRequestHandlers = Record<string, GatewayRequestHandler>;
 
@@ -32,7 +33,7 @@ type FocusPulseState = {
 // --- Helpers ---
 
 function getTodayDate(): string {
-  return new Date().toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
+  return new Date().toLocaleDateString("en-CA", { timeZone: getUserTimezone() });
 }
 
 function emptyState(date: string): FocusPulseState {
@@ -281,7 +282,7 @@ const startMorningSet: GatewayRequestHandler = async ({ respond, context }) => {
     const tomorrow = (() => {
       const d = new Date();
       d.setDate(d.getDate() + 1);
-      return d.toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
+      return d.toLocaleDateString("en-CA", { timeZone: getUserTimezone() });
     })();
 
     // Items from the Win The Day section are "today's confirmed priorities"

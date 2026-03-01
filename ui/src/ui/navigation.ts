@@ -1,7 +1,7 @@
 import type { IconName } from "./icons.js";
 
 export const TAB_GROUPS = [
-  { label: "", tabs: ["chat", "today", "workspaces", "second-brain"] },
+  { label: "", tabs: ["chat", "today", "mission-control", "workspaces", "second-brain", "dashboards"] },
   { label: "Toolkit", tabs: ["skills", "trust", "guardrails", "options"] },
   { label: "Settings", tabs: ["config", "debug", "logs"] },
   { label: "System", tabs: ["overview", "channels", "instances", "sessions", "cron", "nodes"] },
@@ -33,7 +33,9 @@ export type Tab =
   | "debug"
   | "logs"
   | "second-brain"
-  | "intel";
+  | "intel"
+  | "mission-control"
+  | "dashboards";
 
 const TAB_PATHS: Record<Tab, string> = {
   setup: "/setup",
@@ -62,6 +64,8 @@ const TAB_PATHS: Record<Tab, string> = {
   logs: "/logs",
   "second-brain": "/second-brain",
   intel: "/intel",
+  "mission-control": "/mission-control",
+  dashboards: "/dashboards",
 };
 
 const PATH_TO_TAB = new Map(Object.entries(TAB_PATHS).map(([tab, path]) => [path, tab as Tab]));
@@ -207,6 +211,10 @@ export function iconForTab(tab: Tab): IconName {
       return "brain";
     case "intel":
       return "radio";
+    case "mission-control":
+      return "radio";
+    case "dashboards":
+      return "barChart";
     case "config":
       return "settings";
     case "debug":
@@ -265,6 +273,10 @@ export function titleForTab(tab: Tab) {
       return "Second Brain";
     case "intel":
       return "Intel";
+    case "mission-control":
+      return "Mission Control";
+    case "dashboards":
+      return "Dashboards";
     case "config":
       return "Config";
     case "debug":
@@ -323,6 +335,10 @@ export function emojiForTab(tab: Tab): string {
       return "\u{1F9E0}";
     case "intel":
       return "\u{1F4E1}";
+    case "mission-control":
+      return "\u{1F6F0}\uFE0F";
+    case "dashboards":
+      return "\u{1F4CA}";
     case "config":
       return "\u{2699}\uFE0F";
     case "debug":
@@ -354,7 +370,7 @@ export function subtitleForTab(tab: Tab) {
     case "overview":
       return "Gateway status, entry points, and a fast health read.";
     case "workspaces":
-      return "Content explorer organized by project and client.";
+      return "Projects, clients, and personal operating context.";
     case "wheel-of-life":
       return "Track balance across 8 life dimensions with scores, targets, and trends.";
     case "vision-board":
@@ -378,9 +394,13 @@ export function subtitleForTab(tab: Tab) {
     case "guardrails":
       return "Safety gates that prevent runaway loops, bad searches, and lazy responses.";
     case "second-brain":
-      return "Your context profile — identity, memory bank, and live AI packet.";
+      return "Your Obsidian-powered second brain — identity, knowledge, and live AI context.";
     case "intel":
       return "Proactive intelligence — discoveries, insights, and pattern analysis.";
+    case "mission-control":
+      return "Live command center — active agents, pipelines, and activity feed.";
+    case "dashboards":
+      return "Custom data views built by your AI ally — remix anything.";
     case "config":
       return "Edit ~/.openclaw/config.json safely.";
     case "debug":

@@ -4,6 +4,591 @@ This file tracks recent development changes so Atlas and other agents can quickl
 
 ---
 
+## 2026-03-01 — Production Hardening & Beta Pre-Flight
+
+### Why
+Major overnight audit, security hardening, and beta readiness pass. Every file in the codebase was audited. All features are wired, all security issues fixed, and onboarding is customer-ready.
+
+### Security Fixes
+- **isAllowedPath hardened (CRITICAL):** Now uses `path.resolve()` before checking, with directory-boundary separator check to prevent prefix collisions and path traversal attacks. Previously used naive `startsWith`.
+- **Dashboard ID path traversal fixed (CRITICAL):** All dashboard IDs are now sanitized through `sanitizeSlug()` — explicit `id` params can no longer contain `../` to escape the dashboards directory.
+- **Queue file mismatch fixed:** Dashboard widget was reading `queue-state.json` but actual queue data lives in `queue.json`. Widget now reads the correct file.
+
+### Code Quality
+- Removed unused imports: `basename`/`extname`/`createHash` from vault-capture.ts, `homedir` from support.ts.
+- Removed dead `shortHash()` function from vault-capture.ts.
+- Replaced duplicate `GODMODE_ROOT` definition in swarm-pipeline.ts with canonical import from data-paths.js.
+- Replaced `require("node:os")` CommonJS calls in dashboards.ts with ESM `homedir` import.
+- Fixed hardcoded "CT" timezone label in agent-log.ts — now uses `Intl.DateTimeFormat` with user's configured timezone.
+- Added JSDoc comments to `processItem`/`processAllItems` stubs in queue.ts explaining they're intentional pass-throughs.
+
+### Onboarding & Support
+- **Support chat on setup page:** Added "Need help?" banner with support chat button to both the Quick Start form and the setup checklist. Users stuck during onboarding can immediately chat with the AI support agent.
+- **Setup view** now accepts `onOpenSupportChat` prop, wired through to the existing support session system.
+- CSS for setup help banner added to setup.css.
+
+### Documentation
+- Team onboarding guide written: `VAULT/99-System/team-onboarding-guide.md` — full migration instructions for Titus, Ashley, and future team members.
+- Beta pre-flight checklist created: `VAULT/02-Projects/godmode-beta-preflight.md` — complete gap analysis including website, Stripe, license API, npm publishing.
+- Support agent knowledge base updated with all new features.
+- RECENT-CHANGES.md updated with comprehensive session summary.
+
+### Wiring Audit Results (all clean)
+- 34 method handler modules registered in index.ts
+- 8 tools registered
+- 6 hooks wired into lifecycle events
+- 21 services started or consumed indirectly
+- 0 orphaned modules, 0 dangling imports
+- Only intentional exclusion: `lifetracks.ts` (deferred, documented)
+
+---
+
+## 2026-03-01 — Per-Dashboard Persistent Sessions
+
+### Why
+Dashboards needed persistent, dedicated chat sessions — same pattern as tasks. Each dashboard gets a real session that persists history, keeps context, and lives as a proper chat tab. Click "Open Session" on any dashboard to enter its dedicated session.
+
+### What Changed
+
+**Backend: `dashboards.openSession` RPC (`src/methods/dashboards.ts`):**
+- New `sessionId` field on `DashboardManifest` — persisted in index.json and per-dashboard manifest.json
+- `dashboards.openSession` handler: returns existing sessionId or generates new `agent:main:webchat-{uuid}` format
+- Same pattern as `tasks.openSession` — session created on first click, reused thereafter
+
+**Frontend: "Open Session" button (`ui/src/ui/views/dashboards.ts`):**
+- Active dashboard header has "Open Session" button next to Refresh
+- Shows "Working..." when the session is actively processing
+- Click navigates to Chat tab with the dashboard's dedicated session (adds to open tabs, sets auto-title)
+
+**Session Navigation (`ui/src/ui/app.ts`):**
+- `handleDashboardOpenSession` — calls `dashboards.openSession` RPC, navigates to chat tab
+- Seeds new sessions with dashboard context prompt (title, id, widgets) so agent knows what to edit
+- Follows exact same pattern as `handleMissionControlOpenTaskSession` / `onStartTask`
+
+### Files Modified
+- `src/methods/dashboards.ts` — `sessionId` on manifest, `dashboards.openSession` RPC
+- `ui/src/ui/controllers/dashboards.ts` — `sessionId` on frontend type
+- `ui/src/ui/app.ts` — `handleDashboardOpenSession` handler
+- `ui/src/ui/app-view-state.ts` — handler type
+- `ui/src/ui/app-render.ts` — wire `onOpenSession` + `isWorking` props
+- `ui/src/ui/views/dashboards.ts` — "Open Session" button
+- `ui/src/styles/dashboards.css` — session button styles
+
+---
+
+## 2026-03-01 — Dashboard Visual Quality Fix
+
+### Why
+Agent-generated dashboards had gorgeous HTML with `<style>` blocks, SVG charts, gradients, and animations — but `sanitizeHtmlFragment()` stripped `<style>` tags entirely. Dashboards rendered as unstyled plain HTML.
+
+### What Changed
+
+**Dashboard-Specific Sanitizer (`ui/src/ui/markdown.ts`):**
+- New `sanitizeDashboardHtml()` with extract-before-sanitize architecture
+- `extractDashboardParts()` pulls CSS from `<style>` blocks and body from full HTML documents
+- DOMPurify sanitizes only HTML (style tag in FORBID_TAGS to prevent mangling)
+- `scopeCss()` prefixes all selectors with `.dashboard-render` — prevents leaks
+- Handles `@keyframes` (unscoped), `@media`/`@supports` (header pass-through), `@import` (stripped)
+- SVG tags and attributes fully supported
+
+**Two-Div Container Pattern (`ui/src/ui/views/dashboards.ts`, `dashboards.css`):**
+- `.dashboards-content` — outer container with default background/color
+- `.dashboard-render` — inner wrapper (no competing styles) where scoped CSS targets
+
+**Widget CSS Upgrades (`ui/src/styles/dashboards.css`):**
+- Gradient backgrounds, box-shadows, backdrop-blur on `.widget`
+- Glow effects on `.stat`, gradient progress bars, pulsing status dots
+- New utility classes: `.glow`, `.gradient-text`, `.card-accent`, `.bar-chart`, `.chart-container`
+
+**Dashboard Builder Skill Rewrite (`skills/dashboard-builder/SKILL.md`):**
+- SVG chart patterns (donut, gauge, sparkline, bar chart) with copy-paste templates
+- Visual design principles (hierarchy, chart-everything, depth, motion)
+- Full example "Command Center" dashboard with live data integration
+
+---
+
+## 2026-03-01 — Multi-Engine Routing + Parallel Processing + Adversarial Code Review
+
+### Why
+Inspired by a production agent swarm system that routes tasks to different AI engines (Codex for backend, Claude for frontend, Gemini for design) and runs adversarial multi-model code reviews on every PR. GodMode had the orchestration but was Claude-only with serial processing.
+
+### What Changed
+
+**Multi-Engine Support (`src/lib/resolve-claude-bin.ts` → multi-engine resolver):**
+- New `AgentEngine` type: `"claude" | "codex" | "gemini"`
+- `resolveAgentBin(engine)` — resolves any engine's CLI binary path
+- `buildSpawnArgs(engine, prompt)` — builds engine-specific spawn arguments (Claude uses `-p`, Codex uses `exec`, Gemini uses `-p`)
+- `isEngineAvailable(engine)` — checks if an engine's CLI is installed
+- Per-engine env var support: `CLAUDE_BIN`, `CODEX_BIN`, `GEMINI_BIN`
+- Backward-compatible: `resolveClaudeBin()` still works
+
+**Agent Roster Engine Field (`src/lib/agent-roster.ts`):**
+- New `engine` frontmatter field on persona files (e.g., `engine: codex`)
+- Parsed from frontmatter, included in `PersonaProfile` and `listRoster()` output
+- Consciousness heartbeat shows engine labels in roster section (e.g., `[codex]`)
+
+**Queue Processor Multi-Engine Routing (`src/services/queue-processor.ts`):**
+- Spawn resolution chain: explicit `item.engine` > persona `engine` > default `claude`
+- Falls back to claude if requested engine isn't installed
+- Passes `OPENAI_API_KEY` for Codex, `GEMINI_API_KEY` for Gemini to child processes
+- Log messages include engine name: `Spawned Ops Runner agent [codex] for "task"`
+
+**Parallel Processing (5x throughput):**
+- `maxParallel` increased from 2 → 5
+- New 10-minute fast polling loop (`startPolling()`) — recovers orphans + processes pending items
+- Independent of hourly consciousness heartbeat (which still runs for other duties)
+- Wired into gateway startup via `queueProcessor.startPolling()`
+
+**Adversarial Multi-Model Code Review (`src/services/coding-orchestrator.ts`):**
+- `runAdversarialReviews()` — runs all available engines (Codex, Claude, Gemini) in parallel on every PR
+- Each reviewer gets the PR diff and a focused review prompt (bugs, security, edge cases — not style)
+- Codex uses native `codex exec review` when available, falls back to prompt-based
+- Reviews post as PR comments via `gh pr comment` so human sees them before merge
+- Fire-and-forget: runs after PR creation, doesn't block the pipeline
+- Responses flagging "CRITICAL:" are tracked as failed reviews (informational, not blocking)
+
+**Queue State + Tools:**
+- `QueueItem` has new optional `engine` field
+- `queue_add` tool accepts `engine` param
+- `queue.add` RPC passes through `engine`
+
+### Starter Persona Updates
+- `engineering/frontend-developer.md` — `engine: claude` (fast, good at UI)
+- `operations/ops-runner.md` — `engine: codex` (thorough, good at multi-file ops)
+
+---
+
+## 2026-03-01 — Dashboard Visual Quality Fix
+
+### Why
+Agent-generated dashboards looked terrible — agents create HTML with `<style>` blocks, SVG charts, gradients, and animations, but `sanitizeHtmlFragment()` stripped `<style>` tags and all SVG elements. The result was unstyled plain text with no graphics.
+
+### What Changed
+
+**Dashboard-specific sanitizer (`ui/src/ui/markdown.ts`):**
+- New `sanitizeDashboardHtml()` function with expanded allowlists
+- Allows `<style>` tags — CSS is auto-scoped to `.dashboards-content` to prevent leaks
+- Allows SVG elements: `svg`, `path`, `circle`, `rect`, `line`, `text`, `g`, `defs`, gradients, `animate`, etc.
+- Allows SVG attributes: `viewBox`, `d`, `fill`, `stroke`, `stroke-dasharray`, transforms, etc.
+- CSS scoping: walks CSS rules, prefixes selectors with `.dashboards-content`, preserves `@keyframes` unscoped, strips `@import`
+- `<script>`, `<iframe>`, event handlers still stripped (security preserved)
+
+**Dashboard view (`ui/src/ui/views/dashboards.ts`):**
+- Switched from `sanitizeHtmlFragment()` to `sanitizeDashboardHtml()` for rendering dashboard content
+
+**Widget CSS (`ui/src/styles/dashboards.css`):**
+- `.widget` — gradient background, box-shadow, backdrop-blur, hover lift
+- `.stat` — text-shadow glow effect using accent color
+- `.progress-bar`/`.progress-fill` — gradient fill, glow shadow, smooth animation
+- `.badge` variants — subtle glow shadows
+- New utility classes: `.glow`, `.gradient-text`, `.card-accent` (with status variants), `.status-dot` (pulsing), `.chart-container`, `.bar-chart`/`.bar-row`/`.bar-fill` (horizontal bar charts), SVG chart defaults
+
+**Dashboard builder skill (`skills/dashboard-builder/SKILL.md`):**
+- Complete rewrite teaching agents visual design
+- Removed "NO `<style>` tags" rule — replaced with full `<style>` support documentation
+- Added SVG chart patterns: donut charts, gauge meters, sparklines, horizontal bar charts
+- Added visual design principles: hierarchy, chart-everything, depth, color-with-purpose, motion
+- Rich example dashboard: "Command Center" with SVG donut, bar charts, sparklines, animations
+- Documented which tags/attrs are allowed vs stripped
+
+---
+
+## 2026-03-01 — Agent Roster System + Prosper as General
+
+### Why
+Inspired by the "agents as team roles" pattern (markdown persona files organized by department). GodMode already had the hard part (queue processor, swarm pipeline, mission control). This adds the persona layer so Prosper can manage a team of specialized agents.
+
+### What Changed
+
+**Agent Roster (`src/lib/agent-roster.ts` — new):**
+- Loads persona markdown files from vault (`VAULT/99-System/agent-roster/`) or fallback (`~/godmode/memory/agent-roster/`)
+- Frontmatter-driven: `name`, `taskTypes`, `swarmStages` fields route tasks to the right persona
+- `resolvePersona(taskType, hint?)` — finds best persona for a queue item type
+- `resolveSwarmPersona(stage)` — finds persona for swarm design/build/qc stages
+- `formatHandoff(ctx)` — serializes agent-to-agent handoff context as markdown
+- `listRoster()` — returns all personas for UI/RPC listing
+- 30-second cache TTL, vault-first path resolution following existing patterns
+
+**Queue State (`src/lib/queue-state.ts`):**
+- Added `personaHint?: string` — slug targeting a specific roster persona
+- Added `handoff?: { fromAgent, fromTaskId, summary, deliverable }` — structured context from predecessor agent
+
+**Queue Processor (`src/services/queue-processor.ts`):**
+- `buildPromptForItem()` resolves persona and injects `## Your Role` section with persona body
+- Handoff context injected after task section when present
+- `autoQueueOverdueTasks()` now auto-assigns `personaHint` from roster when queuing overdue tasks
+- Log messages use resolved persona name instead of generic role name
+
+**Swarm Pipeline (`src/services/swarm-pipeline.ts`):**
+- `buildStagePrompt()` calls `resolveSwarmPersona(stage)` for each stage
+- Persona body augments identity line for design, build, and qc stages
+- Stage-specific instructions (safety rules, copy pipeline) remain unchanged
+
+**Queue Add Tool (`src/tools/queue-add.ts`):**
+- New params: `persona` (slug), `handoff_summary`, `handoff_deliverable`
+- Enables agent-to-agent handoff: Agent A queues work for a specific persona with context
+
+**Queue RPC (`src/methods/queue.ts`):**
+- `queue.add` accepts `personaHint` passthrough
+- New `queue.roster` RPC returns all loaded personas
+
+**Mission Control (`ui/src/ui/controllers/mission-control.ts`):**
+- `agentRoleName()` uses `personaHint` slug for display name when available
+- Queue items show persona names (e.g., "Frontend Developer") instead of generic "Builder"
+
+**Consciousness Heartbeat (`src/services/consciousness-heartbeat.ts`):**
+- `appendRosterContext()` appends a "## Your Team (Agent Roster)" section to CONSCIOUSNESS.md on every hourly sync
+- Groups personas by category with slugs and task type mappings
+- Replaces any existing roster section to avoid duplication
+- Runs before vault mirror so Prosper and all agents see the current team
+
+**Starter Persona Templates:**
+- `~/godmode/memory/agent-roster/_defaults/researcher.md` — research + url tasks
+- `~/godmode/memory/agent-roster/engineering/frontend-developer.md` — coding + build stage
+- `~/godmode/memory/agent-roster/operations/ops-runner.md` — ops + task
+
+**Trust Tracker Integration:**
+- `resolvePersona()` now prefers higher-trust personas when multiple match the same task type
+- In-memory `_trustScores` cache in `agent-roster.ts` populated by consciousness heartbeat via `setTrustScores()`
+- Consciousness heartbeat shows trust scores next to each persona in the roster section (e.g., "trust: 8/10 ^")
+- Queue item approval → auto-rates persona at 8/10 via `submitTrustRating()` in `queue.ts`
+- Queue item permanent failure → auto-rates persona at 3/10 in `queue-processor.ts`
+- Mission control shows toast prompting user to rate in Trust Tracker after approving a queue item
+- `submitTrustRating()` and `getTrustScore()` exported from `trust-tracker.ts` for programmatic use
+
+### How It Works (End-to-End)
+1. User defines team roles as `.md` files in vault or `~/godmode/memory/agent-roster/`
+2. Consciousness heartbeat syncs roster to CONSCIOUSNESS.md → Prosper sees the team (with trust scores)
+3. When Prosper sets the day and creates tasks, it knows which personas to assign
+4. Tasks auto-queue with persona routing (type-based + roster match, trust-weighted)
+5. Queue processor spawns agents with persona identity + task instructions + handoff context
+6. Agents can hand off to other personas via `queue_add` with structured context
+7. On completion: auto-rated (8 on approval, 3 on failure) + user prompted to rate
+8. Trust scores feed back into persona resolution — best performers get routed more work
+9. Mission control shows who's working with persona names
+10. No roster files = graceful fallback to existing behavior (zero breakage)
+
+---
+
+## 2026-02-28 — Zero-Discipline Auto-Capture Pipelines + Obsidian Headless Sync
+
+### Why
+The vault-first data layer was complete but the vault didn't grow automatically. A zero-discipline second brain means the user never has to manually file, categorize, or organize anything. GodMode is the brain's autonomic nervous system — it captures, routes, distills, and syncs automatically.
+
+### What Changed
+
+**Vault Capture Service (`src/services/vault-capture.ts` — new):**
+Five auto-capture pipelines that run on every consciousness heartbeat tick:
+1. **Scout → Vault (Smart Routing)**: Findings route directly to the RIGHT folder — no inbox dumping. X Intelligence batched into daily digests (`VAULT/10-Discoveries/{date}-x-intelligence.md`), releases → individual `Discoveries/` notes, ClawHub skills → `Resources/Skills/`. Inbox reserved for user captures and agent outputs.
+2. **Sessions → Daily Notes**: Claude Code session summaries appended to `VAULT/01-Daily/{date}.md` under `## Agent Sessions`. Agent-log markdown also mirrored to `VAULT/07-Agent-Log/`.
+3. **Queue Outputs → Inbox**: Agent queue task outputs from `~/godmode/memory/inbox/` copied to vault inbox with `source: queue-agent` frontmatter for later PARA triage.
+4. **Inbox → PARA Auto-Processing**: Mature inbox items (24h+ old) auto-categorized into PARA folders using frontmatter tags and content heuristics. Classification rules for research, people, companies, projects, knowledge, agent outputs. Gives user 24 hours to review before auto-filing.
+5. **Progressive Summarization**: Conservative enhancement for substantial human-authored notes only:
+   - Layer 1 (7+ days): TL;DR callout extracted from first substantial paragraph
+   - Layer 2 (30+ days): Key Insights section from bold text
+   - Layer 3 (60+ days): Connections section linking to related notes via keyword overlap
+   - Skips auto-generated content (scout digests, agent outputs, releases, skills)
+   - Only processes notes > 500 chars, max 5 per run
+
+State tracked in `~/godmode/data/vault-capture-state.json` — idempotent, never re-processes.
+
+**Obsidian Headless Sync (`src/services/obsidian-sync.ts` — new):**
+Integration with `obsidian-headless` CLI (`ob`) for vault sync without desktop app:
+- Auto-detects `ob` CLI availability on gateway start
+- Supports three modes: `continuous` (watches for changes), `manual` (sync on demand), `disabled`
+- Continuous mode auto-restarts on crash after 60s delay
+- Config persisted in `~/godmode/data/obsidian-sync-config.json`
+- Wired into gateway lifecycle (init on start, shutdown on stop)
+
+**New RPC Handlers (added to `src/methods/second-brain.ts`):**
+- `secondBrain.obsidianSyncStatus` — returns sync availability, running state, linked status
+- `secondBrain.obsidianSyncTrigger` — manual one-time sync
+- `secondBrain.obsidianSyncSetMode` — set continuous/manual/disabled
+- `secondBrain.captureStatus` — pipeline status (counts, last run, active pipelines)
+- `secondBrain.captureRunNow` — trigger all capture pipelines immediately
+
+**Consciousness Heartbeat Wiring (`src/services/consciousness-heartbeat.ts`):**
+- Added `runAllCapturePipelines()` call as fire-and-forget during hourly tick
+- Broadcasts `secondBrain:capture` events with capture/processing counts
+
+**Gateway Lifecycle (`index.ts`):**
+- Obsidian Sync service initialized during `gateway_start` (after queue processor)
+- Clean shutdown during `gateway_stop`
+
+### Effect
+The vault now grows automatically from five sources: scout intelligence, Claude Code sessions, agent queue outputs, consciousness sync, and research additions. Inbox items auto-route into the right PARA folder. Older notes get progressively enhanced with summaries and cross-links. With Obsidian headless sync enabled, all of this pushes to every device instantly — phone, tablet, any computer with Obsidian — even when the desktop app isn't open.
+
+---
+
+## 2026-02-28 — Second Brain → Obsidian Vault-First Architecture
+
+### Why
+The "Second Brain" label was cosmetic — data lived in flat `~/godmode/memory/` files with minimal Obsidian integration (only daily briefs touched the vault). A real second brain IS the Obsidian vault. GodMode should be the brain's autonomic nervous system — automatically capturing, organizing, and surfacing knowledge so the user never has to manually maintain it.
+
+### What Changed
+
+**Vault Path Foundation (`src/lib/vault-paths.ts` — new):**
+- PARA-inspired folder constants: `00-Inbox` through `99-System`, plus `06-Brain`, `08-Identity`, `10-Discoveries`
+- Vault-first path resolution with graceful fallback to `~/godmode/memory/`
+- `resolveWithFallback()`, `resolveWritePath()` — try vault, fall back to local
+- Specific resolvers for all data types: identity, people, companies, research, consciousness, knowledge
+- `ensureVaultStructure()` — idempotent creation of PARA folders
+- `getVaultHealth()` — note counts per folder, inbox count, last activity timestamp
+- Vault manifest system for migration state tracking
+
+**Migration System (`src/lib/vault-migrate.ts` — new):**
+- Non-destructive copy (never moves) from `~/godmode/memory/` → vault PARA folders
+- Identity files → `VAULT/08-Identity/`
+- Memory bank (people, companies) → `VAULT/06-Brain/People/`, `VAULT/06-Brain/Companies/`
+- Knowledge (curated, opinions, tacit) → `VAULT/06-Brain/Knowledge/`
+- Research → `VAULT/04-Resources/Research/`
+- Consciousness files → `VAULT/99-System/`
+- Auto-triggers on first Second Brain RPC call if vault exists but migration hasn't run
+- `secondBrain.migrateToVault` RPC for manual trigger
+
+**RPC Handler Rewiring (`src/methods/second-brain.ts`):**
+- All 7 existing handlers (identity, memoryBank, aiPacket, sources, research, etc.) now resolve vault-first
+- Security checks updated: `isAllowedPath()` accepts both vault and `~/godmode/` paths
+- Brain search scans vault folders when available
+- Sources handler: Obsidian vault is now the PRIMARY source (was just one option among many)
+- 3 new RPCs: `secondBrain.vaultHealth`, `secondBrain.inboxItems`, `secondBrain.migrateToVault`
+
+**Consciousness Sync → Vault Mirror (`src/services/consciousness-heartbeat.ts`):**
+- After each hourly sync tick, CONSCIOUSNESS.md and WORKING.md are mirrored to `VAULT/99-System/`
+- Manual sync (`secondBrain.sync`) also mirrors to vault
+
+**UI Dashboard (`ui/src/ui/views/second-brain.ts`):**
+- Vault health bar at top of Second Brain tab showing connection status, note counts, inbox badge
+- New `VaultHealthData` type for vault stats
+- Controller loads vault health alongside every subtab
+- Updated subtitle: "Your Obsidian-powered second brain"
+- CSS: `.vault-health-bar`, `.vault-health-connected`, `.vault-health-inbox-badge`
+
+### New Vault Structure (extends existing PARA)
+```
+VAULT/
+├── 06-Brain/          ← NEW: permanent knowledge (people, companies, knowledge)
+├── 08-Identity/       ← NEW: identity files editable in Obsidian
+├── 10-Discoveries/    ← NEW: promoted scout findings
+└── 99-System/         ← EXTENDED: CONSCIOUSNESS.md + WORKING.md mirror
+```
+
+---
+
+## 2026-02-28 — Organizational Intelligence + Dashboards
+
+### Why
+Two critical gaps: (1) Files were routed by type, not context. Research scattered across 3+ directories with no search, no relationship detection, and no proactive organization. (2) No dashboards — users couldn't visualize their data in custom views despite GodMode having 33 data source groups (~150+ RPCs).
+
+### What Changed
+
+**Organizational Intelligence:**
+- Default workspace `artifactDirs` changed from `["outputs"]` to `["."]` — scans entire workspace root
+- Scan depth increased 4→6, item cap 200→500
+- 5 new workspace RPCs: `browseFolder`, `search`, `createFolder`, `moveFile`, `renameFile`
+- 3 new Second Brain RPCs: `fileTree` (recursive tree of memory/), `search` (cross-scope search), `consolidateResearch` (detect+move scattered research)
+- New `org-sweep.ts` service — hourly read-only health check: stale inbox files, scattered research, near-duplicate titles (Jaccard similarity)
+- Org sweep wired into consciousness heartbeat tick (fire-and-forget pattern)
+- UI: Workspace folder browser with breadcrumbs, search, new folder creation
+- UI: Second Brain "Files" subtab with expandable tree browser and global search
+
+**Dashboards:**
+- New `dashboards.ts` backend with 6 RPCs: `list`, `get`, `save`, `remove`, `setActive`, `widgetData`
+- 16 widget data types: tasks-summary, tasks-today, focus-pulse, goals-progress, agent-activity, queue-status, coding-status, trust-scores, wheel-of-life, intel-highlights, recent-files, brief-summary, weather, streak-stats, workspace-stats, calendar-today
+- Storage: `~/godmode/data/dashboards/{id}/index.html` + manifest.json
+- New "Dashboards" tab in sidebar navigation
+- Gallery view (card grid with create/delete) + active dashboard view (sanitized HTML render)
+- Widget CSS utility classes: `.widget`, `.stat`, `.grid-2/3/4`, `.progress-bar`, `.badge`, `.metric-row`
+- `"style"` attribute added to HTML sanitizer allowedAttrs for dashboard inline styles
+- Dashboard builder skill (`skills/dashboard-builder/SKILL.md`) — teaches agents the full data catalog, CSS conventions, and example layouts
+- "Create via Chat" flow seeds conversation with dashboard creation prompt
+
+### Files Created
+- `src/methods/dashboards.ts` — Dashboard CRUD + 16 widget data fetchers
+- `src/services/org-sweep.ts` — Organizational health sweep service
+- `ui/src/ui/controllers/dashboards.ts` — Dashboard state management
+- `ui/src/ui/views/dashboards.ts` — Gallery + active dashboard views
+- `ui/src/styles/dashboards.css` — Dashboard + widget utility styles
+- `skills/dashboard-builder/SKILL.md` — Agent instructions + full data catalog
+
+### Files Modified
+- `src/lib/workspaces-config.ts` — Default artifactDirs `["."]`
+- `src/methods/workspaces.ts` — browseFolder/search/createFolder/moveFile/renameFile RPCs, scan depth+cap increase
+- `src/methods/second-brain.ts` — fileTree/search/consolidateResearch RPCs
+- `src/services/consciousness-heartbeat.ts` — Wire org-sweep into tick
+- `index.ts` — Register dashboardsHandlers
+- `ui/src/ui/navigation.ts` — Add "dashboards" tab
+- `ui/src/ui/app-view-state.ts` — Dashboard + file browsing state fields + handlers
+- `ui/src/ui/app.ts` — Dashboard + file browsing handler implementations
+- `ui/src/ui/app-render.ts` — Dashboard render block, workspace browse props, Second Brain file props
+- `ui/src/ui/app-settings.ts` — Auto-load dashboards + file tree on tab navigate
+- `ui/src/ui/views/workspaces.ts` — Workspace browser with breadcrumbs/search/folder nav
+- `ui/src/ui/views/second-brain.ts` — "Files" subtab with tree browser + global search
+- `ui/src/ui/controllers/workspaces.ts` — browseFolder/search/createFolder/move/rename controller functions
+- `ui/src/ui/markdown.ts` — Add "style" to allowedAttrs
+- `ui/src/styles.css` — Import dashboards.css
+- `ui/src/styles/workspaces.css` — Workspace browser styles
+- `ui/src/styles/second-brain.css` — Files tab styles
+
+---
+
+## 2026-02-28 — Today Tab Split Layout: Tasks Left + Brief Right
+
+### Why
+The Today tab was a single-column daily brief with tasks embedded as markdown checkboxes. This was a constant source of friction (NBSP bugs, bidirectional sync, surgical toggles) and the brief couldn't show queue status, agent indicators, or session links. Tasks needed a proper task UI, and the brief needed to be just a briefing document.
+
+### What Changed
+
+**Two-column layout:** Tasks on the left (wider, 3fr), daily brief on the right (2fr). Toolbar spans full width above both columns. Agent Log toggle replaces the right column content only — tasks stay visible.
+
+**Task panel features:**
+- Inline "Add task" form creates tasks with today's date
+- Reuses `renderAllTaskRow()` from workspaces.ts — full queue-aware rendering (pulsing dot for processing, Review button for review, Start button for new)
+- "Show N completed" toggle for tasks completed today
+- Inline editing (click title to edit)
+- Sorted by due date, then priority
+
+**Backend:** `tasks.today` RPC now accepts `includeCompleted` param — returns tasks completed today alongside pending/overdue tasks.
+
+**Controller:** New `loadTodayTasksWithQueueStatus()` fetches `tasks.today` and `queue.list` in parallel, merges by `sourceTaskId`. Same pattern as the Work tab's loader.
+
+**Bug fix:** `handleMyDayTaskStatusChange` was wrapping params in `{ updates: {...} }` but the backend expects flat params `{ id, status, completedAt }`. Fixed.
+
+### Files Modified
+- `ui/src/ui/views/my-day.ts` — Rewritten to two-column layout with task panel, agent log helper, add task form
+- `ui/src/ui/views/workspaces.ts` — Exported `renderAllTaskRow`, `sortTasks`, and helper functions
+- `ui/src/ui/controllers/my-day.ts` — New `loadTodayTasksWithQueueStatus()`, updated `loadMyDay()`
+- `src/methods/tasks.ts` — Added `includeCompleted` param to `tasks.today` RPC
+- `ui/src/styles/my-day.css` — Two-column grid, removed orphaned task CSS (old `.today-task-*` classes)
+- `ui/src/ui/app.ts` — New state fields + handlers for create/edit/update/toggle-completed
+- `ui/src/ui/app-view-state.ts` — Type declarations for new fields and handlers
+- `ui/src/ui/app-render.ts` — Wired new task panel props
+
+---
+
+## 2026-02-28 — Unified Workflow: Session Continuity + Queue-Aware Surfaces
+
+### Why
+The 5 surfaces (Chat, Today, Work, Mission Control, Second Brain) were disconnected. Clicking a task in Work opened a blank session even when agents had already done work on it. Mission Control had no way to open an agent's working session. The Work tab had no visibility into what agents were doing. "Approve" button semantics were unclear. Right column buttons were cut off.
+
+### What Changed
+
+**1. Session-Scoped Queue Context Injection (the linchpin)**
+- When a user opens a task session, Atlas now immediately knows about any autonomous queue work done on that task
+- Reverse lookup chain: `sessionKey` → `tasks.json` → `queue.json` → read output file
+- For "processing" items: injects "an agent is currently working on this"
+- For "review" items: injects full output content so Atlas can present findings naturally
+- Global queue injection still works but skips items already covered by session-scoped injection
+
+**2. Work Tab Queue-Aware Status Indicators**
+- Each task row now shows live agent status:
+  - Pulsing green dot + "Builder working..." for processing items
+  - Teal "Review" button for items ready for review
+  - "Start" button (unchanged) for tasks with no queue work
+- New `loadAllTasksWithQueueStatus()` fetches tasks + queue in parallel and merges by `sourceTaskId`
+
+**3. Mission Control "Open Session" Button**
+- Active agent cards now show "Open" button (navigates to agent's working session) or "Open Task" button (navigates to linked task session)
+- Uses same navigation pattern as Today tab task opening
+
+**4. "Approve" → "Done" Rename**
+- Clearer semantics: "Done" means mark the review item as completed
+
+**5. Right Column Width Fix**
+- `.mc-col-side` width increased from 320px to 380px
+- Agent card headers now flex-wrap so buttons don't overflow
+
+**6. Orphaned Queue Item Recovery**
+- `recoverOrphaned()` now checks if output file exists before resetting
+- If output exists → recovers to "review" status (not "pending")
+- Prevents loss of completed autonomous work when agent PIDs die
+
+### Files Modified
+- `index.ts` — Session-scoped queue context injection in `before_prompt_build`
+- `src/services/queue-processor.ts` — Improved `recoverOrphaned()` with output file detection
+- `ui/src/ui/views/workspaces.ts` — Queue status rendering in task rows
+- `ui/src/ui/controllers/workspaces.ts` — `loadAllTasksWithQueueStatus()` function
+- `ui/src/ui/views/mission-control.ts` — "Done" rename, Open/Open Task buttons
+- `ui/src/ui/controllers/mission-control.ts` — `childSessionKey` on AgentRunView
+- `ui/src/ui/app.ts` — `handleMissionControlOpenSession` + `handleMissionControlOpenTaskSession`
+- `ui/src/ui/app-view-state.ts` — Type declarations for new handlers
+- `ui/src/ui/app-render.ts` — Wired new props, replaced loadAllTasks calls
+- `ui/src/ui/app-settings.ts` — Updated workspace loader import
+- `ui/src/styles/mission-control.css` — Width fix, flex-wrap, Open Session button styles
+- `ui/src/styles/workspaces.css` — Queue status indicator styles
+
+---
+
+## 2026-02-28 — Daily Brief Structure Optimization
+
+### Why
+The daily brief had 15 sections with redundant data (Day N appeared 3x, streak counter was optional) and the most actionable content (Win The Day tasks) was buried below the fold behind Chief Aim and LifeTrack sections. Body Check scores were informational but positioned too prominently.
+
+### What Changed
+- **Header collapsed**: Date + weather + day type in one compact line (removed standalone Day N counter)
+- **Chief Aim**: Demoted from H2 section to a single blockquote — always visible, not a landmark
+- **Win The Day moved to #1 position**: Tasks are now the first real content after the context line
+- **LifeTrack collapsed**: From a 3-line H2 section to a single clickable line after tasks
+- **Calendar + Communications merged**: Single "Calendar & Comms" H2 section
+- **Body Check moved below Notes**: Informational, not guilt-tripping at 7AM
+- **Added scaffolding**: Today's Impact (Evening), Evening Review, Bedtime LifeTrack, and Retain sections are now pre-scaffolded as placeholders
+- **Notes section**: Now has "never touched by AI" label
+- **Optional streak counter** moved to conditional display (only shown if configured in CONTEXT.md)
+
+### Files Modified
+- `src/methods/brief-generator.ts` — Restructured `generateDailyBrief()` assembly (lines ~1218-1390)
+
+### Compatibility
+- Section keyword searches (lifetracks.ts `extractSection`) still work — "Calendar & Comms" matches "Calendar" partial keyword
+- Evening capture `upsertH2Section` is independent of section ordering
+- All existing H2 names preserved except Calendar→"Calendar & Comms" and LifeTrack/Chief Aim removed as H2s
+
+---
+
+## 2026-02-28 — Phase 2: Autonomous Queue + Proactive Task Processing
+
+### Why
+Phase 1 built Mission Control (visibility layer). Phase 2 adds the proactive execution engine — a queue system where users/ally can drop tasks, URLs, ideas, and research topics that get processed by background sub-agents. Output goes to `~/godmode/memory/inbox/` for human review. The system is anti-fragile: failures auto-diagnose, write learnings, and retry with improved prompts.
+
+### What Was Built
+
+**Queue Backend (4 new files):**
+- `src/lib/queue-state.ts` — File-locked queue state (`~/godmode/data/queue.json`) with curated agent type taxonomy: Builder, Researcher, Analyst, Creative, Reviewer, Ops, Agent, Reader, Explorer
+- `src/methods/queue.ts` — 9 RPC handlers (add, list, update, approve, remove, process, processAll, prDiff, readOutput). Human-in-the-loop: queue.approve is the ONLY path to "done" status
+- `src/tools/queue-add.ts` — Agent-callable `queue_add` tool so the ally can drop items into queue during conversations
+- `src/services/queue-processor.ts` — Singleton agent spawner with self-evolving failure handling. Failed tasks spawn a diagnostic agent → writes learning to `~/godmode/memory/learnings/INDEX.md` → generates improved retry prompt → retries (max 2). Includes `autoQueueOverdueTasks()` for proactive task capture
+
+**Mission Control UX Overhaul:**
+- Agent badges now show human-readable role names ("Builder", "Researcher", "Analyst") instead of raw types ("CODING", "SWARM")
+- New "Ready for Review" section with Approve + View Output buttons
+- New "Pending Queue" section with priority badges
+- Clickable failed items → sidebar error report with retry button
+- "View PR" opens sidebar with diff instead of navigating to GitHub
+- Stats banner shows queue depth + review count
+- Updated empty state: "Drop tasks into the queue or ask your ally to spawn agents"
+
+**Proactive Systems:**
+- Consciousness heartbeat auto-queues overdue tasks and processes pending items every 60 minutes
+- `before_prompt_build` hook injects queue review summaries so ally proactively surfaces completed work
+- Morning brief includes "Your Agents Overnight" section with completed work summary
+- Meeting prep enrichment: attendee names matched against `~/godmode/memory/bank/people/*.md` for context
+
+**Task → Session Linking:**
+- Win The Day tasks in daily brief get `[→ Review]` or `[→ Open]` session links
+- `?openTask=` URL parameter in web UI for deep linking from Obsidian
+- Sessions created lazily on click via `tasks.openSession`
+
+### Key Design Decisions
+- **Human-in-the-loop**: Queue items finish at "review", never "done". Only `queue.approve` can transition to "done"
+- **Self-evolving failures**: Diagnostic agent writes learnings to INDEX.md, future prompts inject relevant learnings
+- **Queue vs Tasks**: Queue items = work orders for agents. Tasks = user's commitment list. `sourceTaskId` links them
+
+### Files Changed
+- **New:** `src/lib/queue-state.ts`, `src/methods/queue.ts`, `src/tools/queue-add.ts`, `src/services/queue-processor.ts`
+- **Modified:** `index.ts`, `src/services/consciousness-heartbeat.ts`, `src/methods/brief-generator.ts`, `ui/src/ui/controllers/mission-control.ts`, `ui/src/ui/views/mission-control.ts`, `ui/src/styles/mission-control.css`, `ui/src/ui/app-view-state.ts`, `ui/src/ui/app.ts`, `ui/src/ui/app-render.ts`, `ui/src/ui/app-gateway.ts`
+
+---
+
 ## 2026-02-28 — Prompt Injection Defense System (Three Security Shields)
 
 ### Why
@@ -50,7 +635,7 @@ Three new deterministic security gates plus an automated red-team audit system:
 
 ---
 
-## 2026-02-28 — Gateway Token Auto-Generation + Prosper X Sandbox
+## 2026-02-28 — Gateway Token Auto-Generation + X Scanner Sandbox
 
 ### Gateway Token Security (GodMode Plugin)
 Added automatic gateway auth token generation to both onboarding paths (in-app and CLI script). This was the #1 recommendation from the security audit — high-value, zero-friction for clients.
@@ -67,16 +652,15 @@ When a new user activates their license (via `onboarding.activateLicense` RPC or
 **Audit finding fixed:**
 Atlas originally reported the gateway token as missing because the audit checked `gateway.token` (flat key) while the actual config uses `gateway.auth.token` (nested). All code now checks both paths.
 
-### Prosper X Sandbox (Separate Local Project)
-Built a fully sandboxed X/Twitter agent architecture at `~/Projects/prosper-x-sandbox/`. This is local infrastructure, NOT part of the GodMode plugin. Follows Meta's Rule of Two — Prosper processes untrusted inputs (A) and accesses sensitive data (B), so external actions (C) require human approval.
+### X Scanner Sandbox (Separate Local Project)
+Built a fully sandboxed X/Twitter agent architecture for community engagement scanning. This is local infrastructure, NOT part of the GodMode plugin. Follows Meta's Rule of Two — the scanner processes untrusted inputs (A) and accesses sensitive data (B), so external actions (C) require human approval.
 
 **Architecture:**
-- `src/sanitize.ts` — Input sanitizer with 4 defense layers: Unicode normalization (homoglyphs, zero-width chars, NBSP), injection pattern detection (8 categories: direct injection, role manipulation, output control, delimiter injection, data exfiltration, encoded payloads, multi-step manipulation, jailbreak keywords), length enforcement, structural wrapping (`[EXTERNAL_TWEET]` delimiters).
-- `src/drafts.ts` — File-based draft queue. Lifecycle: `data/drafts/` → `data/approved/` or `data/rejected/` → `data/posted/`. Each draft gets a UUID. Approval writes a SHA-256 signature proving human review.
-- `src/ingest.ts` — X API v2 reader with cursor-based pagination. All content sanitized before hitting inbox. Supports manual ingest for testing.
-- `src/poster.ts` — The ONLY code path that can publish. Requires approval signature, rate-limited (48/day, 5min cooldown), full audit trail in `post-log.json`.
-- `src/review-server.ts` — Local web UI at `127.0.0.1:18800` for reviewing drafts. Approve/reject/edit interface with dark theme. Binds to localhost only.
-- `src/cli.ts` — CLI for all operations: `status`, `review`, `ingest`, `inbox`, `drafts`, `approve`, `reject`, `post`.
+- Input sanitizer with 4 defense layers: Unicode normalization, injection pattern detection (8 categories), length enforcement, structural wrapping.
+- File-based draft queue with UUID lifecycle: drafts → approved/rejected → posted. Approval writes SHA-256 signature proving human review.
+- X API v2 reader with cursor-based pagination. All content sanitized before processing.
+- Poster with human approval requirement, rate limiting (48/day, 5min cooldown), full audit trail.
+- Local review web UI at `127.0.0.1:18800` for reviewing drafts. Binds to localhost only.
 
 **Security invariants:**
 1. No auto-posting — every post requires human approval signature (SHA-256)
@@ -85,16 +669,14 @@ Built a fully sandboxed X/Twitter agent architecture at `~/Projects/prosper-x-sa
 4. Draft output validation detects credential leaks (API keys, tokens)
 5. Review server binds to 127.0.0.1 only — never exposed to network
 
-**Setup:** `cd ~/Projects/prosper-x-sandbox && cp .env.example .env` and add X API credentials. `npm run review` starts the review UI.
-
 ---
 
 ## 2026-02-28 — Agent Coding Pipeline Safety Overhaul
 
 ### Problem
-Prosper dispatched a coding agent (swarm pipeline) to build custom guardrails. The agent worked in a worktree, completed successfully, created PR #3. But:
-1. Prosper never followed up — the tool description said "no follow-up action needed"
-2. Prosper manually did `git merge` on main while there were ~38 uncommitted files (sidebar, coretex, navigation rework)
+An agent dispatched a coding agent (swarm pipeline) to build custom guardrails. The agent worked in a worktree, completed successfully, created PR #3. But:
+1. The agent never followed up — the tool description said "no follow-up action needed"
+2. The agent did `git merge` on main while there were ~38 uncommitted files (sidebar, navigation rework)
 3. Git auto-stashed the uncommitted work, merge succeeded, stash was never popped
 4. All sidebar/coretex/navigation work was trapped in stash@{0}
 5. Spawned coding agents had zero awareness of custom guardrails
@@ -291,7 +873,7 @@ Gateway restarts no longer lose in-flight tasks. `recoverOrphanedTasks()` runs o
 
 2. **Close escape hatches** (`2fc8ac1`) — Added exec bypass gate blocking `claude -p` / `--dangerously-skip-permissions` patterns in `before_tool_call`. Added stale task auto-reaping (>2h with dead PID). Removed dead `SWARM_ORCHESTRATION_HANDOFF` doc that referenced never-committed swarm files. Cleaned README.
 
-3. **Fix detached spawn** (`ff58528`) — Detached processes with `stdio: "ignore"` can't answer permission prompts, killing the agent after ~51s. Added `--dangerously-skip-permissions` flag. Resolved full binary path (`/opt/homebrew/bin/claude`) and PATH inheritance for homebrew.
+3. **Fix detached spawn** (`ff58528`) — Detached processes with `stdio: "ignore"` can't answer permission prompts, killing the agent after ~51s. Added `--dangerously-skip-permissions` flag. Resolved full binary path via `resolveClaudeBin()` helper and PATH inheritance for homebrew.
 
 4. **Smart validation gates** (`bff06e0`) — Gates now read `package.json` scripts from the target worktree before running. If the repo has no `package.json` or is missing the relevant script (lint/typecheck/test), the gate is skipped instead of failing. Fixes coding_task marking external projects as failed.
 
@@ -476,7 +1058,7 @@ Fixed 5 bugs causing duplicate tasks from daily brief sync, and implemented the 
 Fixed the consciousness sync pipeline (gold icon + hourly heartbeat). Session harvest was silently failing because the `claude` CLI refuses to run inside Claude Code sessions (CLAUDECODE env var blocks nested invocations).
 - `~/godmode/scripts/consciousness-sync.sh` — added `unset CLAUDECODE` before running Python scripts
 - `~/godmode/scripts/session-harvest.py` — swapped call priority: tries API key first (faster, no env issues), falls back to CLI; respects `OPENCLAW_STATE_DIR` for session path; better error messages
-- `~/godmode/scripts/consciousness-heartbeat.sh` — enriched CONSCIOUSNESS.md generation: reads task status from tasks.json (pending/completed/overdue counts + top 4 items), points daily brief at Obsidian vault instead of missing digest file, adds session harvest status section, dynamic carry-forward (Edison's age calculated, sobriety days computed), reads business context from new `~/godmode/memory/CONTEXT.md` instead of hardcoding
+- `~/godmode/scripts/consciousness-heartbeat.sh` — enriched CONSCIOUSNESS.md generation: reads task status from tasks.json (pending/completed/overdue counts + top 4 items), points daily brief at Obsidian vault instead of missing digest file, adds session harvest status section, dynamic carry-forward (streak counter, user context), reads business context from new `~/godmode/memory/CONTEXT.md` instead of hardcoding
 - `src/methods/consciousness.ts` — unsets CLAUDECODE in child process env; parses step statuses (harvest/clawvault/heartbeat) from script output and includes in response; raised line cap from 50 to 60
 - `~/godmode/memory/CONTEXT.md` — **new file**: editable carry-forward context (business model, architecture, pipeline) that feeds into CONSCIOUSNESS.md
 
@@ -487,8 +1069,8 @@ Built a complete `dailyBrief.generate` RPC method that assembles the daily brief
 - `~/godmode/.env` — added `GOG_CALENDAR_ACCOUNT` and `GOG_CLIENT=godmode` for calendar integration
 - **Action-item extraction**: Parses Notes, Meeting Notes, Brain Dump, and Captured sections from yesterday's daily note. Detects: unchecked checkboxes, labeled task blocks (FIXES:, EXTRA:, TODO:, ACTION ITEMS:), and prose with task-like patterns (need to, should, follow up with, send, fix, build, etc.)
 - **X Intelligence**: Uses XAI Responses API (`https://api.x.ai/v1/responses`) with `grok-4-1-fast-non-reasoning` model and `x_search` tool. Key from `~/.openclaw/.env` (XAI_API_KEY). Parses inline citation URLs from response text. bird CLI is deprecated.
-- **Weather**: Uses `wttr.in/Austin,TX?format=j1` (free, no API key). Returns temp, condition, weather code → emoji.
-- **Calendar integration**: Reads events via gog CLI, formats schedule with times + durations, calculates deep work windows, generates meeting prep section with attendee lookup hints. gog auth requires `--services calendar` flag (not just default user scope). macOS keychain ACLs must be set with `security set-generic-password-partition-list` to allow gateway process access.
+- **Weather**: Uses `wttr.in` with user-configured location (free, no API key). Returns temp, condition, weather code → emoji. Location read from `godmode-options.json` or `CONTEXT.md`.
+- **Calendar integration**: Reads events via gog CLI, formats schedule with times + durations, calculates deep work windows, generates meeting prep section with attendee lookup hints. gog auth requires `--services calendar` flag (not just default user scope).
 - **Carry-forward**: Reads yesterday's brief, extracts unchecked Win The Day items and Tomorrow Handoff items, merges (dedup) into today's Win The Day section as numbered checkboxes
 
 ### NBSP Checkbox Fix
@@ -498,10 +1080,9 @@ Non-breaking space characters (U+00A0) from paste events or contenteditable were
 - `src/methods/brief-generator.ts` — calendar error handler now detects "No auth for calendar" and shows exact fix command with `--services calendar` flag
 
 ### Calendar Auth Root Cause
-gog CLI stores OAuth tokens in macOS keychain (`gogcli` service). Two failure modes discovered:
+gog CLI stores OAuth tokens in system keychain. Two failure modes discovered:
 1. `gog auth add` without `--services calendar` defaults to user-info scope — token saves but lacks calendar permission
-2. macOS keychain ACLs block non-terminal processes (node, gateway) from reading the token — must run `security set-generic-password-partition-list` after auth to grant all local processes access
-- `~/godmode/memory/MISTAKES.md` — updated with both failure modes and fix commands
+2. Keychain ACLs may block non-terminal processes (node, gateway) from reading the token — platform-specific fix required
 
 ### Memory Consolidation & Hierarchy
 Defined and enforced a memory hierarchy so conflicting facts resolve deterministically. Added two new maintenance scripts and wired them into the weekly cron.

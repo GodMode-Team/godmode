@@ -28,8 +28,8 @@ This skill enables Atlas to:
 **SSH Hour Check:**
 
 ```bash
-# Central Time (America/Chicago)
-current_hour=$(TZ=America/Chicago date +%H)
+# Check if within SSH hours (adjust TZ to your support timezone)
+current_hour=$(TZ=${SUPPORT_TIMEZONE:-UTC} date +%H)
 if [[ $current_hour -ge 9 && $current_hour -lt 17 ]]; then
   echo "SSH allowed"
 else
@@ -170,13 +170,13 @@ godmode-support update          # Pull latest GodMode version
     {
       "id": "acme-corp",
       "name": "Acme Corporation",
-      "contact": "john@acme.com",
+      "contact": "user@example.com",
       "tailscaleHostname": "acme-corp-godmode",
       "telegramUserId": "123456789",
       "sshConsent": true,
       "consentDate": "2026-02-01",
       "timezone": "America/New_York",
-      "notes": "8GB Mac Mini, may need memory upgrade"
+      "notes": "Example hardware note"
     }
   ]
 }
@@ -309,7 +309,7 @@ When setting up a new customer Mac Mini:
 4. **Install Support CLI**
 
    ```bash
-   curl -fsSL https://godmode.ai/install-support-cli.sh | bash
+   curl -fsSL https://lifeongodmode.com/install-support-cli.sh | bash
    # Or manually copy from skills/godmode-support/scripts/support-cli.sh
    ```
 
@@ -646,6 +646,42 @@ A good onboarding interaction should:
 - Answer questions patiently
 - Log everything for admin visibility
 - Set clear expectations about GodMode capabilities
+
+---
+
+## Feature Reference (for answering user questions)
+
+When users ask about GodMode capabilities, reference this list:
+
+| Feature | Tab | Description |
+|---------|-----|-------------|
+| Daily Brief | My Day | AI-generated daily brief with tasks, calendar, intel. Always editable (contenteditable). |
+| Focus Pulse | My Day | Timed focus sessions with AI check-ins. Win the Day task curation. |
+| Task Manager | Work | Full task CRUD with priorities, due dates, brief section linking. |
+| Agent Queue | Work | Queue tasks for background AI agents. Auto-processes every 10 min. |
+| Coding Orchestrator | Work | Spawn coding agents in isolated git worktrees. PR creation, validation gates. |
+| Second Brain | Brain | Vault-first knowledge system. PARA structure in Obsidian vault. |
+| Vault Capture | Brain | Auto-capture pipelines: scout findings, sessions, queue outputs to vault. |
+| Dashboards | Dashboards | Custom data views built by AI. Per-dashboard chat sessions. |
+| Trust Tracker | Settings | Rate AI task quality 1-10. Scores inform agent assignment. |
+| Custom Guardrails | Settings (Lab) | User-defined rules for agent behavior. JSON config, not code. |
+| Safety Gates | Always on | Loop breaker, exhaustive search, persistence, prompt/output shield. |
+| Proactive Intel | Background | Auto-fetches news, X intel, market trends for daily brief. |
+| Consciousness Sync | Background | Hourly auto-sync of CONSCIOUSNESS.md with tasks, calendar, brief. |
+| Obsidian Sync | Background | Headless vault sync via `obsidian-headless` CLI (optional). |
+| Agent Roster | Background | Persona files define agent specializations. Auto-routing for queued tasks. |
+
+### Common Troubleshooting
+
+| Symptom | Fix |
+|---------|-----|
+| "Gateway Offline" in UI | `openclaw gateway restart` |
+| LICENSE_REQUIRED errors | `openclaw godmode activate GM-DEV-TEAM-2026` |
+| Chat not responding | Check gateway logs: `openclaw gateway logs` |
+| Daily brief empty | Run: ask Atlas "generate my daily brief" |
+| Focus Pulse not ticking | Check if enabled in Lab tab settings |
+| Dashboard shows no data | Verify queue file exists: `~/godmode/data/queue.json` |
+| Second Brain not syncing | Check vault path: `echo $OBSIDIAN_VAULT_PATH` |
 
 ---
 

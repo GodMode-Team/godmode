@@ -45,10 +45,10 @@ export type VisionBoardProps = {
 // ===== Constants =====
 
 const THEME_ICONS: Record<string, string> = {
-  "godmode-launch": "🚀",
-  "edison-year": "👶",
-  "health-foundation": "💪",
-  "pa-systematization": "⚙️",
+  launch: "🚀",
+  milestone: "🎉",
+  health: "💪",
+  systems: "⚙️",
   default: "🎯",
 };
 

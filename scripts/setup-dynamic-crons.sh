@@ -13,7 +13,7 @@ if [ ! -f "$OPENCLAW" ]; then
 fi
 
 # Detect user timezone (macOS)
-TZ=$(readlink /etc/localtime 2>/dev/null | sed 's|.*/zoneinfo/||' || echo "America/Chicago")
+TZ=$(readlink /etc/localtime 2>/dev/null | sed 's|.*/zoneinfo/||' || echo "UTC")
 echo "Using timezone: $TZ"
 
 # Check if a job already exists by name

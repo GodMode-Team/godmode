@@ -130,7 +130,7 @@ Your rights:
 - Revoke access at any time
 - Request conversation history deletion
 
-Questions? Ask me or email support@godmode.ai
+Questions? Ask me or email support@lifeongodmode.com
 ```
 
 ## Bot Settings

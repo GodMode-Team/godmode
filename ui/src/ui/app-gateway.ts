@@ -11,7 +11,7 @@ import {
 import { extractImages, type ImageBlock } from "./chat/grouped-render";
 import { loadAgents } from "./controllers/agents";
 import { loadAssistantIdentity } from "./controllers/assistant-identity";
-import { loadChatHistory, getPendingImageCache } from "./controllers/chat";
+import { loadChatHistory, loadChatHistoryAfterFinal, getPendingImageCache } from "./controllers/chat";
 import { handleChatEvent, type ChatEventPayload } from "./controllers/chat";
 import { loadDevices } from "./controllers/devices";
 import type { ExecApprovalRequest } from "./controllers/exec-approval";
@@ -608,6 +608,8 @@ export function connectGateway(host: GatewayHost) {
       void loadOptionsOnConnect(host);
       // Start background update check heartbeat (every 30 min)
       startUpdatePolling(host as unknown as GodModeApp);
+      // Handle ?openTask= URL parameter for task → session deep linking
+      handleOpenTaskParam(host as unknown as GodModeApp);
     },
     onClose: ({ code, reason }) => {
       host.connected = false;
@@ -811,9 +813,25 @@ function handleGatewayEventUnsafe(host: GatewayHost, evt: GatewayEventFrame) {
       host.refreshSessionsAfterChat = false;
     }
     if (state === "final") {
-      void loadChatHistory(host as unknown as GodModeApp).then(() => {
+      const allowShrink = Boolean(host.compactionStatus?.completedAt);
+      void loadChatHistoryAfterFinal(host as unknown as GodModeApp, { allowShrink }).then(() => {
         void cacheAndResolveImages(host as unknown as GodModeApp);
       });
+
+      // Auto-refresh dashboard when its session completes (agent may have updated it)
+      const app = host as unknown as {
+        activeDashboardManifest?: { sessionId?: string | null; id?: string } | null;
+        tab?: string;
+      };
+      if (
+        app.tab === "dashboards" &&
+        app.activeDashboardManifest?.sessionId &&
+        app.activeDashboardManifest.sessionId === payload.sessionKey
+      ) {
+        void import("./controllers/dashboards.js").then(({ loadDashboard }) => {
+          void loadDashboard(host as unknown as GodModeApp, app.activeDashboardManifest!.id!);
+        });
+      }
     }
     return;
   }
@@ -1046,6 +1064,39 @@ async function loadOptionsOnConnect(host: GatewayHost) {
   const app = host as unknown as GodModeApp;
   if (typeof app.handleOptionsLoad === "function") {
     await app.handleOptionsLoad();
+  }
+}
+
+/**
+ * Handle ?openTask= URL parameter for task → session deep linking.
+ * When clicked from Obsidian daily brief, opens or creates the task's session.
+ */
+async function handleOpenTaskParam(host: GodModeApp) {
+  if (typeof window === "undefined") return;
+  const params = new URLSearchParams(window.location.search);
+  const taskId = params.get("openTask");
+  if (!taskId || !host.client) return;
+
+  // Clear the URL parameter to prevent re-triggering
+  params.delete("openTask");
+  const nextUrl = params.toString()
+    ? `${window.location.pathname}?${params.toString()}`
+    : window.location.pathname;
+  window.history.replaceState({}, "", nextUrl);
+
+  try {
+    const result = await host.client.request<{ sessionKey: string }>(
+      "tasks.openSession",
+      { taskId },
+    );
+    if (result?.sessionKey) {
+      host.sessionKey = result.sessionKey;
+      host.tab = "chat" as Tab;
+      const { loadChatHistory } = await import("./controllers/chat.js");
+      await loadChatHistory(host, result.sessionKey);
+    }
+  } catch (err) {
+    console.error("[GodMode] Failed to open task session:", err);
   }
 }
 

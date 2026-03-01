@@ -19,12 +19,14 @@ export type GuardrailGateId =
   | "sessionHygiene"
   | "exhaustiveSearch"
   | "selfServiceGate"
+  | "persistenceGate"
   | "planGate"
   | "spawnGate"
   | "validationGate"
   | "promptShield"
   | "outputShield"
-  | "configShield";
+  | "configShield"
+  | "contextPressure";
 
 export type GateConfig = {
   enabled: boolean;
@@ -73,27 +75,29 @@ export type GateDescriptor = {
 // ── Defaults ───────────────────────────────────────────────────────
 
 export const GATE_DEFAULTS: Record<GuardrailGateId, GateConfig> = {
-  loopBreaker: { enabled: true, thresholds: { maxCalls: 15, windowMinutes: 30 } },
+  loopBreaker: { enabled: true, thresholds: { maxCalls: 50, windowMinutes: 30, warnAt: 40 } },
   grepBlocker: { enabled: true },
   sessionHygiene: { enabled: true, thresholds: { maxWorkingLines: 100 } },
   exhaustiveSearch: { enabled: true },
   selfServiceGate: { enabled: true },
+  persistenceGate: { enabled: true, thresholds: { minInvestigationTools: 3 } },
   planGate: { enabled: true },
   spawnGate: { enabled: true },
   validationGate: { enabled: true },
   promptShield: { enabled: true },
   outputShield: { enabled: true },
   configShield: { enabled: true },
+  contextPressure: { enabled: true, thresholds: { warningPercent: 70, criticalPercent: 90, maxContextTokens: 200000 } },
 };
 
 export const GATE_DESCRIPTORS: Record<GuardrailGateId, GateDescriptor> = {
   loopBreaker: {
     name: "Loop Breaker",
     description:
-      "Blocks any tool called more than N times in a time window. Prevents runaway loops from burning credits.",
+      "Warns then blocks any tool called too many times in a window. Burst detection catches rapid-fire loops (<2min). Prevents runaway loops from burning credits.",
     icon: "\u{1F504}",
     hook: "before_tool_call",
-    thresholdLabels: { maxCalls: "Max calls per tool", windowMinutes: "Window (minutes)" },
+    thresholdLabels: { maxCalls: "Max calls per tool", warnAt: "Warn at (calls)", windowMinutes: "Window (minutes)" },
   },
   grepBlocker: {
     name: "Grep Blocker",
@@ -119,9 +123,17 @@ export const GATE_DESCRIPTORS: Record<GuardrailGateId, GateDescriptor> = {
   selfServiceGate: {
     name: "Self-Service Gate",
     description:
-      "Blocks messages that ask the user about code, implementation, or architecture when the agent hasn't used read/search tools first. Forces agents to look things up themselves.",
+      "Blocks ALL forms of delegation to the user — questions, verification requests, \"confirm this\", \"let me know\", investigation asks — when the agent hasn't used its own tools first. Never punt to the human.",
     icon: "\u{1F9E0}",
     hook: "message_sending",
+  },
+  persistenceGate: {
+    name: "Persistence Gate",
+    description:
+      "Blocks premature surrender responses when the agent hasn't used enough investigation tools. Forces the agent to try multiple approaches before giving up.",
+    icon: "\u{1F4AA}",
+    hook: "message_sending",
+    thresholdLabels: { minInvestigationTools: "Min tools before surrender allowed" },
   },
   planGate: {
     name: "Plan Gate",
@@ -164,6 +176,18 @@ export const GATE_DESCRIPTORS: Record<GuardrailGateId, GateDescriptor> = {
       "Blocks tool calls (bash, read) that would access sensitive config files like openclaw.json, .env, AGENTS.md, SOUL.md, or SSH keys.",
     icon: "\u{1F5C4}",
     hook: "before_tool_call",
+  },
+  contextPressure: {
+    name: "Context Pressure",
+    description:
+      "Monitors session context window usage and warns the agent to compact before overflow. Prevents lost responses on long Slack/channel sessions.",
+    icon: "\u{1F4CA}",
+    hook: "llm_output + before_prompt_build",
+    thresholdLabels: {
+      warningPercent: "Warning threshold (%)",
+      criticalPercent: "Critical threshold (%)",
+      maxContextTokens: "Max context tokens",
+    },
   },
 };
 

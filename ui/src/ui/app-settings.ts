@@ -8,6 +8,8 @@ import {
   stopNodesPolling,
   startDebugPolling,
   stopDebugPolling,
+  startMissionControlPolling,
+  stopMissionControlPolling,
 } from "./app-polling";
 import { scheduleChatScroll, scheduleLogsScroll } from "./app-scroll";
 import { loadChannels } from "./controllers/channels";
@@ -181,9 +183,31 @@ export function applySettingsFromUrl(host: SettingsHost) {
 }
 
 export function setTab(host: SettingsHost, next: Tab) {
-  if (host.tab !== next) {
+  const prev = host.tab;
+  if (prev !== next) {
     host.tab = next;
   }
+
+  // Restore stashed session when leaving dashboards tab with an active dashboard
+  if (prev === "dashboards" && next !== "dashboards") {
+    const app = host as unknown as {
+      dashboardPreviousSessionKey?: string | null;
+      activeDashboardId?: string | null;
+      activeDashboardManifest?: unknown | null;
+      activeDashboardHtml?: string | null;
+      dashboardChatOpen?: boolean;
+    };
+    if (app.dashboardPreviousSessionKey && app.activeDashboardId) {
+      const prevKey = app.dashboardPreviousSessionKey;
+      app.dashboardPreviousSessionKey = null;
+      app.activeDashboardId = null;
+      app.activeDashboardManifest = null;
+      app.activeDashboardHtml = null;
+      app.dashboardChatOpen = false;
+      host.sessionKey = prevKey;
+    }
+  }
+
   if (next === "chat") {
     host.chatHasAutoScrolled = false;
   }
@@ -201,6 +225,11 @@ export function setTab(host: SettingsHost, next: Tab) {
     startDebugPolling(host as unknown as Parameters<typeof startDebugPolling>[0]);
   } else {
     stopDebugPolling(host as unknown as Parameters<typeof stopDebugPolling>[0]);
+  }
+  if (next === "mission-control") {
+    startMissionControlPolling(host as unknown as Parameters<typeof startMissionControlPolling>[0]);
+  } else {
+    stopMissionControlPolling(host as unknown as Parameters<typeof stopMissionControlPolling>[0]);
   }
   void refreshActiveTab(host);
   syncUrlWithTab(host, next, false);
@@ -236,8 +265,8 @@ export async function refreshActiveTab(host: SettingsHost) {
   if (host.tab === "workspaces") {
     await loadWorkspaces(host as unknown as GodModeApp);
     // Load all tasks for the workspaces landing page
-    import("./controllers/workspaces").then(async ({ loadAllTasks }) => {
-      (host as unknown as GodModeApp).allTasks = await loadAllTasks(
+    import("./controllers/workspaces").then(async ({ loadAllTasksWithQueueStatus }) => {
+      (host as unknown as GodModeApp).allTasks = await loadAllTasksWithQueueStatus(
         host as unknown as GodModeApp,
       );
     });
@@ -314,10 +343,22 @@ export async function refreshActiveTab(host: SettingsHost) {
       await app.handleGuardrailsLoad();
     }
   }
+  if (host.tab === "mission-control") {
+    const app = host as unknown as GodModeApp;
+    if (typeof app.handleMissionControlRefresh === "function") {
+      await app.handleMissionControlRefresh();
+    }
+  }
   if (host.tab === "setup") {
     const app = host as unknown as GodModeApp;
     if (typeof app.handleLoadSetupChecklist === "function") {
       app.handleLoadSetupChecklist();
+    }
+  }
+  if (host.tab === "dashboards") {
+    const app = host as unknown as GodModeApp;
+    if (typeof app.handleDashboardsRefresh === "function") {
+      await app.handleDashboardsRefresh();
     }
   }
   if (host.tab === "second-brain") {
@@ -326,6 +367,10 @@ export async function refreshActiveTab(host: SettingsHost) {
     if (subtab === "intel") {
       if (typeof app.handleIntelLoad === "function") {
         await app.handleIntelLoad();
+      }
+    } else if (subtab === "files") {
+      if (typeof app.handleSecondBrainFileTreeRefresh === "function") {
+        await app.handleSecondBrainFileTreeRefresh();
       }
     } else if (typeof app.handleSecondBrainRefresh === "function") {
       await app.handleSecondBrainRefresh();
@@ -388,7 +433,7 @@ export function attachThemeListener(host: SettingsHost) {
     if (host.theme !== "system") {
       return;
     }
-    applyResolvedTheme(host, event.matches ? "dark" : "light");
+    applyResolvedTheme(host, event.matches ? "dark" : "lifetrack");
   };
   if (typeof host.themeMedia.addEventListener === "function") {
     host.themeMedia.addEventListener("change", host.themeMediaHandler);
@@ -474,6 +519,11 @@ export function setTabFromRoute(host: SettingsHost, next: Tab) {
     startDebugPolling(host as unknown as Parameters<typeof startDebugPolling>[0]);
   } else {
     stopDebugPolling(host as unknown as Parameters<typeof stopDebugPolling>[0]);
+  }
+  if (next === "mission-control") {
+    startMissionControlPolling(host as unknown as Parameters<typeof startMissionControlPolling>[0]);
+  } else {
+    stopMissionControlPolling(host as unknown as Parameters<typeof stopMissionControlPolling>[0]);
   }
   if (host.connected) {
     void refreshActiveTab(host);

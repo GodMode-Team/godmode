@@ -15,12 +15,12 @@
             "type": "string",
             "description": "Unique identifier (slug format)",
             "pattern": "^[a-z0-9-]+$",
-            "examples": ["acme-corp", "jake-vps", "sarah-dev"]
+            "examples": ["acme-corp", "example-vps", "example-dev"]
           },
           "name": {
             "type": "string",
             "description": "Display name (person or company)",
-            "examples": ["Acme Corporation", "Jake's VPS", "Sarah"]
+            "examples": ["Acme Corporation", "Example VPS", "Example User"]
           },
           "type": {
             "type": "string",
@@ -131,16 +131,16 @@
     {
       "entries": [
         {
-          "id": "jake-vps",
-          "name": "Jake's Dev VPS",
+          "id": "example-vps",
+          "name": "Example Dev VPS",
           "type": "team",
           "platform": "linux",
-          "contact": "jake@godmode.ai",
-          "tailscaleHostname": "jake-dev-vps",
+          "contact": "user@example.com",
+          "tailscaleHostname": "example-dev-vps",
           "telegramUserId": "111222333",
           "sshConsent": true,
           "consentDate": "2026-02-01",
-          "timezone": "America/Chicago",
+          "timezone": "America/New_York",
           "machineSpecs": {
             "model": "DigitalOcean Droplet",
             "cpu": "4 vCPU",
@@ -155,7 +155,7 @@
           "name": "Acme Corporation",
           "type": "customer",
           "platform": "macos",
-          "contact": "john@acme.com",
+          "contact": "user@example.com",
           "tailscaleHostname": "acme-corp-godmode",
           "telegramUserId": "123456789",
           "sshConsent": true,

@@ -531,6 +531,64 @@ export async function loadAllTasks(
   }
 }
 
+const AGENT_ROLE_NAMES: Record<string, string> = {
+  coding: "Builder", research: "Researcher", analysis: "Analyst",
+  creative: "Creative", review: "Reviewer", ops: "Ops",
+  task: "Agent", url: "Reader", idea: "Explorer",
+};
+
+export async function loadAllTasksWithQueueStatus(
+  state: WorkspacesState,
+): Promise<WorkspaceTask[]> {
+  if (!state.client || !state.connected) {
+    return [];
+  }
+  try {
+    const [tasksResult, queueResult] = await Promise.all([
+      state.client.request<{ tasks: GatewayTask[] }>("tasks.list", {}),
+      state.client
+        .request<{
+          items: Array<{
+            id: string;
+            type: string;
+            status: string;
+            sourceTaskId?: string;
+          }>;
+        }>("queue.list", { limit: 100 })
+        .catch(() => ({ items: [] as Array<{ id: string; type: string; status: string; sourceTaskId?: string }> })),
+    ]);
+
+    // Build sourceTaskId → queue status map
+    const queueByTask = new Map<
+      string,
+      { status: "processing" | "review" | "failed"; type: string; roleName: string; queueItemId: string }
+    >();
+    for (const qi of queueResult.items) {
+      if (!qi.sourceTaskId) continue;
+      if (
+        qi.status === "processing" ||
+        qi.status === "review" ||
+        qi.status === "failed"
+      ) {
+        queueByTask.set(qi.sourceTaskId, {
+          status: qi.status as "processing" | "review" | "failed",
+          type: qi.type,
+          roleName: AGENT_ROLE_NAMES[qi.type] ?? qi.type,
+          queueItemId: qi.id,
+        });
+      }
+    }
+
+    return (tasksResult.tasks ?? []).map((t) => ({
+      ...transformTask(t),
+      queueStatus: queueByTask.get(t.id) ?? null,
+    }));
+  } catch (err) {
+    console.error("[Workspaces] loadAllTasksWithQueueStatus failed:", err);
+    return [];
+  }
+}
+
 export async function toggleTaskComplete(
   state: WorkspacesState,
   taskId: string,
@@ -575,7 +633,13 @@ export async function updateTask(
 export async function startTask(
   state: WorkspacesState,
   taskId: string,
-): Promise<{ sessionId: string; created: boolean } | null> {
+): Promise<{
+  sessionId: string;
+  created: boolean;
+  task?: { title?: string };
+  queueOutput?: string | null;
+  agentPrompt?: string | null;
+} | null> {
   if (!state.client || !state.connected) {
     return null;
   }
@@ -583,6 +647,9 @@ export async function startTask(
     const result = await state.client.request<{
       sessionId: string;
       created: boolean;
+      task?: { title?: string };
+      queueOutput?: string | null;
+      agentPrompt?: string | null;
     }>("tasks.openSession", { taskId });
     return result;
   } catch (err) {
@@ -608,5 +675,104 @@ export async function createTask(
   } catch (err) {
     console.error("[Workspaces] createTask failed:", err);
     return null;
+  }
+}
+
+// ── Folder browsing ──────────────────────────────────────────────────
+
+export type BrowseEntry = {
+  name: string;
+  path: string;
+  type: "folder" | "file";
+  fileType?: string;
+  size?: number;
+  modified?: string;
+};
+
+export type BrowseResult = {
+  entries: BrowseEntry[];
+  breadcrumbs: Array<{ name: string; path: string }>;
+  parentPath: string | null;
+};
+
+export async function browseWorkspaceFolder(
+  state: WorkspacesState,
+  workspaceId: string,
+  folderPath: string,
+): Promise<BrowseResult | null> {
+  if (!state.client || !state.connected) return null;
+  try {
+    return await state.client.request<BrowseResult>(
+      "workspaces.browseFolder",
+      { workspaceId, folderPath },
+    );
+  } catch (err) {
+    console.error("[Workspaces] browseFolder failed:", err);
+    return null;
+  }
+}
+
+export async function searchWorkspaceFiles(
+  state: WorkspacesState,
+  workspaceId: string,
+  query: string,
+  limit = 50,
+): Promise<Array<{ path: string; name: string; type: string; excerpt?: string }>> {
+  if (!state.client || !state.connected) return [];
+  try {
+    const result = await state.client.request<{
+      results: Array<{ path: string; name: string; type: string; excerpt?: string }>;
+    }>("workspaces.search", { workspaceId, query, limit });
+    return result.results ?? [];
+  } catch (err) {
+    console.error("[Workspaces] search failed:", err);
+    return [];
+  }
+}
+
+export async function createWorkspaceFolder(
+  state: WorkspacesState,
+  workspaceId: string,
+  folderPath: string,
+): Promise<boolean> {
+  if (!state.client || !state.connected) return false;
+  try {
+    await state.client.request("workspaces.createFolder", { workspaceId, folderPath });
+    return true;
+  } catch (err) {
+    console.error("[Workspaces] createFolder failed:", err);
+    return false;
+  }
+}
+
+export async function moveWorkspaceFile(
+  state: WorkspacesState,
+  workspaceId: string,
+  sourcePath: string,
+  destPath: string,
+): Promise<boolean> {
+  if (!state.client || !state.connected) return false;
+  try {
+    await state.client.request("workspaces.moveFile", { workspaceId, sourcePath, destPath });
+    return true;
+  } catch (err) {
+    console.error("[Workspaces] moveFile failed:", err);
+    return false;
+  }
+}
+
+export async function renameWorkspaceFile(
+  state: WorkspacesState,
+  workspaceId: string,
+  filePath: string,
+  newName: string,
+): Promise<boolean> {
+  if (!state.client || !state.connected) return false;
+  try {
+    await state.client.request("workspaces.renameFile", { workspaceId, filePath, newName });
+    return true;
+  } catch (err) {
+    console.error("[Workspaces] renameFile failed:", err);
+    return false;
   }
 }

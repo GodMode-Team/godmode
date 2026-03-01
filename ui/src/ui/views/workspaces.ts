@@ -11,6 +11,12 @@ export type WorkspaceTask = {
   createdAt: string;
   completedAt: string | null;
   briefSection?: string | null;
+  queueStatus?: {
+    status: "processing" | "review" | "failed";
+    type: string;
+    roleName: string;
+    queueItemId: string;
+  } | null;
 };
 
 export type WorkspaceSummary = {
@@ -107,6 +113,15 @@ export type WorkspacesProps = {
   onStartTask?: (taskId: string) => void;
   onEditTask?: (taskId: string | null) => void;
   onUpdateTask?: (taskId: string, updates: { title?: string; dueDate?: string | null }) => void;
+  browsePath?: string | null;
+  browseEntries?: import("../controllers/workspaces").BrowseEntry[] | null;
+  breadcrumbs?: Array<{ name: string; path: string }> | null;
+  browseSearchQuery?: string;
+  browseSearchResults?: Array<{ path: string; name: string; type: string; excerpt?: string }> | null;
+  onBrowseFolder?: (path: string) => void;
+  onBrowseSearch?: (query: string) => void;
+  onBrowseBack?: () => void;
+  onCreateFolder?: (path: string) => void;
 };
 
 function formatFileSize(size: number): string {
@@ -149,17 +164,17 @@ function statusDotClass(status: WorkspaceSessionEntry["status"]): string {
   return "ws-session-dot ws-session-dot--complete";
 }
 
-function priorityBadgeClass(priority: WorkspaceTask["priority"]): string {
+export function priorityBadgeClass(priority: WorkspaceTask["priority"]): string {
   return `ws-task-priority ws-task-priority--${priority}`;
 }
 
-function priorityLabel(priority: WorkspaceTask["priority"]): string {
+export function priorityLabel(priority: WorkspaceTask["priority"]): string {
   if (priority === "high") return "High";
   if (priority === "low") return "Low";
   return "Med";
 }
 
-function formatDueDate(dueDate: string | null): string {
+export function formatDueDate(dueDate: string | null): string {
   if (!dueDate) return "";
   const today = localDateString();
   if (dueDate === today) return "Today";
@@ -167,7 +182,7 @@ function formatDueDate(dueDate: string | null): string {
   return dueDate;
 }
 
-function dueDateClass(dueDate: string | null): string {
+export function dueDateClass(dueDate: string | null): string {
   if (!dueDate) return "ws-task-due";
   const today = localDateString();
   if (dueDate < today) return "ws-task-due ws-task-due--overdue";
@@ -175,7 +190,7 @@ function dueDateClass(dueDate: string | null): string {
   return "ws-task-due";
 }
 
-function sortTasks(tasks: WorkspaceTask[], mode: TaskSort = "due"): WorkspaceTask[] {
+export function sortTasks(tasks: WorkspaceTask[], mode: TaskSort = "due"): WorkspaceTask[] {
   const priorityOrder = { high: 0, medium: 1, low: 2 };
   return [...tasks].sort((a, b) => {
     if (mode === "priority") {
@@ -203,7 +218,7 @@ function sortTasks(tasks: WorkspaceTask[], mode: TaskSort = "due"): WorkspaceTas
   });
 }
 
-function renderTaskRow(
+export function renderTaskRow(
   task: WorkspaceTask,
   onToggle?: (taskId: string, currentStatus: string) => void,
   onStartTask?: (taskId: string) => void,
@@ -270,18 +285,29 @@ function renderTaskRow(
       ${task.briefSection ? html`<span class="ws-task-section">${task.briefSection}</span>` : nothing}
       <span class=${priorityBadgeClass(task.priority)}>${priorityLabel(task.priority)}</span>
       ${task.dueDate ? html`<span class=${dueDateClass(task.dueDate)}>${formatDueDate(task.dueDate)}</span>` : nothing}
-      ${!isComplete && onStartTask
-        ? html`<button
-            class="ws-task-start-btn"
-            @click=${() => onStartTask(task.id)}
-            title="Start working on this task"
-          >Start</button>`
-        : nothing}
+      ${!isComplete && task.queueStatus?.status === "processing"
+        ? html`<span class="ws-task-agent-status ws-task-agent-status--processing">
+            <span class="ws-task-agent-dot"></span>
+            ${task.queueStatus.roleName} working...
+          </span>`
+        : !isComplete && task.queueStatus?.status === "review" && onStartTask
+          ? html`<button
+              class="ws-task-start-btn ws-task-start-btn--review"
+              @click=${() => onStartTask(task.id)}
+              title="Review agent output"
+            >Review</button>`
+          : !isComplete && onStartTask
+            ? html`<button
+                class="ws-task-start-btn"
+                @click=${() => onStartTask(task.id)}
+                title="Start working on this task"
+              >Start</button>`
+            : nothing}
     </div>
   `;
 }
 
-function renderAllTaskRow(
+export function renderAllTaskRow(
   task: WorkspaceTask,
   onToggle?: (taskId: string, currentStatus: string) => void,
   onStartTask?: (taskId: string) => void,
@@ -349,13 +375,24 @@ function renderAllTaskRow(
       ${task.briefSection ? html`<span class="ws-task-section">${task.briefSection}</span>` : nothing}
       <span class=${priorityBadgeClass(task.priority)}>${priorityLabel(task.priority)}</span>
       ${task.dueDate ? html`<span class=${dueDateClass(task.dueDate)}>${formatDueDate(task.dueDate)}</span>` : nothing}
-      ${!isComplete && onStartTask
-        ? html`<button
-            class="ws-task-start-btn"
-            @click=${() => onStartTask(task.id)}
-            title="Start working on this task"
-          >Start</button>`
-        : nothing}
+      ${!isComplete && task.queueStatus?.status === "processing"
+        ? html`<span class="ws-task-agent-status ws-task-agent-status--processing">
+            <span class="ws-task-agent-dot"></span>
+            ${task.queueStatus.roleName} working...
+          </span>`
+        : !isComplete && task.queueStatus?.status === "review" && onStartTask
+          ? html`<button
+              class="ws-task-start-btn ws-task-start-btn--review"
+              @click=${() => onStartTask(task.id)}
+              title="Review agent output"
+            >Review</button>`
+          : !isComplete && onStartTask
+            ? html`<button
+                class="ws-task-start-btn"
+                @click=${() => onStartTask(task.id)}
+                title="Start working on this task"
+              >Start</button>`
+            : nothing}
     </div>
   `;
 }
@@ -568,6 +605,113 @@ function renderSectionFileRow(props: {
   `;
 }
 
+function renderBreadcrumbs(
+  crumbs: Array<{ name: string; path: string }>,
+  onBrowse: (path: string) => void,
+) {
+  return html`
+    <div class="workspace-breadcrumbs">
+      ${crumbs.map(
+        (c, i) => html`
+          ${i > 0 ? html`<span class="breadcrumb-sep">/</span>` : nothing}
+          <button
+            class="breadcrumb-item ${i === crumbs.length - 1 ? "breadcrumb-current" : ""}"
+            @click=${() => onBrowse(c.path)}
+          >${c.name}</button>
+        `,
+      )}
+    </div>
+  `;
+}
+
+function renderWorkspaceBrowser(props: {
+  browseEntries?: import("../controllers/workspaces").BrowseEntry[] | null;
+  breadcrumbs?: Array<{ name: string; path: string }> | null;
+  browseSearchQuery?: string;
+  browseSearchResults?: Array<{ path: string; name: string; type: string; excerpt?: string }> | null;
+  onBrowseFolder?: (path: string) => void;
+  onBrowseSearch?: (query: string) => void;
+  onBrowseBack?: () => void;
+  onCreateFolder?: (path: string) => void;
+  onItemClick?: (item: WorkspaceFileEntry) => void;
+}) {
+  const {
+    browseEntries,
+    breadcrumbs,
+    browseSearchQuery,
+    browseSearchResults,
+    onBrowseFolder,
+    onBrowseSearch,
+    onBrowseBack,
+    onCreateFolder,
+    onItemClick,
+  } = props;
+
+  const entries = browseSearchResults ?? browseEntries ?? [];
+
+  return html`
+    <div class="workspace-browser">
+      <div class="workspace-browser-toolbar">
+        <button class="workspace-browse-back" @click=${() => onBrowseBack?.()}>
+          &larr; Back
+        </button>
+        ${breadcrumbs
+          ? renderBreadcrumbs(breadcrumbs, (p) => onBrowseFolder?.(p))
+          : nothing}
+        <input
+          type="text"
+          class="workspace-browse-search"
+          placeholder="Search files..."
+          .value=${browseSearchQuery ?? ""}
+          @input=${(e: InputEvent) => {
+            const target = e.target as HTMLInputElement;
+            onBrowseSearch?.(target.value);
+          }}
+        />
+        <button
+          class="workspace-browse-new-folder"
+          @click=${() => {
+            const name = prompt("New folder name:");
+            if (name?.trim()) {
+              const currentPath = breadcrumbs?.[breadcrumbs.length - 1]?.path ?? ".";
+              onCreateFolder?.(`${currentPath}/${name.trim()}`);
+            }
+          }}
+        >+ Folder</button>
+      </div>
+
+      <div class="workspace-browse-list">
+        ${entries.length === 0
+          ? html`<div class="workspace-browse-empty">No files found</div>`
+          : entries.map((entry) => html`
+              <button
+                class="workspace-browse-entry"
+                @click=${() => {
+                  if (entry.type === "folder") {
+                    onBrowseFolder?.(entry.path);
+                  } else if (onItemClick) {
+                    onItemClick({
+                      path: entry.path,
+                      name: entry.name,
+                      type: (entry as any).fileType ?? "text",
+                      size: (entry as any).size ?? 0,
+                      modified: new Date(),
+                    });
+                  }
+                }}
+              >
+                <span class="browse-entry-icon">${entry.type === "folder" ? "\u{1F4C1}" : "\u{1F4C4}"}</span>
+                <span class="browse-entry-name">${entry.name}</span>
+                ${(entry as any).excerpt
+                  ? html`<span class="browse-entry-excerpt">${(entry as any).excerpt}</span>`
+                  : nothing}
+              </button>
+            `)}
+      </div>
+    </div>
+  `;
+}
+
 function renderWorkspaceDetail(props: {
   workspace: WorkspaceDetail;
   itemSearchQuery: string;
@@ -587,6 +731,15 @@ function renderWorkspaceDetail(props: {
   editingTaskId?: string | null;
   onEditTask?: (taskId: string | null) => void;
   onUpdateTask?: (taskId: string, updates: { title?: string; dueDate?: string | null }) => void;
+  browsePath?: string | null;
+  browseEntries?: import("../controllers/workspaces").BrowseEntry[] | null;
+  breadcrumbs?: Array<{ name: string; path: string }> | null;
+  browseSearchQuery?: string;
+  browseSearchResults?: Array<{ path: string; name: string; type: string; excerpt?: string }> | null;
+  onBrowseFolder?: (path: string) => void;
+  onBrowseSearch?: (query: string) => void;
+  onBrowseBack?: () => void;
+  onCreateFolder?: (path: string) => void;
 }) {
   const {
     workspace,
@@ -657,10 +810,16 @@ function renderWorkspaceDetail(props: {
             .value=${itemSearchQuery}
             @input=${(e: Event) => onItemSearch?.((e.target as HTMLInputElement).value)}
           />
+          <button
+            class="workspace-browse-btn"
+            @click=${() => props.onBrowseFolder?.(".")}
+          >Browse Files</button>
         </div>
       </div>
 
       <div class="workspace-content">
+        ${props.browsePath != null ? renderWorkspaceBrowser(props) : nothing}
+
         ${
           showPinnedSection
             ? html`
@@ -916,18 +1075,22 @@ export function renderWorkspaces(props: WorkspacesProps) {
       editingTaskId,
       onEditTask,
       onUpdateTask,
+      browsePath: props.browsePath,
+      browseEntries: props.browseEntries,
+      breadcrumbs: props.breadcrumbs,
+      browseSearchQuery: props.browseSearchQuery,
+      browseSearchResults: props.browseSearchResults,
+      onBrowseFolder: props.onBrowseFolder,
+      onBrowseSearch: props.onBrowseSearch,
+      onBrowseBack: props.onBrowseBack,
+      onCreateFolder: props.onCreateFolder,
     });
   }
 
   return html`
     <div class="workspaces-container">
-      <div class="workspaces-header">
-        <div class="workspaces-header-left">
-          <h1 class="workspaces-title-text">Workspaces</h1>
-          <p class="workspaces-subtitle">Projects, clients, and personal operating context.</p>
-        </div>
-        <div class="workspaces-header-right">
-          <form
+      <div class="workspaces-toolbar">
+        <form
             class="workspaces-create-form"
             @submit=${async (event: Event) => {
               event.preventDefault();
@@ -999,23 +1162,14 @@ export function renderWorkspaces(props: WorkspacesProps) {
           <span class="workspaces-status ${connected ? "online" : "offline"}">
             ${connected ? "Online" : "Offline"}
           </span>
-        </div>
+          ${
+            onTeamSetup
+              ? html`<button class="ws-team-setup-btn" @click=${() => onTeamSetup()}>Team Setup</button>`
+              : nothing
+          }
       </div>
 
       ${error ? html`<div class="callout danger" style="margin: 16px;">${error}</div>` : nothing}
-
-      ${
-        onTeamSetup
-          ? html`
-              <div class="ws-team-setup-bar">
-                <span class="ws-team-setup-text">Want your team's AIs to collaborate?</span>
-                <button class="btn ws-team-setup-btn" @click=${() => onTeamSetup()}>
-                  Set Up Team Workspace
-                </button>
-              </div>
-            `
-          : nothing
-      }
 
       ${
         loading

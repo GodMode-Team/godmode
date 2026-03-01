@@ -12,11 +12,13 @@ import {
 } from "../lib/workspaces-config.js";
 import type { CodingOrchestrator } from "./coding-orchestrator.js";
 import { formatGuardrailsForPrompt } from "./guardrails.js";
+import { resolveClaudeBin } from "../lib/resolve-claude-bin.js";
+import { resolveSwarmPersona } from "../lib/agent-roster.js";
+import { GODMODE_ROOT } from "../data-paths.js";
 
 // ── Copy & voice resource paths ────────────────────────────────
 
 const HOME = process.env.HOME ?? process.env.USERPROFILE ?? "/tmp";
-const GODMODE_ROOT = process.env.GODMODE_ROOT ?? path.join(HOME, "godmode");
 
 // Global fallbacks
 const VOICE_BIBLE = path.join(GODMODE_ROOT, "memory/projects/voice-bible/VOICE-BIBLE-v1.md");
@@ -336,7 +338,7 @@ export class SwarmPipeline {
     const prompt = await this.buildStagePrompt(stage, task, worktreePath, branch, scopeGlobs);
 
     try {
-      const claudeBin = process.env.CLAUDE_BIN ?? "/opt/homebrew/bin/claude";
+      const claudeBin = resolveClaudeBin();
       const args = ["-p", prompt, "--verbose", "--dangerously-skip-permissions"];
       if (model) args.push("--model", model);
 
@@ -433,9 +435,15 @@ export class SwarmPipeline {
       res.workspaceName ? `- Project: ${res.workspaceName}` : "",
     ].filter(Boolean).join("\n");
 
+    const stagePersona = resolveSwarmPersona(stage);
+
     if (stage === "design") {
+      const identity = stagePersona
+        ? `You are the ${stagePersona.name} (Design Architect) in a multi-agent coding pipeline${projectLabel}.`
+        : `You are the DESIGN ARCHITECT in a multi-agent coding pipeline${projectLabel}.`;
       return [
-        `You are the DESIGN ARCHITECT in a multi-agent coding pipeline${projectLabel}.`,
+        identity,
+        ...(stagePersona ? ["", "## Your Role", "", stagePersona.body, ""] : []),
         "Your job: analyze the codebase and make design decisions. Do NOT write implementation code.",
         "",
         "## Task",
@@ -469,9 +477,13 @@ export class SwarmPipeline {
 
     if (stage === "build") {
       const designBrief = await readOptionalFile(path.join(worktreePath, ".swarm", "design-brief.md"));
+      const buildIdentity = stagePersona
+        ? `You are the ${stagePersona.name} (Builder) in a multi-agent coding pipeline${projectLabel}.`
+        : `You are the BUILDER in a multi-agent coding pipeline${projectLabel}.`;
 
       return [
-        `You are the BUILDER in a multi-agent coding pipeline${projectLabel}.`,
+        buildIdentity,
+        ...(stagePersona ? ["", "## Your Role", "", stagePersona.body, ""] : []),
         "A design architect has already made all architectural decisions. Follow the design brief.",
         "",
         "## Task",
@@ -506,9 +518,13 @@ export class SwarmPipeline {
 
     // QC stage
     const designBrief = await readOptionalFile(path.join(worktreePath, ".swarm", "design-brief.md"));
+    const qcIdentity = stagePersona
+      ? `You are the ${stagePersona.name} (QC Reviewer) in a multi-agent coding pipeline${projectLabel}.`
+      : `You are the QC REVIEWER in a multi-agent coding pipeline${projectLabel}.`;
 
     return [
-      `You are the QC REVIEWER in a multi-agent coding pipeline${projectLabel}.`,
+      qcIdentity,
+      ...(stagePersona ? ["", "## Your Role", "", stagePersona.body, ""] : []),
       "A builder has implemented the task. Your job: fresh-eyes review and polish.",
       "",
       "## Task",

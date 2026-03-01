@@ -8,6 +8,48 @@
   width: 100%;
 }
 
+/* ── Vault Health Bar ──────────────────────────────────────────── */
+
+.vault-health-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: var(--radius-sm, 6px);
+  font-size: 0.8125rem;
+  flex-wrap: wrap;
+}
+
+.vault-health-connected {
+  background: color-mix(in srgb, var(--accent, #c99a2e) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent, #c99a2e) 20%, transparent);
+}
+
+.vault-health-disconnected {
+  background: color-mix(in srgb, var(--muted) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--muted) 20%, transparent);
+}
+
+.vault-health-status {
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.vault-health-detail {
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.vault-health-inbox-badge {
+  background: var(--accent, #c99a2e);
+  color: var(--bg, #fff);
+  padding: 0.125rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
 /* ── Sub-tabs ───────────────────────────────────────────────────── */
 
 .second-brain-tabs {
@@ -801,4 +843,153 @@
   .second-brain-sync-btn {
     justify-content: center;
   }
+}
+
+/* ── Second Brain Files Tab ───────────────────────────────────────── */
+
+.sb-files-container {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.sb-files-search-bar {
+  display: flex;
+  gap: 8px;
+}
+
+.sb-files-search-input {
+  flex: 1;
+  padding: 8px 12px;
+  font-size: 0.875rem;
+  background: var(--bg-elevated, var(--card));
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm, 6px);
+  color: var(--text);
+  font-family: var(--font-body);
+  outline: none;
+  transition: border-color 0.15s ease;
+}
+.sb-files-search-input::placeholder {
+  color: var(--muted);
+}
+.sb-files-search-input:focus {
+  border-color: var(--accent);
+}
+
+.sb-files-loading,
+.sb-files-empty {
+  text-align: center;
+  padding: 2rem;
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+
+.sb-file-tree {
+  display: flex;
+  flex-direction: column;
+}
+
+.sb-tree-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  font-size: 0.875rem;
+  color: var(--text);
+  border: none;
+  background: none;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  border-radius: 4px;
+}
+.sb-tree-item:hover {
+  background: var(--bg-hover);
+}
+
+.sb-tree-folder > summary {
+  list-style: none;
+}
+.sb-tree-folder > summary::-webkit-details-marker {
+  display: none;
+}
+
+.sb-tree-folder-name::before {
+  content: "\25B8 ";
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.sb-tree-folder[open] > .sb-tree-folder-name::before {
+  content: "\25BE ";
+}
+
+.sb-tree-count {
+  font-size: 0.6875rem;
+  color: var(--muted);
+  background: var(--bg-elevated, var(--bg-hover));
+  padding: 0 5px;
+  border-radius: 3px;
+  margin-left: auto;
+}
+
+.sb-tree-size {
+  font-size: 0.6875rem;
+  color: var(--muted);
+  margin-left: auto;
+}
+
+.sb-file-icon {
+  flex-shrink: 0;
+  font-size: 0.875rem;
+}
+
+.sb-files-results {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.sb-files-result-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 12px;
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm, 6px);
+  cursor: pointer;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+}
+.sb-files-result-item:hover {
+  background: var(--bg-hover);
+}
+
+.sb-file-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.sb-file-name {
+  font-weight: 500;
+  font-size: 0.875rem;
+}
+
+.sb-file-path {
+  font-size: 0.75rem;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sb-file-excerpt {
+  font-size: 0.75rem;
+  color: var(--muted);
+  line-height: 1.4;
 }

@@ -224,21 +224,59 @@ type GatewayTodayTask = {
   completedAt: string | null;
 };
 
+const AGENT_ROLE_NAMES: Record<string, string> = {
+  coding: "Builder", research: "Researcher", analysis: "Analyst",
+  creative: "Creative", review: "Reviewer", ops: "Ops",
+  task: "Agent", url: "Reader", idea: "Explorer",
+};
+
 /**
- * Load today's pending tasks via the tasks.today RPC.
+ * Load today's tasks with queue status (processing/review/failed indicators).
+ * Fetches tasks.today and queue.list in parallel, merges by sourceTaskId.
  */
-export async function loadTodayTasks(state: MyDayState): Promise<WorkspaceTask[]> {
+export async function loadTodayTasksWithQueueStatus(state: MyDayState): Promise<WorkspaceTask[]> {
   if (!state.client || !state.connected) {
     return [];
   }
 
   state.todayTasksLoading = true;
   try {
-    const result = await state.client.request<{ tasks: GatewayTodayTask[] }>(
-      "tasks.today",
-      { date: state.todaySelectedDate ?? localDateString() },
-    );
-    const tasks: WorkspaceTask[] = (result.tasks ?? []).map((t) => ({
+    const date = state.todaySelectedDate ?? localDateString();
+    const [tasksResult, queueResult] = await Promise.all([
+      state.client.request<{ tasks: GatewayTodayTask[] }>(
+        "tasks.today",
+        { date, includeCompleted: true },
+      ),
+      state.client
+        .request<{
+          items: Array<{
+            id: string;
+            type: string;
+            status: string;
+            sourceTaskId?: string;
+          }>;
+        }>("queue.list", { limit: 100 })
+        .catch(() => ({ items: [] as Array<{ id: string; type: string; status: string; sourceTaskId?: string }> })),
+    ]);
+
+    // Build sourceTaskId → queue status map
+    const queueByTask = new Map<
+      string,
+      { status: "processing" | "review" | "failed"; type: string; roleName: string; queueItemId: string }
+    >();
+    for (const qi of queueResult.items) {
+      if (!qi.sourceTaskId) continue;
+      if (qi.status === "processing" || qi.status === "review" || qi.status === "failed") {
+        queueByTask.set(qi.sourceTaskId, {
+          status: qi.status as "processing" | "review" | "failed",
+          type: qi.type,
+          roleName: AGENT_ROLE_NAMES[qi.type] ?? qi.type,
+          queueItemId: qi.id,
+        });
+      }
+    }
+
+    const tasks: WorkspaceTask[] = (tasksResult.tasks ?? []).map((t) => ({
       id: t.id,
       title: t.title,
       status: t.status,
@@ -247,6 +285,7 @@ export async function loadTodayTasks(state: MyDayState): Promise<WorkspaceTask[]
       priority: t.priority,
       createdAt: t.createdAt,
       completedAt: t.completedAt,
+      queueStatus: queueByTask.get(t.id) ?? null,
     }));
     state.todayTasks = tasks;
     return tasks;
@@ -350,7 +389,7 @@ export async function loadMyDay(state: MyDayState) {
     withTimeout(loadDailyBrief(state.client, date), 10_000, "Daily Brief"),
     loadBriefNotesPromise,
     withTimeout(loadAgentLog(state.client, date, { refresh: false }), 10_000, "Agent Log"),
-    withTimeout(loadTodayTasks(state), 8_000, "Today Tasks"),
+    withTimeout(loadTodayTasksWithQueueStatus(state), 8_000, "Today Tasks"),
   ]);
 
   state.dailyBrief = results[0].status === "fulfilled" ? results[0].value : null;
