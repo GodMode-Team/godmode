@@ -314,9 +314,20 @@ export async function refreshActiveTab(host: SettingsHost) {
       await app.handleGuardrailsLoad();
     }
   }
+  if (host.tab === "setup") {
+    const app = host as unknown as GodModeApp;
+    if (typeof app.handleLoadSetupChecklist === "function") {
+      app.handleLoadSetupChecklist();
+    }
+  }
   if (host.tab === "coretex") {
     const app = host as unknown as GodModeApp;
-    if (typeof app.handleCoretexRefresh === "function") {
+    const subtab = (app as unknown as { coretexSubtab?: string }).coretexSubtab;
+    if (subtab === "intel") {
+      if (typeof app.handleIntelLoad === "function") {
+        await app.handleIntelLoad();
+      }
+    } else if (typeof app.handleCoretexRefresh === "function") {
       await app.handleCoretexRefresh();
     }
   }

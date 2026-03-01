@@ -371,9 +371,22 @@ async function checkOnboardingStatus(host: GatewayHost) {
       app.onboardingActive = true;
       app.onboardingPhase = res.phase ?? 0;
       app.onboardingData = res;
+      // Show setup tab in sidebar for the new 80/20 flow
+      const setupApp = host as unknown as {
+        showSetupTab?: boolean;
+        setupQuickDone?: boolean;
+      };
+      setupApp.showSetupTab = true;
+      // If identity already exists, quick setup is already done
+      if (res.identity?.name) {
+        setupApp.setupQuickDone = true;
+      }
     } else {
       app.onboardingActive = false;
       app.onboardingData = res ?? null;
+      // Hide setup tab for completed users
+      const setupApp = host as unknown as { showSetupTab?: boolean };
+      setupApp.showSetupTab = false;
     }
   } catch {
     // Onboarding status not available — skip (probably standalone without the method)
@@ -958,6 +971,32 @@ function handleGatewayEventUnsafe(host: GatewayHost, evt: GatewayEventFrame) {
       const app = host as unknown as { godmodeOptions?: Record<string, unknown> | null; requestUpdate?: () => void };
       app.godmodeOptions = payload;
       app.requestUpdate?.();
+    }
+    return;
+  }
+
+  // Proactive Intel live updates
+  if (evt.event === "proactiveIntel:insight") {
+    const app = host as unknown as GodModeApp;
+    if (typeof app.handleIntelLoad === "function") {
+      void app.handleIntelLoad();
+    }
+    // Show toast for new insights
+    const payload = evt.payload as { newInsights?: number; totalActive?: number } | undefined;
+    if (payload?.newInsights && typeof app.showToast === "function") {
+      app.showToast(
+        `${payload.newInsights} new intelligence insight${payload.newInsights > 1 ? "s" : ""} available`,
+        "info",
+        6000,
+      );
+    }
+    return;
+  }
+  if (evt.event === "proactiveIntel:update") {
+    const app = host as unknown as GodModeApp;
+    const subtab = (app as unknown as { coretexSubtab?: string }).coretexSubtab;
+    if (typeof app.handleIntelLoad === "function" && host.tab === "coretex" && subtab === "intel") {
+      void app.handleIntelLoad();
     }
     return;
   }

@@ -3,6 +3,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk";
 import { GODMODE_ROOT } from "../data-paths.js";
+import { formatGuardrailsForPrompt } from "./guardrails.js";
 import {
   classifyTaskMode,
   newTaskId,
@@ -302,6 +303,15 @@ async function mergePullRequest(run: RunCmd, worktreePath: string, prNumber: num
   }
 }
 
+async function isWorkingTreeClean(run: RunCmd, repoRoot: string): Promise<boolean> {
+  try {
+    const { stdout } = await run(["git", "status", "--porcelain"], { timeoutMs: 10_000, cwd: repoRoot });
+    return stdout.trim().length === 0;
+  } catch {
+    return false; // If we can't check, assume dirty to be safe
+  }
+}
+
 async function isGitRepo(run: RunCmd, dir: string): Promise<boolean> {
   try {
     const { exitCode } = await run(["git", "rev-parse", "--git-dir"], { timeoutMs: 5_000, cwd: dir });
@@ -465,13 +475,34 @@ export type LaunchTaskResult = {
   message?: string;
 };
 
+export type TaskCompletionCallback = (task: CodingTask) => void | Promise<void>;
+
 export class CodingOrchestrator {
   private api: OpenClawPluginApi;
   private logger: { info: (msg: string) => void; warn: (msg: string) => void; error: (msg: string) => void };
+  private onTaskCompletedCallbacks: TaskCompletionCallback[] = [];
 
   constructor(api: OpenClawPluginApi) {
     this.api = api;
     this.logger = api.logger;
+  }
+
+  /**
+   * Register a callback that fires whenever a task completes (done or failed).
+   * Used to wire up notifications for detached agent processes.
+   */
+  onTaskCompleted(cb: TaskCompletionCallback): void {
+    this.onTaskCompletedCallbacks.push(cb);
+  }
+
+  private async fireTaskCompleted(task: CodingTask): Promise<void> {
+    for (const cb of this.onTaskCompletedCallbacks) {
+      try {
+        await cb(task);
+      } catch (err) {
+        this.logger.warn(`[GodMode][Coding] onTaskCompleted callback error: ${String(err)}`);
+      }
+    }
   }
 
   /**
@@ -732,6 +763,14 @@ export class CodingOrchestrator {
   }): Promise<{ spawned: boolean; error?: string; pid?: number }> {
     const { taskId, task, worktreePath, branch, scopeGlobs, model } = params;
 
+    // Fetch active guardrails to inject into the agent prompt
+    let guardrailsBlock = "";
+    try {
+      guardrailsBlock = await formatGuardrailsForPrompt();
+    } catch {
+      // Non-fatal — agent runs without guardrail awareness
+    }
+
     const prompt = [
       "You are a coding agent working in an isolated git worktree.",
       "",
@@ -743,6 +782,14 @@ export class CodingOrchestrator {
       `- Branch: ${branch}`,
       `- Scope: ${scopeGlobs.join(", ")}`,
       "",
+      "## Safety Rules",
+      "- NEVER merge your branch into main. Only push your branch.",
+      "- NEVER run `git merge`, `git checkout main`, or `git switch main`.",
+      "- NEVER modify files outside the specified scope.",
+      "- If you encounter merge conflicts, stop and report — do not force-resolve.",
+      "- Do not run destructive commands (rm -rf, git reset --hard) on the main worktree.",
+      "",
+      ...(guardrailsBlock ? [guardrailsBlock, ""] : []),
       "## Instructions",
       "1. Complete the task above.",
       "2. Keep changes within the specified scope.",
@@ -847,13 +894,21 @@ export class CodingOrchestrator {
             task.prNumber = pr.prNumber;
             task.prUrl = pr.prUrl;
 
-            // Auto-merge if configured
+            // Auto-merge if configured — but only if main's working tree is clean.
+            // If there are uncommitted changes, skip merge to avoid stashing/losing work.
             if (this.config().autoMerge) {
-              const merged = await mergePullRequest(this.run, task.worktreePath, pr.prNumber);
-              if (merged) {
-                this.logger.info(`[GodMode][Coding] Auto-merged PR #${pr.prNumber} for task ${task.id}`);
+              const mainClean = await isWorkingTreeClean(this.run, task.repoRoot);
+              if (!mainClean) {
+                this.logger.warn(
+                  `[GodMode][Coding] Skipping auto-merge for PR #${pr.prNumber} — main has uncommitted changes. PR remains open for manual merge.`,
+                );
               } else {
-                this.logger.warn(`[GodMode][Coding] Auto-merge failed for PR #${pr.prNumber}, PR remains open`);
+                const merged = await mergePullRequest(this.run, task.worktreePath, pr.prNumber);
+                if (merged) {
+                  this.logger.info(`[GodMode][Coding] Auto-merged PR #${pr.prNumber} for task ${task.id}`);
+                } else {
+                  this.logger.warn(`[GodMode][Coding] Auto-merge failed for PR #${pr.prNumber}, PR remains open`);
+                }
               }
             }
           }
@@ -875,6 +930,11 @@ export class CodingOrchestrator {
 
       return { task, nextReady };
     });
+
+    // Fire completion callbacks (notifications, etc.)
+    if (result.task && (result.task.status === "done" || result.task.status === "failed")) {
+      this.fireTaskCompleted(result.task).catch(() => {});
+    }
 
     // If a queued task is now ready, prepare its worktree
     if (result.nextReady) {

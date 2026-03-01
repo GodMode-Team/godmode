@@ -1,5 +1,5 @@
 /**
- * bundle-ui.mjs — Copy built GodMode UI and Deck assets into plugin dist/.
+ * bundle-ui.mjs — Copy built GodMode UI assets into plugin dist/.
  *
  * GodMode UI source resolution order:
  * 1) --ui-dir <path>
@@ -7,16 +7,8 @@
  * 3) <plugin>/ui/dist (in-repo Vite build output)
  * 4) <plugin>/assets/godmode-ui (committed fallback snapshot)
  *
- * Deck source resolution order:
- * 1) --deck-dir <path>
- * 2) GODMODE_DECK_DIR=<path>
- * 3) <plugin>/deck/dist
- * 4) <plugin>/assets/deck (committed fallback snapshot)
- * 5) sibling workspaces:
- *    - ../openclaw-deck/dist
- *
- * Missing assets fail the build by default to avoid shipping a plugin without UIs.
- * Set GODMODE_UI_OPTIONAL=1 or GODMODE_DECK_OPTIONAL=1 to skip a missing bundle.
+ * Missing assets fail the build by default to avoid shipping a plugin without UI.
+ * Set GODMODE_UI_OPTIONAL=1 to skip a missing bundle.
  */
 
 import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -52,39 +44,6 @@ function hasGodModeRootTag(sourceDir) {
     return /<godmode-app\b/i.test(html);
   } catch {
     return false;
-  }
-}
-
-function hasDeckBuildIndex(sourceDir) {
-  const indexPath = join(sourceDir, "index.html");
-  if (!existsSync(indexPath)) {
-    return false;
-  }
-  try {
-    const html = readFileSync(indexPath, "utf8");
-    // Reject source/dev index files that still point to /src/main.tsx.
-    if (/\/src\/main\.[jt]sx?/.test(html)) {
-      return false;
-    }
-    return /<div id=["']root["']>/.test(html);
-  } catch {
-    return false;
-  }
-}
-
-function normalizeDeckIndex(deckDest) {
-  const indexPath = join(deckDest, "index.html");
-  if (!existsSync(indexPath)) {
-    return;
-  }
-  const html = readFileSync(indexPath, "utf8");
-  const normalized = html
-    .replaceAll('src="/assets/', 'src="/deck/assets/')
-    .replaceAll("src='/assets/", "src='/deck/assets/")
-    .replaceAll('href="/assets/', 'href="/deck/assets/')
-    .replaceAll("href='/assets/", "href='/deck/assets/");
-  if (normalized !== html) {
-    writeFileSync(indexPath, normalized);
   }
 }
 
@@ -179,43 +138,5 @@ copyBundle({
   missingHint: "Run 'pnpm build:ui' first or pass --ui-dir containing <godmode-app>.",
   afterCopy: (destination, source) => {
     writeBundleSourceMeta(destination, source, "godmode-ui");
-  },
-});
-
-const deckDirFlag = readFlag("--deck-dir");
-const deckDirEnv = readEnvPath("GODMODE_DECK_DIR");
-
-assertExplicitSource({
-  label: "--deck-dir",
-  pathValue: deckDirFlag,
-  validator: hasDeckBuildIndex,
-  hint: "Run a deck build first or pass a built deck directory.",
-});
-
-assertExplicitSource({
-  label: "GODMODE_DECK_DIR",
-  pathValue: deckDirEnv,
-  validator: hasDeckBuildIndex,
-  hint: "Run a deck build first or point GODMODE_DECK_DIR at a built deck directory.",
-});
-
-const deckCandidates = [
-  deckDirFlag,
-  deckDirEnv,
-  join(pluginRoot, "deck", "dist"),
-  join(pluginRoot, "assets", "deck"),
-  join(pluginRoot, "..", "openclaw-deck", "dist"),
-].filter(Boolean);
-
-copyBundle({
-  label: "Deck",
-  candidates: deckCandidates,
-  destination: join(pluginRoot, "dist", "deck"),
-  validator: hasDeckBuildIndex,
-  optionalEnv: "GODMODE_DECK_OPTIONAL",
-  missingHint: "Build deck first, pass --deck-dir, or add assets/deck fallback.",
-  afterCopy: (destination, source) => {
-    normalizeDeckIndex(destination);
-    writeBundleSourceMeta(destination, source, "deck");
   },
 });

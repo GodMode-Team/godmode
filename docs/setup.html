@@ -1,0 +1,1168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GodMode Setup Wizard</title>
+<style>
+:root {
+  --bg: #0b1120;
+  --bg-card: #111827;
+  --bg-code: #1e293b;
+  --text: #e2e8f0;
+  --text-muted: #94a3b8;
+  --text-dim: #64748b;
+  --accent: #38bdf8;
+  --accent-dim: #0ea5e9;
+  --green: #34d399;
+  --green-dim: #059669;
+  --border: #1e293b;
+  --yellow: #fbbf24;
+  --red: #f87171;
+  --purple: #a78bfa;
+  --radius: 12px;
+  --radius-sm: 8px;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html { scroll-behavior: smooth; font-size: 15px; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  line-height: 1.6;
+}
+
+/* ── Progress Bar ── */
+.progress-wrapper {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: rgba(11, 17, 32, 0.92);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border);
+  padding: 16px 24px;
+}
+
+.progress-inner {
+  max-width: 720px;
+  margin: 0 auto;
+}
+
+.progress-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.progress-label {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.progress-count {
+  font-size: 0.85rem;
+  color: var(--accent);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.progress-track {
+  width: 100%;
+  height: 6px;
+  background: var(--bg-code);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, var(--accent), var(--green));
+  border-radius: 3px;
+  transition: width 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* ── Hero ── */
+.hero {
+  text-align: center;
+  padding: 64px 24px 48px;
+  max-width: 720px;
+  margin: 0 auto;
+}
+
+.hero-logo {
+  font-size: 3.5rem;
+  margin-bottom: 16px;
+  display: block;
+}
+
+.hero h1 {
+  font-size: 2.2rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  margin-bottom: 12px;
+  background: linear-gradient(135deg, var(--text), var(--accent));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.hero p {
+  font-size: 1.1rem;
+  color: var(--text-muted);
+  max-width: 500px;
+  margin: 0 auto 24px;
+}
+
+.hero-name {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.os-pills {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.os-pill {
+  padding: 8px 20px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-weight: 500;
+  user-select: none;
+}
+
+.os-pill:hover {
+  border-color: var(--accent-dim);
+  color: var(--text);
+}
+
+.os-pill.active {
+  background: rgba(56, 189, 248, 0.12);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* ── Steps ── */
+.steps {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 0 24px 80px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.step-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 28px 28px 24px;
+  position: relative;
+  transition: border-color 0.3s, box-shadow 0.3s;
+}
+
+.step-card:hover {
+  border-color: rgba(56, 189, 248, 0.2);
+}
+
+.step-card.completed {
+  border-color: rgba(52, 211, 153, 0.3);
+}
+
+.step-card.completed .step-number {
+  background: rgba(52, 211, 153, 0.15);
+  color: var(--green);
+  border-color: rgba(52, 211, 153, 0.3);
+}
+
+.step-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.step-number {
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: rgba(56, 189, 248, 0.1);
+  border: 1px solid rgba(56, 189, 248, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--accent);
+  transition: all 0.3s;
+}
+
+.step-card.completed .step-number::after {
+  content: '\2713';
+}
+.step-card.completed .step-number .num {
+  display: none;
+}
+
+.step-title-area {
+  flex: 1;
+  min-width: 0;
+}
+
+.step-title {
+  font-size: 1.15rem;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.step-subtitle {
+  font-size: 0.9rem;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+.step-subtitle a {
+  color: var(--accent);
+  text-decoration: none;
+}
+.step-subtitle a:hover {
+  text-decoration: underline;
+}
+
+.step-done {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  user-select: none;
+  padding: 6px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  font-weight: 500;
+  transition: all 0.2s;
+  font-family: inherit;
+}
+
+.step-done:hover {
+  border-color: var(--green-dim);
+  color: var(--green);
+}
+
+.step-card.completed .step-done {
+  background: rgba(52, 211, 153, 0.1);
+  border-color: rgba(52, 211, 153, 0.3);
+  color: var(--green);
+}
+
+.step-done-check {
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  border: 2px solid var(--text-dim);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  font-size: 0.7rem;
+}
+
+.step-card.completed .step-done-check {
+  background: var(--green);
+  border-color: var(--green);
+  color: var(--bg);
+}
+
+/* ── Code Blocks ── */
+.code-wrapper {
+  position: relative;
+  margin-top: 16px;
+}
+
+.code-block {
+  background: var(--bg-code);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 14px 50px 14px 16px;
+  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', Menlo, monospace;
+  font-size: 0.88rem;
+  line-height: 1.6;
+  color: var(--text);
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.code-block .prompt {
+  color: var(--green);
+  user-select: none;
+}
+
+.code-block .comment {
+  color: var(--text-dim);
+}
+
+.copy-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  color: var(--text-muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  font-size: 0.9rem;
+}
+
+.copy-btn:hover {
+  border-color: var(--accent-dim);
+  color: var(--accent);
+  background: rgba(56, 189, 248, 0.08);
+}
+
+.copy-btn.copied {
+  border-color: var(--green);
+  color: var(--green);
+  background: rgba(52, 211, 153, 0.08);
+}
+
+.copy-btn svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* ── Multiple command blocks ── */
+.code-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.code-label {
+  font-size: 0.78rem;
+  color: var(--text-dim);
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: -4px;
+}
+
+/* ── Info callout ── */
+.info-callout {
+  background: rgba(56, 189, 248, 0.06);
+  border: 1px solid rgba(56, 189, 248, 0.15);
+  border-radius: var(--radius-sm);
+  padding: 14px 16px;
+  margin-top: 16px;
+  font-size: 0.88rem;
+  color: var(--text-muted);
+  line-height: 1.6;
+}
+
+.info-callout strong {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.info-callout code {
+  background: var(--bg-code);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: 'SF Mono', Menlo, monospace;
+  font-size: 0.84rem;
+}
+
+/* ── License input ── */
+.license-input-group {
+  display: flex;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.license-input {
+  flex: 1;
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--bg-code);
+  color: var(--text);
+  font-family: 'SF Mono', Menlo, monospace;
+  font-size: 0.9rem;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.license-input:focus {
+  border-color: var(--accent);
+}
+
+.license-input::placeholder {
+  color: var(--text-dim);
+}
+
+/* ── Troubleshooting ── */
+.trouble-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 16px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--text-dim);
+  font-size: 0.85rem;
+  cursor: pointer;
+  font-family: inherit;
+  transition: color 0.2s;
+}
+
+.trouble-toggle:hover {
+  color: var(--text-muted);
+}
+
+.trouble-arrow {
+  font-size: 0.7rem;
+  transition: transform 0.2s;
+  display: inline-block;
+}
+
+.trouble-toggle.open .trouble-arrow {
+  transform: rotate(90deg);
+}
+
+.trouble-content {
+  display: none;
+  margin-top: 12px;
+  padding: 16px;
+  background: rgba(251, 191, 36, 0.04);
+  border: 1px solid rgba(251, 191, 36, 0.12);
+  border-radius: var(--radius-sm);
+  font-size: 0.88rem;
+  color: var(--text-muted);
+  line-height: 1.7;
+}
+
+.trouble-content.open {
+  display: block;
+}
+
+.trouble-content code {
+  background: var(--bg-code);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: 'SF Mono', Menlo, monospace;
+  font-size: 0.84rem;
+  color: var(--text);
+}
+
+.trouble-content ul {
+  margin: 8px 0 8px 20px;
+}
+
+.trouble-content li {
+  margin-bottom: 6px;
+}
+
+.trouble-content a {
+  color: var(--accent);
+  text-decoration: none;
+}
+.trouble-content a:hover {
+  text-decoration: underline;
+}
+
+/* ── Final CTA ── */
+.final-cta {
+  text-align: center;
+  padding: 48px 24px 80px;
+  max-width: 720px;
+  margin: 0 auto;
+}
+
+.final-cta.hidden {
+  display: none;
+}
+
+.final-cta h2 {
+  font-size: 1.8rem;
+  font-weight: 700;
+  margin-bottom: 12px;
+  background: linear-gradient(135deg, var(--green), var(--accent));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.final-cta p {
+  color: var(--text-muted);
+  margin-bottom: 28px;
+  font-size: 1.05rem;
+}
+
+.open-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 32px;
+  border-radius: 999px;
+  border: none;
+  background: linear-gradient(135deg, var(--accent-dim), var(--accent));
+  color: var(--bg);
+  font-size: 1.05rem;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  transition: transform 0.2s, box-shadow 0.2s;
+  text-decoration: none;
+}
+
+.open-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 30px rgba(56, 189, 248, 0.25);
+}
+
+/* ── Encouragement toasts ── */
+.toast {
+  position: fixed;
+  bottom: 32px;
+  left: 50%;
+  transform: translateX(-50%) translateY(80px);
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 12px 24px;
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: var(--text);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+  opacity: 0;
+  transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.4s;
+  z-index: 200;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+.toast.show {
+  transform: translateX(-50%) translateY(0);
+  opacity: 1;
+}
+
+/* ── Footer ── */
+.footer {
+  text-align: center;
+  padding: 24px;
+  color: var(--text-dim);
+  font-size: 0.8rem;
+  border-top: 1px solid var(--border);
+}
+
+.footer a {
+  color: var(--text-muted);
+  text-decoration: none;
+}
+.footer a:hover {
+  color: var(--accent);
+}
+
+/* ── Responsive ── */
+@media (max-width: 640px) {
+  .hero { padding: 48px 20px 36px; }
+  .hero h1 { font-size: 1.7rem; }
+  .hero-logo { font-size: 2.8rem; }
+  .steps { padding: 0 16px 60px; gap: 16px; }
+  .step-card { padding: 20px 18px 18px; }
+  .step-header { flex-wrap: wrap; }
+  .step-number { width: 38px; height: 38px; font-size: 1rem; }
+  .step-done { margin-top: 8px; }
+  .license-input-group { flex-direction: column; }
+  .code-block { font-size: 0.82rem; padding: 12px 44px 12px 12px; }
+  .os-pills { gap: 6px; }
+  .os-pill { padding: 6px 14px; font-size: 0.82rem; }
+  .progress-wrapper { padding: 12px 16px; }
+}
+
+/* ── Animations ── */
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.step-card {
+  animation: fadeInUp 0.5s ease-out backwards;
+}
+
+.step-card:nth-child(1) { animation-delay: 0.05s; }
+.step-card:nth-child(2) { animation-delay: 0.1s; }
+.step-card:nth-child(3) { animation-delay: 0.15s; }
+.step-card:nth-child(4) { animation-delay: 0.2s; }
+.step-card:nth-child(5) { animation-delay: 0.25s; }
+.step-card:nth-child(6) { animation-delay: 0.3s; }
+</style>
+</head>
+<body>
+
+<!-- Progress Bar -->
+<div class="progress-wrapper">
+  <div class="progress-inner">
+    <div class="progress-top">
+      <span class="progress-label" id="progressLabel">Let's get you set up</span>
+      <span class="progress-count" id="progressCount">0 / 6</span>
+    </div>
+    <div class="progress-track">
+      <div class="progress-fill" id="progressFill"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Hero -->
+<section class="hero">
+  <span class="hero-logo" aria-hidden="true">&#9889;</span>
+  <h1 id="heroTitle">Welcome to GodMode</h1>
+  <p id="heroSubtitle">You're 6 steps away from your AI-powered second brain. Follow along &mdash; this takes about 5 minutes.</p>
+  <div class="os-pills">
+    <button class="os-pill" data-os="mac" onclick="setOS('mac')">macOS</button>
+    <button class="os-pill" data-os="win" onclick="setOS('win')">Windows</button>
+    <button class="os-pill" data-os="linux" onclick="setOS('linux')">Linux</button>
+  </div>
+</section>
+
+<!-- Steps -->
+<div class="steps" id="steps">
+
+  <!-- Step 1: Node.js -->
+  <div class="step-card" data-step="1">
+    <div class="step-header">
+      <div class="step-number"><span class="num">1</span></div>
+      <div class="step-title-area">
+        <div class="step-title">Install Node.js (v22 LTS)</div>
+        <div class="step-subtitle">GodMode runs on Node.js. Grab the latest LTS version, or use the command below.</div>
+      </div>
+      <button class="step-done" onclick="toggleStep(1)">
+        <span class="step-done-check">&#10003;</span>
+        Done
+      </button>
+    </div>
+
+    <div class="step-subtitle" style="margin-bottom:8px">
+      <a href="https://nodejs.org/en/download" target="_blank" rel="noopener">Download from nodejs.org &rarr;</a>
+      &nbsp;or install via terminal:
+    </div>
+
+    <div class="code-group">
+      <!-- macOS -->
+      <div class="os-cmd" data-os="mac">
+        <div class="code-wrapper">
+          <div class="code-block"><span class="prompt">$ </span>brew install node@22</div>
+          <button class="copy-btn" onclick="copyCmd(this, 'brew install node@22')" title="Copy to clipboard">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+          </button>
+        </div>
+      </div>
+      <!-- Windows -->
+      <div class="os-cmd" data-os="win">
+        <div class="code-wrapper">
+          <div class="code-block"><span class="prompt">&gt; </span>winget install OpenJS.NodeJS.LTS</div>
+          <button class="copy-btn" onclick="copyCmd(this, 'winget install OpenJS.NodeJS.LTS')" title="Copy to clipboard">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+          </button>
+        </div>
+      </div>
+      <!-- Linux -->
+      <div class="os-cmd" data-os="linux">
+        <div class="code-wrapper">
+          <div class="code-block"><span class="prompt">$ </span>curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash - &amp;&amp; \
+  sudo apt-get install -y nodejs</div>
+          <button class="copy-btn" onclick="copyCmd(this, 'curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash - && sudo apt-get install -y nodejs')" title="Copy to clipboard">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="code-group" style="margin-top:12px">
+      <div class="code-label">Verify</div>
+      <div class="code-wrapper">
+        <div class="code-block"><span class="prompt">$ </span>node --version  <span class="comment"># should print v22.x.x</span></div>
+        <button class="copy-btn" onclick="copyCmd(this, 'node --version')" title="Copy to clipboard">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <button class="trouble-toggle" onclick="toggleTrouble(this)">
+      <span class="trouble-arrow">&#9654;</span> Having trouble?
+    </button>
+    <div class="trouble-content">
+      <ul>
+        <li><strong>macOS:</strong> Don't have Homebrew? Install it first: <code>/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"</code></li>
+        <li><strong>Windows:</strong> If <code>winget</code> isn't available, download the installer directly from <a href="https://nodejs.org/en/download" target="_blank">nodejs.org</a>.</li>
+        <li><strong>Linux:</strong> On Fedora/RHEL, use <code>sudo dnf install nodejs</code>. On Arch, use <code>sudo pacman -S nodejs npm</code>.</li>
+        <li><strong>Already have Node but older version?</strong> Use <a href="https://github.com/nvm-sh/nvm" target="_blank">nvm</a> to manage multiple versions: <code>nvm install 22 &amp;&amp; nvm use 22</code></li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Step 2: Install OpenClaw -->
+  <div class="step-card" data-step="2">
+    <div class="step-header">
+      <div class="step-number"><span class="num">2</span></div>
+      <div class="step-title-area">
+        <div class="step-title">Install OpenClaw</div>
+        <div class="step-subtitle">OpenClaw is the AI gateway that powers GodMode. One command to install it globally.</div>
+      </div>
+      <button class="step-done" onclick="toggleStep(2)">
+        <span class="step-done-check">&#10003;</span>
+        Done
+      </button>
+    </div>
+
+    <div class="code-group">
+      <div class="code-wrapper">
+        <div class="code-block"><span class="prompt">$ </span>npm install -g openclaw</div>
+        <button class="copy-btn" onclick="copyCmd(this, 'npm install -g openclaw')" title="Copy to clipboard">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <div class="code-group" style="margin-top:12px">
+      <div class="code-label">Verify</div>
+      <div class="code-wrapper">
+        <div class="code-block"><span class="prompt">$ </span>openclaw --version</div>
+        <button class="copy-btn" onclick="copyCmd(this, 'openclaw --version')" title="Copy to clipboard">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <button class="trouble-toggle" onclick="toggleTrouble(this)">
+      <span class="trouble-arrow">&#9654;</span> Having trouble?
+    </button>
+    <div class="trouble-content">
+      <ul>
+        <li><strong>Permission denied?</strong> On macOS/Linux, try <code>sudo npm install -g openclaw</code> or fix your npm prefix: <code>npm config set prefix ~/.npm-global</code> and add <code>~/.npm-global/bin</code> to your PATH.</li>
+        <li><strong>Command not found after install?</strong> Close and reopen your terminal, or run <code>hash -r</code> (bash/zsh) to refresh your PATH.</li>
+        <li><strong>Behind a proxy?</strong> Set <code>npm config set proxy http://your-proxy:port</code> before installing.</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Step 3: Authenticate -->
+  <div class="step-card" data-step="3">
+    <div class="step-header">
+      <div class="step-number"><span class="num">3</span></div>
+      <div class="step-title-area">
+        <div class="step-title">Authenticate with Claude</div>
+        <div class="step-subtitle">Connect your Claude account so GodMode can talk to AI models.</div>
+      </div>
+      <button class="step-done" onclick="toggleStep(3)">
+        <span class="step-done-check">&#10003;</span>
+        Done
+      </button>
+    </div>
+
+    <div class="info-callout">
+      <strong>Which command should I use?</strong><br>
+      &bull; <code>openclaw setup-token</code> &mdash; Use this if you have a <strong>Claude Pro or Max</strong> subscription. It links your existing Anthropic account.<br>
+      &bull; <code>openclaw auth login</code> &mdash; Use this if you have a <strong>separate API key</strong> or want to log in with API credentials.
+    </div>
+
+    <div class="code-group">
+      <div class="code-label">Option A &mdash; Claude Pro / Max subscribers</div>
+      <div class="code-wrapper">
+        <div class="code-block"><span class="prompt">$ </span>openclaw setup-token</div>
+        <button class="copy-btn" onclick="copyCmd(this, 'openclaw setup-token')" title="Copy to clipboard">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <div class="code-group">
+      <div class="code-label">Option B &mdash; API key authentication</div>
+      <div class="code-wrapper">
+        <div class="code-block"><span class="prompt">$ </span>openclaw auth login</div>
+        <button class="copy-btn" onclick="copyCmd(this, 'openclaw auth login')" title="Copy to clipboard">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <button class="trouble-toggle" onclick="toggleTrouble(this)">
+      <span class="trouble-arrow">&#9654;</span> Having trouble?
+    </button>
+    <div class="trouble-content">
+      <ul>
+        <li><strong>Browser doesn't open?</strong> Copy the URL printed in your terminal and paste it into your browser manually.</li>
+        <li><strong>Token expired?</strong> Run the same command again to refresh your credentials.</li>
+        <li><strong>Not sure which plan you have?</strong> Check at <a href="https://console.anthropic.com" target="_blank">console.anthropic.com</a>. If you pay monthly for Claude.ai, you likely have Pro or Max.</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Step 4: Install GodMode -->
+  <div class="step-card" data-step="4">
+    <div class="step-header">
+      <div class="step-number"><span class="num">4</span></div>
+      <div class="step-title-area">
+        <div class="step-title">Install the GodMode Plugin</div>
+        <div class="step-subtitle">Almost there! This pulls down the GodMode plugin and registers it with OpenClaw.</div>
+      </div>
+      <button class="step-done" onclick="toggleStep(4)">
+        <span class="step-done-check">&#10003;</span>
+        Done
+      </button>
+    </div>
+
+    <div class="code-group">
+      <div class="code-wrapper">
+        <div class="code-block"><span class="prompt">$ </span>openclaw plugins install @godmode-team/godmode</div>
+        <button class="copy-btn" onclick="copyCmd(this, 'openclaw plugins install @godmode-team/godmode')" title="Copy to clipboard">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <button class="trouble-toggle" onclick="toggleTrouble(this)">
+      <span class="trouble-arrow">&#9654;</span> Having trouble?
+    </button>
+    <div class="trouble-content">
+      <ul>
+        <li><strong>Plugin not found?</strong> Make sure you're running OpenClaw v1.0 or later: <code>openclaw --version</code>. Update with <code>npm update -g openclaw</code>.</li>
+        <li><strong>Install hangs?</strong> Check your internet connection and try again. If behind a firewall, ensure npm registry access is allowed.</li>
+        <li><strong>Want to install from source?</strong> Clone the repo and run <code>openclaw plugins link ./godmode-plugin</code> from the project directory.</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Step 5: Activate License -->
+  <div class="step-card" data-step="5">
+    <div class="step-header">
+      <div class="step-number"><span class="num">5</span></div>
+      <div class="step-title-area">
+        <div class="step-title">Activate Your License</div>
+        <div class="step-subtitle" id="licenseSubtitle">Enter your license key to unlock GodMode.</div>
+      </div>
+      <button class="step-done" onclick="toggleStep(5)">
+        <span class="step-done-check">&#10003;</span>
+        Done
+      </button>
+    </div>
+
+    <div class="license-input-group" id="licenseInputGroup">
+      <input
+        type="text"
+        class="license-input"
+        id="licenseInput"
+        placeholder="GM-DEV-XXXX-XXXX"
+        spellcheck="false"
+        autocomplete="off"
+      >
+    </div>
+
+    <div class="code-group">
+      <div class="code-wrapper">
+        <div class="code-block" id="licenseCmd"><span class="prompt">$ </span>openclaw godmode activate <span id="licensePlaceholder" class="comment">GM-...</span></div>
+        <button class="copy-btn" id="licenseCopyBtn" onclick="copyLicenseCmd(this)" title="Copy to clipboard">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <button class="trouble-toggle" onclick="toggleTrouble(this)">
+      <span class="trouble-arrow">&#9654;</span> Having trouble?
+    </button>
+    <div class="trouble-content">
+      <ul>
+        <li><strong>Don't have a key yet?</strong> Get one at <a href="https://lifeongodmode.com" target="_blank">lifeongodmode.com</a>.</li>
+        <li><strong>"Invalid key" error?</strong> Double-check for typos. Keys are case-sensitive and start with <code>GM-</code>.</li>
+        <li><strong>Key already used?</strong> Each key is single-use. Contact support at <a href="mailto:support@lifeongodmode.com">support@lifeongodmode.com</a> if you need to transfer a license.</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Step 6: Start & Open -->
+  <div class="step-card" data-step="6">
+    <div class="step-header">
+      <div class="step-number"><span class="num">6</span></div>
+      <div class="step-title-area">
+        <div class="step-title">Launch GodMode</div>
+        <div class="step-subtitle">Fire up the gateway and open GodMode in your browser. You made it!</div>
+      </div>
+      <button class="step-done" onclick="toggleStep(6)">
+        <span class="step-done-check">&#10003;</span>
+        Done
+      </button>
+    </div>
+
+    <div class="code-group">
+      <div class="code-wrapper">
+        <div class="code-block"><span class="prompt">$ </span>openclaw gateway start</div>
+        <button class="copy-btn" onclick="copyCmd(this, 'openclaw gateway start')" title="Copy to clipboard">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <div style="margin-top:16px; text-align:center">
+      <a class="open-btn" href="http://127.0.0.1:18789/godmode/" target="_blank" rel="noopener">
+        &#9889; Open GodMode
+      </a>
+    </div>
+
+    <button class="trouble-toggle" onclick="toggleTrouble(this)">
+      <span class="trouble-arrow">&#9654;</span> Having trouble?
+    </button>
+    <div class="trouble-content">
+      <ul>
+        <li><strong>Port in use?</strong> Another process may be on port 18789. Check with <code>lsof -i :18789</code> (macOS/Linux) or <code>netstat -ano | findstr :18789</code> (Windows).</li>
+        <li><strong>Page won't load?</strong> Wait a few seconds after starting the gateway &mdash; it may need a moment to initialize. Then refresh.</li>
+        <li><strong>Want to run in the background?</strong> Use <code>openclaw gateway start --daemon</code> to run the gateway as a background service.</li>
+        <li><strong>Need to restart?</strong> Run <code>openclaw gateway restart</code> to restart cleanly.</li>
+      </ul>
+    </div>
+  </div>
+
+</div>
+
+<!-- Final CTA (shown when all done) -->
+<div class="final-cta hidden" id="finalCta">
+  <h2>&#9889; You're in GodMode</h2>
+  <p>All steps complete. Your AI-powered second brain is ready to roll.</p>
+  <a class="open-btn" href="http://127.0.0.1:18789/godmode/" target="_blank" rel="noopener">
+    &#9889; Open GodMode
+  </a>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<!-- Footer -->
+<div class="footer">
+  &#9889; GodMode &mdash; <a href="https://lifeongodmode.com" target="_blank">lifeongodmode.com</a>
+</div>
+
+<script>
+(function() {
+  'use strict';
+
+  // ── State ──
+  const TOTAL_STEPS = 6;
+  const completed = new Set();
+  let currentOS = 'mac';
+
+  // ── Query Params ──
+  const params = new URLSearchParams(window.location.search);
+  const paramKey = params.get('key') || '';
+  const paramName = params.get('name') || '';
+  const paramOS = params.get('os') || '';
+
+  // ── OS Detection ──
+  function detectOS() {
+    if (paramOS) {
+      const os = paramOS.toLowerCase();
+      if (['mac', 'win', 'linux'].includes(os)) return os;
+    }
+    const ua = navigator.userAgent || '';
+    const platform = navigator.platform || '';
+    if (/Mac/i.test(platform) || /Macintosh/i.test(ua)) return 'mac';
+    if (/Win/i.test(platform) || /Windows/i.test(ua)) return 'win';
+    if (/Linux/i.test(platform) || /Linux/i.test(ua)) return 'linux';
+    return 'mac';
+  }
+
+  // ── Personalization ──
+  function personalize() {
+    if (paramName) {
+      document.getElementById('heroTitle').textContent = 'Welcome to GodMode, ' + paramName;
+    }
+    if (paramKey) {
+      var input = document.getElementById('licenseInput');
+      input.value = paramKey;
+      updateLicenseCmd();
+      document.getElementById('licenseSubtitle').innerHTML =
+        'Your license key is pre-filled below. Just copy the command and run it.';
+    }
+  }
+
+  // ── OS Switching ──
+  window.setOS = function(os) {
+    currentOS = os;
+    // Update pills
+    document.querySelectorAll('.os-pill').forEach(function(pill) {
+      pill.classList.toggle('active', pill.dataset.os === os);
+    });
+    // Show/hide OS-specific commands
+    document.querySelectorAll('.os-cmd').forEach(function(el) {
+      el.style.display = el.dataset.os === os ? '' : 'none';
+    });
+  };
+
+  // ── Copy to clipboard ──
+  window.copyCmd = function(btn, text) {
+    navigator.clipboard.writeText(text).then(function() {
+      btn.classList.add('copied');
+      btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>';
+      setTimeout(function() {
+        btn.classList.remove('copied');
+        btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>';
+      }, 2000);
+    }).catch(function() {
+      // Fallback: select text
+      var textarea = document.createElement('textarea');
+      textarea.value = text;
+      textarea.style.position = 'fixed';
+      textarea.style.opacity = '0';
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textarea);
+      btn.classList.add('copied');
+      setTimeout(function() { btn.classList.remove('copied'); }, 2000);
+    });
+  };
+
+  // ── License Key Handling ──
+  function updateLicenseCmd() {
+    var input = document.getElementById('licenseInput');
+    var placeholder = document.getElementById('licensePlaceholder');
+    var val = input.value.trim();
+    if (val) {
+      placeholder.textContent = val;
+      placeholder.classList.remove('comment');
+      placeholder.style.color = 'var(--text)';
+    } else {
+      placeholder.textContent = 'GM-...';
+      placeholder.classList.add('comment');
+      placeholder.style.color = '';
+    }
+  }
+
+  window.copyLicenseCmd = function(btn) {
+    var input = document.getElementById('licenseInput');
+    var key = input.value.trim() || 'GM-...';
+    window.copyCmd(btn, 'openclaw godmode activate ' + key);
+  };
+
+  // ── Step Toggle ──
+  var encouragements = [
+    { at: 1, msg: "Great start! You're on your way." },
+    { at: 2, msg: "Nice! OpenClaw is locked and loaded." },
+    { at: 3, msg: "Authenticated! The hard part is over." },
+    { at: 4, msg: "GodMode plugin installed. Almost there!" },
+    { at: 5, msg: "License activated. One more step!" },
+    { at: 6, msg: "You're in GodMode. Let's go!" }
+  ];
+
+  window.toggleStep = function(step) {
+    var card = document.querySelector('.step-card[data-step="' + step + '"]');
+    if (completed.has(step)) {
+      completed.delete(step);
+      card.classList.remove('completed');
+    } else {
+      completed.add(step);
+      card.classList.add('completed');
+      // Show encouragement
+      var enc = encouragements.find(function(e) { return e.at === step; });
+      if (enc) showToast(enc.msg);
+    }
+    updateProgress();
+  };
+
+  // ── Progress ──
+  function updateProgress() {
+    var count = completed.size;
+    var pct = (count / TOTAL_STEPS) * 100;
+    document.getElementById('progressFill').style.width = pct + '%';
+    document.getElementById('progressCount').textContent = count + ' / ' + TOTAL_STEPS;
+
+    var label = document.getElementById('progressLabel');
+    if (count === 0) label.textContent = "Let's get you set up";
+    else if (count < 3) label.textContent = 'Off to a great start';
+    else if (count < 5) label.textContent = "You're cruising now";
+    else if (count < 6) label.textContent = 'Almost there!';
+    else label.textContent = 'Setup complete!';
+
+    // Final CTA
+    var cta = document.getElementById('finalCta');
+    if (count === TOTAL_STEPS) {
+      cta.classList.remove('hidden');
+      cta.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    } else {
+      cta.classList.add('hidden');
+    }
+  }
+
+  // ── Toast ──
+  function showToast(msg) {
+    var toast = document.getElementById('toast');
+    toast.textContent = msg;
+    toast.classList.add('show');
+    setTimeout(function() {
+      toast.classList.remove('show');
+    }, 3000);
+  }
+
+  // ── Troubleshooting Toggle ──
+  window.toggleTrouble = function(btn) {
+    btn.classList.toggle('open');
+    var content = btn.nextElementSibling;
+    content.classList.toggle('open');
+  };
+
+  // ── Init ──
+  currentOS = detectOS();
+  window.setOS(currentOS);
+  personalize();
+
+  // License input listener
+  var licenseInput = document.getElementById('licenseInput');
+  licenseInput.addEventListener('input', updateLicenseCmd);
+
+  // Persist state to sessionStorage
+  var saved = sessionStorage.getItem('godmode-setup-completed');
+  if (saved) {
+    try {
+      JSON.parse(saved).forEach(function(s) {
+        completed.add(s);
+        var card = document.querySelector('.step-card[data-step="' + s + '"]');
+        if (card) card.classList.add('completed');
+      });
+      updateProgress();
+    } catch(e) {}
+  }
+
+  // Save on change
+  var origToggle = window.toggleStep;
+  window.toggleStep = function(step) {
+    origToggle(step);
+    sessionStorage.setItem('godmode-setup-completed', JSON.stringify(Array.from(completed)));
+  };
+})();
+</script>
+</body>
+</html>

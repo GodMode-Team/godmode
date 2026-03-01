@@ -66,6 +66,27 @@
   line-height: 1;
 }
 
+.sidebar-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.sidebar-open-browser-btn {
+  font-size: 12px;
+  color: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--card);
+  cursor: pointer;
+}
+
+.sidebar-open-browser-btn:hover {
+  color: var(--text);
+  border-color: var(--border-strong);
+}
+
 .sidebar-title {
   font-weight: 600;
   font-size: 14px;

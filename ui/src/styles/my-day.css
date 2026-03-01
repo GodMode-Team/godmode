@@ -1,13 +1,28 @@
 /* My Day - Daily Dashboard View */
 
+/* Map legacy --mc-* tokens to the global theme variables */
+:root {
+  --mc-bg: var(--bg);
+  --mc-bg-secondary: var(--bg-accent);
+  --mc-bg-tertiary: var(--bg-elevated);
+  --mc-bg-card: var(--card);
+  --mc-bg-hover: var(--bg-hover);
+  --mc-text: var(--text);
+  --mc-text-secondary: var(--muted);
+  --mc-text-muted: var(--muted);
+  --mc-border: var(--border);
+  --mc-border-light: var(--border);
+  --mc-accent: var(--accent);
+}
+
 /* ===== Container ===== */
 
 .my-day-container {
   display: flex;
   flex-direction: column;
   height: 100%;
-  background: var(--mc-bg, #0a0a0a);
-  color: var(--mc-text, #e5e5e5);
+  background: var(--mc-bg);
+  color: var(--mc-text);
   overflow: hidden;
 }
 

@@ -153,8 +153,20 @@ function renderBody(props: MarkdownSidebarProps) {
   return html`<pre class="sidebar-plain">${content}</pre>`;
 }
 
+function isHtmlContent(props: MarkdownSidebarProps): boolean {
+  const mime = normalizeMimeType(props);
+  return mime === "text/html" || mime === "application/xhtml+xml";
+}
+
+function handleOpenInBrowser(content: string) {
+  const blob = new Blob([content], { type: "text/html" });
+  const url = URL.createObjectURL(blob);
+  window.open(url, "_blank", "noopener,noreferrer");
+}
+
 export function renderMarkdownSidebar(props: MarkdownSidebarProps) {
   const resolvedTitle = props.title?.trim() || "Tool Output";
+  const showOpenInBrowser = isHtmlContent(props) && props.content;
   return html`
     <div class="sidebar-panel">
       <div class="sidebar-header">
@@ -166,9 +178,18 @@ export function renderMarkdownSidebar(props: MarkdownSidebarProps) {
               : nothing
           }
         </div>
-        <button @click=${props.onClose} class="btn" title="Close sidebar">
-          ${icons.x}
-        </button>
+        <div class="sidebar-header-actions">
+          ${showOpenInBrowser
+            ? html`<button
+                class="btn sidebar-open-browser-btn"
+                title="Open in browser tab"
+                @click=${() => handleOpenInBrowser(props.content!)}
+              >Open in Browser</button>`
+            : nothing}
+          <button @click=${props.onClose} class="btn" title="Close sidebar">
+            ${icons.x}
+          </button>
+        </div>
       </div>
       <div class="sidebar-content">${renderBody(props)}</div>
     </div>

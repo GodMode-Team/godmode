@@ -518,8 +518,27 @@ async function fetchXIntelligence(): Promise<{
   }
 
   try {
-    const query =
-      "Latest AI agent news, Claude updates, developer tools, and SaaS automation trends from the last 24 hours. Focus on actionable insights for an AI-first SaaS founder.";
+    // Read user-configured topics from options, fall back to default
+    let topics: string | undefined;
+    try {
+      const { readFile } = await import("node:fs/promises");
+      const { join } = await import("node:path");
+      const optionsPath = join(
+        process.env.GODMODE_ROOT || join((await import("node:os")).homedir(), "godmode"),
+        "data",
+        "godmode-options.json",
+      );
+      const raw = JSON.parse(await readFile(optionsPath, "utf-8")) as Record<string, unknown>;
+      if (typeof raw["dailyIntel.topics"] === "string" && raw["dailyIntel.topics"].trim()) {
+        topics = raw["dailyIntel.topics"].trim();
+      }
+    } catch {
+      // Options file not found or unreadable — use default
+    }
+
+    const query = topics
+      ? `Latest news and developments about: ${topics}. Focus on actionable insights from the last 24 hours.`
+      : "Latest AI agent news, Claude updates, developer tools, and SaaS automation trends from the last 24 hours. Focus on actionable insights for an AI-first SaaS founder.";
 
     const resp = await fetch("https://api.x.ai/v1/responses", {
       method: "POST",
@@ -532,8 +551,14 @@ async function fetchXIntelligence(): Promise<{
         tools: [{ type: "x_search" }],
         input: query,
       }),
-      signal: AbortSignal.timeout(20_000),
+      signal: AbortSignal.timeout(30_000),
     });
+
+    if (!resp.ok) {
+      const body = await resp.text().catch(() => "");
+      console.error(`[XIntel] API returned ${resp.status}: ${body.slice(0, 200)}`);
+      return { items: [], error: `XAI API ${resp.status}: ${resp.statusText}` };
+    }
 
     const data = (await resp.json()) as {
       output?: Array<{
@@ -545,6 +570,7 @@ async function fetchXIntelligence(): Promise<{
     };
 
     if (data.error?.message) {
+      console.error(`[XIntel] API error: ${data.error.message}`);
       return { items: [], error: data.error.message };
     }
 
@@ -568,6 +594,7 @@ async function fetchXIntelligence(): Promise<{
     }
 
     if (!textOutput) {
+      console.error("[XIntel] No text output extracted from response");
       return { items: [], error: "No results from XAI x_search" };
     }
 
@@ -599,12 +626,12 @@ async function fetchXIntelligence(): Promise<{
       });
     }
 
+    console.log(`[XIntel] Success: ${items.length} items, ${citations.length} citations`);
     return { items: items.slice(0, 8) };
   } catch (err) {
-    return {
-      items: [],
-      error: err instanceof Error ? err.message : "XAI API call failed",
-    };
+    const msg = err instanceof Error ? err.message : "XAI API call failed";
+    console.error(`[XIntel] Fetch failed: ${msg}`);
+    return { items: [], error: msg };
   }
 }
 
@@ -632,6 +659,72 @@ function formatXIntelligence(items: XIntelItem[], error?: string): string {
   }
 
   return lines.join("\n");
+}
+
+// ── Data source: Proactive Intelligence insights ──────────────────────────────
+
+async function formatIntelligenceSection(): Promise<string | null> {
+  // Check if brief integration is enabled
+  try {
+    const optionsPath = join(
+      process.env.GODMODE_ROOT || join((await import("node:os")).homedir(), "godmode"),
+      "data",
+      "godmode-options.json",
+    );
+    const raw = JSON.parse(await readFile(optionsPath, "utf-8")) as Record<string, unknown>;
+    if (raw["proactiveIntel.briefIntegration.enabled"] === false) return null;
+    if (raw["proactiveIntel.enabled"] === false) return null;
+  } catch {
+    // Options not available — proceed with defaults (enabled)
+  }
+
+  try {
+    const { getActiveInsights } = await import("../services/advisor.js");
+    const { readUserPatterns } = await import("../services/observer.js");
+
+    const insights = await getActiveInsights();
+    const patterns = await readUserPatterns();
+
+    if (insights.length === 0 && !patterns) return null;
+
+    const lines: string[] = [];
+
+    // Top insights
+    if (insights.length > 0) {
+      const topInsights = insights.slice(0, 5);
+      lines.push(`**${insights.length} active insight${insights.length === 1 ? "" : "s"}:**`);
+      lines.push("");
+      for (const insight of topInsights) {
+        const prio = insight.priority === "high" || insight.priority === "urgent" ? "**!!**" : "";
+        lines.push(`- ${prio} ${insight.title}`);
+      }
+      if (insights.length > 5) {
+        lines.push(`\n*+${insights.length - 5} more — check Discoveries tab*`);
+      }
+    }
+
+    // Pattern summary
+    if (patterns) {
+      lines.push("");
+      const parts: string[] = [];
+      if (patterns.taskPatterns.completionRate7d > 0) {
+        parts.push(`Completion rate: ${Math.round(patterns.taskPatterns.completionRate7d * 100)}%`);
+      }
+      if (patterns.taskPatterns.stuckTasks.length > 0) {
+        parts.push(`${patterns.taskPatterns.stuckTasks.length} stuck task${patterns.taskPatterns.stuckTasks.length === 1 ? "" : "s"}`);
+      }
+      if (patterns.goalStatus.stalledGoals.length > 0) {
+        parts.push(`${patterns.goalStatus.stalledGoals.length} stalled goal${patterns.goalStatus.stalledGoals.length === 1 ? "" : "s"}`);
+      }
+      if (parts.length > 0) {
+        lines.push(`**Patterns:** ${parts.join(" · ")}`);
+      }
+    }
+
+    return lines.length > 0 ? lines.join("\n") : null;
+  } catch {
+    return null;
+  }
 }
 
 // ── Data source: Yesterday's brief (carry-forward + action items) ────────────
@@ -1090,6 +1183,22 @@ async function generateDailyBrief(date?: string): Promise<GenerateResult> {
   brief.push("");
   brief.push("---");
   brief.push("");
+
+  // GodMode Intelligence (from Proactive Intel system)
+  try {
+    const intelSection = await formatIntelligenceSection();
+    if (intelSection) {
+      sections.push("GodMode Intelligence");
+      brief.push("## GodMode Intelligence");
+      brief.push("");
+      brief.push(intelSection);
+      brief.push("");
+      brief.push("---");
+      brief.push("");
+    }
+  } catch {
+    // Proactive Intel not available — skip silently
+  }
 
   // Body Check
   sections.push("Body Check");

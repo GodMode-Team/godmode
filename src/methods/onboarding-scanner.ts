@@ -257,6 +257,20 @@ export async function generateConfigRecommendations(): Promise<ConfigRecommendat
   const cron = config.cron as Record<string, unknown> | undefined;
   const session = config.session as Record<string, unknown> | undefined;
 
+  // Critical: gateway security token (check both gateway.token and gateway.auth.token)
+  const gatewayAuth = gateway?.auth as Record<string, unknown> | undefined;
+  const hasGatewayToken = Boolean(gateway?.token) || Boolean(gatewayAuth?.token);
+  if (!hasGatewayToken) {
+    recommendations.push({
+      key: "gateway.auth.token",
+      label: "Gateway security token",
+      currentValue: "not set",
+      recommendedValue: "(auto-generated 256-bit token)",
+      reason: "Without a token, any process on your machine can send commands to the agent via the WebSocket port.",
+      priority: "critical",
+    });
+  }
+
   // Critical: gateway.mode must be "local"
   if (gateway?.mode !== "local") {
     recommendations.push({
@@ -270,12 +284,19 @@ export async function generateConfigRecommendations(): Promise<ConfigRecommendat
   }
 
   // Critical: gateway.controlUi
+  // OC enables the control UI when the controlUi section exists with real
+  // configuration (allowedOrigins, etc.), not necessarily an `enabled` boolean.
   const controlUi = gateway?.controlUi as Record<string, unknown> | undefined;
-  if (!controlUi?.enabled) {
+  const controlUiActive = controlUi && (
+    controlUi.enabled === true ||
+    Array.isArray(controlUi.allowedOrigins) ||
+    typeof controlUi.path === "string"
+  );
+  if (!controlUiActive) {
     recommendations.push({
       key: "gateway.controlUi.enabled",
       label: "Control UI",
-      currentValue: controlUi?.enabled ?? false,
+      currentValue: controlUi ? "configured (no enabled flag)" : false,
       recommendedValue: true,
       reason: "Enables the GodMode web interface.",
       priority: "critical",
@@ -283,8 +304,15 @@ export async function generateConfigRecommendations(): Promise<ConfigRecommendat
   }
 
   // Recommended: memory search
+  // OC considers memory search active when the section exists with a provider
+  // or sources configured, not just via `enabled: true`.
   const memSearch = defaults?.memorySearch as Record<string, unknown> | undefined;
-  if (!memSearch?.enabled) {
+  const memSearchActive = memSearch && (
+    memSearch.enabled === true ||
+    typeof memSearch.provider === "string" ||
+    Array.isArray(memSearch.sources)
+  );
+  if (!memSearchActive) {
     recommendations.push({
       key: "agents.defaults.memorySearch.enabled",
       label: "Memory search",
@@ -297,7 +325,7 @@ export async function generateConfigRecommendations(): Promise<ConfigRecommendat
 
   // Recommended: session memory indexing
   const experimental = memSearch?.experimental as Record<string, unknown> | undefined;
-  if (memSearch?.enabled && !experimental?.sessionMemory) {
+  if (memSearchActive && !experimental?.sessionMemory) {
     recommendations.push({
       key: "agents.defaults.memorySearch.experimental.sessionMemory",
       label: "Session memory indexing",
@@ -335,8 +363,15 @@ export async function generateConfigRecommendations(): Promise<ConfigRecommendat
   }
 
   // Recommended: heartbeat
+  // OC activates the heartbeat when the section exists with a schedule,
+  // not just via `enabled: true`.
   const heartbeat = defaults?.heartbeat as Record<string, unknown> | undefined;
-  if (!heartbeat?.enabled) {
+  const heartbeatActive = heartbeat && (
+    heartbeat.enabled === true ||
+    typeof heartbeat.every === "string" ||
+    heartbeat.activeHours
+  );
+  if (!heartbeatActive) {
     recommendations.push({
       key: "agents.defaults.heartbeat.enabled",
       label: "Heartbeat",
@@ -398,8 +433,15 @@ export async function generateConfigRecommendations(): Promise<ConfigRecommendat
   }
 
   // Recommended: loop detection
+  // Only recommend if tools section exists but loopDetection is completely absent.
+  // Many OC setups handle this at the engine level without explicit config.
   const loopDetection = tools?.loopDetection as Record<string, unknown> | undefined;
-  if (!loopDetection?.enabled) {
+  const loopDetectionActive = loopDetection && (
+    loopDetection.enabled === true ||
+    typeof loopDetection.maxIterations === "number" ||
+    typeof loopDetection.strategy === "string"
+  );
+  if (tools && !loopDetectionActive) {
     recommendations.push({
       key: "tools.loopDetection.enabled",
       label: "Loop detection",
@@ -411,7 +453,15 @@ export async function generateConfigRecommendations(): Promise<ConfigRecommendat
   }
 
   // Critical: plugins enabled
-  if (!plugins?.enabled) {
+  // OC activates plugins when entries/allow/load are configured, not just
+  // via a top-level `enabled` boolean. If GodMode is in the entries list and
+  // marked enabled, the plugin system is clearly working.
+  const pluginsActive = plugins && (
+    plugins.enabled === true ||
+    (plugins.entries && typeof plugins.entries === "object" && Object.keys(plugins.entries as object).length > 0) ||
+    (Array.isArray(plugins.allow) && (plugins.allow as unknown[]).length > 0)
+  );
+  if (!pluginsActive) {
     recommendations.push({
       key: "plugins.enabled",
       label: "Plugin system",
@@ -419,6 +469,36 @@ export async function generateConfigRecommendations(): Promise<ConfigRecommendat
       recommendedValue: true,
       reason: "Required for GodMode plugin to load.",
       priority: "critical",
+    });
+  }
+
+  // Recommended: prompt caching for Anthropic models
+  const models = defaults?.models as Record<string, unknown> | undefined;
+  if (models) {
+    for (const [modelId, modelConfig] of Object.entries(models)) {
+      if (modelId.startsWith("anthropic/")) {
+        const params = (modelConfig as Record<string, unknown>)?.params as Record<string, unknown> | undefined;
+        if (params?.cacheRetention !== "long") {
+          recommendations.push({
+            key: `agents.defaults.models.${modelId}.params.cacheRetention`,
+            label: `Prompt caching for ${modelId.replace("anthropic/", "")}`,
+            currentValue: (params?.cacheRetention as string) ?? "not set",
+            recommendedValue: "long",
+            reason: "Reduces costs up to 90% on repeated context. Should always be on for Anthropic models.",
+            priority: "recommended",
+          });
+        }
+      }
+    }
+  } else {
+    // No models configured at all — recommend adding caching for common models
+    recommendations.push({
+      key: "agents.defaults.models",
+      label: "Prompt caching (Anthropic models)",
+      currentValue: "not configured",
+      recommendedValue: '{ "anthropic/claude-sonnet-4-6": { params: { cacheRetention: "long" } } }',
+      reason: "Reduces costs up to 90% on repeated context. Should always be on for Anthropic models.",
+      priority: "recommended",
     });
   }
 
@@ -474,6 +554,11 @@ export async function runAssessment(): Promise<AssessmentResult> {
   const githubReady = await checkGitHubReady();
   const obsidianVaultConfigured = checkObsidianVault();
 
+  // Check gateway token (supports both gateway.token and gateway.auth.token)
+  const gateway = config.gateway as Record<string, unknown> | undefined;
+  const gwAuth = gateway?.auth as Record<string, unknown> | undefined;
+  const gatewayTokenSet = Boolean(gateway?.token) || Boolean(gwAuth?.token);
+
   const partial = {
     configExists,
     authMethod,
@@ -489,6 +574,7 @@ export async function runAssessment(): Promise<AssessmentResult> {
     workspaceConfigured,
     githubReady,
     obsidianVaultConfigured,
+    gatewayTokenSet,
   };
 
   return {

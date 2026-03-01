@@ -3,6 +3,7 @@ import type { FailedMessage } from "./controllers/chat";
 import type { DevicePairingList } from "./controllers/devices";
 import type { ExecApprovalRequest } from "./controllers/exec-approval";
 import type { ExecApprovalsFile, ExecApprovalsSnapshot } from "./controllers/exec-approvals";
+import type { ClawHubMessage } from "./controllers/clawhub";
 import type { SkillMessage } from "./controllers/skills";
 import type { GatewayBrowserClient, GatewayHelloOk } from "./gateway";
 import type { Tab } from "./navigation";
@@ -14,6 +15,9 @@ import type {
   AgentsListResult,
   ArchivedSessionEntry,
   ChannelsStatusSnapshot,
+  ClawHubSearchResult,
+  ClawHubSkillDetail,
+  ClawHubSkillItem,
   ConfigSnapshot,
   CronJob,
   CronRunLogEntry,
@@ -182,6 +186,17 @@ export type AppViewState = {
   skillEdits: Record<string, string>;
   skillMessages: Record<string, SkillMessage>;
   skillsBusyKey: string | null;
+  skillsSubTab: "my-skills" | "clawhub";
+  clawhubQuery: string;
+  clawhubResults: ClawHubSearchResult[] | null;
+  clawhubExploreItems: ClawHubSkillItem[] | null;
+  clawhubExploreSort: string;
+  clawhubLoading: boolean;
+  clawhubError: string | null;
+  clawhubDetailSlug: string | null;
+  clawhubDetail: ClawHubSkillDetail | null;
+  clawhubImporting: string | null;
+  clawhubMessage: ClawHubMessage | null;
   debugLoading: boolean;
   debugStatus: StatusSummary | null;
   debugHealth: HealthSnapshot | null;
@@ -269,6 +284,11 @@ export type AppViewState = {
   // Memory onboarding wizard state
   wizardActive?: boolean;
   wizardState?: import("./views/onboarding-wizard").WizardState | null;
+  // Setup tab state (80/20 fast onboarding)
+  showSetupTab?: boolean;
+  setupChecklist?: unknown;
+  setupChecklistLoading?: boolean;
+  setupQuickDone?: boolean;
   // Focus Pulse state
   focusPulseData?: import("./controllers/focus-pulse").FocusPulseData | null;
   // Trust Tracker state
@@ -312,12 +332,23 @@ export type AppViewState = {
   coretexMemoryBank?: import("./views/coretex").CoreTexMemoryBankData | null;
   coretexAiPacket?: import("./views/coretex").CoreTexAiPacketData | null;
   coretexSourcesData?: import("./views/coretex").CoreTexSourcesData | null;
+  coretexResearchData?: import("./views/coretex").CoreTexResearchData | null;
+  coretexResearchAddFormOpen?: boolean;
+  coretexResearchAddForm?: import("./views/coretex").ResearchAddForm;
+  coretexResearchCategories?: string[];
   coretexSelectedEntry?: import("./views/coretex").CoreTexEntryDetail | null;
   coretexSearchQuery?: string;
   coretexSyncing?: boolean;
   coretexBrowsingFolder?: string | null;
   coretexFolderEntries?: import("./views/coretex").CoreTexMemoryEntry[] | null;
   coretexFolderName?: string | null;
+  // Proactive Intel state
+  intelInsights: import("./controllers/proactive-intel").IntelInsight[];
+  intelDiscoveries: import("./controllers/proactive-intel").ScoutFinding[];
+  intelPatterns: import("./controllers/proactive-intel").UserPatterns | null;
+  intelStatus: import("./controllers/proactive-intel").IntelStatus | null;
+  intelLoading: boolean;
+  intelError: string | null;
   // File explorer state
   explorerOpen: boolean;
   explorerPath: string;
@@ -480,6 +511,11 @@ export type AppViewState = {
   handleOnboardingIdentitySubmit?: (identity: import("./views/onboarding").OnboardingIdentity) => Promise<void>;
   handleOnboardingSkipPhase?: () => void;
   handleOnboardingComplete?: () => void;
+  // Setup tab handlers
+  handleQuickSetup?: (name: string, licenseKey: string, dailyIntelTopics: string) => void;
+  handleLoadSetupChecklist?: () => void;
+  handleHideSetup?: () => void;
+  handleRunAssessment?: () => void;
   // Memory wizard handlers
   handleWizardOpen?: () => void;
   handleWizardClose?: () => void;
@@ -501,8 +537,18 @@ export type AppViewState = {
   handleCoretexRefresh: () => Promise<void>;
   handleCoretexSubtabChange: (subtab: import("./views/coretex").CoreTexSubtab) => void;
   handleCoretexSelectEntry: (path: string) => Promise<void>;
+  handleCoretexOpenInBrowser: (path: string) => Promise<void>;
   handleCoretexBrowseFolder: (path: string) => Promise<void>;
   handleCoretexBack: () => void;
   handleCoretexSearch: (query: string) => void;
   handleCoretexSync: () => Promise<void>;
+  handleResearchAddFormToggle: () => void;
+  handleResearchAddFormChange: (field: string, value: string) => void;
+  handleResearchAddSubmit: () => Promise<void>;
+  handleResearchSaveViaChat: () => Promise<void>;
+  // Proactive Intel handlers
+  handleIntelLoad: () => Promise<void>;
+  handleIntelDismiss: (id: string) => Promise<void>;
+  handleIntelAct: (id: string) => Promise<void>;
+  handleIntelRefresh: () => Promise<void>;
 };

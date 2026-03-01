@@ -22,7 +22,9 @@ export function createCodingTaskTool(
       "Launch an isolated coding task with its own git worktree and branch.",
       "Use when the user asks to build, fix, refactor, or ship code.",
       "Each task gets a separate worktree so multiple tasks cannot overwrite each other.",
-      "The coding agent runs automatically — no follow-up action needed.",
+      "IMPORTANT: After dispatching, you MUST follow up. Poll codingTask.status every 30-60 seconds",
+      "until the task completes. Then review the PR, verify the output matches the ask, and report results",
+      "to the user. NEVER merge branches into main yourself — let the orchestrator handle merges via GitHub PRs.",
     ].join(" "),
     parameters: {
       type: "object" as const,
@@ -149,7 +151,12 @@ export function createCodingTaskTool(
               "",
               "Stage 1: Design agent is analyzing the codebase and writing a design brief.",
               "The pipeline will auto-advance through build and QC stages.",
-              "Validation gates and PR creation run automatically on completion.",
+              "",
+              "ACTION REQUIRED: You must follow up on this task:",
+              "1. Poll `codingTask.status` every 30-60 seconds until the task is done or failed.",
+              "2. When done, review the PR and verify the output matches what was asked.",
+              "3. Report results to the user — what was built, PR link, any issues.",
+              "4. Do NOT merge branches yourself. The orchestrator handles merges via GitHub PRs.",
             ].join("\n"),
           });
         }
@@ -180,7 +187,13 @@ export function createCodingTaskTool(
             `Branch: ${result.branch}`,
             `Scope: ${result.scopeGlobs.join(", ")}`,
             "",
-            "The agent will commit and push when done. Validation gates (lint, typecheck, test) run automatically on completion, then a PR is created.",
+            "Validation gates (lint, typecheck, test) and PR creation run on completion.",
+            "",
+            "ACTION REQUIRED: You must follow up on this task:",
+            "1. Poll `codingTask.status` every 30-60 seconds until the task is done or failed.",
+            "2. When done, review the PR and verify the output matches what was asked.",
+            "3. Report results to the user — what was built, PR link, any issues.",
+            "4. Do NOT merge branches yourself. The orchestrator handles merges via GitHub PRs.",
           ].join("\n"),
         });
       }

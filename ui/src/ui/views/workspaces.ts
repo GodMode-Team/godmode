@@ -68,7 +68,7 @@ export type WorkspaceCreateRequest = {
   path?: string;
 };
 
-export type TaskFilter = "all" | "outstanding" | "complete";
+export type TaskFilter = "all" | "outstanding" | "today" | "complete";
 export type TaskSort = "due" | "priority" | "newest";
 
 export type WorkspacesProps = {
@@ -1089,6 +1089,9 @@ function renderAllTasksSection(props: {
   let filtered: WorkspaceTask[];
   if (taskFilter === "outstanding") {
     filtered = tasks.filter((t) => t.status === "pending");
+  } else if (taskFilter === "today") {
+    const today = localDateString();
+    filtered = tasks.filter((t) => t.status === "pending" && t.dueDate != null && t.dueDate <= today);
   } else if (taskFilter === "complete") {
     filtered = tasks.filter((t) => t.status === "complete");
   } else {
@@ -1111,6 +1114,10 @@ function renderAllTasksSection(props: {
                 class="ws-task-filter-btn ${taskFilter === "outstanding" ? "active" : ""}"
                 @click=${() => onSetTaskFilter?.("outstanding")}
               >To Do</button>
+              <button
+                class="ws-task-filter-btn ${taskFilter === "today" ? "active" : ""}"
+                @click=${() => onSetTaskFilter?.("today")}
+              >Today</button>
               <button
                 class="ws-task-filter-btn ${taskFilter === "complete" ? "active" : ""}"
                 @click=${() => onSetTaskFilter?.("complete")}

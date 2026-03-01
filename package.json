@@ -30,6 +30,7 @@
     "dompurify": "^3.3.1",
     "json5": "^2.2.3",
     "lit": "^3.3.2",
+    "clawhub": "^0.7.0",
     "marked": "^17.0.1"
   },
   "devDependencies": {

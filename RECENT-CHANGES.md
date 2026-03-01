@@ -4,6 +4,120 @@ This file tracks recent development changes so Atlas and other agents can quickl
 
 ---
 
+## 2026-02-28 — Agent Coding Pipeline Safety Overhaul
+
+### Problem
+Prosper dispatched a coding agent (swarm pipeline) to build custom guardrails. The agent worked in a worktree, completed successfully, created PR #3. But:
+1. Prosper never followed up — the tool description said "no follow-up action needed"
+2. Prosper manually did `git merge` on main while there were ~38 uncommitted files (sidebar, coretex, navigation rework)
+3. Git auto-stashed the uncommitted work, merge succeeded, stash was never popped
+4. All sidebar/coretex/navigation work was trapped in stash@{0}
+5. Spawned coding agents had zero awareness of custom guardrails
+
+### Fixes Applied
+
+**Immediate recovery:**
+- Restored stash (38 files, 2076 additions) — sidebar/coretex/navigation work recovered
+- Cleaned up 6 stale worktrees and their branches
+
+**Structural fixes (5 files):**
+
+1. **coding-task.ts** — Tool description changed from "no follow-up needed" to explicit "MUST follow up". Return messages now include ACTION REQUIRED block: poll status, review PR, report results, never merge yourself.
+
+2. **coding-orchestrator.ts** — Three changes:
+   - Agent prompts now include Safety Rules (never merge, never checkout main, stay in scope)
+   - Agent prompts now include all active guardrails (built-in + custom) via `formatGuardrailsForPrompt()`
+   - `handleTaskCompleted` checks `isWorkingTreeClean()` before auto-merge — skips merge if main has uncommitted changes
+   - Added `onTaskCompleted` callback system for notification wiring
+
+3. **guardrails.ts** — New `formatGuardrailsForPrompt()` exports all enabled guardrails as markdown for agent prompts
+
+4. **swarm-pipeline.ts** — Build and QC stage prompts now include Safety Rules + guardrails block
+
+5. **index.ts** — Wired `codingNotification.sendCompletionNotification` as `onTaskCompleted` callback so detached CLI agents trigger notifications (previously only `subagent_ended` path sent them)
+
+### Key Principle
+Chat agents must NEVER merge branches locally. All merges go through GitHub PRs via the orchestrator. Agents must follow up on coding tasks and report results.
+
+---
+
+## 2026-02-28 — ClawHub Marketplace Integration (Skills Page)
+
+### What
+Added a full ClawHub marketplace tab to the Skills page — search, browse, preview, import, and personalize skills from ClawHub (3,200+ skills) directly in GodMode.
+
+### Search & Browse
+- Vector search across all ClawHub skills
+- Sort by Trending / Newest / Top Rated / Popular
+- Skill cards show name, summary, version, and relative timestamps
+- Detail panel with owner info, moderation badges, version changelog
+
+### Import + Personalize Flow
+Two paths: "Import" (download as-is) and "Import + Personalize" (conversational):
+1. Backend downloads zip, extracts to `~/godmode/skills/`, updates lockfile
+2. Backend assembles personalization prompt from: SKILL.md content, onboarding.json, data-sources.json, installed skills list, USER.md
+3. UI prefills chat message and navigates to chat tab
+4. User has a back-and-forth conversation with their GodMode agent to tailor the skill to their specific tools, workflow, and needs
+5. Agent writes the personalized SKILL.md when the user is satisfied
+
+### Moderation
+- Malware-blocked skills cannot be imported (hard block)
+- Suspicious skills show a yellow warning badge but can still be imported
+
+### New Files
+- `src/methods/clawhub.ts` — 5 RPC handlers: `clawhub.search`, `clawhub.explore`, `clawhub.detail`, `clawhub.import`, `clawhub.personalizeContext`
+- `ui/src/ui/controllers/clawhub.ts` — Frontend state management + RPC calls
+- `ui/src/ui/views/clawhub.ts` — Marketplace UI (search bar, sort tabs, results list, detail panel)
+
+### Modified Files
+- `index.ts` — Registered `clawhubHandlers`
+- `package.json` — Added `clawhub` dependency
+- `ui/src/ui/types.ts` — Added `ClawHubSearchResult`, `ClawHubSkillItem`, `ClawHubSkillDetail` types
+- `ui/src/ui/views/skills.ts` — Added "My Skills" / "ClawHub" sub-tab layout
+- `ui/src/ui/controllers/skills.ts` — Extended state with ClawHub fields
+- `ui/src/ui/app-view-state.ts` — Added 11 ClawHub state fields
+- `ui/src/ui/app.ts` — Added `@state()` declarations for ClawHub state
+- `ui/src/ui/app-render.ts` — Wired ClawHub state, callbacks, and personalization flow
+
+---
+
+## 2026-02-28 — 80/20 Onboarding Overhaul + Cross-Platform Setup
+
+### New Setup Tab (persistent sidebar item)
+Replaces the full-screen onboarding takeover with a fast, non-blocking setup flow.
+
+**New files:**
+- `ui/src/ui/views/setup.ts` — Setup view with Quick Start form (name + license key + daily intel topics) and progressive checklist
+- `ui/src/ui/controllers/setup.ts` — RPC client for setup operations
+- `ui/src/styles/setup.css` — Setup tab styles
+- `docs/setup.html` — Hosted setup wizard page for lifeongodmode.com/setup (auto-detects OS, step-by-step with copy-paste commands)
+- `scripts/team-setup.mjs` — Cross-platform Node.js setup script (works on Windows, Mac, Linux)
+
+**Modified files:**
+- `ui/src/ui/navigation.ts` — Added "setup" tab type
+- `ui/src/ui/app.ts` — Added setup state + handlers (handleQuickSetup, handleLoadSetupChecklist, handleHideSetup, handleRunAssessment)
+- `ui/src/ui/app-view-state.ts` — Added setup state fields and handler types
+- `ui/src/ui/app-render.ts` — Sidebar injection (setup tab appears at top when onboarding incomplete), view routing, gated full-screen takeover (only shows for legacy ?onboarding=1 flow)
+- `ui/src/ui/app-gateway.ts` — checkOnboardingStatus now sets showSetupTab for new users
+- `ui/src/ui/app-settings.ts` — Loads checklist when setup tab is active
+- `ui/src/styles.css` — Added setup.css import
+
+### Backend: Ungated Quick Setup RPCs
+- `src/methods/onboarding.ts` — Added `onboarding.quickSetup` (saves identity + intel prefs, marks phases complete) and `onboarding.activateLicense` (writes license key to openclaw.json)
+- `index.ts` — These methods + onboarding.status + onboarding.checklist skip license gate so they work before license is configured
+
+### Configurable Daily Intelligence
+- `src/methods/brief-generator.ts` — XAI x_search query now reads `dailyIntel.topics` from godmode-options.json instead of hardcoded query. Users set their topics during quick setup.
+
+### Model + Caching Recommendations
+- `src/methods/onboarding-scanner.ts` — Config audit now recommends `cacheRetention: "long"` for Anthropic models
+- `src/services/onboarding.ts` — Config patch includes Anthropic model configs with caching enabled + `thinkingDefault: "low"`
+
+### Cross-Platform Deployment Guide
+- `docs/DEPLOYMENT-GUIDE.md` — Rewritten for Windows, Mac, Linux, and VPS. Only real prerequisite is Node.js 22+. References team setup script and hosted wizard page.
+
+---
+
 ## 2026-02-28 — Client Readiness Audit + Deployment Prep
 
 ### Code Review & Hardening

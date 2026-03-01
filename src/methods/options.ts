@@ -18,7 +18,10 @@ type GodModeOptions = Record<string, unknown>;
 
 const DEFAULTS: GodModeOptions = {
   "focusPulse.enabled": true,
-  "deck.enabled": false,
+  "proactiveIntel.enabled": true,
+  "proactiveIntel.notifications.enabled": true,
+  "proactiveIntel.briefIntegration.enabled": true,
+  "proactiveIntel.cadenceMultiplier": 1.0,
 };
 
 async function readOptions(): Promise<GodModeOptions> {

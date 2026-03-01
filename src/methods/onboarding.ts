@@ -13,8 +13,10 @@
  * State persisted to ~/godmode/data/onboarding.json
  */
 
+import { randomBytes } from "node:crypto";
 import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { join } from "node:path";
+import { homedir } from "node:os";
 import { DATA_DIR, GODMODE_ROOT } from "../data-paths.js";
 import type { GatewayRequestHandler } from "openclaw/plugin-sdk";
 import {
@@ -748,6 +750,176 @@ export const onboardingHandlers: GatewayRequestHandlers = {
           ? `Found ${recommendations.length} recommendations to optimize your setup.`
           : "Your config looks good! No changes needed.",
     });
+  },
+
+  // ── Quick Setup (80/20 fast onboarding) ────────────────────────
+
+  /**
+   * Quick setup: name + optional daily intel topics → identity saved, phase 1 done.
+   * Called from the new Setup tab for fast onboarding.
+   * This handler is registered WITHOUT license gate so new users can use it.
+   */
+  "onboarding.quickSetup": async ({ params, respond, context }) => {
+    const name = typeof params.name === "string" ? params.name.trim() : "";
+    if (!name) {
+      respond(false, null, { code: "INVALID_REQUEST", message: "name is required" });
+      return;
+    }
+
+    const dailyIntelTopics = typeof params.dailyIntelTopics === "string"
+      ? params.dailyIntelTopics.trim()
+      : "";
+
+    const state = await readOnboarding();
+
+    // Save identity
+    state.identity = {
+      name,
+      mission: "",
+      emoji: "\u{1F680}",
+    };
+    state.interview = {
+      ...state.interview,
+      name,
+      completed: false,
+    };
+
+    // Mark phase 0 and 1 as complete (quick setup skips assessment)
+    if (!state.completedPhases.includes(0)) state.completedPhases.push(0);
+    if (!state.completedPhases.includes(1)) state.completedPhases.push(1);
+    state.completedPhases.sort();
+    if (state.phase < 2) state.phase = 2 as OnboardingPhase;
+
+    if (!state.startedAt) {
+      state.startedAt = new Date().toISOString();
+    }
+
+    await writeOnboarding(state);
+
+    // Save daily intel topics to options if provided
+    if (dailyIntelTopics) {
+      try {
+        const optionsFile = join(DATA_DIR, "godmode-options.json");
+        let options: Record<string, unknown> = {};
+        try {
+          const raw = await readFile(optionsFile, "utf-8");
+          options = JSON.parse(raw) as Record<string, unknown>;
+        } catch { /* file may not exist yet */ }
+        options["dailyIntel.topics"] = dailyIntelTopics;
+        await mkdir(DATA_DIR, { recursive: true });
+        await writeFile(optionsFile, JSON.stringify(options, null, 2), "utf-8");
+      } catch {
+        // Non-fatal: intel topics are optional
+      }
+    }
+
+    try {
+      context?.broadcast?.("onboarding:update", state);
+    } catch {}
+
+    respond(true, { state });
+  },
+
+  /**
+   * Activate a license key by writing it to openclaw.json.
+   * This handler is registered WITHOUT license gate so new users can use it.
+   * For dev keys (GM-DEV-*), also updates the in-memory license state.
+   */
+  "onboarding.activateLicense": async ({ params, respond }) => {
+    const key = typeof params.key === "string" ? params.key.trim() : "";
+    if (!key || !key.startsWith("GM-")) {
+      respond(false, null, {
+        code: "INVALID_KEY",
+        message: "License key must start with GM-",
+      });
+      return;
+    }
+
+    // Locate openclaw.json
+    const stateDir = process.env.OPENCLAW_STATE_DIR || join(homedir(), ".openclaw");
+    const configPath = join(stateDir, "openclaw.json");
+
+    try {
+      // Read existing config
+      let config: Record<string, unknown> = {};
+      try {
+        const raw = await readFile(configPath, "utf-8");
+        config = JSON.parse(raw) as Record<string, unknown>;
+      } catch {
+        // Config may not exist yet — create it
+      }
+
+      // Deep-set plugins.entries.godmode.config.licenseKey
+      if (!config.plugins || typeof config.plugins !== "object") {
+        config.plugins = {};
+      }
+      const plugins = config.plugins as Record<string, unknown>;
+      plugins.enabled = true;
+      if (!plugins.entries || typeof plugins.entries !== "object") {
+        plugins.entries = {};
+      }
+      const entries = plugins.entries as Record<string, unknown>;
+      if (!entries.godmode || typeof entries.godmode !== "object") {
+        entries.godmode = {};
+      }
+      const godmode = entries.godmode as Record<string, unknown>;
+      godmode.enabled = true;
+      if (!godmode.config || typeof godmode.config !== "object") {
+        godmode.config = {};
+      }
+      const godmodeConfig = godmode.config as Record<string, unknown>;
+      godmodeConfig.licenseKey = key;
+
+      // Also ensure gateway basics
+      if (!config.gateway || typeof config.gateway !== "object") {
+        config.gateway = {};
+      }
+      const gateway = config.gateway as Record<string, unknown>;
+      if (!gateway.mode) gateway.mode = "local";
+      if (!gateway.controlUi || typeof gateway.controlUi !== "object") {
+        gateway.controlUi = {};
+      }
+      (gateway.controlUi as Record<string, unknown>).enabled = true;
+
+      // Auto-generate a gateway auth token if one doesn't exist
+      // Supports both gateway.token (legacy) and gateway.auth.token (standard)
+      let gatewayTokenGenerated = false;
+      const existingAuth = gateway.auth as Record<string, unknown> | undefined;
+      const hasExistingToken = Boolean(gateway.token) || Boolean(existingAuth?.token);
+      if (!hasExistingToken) {
+        if (!gateway.auth || typeof gateway.auth !== "object") {
+          gateway.auth = {};
+        }
+        const gwAuth = gateway.auth as Record<string, unknown>;
+        gwAuth.mode = "token";
+        gwAuth.token = randomBytes(32).toString("hex");
+        gatewayTokenGenerated = true;
+      }
+
+      // Write back
+      await mkdir(stateDir, { recursive: true });
+      await writeFile(configPath, JSON.stringify(config, null, 2) + "\n", "utf-8");
+
+      const isDevKey = key.startsWith("GM-DEV-") || key === "GM-INTERNAL";
+      const tokenNote = gatewayTokenGenerated
+        ? " Gateway security token auto-generated."
+        : "";
+      respond(true, {
+        saved: true,
+        configPath,
+        isDevKey,
+        gatewayTokenGenerated,
+        needsRestart: true,
+        message: isDevKey
+          ? `Dev license activated.${tokenNote} Gateway restart recommended to apply.`
+          : `License saved.${tokenNote} Restart the gateway to activate: openclaw gateway restart`,
+      });
+    } catch (err) {
+      respond(false, null, {
+        code: "WRITE_FAILED",
+        message: `Failed to write config: ${err instanceof Error ? err.message : "unknown error"}. Try running: openclaw godmode activate ${key}`,
+      });
+    }
   },
 
   // ── Memory Onboarding Wizard Handlers ───────────────────────────

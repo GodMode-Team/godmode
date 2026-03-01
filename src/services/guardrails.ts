@@ -311,6 +311,37 @@ export async function addCustomGuardrail(
 }
 
 /**
+ * Format all active guardrails (built-in + custom) into a plain-text block
+ * suitable for injecting into a spawned agent's prompt.
+ * This lets coding agents know what rules to follow.
+ */
+export async function formatGuardrailsForPrompt(): Promise<string> {
+  const state = await readGuardrailsStateCached();
+  const lines: string[] = ["## Active Guardrails"];
+
+  // Built-in gates
+  for (const [id, config] of Object.entries(state.gates)) {
+    if (!config.enabled) continue;
+    const descriptor = GATE_DESCRIPTORS[id as GuardrailGateId];
+    if (descriptor) {
+      lines.push(`- **${descriptor.name}**: ${descriptor.description}`);
+    }
+  }
+
+  // Custom guardrails
+  const customs = state.custom?.filter((g) => g.enabled) ?? [];
+  if (customs.length > 0) {
+    lines.push("");
+    lines.push("### Custom Rules");
+    for (const g of customs) {
+      lines.push(`- **${g.name}** (${g.trigger.tool} → ${g.trigger.patterns.join(", ")}): ${g.message}`);
+    }
+  }
+
+  return lines.join("\n");
+}
+
+/**
  * Remove a custom guardrail by id.
  * Returns { removed: true } if found and removed, { removed: false } otherwise.
  */

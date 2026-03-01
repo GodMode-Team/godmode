@@ -39,6 +39,8 @@ export type AssessmentResult = {
   githubReady: boolean;
   /** Obsidian vault path resolved (needed for daily brief) */
   obsidianVaultConfigured: boolean;
+  /** Gateway WebSocket token configured (prevents unauthorized local access) */
+  gatewayTokenSet: boolean;
   timestamp: string;
 };
 

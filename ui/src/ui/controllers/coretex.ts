@@ -9,8 +9,10 @@ import type {
   CoreTexEntryDetail,
   CoreTexIdentityData,
   CoreTexMemoryBankData,
+  CoreTexResearchData,
   CoreTexSourcesData,
   CoreTexSubtab,
+  ResearchAddForm,
 } from "../views/coretex";
 
 export type CoreTexState = {
@@ -23,6 +25,10 @@ export type CoreTexState = {
   coretexMemoryBank?: CoreTexMemoryBankData | null;
   coretexAiPacket?: CoreTexAiPacketData | null;
   coretexSourcesData?: CoreTexSourcesData | null;
+  coretexResearchData?: CoreTexResearchData | null;
+  coretexResearchAddFormOpen?: boolean;
+  coretexResearchAddForm?: ResearchAddForm;
+  coretexResearchCategories?: string[];
   coretexSelectedEntry?: CoreTexEntryDetail | null;
   coretexSearchQuery?: string;
   coretexSyncing?: boolean;
@@ -54,6 +60,16 @@ export async function loadCoretex(state: CoreTexState): Promise<void> {
     } else if (subtab === "sources") {
       const result = await state.client.request<CoreTexSourcesData>("coretex.sources", {});
       state.coretexSourcesData = result;
+    } else if (subtab === "research") {
+      const result = await state.client.request<CoreTexResearchData>("coretex.research", {});
+      state.coretexResearchData = result;
+      state.coretexBrowsingFolder = null;
+      state.coretexFolderEntries = null;
+      state.coretexFolderName = null;
+      try {
+        const cats = await state.client.request<{ categories: string[] }>("coretex.researchCategories", {});
+        state.coretexResearchCategories = cats.categories;
+      } catch { /* non-critical */ }
     }
   } catch (err) {
     console.error("[CoreTex] Failed to load:", err);
@@ -119,5 +135,44 @@ export async function syncCoretex(state: CoreTexState): Promise<void> {
     state.coretexError = err instanceof Error ? err.message : "Sync failed";
   } finally {
     state.coretexSyncing = false;
+  }
+}
+
+export async function addResearch(state: CoreTexState): Promise<void> {
+  if (!state.client || !state.connected) return;
+  const form = state.coretexResearchAddForm;
+  if (!form || !form.title.trim()) return;
+
+  state.coretexLoading = true;
+  try {
+    const tags = form.tags
+      .split(",")
+      .map(t => t.trim())
+      .filter(Boolean);
+
+    await state.client.request("coretex.addResearch", {
+      title: form.title.trim(),
+      url: form.url.trim() || undefined,
+      category: form.category.trim() || undefined,
+      tags: tags.length > 0 ? tags : undefined,
+      notes: form.notes.trim() || undefined,
+      source: "manual",
+    });
+
+    // Reset form and refresh
+    state.coretexResearchAddForm = { title: "", url: "", category: "", tags: "", notes: "" };
+    state.coretexResearchAddFormOpen = false;
+
+    const result = await state.client.request<CoreTexResearchData>("coretex.research", {});
+    state.coretexResearchData = result;
+    try {
+      const cats = await state.client.request<{ categories: string[] }>("coretex.researchCategories", {});
+      state.coretexResearchCategories = cats.categories;
+    } catch { /* non-critical */ }
+  } catch (err) {
+    console.error("[CoreTex] Failed to add research:", err);
+    state.coretexError = err instanceof Error ? err.message : "Failed to add research";
+  } finally {
+    state.coretexLoading = false;
   }
 }

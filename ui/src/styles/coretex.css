@@ -666,6 +666,106 @@
   color: var(--muted);
 }
 
+/* ── Research ───────────────────────────────────────────────────── */
+
+.coretex-research-toolbar {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.coretex-research-add-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.375rem 0.75rem;
+  background: var(--accent-subtle);
+  color: var(--accent);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-sm, 6px);
+  font-size: 0.75rem;
+  font-weight: 500;
+  cursor: pointer;
+  font-family: var(--font-body);
+  transition: all 0.15s ease;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.coretex-research-add-btn:hover {
+  background: var(--accent);
+  color: var(--primary-foreground);
+}
+
+.coretex-research-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.625rem;
+  padding: 1rem 1.25rem;
+  background: var(--card);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-md, 8px);
+}
+
+.coretex-research-form-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.coretex-research-form-label {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+}
+
+.coretex-research-form-textarea {
+  padding: 0.5rem 0.75rem;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm, 6px);
+  color: var(--text);
+  font-size: 0.8125rem;
+  font-family: var(--font-body);
+  outline: none;
+  transition: border-color 0.15s ease;
+  resize: vertical;
+  min-height: 80px;
+}
+
+.coretex-research-form-textarea:focus {
+  border-color: var(--accent);
+}
+
+.coretex-research-url {
+  font-size: 0.625rem;
+  color: var(--accent);
+  font-family: var(--mono);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 300px;
+}
+
+.coretex-research-tags {
+  display: flex;
+  gap: 0.25rem;
+  flex-wrap: wrap;
+  margin-top: 0.25rem;
+}
+
+.coretex-research-tag {
+  font-size: 0.5625rem;
+  padding: 0.0625rem 0.375rem;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--muted);
+  font-weight: 500;
+}
+
 /* ── Responsive ─────────────────────────────────────────────────── */
 
 @media (max-width: 640px) {

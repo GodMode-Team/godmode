@@ -11,6 +11,7 @@ import {
   detectWorkspaceFromText,
 } from "../lib/workspaces-config.js";
 import type { CodingOrchestrator } from "./coding-orchestrator.js";
+import { formatGuardrailsForPrompt } from "./guardrails.js";
 
 // ── Copy & voice resource paths ────────────────────────────────
 
@@ -414,6 +415,16 @@ export class SwarmPipeline {
     const res = await resolveWorkspaceResources(task);
     const projectLabel = res.workspaceName ? ` for ${res.workspaceName}` : "";
 
+    // Fetch active guardrails for code-touching stages
+    let guardrailsBlock = "";
+    if (stage === "build" || stage === "qc") {
+      try {
+        guardrailsBlock = await formatGuardrailsForPrompt();
+      } catch {
+        // Non-fatal
+      }
+    }
+
     const env = [
       "## Environment",
       `- Working directory: ${worktreePath}`,
@@ -471,6 +482,12 @@ export class SwarmPipeline {
         "## Design Brief (from Design Agent)",
         designBrief || "(No design brief found — proceed with your best judgment)",
         "",
+        "## Safety Rules",
+        "- NEVER merge your branch into main. Only push your branch.",
+        "- NEVER run `git merge`, `git checkout main`, or `git switch main`.",
+        "- NEVER modify files outside the specified scope.",
+        "",
+        ...(guardrailsBlock ? [guardrailsBlock, ""] : []),
         "## Instructions",
         "1. Read the design brief above carefully — follow it, don't redesign",
         "2. Implement everything specified in the brief",
@@ -502,6 +519,11 @@ export class SwarmPipeline {
       "## Design Brief (original spec)",
       designBrief || "(No design brief found)",
       "",
+      "## Safety Rules",
+      "- NEVER merge your branch into main. Only push your branch.",
+      "- NEVER run `git merge`, `git checkout main`, or `git switch main`.",
+      "",
+      ...(guardrailsBlock ? [guardrailsBlock, ""] : []),
       "## Review Checklist",
       "1. Does the implementation match the design brief?",
       "2. Accessibility: ARIA labels, keyboard navigation, color contrast, screen reader support",

@@ -1,6 +1,6 @@
 # GodMode Plugin — Deployment Guide
 
-Step-by-step setup for a brand-new machine.
+Step-by-step setup for any machine: macOS, Windows, Linux, or VPS.
 
 ---
 
@@ -8,23 +8,58 @@ Step-by-step setup for a brand-new machine.
 
 | Requirement | Minimum Version | Check Command |
 |-------------|----------------|---------------|
-| macOS | 13+ (Ventura) | `sw_vers` |
-| Node.js | 22+ | `node -v` |
-| Homebrew | latest | `brew -v` |
-| Git | 2.30+ | `git --version` |
+| Node.js     | 22+            | `node -v`     |
 
-### Install prerequisites (if missing)
+That's it. Node.js is the **only** prerequisite. Everything else is installed via npm.
 
+### Install Node.js (if missing)
+
+**macOS:**
 ```bash
-# Homebrew (if not installed)
-/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-
-# Node 22 via Homebrew
+# Option A: Homebrew
 brew install node@22
 
-# Verify
-node -v   # Should show v22.x.x
+# Option B: Direct download
+# https://nodejs.org/en/download
 ```
+
+**Windows:**
+```powershell
+# Option A: winget (built into Windows 11)
+winget install OpenJS.NodeJS.LTS
+
+# Option B: Direct download
+# https://nodejs.org/en/download
+```
+
+**Linux / VPS:**
+```bash
+# Option A: NodeSource (Debian/Ubuntu)
+curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
+sudo apt-get install -y nodejs
+
+# Option B: Direct download
+# https://nodejs.org/en/download
+```
+
+Verify:
+```bash
+node -v   # Should show v22.x.x or later
+```
+
+---
+
+## Quick Setup (Team Script)
+
+For the fastest setup, use the team setup script. Just one command:
+
+```bash
+node scripts/team-setup.mjs GM-DEV-YOUR-KEY
+```
+
+This automatically installs OpenClaw, the GodMode plugin, activates your license, and configures the gateway. Works on macOS, Windows, and Linux.
+
+If you prefer step-by-step, continue below.
 
 ---
 
@@ -43,16 +78,17 @@ openclaw --version   # Should show 2026.2.x or later
 
 ## Step 2: Set up OpenClaw authentication
 
+For **Claude Pro/Max subscribers** (recommended):
+```bash
+openclaw setup-token
+```
+
+For **API key users**:
 ```bash
 openclaw auth login
 ```
 
 Follow the prompts. This authenticates the AI agent (Claude) so it can respond to your messages.
-
-For Claude Pro/Max subscribers:
-```bash
-openclaw setup-token
-```
 
 Verify:
 ```bash
@@ -69,10 +105,15 @@ openclaw plugins install @godmode-team/godmode
 
 ---
 
-## Step 4: Configure your license key
+## Step 4: Activate your license key
 
-You'll receive a license key starting with `GM-`. Set it:
+You'll receive a license key starting with `GM-`.
 
+```bash
+openclaw godmode activate GM-YOUR-KEY-HERE
+```
+
+Or set it manually:
 ```bash
 openclaw config set plugins.entries.godmode.enabled true
 openclaw config set plugins.entries.godmode.config.licenseKey "GM-YOUR-KEY-HERE"
@@ -80,40 +121,7 @@ openclaw config set plugins.entries.godmode.config.licenseKey "GM-YOUR-KEY-HERE"
 
 ---
 
-## Step 5: Set up essential config
-
-Open your config file:
-```bash
-openclaw config edit
-```
-
-Ensure these keys are set (the onboarding wizard will help configure most of these, but the gateway basics need to be right first):
-
-```jsonc
-{
-  "gateway": {
-    "mode": "local",
-    "port": 18789,
-    "bind": "loopback",
-    "controlUi": { "enabled": true }
-  },
-  "plugins": {
-    "enabled": true,
-    "entries": {
-      "godmode": {
-        "enabled": true,
-        "config": {
-          "licenseKey": "GM-YOUR-KEY-HERE"
-        }
-      }
-    }
-  }
-}
-```
-
----
-
-## Step 6: Start the gateway
+## Step 5: Start the gateway
 
 ```bash
 openclaw gateway start
@@ -121,7 +129,12 @@ openclaw gateway start
 
 Verify it's running:
 ```bash
-curl -fsS http://127.0.0.1:18789/godmode/health | python3 -m json.tool
+curl -fsS http://127.0.0.1:18789/godmode/health
+```
+
+**Windows (PowerShell):**
+```powershell
+Invoke-RestMethod http://127.0.0.1:18789/godmode/health
 ```
 
 You should see:
@@ -130,80 +143,85 @@ You should see:
   "plugin": "godmode",
   "version": "1.0.0",
   "license": { "status": "valid", "tier": "..." },
-  "ui": "available",
-  "methods": 87
+  "ui": "available"
 }
 ```
 
 ---
 
-## Step 7: Open GodMode
+## Step 6: Open GodMode
 
 Open your browser to:
 ```
 http://127.0.0.1:18789/godmode/
 ```
 
-The onboarding wizard will launch automatically on first visit.
+The **Setup tab** will appear in the sidebar for new users. It walks you through:
+
+1. **Quick Start** — enter your name, license key, and daily intelligence topics (under 2 minutes)
+2. **Progressive Checklist** — deeper setup tasks you work through at your own pace:
+   - Second Brain (memory setup) via the Memory Wizard
+   - Connect tools (GitHub, Obsidian)
+   - Health audit and config optimization
+   - First win demo
 
 ---
 
-## Step 8: Complete onboarding
+## Hosted Setup Guide
 
-The onboarding flow walks through everything. Here's what to expect:
+For non-technical team members, send them to:
 
-### Phase 1: Identity
-- Enter your name, mission, and pick an avatar emoji
-- This becomes your profile across GodMode
+```
+lifeongodmode.com/setup
+```
 
-### Phase 2: Second Brain (Memory Setup)
-- The wizard generates your workspace files at `~/godmode/`
-- Creates AGENTS.md, memory files, daily notes structure
-- Patches your OpenClaw config with optimal settings
+Or with a pre-filled license key:
+```
+lifeongodmode.com/setup?key=GM-DEV-teamname&name=Alice
+```
 
-### Phase 3: Connect Tools
-- This is where you connect **GitHub**, **Obsidian**, and other tools
-- For each tool you want to use:
+This page auto-detects their OS and walks them through every step with copy-paste commands.
 
-**GitHub** (needed for coding tasks + team workspaces):
+---
+
+## Connecting Optional Tools
+
+### GitHub (for coding tasks + team workspaces)
+
+**macOS:**
 ```bash
-# Install GitHub CLI
-brew install gh
+brew install gh && gh auth login
+```
 
-# Authenticate
+**Windows:**
+```powershell
+winget install GitHub.cli
 gh auth login
-# Choose: GitHub.com → Login with web browser → follow prompts
-
-# Verify
-gh auth status
 ```
 
-**Obsidian** (needed for daily brief + second brain):
-1. Download Obsidian from https://obsidian.md
-2. Create a vault (or use an existing one)
+**Linux:**
+```bash
+# See https://github.com/cli/cli/blob/trunk/docs/install_linux.md
+gh auth login
+```
+
+### Obsidian (for daily brief + second brain)
+
+1. Download from https://obsidian.md
+2. Create a vault (or use existing)
 3. Set the vault path:
+
+**macOS/Linux** (add to `~/.zshrc` or `~/.bashrc`):
 ```bash
-# Add to your shell profile (~/.zshrc or ~/.bashrc)
-export OBSIDIAN_VAULT_PATH="/path/to/your/Obsidian/vault"
-```
-4. Restart the gateway after setting this:
-```bash
-openclaw gateway restart
+export OBSIDIAN_VAULT_PATH="/path/to/your/vault"
 ```
 
-- If you skip a tool, it's marked as "pending" — you can set it up later
-- Nothing crashes if a tool isn't connected yet
+**Windows** (System Environment Variables, or add to PowerShell profile):
+```powershell
+[Environment]::SetEnvironmentVariable("OBSIDIAN_VAULT_PATH", "C:\Users\You\Obsidian\vault", "User")
+```
 
-### Phase 4: GodMode Audit
-- Answers 3 questions about your workflow
-- Maps your pain points to automations
-
-### Phase 5: First Win
-- Demonstrates a live capability (morning brief, task breakdown, etc.)
-- Sets up cron jobs for daily brief (5 AM) and evening review (8 PM)
-
-### Phase 6: Summary
-- Shows what was set up and your health score
+4. Restart the gateway: `openclaw gateway restart`
 
 ---
 
@@ -211,12 +229,31 @@ openclaw gateway restart
 
 | Missing Dependency | What Happens | How to Fix Later |
 |-------------------|-------------|-----------------|
-| **GitHub CLI** | Coding tasks show friendly setup instructions instead of running | `brew install gh && gh auth login` then retry |
-| **Obsidian vault** | Today tab shows "No brief available" — still fully functional | Set `OBSIDIAN_VAULT_PATH` env var, restart gateway |
-| **Channels (Slack, etc.)** | Chat works fine, just no cross-platform messaging | Connect via Settings → Channels tab |
-| **Cron jobs** | No automated briefs or reviews — everything still works on-demand | Enable in Settings → Cron tab |
+| **GitHub CLI** | Coding tasks show friendly setup instructions | Install `gh` and run `gh auth login` |
+| **Obsidian vault** | Today tab shows "No brief available" — still functional | Set `OBSIDIAN_VAULT_PATH`, restart gateway |
+| **Channels** | Chat works fine, no cross-platform messaging | Connect via Settings → Channels |
+| **Cron jobs** | No automated briefs/reviews — everything works on-demand | Enable in Settings → Cron |
 
-Nothing will crash. Every dependency degrades gracefully with a clear message about what's needed.
+Nothing will crash. Every dependency degrades gracefully with a clear message.
+
+---
+
+## Platform-Specific Notes
+
+### Windows
+- Use **PowerShell** (not CMD) for all commands
+- Paths use backslashes: `C:\Users\You\godmode\`
+- The `~/godmode` shorthand maps to `%USERPROFILE%\godmode`
+- Gateway runs the same way: `openclaw gateway start`
+
+### Linux VPS / Mac Mini (headless)
+- Start gateway in background: `openclaw gateway start --daemon` or use `tmux`/`screen`
+- Access GodMode remotely via SSH tunnel: `ssh -L 18789:localhost:18789 your-vps`
+- Or configure Tailscale for direct access to `http://your-vps:18789/godmode/`
+
+### macOS
+- If using Homebrew: `brew install node@22` is the fastest path
+- Spotlight-searchable: gateway runs as a background process
 
 ---
 
@@ -225,7 +262,10 @@ Nothing will crash. Every dependency degrades gracefully with a clear message ab
 ### Gateway won't start
 ```bash
 # Check for port conflicts
+# macOS/Linux:
 lsof -i :18789
+# Windows:
+netstat -ano | findstr :18789
 
 # Check logs
 openclaw gateway logs
@@ -239,8 +279,8 @@ openclaw doctor
 # Verify the key is set
 openclaw config get plugins.entries.godmode.config.licenseKey
 
-# Check connectivity
-curl -fsS https://lifeongodmode.com/api/v1/license/validate
+# Dev keys (GM-DEV-*) work offline — no validation needed
+# Prod keys require internet for first validation
 ```
 
 ### Plugin not loading
@@ -257,9 +297,6 @@ openclaw plugins install @godmode-team/godmode --force
 # Check vault path
 echo $OBSIDIAN_VAULT_PATH
 
-# Make sure the daily folder exists
-ls "$OBSIDIAN_VAULT_PATH/01-Daily/"
-
 # Restart gateway after env changes
 openclaw gateway restart
 ```
@@ -268,42 +305,36 @@ openclaw gateway restart
 
 ## Environment Variables (Optional)
 
-Add to `~/.zshrc` (or `~/.bashrc`):
-
+**macOS/Linux** — add to `~/.zshrc` or `~/.bashrc`:
 ```bash
 # Obsidian vault location (required for daily brief)
 export OBSIDIAN_VAULT_PATH="/path/to/your/vault"
-
-# Custom daily brief folder (default: 01-Daily)
-# export DAILY_BRIEF_FOLDER="DailyNotes"
 
 # Custom workspace root (default: ~/godmode)
 # export GODMODE_ROOT="$HOME/godmode"
 ```
 
-After adding, reload:
-```bash
-source ~/.zshrc
-openclaw gateway restart
+**Windows** — set via System Properties → Environment Variables, or:
+```powershell
+[Environment]::SetEnvironmentVariable("OBSIDIAN_VAULT_PATH", "C:\path\to\vault", "User")
 ```
+
+After adding, reload your shell and restart the gateway.
 
 ---
 
 ## Quick verification checklist
 
 ```bash
-# 1. OpenClaw is installed and authenticated
+# 1. Node.js installed
+node -v
+
+# 2. OpenClaw installed and authenticated
 openclaw --version && openclaw auth status
 
-# 2. Gateway is running
+# 3. Gateway is running
 curl -fsS http://127.0.0.1:18789/godmode/health
 
-# 3. GitHub is ready (optional but recommended)
-gh auth status
-
-# 4. Obsidian vault exists (optional but recommended)
-ls "$OBSIDIAN_VAULT_PATH" 2>/dev/null || echo "Not configured"
-
-# 5. GodMode workspace exists
+# 4. GodMode workspace exists
 ls ~/godmode/data/ 2>/dev/null || echo "Will be created during onboarding"
 ```

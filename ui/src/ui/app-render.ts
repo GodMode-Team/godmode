@@ -5,8 +5,8 @@ import { parseAgentSessionKey } from "../lib/session-key-utils.js";
 import { sanitizeHtmlFragment } from "./markdown";
 import { refreshChatAvatar, saveDraft, restoreDraft } from "./app-chat";
 import { findSessionByKey } from "./app-lifecycle";
-import { renderChatControls, renderTab, renderThemeToggle } from "./app-render.helpers";
-import { syncUrlWithSessionKey } from "./app-settings";
+import { createNewSession, renderChatControls, renderTab, renderThemeToggle } from "./app-render.helpers";
+import { setTab, syncUrlWithSessionKey } from "./app-settings";
 import type { AppViewState } from "./app-view-state";
 import { loadChannels } from "./controllers/channels";
 import { loadChatHistory, loadLaneHistory } from "./controllers/chat";
@@ -52,6 +52,14 @@ import {
   triggerAutoArchive,
   unarchiveSession,
 } from "./controllers/sessions";
+import {
+  searchClawHub,
+  exploreClawHub,
+  getClawHubDetail,
+  importFromClawHub,
+  getPersonalizePrompt,
+  clearClawHubDetail,
+} from "./controllers/clawhub";
 import {
   installSkill,
   loadSkills,
@@ -101,6 +109,7 @@ import {
   renderOnboardingSummary,
   type OnboardingPhase as OnbPhase,
 } from "./views/onboarding";
+import { renderSetup } from "./views/setup";
 
 const AVATAR_DATA_RE = /^data:/i;
 const AVATAR_HTTP_RE = /^https?:\/\//i;
@@ -237,7 +246,9 @@ function getRenderableSessionTabState(state: AppViewState): {
 
 export function renderApp(state: AppViewState) {
   // ── Onboarding full-screen takeovers (phases 0, 1, 6) ─────
-  const obActive = state.onboardingActive;
+  // Only show full-screen takeover for legacy ?onboarding=1 flow.
+  // New users see the persistent Setup tab in the sidebar instead.
+  const obActive = state.onboardingActive && state.onboarding;
   const obPhase = (state.onboardingPhase ?? 0);
   const obData = state.onboardingData;
 
@@ -418,23 +429,28 @@ export function renderApp(state: AppViewState) {
               `
               }
               <div class="nav-group__items">
-                ${group.tabs.map((tab) => renderTab(state, tab))}
                 ${
-                  !group.label && state.godmodeOptions?.["deck.enabled"]
+                  !group.label && state.showSetupTab && !state.godmodeOptions?.["onboarding.hidden"]
                     ? html`
                         <a
-                          class="nav-item nav-item--external"
-                          href="/deck/"
-                          target="_blank"
-                          rel="noreferrer"
-                          title="Open Deck — parallel agent sessions"
+                          class="nav-item ${state.tab === "setup" ? "active" : ""}"
+                          href="#"
+                          @click=${(e: Event) => {
+                            e.preventDefault();
+                            state.setTab("setup" as Tab);
+                          }}
+                          title="Get GodMode configured and running."
                         >
-                          <span class="nav-item__emoji" aria-hidden="true">🏛️</span>
-                          <span class="nav-item__text">Deck</span>
+                          <span class="nav-item__emoji" aria-hidden="true">\u{1F680}</span>
+                          <span class="nav-item__text">Setup</span>
+                          ${state.setupChecklist && (state.setupChecklist as { percentComplete?: number }).percentComplete != null
+                            ? html`<span class="nav-item__badge">${(state.setupChecklist as { percentComplete: number }).percentComplete}%</span>`
+                            : nothing}
                         </a>
                       `
                     : nothing
                 }
+                ${group.tabs.map((tab) => renderTab(state, tab))}
               </div>
             </div>
           `;
@@ -462,6 +478,7 @@ export function renderApp(state: AppViewState) {
           <div>
             ${
               state.tab !== "chat" &&
+              state.tab !== "setup" &&
               state.tab !== "workspaces" &&
               state.tab !== "today" &&
               state.tab !== "my-day" &&
@@ -960,6 +977,23 @@ export function renderApp(state: AppViewState) {
               </svg>
             </button>`
           : nothing}
+
+        ${
+          state.tab === "setup"
+            ? renderSetup({
+                connected: state.connected,
+                quickSetupDone: state.setupQuickDone ?? false,
+                checklist: (state.setupChecklist as import("./views/setup").SetupViewProps["checklist"]) ?? null,
+                checklistLoading: state.setupChecklistLoading ?? false,
+                onQuickSetup: (name, licenseKey, dailyIntelTopics) =>
+                  state.handleQuickSetup?.(name, licenseKey, dailyIntelTopics),
+                onHideSetup: () => state.handleHideSetup?.(),
+                onOpenWizard: () => state.handleWizardOpen?.(),
+                onNavigate: (tab) => state.setTab(tab),
+                onRunAssessment: () => state.handleRunAssessment?.(),
+              })
+            : nothing
+        }
 
         ${
           state.tab === "overview"
@@ -1704,6 +1738,7 @@ export function renderApp(state: AppViewState) {
                 edits: state.skillEdits,
                 messages: state.skillMessages,
                 busyKey: state.skillsBusyKey,
+                subTab: state.skillsSubTab,
                 onFilterChange: (next) => (state.skillsFilter = next),
                 onRefresh: () => loadSkills(state, { clearMessages: true }),
                 onToggle: (key, enabled) => updateSkillEnabled(state, key, enabled),
@@ -1711,6 +1746,42 @@ export function renderApp(state: AppViewState) {
                 onSaveKey: (key) => saveSkillApiKey(state, key),
                 onInstall: (skillKey, name, installId) =>
                   installSkill(state, skillKey, name, installId),
+                onSubTabChange: (tab) => {
+                  state.skillsSubTab = tab;
+                  if (tab === "clawhub" && !state.clawhubExploreItems) {
+                    exploreClawHub(state);
+                  }
+                },
+                clawhub: {
+                  loading: state.clawhubLoading,
+                  error: state.clawhubError,
+                  query: state.clawhubQuery,
+                  results: state.clawhubResults,
+                  exploreItems: state.clawhubExploreItems,
+                  exploreSort: state.clawhubExploreSort,
+                  detailSlug: state.clawhubDetailSlug,
+                  detail: state.clawhubDetail,
+                  importing: state.clawhubImporting,
+                  message: state.clawhubMessage,
+                  onSearch: (query) => {
+                    state.clawhubQuery = query;
+                    searchClawHub(state, query);
+                  },
+                  onExplore: (sort) => exploreClawHub(state, sort),
+                  onDetail: (slug) => getClawHubDetail(state, slug),
+                  onCloseDetail: () => clearClawHubDetail(state),
+                  onImport: (slug) => importFromClawHub(state, slug),
+                  onImportAndPersonalize: async (slug) => {
+                    const ok = await importFromClawHub(state, slug);
+                    if (!ok) return;
+                    const prompt = await getPersonalizePrompt(state, slug);
+                    if (prompt) {
+                      setTab(state, "chat");
+                      createNewSession(state);
+                      state.chatMessage = prompt;
+                    }
+                  },
+                },
               })
             : nothing
         }
@@ -2128,12 +2199,32 @@ export function renderApp(state: AppViewState) {
                 folderName: state.coretexFolderName ?? null,
                 onSubtabChange: (subtab) => state.handleCoretexSubtabChange(subtab),
                 onSelectEntry: (path) => state.handleCoretexSelectEntry(path),
+                onOpenInBrowser: (path) => state.handleCoretexOpenInBrowser(path),
                 onBrowseFolder: (path) => state.handleCoretexBrowseFolder(path),
                 onBack: () => state.handleCoretexBack(),
                 onSearch: (query) => state.handleCoretexSearch(query),
                 onSync: () => state.handleCoretexSync(),
                 onRefresh: () => state.handleCoretexRefresh(),
                 onOpenSidebar: (content, opts) => state.handleOpenSidebar(content, opts),
+                researchData: state.coretexResearchData ?? null,
+                researchAddFormOpen: state.coretexResearchAddFormOpen ?? false,
+                researchAddForm: state.coretexResearchAddForm,
+                researchCategories: state.coretexResearchCategories ?? [],
+                onResearchAddFormToggle: () => state.handleResearchAddFormToggle(),
+                onResearchAddFormChange: (field: any, value: string) => state.handleResearchAddFormChange(field, value),
+                onResearchAddSubmit: () => state.handleResearchAddSubmit(),
+                onSaveViaChat: () => state.handleResearchSaveViaChat(),
+                intelProps: (state.coretexSubtab ?? "identity") === "intel" ? {
+                  insights: state.intelInsights ?? [],
+                  discoveries: state.intelDiscoveries ?? [],
+                  patterns: state.intelPatterns ?? null,
+                  status: state.intelStatus ?? null,
+                  loading: state.intelLoading ?? false,
+                  error: state.intelError ?? null,
+                  onDismiss: (id: string) => state.handleIntelDismiss(id),
+                  onAct: (id: string) => state.handleIntelAct(id),
+                  onRefresh: () => state.handleIntelRefresh(),
+                } : undefined,
               })
             : nothing
         }

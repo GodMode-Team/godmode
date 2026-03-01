@@ -2,6 +2,9 @@ import { html, nothing } from "lit";
 import type { SkillMessageMap } from "../controllers/skills";
 import { clampText } from "../format";
 import type { SkillStatusEntry, SkillStatusReport } from "../types";
+import { renderClawHub, type ClawHubProps } from "./clawhub";
+
+export type SkillsSubTab = "my-skills" | "clawhub";
 
 export type SkillsProps = {
   loading: boolean;
@@ -11,15 +14,55 @@ export type SkillsProps = {
   edits: Record<string, string>;
   busyKey: string | null;
   messages: SkillMessageMap;
+  subTab: SkillsSubTab;
+  clawhub: ClawHubProps;
   onFilterChange: (next: string) => void;
   onRefresh: () => void;
   onToggle: (skillKey: string, enabled: boolean) => void;
   onEdit: (skillKey: string, value: string) => void;
   onSaveKey: (skillKey: string) => void;
   onInstall: (skillKey: string, name: string, installId: string) => void;
+  onSubTabChange: (tab: SkillsSubTab) => void;
 };
 
 export function renderSkills(props: SkillsProps) {
+  return html`
+    <section class="card">
+      <div class="row" style="justify-content: space-between; align-items: center;">
+        <div class="chip-row" style="gap: 0;">
+          <button
+            class="chip ${props.subTab === "my-skills" ? "chip-ok" : ""}"
+            style="cursor: pointer; border: none; padding: 6px 14px; font-size: 13px;
+                   background: var(${props.subTab === "my-skills" ? "--chip-ok-bg, #e6f4ea" : "--chip-bg, #f3f3f3"});"
+            @click=${() => props.onSubTabChange("my-skills")}
+          >
+            My Skills
+          </button>
+          <button
+            class="chip ${props.subTab === "clawhub" ? "chip-ok" : ""}"
+            style="cursor: pointer; border: none; padding: 6px 14px; font-size: 13px;
+                   background: var(${props.subTab === "clawhub" ? "--chip-ok-bg, #e6f4ea" : "--chip-bg, #f3f3f3"});"
+            @click=${() => props.onSubTabChange("clawhub")}
+          >
+            ClawHub
+          </button>
+        </div>
+        ${props.subTab === "my-skills"
+          ? html`<button class="btn" ?disabled=${props.loading} @click=${props.onRefresh}>
+              ${props.loading ? "Loading\u2026" : "Refresh"}
+            </button>`
+          : nothing}
+      </div>
+
+      ${props.subTab === "my-skills" ? renderMySkills(props) : nothing}
+      ${props.subTab === "clawhub"
+        ? html`<div style="margin-top: 16px;">${renderClawHub(props.clawhub)}</div>`
+        : nothing}
+    </section>
+  `;
+}
+
+function renderMySkills(props: SkillsProps) {
   const skills = props.report?.skills ?? [];
   const filter = props.filter.trim().toLowerCase();
   const filtered = filter
@@ -29,47 +72,31 @@ export function renderSkills(props: SkillsProps) {
     : skills;
 
   return html`
-    <section class="card">
-      <div class="row" style="justify-content: space-between;">
-        <div>
-          <div class="card-title">Skills</div>
-          <div class="card-sub">Bundled, managed, and workspace skills.</div>
-        </div>
-        <button class="btn" ?disabled=${props.loading} @click=${props.onRefresh}>
-          ${props.loading ? "Loading…" : "Refresh"}
-        </button>
-      </div>
+    <div class="filters" style="margin-top: 14px;">
+      <label class="field" style="flex: 1;">
+        <span>Filter</span>
+        <input
+          .value=${props.filter}
+          @input=${(e: Event) => props.onFilterChange((e.target as HTMLInputElement).value)}
+          placeholder="Search skills"
+        />
+      </label>
+      <div class="muted">${filtered.length} shown</div>
+    </div>
 
-      <div class="filters" style="margin-top: 14px;">
-        <label class="field" style="flex: 1;">
-          <span>Filter</span>
-          <input
-            .value=${props.filter}
-            @input=${(e: Event) => props.onFilterChange((e.target as HTMLInputElement).value)}
-            placeholder="Search skills"
-          />
-        </label>
-        <div class="muted">${filtered.length} shown</div>
-      </div>
+    ${
+      props.error
+        ? html`<div class="callout danger" style="margin-top: 12px;">${props.error}</div>`
+        : nothing
+    }
 
-      ${
-        props.error
-          ? html`<div class="callout danger" style="margin-top: 12px;">${props.error}</div>`
-          : nothing
-      }
-
-      ${
-        filtered.length === 0
-          ? html`
-              <div class="muted" style="margin-top: 16px">No skills found.</div>
-            `
-          : html`
-            <div class="list" style="margin-top: 16px;">
-              ${filtered.map((skill) => renderSkill(skill, props))}
-            </div>
-          `
-      }
-    </section>
+    ${
+      filtered.length === 0
+        ? html`<div class="muted" style="margin-top: 16px">No skills found.</div>`
+        : html`<div class="list" style="margin-top: 16px;">
+            ${filtered.map((skill) => renderSkill(skill, props))}
+          </div>`
+    }
   `;
 }
 

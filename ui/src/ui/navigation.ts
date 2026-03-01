@@ -2,15 +2,13 @@ import type { IconName } from "./icons.js";
 
 export const TAB_GROUPS = [
   { label: "", tabs: ["chat", "today", "workspaces", "coretex"] },
-  {
-    label: "Control",
-    tabs: ["overview", "trust", "guardrails", "channels", "instances", "sessions", "cron", "options"],
-  },
-  { label: "Agent", tabs: ["skills", "nodes"] },
+  { label: "Toolkit", tabs: ["skills", "trust", "guardrails", "options"] },
   { label: "Settings", tabs: ["config", "debug", "logs"] },
+  { label: "System", tabs: ["overview", "channels", "instances", "sessions", "cron", "nodes"] },
 ] as const;
 
 export type Tab =
+  | "setup"
   | "guardrails"
   | "options"
   | "overview"
@@ -34,9 +32,11 @@ export type Tab =
   | "trust"
   | "debug"
   | "logs"
-  | "coretex";
+  | "coretex"
+  | "intel";
 
 const TAB_PATHS: Record<Tab, string> = {
+  setup: "/setup",
   options: "/options",
   overview: "/overview",
   workspaces: "/workspaces",
@@ -61,6 +61,7 @@ const TAB_PATHS: Record<Tab, string> = {
   debug: "/debug",
   logs: "/logs",
   coretex: "/coretex",
+  intel: "/intel",
 };
 
 const PATH_TO_TAB = new Map(Object.entries(TAB_PATHS).map(([tab, path]) => [path, tab as Tab]));
@@ -161,6 +162,8 @@ export function inferBasePathFromPathname(pathname: string): string {
 
 export function iconForTab(tab: Tab): IconName {
   switch (tab) {
+    case "setup":
+      return "zap";
     case "chat":
       return "messageSquare";
     case "today":
@@ -202,6 +205,8 @@ export function iconForTab(tab: Tab): IconName {
       return "shield";
     case "coretex":
       return "brain";
+    case "intel":
+      return "radio";
     case "config":
       return "settings";
     case "debug":
@@ -215,6 +220,8 @@ export function iconForTab(tab: Tab): IconName {
 
 export function titleForTab(tab: Tab) {
   switch (tab) {
+    case "setup":
+      return "Setup";
     case "chat":
       return "Chat";
     case "today":
@@ -256,6 +263,8 @@ export function titleForTab(tab: Tab) {
       return "Guardrails";
     case "coretex":
       return "CoreTex";
+    case "intel":
+      return "Intel";
     case "config":
       return "Config";
     case "debug":
@@ -269,6 +278,8 @@ export function titleForTab(tab: Tab) {
 
 export function emojiForTab(tab: Tab): string {
   switch (tab) {
+    case "setup":
+      return "\u{1F680}";
     case "chat":
       return "\u{1F4AC}";
     case "today":
@@ -310,6 +321,8 @@ export function emojiForTab(tab: Tab): string {
       return "\u{1F6A7}";
     case "coretex":
       return "\u{1F9E0}";
+    case "intel":
+      return "\u{1F4E1}";
     case "config":
       return "\u{2699}\uFE0F";
     case "debug":
@@ -323,6 +336,8 @@ export function emojiForTab(tab: Tab): string {
 
 export function subtitleForTab(tab: Tab) {
   switch (tab) {
+    case "setup":
+      return "Get GodMode configured and running.";
     case "chat":
       return "Your command center. Ask anything, customize any view.";
     case "today":
@@ -353,7 +368,7 @@ export function subtitleForTab(tab: Tab) {
     case "cron":
       return "Schedule wakeups and recurring agent runs.";
     case "skills":
-      return "Manage skill availability and API key injection.";
+      return "Manage your skills, discover new ones from ClawHub, and personalize them for your workflow.";
     case "nodes":
       return "Paired devices, capabilities, and command exposure.";
     case "options":
@@ -364,6 +379,8 @@ export function subtitleForTab(tab: Tab) {
       return "Safety gates that prevent runaway loops, bad searches, and lazy responses.";
     case "coretex":
       return "Your context profile — identity, memory bank, and live AI packet.";
+    case "intel":
+      return "Proactive intelligence — discoveries, insights, and pattern analysis.";
     case "config":
       return "Edit ~/.openclaw/config.json safely.";
     case "debug":

@@ -54,7 +54,7 @@ export function loadSettings(): UiSettings {
     chatShowThinking: true,
     splitRatio: 0.6,
     navCollapsed: false,
-    navGroupsCollapsed: {},
+    navGroupsCollapsed: { System: true },
     openTabs: ["agent:main:main"],
     tabLastViewed: {},
     userName: "",

@@ -121,6 +121,10 @@ import { addToast, createToast, removeToast } from "./toast";
 import type {
   AgentsListResult,
   ArchivedSessionEntry,
+  ChannelsStatusSnapshot,
+  ClawHubSearchResult,
+  ClawHubSkillDetail,
+  ClawHubSkillItem,
   ConfigSnapshot,
   ConfigUiHints,
   CronJob,
@@ -129,13 +133,13 @@ import type {
   HealthSnapshot,
   LogEntry,
   LogLevel,
+  NostrProfile,
   PresenceEntry,
-  ChannelsStatusSnapshot,
   SessionsListResult,
   SkillStatusReport,
   StatusSummary,
-  NostrProfile,
 } from "./types";
+import type { ClawHubMessage } from "./controllers/clawhub";
 import type { ToolExecutionInfo } from "./types/chat-types";
 import { type ChatAttachment, type ChatQueueItem, type CronFormState } from "./ui-types";
 import type { NostrProfileFormState } from "./views/channels.nostr-profile-form";
@@ -377,6 +381,12 @@ export class GodModeApp extends LitElement {
   @state() wizardActive = false;
   @state() wizardState: import("./views/onboarding-wizard").WizardState | null = null;
 
+  // Setup tab state (80/20 fast onboarding)
+  @state() showSetupTab = false;
+  @state() setupChecklist: unknown = null;
+  @state() setupChecklistLoading = false;
+  @state() setupQuickDone = false;
+
   // Workspaces state
   @state() workspaces?: WorkspaceSummary[];
   @state() selectedWorkspace: WorkspaceDetail | null = null;
@@ -474,6 +484,17 @@ export class GodModeApp extends LitElement {
   @state() skillEdits: Record<string, string> = {};
   @state() skillsBusyKey: string | null = null;
   @state() skillMessages: Record<string, SkillMessage> = {};
+  @state() skillsSubTab: "my-skills" | "clawhub" = "my-skills";
+  @state() clawhubQuery = "";
+  @state() clawhubResults: ClawHubSearchResult[] | null = null;
+  @state() clawhubExploreItems: ClawHubSkillItem[] | null = null;
+  @state() clawhubExploreSort = "trending";
+  @state() clawhubLoading = false;
+  @state() clawhubError: string | null = null;
+  @state() clawhubDetailSlug: string | null = null;
+  @state() clawhubDetail: ClawHubSkillDetail | null = null;
+  @state() clawhubImporting: string | null = null;
+  @state() clawhubMessage: ClawHubMessage | null = null;
 
   @state() debugLoading = false;
   @state() debugStatus: StatusSummary | null = null;
@@ -535,12 +556,24 @@ export class GodModeApp extends LitElement {
   @state() coretexMemoryBank: import("./views/coretex").CoreTexMemoryBankData | null = null;
   @state() coretexAiPacket: import("./views/coretex").CoreTexAiPacketData | null = null;
   @state() coretexSourcesData: import("./views/coretex").CoreTexSourcesData | null = null;
+  @state() coretexResearchData: import("./views/coretex").CoreTexResearchData | null = null;
+  @state() coretexResearchAddFormOpen = false;
+  @state() coretexResearchAddForm: import("./views/coretex").ResearchAddForm = { title: "", url: "", category: "", tags: "", notes: "" };
+  @state() coretexResearchCategories: string[] = [];
   @state() coretexSelectedEntry: import("./views/coretex").CoreTexEntryDetail | null = null;
   @state() coretexSearchQuery = "";
   @state() coretexSyncing = false;
   @state() coretexBrowsingFolder: string | null = null;
   @state() coretexFolderEntries: import("./views/coretex").CoreTexMemoryEntry[] | null = null;
   @state() coretexFolderName: string | null = null;
+
+  // Proactive Intel state
+  @state() intelInsights: import("./controllers/proactive-intel").IntelInsight[] = [];
+  @state() intelDiscoveries: import("./controllers/proactive-intel").ScoutFinding[] = [];
+  @state() intelPatterns: import("./controllers/proactive-intel").UserPatterns | null = null;
+  @state() intelStatus: import("./controllers/proactive-intel").IntelStatus | null = null;
+  @state() intelLoading = false;
+  @state() intelError: string | null = null;
 
   private nodesPollInterval: number | null = null;
   private logsPollInterval: number | null = null;
@@ -800,11 +833,19 @@ export class GodModeApp extends LitElement {
     this.coretexBrowsingFolder = null;
     this.coretexFolderEntries = null;
     this.coretexFolderName = null;
-    this.handleCoretexRefresh().catch((err) => {
-      console.error("[CoreTex] Refresh after subtab change failed:", err);
-      this.coretexError = err instanceof Error ? err.message : "Failed to load data";
-      this.coretexLoading = false;
-    });
+    if (subtab === "intel") {
+      // Intel subtab loads its own data
+      this.handleIntelLoad().catch((err) => {
+        console.error("[Intel] Load after subtab change failed:", err);
+        this.intelError = err instanceof Error ? err.message : "Failed to load intel data";
+      });
+    } else {
+      this.handleCoretexRefresh().catch((err) => {
+        console.error("[CoreTex] Refresh after subtab change failed:", err);
+        this.coretexError = err instanceof Error ? err.message : "Failed to load data";
+        this.coretexLoading = false;
+      });
+    }
   }
 
   async handleCoretexSelectEntry(path: string) {
@@ -834,6 +875,22 @@ export class GodModeApp extends LitElement {
     await loadCoretexEntry(this, path);
   }
 
+  async handleCoretexOpenInBrowser(path: string) {
+    try {
+      const result = await this.client!.request<{ name: string; content: string }>(
+        "coretex.memoryBankEntry",
+        { path },
+      );
+      if (result?.content) {
+        const blob = new Blob([result.content], { type: "text/html" });
+        const url = URL.createObjectURL(blob);
+        window.open(url, "_blank", "noopener,noreferrer");
+      }
+    } catch (err) {
+      console.error("[CoreTex] Failed to open in browser:", err);
+    }
+  }
+
   async handleCoretexBrowseFolder(path: string) {
     const { browseFolder } = await import("./controllers/coretex.js");
     await browseFolder(this, path);
@@ -856,6 +913,107 @@ export class GodModeApp extends LitElement {
   async handleCoretexSync() {
     const { syncCoretex } = await import("./controllers/coretex.js");
     await syncCoretex(this);
+  }
+
+  handleResearchAddFormToggle() {
+    this.coretexResearchAddFormOpen = !this.coretexResearchAddFormOpen;
+    if (this.coretexResearchAddFormOpen) {
+      this.coretexResearchAddForm = { title: "", url: "", category: "", tags: "", notes: "" };
+    }
+  }
+
+  handleResearchAddFormChange(field: string, value: string) {
+    this.coretexResearchAddForm = { ...this.coretexResearchAddForm, [field]: value };
+  }
+
+  async handleResearchAddSubmit() {
+    const { addResearch } = await import("./controllers/coretex.js");
+    await addResearch(this);
+  }
+
+  async handleResearchSaveViaChat() {
+    this.setTab("chat" as import("./navigation").Tab);
+    const { createNewSession } = await import("./app-render.helpers.js");
+    createNewSession(this);
+    void this.handleSendChat(
+      "I want to save some research. I'll paste links, bookmarks, or notes — please organize them into ~/godmode/memory/research/ with proper frontmatter (title, url, category, tags, date). Ask me what I'd like to save.",
+    );
+  }
+
+  // Proactive Intel handlers
+  async handleIntelLoad() {
+    const { loadInsights, loadDiscoveries, loadUserPatterns, loadStatus } = await import("./controllers/proactive-intel.js");
+    const state = {
+      client: this.client,
+      connected: this.connected,
+      insights: this.intelInsights ?? [],
+      discoveries: this.intelDiscoveries ?? [],
+      patterns: this.intelPatterns ?? null,
+      status: this.intelStatus ?? null,
+      loading: false,
+      error: null,
+    };
+    await Promise.all([loadInsights(state), loadDiscoveries(state), loadUserPatterns(state), loadStatus(state)]);
+    this.intelInsights = state.insights;
+    this.intelDiscoveries = state.discoveries;
+    this.intelPatterns = state.patterns;
+    this.intelStatus = state.status;
+    this.intelLoading = state.loading;
+    this.intelError = state.error;
+  }
+
+  async handleIntelDismiss(id: string) {
+    const { dismissInsight } = await import("./controllers/proactive-intel.js");
+    const state = {
+      client: this.client,
+      connected: this.connected,
+      insights: this.intelInsights ?? [],
+      discoveries: this.intelDiscoveries ?? [],
+      patterns: this.intelPatterns ?? null,
+      status: this.intelStatus ?? null,
+      loading: false,
+      error: null,
+    };
+    await dismissInsight(state, id);
+    this.intelInsights = state.insights;
+  }
+
+  async handleIntelAct(id: string) {
+    const { actOnInsight } = await import("./controllers/proactive-intel.js");
+    const state = {
+      client: this.client,
+      connected: this.connected,
+      insights: this.intelInsights ?? [],
+      discoveries: this.intelDiscoveries ?? [],
+      patterns: this.intelPatterns ?? null,
+      status: this.intelStatus ?? null,
+      loading: false,
+      error: null,
+    };
+    await actOnInsight(state, id);
+    this.intelInsights = state.insights;
+  }
+
+  async handleIntelRefresh() {
+    this.intelLoading = true;
+    const { forceRefresh } = await import("./controllers/proactive-intel.js");
+    const state = {
+      client: this.client,
+      connected: this.connected,
+      insights: this.intelInsights ?? [],
+      discoveries: this.intelDiscoveries ?? [],
+      patterns: this.intelPatterns ?? null,
+      status: this.intelStatus ?? null,
+      loading: true,
+      error: null,
+    };
+    await forceRefresh(state);
+    this.intelInsights = state.insights;
+    this.intelDiscoveries = state.discoveries;
+    this.intelPatterns = state.patterns;
+    this.intelStatus = state.status;
+    this.intelLoading = false;
+    this.intelError = state.error;
   }
 
   removeQueuedMessage(id: string) {
@@ -2187,6 +2345,34 @@ export class GodModeApp extends LitElement {
       this.requestUpdate();
       this.showToast(errorMsg, "error");
     }
+  }
+
+  // ── Setup tab handlers ───────────────────────────────────────
+
+  async handleQuickSetup(name: string, licenseKey: string, dailyIntelTopics: string) {
+    void import("./controllers/setup.js").then(async ({ quickSetup }) => {
+      const success = await quickSetup(this, name, licenseKey, dailyIntelTopics);
+      if (success) {
+        this.setTab("chat" as import("./navigation").Tab);
+        // Reload checklist in background
+        void import("./controllers/setup.js").then(({ loadChecklist }) => loadChecklist(this));
+      }
+    });
+  }
+
+  handleLoadSetupChecklist() {
+    void import("./controllers/setup.js").then(({ loadChecklist }) => loadChecklist(this));
+  }
+
+  handleHideSetup() {
+    void import("./controllers/setup.js").then(({ hideSetup }) => hideSetup(this));
+  }
+
+  handleRunAssessment() {
+    if (!this.client) return;
+    void this.client.request("onboarding.assess", {}).then(() => {
+      this.handleLoadSetupChecklist();
+    });
   }
 
   // Data tab handlers

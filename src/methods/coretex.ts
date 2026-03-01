@@ -21,6 +21,7 @@ import {
   readFileSync,
   statSync,
 } from "node:fs";
+import { mkdir, writeFile } from "node:fs/promises";
 import { basename, extname, join, relative } from "node:path";
 import type { GatewayRequestHandler } from "openclaw/plugin-sdk";
 import { GODMODE_ROOT, MEMORY_DIR } from "../data-paths.js";
@@ -516,6 +517,240 @@ const sources: GatewayRequestHandler = async ({ respond }) => {
   respond(true, { sources: result, connectedCount, totalCount: result.length });
 };
 
+// ── Research ─────────────────────────────────────────────────────────
+
+const RESEARCH_DIR = join(MEMORY_DIR, "research");
+const RESEARCH_DIR_ALT = join(GODMODE_ROOT, "research");  // ~/godmode/research/
+
+type ResearchFrontmatter = {
+  title?: string;
+  url?: string;
+  category?: string;
+  tags?: string[];
+  date?: string;
+  source?: string;
+};
+
+function parseFrontmatter(content: string): ResearchFrontmatter | null {
+  const match = content.match(/^---\n([\s\S]*?)\n---/);
+  if (!match) return null;
+  const fm = match[1];
+  const get = (key: string) => fm.match(new RegExp(`^${key}:\\s*(.+)$`, "m"))?.[1]?.trim();
+  const getTags = (key: string): string[] => {
+    const raw = fm.match(new RegExp(`^${key}:\\s*\\[([^\\]]*)\\]`, "m"))?.[1];
+    return raw ? raw.split(",").map(t => t.trim().replace(/['"]/g, "")).filter(Boolean) : [];
+  };
+  return {
+    title: get("title") || undefined,
+    url: get("url") || undefined,
+    category: get("category") || undefined,
+    tags: getTags("tags"),
+    date: get("date") || undefined,
+    source: get("source") || undefined,
+  };
+}
+
+type ResearchFileEntry = FileEntry & { frontmatter?: ResearchFrontmatter };
+
+function listResearchEntries(dirPath: string): ResearchFileEntry[] {
+  const entries = listEntries(dirPath);
+  return entries.map((entry) => {
+    if (entry.isDirectory) return entry;
+    const content = safeReadFile(entry.path);
+    const frontmatter = content ? parseFrontmatter(content) : null;
+    return {
+      ...entry,
+      name: frontmatter?.title || entry.name,
+      frontmatter: frontmatter ?? undefined,
+    };
+  });
+}
+
+/** Scan a single research directory, returning categories for root files + subdirectories. */
+function scanResearchDir(
+  dirPath: string,
+  rootLabel: string,
+  rootKey: string,
+): { categories: ResearchCategory[]; count: number } {
+  if (!existsSync(dirPath)) return { categories: [], count: 0 };
+  const categories: ResearchCategory[] = [];
+  let count = 0;
+
+  try {
+    const dirents = readdirSync(dirPath, { withFileTypes: true })
+      .filter(e => !e.name.startsWith(".") && !e.name.startsWith("_"));
+
+    // Root-level files
+    const rootFiles = dirents.filter(e =>
+      !e.isDirectory() && [".md", ".txt", ".json"].includes(extname(e.name)),
+    );
+    if (rootFiles.length > 0) {
+      const entries = listResearchEntries(dirPath).filter(e => !e.isDirectory);
+      categories.push({ key: rootKey, label: rootLabel, path: dirPath, entries });
+      count += entries.length;
+    }
+
+    // Subdirectories become categories
+    const subdirs = dirents.filter(e => e.isDirectory()).sort((a, b) => a.name.localeCompare(b.name));
+    for (const dir of subdirs) {
+      const subPath = join(dirPath, dir.name);
+      const entries = listResearchEntries(subPath);
+      const fileEntries = entries.filter(e => !e.isDirectory);
+      if (entries.length > 0) {
+        const label = dir.name.charAt(0).toUpperCase() + dir.name.slice(1).replace(/-/g, " ");
+        categories.push({ key: `${rootKey}:${dir.name}`, label, path: subPath, entries });
+        count += fileEntries.length;
+      }
+    }
+  } catch { /* directory inaccessible — skip */ }
+
+  return { categories, count };
+}
+
+/** Scan ~/godmode/*.html for standalone proposals and analysis docs. */
+function scanHtmlDocs(): { entries: ResearchFileEntry[]; count: number } {
+  const entries: ResearchFileEntry[] = [];
+  try {
+    const dirents = readdirSync(GODMODE_ROOT, { withFileTypes: true })
+      .filter(e => !e.isDirectory() && extname(e.name) === ".html" && !e.name.startsWith("."));
+    for (const d of dirents) {
+      const filePath = join(GODMODE_ROOT, d.name);
+      const st = statSync(filePath);
+      const displayName = d.name
+        .replace(/\.html$/, "")
+        .replace(/[-_]/g, " ")
+        .replace(/\b\w/g, c => c.toUpperCase());
+      entries.push({
+        name: displayName,
+        path: filePath,
+        updatedAt: st.mtime.toISOString(),
+        excerpt: `HTML document (${Math.round(st.size / 1024)} KB)`,
+        size: st.size,
+        isDirectory: false,
+        frontmatter: { source: "html-doc" },
+      });
+    }
+  } catch { /* skip */ }
+  return { entries, count: entries.length };
+}
+
+type ResearchCategory = { key: string; label: string; path: string; entries: ResearchFileEntry[] };
+
+const research: GatewayRequestHandler = async ({ params, respond }) => {
+  const p = params as { folder?: string };
+  const folder = typeof p.folder === "string" ? p.folder.trim() : "";
+
+  // Subfolder browsing
+  if (folder) {
+    if (!folder.startsWith(GODMODE_ROOT)) {
+      respond(false, undefined, { code: "INVALID_REQUEST", message: "Path must be within godmode directory" });
+      return;
+    }
+    const entries = listResearchEntries(folder);
+    respond(true, { folder, folderName: basename(folder), entries });
+    return;
+  }
+
+  // Top-level: scan all research sources
+  const categories: ResearchCategory[] = [];
+  let totalEntries = 0;
+
+  // 1. ~/godmode/memory/research/ — user-saved research (primary)
+  const memRes = scanResearchDir(RESEARCH_DIR, "Saved Research", "saved");
+  categories.push(...memRes.categories);
+  totalEntries += memRes.count;
+
+  // 2. ~/godmode/research/ — analysis docs and reports
+  const altRes = scanResearchDir(RESEARCH_DIR_ALT, "Analysis & Reports", "analysis");
+  categories.push(...altRes.categories);
+  totalEntries += altRes.count;
+
+  // 3. ~/godmode/*.html — proposals and standalone docs
+  const htmlDocs = scanHtmlDocs();
+  if (htmlDocs.count > 0) {
+    categories.push({
+      key: "proposals",
+      label: "Proposals & Docs",
+      path: GODMODE_ROOT,
+      entries: htmlDocs.entries,
+    });
+    totalEntries += htmlDocs.count;
+  }
+
+  respond(true, { categories, totalEntries });
+};
+
+function sanitizeSlug(text: string): string {
+  return text.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 80);
+}
+
+const addResearch: GatewayRequestHandler = async ({ params, respond }) => {
+  const p = params as {
+    title?: string;
+    url?: string;
+    category?: string;
+    tags?: string[];
+    notes?: string;
+    source?: string;
+  };
+
+  const title = typeof p.title === "string" ? p.title.trim() : "";
+  if (!title) {
+    respond(false, undefined, { code: "INVALID_REQUEST", message: "Title is required" });
+    return;
+  }
+
+  const category = typeof p.category === "string" ? sanitizeSlug(p.category) : "";
+  const targetDir = category ? join(RESEARCH_DIR, category) : RESEARCH_DIR;
+  await mkdir(targetDir, { recursive: true });
+
+  // Generate filename, handle collisions
+  const baseSlug = sanitizeSlug(title);
+  let filename = `${baseSlug}.md`;
+  let filePath = join(targetDir, filename);
+  let suffix = 2;
+  while (existsSync(filePath)) {
+    filename = `${baseSlug}-${suffix}.md`;
+    filePath = join(targetDir, filename);
+    suffix++;
+  }
+
+  // Build YAML frontmatter
+  const today = new Date().toISOString().slice(0, 10);
+  const tags = Array.isArray(p.tags) ? p.tags.filter(t => typeof t === "string" && t.trim()) : [];
+  const source = typeof p.source === "string" ? p.source : "manual";
+  const url = typeof p.url === "string" ? p.url.trim() : "";
+  const notes = typeof p.notes === "string" ? p.notes : "";
+
+  const lines = ["---", `title: ${title}`];
+  if (url) lines.push(`url: ${url}`);
+  if (category) lines.push(`category: ${category}`);
+  if (tags.length > 0) lines.push(`tags: [${tags.join(", ")}]`);
+  lines.push(`date: ${today}`);
+  lines.push(`source: ${source}`);
+  lines.push("---", "");
+  if (notes) lines.push(notes);
+
+  await writeFile(filePath, lines.join("\n"), "utf-8");
+  respond(true, { ok: true, path: filePath, category: category || null });
+};
+
+const researchCategories: GatewayRequestHandler = async ({ respond }) => {
+  const cats = new Set<string>();
+  for (const dir of [RESEARCH_DIR, RESEARCH_DIR_ALT]) {
+    if (!existsSync(dir)) continue;
+    try {
+      const entries = readdirSync(dir, { withFileTypes: true });
+      for (const e of entries) {
+        if (e.isDirectory() && !e.name.startsWith(".") && !e.name.startsWith("_")) {
+          cats.add(e.name);
+        }
+      }
+    } catch { /* skip */ }
+  }
+  respond(true, { categories: [...cats].sort() });
+};
+
 // ── Export ────────────────────────────────────────────────────────────
 
 export const coretexHandlers: GatewayRequestHandlers = {
@@ -525,4 +760,7 @@ export const coretexHandlers: GatewayRequestHandlers = {
   "coretex.aiPacket": aiPacket,
   "coretex.sync": sync,
   "coretex.sources": sources,
+  "coretex.research": research,
+  "coretex.addResearch": addResearch,
+  "coretex.researchCategories": researchCategories,
 };

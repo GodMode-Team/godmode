@@ -8,6 +8,7 @@
 import { html, nothing } from "lit";
 import { unsafeHTML } from "lit/directives/unsafe-html.js";
 import { toSanitizedMarkdownHtml } from "../markdown";
+import { renderProactiveIntel, type ProactiveIntelProps } from "./proactive-intel.js";
 import { formatAgo } from "../format";
 
 // ── Types ────────────────────────────────────────────────────────────
@@ -98,7 +99,40 @@ export type CoreTexSourcesData = {
   totalCount: number;
 };
 
-export type CoreTexSubtab = "identity" | "memory-bank" | "ai-packet" | "sources";
+export type CoreTexSubtab = "identity" | "memory-bank" | "ai-packet" | "sources" | "research" | "intel";
+
+export type ResearchFrontmatter = {
+  title?: string;
+  url?: string;
+  category?: string;
+  tags?: string[];
+  date?: string;
+  source?: string;
+};
+
+export type ResearchEntry = CoreTexMemoryEntry & {
+  frontmatter?: ResearchFrontmatter;
+};
+
+export type ResearchCategory = {
+  key: string;
+  label: string;
+  path: string;
+  entries: ResearchEntry[];
+};
+
+export type CoreTexResearchData = {
+  categories: ResearchCategory[];
+  totalEntries: number;
+};
+
+export type ResearchAddForm = {
+  title: string;
+  url: string;
+  category: string;
+  tags: string;
+  notes: string;
+};
 
 export type CoreTexProps = {
   connected: boolean;
@@ -109,6 +143,10 @@ export type CoreTexProps = {
   memoryBank?: CoreTexMemoryBankData | null;
   aiPacket?: CoreTexAiPacketData | null;
   sourcesData?: CoreTexSourcesData | null;
+  researchData?: CoreTexResearchData | null;
+  researchAddFormOpen?: boolean;
+  researchAddForm?: ResearchAddForm;
+  researchCategories?: string[];
   selectedEntry?: CoreTexEntryDetail | null;
   searchQuery?: string;
   syncing?: boolean;
@@ -117,12 +155,19 @@ export type CoreTexProps = {
   folderName?: string | null;
   onSubtabChange: (subtab: CoreTexSubtab) => void;
   onSelectEntry: (path: string) => void;
+  onOpenInBrowser: (path: string) => void;
   onBrowseFolder: (path: string) => void;
   onBack: () => void;
   onSearch: (query: string) => void;
   onSync: () => void;
   onRefresh: () => void;
   onOpenSidebar: (content: string, opts?: { mimeType?: string | null; filePath?: string | null; title?: string | null }) => void;
+  onResearchAddFormToggle: () => void;
+  onResearchAddFormChange: (field: keyof ResearchAddForm, value: string) => void;
+  onResearchAddSubmit: () => void;
+  onSaveViaChat: () => void;
+  // Proactive Intel props (for intel subtab)
+  intelProps?: ProactiveIntelProps;
 };
 
 // ── Helpers ──────────────────────────────────────────────────────────
@@ -157,10 +202,9 @@ function renderIdentityPanel(props: CoreTexProps) {
         <div
           class="coretex-hero"
           @click=${() => {
-            // Read the HTML file and open in sidebar
             const dashPath = identity.identityOs?.dashboardPath;
             if (dashPath) {
-              props.onSelectEntry(dashPath);
+              props.onOpenInBrowser(dashPath);
             }
           }}
         >
@@ -491,6 +535,224 @@ function renderSourceCard(source: CoreTexSourceEntry) {
   `;
 }
 
+// ── Research Panel ───────────────────────────────────────────────────
+
+function renderResearchEntryRow(entry: ResearchEntry, props: CoreTexProps) {
+  const isDir = entry.isDirectory;
+  const icon = isDir ? "\u{1F4C1}" : "\u{1F4D1}";
+  const handleClick = () => {
+    if (isDir) {
+      props.onBrowseFolder(entry.path);
+    } else {
+      props.onSelectEntry(entry.path);
+    }
+  };
+  const displayName = entry.frontmatter?.title || entry.name;
+
+  return html`
+    <div class="coretex-entry" @click=${handleClick}>
+      <div class="coretex-entry-icon ${isDir ? "coretex-entry-icon--folder" : ""}">${icon}</div>
+      <div class="coretex-entry-body">
+        <div class="coretex-entry-name">${displayName}${isDir ? "/" : ""}</div>
+        ${entry.frontmatter?.url ? html`<div class="coretex-research-url">${entry.frontmatter.url}</div>` : nothing}
+        ${entry.excerpt && !isDir ? html`<div class="coretex-entry-excerpt">${entry.excerpt}</div>` : nothing}
+        ${entry.frontmatter?.tags?.length ? html`
+          <div class="coretex-research-tags">
+            ${entry.frontmatter.tags.map(t => html`<span class="coretex-research-tag">${t}</span>`)}
+          </div>
+        ` : nothing}
+      </div>
+      ${entry.updatedAt ? html`<div class="coretex-entry-meta">${fmtUpdated(entry.updatedAt)}</div>` : nothing}
+    </div>
+  `;
+}
+
+function renderResearchAddForm(props: CoreTexProps) {
+  const form = props.researchAddForm ?? { title: "", url: "", category: "", tags: "", notes: "" };
+  const categories = props.researchCategories ?? [];
+
+  return html`
+    <div class="coretex-research-form">
+      <div class="coretex-research-form-row">
+        <label class="coretex-research-form-label">Title *</label>
+        <input
+          class="coretex-search-input"
+          type="text"
+          placeholder="Article or resource title"
+          .value=${form.title}
+          @input=${(e: Event) => props.onResearchAddFormChange("title", (e.target as HTMLInputElement).value)}
+        />
+      </div>
+      <div class="coretex-research-form-row">
+        <label class="coretex-research-form-label">URL</label>
+        <input
+          class="coretex-search-input"
+          type="text"
+          placeholder="https://example.com/article"
+          .value=${form.url}
+          @input=${(e: Event) => props.onResearchAddFormChange("url", (e.target as HTMLInputElement).value)}
+        />
+      </div>
+      <div class="coretex-research-form-row">
+        <label class="coretex-research-form-label">Category</label>
+        <input
+          class="coretex-search-input"
+          type="text"
+          placeholder="e.g. ai, business, health"
+          list="research-categories"
+          .value=${form.category}
+          @input=${(e: Event) => props.onResearchAddFormChange("category", (e.target as HTMLInputElement).value)}
+        />
+        ${categories.length > 0 ? html`
+          <datalist id="research-categories">
+            ${categories.map(c => html`<option value=${c}></option>`)}
+          </datalist>
+        ` : nothing}
+      </div>
+      <div class="coretex-research-form-row">
+        <label class="coretex-research-form-label">Tags</label>
+        <input
+          class="coretex-search-input"
+          type="text"
+          placeholder="Comma-separated: agents, tools, rag"
+          .value=${form.tags}
+          @input=${(e: Event) => props.onResearchAddFormChange("tags", (e.target as HTMLInputElement).value)}
+        />
+      </div>
+      <div class="coretex-research-form-row">
+        <label class="coretex-research-form-label">Notes</label>
+        <textarea
+          class="coretex-research-form-textarea"
+          rows="4"
+          placeholder="Key takeaways, quotes, or context..."
+          .value=${form.notes}
+          @input=${(e: Event) => props.onResearchAddFormChange("notes", (e.target as HTMLTextAreaElement).value)}
+        ></textarea>
+      </div>
+      <button
+        class="coretex-sync-btn"
+        ?disabled=${!form.title.trim()}
+        @click=${() => props.onResearchAddSubmit()}
+      >Save Research</button>
+    </div>
+  `;
+}
+
+function renderResearchPanel(props: CoreTexProps) {
+  const { researchData, selectedEntry, searchQuery, browsingFolder, folderEntries, folderName } = props;
+
+  // Detail view — reading a file
+  if (selectedEntry) {
+    return html`
+      <div class="coretex-panel">
+        <button class="coretex-back-btn" @click=${() => props.onBack()}>
+          \u{2190} Back
+        </button>
+        <div class="coretex-card">
+          <div class="coretex-card-header">
+            <span class="coretex-card-label">${selectedEntry.name}</span>
+            ${selectedEntry.updatedAt ? html`<span class="coretex-card-updated">${fmtUpdated(selectedEntry.updatedAt)}</span>` : nothing}
+          </div>
+          ${selectedEntry.relativePath ? html`<div class="coretex-card-path">${selectedEntry.relativePath}</div>` : nothing}
+          <div class="coretex-card-content">${renderMd(selectedEntry.content)}</div>
+        </div>
+      </div>
+    `;
+  }
+
+  // Browsing a category subfolder
+  if (browsingFolder && folderEntries) {
+    return html`
+      <div class="coretex-panel">
+        <button class="coretex-back-btn" @click=${() => props.onBack()}>
+          \u{2190} Back
+        </button>
+        <div class="coretex-section">
+          <div class="coretex-section-header">
+            <span class="coretex-section-title">${folderName ?? "Category"}</span>
+            <span class="coretex-section-count">${folderEntries.length} items</span>
+          </div>
+          <div class="coretex-entry-list">
+            ${folderEntries.length > 0
+              ? (folderEntries as ResearchEntry[]).map((e) => renderResearchEntryRow(e, props))
+              : html`<div class="coretex-empty-inline">No research in this category</div>`}
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  // Empty state
+  if (!researchData || researchData.totalEntries === 0) {
+    return html`
+      <div class="coretex-panel">
+        <div class="coretex-research-toolbar">
+          <div style="flex:1"></div>
+          <button class="coretex-sync-btn" @click=${() => props.onSaveViaChat()}>
+            + Save via Chat
+          </button>
+        </div>
+        ${renderEmpty(
+          "No research collected yet",
+          "Click 'Save via Chat' to paste links, bookmarks, or notes \u2014 your AI will organize them for you.",
+        )}
+      </div>
+    `;
+  }
+
+  // Main list view
+  const query = (searchQuery ?? "").toLowerCase().trim();
+  const filterEntries = (entries: ResearchEntry[]) =>
+    query
+      ? entries.filter((e) =>
+          e.name.toLowerCase().includes(query) ||
+          e.excerpt.toLowerCase().includes(query) ||
+          (e.frontmatter?.tags ?? []).some(t => t.toLowerCase().includes(query)) ||
+          (e.frontmatter?.url ?? "").toLowerCase().includes(query),
+        )
+      : entries;
+
+  return html`
+    <div class="coretex-panel">
+      <div class="coretex-research-toolbar">
+        <div class="coretex-search" style="flex:1">
+          <input
+            class="coretex-search-input"
+            type="text"
+            placeholder="Search research by title, tag, URL..."
+            .value=${searchQuery ?? ""}
+            @input=${(e: Event) => props.onSearch((e.target as HTMLInputElement).value)}
+          />
+          <span class="coretex-search-count">${researchData.totalEntries} entries</span>
+        </div>
+        <button class="coretex-sync-btn" @click=${() => props.onSaveViaChat()}>
+          + Save via Chat
+        </button>
+      </div>
+
+      ${researchData.categories.map((cat) => {
+        const filtered = filterEntries(cat.entries);
+        if (cat.entries.length === 0) return nothing;
+        return html`
+          <div class="coretex-section">
+            <div class="coretex-section-header">
+              <span class="coretex-section-title">\u{1F4C1} ${cat.label}</span>
+              <span class="coretex-section-count">${cat.entries.length}</span>
+            </div>
+            <div class="coretex-entry-list">
+              ${filtered.length > 0
+                ? filtered.map((e) => renderResearchEntryRow(e, props))
+                : query
+                  ? html`<div class="coretex-empty-inline">No matches</div>`
+                  : nothing}
+            </div>
+          </div>
+        `;
+      })}
+    </div>
+  `;
+}
+
 // ── Empty state ──────────────────────────────────────────────────────
 
 function renderEmpty(title: string, hint: string) {
@@ -535,17 +797,35 @@ export function renderCoretex(props: CoreTexProps) {
         >
           \u{1F310} Sources
         </button>
+        <button
+          class="coretex-tab ${subtab === "research" ? "active" : ""}"
+          @click=${() => props.onSubtabChange("research")}
+        >
+          \u{1F50D} Research
+        </button>
+        <button
+          class="coretex-tab ${subtab === "intel" ? "active" : ""}"
+          @click=${() => props.onSubtabChange("intel")}
+        >
+          \u{1F441}\uFE0F Insights
+        </button>
       </div>
 
-      ${loading
-        ? html`<div class="coretex-loading"><div class="coretex-loading-spinner"></div>Loading...</div>`
-        : subtab === "identity"
-          ? renderIdentityPanel(props)
-          : subtab === "memory-bank"
-            ? renderMemoryBankPanel(props)
-            : subtab === "ai-packet"
-              ? renderAiPacketPanel(props)
-              : renderSourcesPanel(props)}
+      ${subtab === "intel"
+        ? props.intelProps
+          ? renderProactiveIntel(props.intelProps)
+          : html`<div class="coretex-loading"><div class="coretex-loading-spinner"></div>Loading...</div>`
+        : loading
+          ? html`<div class="coretex-loading"><div class="coretex-loading-spinner"></div>Loading...</div>`
+          : subtab === "identity"
+            ? renderIdentityPanel(props)
+            : subtab === "memory-bank"
+              ? renderMemoryBankPanel(props)
+              : subtab === "ai-packet"
+                ? renderAiPacketPanel(props)
+                : subtab === "sources"
+                  ? renderSourcesPanel(props)
+                  : renderResearchPanel(props)}
     </section>
   `;
 }

@@ -530,6 +530,17 @@ function buildConfigPatch(answers: OnboardingAnswers): Record<string, unknown> {
           mode: "safeguard",
           memoryFlush: { enabled: true, softThresholdTokens: 20000 },
         },
+        thinkingDefault: "low",
+        models: {
+          "anthropic/claude-sonnet-4-6": {
+            alias: "sonnet",
+            params: { cacheRetention: "long" },
+          },
+          "anthropic/claude-opus-4-6": {
+            alias: "opus",
+            params: { cacheRetention: "long" },
+          },
+        },
       },
     },
     memory: {

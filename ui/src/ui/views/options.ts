@@ -19,14 +19,6 @@ const FEATURES: FeatureDescriptor[] = [
       "Morning priority ritual + persistent focus widget in the topbar. Silent 30-min pulse checks compare your activity against your plan.",
     default: true,
   },
-  {
-    key: "deck.enabled",
-    icon: "\uD83C\uDFDB\uFE0F",
-    name: "Deck",
-    description:
-      "Parallel agent session manager. Opens in a separate tab for multi-agent workflows.",
-    default: false,
-  },
 ];
 
 // ===== Types =====

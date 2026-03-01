@@ -511,6 +511,61 @@ export type SkillStatusReport = {
   skills: SkillStatusEntry[];
 };
 
+// ── ClawHub marketplace types ────────────────────────────────────────
+
+export type ClawHubSkillStats = {
+  downloads?: number;
+  stars?: number;
+  installsAllTime?: number;
+  installsCurrent?: number;
+  comments?: number;
+  versions?: number;
+};
+
+export type ClawHubSearchResult = {
+  score: number;
+  slug?: string;
+  displayName?: string;
+  summary?: string | null;
+  version?: string | null;
+  updatedAt?: number;
+  stats?: ClawHubSkillStats | null;
+};
+
+export type ClawHubSkillItem = {
+  slug: string;
+  displayName: string;
+  tags: unknown;
+  stats: ClawHubSkillStats | null;
+  createdAt: number;
+  updatedAt: number;
+  summary?: string | null;
+  latestVersion?: { version: string; createdAt: number; changelog: string };
+};
+
+export type ClawHubSkillDetail = {
+  skill: {
+    slug: string;
+    displayName: string;
+    tags: unknown;
+    stats: ClawHubSkillStats | null;
+    summary?: string | null;
+  } | null;
+  latestVersion: {
+    version: string;
+    createdAt: number;
+    changelog: string;
+  } | null;
+  owner: {
+    handle: string | null;
+    displayName?: string | null;
+  } | null;
+  moderation?: {
+    isSuspicious: boolean;
+    isMalwareBlocked: boolean;
+  } | null;
+};
+
 export type StatusSummary = Record<string, unknown>;
 
 export type HealthSnapshot = Record<string, unknown>;
