@@ -27,9 +27,23 @@ export type GateConfig = {
   thresholds?: Record<string, number>;
 };
 
+export type CustomGuardrail = {
+  id: string;
+  name: string;
+  description: string;
+  enabled: boolean;
+  trigger: {
+    tool: string;
+    patterns: string[];
+  };
+  action: "block";
+  message: string;
+  createdAt: string;
+};
+
 export type GuardrailActivityEntry = {
   id: string;
-  gateId: GuardrailGateId;
+  gateId: GuardrailGateId | `custom:${string}`;
   action: "fired" | "blocked" | "cleaned";
   detail: string;
   sessionKey?: string;
@@ -39,6 +53,7 @@ export type GuardrailActivityEntry = {
 export type GuardrailsState = {
   gates: Record<GuardrailGateId, GateConfig>;
   activity: GuardrailActivityEntry[];
+  custom?: CustomGuardrail[];
   updatedAt: string;
 };
 
@@ -115,6 +130,24 @@ export const GATE_DESCRIPTORS: Record<GuardrailGateId, GateDescriptor> = {
   },
 };
 
+// ── Custom guardrail defaults ────────────────────────────────────────
+
+export const CUSTOM_DEFAULTS: CustomGuardrail[] = [
+  {
+    id: "block-x-webfetch",
+    name: "Block X/Twitter web_fetch",
+    description: "web_fetch returns garbage on x.com — use browser tool instead",
+    enabled: true,
+    trigger: {
+      tool: "web_fetch",
+      patterns: ["x.com", "twitter.com", "t.co"],
+    },
+    action: "block",
+    message: "Use browser tool for X/Twitter research — web_fetch fails on x.com",
+    createdAt: "2026-02-28T00:00:00.000Z",
+  },
+];
+
 // ── State file ─────────────────────────────────────────────────────
 
 const STATE_FILE = join(DATA_DIR, "guardrails.json");
@@ -127,6 +160,7 @@ function emptyState(): GuardrailsState {
   return {
     gates: { ...GATE_DEFAULTS },
     activity: [],
+    custom: [...CUSTOM_DEFAULTS],
     updatedAt: new Date().toISOString(),
   };
 }
@@ -138,6 +172,9 @@ export async function readGuardrailsState(): Promise<GuardrailsState> {
     return {
       gates: { ...GATE_DEFAULTS, ...(parsed.gates ?? {}) },
       activity: parsed.activity ?? [],
+      // Seed custom defaults on first read (undefined = never initialized).
+      // An explicit empty array means the user cleared them — respect that.
+      custom: parsed.custom === undefined ? [...CUSTOM_DEFAULTS] : parsed.custom,
       updatedAt: parsed.updatedAt ?? new Date().toISOString(),
     };
   } catch {
@@ -179,7 +216,7 @@ export async function getGateThreshold(
 }
 
 export async function logGateActivity(
-  gateId: GuardrailGateId,
+  gateId: GuardrailGateId | `custom:${string}`,
   action: "fired" | "blocked" | "cleaned",
   detail: string,
   sessionKey?: string,
@@ -201,4 +238,93 @@ export async function logGateActivity(
   } catch {
     // Activity logging is best-effort — never block the gate itself
   }
+}
+
+// ── Custom Guardrails ────────────────────────────────────────────
+
+type CustomCheckResult =
+  | { blocked: false }
+  | { blocked: true; guardrailId: string; message: string };
+
+/**
+ * Check all enabled custom guardrails against a tool call.
+ * Returns blocked + message on first match, or { blocked: false }.
+ */
+export async function checkCustomGuardrails(
+  tool: string,
+  params: Record<string, unknown>,
+): Promise<CustomCheckResult> {
+  const state = await readGuardrailsStateCached();
+  const customs = state.custom;
+  if (!customs || customs.length === 0) return { blocked: false };
+
+  const toolLower = tool.toLowerCase();
+  const paramsStr = JSON.stringify(params).toLowerCase();
+
+  for (const g of customs) {
+    if (!g.enabled) continue;
+    if (g.trigger.tool.toLowerCase() !== toolLower) continue;
+
+    const matched = g.trigger.patterns.some((p) =>
+      paramsStr.includes(p.toLowerCase()),
+    );
+    if (matched) {
+      return { blocked: true, guardrailId: g.id, message: g.message };
+    }
+  }
+
+  return { blocked: false };
+}
+
+/**
+ * Add a custom guardrail. Rejects if an id already exists.
+ * Returns the created guardrail with createdAt filled.
+ */
+export async function addCustomGuardrail(
+  input: Omit<CustomGuardrail, "createdAt"> & { id?: string },
+): Promise<CustomGuardrail> {
+  const state = await readGuardrailsState();
+  if (!state.custom) state.custom = [];
+
+  const id = input.id || randomUUID();
+
+  if (state.custom.some((g) => g.id === id)) {
+    throw Object.assign(new Error(`Custom guardrail with id "${id}" already exists`), {
+      code: "DUPLICATE_ID",
+    });
+  }
+
+  const guardrail: CustomGuardrail = {
+    id,
+    name: input.name,
+    description: input.description,
+    enabled: input.enabled,
+    trigger: input.trigger,
+    action: input.action,
+    message: input.message,
+    createdAt: new Date().toISOString(),
+  };
+
+  state.custom.push(guardrail);
+  await writeGuardrailsState(state);
+  return guardrail;
+}
+
+/**
+ * Remove a custom guardrail by id.
+ * Returns { removed: true } if found and removed, { removed: false } otherwise.
+ */
+export async function removeCustomGuardrail(
+  id: string,
+): Promise<{ removed: boolean }> {
+  const state = await readGuardrailsState();
+  if (!state.custom) return { removed: false };
+
+  const before = state.custom.length;
+  state.custom = state.custom.filter((g) => g.id !== id);
+
+  if (state.custom.length === before) return { removed: false };
+
+  await writeGuardrailsState(state);
+  return { removed: true };
 }

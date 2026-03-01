@@ -68,7 +68,7 @@ import {
   consumeSearchGateNudge,
   resetSearchTracking,
 } from "./src/hooks/safety-gates.js";
-import { isGateEnabled } from "./src/services/guardrails.js";
+import { isGateEnabled, checkCustomGuardrails, logGateActivity } from "./src/services/guardrails.js";
 import { guardrailsHandlers } from "./src/methods/guardrails.js";
 import { imageCacheHandlers } from "./src/methods/image-cache.js";
 import { coretexHandlers } from "./src/methods/coretex.js";
@@ -992,6 +992,19 @@ h1{color:#ff6b6b}code{background:#16213e;padding:2px 8px;border-radius:4px}a{col
       if (loopCheck.blocked) {
         api.logger.warn(`[GodMode][SafetyGate] loop breaker fired: ${name}`);
         return { block: true, blockReason: loopCheck.reason };
+      }
+
+      // Gate 1b: Custom Guardrails — runtime-installed JSON rules
+      const customCheck = await checkCustomGuardrails(name, (event.params ?? {}) as Record<string, unknown>);
+      if (customCheck.blocked) {
+        api.logger.warn(`[GodMode][SafetyGate] custom guardrail fired: ${customCheck.guardrailId} on ${name}`);
+        void logGateActivity(
+          `custom:${customCheck.guardrailId}`,
+          "blocked",
+          `Custom guardrail blocked ${name}: ${customCheck.guardrailId}`,
+          sessionKey,
+        );
+        return { block: true, blockReason: customCheck.message };
       }
 
       // Gate 2: Grep Blocker + Coding Bypass Blocker — exec/bash/shell commands
