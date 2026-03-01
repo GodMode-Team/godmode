@@ -281,7 +281,7 @@ export async function checkCustomGuardrails(
  * Returns the created guardrail with createdAt filled.
  */
 export async function addCustomGuardrail(
-  input: Omit<CustomGuardrail, "createdAt"> & { id?: string },
+  input: Omit<CustomGuardrail, "createdAt" | "id"> & { id?: string },
 ): Promise<CustomGuardrail> {
   const state = await readGuardrailsState();
   if (!state.custom) state.custom = [];

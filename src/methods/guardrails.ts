@@ -107,7 +107,7 @@ const addCustomGuardrailHandler: GatewayRequestHandler = async ({ params, respon
 
   try {
     const guardrail = await addCustomGuardrail({
-      id: input.id ?? "",
+      id: input.id || undefined,
       name: input.name,
       description: input.description ?? "",
       enabled: input.enabled ?? true,
