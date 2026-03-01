@@ -685,4 +685,211 @@ When users ask about GodMode capabilities, reference this list:
 
 ---
 
+## Plugin Architecture — Deep Troubleshooting Reference
+
+**Use this section when simple fixes don't work. This covers the internals.**
+
+### Current Version
+
+- **npm package:** `@godmode-team/godmode@1.1.0`
+- **Install:** `openclaw plugin install @godmode-team/godmode`
+- **Team license key:** `GM-DEV-TEAM-2026`
+
+### Quick Diagnostic Checklist
+
+When a user reports a problem, walk them through this:
+
+1. **Gateway running?** → `openclaw gateway status`
+2. **Plugin loaded?** → Open `http://localhost:3000/godmode/health` — should return JSON with `status: "ok"`
+3. **License valid?** → Health endpoint shows `license.status: "valid"`
+4. **UI available?** → Health endpoint shows `ui.available: true`
+5. **Correct version?** → `npm list @godmode-team/godmode` should show `1.1.0`
+
+### Startup Sequence
+
+When the gateway starts, the plugin initializes in two phases:
+
+**Phase 1 — register() (synchronous, immediate):**
+1. License validation starts in background (non-blocking)
+2. ~120 RPC methods registered across all namespaces
+3. All methods except `onboarding.*` wrapped with `withLicenseGate()`
+4. UI assets resolved: tries `dist/godmode-ui/` → `ui/dist/` → `assets/godmode-ui/`
+5. HTTP routes: `/godmode/health`, `/godmode/*` (UI), `/ops/*` (Mission Control)
+
+**Phase 2 — gateway_start (async, ~15s after register):**
+Services start in order. All failures are non-fatal (logged, continues):
+1. Agent log writer → Workspace sync → Curation agent
+2. Session auto-archive → Image cache cleanup
+3. Claude Code session sync → IDE Activity Watcher
+4. Post-update health check
+5. Focus Pulse heartbeat (resumes if active)
+6. **Consciousness heartbeat** (15-min interval)
+7. Proactive Intelligence
+8. Coding task recovery (orphaned task reattachment)
+9. **Queue processor** (10-min polling)
+10. **Obsidian Sync** (headless vault integration)
+
+### License System Internals
+
+**Dev keys bypass validation entirely:**
+- Any key matching `GM-DEV-*` → immediate pass, tier = "developer"
+- `GM-INTERNAL` → immediate pass
+- Team key: `GM-DEV-TEAM-2026`
+
+**Production keys:**
+- Validated against `https://lifeongodmode.com/api/v1/license/validate`
+- Cache: 24 hours — re-validates after expiry
+- Grace period: If server unreachable but cached within 24h, allows through
+- All concurrent RPC calls wait on the same validation promise
+
+**License troubleshooting:**
+
+| Error | Cause | Fix |
+|---|---|---|
+| `LICENSE_REQUIRED` | No key in config | Add `licenseKey` to `~/.openclaw/openclaw.json` under `plugins.entries.godmode.config` |
+| `LICENSE_INVALID` | Bad key or validation server down | Check key format (must start with `GM-`), check network |
+| License valid but features blocked | Stale cache | Restart gateway |
+
+### File Paths & Data Locations
+
+```
+~/godmode/
+├── data/
+│   ├── godmode-options.json          ← feature toggles
+│   ├── onboarding.json               ← 7-phase setup state
+│   ├── guardrails.json               ← custom rules
+│   ├── coding-tasks.json             ← active/completed coding tasks
+│   ├── queue-items.json              ← background task queue
+│   ├── tasks.json                    ← task list
+│   ├── vault-capture-state.json      ← auto-capture pipeline state
+│   └── snapshots/                    ← daily session snapshots
+├── memory/
+│   ├── CONSCIOUSNESS.md              ← heartbeat output (every 15min)
+│   ├── WORKING.md                    ← current session state
+│   ├── USER.md, SOUL.md, VISION.md   ← identity files
+│   ├── agent-log/                    ← session records
+│   └── agent-roster/                 ← persona files
+└── scripts/
+    └── consciousness-sync.sh         ← bash script (90s timeout)
+```
+
+**Vault paths (Obsidian):**
+```
+$OBSIDIAN_VAULT_PATH or ~/Documents/VAULT/
+├── 00-Inbox/              ← quick capture
+├── 01-Daily/YYYY-MM-DD.md ← daily briefs
+├── 02-Projects/           ← active work
+├── 06-Brain/              ← People, Companies, Knowledge
+├── 07-Agent-Log/          ← Claude Code sessions (auto-synced)
+├── 08-Identity/           ← USER.md, SOUL.md, VISION.md
+└── 99-System/
+    ├── agent-roster/      ← persona files
+    ├── team-onboarding-guide.md
+    └── godmode-plugin-internals.md  ← full internals reference
+```
+
+**Path resolution:** Vault first → `~/godmode/memory/` fallback.
+
+### Environment Variables
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `GODMODE_ROOT` | `~/godmode` | Root data directory |
+| `OBSIDIAN_VAULT_PATH` | `~/Documents/VAULT` | Obsidian vault location |
+| `DAILY_BRIEF_FOLDER` | `01-Daily` | Vault subfolder for daily briefs |
+| `OPENCLAW_STATE_DIR` | `~/.openclaw` | OpenClaw session state |
+| `XAI_API_KEY` | (none) | X/Twitter intelligence via Grok |
+
+### Deep Troubleshooting by System
+
+#### Gateway Won't Start / Plugin Not Loading
+```bash
+# Is plugin installed?
+openclaw plugin list
+# Should show: @godmode-team/godmode@1.1.0
+
+# Check logs for errors
+openclaw gateway logs
+
+# Is the port free?
+lsof -i :3000
+```
+
+#### UI Shows Blank Page or 404
+- Reinstall: `openclaw plugin install @godmode-team/godmode`
+- Check `/godmode/health` — `ui.available` should be `true`
+- If developing locally: `pnpm build` in plugin repo, then restart gateway
+- Asset fallback: `assets/godmode-ui/` is a committed npm snapshot
+
+#### Consciousness Sync Fails or Hangs
+- **Timeout (90s):** consciousness-sync.sh is stalling
+  - Test manually: `bash ~/godmode/scripts/consciousness-sync.sh`
+  - Check it exists: `ls -la ~/godmode/scripts/consciousness-sync.sh`
+- **NOT_FOUND:** Script missing — heartbeat falls back to reading existing CONSCIOUSNESS.md
+- **UI feedback:** Consciousness button shows 4 states: idle (grey), loading (pulse), ok (green glow), error (red glow)
+
+#### Daily Brief Not Saving or Loading
+- Check vault path: `echo $OBSIDIAN_VAULT_PATH` or verify `~/Documents/VAULT` exists
+- Check daily folder: `ls ~/Documents/VAULT/01-Daily/`
+- Brief is vault-first — if vault missing, falls back to `~/godmode/memory/`
+- Checkbox issues: NBSP bug (U+00A0) is auto-stripped in all markdown pipelines
+
+#### Coding Task Stuck on "running"
+- Check PID in `~/godmode/data/coding-tasks.json`
+- **Auto-recovery on restart:** `recoverOrphanedTasks()` runs on gateway_start
+  - Dead PID → reattach or mark failed
+  - Output found → move to review
+- Worktree issues: `git worktree list` in target repo
+
+#### Queue Items Not Processing
+- Queue processor polls every 10 minutes automatically
+- Force immediate: Call `queue.process` RPC via chat
+- Items need status `pending` or `ready` to be picked up
+- **Recovery on restart:** `recoverOrphaned()` checks for stuck items
+- If persona routing set but persona file missing → falls back to default agent
+
+#### Safety Gates Blocking Legitimate Actions
+- Loop breaker: warns at 40 calls/30min, blocks at 50
+- Burst detection: 10+ same-tool calls in <2min
+- Config: `~/godmode/data/guardrails.json`
+- Check active rules: `guardrails.list` RPC
+
+### Gateway Restart Behavior
+
+**Persists (survives restart):**
+- All `~/godmode/data/*.json` files
+- All `~/godmode/memory/*.md` files
+- Vault data
+- License cache (24h TTL)
+
+**Resets:**
+- In-memory caches (options 5s TTL, guardrails 30s TTL)
+- Active timers/polling loops
+- Service connections
+- PID tracking (recovery re-runs)
+
+**Recovery sequence on restart:**
+1. Coding tasks: Check PIDs, reattach or mark failed
+2. Queue items: Check outputs, move to review or reset to pending
+3. Services resume: Focus Pulse, Consciousness, Queue Processor, Obsidian Sync
+
+### Build & Update Commands (for developers/Prosper)
+
+```bash
+pnpm build          # Full build: code + UI + bundle
+pnpm build:code     # TypeScript only → dist/index.js
+pnpm build:ui       # Vite UI only → ui/dist/
+pnpm bundle:ui      # Copy ui/dist/ → dist/godmode-ui/
+pnpm ui:sync        # Sync to assets/godmode-ui/ (commit fallback)
+pnpm typecheck      # tsc --noEmit
+pnpm clean          # Remove all build artifacts
+```
+
+### Full Internals Reference
+
+For the complete deep dive (all RPC methods, all error codes, full config schemas), see:
+`VAULT/99-System/godmode-plugin-internals.md`
+
+---
+
 _This skill is part of GodMode's beta support system. Configuration may change._
