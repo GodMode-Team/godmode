@@ -4,6 +4,24 @@ This file tracks recent development changes so Atlas and other agents can quickl
 
 ---
 
+## 2026-03-01 — v1.1.0 Published to npm + CI/CD
+
+### What
+- **v1.1.0 published to npm** — `@godmode-team/godmode@1.1.0` is live. Team can install now.
+- Version bumped in both `package.json` and `openclaw.plugin.json`.
+- **GitHub Actions workflow** added at `.github/workflows/publish.yml` — auto-publishes on version tags (`v*`).
+- Future releases: `git tag v1.2.0 && git push --tags` → automatic build + npm publish.
+- Requires `NPM_TOKEN` repo secret (pending setup).
+
+### Team Install
+```bash
+openclaw plugin install @godmode-team/godmode
+openclaw gateway restart
+```
+License key: `GM-DEV-TEAM-2026`
+
+---
+
 ## 2026-03-01 — Production Hardening & Beta Pre-Flight
 
 ### Why
