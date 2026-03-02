@@ -8,7 +8,7 @@ export default defineConfig({
 	dts: false, // plugin is runtime-only, not a published TS library
 	clean: true,
 	splitting: false,
-	sourcemap: true,
+	sourcemap: false, // proprietary plugin — don't ship source maps to npm
 	external: [
 		"openclaw/plugin-sdk",
 	],

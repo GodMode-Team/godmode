@@ -24,8 +24,16 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      - run: pnpm build
+      - name: Build plugin
+        run: pnpm build
 
-      - run: npm publish --access public
+      - name: Verify dist integrity
+        run: node scripts/verify-dist.mjs
+
+      - name: Dry-run pack check
+        run: npm pack --dry-run
+
+      - name: Publish to npm
+        run: npm publish --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
