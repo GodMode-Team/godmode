@@ -20,6 +20,16 @@ import {
 import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk";
+
+/**
+ * The host OpenClaw runtime exposes `broadcast` on the plugin API at runtime,
+ * but the published SDK types don't declare it yet. Augment locally so we
+ * can call it without `as any` everywhere.
+ */
+interface GodModePluginApi extends OpenClawPluginApi {
+  broadcast?: (event: string, data: unknown) => void;
+}
+
 // Method handler imports
 import { agentLogHandlers } from "./src/methods/agent-log.js";
 import { briefNotesHandlers } from "./src/methods/brief-notes.js";
@@ -542,7 +552,7 @@ const godmodePlugin = {
   description: "Personal AI Operating System for entrepreneurs",
 
   // SYNCHRONOUS register — no async, no race condition
-  register(api: OpenClawPluginApi) {
+  register(api: GodModePluginApi) {
     const licenseKey = (api.pluginConfig as { licenseKey?: string } | undefined)?.licenseKey;
 
     if (!licenseKey) {
@@ -903,7 +913,7 @@ h1{color:#ff6b6b}code{background:#16213e;padding:2px 8px;border-radius:4px}a{col
       try {
         const { initQueueProcessor } = await import("./src/services/queue-processor.js");
         const queueProcessor = initQueueProcessor(api.logger);
-        queueProcessor.setBroadcast((event, data) => api.broadcast(event, data));
+        queueProcessor.setBroadcast((event, data) => api.broadcast?.(event, data));
         await queueProcessor.recoverOrphaned();
         queueProcessor.startPolling();
         api.logger.info("[GodMode] Queue processor initialized (10-min polling)");
@@ -915,7 +925,7 @@ h1{color:#ff6b6b}code{background:#16213e;padding:2px 8px;border-radius:4px}a{col
       try {
         const { initObsidianSync } = await import("./src/services/obsidian-sync.js");
         const obsSync = initObsidianSync(api.logger);
-        obsSync.setBroadcast((event, data) => api.broadcast(event, data));
+        obsSync.setBroadcast((event, data) => api.broadcast?.(event, data));
         await obsSync.init();
         api.logger.info("[GodMode] Obsidian Sync service initialized");
       } catch (err) {
@@ -982,7 +992,8 @@ h1{color:#ff6b6b}code{background:#16213e;padding:2px 8px;border-radius:4px}a{col
 
     // ── Safety Gates: message_received — Prompt Shield input detection ──
     api.on("message_received", async (event, ctx) => {
-      const sessionKey = ctx?.sessionKey;
+      // Runtime ctx includes sessionKey but SDK type doesn't declare it yet
+      const sessionKey = (ctx as Record<string, unknown> | undefined)?.sessionKey as string | undefined;
       const content = event.content ?? "";
       if (content) {
         const result = await scanForInjection(sessionKey, content);
@@ -1387,10 +1398,11 @@ h1{color:#ff6b6b}code{background:#16213e;padding:2px 8px;border-radius:4px}a{col
         api.logger.warn(`[GodMode] context pressure tracking error: ${String(err)}`);
       }
       // Support session logging — assistant messages
-      if (ctx?.sessionKey === "agent:main:support" && event.content) {
+      const assistantContent = event.assistantTexts?.join("") ?? "";
+      if (ctx?.sessionKey === "agent:main:support" && assistantContent) {
         try {
           const { logExchangeInternal } = await import("./src/methods/support.js");
-          await logExchangeInternal("assistant", event.content);
+          await logExchangeInternal("assistant", assistantContent);
         } catch { /* non-fatal */ }
       }
     });

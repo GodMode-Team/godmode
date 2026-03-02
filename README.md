@@ -1,146 +1,88 @@
-# GodMode Plugin for OpenClaw
+# GodMode — Personal AI Operating System
 
-GodMode is a commercial OpenClaw plugin that adds:
+GodMode is a premium OpenClaw plugin that transforms your self-hosted AI into a personal operating system. It adds deep onboarding, daily operating rhythms, trust tracking, team workspaces, and coding orchestration on top of OpenClaw's powerful infrastructure.
 
-- Personal operating dashboard at `/godmode`
-- Goal/project/task/people data handlers
-- My Day (`agentLog.*`) and workspace tooling
-- Optional Lifetracks generation endpoints
+## What You Get
+
+- **Guided Onboarding** — Interactive setup wizard that interviews you, audits your existing configuration, and builds your personalized AI operating environment
+- **Daily Operating Rhythm** — Morning briefs with calendar + intelligence, Focus Pulse for priority tracking, evening capture and processing
+- **Consciousness Sync** — Your AI maintains a living context document that updates hourly, keeping it aware of your schedule, tasks, and current state
+- **Trust Tracker** — Rate your AI's outputs, and it learns your preferences over time. The compounding feedback loop is what makes GodMode irreplaceable
+- **Second Brain** — Markdown-based knowledge management with semantic search across all your files
+- **Team Workspaces** — Git-backed collaboration with member roles, shared memory, and automatic sync
+- **Coding Orchestration** — Dispatch code tasks to isolated worktrees with automated validation gates, PR creation, and completion notifications
+- **Safety Gates** — Built-in guardrails that prevent prompt injection, credential leaks, and runaway agent loops
+- **Support Chat** — Built-in AI support agent that knows the full system and can troubleshoot issues
 
 ## Requirements
 
-- Node 22+
-- OpenClaw `>=2026.0.0`
+- Node.js 22+
+- OpenClaw `>=2026.2.0`
+- A GodMode license key
 
-## Install
+## Quick Start
 
-From npm:
+### 1. Install the plugin
 
 ```bash
 openclaw plugins install @godmode-team/godmode
 ```
 
-From a local clone:
+### 2. Activate your license
 
 ```bash
-pnpm install
-pnpm build
-openclaw plugins install --link /absolute/path/to/godmode-plugin
-```
-
-## Configure
-
-Set required license key:
-
-```bash
-openclaw config set plugins.entries.godmode.config.licenseKey "GM-..."
+openclaw config set plugins.entries.godmode.config.licenseKey "GM-YOUR-KEY-HERE"
 openclaw config set plugins.entries.godmode.enabled true
 ```
 
-Optional workspace root:
-
-```bash
-openclaw config set plugins.entries.godmode.config.workspaceRoot "~/godmode"
-```
-
-Enable coding orchestration:
-
-```bash
-openclaw config set plugins.entries.godmode.config.coding.enabled true
-openclaw config set plugins.entries.godmode.config.coding.maxParallelWriters 1
-```
-
-Restart gateway after config changes:
+### 3. Restart the gateway
 
 ```bash
 openclaw gateway restart
 ```
 
-## Verify
+### 4. Open GodMode
+
+Navigate to `http://localhost:18789/godmode` in your browser. The setup wizard will walk you through everything else.
+
+## Verify Installation
 
 ```bash
 openclaw plugins list
 curl -fsS http://127.0.0.1:18789/godmode/health
 ```
 
-Then open `http://127.0.0.1:18789/godmode`.
+## Configuration
 
-## Build
-
-```bash
-pnpm build
-```
-
-Build outputs:
-
-- `dist/index.js` (plugin runtime entry)
-- `dist/godmode-ui/*` (UI assets)
-
-`pnpm build` bundles UI from the first available source:
-
-1. `--ui-dir <path>` passed to `scripts/bundle-ui.mjs`
-2. `GODMODE_UI_DIR=<path>`
-3. `ui/dist` (in-repo Vite build output)
-4. `assets/godmode-ui` (committed fallback snapshot)
-
-Build the UI:
+### Workspace root (default: `~/godmode`)
 
 ```bash
-pnpm build:ui
-pnpm build
+openclaw config set plugins.entries.godmode.config.workspaceRoot "~/godmode"
 ```
 
-To refresh fallback assets (recommended before release):
+### Coding orchestration
 
 ```bash
-pnpm ui:sync
+openclaw config set plugins.entries.godmode.config.coding.enabled true
+openclaw config set plugins.entries.godmode.config.coding.maxParallelWriters 1
 ```
 
-## Optional Features
-
-Lifetracks endpoints require a generation module. Set:
+### Focus Pulse (daily priority tracking)
 
 ```bash
-export GODMODE_LIFETRACK_MODULE=/absolute/path/to/lifetrack/index.js
+openclaw config set plugins.entries.godmode.config.focusPulse.enabled true
 ```
 
-Agent log writer startup integration is optional and auto-detected when the
-host runtime exposes the expected module.
+## Consciousness Sync
 
-## Consciousness Sync (Gold Icon)
+The gold heart-brain icon in chat triggers a manual consciousness sync. Press `Cmd/Ctrl+Shift+H` or click the icon to force an immediate refresh of your AI's awareness context.
 
-The gold heart-brain icon in chat is a manual consciousness sync trigger.
-Legacy pre-plugin consciousness flows are retired; this heartbeat + manual flush path is the canonical system.
+By default, consciousness syncs automatically every hour via a background heartbeat.
 
-- UI action: click icon (or press `Cmd/Ctrl+Shift+H`)
-- RPC method: `godmode.consciousness.flush`
-- Backend action: runs `~/godmode/scripts/consciousness-sync.sh`
-- Result: regenerates `~/godmode/memory/CONSCIOUSNESS.md` and returns status to UI
+## Support
 
-The plugin also exposes read-only fetch:
+Having trouble? Open the built-in support chat from the Setup tab, or reach out to your account admin.
 
-- RPC method: `godmode.consciousness.read`
-- Result: returns current `CONSCIOUSNESS.md` content and timestamp
+## License
 
-By default in the GodMode runtime, `CONSCIOUSNESS.md` is refreshed by a
-separate heartbeat cron (typically hourly), while the gold icon forces an
-immediate sync on demand.
-
-## Coding Orchestration
-
-The `coding_task` agent tool is the single entry point for all code work. It:
-
-1. Creates an isolated git worktree and branch per task
-2. Spawns a Claude Code agent directly in the worktree
-3. Runs validation gates (lint, typecheck, test) on completion
-4. Creates a PR and optionally auto-merges
-5. Sends iMessage completion notifications
-
-Agents must use `coding_task` — running `claude -p` via `exec` is blocked by the spawn gate.
-
-Check coding task status:
-
-```bash
-openclaw rpc coding.status '{}'
-openclaw rpc coding.list '{}'
-```
+Commercial software. See [LICENSE](./LICENSE) for terms.
