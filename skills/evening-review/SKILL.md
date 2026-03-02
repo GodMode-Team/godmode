@@ -160,8 +160,31 @@ Score your day 1-10 and brain dump anything on your mind.
 
 ## Cron Setup
 
+> **IMPORTANT**: This skill MUST use `sessionTarget: "main"` — NEVER `"isolated"`.
+> Isolated sessions create a separate agent context. When the user replies to the
+> check-in message, their reply (brain dump, ideas, reflections) gets captured by
+> the isolated session instead of the main Prosper session, effectively swallowing
+> the message. The main session never sees it.
+
 ```
 Schedule: 0 21 * * * (9 PM daily, user's timezone)
-Session: isolated
+Session: main (NEVER isolated — replies get swallowed)
+Payload kind: systemEvent (not agentTurn)
 Delivery: announce to iMessage
+```
+
+### Safe cron job config example
+
+```json
+{
+  "name": "Evening Review - 9PM",
+  "enabled": true,
+  "sessionTarget": "main",
+  "wakeMode": "now",
+  "payload": {
+    "kind": "systemEvent",
+    "text": "It's 9 PM. Run the evening-review skill — compose a warm check-in message via iMessage."
+  },
+  "schedule": { "cron": "0 21 * * *" }
+}
 ```

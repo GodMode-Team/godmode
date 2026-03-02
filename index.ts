@@ -768,6 +768,21 @@ h1{color:#ff6b6b}code{background:#16213e;padding:2px 8px;border-radius:4px}a{col
     api.on("gateway_start", async () => {
       api.logger.info("[GodMode] Gateway started — plugin active");
 
+      // Cron Guard — disable isolated messaging crons that swallow user messages
+      // Must run FIRST before any cron has a chance to fire
+      try {
+        const { scanAndPatchCronJobs } = await import("./src/services/cron-guard.js");
+        const cronResults = await scanAndPatchCronJobs(api.logger);
+        if (cronResults.length > 0) {
+          api.logger.warn(
+            `[GodMode] CronGuard: patched ${cronResults.length} dangerous cron(s): ` +
+              cronResults.map((r) => `${r.jobName} -> ${r.action}`).join(", "),
+          );
+        }
+      } catch (err) {
+        api.logger.warn(`[GodMode] CronGuard failed: ${String(err)}`);
+      }
+
       // Agent log writer
       try {
         const started = await initAgentLogWriter();
@@ -903,7 +918,7 @@ h1{color:#ff6b6b}code{background:#16213e;padding:2px 8px;border-radius:4px}a{col
       try {
         const { initQueueProcessor } = await import("./src/services/queue-processor.js");
         const queueProcessor = initQueueProcessor(api.logger);
-        queueProcessor.setBroadcast((event, data) => api.broadcast(event, data));
+        queueProcessor.setBroadcast((event, data) => (api as unknown as { broadcast?: (e: string, d: unknown) => void }).broadcast?.(event, data));
         await queueProcessor.recoverOrphaned();
         queueProcessor.startPolling();
         api.logger.info("[GodMode] Queue processor initialized (10-min polling)");
@@ -915,7 +930,7 @@ h1{color:#ff6b6b}code{background:#16213e;padding:2px 8px;border-radius:4px}a{col
       try {
         const { initObsidianSync } = await import("./src/services/obsidian-sync.js");
         const obsSync = initObsidianSync(api.logger);
-        obsSync.setBroadcast((event, data) => api.broadcast(event, data));
+        obsSync.setBroadcast((event, data) => (api as unknown as { broadcast?: (e: string, d: unknown) => void }).broadcast?.(event, data));
         await obsSync.init();
         api.logger.info("[GodMode] Obsidian Sync service initialized");
       } catch (err) {
@@ -982,9 +997,20 @@ h1{color:#ff6b6b}code{background:#16213e;padding:2px 8px;border-radius:4px}a{col
 
     // ── Safety Gates: message_received — Prompt Shield input detection ──
     api.on("message_received", async (event, ctx) => {
-      const sessionKey = ctx?.sessionKey;
+      const sessionKey = ctx?.conversationId;
       const content = event.content ?? "";
       if (content) {
+        // Cron Guard runtime check — warn if an isolated cron session is capturing user replies
+        try {
+          const { isCronIsolatedSession } = await import("./src/services/cron-guard.js");
+          if (isCronIsolatedSession(sessionKey)) {
+            api.logger.warn(
+              `[GodMode][CronGuard] Isolated cron session "${sessionKey}" received a user message. ` +
+                `This message may have been meant for the main session. Content length: ${content.length}`,
+            );
+          }
+        } catch { /* non-fatal */ }
+
         const result = await scanForInjection(sessionKey, content);
         if (result.flagged) {
           api.logger.warn(
@@ -1387,10 +1413,11 @@ h1{color:#ff6b6b}code{background:#16213e;padding:2px 8px;border-radius:4px}a{col
         api.logger.warn(`[GodMode] context pressure tracking error: ${String(err)}`);
       }
       // Support session logging — assistant messages
-      if (ctx?.sessionKey === "agent:main:support" && event.content) {
+      const lastAssistantText = event.assistantTexts?.[event.assistantTexts.length - 1];
+      if (ctx?.sessionKey === "agent:main:support" && lastAssistantText) {
         try {
           const { logExchangeInternal } = await import("./src/methods/support.js");
-          await logExchangeInternal("assistant", event.content);
+          await logExchangeInternal("assistant", lastAssistantText);
         } catch { /* non-fatal */ }
       }
     });
