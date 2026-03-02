@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OpenClaw Docs Analysis — Atlas for Caleb</title>
+<style>
+  :root {
+    --bg: #0d1117;
+    --surface: #161b22;
+    --surface2: #1c2128;
+    --border: #30363d;
+    --text: #e6edf3;
+    --muted: #8b949e;
+    --accent: #58a6ff;
+    --green: #3fb950;
+    --yellow: #d29922;
+    --red: #f85149;
+    --purple: #bc8cff;
+    --teal: #39d353;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.7;
+    padding: 40px 20px 80px;
+  }
+  .container { max-width: 900px; margin: 0 auto; }
+  .header {
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 24px;
+    margin-bottom: 40px;
+  }
+  .header h1 { font-size: 28px; font-weight: 700; color: var(--accent); }
+  .header .meta { font-size: 13px; color: var(--muted); margin-top: 6px; }
+  .insight-box {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-left: 4px solid var(--accent);
+    border-radius: 8px;
+    padding: 20px 24px;
+    margin-bottom: 32px;
+  }
+  .insight-box h2 { font-size: 16px; color: var(--accent); margin-bottom: 8px; }
+  .insight-box p { color: var(--text); font-size: 14px; }
+
+  h2.section {
+    font-size: 20px;
+    font-weight: 700;
+    margin: 44px 0 20px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border);
+    color: var(--text);
+  }
+  h2.section .emoji { margin-right: 8px; }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 20px 24px;
+    margin-bottom: 20px;
+  }
+  .card h3 {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--accent);
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .card p, .card li { font-size: 14px; color: var(--text); margin-bottom: 6px; }
+  .card ul { padding-left: 20px; }
+  .card .overlap {
+    background: var(--surface2);
+    border-left: 3px solid var(--yellow);
+    border-radius: 4px;
+    padding: 10px 14px;
+    margin: 12px 0;
+    font-size: 13px;
+    color: var(--muted);
+  }
+  .card .overlap strong { color: var(--yellow); }
+  .card .action {
+    background: var(--surface2);
+    border-left: 3px solid var(--green);
+    border-radius: 4px;
+    padding: 10px 14px;
+    margin: 12px 0;
+    font-size: 13px;
+    color: var(--text);
+  }
+  .card .action strong { color: var(--green); }
+
+  .tag {
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 12px;
+    margin-right: 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .tag.dont-build { background: rgba(248,81,73,0.15); color: var(--red); border: 1px solid rgba(248,81,73,0.3); }
+  .tag.configure { background: rgba(63,185,80,0.15); color: var(--green); border: 1px solid rgba(63,185,80,0.3); }
+  .tag.strategic { background: rgba(88,166,255,0.15); color: var(--accent); border: 1px solid rgba(88,166,255,0.3); }
+  .tag.unused { background: rgba(188,140,255,0.15); color: var(--purple); border: 1px solid rgba(188,140,255,0.3); }
+
+  table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 16px; }
+  th { background: var(--surface2); color: var(--muted); font-weight: 600; padding: 10px 14px; text-align: left; border-bottom: 1px solid var(--border); }
+  td { padding: 10px 14px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  tr:last-child td { border-bottom: none; }
+  .p-high { color: var(--red); font-weight: 700; }
+  .p-med { color: var(--yellow); font-weight: 600; }
+  .p-strat { color: var(--accent); }
+
+  code {
+    font-family: 'SF Mono', Consolas, monospace;
+    font-size: 12px;
+    background: var(--surface2);
+    padding: 2px 6px;
+    border-radius: 4px;
+    color: var(--purple);
+  }
+  pre {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 16px;
+    font-size: 12px;
+    font-family: 'SF Mono', Consolas, monospace;
+    color: var(--purple);
+    overflow-x: auto;
+    margin: 12px 0;
+    line-height: 1.6;
+  }
+  .divider { border: none; border-top: 1px solid var(--border); margin: 40px 0; }
+  .muted { color: var(--muted); font-size: 13px; }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <div class="header">
+    <h1>⚛️ OpenClaw Docs — Full Analysis</h1>
+    <div class="meta">Atlas for Caleb Hodges &nbsp;·&nbsp; Friday Feb 27, 2026 &nbsp;·&nbsp; 20+ pages crawled from docs.openclaw.ai</div>
+  </div>
+
+  <div class="insight-box">
+    <h2>🔑 The Meta-Insight</h2>
+    <p>OpenClaw's architecture is: <strong>Gateway + Channels + Agents + Skills + Automation</strong>. GodMode <em>is</em> that architecture for your setup, but most of the plumbing is already built. The strategic question is: <strong>what should GodMode configure vs. rebuild vs. just expose nicely?</strong> Almost everything we've been hand-rolling in shell scripts and custom orchestration already exists in the platform — often better. The opportunity is the UX layer, not more infrastructure.</p>
+  </div>
+
+  <!-- SECTION 1: DON'T BUILD -->
+  <h2 class="section"><span class="emoji">🚫</span> They've Already Built It — Don't Rebuild</h2>
+
+  <div class="card">
+    <h3><span>🦞</span> Lobster — Typed Workflow Runtime <span class="tag dont-build">Don't Build</span></h3>
+    <p>This is the biggest one. Lobster is a deterministic pipeline runner with:</p>
+    <ul>
+      <li>JSON-pipe chaining between steps (<code>inbox list | inbox categorize | inbox apply</code>)</li>
+      <li><strong>Built-in approval gates</strong> — pauses, returns a <code>resumeToken</code>, resumes on approve</li>
+      <li><code>.lobster</code> YAML workflow files with <code>condition</code>, <code>approval</code>, <code>stdin: $step.stdout</code></li>
+      <li><strong>llm-task plugin tool</strong> — structured JSON-only LLM steps inside pipelines with optional JSON Schema validation</li>
+      <li>Resume tokens are durable — stored state on disk, small token key handed back</li>
+      <li>The community "second brain" example includes: <code>weekly-review</code>, <code>inbox-triage</code>, <code>memory-consolidation</code>, <code>shared-task-sync</code></li>
+    </ul>
+    <div class="overlap"><strong>⚠️ Current overlap:</strong> Our <code>swarm</code> orchestration, shell scripts, <code>godmode-wip-commit.sh</code> + approval patterns — all reinventing what Lobster does at the platform level.</div>
+    <div class="action"><strong>✅ What GodMode should do:</strong> Help users build and manage <code>.lobster</code> workflow files through a UI. Not build another orchestration engine. Enable: <code>tools.alsoAllow: ["lobster"]</code></div>
+  </div>
+
+  <div class="card">
+    <h3><span>⏰</span> Native Cron Scheduler <span class="tag dont-build">Don't Build</span></h3>
+    <p>OpenClaw has a full built-in cron system that survives restarts:</p>
+    <ul>
+      <li>Persists to <code>~/.openclaw/cron/jobs.json</code></li>
+      <li>Two modes: <strong>main session</strong> (enqueues system event to heartbeat) or <strong>isolated session</strong> (own fresh context, announces result to channel)</li>
+      <li>Channel delivery: announces directly to WhatsApp/Telegram/Discord/Slack</li>
+      <li>Per-job model overrides (<code>--model opus --thinking high</code>)</li>
+      <li>One-shot (<code>--at 20m</code>), fixed interval, or cron expressions with timezone</li>
+      <li>Run history: <code>~/.openclaw/cron/runs/&lt;jobId&gt;.jsonl</code></li>
+      <li>Webhook delivery mode per job</li>
+    </ul>
+    <div class="overlap"><strong>⚠️ Current overlap:</strong> Our <code>consciousness-heartbeat.sh</code> runs via system crontab. Our morning brief, weekly maintenance — all of it could move here. The difference is dramatic: OpenClaw cron persists, delivers to channels, has run history, model overrides, restart-safe. System crontab has none of that.</div>
+    <div class="action"><strong>✅ What GodMode should do:</strong> Expose cron job management through a UI — create/edit/disable/run/view history. This is exactly "configured but not enabled" that users need help with.</div>
+  </div>
+
+  <div class="card">
+    <h3><span>🪝</span> Hooks System — 4 Bundled, All Disabled <span class="tag configure">Configure Now</span></h3>
+    <p>OpenClaw ships 4 bundled hooks, disabled by default:</p>
+    <ul>
+      <li><strong><code>session-memory</code></strong> — saves session context to <code>memory/YYYY-MM-DD-slug.md</code> when <code>/new</code> is issued. Uses last 15 lines + LLM to generate filename slug (e.g., <code>2026-01-16-api-design.md</code>). This is close to what our consciousness sync does but at the session boundary.</li>
+      <li><strong><code>command-logger</code></strong> — JSONL audit trail of all commands (action, timestamp, session key, sender, source)</li>
+      <li><strong><code>boot-md</code></strong> — runs <code>BOOT.md</code> at gateway startup. <em>This is our HEARTBEAT.md startup sequence — it's already built.</em></li>
+      <li><strong><code>bootstrap-extra-files</code></strong> — injects extra workspace files (monorepo-local AGENTS.md/TOOLS.md) during agent bootstrap</li>
+    </ul>
+    <p style="margin-top:10px;">Custom hooks are TypeScript files with event listeners for: <code>command:new</code>, <code>command:reset</code>, <code>command:stop</code>, <code>agent:bootstrap</code>, <code>gateway:startup</code>, <code>message:received</code>, <code>message:sent</code>, and <code>tool_result_persist</code> (synchronously transforms tool results before session transcript).</p>
+    <div class="overlap"><strong>⚠️ Current overlap:</strong> We have custom bash scripts doing what <code>session-memory</code> and <code>boot-md</code> do natively.</div>
+    <div class="action"><strong>✅ What GodMode should do:</strong> Ship a GodMode hook pack via npm. Enable <code>session-memory</code>, <code>boot-md</code>, <code>command-logger</code> by default for every GodMode user. The hook pack becomes the GodMode extension point.</div>
+    <pre>openclaw hooks enable session-memory
+openclaw hooks enable boot-md
+openclaw hooks enable command-logger</pre>
+  </div>
+
+  <div class="card">
+    <h3><span>🔐</span> Secrets Management <span class="tag configure">Configure Now</span></h3>
+    <p>OpenClaw has a full secrets system with three provider types:</p>
+    <ul>
+      <li><strong>env</strong> — reads from environment variables</li>
+      <li><strong>file</strong> — reads from a JSON file at a path</li>
+      <li><strong>exec</strong> — calls any binary (1Password CLI, HashiCorp Vault, sops). 1Password integration is explicitly documented as an example.</li>
+    </ul>
+    <p>Interactive: <code>openclaw secrets configure</code> wizard. Audit: <code>openclaw secrets audit --check</code>.</p>
+    <div class="overlap"><strong>⚠️ Current overlap:</strong> Our <code>skills/1password/SKILL.md</code> handles 1Password retrieval for tasks. OpenClaw already handles credential storage natively — for model API keys and skill API keys. These are different use cases but worth knowing.</div>
+    <div class="action"><strong>✅ What GodMode should do:</strong> During user setup, run <code>openclaw secrets configure</code>. Expose the audit as a health check in GodMode. Don't build a secrets UI — wire to the existing one.</div>
+  </div>
+
+  <div class="card">
+    <h3><span>🧠</span> ACP Coding Agent Sessions <span class="tag dont-build">Don't Build</span></h3>
+    <p>OpenClaw has a native runtime for running Codex, Claude Code, Gemini CLI, OpenCode, Pi as thread-bound sessions via ACP (Agent Client Protocol):</p>
+    <ul>
+      <li><code>/acp spawn codex --mode persistent --thread auto</code></li>
+      <li>Thread-bound: follow-up messages in that Discord/etc thread route to the same coding session</li>
+      <li><code>/acp steer</code> — nudges a running session without replacing context</li>
+      <li>Model overrides, permission profiles, timeout controls</li>
+      <li>Session isolation, run history, announce results back to channel</li>
+      <li>Harnesses: <code>pi</code>, <code>claude</code>, <code>codex</code>, <code>opencode</code>, <code>gemini</code></li>
+    </ul>
+    <div class="overlap"><strong>⚠️ Current overlap:</strong> Our <code>skills/coding-agent/SKILL.md</code> does this manually. ACP is the designed path and works better (thread binding, steer, cancel, status, doctor).</div>
+    <div class="action"><strong>✅ What GodMode should do:</strong> Enable ACP in config, install acpx plugin. Our coding agent skill may become unnecessary.</div>
+    <pre>openclaw plugins install @openclaw/acpx
+openclaw config set plugins.entries.acpx.enabled true
+/acp doctor</pre>
+  </div>
+
+  <div class="card">
+    <h3><span>🔀</span> Multi-Agent Routing Bindings <span class="tag strategic">Strategic</span></h3>
+    <p>The binding system is more sophisticated than we're using:</p>
+    <ul>
+      <li>Route different WhatsApp DMs to different agents by peer ID (exact phone number)</li>
+      <li>Route by guild, team, account, or channel-wide fallback with AND semantics</li>
+      <li>Per-agent sandboxing + tool restrictions (Docker containers per agent)</li>
+      <li>Agent-to-agent messaging (opt-in, off by default)</li>
+      <li>Each agent gets its own workspace, auth profiles, session store</li>
+    </ul>
+    <div class="action"><strong>✅ What GodMode should do:</strong> The Deck concept (agent columns) maps directly to this multi-agent model. Each GodMode "workspace" is an OpenClaw agent with its own binding config. Expose this through UI.</div>
+  </div>
+
+  <!-- SECTION 2: MEMORY -->
+  <h2 class="section"><span class="emoji">⚡</span> Memory — Far More Powerful Than We're Using</h2>
+
+  <div class="card">
+    <h3><span>🔍</span> Memory Quality Settings We Haven't Enabled <span class="tag configure">Configure Now</span></h3>
+    <p>The memory system has high-value features that are all off by default:</p>
+    <ul>
+      <li><strong>Hybrid BM25 + Vector search</strong> — Not enabled. Combines semantic match (vector) with exact token match (BM25). Essential for searching code symbols, error strings, IDs — things pure vector search misses. We have 1000+ files in QMD.</li>
+      <li><strong>MMR Re-ranking</strong> — Not enabled. Eliminates near-duplicate results. With months of daily notes, prevents five slightly-different versions of the same memory eating all result slots.</li>
+      <li><strong>Temporal Decay</strong> — Not enabled. Exponential decay based on file age so recent memories outrank stale ones. Without this, old notes with better semantic match outrank yesterday's update on the same topic.</li>
+      <li><strong>Pre-compaction memory flush</strong> — Built in. Triggers a silent agent turn before compaction to save durable notes. Uses <code>NO_REPLY</code> so user never sees it. Our <code>compaction.memoryFlush.enabled: true</code> is already on ✅</li>
+      <li><strong>Memory citations</strong> — <code>memory.citations: "auto"</code> adds <code>Source: &lt;path#line&gt;</code> footers to memory search results.</li>
+    </ul>
+    <pre>agents: {
+  defaults: {
+    memorySearch: {
+      query: {
+        hybrid: {
+          enabled: true,
+          vectorWeight: 0.7,
+          textWeight: 0.3,
+          mmr: { enabled: true, lambda: 0.7 },
+          temporalDecay: { enabled: true, halfLifeDays: 30 }
+        }
+      }
+    }
+  }
+}</pre>
+    <div class="action"><strong>✅ Immediate action:</strong> Add MMR + temporal decay to <code>openclaw.json</code>. Hybrid is already configured but MMR and temporalDecay are missing. 3 lines, immediate quality improvement.</div>
+  </div>
+
+  <!-- SECTION 3: SLASH COMMANDS -->
+  <h2 class="section"><span class="emoji">⌨️</span> Slash Commands We're Not Using</h2>
+
+  <div class="card">
+    <h3><span>/</span> High-Value Commands Not in Regular Use <span class="tag unused">Unused</span></h3>
+    <table>
+      <tr><th>Command</th><th>What it does</th><th>Why it matters</th></tr>
+      <tr><td><code>/context detail</code></td><td>Shows per-file + per-tool + per-skill + system prompt token sizes</td><td>How we debug bloated context windows. Use this before calling it slow.</td></tr>
+      <tr><td><code>/export-session</code></td><td>Exports current session to HTML with full system prompt</td><td>Audit, debugging, sharing sessions</td></tr>
+      <tr><td><code>/compact [instructions]</code></td><td>Manual compaction with custom focus instructions</td><td>"Focus on decisions and open questions" — preserves what matters</td></tr>
+      <tr><td><code>/config show|set</code></td><td>Read/write <code>openclaw.json</code> from chat</td><td>Needs <code>commands.config: true</code> — change config without touching files</td></tr>
+      <tr><td><code>/debug show|set</code></td><td>Runtime-only overrides without disk writes or restarts</td><td>Needs <code>commands.debug: true</code> — test config changes live</td></tr>
+      <tr><td><code>/usage cost</code></td><td>Local cost summary from session logs</td><td>Actual spend visibility</td></tr>
+      <tr><td><code>/subagents steer &lt;id&gt; &lt;message&gt;</code></td><td>Redirects a running subagent mid-run</td><td>Correct course without killing the run</td></tr>
+      <tr><td><code>/approve &lt;id&gt; allow-once|allow-always|deny</code></td><td>Resolve exec approval prompts from chat</td><td>No need to touch the terminal</td></tr>
+      <tr><td><code>/model list</code></td><td>Numbered picker, interactive on Discord</td><td>Quick model switching</td></tr>
+      <tr><td><code>/acp doctor</code></td><td>Backend health, capabilities, actionable fixes</td><td>Debug ACP harness issues instantly</td></tr>
+    </table>
+    <div class="action"><strong>✅ Enable now:</strong> Add <code>"commands": { "config": true, "debug": true }</code> to <code>openclaw.json</code> — unlocks <code>/config set</code> and <code>/debug set</code> from chat.</div>
+  </div>
+
+  <!-- SECTION 4: HEARTBEAT -->
+  <h2 class="section"><span class="emoji">💓</span> Heartbeat — Underutilized Features</h2>
+
+  <div class="card">
+    <h3><span>💓</span> Heartbeat Config We're Not Using <span class="tag unused">Unused</span></h3>
+    <ul>
+      <li><strong>Active hours</strong> — Restrict heartbeats to business hours. <code>activeHours: { start: "08:00", end: "22:00", timezone: "America/Chicago" }</code>. Outside window, heartbeats skip entirely.</li>
+      <li><strong>Per-channel visibility controls</strong> — <code>channels.defaults.heartbeat.showOk: false</code> (already default), <code>showAlerts: true</code>, <code>useIndicator: true</code>. If all three are false, OpenClaw skips the heartbeat run entirely (saves API calls).</li>
+      <li><strong>Per-agent heartbeats</strong> — Different agents can run on different intervals with different models. Only agents with a <code>heartbeat</code> block run heartbeats.</li>
+      <li><strong>Model override</strong> — Already configured ✅ (<code>"model": "anthropic/claude-sonnet-4-6"</code>)</li>
+      <li><strong>includeReasoning</strong> — Sends separate <code>Reasoning:</code> message with heartbeat. Useful for transparency. Leave off in group chats.</li>
+    </ul>
+    <div class="action"><strong>✅ Recommended:</strong> Add <code>activeHours</code> to avoid 3am heartbeats burning tokens when you're asleep with Edison.</div>
+  </div>
+
+  <!-- SECTION 5: STRATEGIC -->
+  <h2 class="section"><span class="emoji">🎯</span> GodMode Strategic Opportunity</h2>
+
+  <div class="insight-box">
+    <h2>The Real Wedge</h2>
+    <p>OpenClaw built a lot of infrastructure. Most of it is disabled or requires manual JSON editing to enable. Their own docs acknowledge this — they built an <code>openclaw onboard</code> wizard because the config is too complex. <strong>GodMode's opportunity is the UX layer on top of what they've built, not more infrastructure.</strong></p>
+  </div>
+
+  <div class="card">
+    <h3><span>🗺️</span> Product Surfaces OpenClaw Doesn't Have</h3>
+    <ul>
+      <li><strong>Setup wizard</strong> — Walk new users through enabling hooks, cron jobs, memory settings, secrets, channels. One screen per category. GodMode handles the JSON writes.</li>
+      <li><strong>Cron job manager UI</strong> — Create/edit/disable/run/view history for scheduled tasks. This is valuable for every OpenClaw user, not just power users.</li>
+      <li><strong>Workflow builder</strong> — Visual or template-based <code>.lobster</code> workflow builder. Build once, run forever. Approval gate UI.</li>
+      <li><strong>Memory quality dashboard</strong> — Show current memory settings, enable hybrid/MMR/temporal decay with toggles, visualize search results.</li>
+      <li><strong>Skills marketplace integration</strong> — ClawHub (<code>clawhub.ai</code>) is a public registry with vector search. GodMode could surface and install skills through UI. <code>clawhub install &lt;slug&gt;</code> from a button click.</li>
+      <li><strong>Hook manager</strong> — Enable/disable/install hooks. Ship a GodMode hook pack (npm). Bundled hooks enabled by default for GodMode users.</li>
+      <li><strong>Agent multi-workspace management</strong> — Each workspace gets a card. Bindings, sandboxing, tool policies — configurable through GodMode UI instead of JSON.</li>
+    </ul>
+  </div>
+
+  <!-- PRIORITY TABLE -->
+  <h2 class="section"><span class="emoji">📋</span> Priority Action List</h2>
+
+  <table>
+    <tr>
+      <th>Priority</th>
+      <th>Action</th>
+      <th>Effort</th>
+      <th>Payoff</th>
+    </tr>
+    <tr>
+      <td><span class="p-high">🔴 High</span></td>
+      <td>Add MMR + temporal decay to <code>openclaw.json</code> memory config</td>
+      <td>5 min</td>
+      <td>Immediate search quality improvement across 1000+ notes</td>
+    </tr>
+    <tr>
+      <td><span class="p-high">🔴 High</span></td>
+      <td>Enable <code>session-memory</code>, <code>boot-md</code>, <code>command-logger</code> hooks</td>
+      <td>5 min</td>
+      <td>Replace manual scripts, get audit trail, auto-save sessions</td>
+    </tr>
+    <tr>
+      <td><span class="p-high">🔴 High</span></td>
+      <td>Enable <code>commands.config: true</code> + <code>commands.debug: true</code></td>
+      <td>2 min</td>
+      <td>Unlocks <code>/config set</code> + <code>/debug set</code> from chat without touching files</td>
+    </tr>
+    <tr>
+      <td><span class="p-high">🔴 High</span></td>
+      <td>Add <code>activeHours</code> to heartbeat config</td>
+      <td>2 min</td>
+      <td>Stop burning tokens on 3am heartbeats</td>
+    </tr>
+    <tr>
+      <td><span class="p-med">🟡 Medium</span></td>
+      <td>Migrate consciousness cron to <code>openclaw cron add</code></td>
+      <td>30 min</td>
+      <td>Persistent, auditable, channel-delivered, restart-safe</td>
+    </tr>
+    <tr>
+      <td><span class="p-med">🟡 Medium</span></td>
+      <td>Install + enable Lobster (<code>tools.alsoAllow: ["lobster"]</code>)</td>
+      <td>1 hr</td>
+      <td>Workflow pipelines with approval gates replace shell scripts</td>
+    </tr>
+    <tr>
+      <td><span class="p-med">🟡 Medium</span></td>
+      <td>Install acpx, enable ACP for coding sessions</td>
+      <td>1 hr</td>
+      <td>Thread-bound coding agent sessions, replaces coding-agent skill</td>
+    </tr>
+    <tr>
+      <td><span class="p-strat">🟢 Strategic</span></td>
+      <td>GodMode as OpenClaw configurator UI (setup wizard)</td>
+      <td>Sprint</td>
+      <td>Product wedge — the UX layer OpenClaw doesn't have</td>
+    </tr>
+    <tr>
+      <td><span class="p-strat">🟢 Strategic</span></td>
+      <td>Publish GodMode hook pack to npm</td>
+      <td>1 day</td>
+      <td>Extension ecosystem, every GodMode user gets the hooks</td>
+    </tr>
+    <tr>
+      <td><span class="p-strat">🟢 Strategic</span></td>
+      <td>Integrate ClawHub into GodMode skills UI</td>
+      <td>Sprint</td>
+      <td>Marketplace wedge — browse/install skills from GodMode</td>
+    </tr>
+  </table>
+
+  <hr class="divider">
+  <p class="muted">Generated by Atlas · docs.openclaw.ai · February 27, 2026 · 20+ pages crawled</p>
+
+</div>
+</body>
+</html>

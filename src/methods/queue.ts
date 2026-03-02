@@ -11,7 +11,7 @@ import {
   type QueueItemType,
   type QueueItemStatus,
 } from "../lib/queue-state.js";
-import { readTasks, writeTasks } from "./tasks.js";
+import { updateTasks } from "./tasks.js";
 import type { GatewayRequestHandler } from "openclaw/plugin-sdk";
 import type { LessonCategory } from "../lib/agent-lessons.js";
 
@@ -178,13 +178,13 @@ const approveItem: GatewayRequestHandler = async ({ params, respond }) => {
   // If item has a sourceTaskId, mark the linked NativeTask as complete
   if (result.item.sourceTaskId) {
     try {
-      const tasksData = await readTasks();
-      const taskIdx = tasksData.tasks.findIndex((t) => t.id === result.item!.sourceTaskId);
-      if (taskIdx !== -1) {
-        tasksData.tasks[taskIdx].status = "complete";
-        tasksData.tasks[taskIdx].completedAt = new Date().toISOString();
-        await writeTasks(tasksData);
-      }
+      await updateTasks((data) => {
+        const taskIdx = data.tasks.findIndex((t) => t.id === result.item!.sourceTaskId);
+        if (taskIdx !== -1) {
+          data.tasks[taskIdx].status = "complete";
+          data.tasks[taskIdx].completedAt = new Date().toISOString();
+        }
+      });
     } catch {
       // Task sync is best-effort; don't fail the approval
     }
@@ -448,6 +448,21 @@ const removeLessonRpc: GatewayRequestHandler = async ({ params, respond }) => {
   respond(true, { removed });
 };
 
+const bulkDismiss: GatewayRequestHandler = async ({ params, respond }) => {
+  const { status } = params as { status?: string };
+  if (!status) {
+    respond(false, null, { code: "INVALID_REQUEST", message: "Missing status to dismiss" });
+    return;
+  }
+  let dismissed = 0;
+  await updateQueueState((state) => {
+    const before = state.items.length;
+    state.items = state.items.filter((item) => item.status !== status);
+    dismissed = before - state.items.length;
+  });
+  respond(true, { dismissed });
+};
+
 // ── Export ────────────────────────────────────────────────────────
 
 export const queueHandlers: Record<string, GatewayRequestHandler> = {
@@ -465,4 +480,5 @@ export const queueHandlers: Record<string, GatewayRequestHandler> = {
   "queue.lessons": listLessons,
   "queue.addLesson": addLessonManual,
   "queue.removeLesson": removeLessonRpc,
+  "queue.bulkDismiss": bulkDismiss,
 };

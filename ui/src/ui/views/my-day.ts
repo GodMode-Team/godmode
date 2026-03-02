@@ -11,6 +11,26 @@ import { renderAllTaskRow, sortTasks } from "./workspaces.js";
 // Re-export for convenience
 export type { DailyBriefData } from "./daily-brief.js";
 
+// ===== Decision Cards (Overnight Agent Results) =====
+
+export type DecisionCardItem = {
+  id: string;
+  title: string;
+  summary: string;
+  status: "review" | "done";
+  completedAt?: number;
+  outputPath?: string;
+  prUrl?: string;
+};
+
+export type DecisionCardsProps = {
+  items: DecisionCardItem[];
+  onApprove: (id: string) => void;
+  onReject: (id: string) => void;
+  onViewOutput: (id: string, outputPath: string) => void;
+  onOpenChat: (id: string) => void;
+};
+
 export type AgentLogData = {
   date: string;
   content: string;
@@ -62,6 +82,8 @@ export type MyDayProps = {
   editingTaskId?: string | null;
   showCompletedTasks?: boolean;
   onToggleCompletedTasks?: () => void;
+  // Decision cards (overnight agent results)
+  decisionCards?: DecisionCardsProps;
 };
 
 // ===== Helper Functions =====
@@ -268,6 +290,64 @@ function renderTaskPanel(props: MyDayProps) {
   `;
 }
 
+// ===== Decision Cards (Overnight Agent Results) =====
+
+function renderDecisionCard(item: DecisionCardItem, props: DecisionCardsProps) {
+  const isReview = item.status === "review";
+  const statusClass = isReview ? "decision-card-status--review" : "decision-card-status--done";
+  const statusLabel = isReview ? "Needs Review" : "Complete";
+
+  return html`
+    <div class="decision-card">
+      <span class="decision-card-status ${statusClass}">${statusLabel}</span>
+      <h4 class="decision-card-title">${item.title}</h4>
+      <p class="decision-card-summary">${item.summary}</p>
+      <div class="decision-card-actions">
+        ${isReview
+          ? html`
+              <button class="decision-card-btn decision-card-btn--approve"
+                @click=${() => props.onApprove(item.id)}>Approve</button>
+              ${item.outputPath
+                ? html`<button class="decision-card-btn decision-card-btn--view"
+                    @click=${() => props.onViewOutput(item.id, item.outputPath!)}>View Output</button>`
+                : nothing}
+              <button class="decision-card-btn decision-card-btn--chat"
+                @click=${() => props.onOpenChat(item.id)}>Open Chat</button>
+              <button class="decision-card-btn decision-card-btn--reject"
+                @click=${() => props.onReject(item.id)}>Reject</button>
+            `
+          : html`
+              ${item.outputPath
+                ? html`<button class="decision-card-btn decision-card-btn--view"
+                    @click=${() => props.onViewOutput(item.id, item.outputPath!)}>View Output</button>`
+                : nothing}
+            `}
+        ${item.prUrl
+          ? html`<a class="decision-card-btn decision-card-btn--view" href="${item.prUrl}" target="_blank" rel="noopener">View PR</a>`
+          : nothing}
+      </div>
+    </div>
+  `;
+}
+
+function renderDecisionCards(props: DecisionCardsProps) {
+  if (!props.items.length) return nothing;
+
+  const useScroll = props.items.length > 3;
+
+  return html`
+    <div class="decision-cards">
+      <div class="decision-cards-header">
+        <h3>Agent Results</h3>
+        <span class="count-badge">${props.items.length}</span>
+      </div>
+      <div class="decision-cards-list ${useScroll ? "decision-cards-list--scroll" : ""}">
+        ${props.items.map((item) => renderDecisionCard(item, props))}
+      </div>
+    </div>
+  `;
+}
+
 // ===== Toolbar (rendered in page header) =====
 
 export function renderMyDayToolbar(props: MyDayProps) {
@@ -356,6 +436,9 @@ export function renderMyDay(props: MyDayProps) {
 
   return html`
     <div class="my-day-container">
+      ${props.decisionCards && props.decisionCards.items.length > 0
+        ? renderDecisionCards(props.decisionCards)
+        : nothing}
       <!-- Two-column layout: Tasks (left) + Brief/AgentLog (right) -->
       <div class="my-day-columns">
         <div class="my-day-tasks-col">

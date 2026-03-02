@@ -70,15 +70,15 @@ import {
 import { checkForUpdates } from "./controllers/updates";
 import { icons } from "./icons";
 import { TAB_GROUPS, subtitleForTab, titleForTab, type Tab } from "./navigation";
+import { renderAllyChat } from "./views/ally-chat.js";
+import { ALLY_SESSION_KEY } from "./controllers/ally.js";
 import { renderChannels } from "./views/channels";
 import { renderChat } from "./views/chat";
 import { renderConfig } from "./views/config";
 import { renderCron } from "./views/cron";
-import { renderDataTab } from "./views/data";
 import { renderDebug } from "./views/debug";
 import { renderExecApprovalPrompt } from "./views/exec-approval";
 import { renderGatewayUrlConfirmation } from "./views/gateway-url-confirmation";
-import { renderGoals } from "./views/goals";
 import { renderInstances } from "./views/instances";
 import { renderLifetracks } from "./views/lifetracks";
 import { renderLogs } from "./views/logs";
@@ -86,7 +86,6 @@ import { renderMarkdownSidebar } from "./views/markdown-sidebar";
 import { renderMyDay, renderMyDayToolbar } from "./views/my-day";
 import { renderNodes } from "./views/nodes";
 import { renderOverview } from "./views/overview";
-import { renderPeople } from "./views/people";
 import { renderSessions } from "./views/sessions";
 import { renderSkills } from "./views/skills";
 import { renderLightbox } from "./chat/lightbox";
@@ -473,9 +472,6 @@ export function renderApp(state: AppViewState) {
             ${
               state.tab !== "chat" &&
               state.tab !== "setup" &&
-              state.tab !== "people" &&
-              state.tab !== "life" &&
-              state.tab !== "data" &&
               state.tab !== "wheel-of-life" &&
               state.tab !== "vision-board" &&
               state.tab !== "lifetracks"
@@ -486,6 +482,38 @@ export function renderApp(state: AppViewState) {
                 : state.tab === "chat"
                   ? html`
               <div class="session-tabs">
+                <div class="session-tab session-tab--pinned ${state.sessionKey === ALLY_SESSION_KEY ? 'session-tab--active' : ''}"
+                     @click=${() => {
+                       if (state.sessionKey === ALLY_SESSION_KEY) return;
+                       saveDraft(state);
+                       state.sessionKey = ALLY_SESSION_KEY;
+                       restoreDraft(state, ALLY_SESSION_KEY);
+                       state.chatLoading = true;
+                       state.chatStream = null;
+                       state.chatStreamStartedAt = null;
+                       state.chatRunId = null;
+                       state.resetToolStream();
+                       state.resetChatScroll();
+                       state.applySettings({
+                         ...state.settings,
+                         sessionKey: ALLY_SESSION_KEY,
+                         lastActiveSessionKey: ALLY_SESSION_KEY,
+                         tabLastViewed: {
+                           ...state.settings.tabLastViewed,
+                           [ALLY_SESSION_KEY]: Date.now(),
+                         },
+                       });
+                       void state.loadAssistantIdentity();
+                       void loadChatHistory(state);
+                       void loadSessions(state);
+                     }}
+                     title="${state.assistantName || 'Ally'}">
+                  ${state.assistantAvatar
+                    ? html`<img src="${state.assistantAvatar}" class="session-tab-avatar" width="16" height="16" style="border-radius:50%;vertical-align:middle;margin-right:4px;" />`
+                    : html`<span class="session-tab-icon" style="margin-right:4px;">&#x2726;</span>`}
+                  ${state.assistantName || 'Ally'}
+                  ${(state.allyUnread ?? 0) > 0 ? html`<span class="ally-tab-badge" style="margin-left:4px;font-size:10px;background:var(--accent-color,#5b73e8);color:#fff;border-radius:50%;padding:1px 5px;">${state.allyUnread}</span>` : nothing}
+                </div>
                 ${repeat(
                   renderSessionTabKeys,
                   (key) => key,
@@ -1405,6 +1433,14 @@ export function renderApp(state: AppViewState) {
                   editingTaskId: state.todayEditingTaskId,
                   showCompletedTasks: state.todayShowCompleted,
                   onToggleCompletedTasks: () => state.handleTodayToggleCompleted(),
+                  // Decision cards (overnight agent results)
+                  decisionCards: (state.todayQueueResults ?? []).length > 0 ? {
+                    items: state.todayQueueResults!,
+                    onApprove: (id: string) => state.handleDecisionApprove(id),
+                    onReject: (id: string) => state.handleDecisionReject(id),
+                    onViewOutput: (id: string, path: string) => state.handleDecisionViewOutput(id, path),
+                    onOpenChat: (id: string) => state.handleDecisionOpenChat(id),
+                  } : undefined,
                 })
             : nothing
         }
@@ -1427,163 +1463,6 @@ export function renderApp(state: AppViewState) {
                   onFileClick: (path) => state.handleWorkFileClick(path),
                   onSkillClick: (skill, projectName) =>
                     state.handleWorkSkillClick(skill, projectName),
-                })
-            : nothing
-        }
-
-        ${
-          state.tab === "people"
-            ? state.dynamicSlots["people"]
-              ? renderDynamicSlot(state, "people")
-              : renderPeople({
-                  connected: state.connected,
-                  people: state.peopleList ?? [],
-                  loading: state.peopleLoading ?? false,
-                  error: state.peopleError ?? null,
-                  selectedId: state.peopleSelected ?? null,
-                  searchQuery: state.peopleSearchQuery ?? "",
-                  onRefresh: () => state.handlePeopleRefresh(),
-                  onSelectPerson: (id) => state.handlePeopleSelect(id),
-                  onBack: () => state.handlePeopleBack(),
-                  onSearchChange: (query) => state.handlePeopleSearch(query),
-                  onImportContacts: (source) => state.handlePeopleImport(source),
-                })
-            : nothing
-        }
-
-        ${
-          state.tab === "life"
-            ? state.dynamicSlots["life"]
-              ? renderDynamicSlot(state, "life")
-              : html`
-                <div class="my-day-container" style="overflow-y: auto;">
-                  <div class="my-day-header">
-                    <div class="my-day-header-left">
-                      <h1 class="my-day-title">Life</h1>
-                      <p class="my-day-subtitle">Vision board, goals, life scores, and LifeTracks.</p>
-                    </div>
-                    <div class="my-day-header-right">
-                      <button class="my-day-refresh-btn" @click=${() =>
-                        state.handleStartChatWithPrompt(
-                          state.lifeSubtab === "vision-board"
-                            ? "Let's update my Vision Board"
-                            : state.lifeSubtab === "goals"
-                              ? "Let's review and update my goals"
-                              : "Time for a Wheel of Life check-in",
-                        )} title="Update via Chat">
-                        💬 Update
-                      </button>
-                    </div>
-                  </div>
-                  <div class="life-subnav">
-                    ${(["vision-board", "goals", "wheel-of-life"] as const).map(
-                      (sub) => {
-                        const labels: Record<string, string> = {
-                          "vision-board": "Vision Board",
-                          goals: "Goals",
-                          "wheel-of-life": "Wheel of Life",
-                        };
-                        const active = (state.lifeSubtab ?? "vision-board") === sub;
-                        return html`
-                        <button
-                          class="life-subnav__item ${active ? "active" : ""}"
-                          @click=${() => state.handleLifeSubtabChange(sub)}
-                        >${labels[sub]}</button>
-                      `;
-                      },
-                    )}
-                  </div>
-                  <div class="life-subtab-content">
-                    ${
-                      (state.lifeSubtab ?? "vision-board") === "vision-board"
-                        ? renderVisionBoard({
-                            connected: state.connected,
-                            data: state.visionBoardData ?? null,
-                            identityToday: state.visionBoardIdentityToday ?? null,
-                            loading: state.visionBoardLoading ?? false,
-                            error: state.visionBoardError ?? null,
-                            onRefresh: () => state.handleVisionBoardRefresh(),
-                            onUpdateViaChat: () =>
-                              state.handleStartChatWithPrompt(
-                                "Let's update my Vision Board — review my Chief Definite Aim, annual themes, values, and identity statements.",
-                              ),
-                          })
-                        : nothing
-                    }
-                    ${
-                      (state.lifeSubtab ?? "vision-board") === "lifetracks"
-                        ? renderLifetracks({
-                            connected: state.connected,
-                            data: state.lifetracksData ?? null,
-                            currentTrack: state.lifetracksCurrentTrack ?? null,
-                            loading: state.lifetracksLoading ?? false,
-                            error: state.lifetracksError ?? null,
-                            config: state.lifetracksConfig ?? null,
-                            generating: state.lifetracksGenerating ?? false,
-                            generationError: state.lifetracksGenerationError ?? null,
-                            onRefresh: () => state.handleLifetracksRefresh(),
-                            onSelectTrack: (track) => state.handleLifetracksSelectTrack(track),
-                            onEnable: () => state.handleLifetracksEnable(),
-                            onGenerate: () => state.handleLifetracksGenerate(),
-                            onUpdateViaChat: () =>
-                              state.handleStartChatWithPrompt(
-                                "Time to update my LifeTracks — let's review my meditation and affirmation audio settings.",
-                              ),
-                          })
-                        : nothing
-                    }
-                    ${
-                      state.lifeSubtab === "goals"
-                        ? renderGoals({
-                            connected: state.connected,
-                            goals: state.goals ?? [],
-                            loading: state.goalsLoading ?? false,
-                            error: state.goalsError ?? null,
-                            onRefresh: () => state.handleGoalsRefresh(),
-                            onUpdateViaChat: () =>
-                              state.handleStartChatWithPrompt("Let's review and update my goals"),
-                          })
-                        : nothing
-                    }
-                    ${
-                      state.lifeSubtab === "wheel-of-life"
-                        ? renderWheelOfLife({
-                            connected: state.connected,
-                            data: state.wheelOfLifeData ?? null,
-                            loading: state.wheelOfLifeLoading ?? false,
-                            error: state.wheelOfLifeError ?? null,
-                            editMode: state.wheelOfLifeEditMode ?? false,
-                            onRefresh: () => state.handleWheelOfLifeRefresh(),
-                            onEdit: () => state.handleWheelOfLifeEdit(),
-                            onSave: (updates) => state.handleWheelOfLifeSave(updates),
-                            onCancel: () => state.handleWheelOfLifeCancel(),
-                            onUpdateViaChat: () =>
-                              state.handleStartChatWithPrompt(
-                                "Let's do a Wheel of Life check-in — rate my current satisfaction across all 8 life areas.",
-                              ),
-                          })
-                        : nothing
-                    }
-                  </div>
-                </div>
-              `
-            : nothing
-        }
-
-        ${
-          state.tab === "data"
-            ? state.dynamicSlots["data"]
-              ? renderDynamicSlot(state, "data")
-              : renderDataTab({
-                  connected: state.connected,
-                  sources: state.dataSources ?? [],
-                  loading: state.dataLoading ?? false,
-                  error: state.dataError ?? null,
-                  subtab: state.dataSubtab ?? "dashboard",
-                  onRefresh: () => state.handleDataRefresh(),
-                  onSubtabChange: (sub) => state.handleDataSubtabChange(sub),
-                  onConnectSource: (sourceId) => state.handleDataConnectSource(sourceId),
-                  onQuerySubmit: (query) => state.handleDataQuerySubmit(query),
                 })
             : nothing
         }
@@ -2186,6 +2065,25 @@ export function renderApp(state: AppViewState) {
                     state.chatNewMessagesBelow = false;
                   }
                 },
+                // Ally inline panel (split sidebar)
+                allyPanelOpen: state.allyPanelOpen ?? false,
+                allyProps: state.allyPanelOpen ? {
+                  allyName: state.assistantName,
+                  allyAvatar: state.assistantAvatar ?? null,
+                  open: true,
+                  messages: state.allyMessages ?? [],
+                  stream: state.allyStream ?? null,
+                  draft: state.allyDraft ?? "",
+                  sending: state.allySending ?? false,
+                  isWorking: state.allyWorking ?? false,
+                  unreadCount: 0,
+                  connected: state.connected,
+                  compact: true,
+                  onToggle: () => state.handleAllyToggle(),
+                  onDraftChange: (text: string) => state.handleAllyDraftChange(text),
+                  onSend: () => state.handleAllySend(),
+                  onOpenFullChat: () => state.handleAllyOpenFull(),
+                } : null,
               })
             : nothing
         }
@@ -2354,25 +2252,6 @@ export function renderApp(state: AppViewState) {
                   onBack: () => state.handleDashboardBack(),
                   onRefresh: () => state.handleDashboardsRefresh(),
                   onOpenSession: (id) => state.handleDashboardOpenSession(id),
-                  // Inline chat — powered by the dashboard's persistent session
-                  chatOpen: (state as unknown as { dashboardChatOpen?: boolean }).dashboardChatOpen ?? false,
-                  chatMessages: state.activeDashboardManifest ? state.chatMessages : [],
-                  chatStream: state.activeDashboardManifest ? state.chatStream : null,
-                  chatMessage: state.chatMessage,
-                  chatSending: state.chatSending,
-                  assistantName: state.assistantName,
-                  assistantAvatar: state.assistantAvatar,
-                  onToggleChat: () => {
-                    const app = state as unknown as { dashboardChatOpen: boolean; requestUpdate: () => void };
-                    app.dashboardChatOpen = !app.dashboardChatOpen;
-                    app.requestUpdate();
-                  },
-                  onChatMessageChange: (value: string) => {
-                    state.setChatMessage(value);
-                  },
-                  onChatSend: () => {
-                    void state.handleSendChat();
-                  },
                 })
             : nothing
         }
@@ -2464,6 +2343,23 @@ export function renderApp(state: AppViewState) {
             : nothing
         }
       </main>
+      ${state.tab !== "chat" ? renderAllyChat({
+        allyName: state.assistantName,
+        allyAvatar: state.assistantAvatar ?? null,
+        open: state.allyPanelOpen ?? false,
+        messages: state.allyMessages ?? [],
+        stream: state.allyStream ?? null,
+        draft: state.allyDraft ?? "",
+        sending: state.allySending ?? false,
+        isWorking: state.allyWorking ?? false,
+        unreadCount: state.allyUnread ?? 0,
+        connected: state.connected,
+        compact: false,
+        onToggle: () => state.handleAllyToggle(),
+        onDraftChange: (text: string) => state.handleAllyDraftChange(text),
+        onSend: () => state.handleAllySend(),
+        onOpenFullChat: () => state.handleAllyOpenFull(),
+      }) : nothing}
       ${renderExecApprovalPrompt(state)}
       ${renderGatewayUrlConfirmation(state)}
       ${

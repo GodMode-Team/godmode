@@ -815,6 +815,67 @@ function handleGatewayEventUnsafe(host: GatewayHost, evt: GatewayEventFrame) {
     // Only process events for the current session
     const state = handleChatEvent(host as unknown as GodModeApp, payload);
 
+    // ── Ally side-chat routing ──────────────────────────────────────
+    // When the ally-main session receives chat events and is NOT the
+    // active full-screen session, route messages to the ally overlay state.
+    if (payload && payload.sessionKey === "ally-main") {
+      const allyHost = host as unknown as {
+        allyMessages?: Array<{ role: string; content: string; timestamp?: number }>;
+        allyStream?: string | null;
+        allyWorking?: boolean;
+        allyPanelOpen?: boolean;
+        allyUnread?: number;
+        tab?: string;
+        requestUpdate?: () => void;
+      };
+      const isAllyFullScreen = host.tab === "chat" && host.sessionKey === "ally-main";
+
+      // Extract streaming text from the message payload (same shape as chat events)
+      const extractAllyText = (msg: unknown): string | null => {
+        if (!msg) return null;
+        if (typeof msg === "string") return msg;
+        if (Array.isArray(msg)) {
+          const textBlock = msg.find((b: Record<string, unknown>) => b.type === "text");
+          return (textBlock as { text?: string })?.text ?? null;
+        }
+        if (typeof (msg as Record<string, unknown>).text === "string") {
+          return (msg as { text: string }).text;
+        }
+        return null;
+      };
+
+      if (payload.state === "delta") {
+        // Streaming delta: update ally stream
+        const deltaText = extractAllyText(payload.message);
+        if (!isAllyFullScreen && typeof deltaText === "string") {
+          allyHost.allyStream = deltaText;
+          allyHost.allyWorking = true;
+          allyHost.requestUpdate?.();
+        }
+      } else if (payload.state === "final") {
+        // Final message: append to ally messages, clear stream
+        if (!isAllyFullScreen) {
+          const finalContent = allyHost.allyStream ?? extractAllyText(payload.message) ?? "";
+          if (finalContent) {
+            allyHost.allyMessages = [
+              ...(allyHost.allyMessages ?? []),
+              { role: "assistant", content: finalContent, timestamp: Date.now() },
+            ];
+          }
+          allyHost.allyStream = null;
+          allyHost.allyWorking = false;
+          if (!allyHost.allyPanelOpen && host.tab !== "chat") {
+            allyHost.allyUnread = (allyHost.allyUnread ?? 0) + 1;
+          }
+          allyHost.requestUpdate?.();
+        }
+      } else if (payload.state === "error" || payload.state === "aborted") {
+        allyHost.allyStream = null;
+        allyHost.allyWorking = false;
+        allyHost.requestUpdate?.();
+      }
+    }
+
     // Auto-title and session refresh run for ANY session (not just the active one).
     // handleChatEvent returns null for non-active sessions, so we check payload.state
     // directly to avoid missing auto-title when the user switches tabs mid-response.
@@ -1089,6 +1150,50 @@ function handleGatewayEventUnsafe(host: GatewayHost, evt: GatewayEventFrame) {
         app.onboardingActive = false;
       }
       app.requestUpdate?.();
+    }
+    return;
+  }
+
+  // Ally notification events (proactive messages from the ally)
+  if (evt.event === "ally:notification") {
+    const payload = evt.payload as
+      | {
+          summary?: string;
+          actions?: Array<{
+            label: string;
+            action: string;
+            target?: string;
+            method?: string;
+            params?: Record<string, unknown>;
+          }>;
+        }
+      | undefined;
+    if (payload) {
+      const allyHost = host as unknown as {
+        allyMessages?: Array<{
+          role: string;
+          content: string;
+          timestamp?: number;
+          isNotification?: boolean;
+          actions?: unknown[];
+        }>;
+        allyPanelOpen?: boolean;
+        allyUnread?: number;
+        tab?: string;
+        requestUpdate?: () => void;
+      };
+      const msg = {
+        role: "assistant" as const,
+        content: payload.summary || "Notification received.",
+        timestamp: Date.now(),
+        isNotification: true,
+        actions: payload.actions ?? [],
+      };
+      allyHost.allyMessages = [...(allyHost.allyMessages ?? []), msg];
+      if (!allyHost.allyPanelOpen && host.tab !== "chat") {
+        allyHost.allyUnread = (allyHost.allyUnread ?? 0) + 1;
+      }
+      allyHost.requestUpdate?.();
     }
     return;
   }

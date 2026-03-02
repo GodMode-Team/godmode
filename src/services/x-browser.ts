@@ -2,39 +2,25 @@
  * x-browser.ts — Headless Brave lifecycle manager for X/Twitter access.
  *
  * Manages a headless Brave browser instance with a dedicated profile
- * logged into X. Provides CDP-based page operations for reading tweets,
- * bookmarks, timelines, and articles.
- *
- * Uses OpenClaw plugin-sdk browser functions — zero new dependencies.
+ * logged into X. Uses native CDP (Chrome DevTools Protocol) over
+ * HTTP + WebSocket — zero external dependencies.
  */
 
 import { spawn, type ChildProcess } from "node:child_process";
 import { join } from "node:path";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
-
-// SDK browser functions
-import {
-  findChromeExecutableMac,
-  isChromeReachable,
-  getChromeWebSocketUrl,
-} from "openclaw/plugin-sdk/browser/chrome";
-import {
-  createTargetViaCdp,
-  evaluateJavaScript,
-  getDomText,
-} from "openclaw/plugin-sdk/browser/cdp";
-import { closePageByTargetIdViaPlaywright } from "openclaw/plugin-sdk/browser/pw-session";
+import { mkdir, writeFile } from "node:fs/promises";
+import { existsSync } from "node:fs";
 
 // ── Constants ──────────────────────────────────────────────────────────
 
 const CDP_PORT = 18850;
-const CDP_URL = `http://127.0.0.1:${CDP_PORT}`;
+const CDP_BASE = `http://127.0.0.1:${CDP_PORT}`;
+
+/** Well-known Brave path on macOS. */
+const BRAVE_MAC = "/Applications/Brave Browser.app/Contents/MacOS/Brave Browser";
 
 /** How long to wait for a page to load before extracting content. */
 const PAGE_LOAD_WAIT_MS = 4_000;
-
-/** Max time for a single browser operation. */
-const OP_TIMEOUT_MS = 15_000;
 
 /** Auto-restart backoff schedule (ms). */
 const RESTART_BACKOFF = [1_000, 5_000, 30_000];
@@ -44,7 +30,7 @@ const RESTART_BACKOFF = [1_000, 5_000, 30_000];
 export type XBrowserHealth = {
   browserRunning: boolean;
   cdpReachable: boolean;
-  xSessionValid: boolean | null; // null = not checked yet
+  xSessionValid: boolean | null;
   cdpUrl: string;
   error?: string;
 };
@@ -55,6 +41,14 @@ export type ExtractedTweet = {
   text: string;
   url?: string;
   timestamp?: string;
+};
+
+type CdpTarget = {
+  id: string;
+  webSocketDebuggerUrl: string;
+  url: string;
+  title: string;
+  type: string;
 };
 
 // ── State ──────────────────────────────────────────────────────────────
@@ -68,62 +62,127 @@ function profileDir(): string {
   return join(root, "data", "x-browser-profile");
 }
 
-function healthFile(): string {
-  const root = process.env.GODMODE_ROOT || join(process.env.HOME || "", "godmode");
-  return join(root, "data", "x-browser-health.json");
+// ── CDP helpers (native fetch + WebSocket) ─────────────────────────────
+
+/** Check if a CDP endpoint is reachable. */
+async function cdpReachable(base: string, timeoutMs = 2_000): Promise<boolean> {
+  try {
+    const resp = await fetch(`${base}/json/version`, {
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+    return resp.ok;
+  } catch {
+    return false;
+  }
+}
+
+/** Create a new browser tab and return its target info. */
+async function cdpNewTab(base: string, url: string): Promise<CdpTarget | null> {
+  try {
+    const resp = await fetch(`${base}/json/new?${encodeURIComponent(url)}`, {
+      method: "PUT",
+      signal: AbortSignal.timeout(5_000),
+    });
+    if (!resp.ok) return null;
+    return (await resp.json()) as CdpTarget;
+  } catch {
+    return null;
+  }
+}
+
+/** Close a browser tab by target ID. */
+async function cdpCloseTab(base: string, targetId: string): Promise<void> {
+  try {
+    await fetch(`${base}/json/close/${targetId}`, { signal: AbortSignal.timeout(3_000) });
+  } catch {
+    // Best effort
+  }
+}
+
+/** Execute JavaScript in a tab via CDP WebSocket. Returns the stringified result. */
+async function cdpEvaluate(wsUrl: string, expression: string, timeoutMs = 10_000): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const ws = new WebSocket(wsUrl);
+    const timer = setTimeout(() => {
+      ws.close();
+      reject(new Error("CDP evaluate timed out"));
+    }, timeoutMs);
+
+    ws.addEventListener("open", () => {
+      ws.send(
+        JSON.stringify({
+          id: 1,
+          method: "Runtime.evaluate",
+          params: { expression, returnByValue: true, awaitPromise: true },
+        }),
+      );
+    });
+
+    ws.addEventListener("message", (event) => {
+      try {
+        const msg = JSON.parse(String(event.data)) as {
+          id?: number;
+          result?: { result?: { value?: unknown } };
+        };
+        if (msg.id === 1) {
+          clearTimeout(timer);
+          ws.close();
+          resolve(String(msg.result?.result?.value ?? ""));
+        }
+      } catch {
+        // ignore non-JSON messages
+      }
+    });
+
+    ws.addEventListener("error", () => {
+      clearTimeout(timer);
+      reject(new Error(`CDP WebSocket error connecting to ${wsUrl}`));
+    });
+  });
 }
 
 // ── Browser lifecycle ──────────────────────────────────────────────────
 
 /**
- * Try to connect to an already-running Brave/Chrome on the configured CDP port,
- * or to the OpenClaw-managed brave profile on port 9222.
- * Returns the CDP URL that's reachable, or null.
+ * Find a reachable CDP endpoint:
+ * 1. GodMode-managed port (18850)
+ * 2. OpenClaw brave profile port (9222)
  */
 export async function findReachableCdp(): Promise<string | null> {
-  // Check GodMode-managed port first
-  if (await isChromeReachable(CDP_URL, 2_000)) return CDP_URL;
-  // Check OpenClaw brave profile port
-  const ocUrl = "http://127.0.0.1:9222";
-  if (await isChromeReachable(ocUrl, 2_000)) return ocUrl;
+  if (await cdpReachable(CDP_BASE)) return CDP_BASE;
+  if (await cdpReachable("http://127.0.0.1:9222")) return "http://127.0.0.1:9222";
   return null;
 }
 
 /**
  * Launch headless Brave with the GodMode X browser profile.
- * No-op if a browser is already reachable on the CDP port.
+ * No-op if a browser is already reachable.
  */
 export async function launchBrave(): Promise<{ cdpUrl: string } | { error: string }> {
-  // Already running?
   const existing = await findReachableCdp();
   if (existing) {
     _restartCount = 0;
     return { cdpUrl: existing };
   }
 
-  // Find Brave executable
-  const exe = findChromeExecutableMac();
-  if (!exe || exe.kind !== "brave") {
-    return { error: "Brave Browser not found. Install it from https://brave.com" };
+  const bravePath = existsSync(BRAVE_MAC) ? BRAVE_MAC : null;
+  if (!bravePath) {
+    return { error: "Brave Browser not found at /Applications/Brave Browser.app" };
   }
 
-  // Ensure profile directory exists
   const dir = profileDir();
   await mkdir(dir, { recursive: true });
 
-  // Launch headless
-  const args = [
-    `--remote-debugging-port=${CDP_PORT}`,
-    `--user-data-dir=${dir}`,
-    "--headless=new",
-    "--disable-gpu",
-    "--no-first-run",
-    "--no-default-browser-check",
-    "--disable-background-networking",
-  ];
-
   try {
-    _proc = spawn(exe.path, args, {
+    _proc = spawn(bravePath, [
+      `--remote-debugging-port=${CDP_PORT}`,
+      `--user-data-dir=${dir}`,
+      "--headless=new",
+      "--disable-gpu",
+      "--no-first-run",
+      "--no-default-browser-check",
+      "--disable-background-networking",
+    ], {
       stdio: "ignore",
       detached: false,
     });
@@ -142,10 +201,10 @@ export async function launchBrave(): Promise<{ cdpUrl: string } | { error: strin
     // Wait for CDP to become reachable
     for (let i = 0; i < 10; i++) {
       await sleep(500);
-      if (await isChromeReachable(CDP_URL, 1_000)) {
+      if (await cdpReachable(CDP_BASE)) {
         _restartCount = 0;
         console.log(`[x-browser] Brave launched on CDP port ${CDP_PORT}`);
-        return { cdpUrl: CDP_URL };
+        return { cdpUrl: CDP_BASE };
       }
     }
 
@@ -170,9 +229,7 @@ function scheduleRestart(): void {
   }, delay);
 }
 
-/**
- * Stop the GodMode-managed Brave process.
- */
+/** Stop the GodMode-managed Brave process. */
 export function stopBrave(): void {
   if (_proc) {
     _proc.removeAllListeners("exit");
@@ -186,12 +243,10 @@ export function stopBrave(): void {
 export async function checkHealth(): Promise<XBrowserHealth> {
   const cdpUrl = await findReachableCdp();
   const browserRunning = cdpUrl !== null;
-  const cdpReachable = browserRunning;
 
   let xSessionValid: boolean | null = null;
 
-  if (cdpReachable && cdpUrl) {
-    // Check if X session is still valid (cached for 30 min)
+  if (browserRunning && cdpUrl) {
     if (_lastSessionCheck && Date.now() - _lastSessionCheck.ts < 30 * 60_000) {
       xSessionValid = _lastSessionCheck.valid;
     } else {
@@ -206,19 +261,20 @@ export async function checkHealth(): Promise<XBrowserHealth> {
 
   const health: XBrowserHealth = {
     browserRunning,
-    cdpReachable,
+    cdpReachable: browserRunning,
     xSessionValid,
-    cdpUrl: cdpUrl || CDP_URL,
+    cdpUrl: cdpUrl || CDP_BASE,
   };
 
-  // Persist health for other tools to read
+  // Persist health
   try {
-    const dir = join(
-      process.env.GODMODE_ROOT || join(process.env.HOME || "", "godmode"),
-      "data",
+    const root = process.env.GODMODE_ROOT || join(process.env.HOME || "", "godmode");
+    await mkdir(join(root, "data"), { recursive: true });
+    await writeFile(
+      join(root, "data", "x-browser-health.json"),
+      JSON.stringify(health, null, 2),
+      "utf-8",
     );
-    await mkdir(dir, { recursive: true });
-    await writeFile(healthFile(), JSON.stringify(health, null, 2), "utf-8");
   } catch {
     // Non-critical
   }
@@ -226,118 +282,57 @@ export async function checkHealth(): Promise<XBrowserHealth> {
   return health;
 }
 
-/**
- * Navigate to x.com/home and check if we're redirected to login.
- */
-async function validateXSession(cdpUrl: string): Promise<boolean> {
-  let targetId: string | undefined;
+async function validateXSession(base: string): Promise<boolean> {
+  const tab = await cdpNewTab(base, "https://x.com/home");
+  if (!tab) return false;
+
   try {
-    const target = await createTargetViaCdp({ cdpUrl, url: "about:blank" });
-    targetId = target.targetId;
-
-    const wsUrl = await getChromeWebSocketUrl(cdpUrl);
-    if (!wsUrl) return false;
-
-    // Navigate to X home
-    const { result } = await evaluateJavaScript({
-      wsUrl: wsUrl.replace(/\/devtools\/browser\/.*/, `/devtools/page/${targetId}`),
-      expression: `
-        await new Promise(r => {
-          window.location.href = 'https://x.com/home';
-          setTimeout(r, 3000);
-        });
-        window.location.href;
-      `,
-      awaitPromise: true,
-      returnByValue: true,
-    });
-
-    const finalUrl = String(result.value ?? "");
-    // If we end up on login page, session is expired
-    const isLoggedIn = !finalUrl.includes("/login") && !finalUrl.includes("/i/flow/login");
-    return isLoggedIn;
+    await sleep(3_000);
+    const finalUrl = await cdpEvaluate(tab.webSocketDebuggerUrl, "window.location.href");
+    return !finalUrl.includes("/login") && !finalUrl.includes("/i/flow/login");
   } catch {
     return false;
   } finally {
-    if (targetId) {
-      try {
-        const cdp = cdpUrl;
-        await closePageByTargetIdViaPlaywright({ cdpUrl: cdp, targetId });
-      } catch {
-        // Best effort cleanup
-      }
-    }
+    await cdpCloseTab(base, tab.id);
   }
 }
 
 // ── Page operations ────────────────────────────────────────────────────
 
-/**
- * Navigate to a URL, wait for load, extract text content.
- * Opens a new tab, extracts content, closes tab.
- */
 async function navigateAndExtract(
   url: string,
   opts?: { waitMs?: number },
 ): Promise<{ text: string; finalUrl: string } | { error: string }> {
-  const cdpUrl = await findReachableCdp();
-  if (!cdpUrl) return { error: "No browser available. Run x.setup to configure." };
+  const base = await findReachableCdp();
+  if (!base) return { error: "No browser available. Run x.setup to configure." };
 
-  let targetId: string | undefined;
+  const tab = await cdpNewTab(base, url);
+  if (!tab) return { error: "Failed to open new browser tab" };
+
   try {
-    const target = await createTargetViaCdp({ cdpUrl, url });
-    targetId = target.targetId;
-
-    // Wait for page to load
     await sleep(opts?.waitMs ?? PAGE_LOAD_WAIT_MS);
 
-    // Get the WebSocket URL for this page
-    const browserWsUrl = await getChromeWebSocketUrl(cdpUrl);
-    if (!browserWsUrl) return { error: "Could not get CDP WebSocket URL" };
-    const pageWsUrl = browserWsUrl.replace(/\/devtools\/browser\/.*/, `/devtools/page/${targetId}`);
-
-    // Get final URL (after redirects)
-    const { result: urlResult } = await evaluateJavaScript({
-      wsUrl: pageWsUrl,
-      expression: "window.location.href",
-      returnByValue: true,
-    });
-    const finalUrl = String(urlResult.value ?? url);
-
-    // Extract text content
-    const { text } = await getDomText({
-      wsUrl: pageWsUrl,
-      format: "text",
-      maxChars: 20_000,
-    });
+    const finalUrl = await cdpEvaluate(tab.webSocketDebuggerUrl, "window.location.href");
+    const text = await cdpEvaluate(
+      tab.webSocketDebuggerUrl,
+      "document.body?.innerText || ''",
+    );
 
     return { text, finalUrl };
   } catch (err) {
     return { error: `Navigation failed: ${err instanceof Error ? err.message : String(err)}` };
   } finally {
-    if (targetId) {
-      try {
-        await closePageByTargetIdViaPlaywright({ cdpUrl, targetId });
-      } catch {
-        // Best effort
-      }
-    }
+    await cdpCloseTab(base, tab.id);
   }
 }
 
 // ── X-specific operations ──────────────────────────────────────────────
 
-/**
- * Parse a tweet ID from a URL like https://x.com/user/status/123456.
- */
 function parseTweetId(urlOrId: string): string {
   const match = urlOrId.match(/(?:x\.com|twitter\.com)\/\w+\/status\/(\d+)/);
   return match ? match[1] : urlOrId;
 }
 
-/**
- * Parse a handle from a URL like https://x.com/username.
- */
 function parseHandle(urlOrHandle: string): string {
   const match = urlOrHandle.match(/(?:x\.com|twitter\.com)\/(@?\w+)/);
   const raw = match ? match[1] : urlOrHandle;
@@ -347,19 +342,12 @@ function parseHandle(urlOrHandle: string): string {
 export async function getBookmarks(
   count = 20,
 ): Promise<{ tweets: ExtractedTweet[]; error?: string }> {
-  const result = await navigateAndExtract("https://x.com/i/bookmarks", {
-    waitMs: 5_000, // bookmarks page loads slower
-  });
-
+  const result = await navigateAndExtract("https://x.com/i/bookmarks", { waitMs: 5_000 });
   if ("error" in result) return { tweets: [], error: result.error };
-
-  // Check for login redirect
   if (result.finalUrl.includes("/login")) {
     return { tweets: [], error: "X session expired. Run x.setup to re-login." };
   }
-
-  const tweets = extractTweetsFromText(result.text, count);
-  return { tweets };
+  return { tweets: extractTweetsFromText(result.text, count) };
 }
 
 export async function getTweet(
@@ -385,9 +373,7 @@ export async function getThread(
 
   const result = await navigateAndExtract(url, { waitMs: 5_000 });
   if ("error" in result) return { tweets: [], error: result.error };
-
-  const tweets = extractTweetsFromText(result.text, 50);
-  return { tweets };
+  return { tweets: extractTweetsFromText(result.text, 50) };
 }
 
 export async function getUserTimeline(
@@ -395,93 +381,53 @@ export async function getUserTimeline(
   count = 10,
 ): Promise<{ tweets: ExtractedTweet[]; error?: string }> {
   const handle = parseHandle(handleOrUrl);
-  const url = `https://x.com/${handle}`;
-
-  const result = await navigateAndExtract(url, { waitMs: 5_000 });
+  const result = await navigateAndExtract(`https://x.com/${handle}`, { waitMs: 5_000 });
   if ("error" in result) return { tweets: [], error: result.error };
-
-  const tweets = extractTweetsFromText(result.text, count);
-  return { tweets };
+  return { tweets: extractTweetsFromText(result.text, count) };
 }
 
 export async function readArticle(
   urlOrTweetUrl: string,
 ): Promise<{ title: string; text: string; url: string } | { error: string }> {
-  // If it's a tweet URL, navigate to the tweet first to find the article link
   const isTweetUrl = /(?:x\.com|twitter\.com)\/\w+\/status\/\d+/.test(urlOrTweetUrl);
-
-  if (isTweetUrl) {
-    const tweetResult = await navigateAndExtract(urlOrTweetUrl);
-    if ("error" in tweetResult) return { error: tweetResult.error };
-
-    // For now, return the tweet's content. In the future, we can extract linked article URLs.
-    return {
-      title: "Tweet content",
-      text: tweetResult.text.slice(0, 10_000),
-      url: urlOrTweetUrl,
-    };
-  }
-
-  // Direct article URL
-  const result = await navigateAndExtract(urlOrTweetUrl, { waitMs: 5_000 });
+  const result = await navigateAndExtract(urlOrTweetUrl, { waitMs: isTweetUrl ? 4_000 : 5_000 });
   if ("error" in result) return { error: result.error };
 
-  // Extract title from first line or heading
   const lines = result.text.split("\n").filter((l) => l.trim());
   const title = lines[0]?.slice(0, 200) ?? "Article";
 
-  return {
-    title,
-    text: result.text.slice(0, 10_000),
-    url: result.finalUrl,
-  };
+  return { title, text: result.text.slice(0, 10_000), url: result.finalUrl };
 }
 
 // ── Setup ──────────────────────────────────────────────────────────────
 
-/**
- * Launch Brave non-headless for user to log into X.
- * Returns instructions for the user.
- */
 export async function setupLogin(): Promise<{ message: string } | { error: string }> {
-  const exe = findChromeExecutableMac();
-  if (!exe || exe.kind !== "brave") {
-    return { error: "Brave Browser not found. Install it from https://brave.com" };
-  }
+  const bravePath = existsSync(BRAVE_MAC) ? BRAVE_MAC : null;
+  if (!bravePath) return { error: "Brave Browser not found" };
 
   const dir = profileDir();
   await mkdir(dir, { recursive: true });
 
-  // Stop headless if running
   stopBrave();
 
-  // Launch non-headless
-  const proc = spawn(exe.path, [
+  const proc = spawn(bravePath, [
     `--remote-debugging-port=${CDP_PORT}`,
     `--user-data-dir=${dir}`,
     "--no-first-run",
     "--no-default-browser-check",
-  ], {
-    stdio: "ignore",
-    detached: true,
-  });
+  ], { stdio: "ignore", detached: true });
 
   proc.unref();
 
   return {
     message:
-      "Brave has opened. Please log into X (twitter.com) in the browser window, " +
-      "then close the window. GodMode will switch to headless mode automatically.",
+      "Brave has opened. Log into X (twitter.com) in the browser window, " +
+      "then close it. GodMode will switch to headless mode automatically.",
   };
 }
 
 // ── Text extraction helpers ────────────────────────────────────────────
 
-/**
- * Best-effort extraction of tweet-like content from raw page text.
- * This is intentionally loose — X's DOM changes frequently but the
- * text content structure is relatively stable.
- */
 function extractTweetsFromText(text: string, maxCount: number): ExtractedTweet[] {
   const tweets: ExtractedTweet[] = [];
   const lines = text.split("\n").map((l) => l.trim()).filter(Boolean);
@@ -491,10 +437,8 @@ function extractTweetsFromText(text: string, maxCount: number): ExtractedTweet[]
   let currentText = "";
 
   for (const line of lines) {
-    // Detect handle patterns like @username
     const handleMatch = line.match(/^@(\w{1,15})$/);
     if (handleMatch) {
-      // Save previous tweet if we have one
       if (currentText && currentHandle) {
         tweets.push({
           author: currentAuthor || currentHandle,
@@ -509,19 +453,16 @@ function extractTweetsFromText(text: string, maxCount: number): ExtractedTweet[]
       continue;
     }
 
-    // Detect display name patterns (capitalized, before @handle)
     if (!currentHandle && /^[A-Z]/.test(line) && line.length < 50) {
       currentAuthor = line;
       continue;
     }
 
-    // Accumulate text content
     if (currentHandle && line.length > 10) {
       currentText += (currentText ? " " : "") + line;
     }
   }
 
-  // Don't forget the last tweet
   if (currentText && currentHandle && tweets.length < maxCount) {
     tweets.push({
       author: currentAuthor || currentHandle,

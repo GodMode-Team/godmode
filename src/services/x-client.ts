@@ -224,7 +224,7 @@ export async function health(): Promise<XHealthStatus> {
 
 // ── Init (called from gateway_start) ──────────────────────────────────
 
-export async function initXClient(logger?: { info: (...args: unknown[]) => void; warn: (...args: unknown[]) => void }): Promise<void> {
+export async function initXClient(logger?: { info: (msg: string) => void; warn: (msg: string) => void }): Promise<void> {
   const log = logger ?? console;
 
   // Check XAI

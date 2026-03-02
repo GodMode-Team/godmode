@@ -6,6 +6,7 @@ import { GODMODE_ROOT } from "../data-paths.js";
 import { formatGuardrailsForPrompt } from "./guardrails.js";
 import { resolveClaudeBin, resolveAgentBin, isEngineAvailable } from "../lib/resolve-claude-bin.js";
 import type { AgentEngine } from "../lib/agent-roster.js";
+import { resolveIdentityDir, getVaultPath, VAULT_FOLDERS } from "../lib/vault-paths.js";
 import {
   classifyTaskMode,
   newTaskId,
@@ -960,7 +961,7 @@ export class CodingOrchestrator {
       // Non-fatal — agent runs without guardrail awareness
     }
 
-    const prompt = [
+    const promptSections: string[] = [
       "You are a coding agent working in an isolated git worktree.",
       "",
       "## Task",
@@ -987,13 +988,39 @@ export class CodingOrchestrator {
       "- Do not run destructive commands (rm -rf, git reset --hard) on the main worktree.",
       "",
       ...(guardrailsBlock ? [guardrailsBlock, ""] : []),
+    ];
+
+    // ── Owner identity context ──────────────────────────────────────
+    try {
+      const { path: identityDir } = resolveIdentityDir();
+
+      try {
+        const userMd = await fs.readFile(path.join(identityDir, "USER.md"), "utf-8");
+        const userLines = userMd.split("\n").slice(0, 50).join("\n");
+        if (userLines.trim()) {
+          promptSections.push("## Owner Context", userLines, "");
+        }
+      } catch { /* USER.md not found — that's fine */ }
+
+      try {
+        const soulMd = await fs.readFile(path.join(identityDir, "SOUL.md"), "utf-8");
+        const soulLines = soulMd.split("\n").slice(0, 30).join("\n");
+        if (soulLines.trim()) {
+          promptSections.push("## Communication Style", soulLines, "");
+        }
+      } catch { /* SOUL.md not found — that's fine */ }
+    } catch { /* Identity dir resolution failed — skip all identity context */ }
+
+    promptSections.push(
       "## Instructions",
       "1. Complete the task above.",
       "2. Keep changes within the specified scope.",
       "3. Commit all changes with a clear, descriptive message.",
       `4. Push the branch: \`git push -u origin ${branch}\``,
       "5. When done, output a thorough summary of what you built/changed and any issues resolved.",
-    ].join("\n");
+    );
+
+    const prompt = promptSections.join("\n");
 
     try {
       // Resolve full claude binary path so detached processes find it

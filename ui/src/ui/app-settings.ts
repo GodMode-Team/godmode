@@ -255,6 +255,12 @@ export async function refreshActiveTab(host: SettingsHost) {
   }
   if (host.tab === "today" || host.tab === "my-day") {
     await loadMyDay(host as unknown as GodModeApp);
+    // Load decision cards alongside My Day data
+    import("./controllers/my-day").then(async ({ loadTodayQueueResults }) => {
+      (host as unknown as GodModeApp).todayQueueResults = await loadTodayQueueResults(
+        host as unknown as GodModeApp,
+      );
+    }).catch(() => {});
   }
   if (host.tab === "work") {
     await loadWork(host as unknown as GodModeApp);

@@ -1,10 +1,10 @@
 import type { IconName } from "./icons.js";
 
 export const TAB_GROUPS = [
-  { label: "", tabs: ["chat", "today", "mission-control", "workspaces", "second-brain", "dashboards"] },
+  { label: "", tabs: ["chat", "today", "workspaces", "second-brain", "dashboards"] },
   { label: "Toolkit", tabs: ["skills", "trust", "guardrails", "options"] },
   { label: "Settings", tabs: ["config", "debug", "logs"] },
-  { label: "System", tabs: ["overview", "channels", "instances", "sessions", "cron", "nodes"] },
+  { label: "System", tabs: ["mission-control", "overview", "channels", "instances", "sessions", "cron", "nodes"] },
 ] as const;
 
 export type Tab =
@@ -15,9 +15,6 @@ export type Tab =
   | "workspaces"
   | "today"
   | "work"
-  | "people"
-  | "life"
-  | "data"
   | "my-day"
   | "wheel-of-life"
   | "vision-board"
@@ -44,9 +41,6 @@ const TAB_PATHS: Record<Tab, string> = {
   workspaces: "/workspaces",
   today: "/today",
   work: "/work",
-  people: "/people",
-  life: "/life",
-  data: "/data",
   "my-day": "/today",
   "wheel-of-life": "/wheel-of-life",
   "vision-board": "/vision-board",
@@ -175,12 +169,6 @@ export function iconForTab(tab: Tab): IconName {
       return "calendar";
     case "work":
       return "folder";
-    case "people":
-      return "users";
-    case "life":
-      return "heart";
-    case "data":
-      return "barChart";
     case "overview":
       return "barChart";
     case "workspaces":
@@ -237,12 +225,6 @@ export function titleForTab(tab: Tab) {
       return "Today";
     case "work":
       return "Work";
-    case "people":
-      return "People";
-    case "life":
-      return "Life";
-    case "data":
-      return "Data";
     case "overview":
       return "Overview";
     case "workspaces":
@@ -299,12 +281,6 @@ export function emojiForTab(tab: Tab): string {
       return "\u{2600}\uFE0F";
     case "work":
       return "\u{1F4BC}";
-    case "people":
-      return "\u{1F465}";
-    case "life":
-      return "\u{2728}";
-    case "data":
-      return "\u{1F4CA}";
     case "overview":
       return "\u{1F3AF}";
     case "workspaces":
@@ -361,12 +337,6 @@ export function subtitleForTab(tab: Tab) {
       return "Calendar, brief, tasks, and schedule for the day.";
     case "work":
       return "Your projects, files, tasks, and team — organized by workspace.";
-    case "people":
-      return "Contacts, relationships, and follow-up suggestions.";
-    case "life":
-      return "Vision board, goals, life scores, and LifeTracks.";
-    case "data":
-      return "Connected integrations, data sources, and query interface.";
     case "overview":
       return "Gateway status, entry points, and a fast health read.";
     case "workspaces":

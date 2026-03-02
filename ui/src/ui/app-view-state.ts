@@ -37,7 +37,8 @@ import type { ChatAttachment, ChatQueueItem, CronFormState, FileTreeNode } from 
 import type { NostrProfileFormState } from "./views/channels.nostr-profile-form";
 import type { DataSource } from "./views/data";
 import type { Goal } from "./views/goals";
-import type { AgentLogData, DailyBriefData } from "./views/my-day";
+import type { AllyChatMessage } from "./views/ally-chat";
+import type { AgentLogData, DailyBriefData, DecisionCardItem } from "./views/my-day";
 import type { Person } from "./views/people";
 import type { Project } from "./views/work";
 import type { TaskFilter, TaskSort, WorkspaceDetail, WorkspaceSummary, WorkspaceTask } from "./views/workspaces";
@@ -243,6 +244,15 @@ export type AppViewState = {
   todayTasksLoading?: boolean;
   todayEditingTaskId?: string | null;
   todayShowCompleted?: boolean;
+  // Ally side-chat state
+  allyPanelOpen?: boolean;
+  allyMessages?: AllyChatMessage[];
+  allyStream?: string | null;
+  allyDraft?: string;
+  allyUnread?: number;
+  allySending?: boolean;
+  allyWorking?: boolean;
+  todayQueueResults?: DecisionCardItem[];
   // Daily Brief state
   dailyBrief?: DailyBriefData | null;
   dailyBriefLoading?: boolean;
@@ -517,6 +527,18 @@ export type AppViewState = {
   // Today view mode handler
   handleTodayViewModeChange: (mode: "my-day" | "agent-log") => void;
   handlePrivateModeToggle: () => void;
+  // Ally side-chat handlers
+  handleAllyToggle: () => void;
+  handleAllyDraftChange: (text: string) => void;
+  handleAllySend: () => Promise<void>;
+  handleAllyOpenFull: () => void;
+  // Decision card handlers
+  handleDecisionApprove: (id: string) => Promise<void>;
+  handleDecisionReject: (id: string) => Promise<void>;
+  handleDecisionViewOutput: (id: string, outputPath: string) => void;
+  handleDecisionOpenChat: (id: string) => void;
+  // File open handler
+  handleOpenFile: (filePath: string) => Promise<void>;
   // Inner Work handlers
   handleSendToSage: (message: string) => Promise<void>;
   handleBackToSessions: () => void;

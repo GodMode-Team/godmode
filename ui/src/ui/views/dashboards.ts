@@ -3,15 +3,13 @@
  *
  * Two modes:
  *   1. Gallery: grid of dashboard cards with create/delete actions.
- *   2. Active: renders a single dashboard's HTML with back/refresh controls,
- *      an "Open in Chat" button, and an inline chat panel at the bottom
- *      powered by the dashboard's persistent session.
+ *   2. Active: renders a single dashboard's HTML with back/refresh controls
+ *      and an "Open in Chat" button. Chat is handled by the side-panel Ally.
  */
 
 import { html, nothing } from "lit";
 import { unsafeHTML } from "lit/directives/unsafe-html.js";
 import { sanitizeDashboardHtml } from "../markdown.js";
-import { sanitizeHtmlFragment } from "../markdown.js";
 import { formatAgo } from "../format.js";
 import type { DashboardManifest } from "../controllers/dashboards.js";
 
@@ -32,17 +30,6 @@ export type DashboardsProps = {
   onBack: () => void;
   onRefresh: () => void;
   onOpenSession: (dashboardId: string) => void;
-  // Inline chat props
-  chatOpen?: boolean;
-  chatMessages?: unknown[];
-  chatStream?: string | null;
-  chatMessage?: string;
-  chatSending?: boolean;
-  assistantName?: string;
-  assistantAvatar?: string | null;
-  onToggleChat?: () => void;
-  onChatMessageChange?: (value: string) => void;
-  onChatSend?: () => void;
 };
 
 // ── Helpers ──────────────────────────────────────────────────────────
@@ -90,115 +77,6 @@ function renderDashboardCard(
   `;
 }
 
-// ── Inline Chat Message ─────────────────────────────────────────────
-
-function renderChatMessage(msg: Record<string, unknown>, assistantName: string) {
-  const role = (msg.role as string) || "unknown";
-  const isAssistant = role === "assistant";
-  const label = isAssistant ? assistantName : "You";
-
-  // Extract text content
-  let text = "";
-  if (typeof msg.text === "string") {
-    text = msg.text;
-  } else if (typeof msg.content === "string") {
-    text = msg.content;
-  } else if (Array.isArray(msg.content)) {
-    text = (msg.content as Array<Record<string, unknown>>)
-      .filter((b) => b.type === "text" && typeof b.text === "string")
-      .map((b) => b.text as string)
-      .join("\n");
-  }
-
-  if (!text.trim()) return nothing;
-
-  return html`
-    <div class="db-chat-msg ${isAssistant ? "db-chat-msg--assistant" : "db-chat-msg--user"}">
-      <div class="db-chat-msg-label">${label}</div>
-      <div class="db-chat-msg-body">${isAssistant ? unsafeHTML(sanitizeHtmlFragment(text)) : text}</div>
-    </div>
-  `;
-}
-
-// ── Inline Chat Panel ───────────────────────────────────────────────
-
-function renderInlineChat(props: DashboardsProps) {
-  const {
-    chatOpen,
-    chatMessages,
-    chatStream,
-    chatMessage,
-    chatSending,
-    isWorking,
-    assistantName,
-    onToggleChat,
-    onChatMessageChange,
-    onChatSend,
-  } = props;
-
-  const name = assistantName || "Assistant";
-  const messages = (chatMessages ?? []) as Array<Record<string, unknown>>;
-  const hasMessages = messages.length > 0;
-
-  return html`
-    <div class="db-chat-panel ${chatOpen ? "db-chat-panel--open" : ""}">
-      <button
-        class="db-chat-toggle"
-        @click=${() => onToggleChat?.()}
-      >
-        <span class="db-chat-toggle-label">
-          Session ${hasMessages ? `(${messages.length})` : ""}
-          ${isWorking ? html`<span class="db-chat-working">working...</span>` : nothing}
-        </span>
-        <span class="db-chat-toggle-arrow">${chatOpen ? "\u25BC" : "\u25B2"}</span>
-      </button>
-
-      ${chatOpen
-        ? html`
-            <div class="db-chat-messages" id="db-chat-messages">
-              ${!hasMessages && !chatStream
-                ? html`<div class="db-chat-empty">Send a message to refine this dashboard.</div>`
-                : nothing}
-              ${messages.map((m) => renderChatMessage(m, name))}
-              ${chatStream
-                ? html`
-                    <div class="db-chat-msg db-chat-msg--assistant">
-                      <div class="db-chat-msg-label">${name}</div>
-                      <div class="db-chat-msg-body">${unsafeHTML(sanitizeHtmlFragment(chatStream))}</div>
-                    </div>
-                  `
-                : nothing}
-              ${isWorking && !chatStream
-                ? html`<div class="db-chat-typing">${name} is thinking...</div>`
-                : nothing}
-            </div>
-            <div class="db-chat-input-row">
-              <input
-                class="db-chat-input"
-                type="text"
-                placeholder="Ask to refine this dashboard..."
-                .value=${chatMessage ?? ""}
-                ?disabled=${chatSending || isWorking}
-                @input=${(e: Event) => onChatMessageChange?.((e.target as HTMLInputElement).value)}
-                @keydown=${(e: KeyboardEvent) => {
-                  if (e.key === "Enter" && !e.shiftKey) {
-                    e.preventDefault();
-                    onChatSend?.();
-                  }
-                }}
-              />
-              <button
-                class="db-chat-send-btn"
-                ?disabled=${chatSending || isWorking || !(chatMessage ?? "").trim()}
-                @click=${() => onChatSend?.()}
-              >${chatSending ? "..." : "Send"}</button>
-            </div>
-          `
-        : nothing}
-    </div>
-  `;
-}
-
 // ── Active Dashboard View ────────────────────────────────────────────
 
 function renderActiveDashboard(props: DashboardsProps) {
@@ -227,7 +105,6 @@ function renderActiveDashboard(props: DashboardsProps) {
           ${unsafeHTML(sanitizeDashboardHtml(activeDashboardHtml))}
         </div>
       </div>
-      ${renderInlineChat(props)}
     </section>
   `;
 }

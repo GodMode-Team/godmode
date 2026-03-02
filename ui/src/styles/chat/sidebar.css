@@ -194,6 +194,25 @@
   background: var(--panel-elevated, rgba(255, 255, 255, 0.03));
 }
 
+/* Split sidebar: file viewer on top, ally chat below */
+.chat-sidebar--split {
+  display: flex;
+  flex-direction: column;
+}
+
+.chat-sidebar-top {
+  flex: 3;
+  min-height: 120px;
+  overflow-y: auto;
+}
+
+.chat-sidebar-bottom {
+  flex: 2;
+  min-height: 120px;
+  overflow: hidden;
+  border-top: 1px solid var(--border, #2a2a4a);
+}
+
 /* Mobile: Full-screen modal */
 @media (max-width: 768px) {
   .chat-split-container--open {

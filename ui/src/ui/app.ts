@@ -62,6 +62,9 @@ import {
 import { loadAssistantIdentity as loadAssistantIdentityInternal } from "./controllers/assistant-identity";
 import type { FailedMessage } from "./controllers/chat";
 import { retryPendingMessage } from "./controllers/chat";
+import type { AllyChatMessage } from "./views/ally-chat.js";
+import type { DecisionCardItem } from "./views/my-day.js";
+import { ALLY_SESSION_KEY, buildAllyContext } from "./controllers/ally.js";
 import type { DevicePairingList } from "./controllers/devices";
 import type { ExecApprovalRequest } from "./controllers/exec-approval";
 import type { ExecApprovalsFile, ExecApprovalsSnapshot } from "./controllers/exec-approvals";
@@ -430,6 +433,16 @@ export class GodModeApp extends LitElement {
   @state() todayTasksLoading = false;
   @state() todayEditingTaskId: string | null = null;
   @state() todayShowCompleted = false;
+
+  // Ally side-chat state
+  @state() allyPanelOpen = false;
+  @state() allyMessages: AllyChatMessage[] = [];
+  @state() allyStream: string | null = null;
+  @state() allyDraft = "";
+  @state() allyUnread = 0;
+  @state() allySending = false;
+  @state() allyWorking = false;
+  @state() todayQueueResults: DecisionCardItem[] = [];
 
   @state() chatPrivateMode = false;
   /** Maps private session keys → expiry timestamp (ms). Ephemeral sessions auto-delete. */
@@ -963,41 +976,190 @@ export class GodModeApp extends LitElement {
     await this.handleMissionControlOpenTaskSession(itemId);
   }
 
+  // ── Ally Side-Chat Handlers ──────────────────────────────────────────
+
+  handleAllyToggle() {
+    this.allyPanelOpen = !this.allyPanelOpen;
+    if (this.allyPanelOpen) {
+      this.allyUnread = 0;
+      this._loadAllyHistory();
+    }
+  }
+
+  handleAllyDraftChange(text: string) {
+    this.allyDraft = text;
+  }
+
+  async handleAllySend() {
+    const text = this.allyDraft.trim();
+    if (!text || this.allySending) return;
+
+    // Prepend tab context so the ally knows what the user is looking at
+    const context = buildAllyContext(this as any);
+    const messageWithContext = `${context}\n\n${text}`;
+
+    this.allyDraft = "";
+    this.allySending = true;
+    this.allyMessages = [...this.allyMessages, { role: "user" as const, content: text, timestamp: Date.now() }];
+
+    try {
+      await this.client?.request("chat.send", {
+        sessionKey: ALLY_SESSION_KEY,
+        message: messageWithContext,
+        deliver: false,
+      });
+    } catch (e) {
+      console.error("[Ally] Failed to send ally message:", e);
+    } finally {
+      this.allySending = false;
+    }
+  }
+
+  handleAllyOpenFull() {
+    // Switch to chat tab and activate ally session
+    this.allyPanelOpen = false;
+    this.setTab("chat" as import("./navigation.js").Tab);
+    // Ensure ally-main session is open in tabs, then switch to it
+    const openTabs = this.settings.openTabs.includes(ALLY_SESSION_KEY)
+      ? this.settings.openTabs
+      : [ALLY_SESSION_KEY, ...this.settings.openTabs];
+    this.applySettings({
+      ...this.settings,
+      openTabs,
+      sessionKey: ALLY_SESSION_KEY,
+      lastActiveSessionKey: ALLY_SESSION_KEY,
+      tabLastViewed: {
+        ...this.settings.tabLastViewed,
+        [ALLY_SESSION_KEY]: Date.now(),
+      },
+    });
+    this.sessionKey = ALLY_SESSION_KEY;
+    this.chatMessages = [];
+    this.chatStream = null;
+    this.chatStreamStartedAt = null;
+    this.chatRunId = null;
+    this.resetToolStream();
+    this.resetChatScroll();
+    void this.loadAssistantIdentity();
+    void import("./controllers/chat.js").then(({ loadChatHistory }) => loadChatHistory(this));
+  }
+
+  private async _loadAllyHistory() {
+    try {
+      const res = await this.client?.request<{
+        messages: Array<{ role: string; content: unknown; timestamp?: number }>;
+      }>("chat.history", { sessionKey: ALLY_SESSION_KEY, limit: 100 });
+      if (res?.messages) {
+        this.allyMessages = res.messages.map((m) => ({
+          role: m.role as "user" | "assistant",
+          content: typeof m.content === "string"
+            ? m.content
+            : Array.isArray(m.content)
+              ? (m.content.find((b: any) => b.type === "text") as any)?.text ?? ""
+              : "",
+          timestamp: m.timestamp,
+        }));
+      }
+    } catch {
+      // History load failed — start fresh
+    }
+  }
+
+  // ── Decision Card Handlers ──────────────────────────────────────────
+
+  async handleDecisionApprove(id: string) {
+    if (!this.client || !this.connected) return;
+    try {
+      await this.client.request("queue.approve", { id });
+      this.todayQueueResults = this.todayQueueResults.filter(r => r.id !== id);
+    } catch (e) {
+      console.error("[DecisionCard] Approve failed:", e);
+      this.showToast("Failed to approve", "error");
+    }
+  }
+
+  async handleDecisionReject(id: string) {
+    if (!this.client || !this.connected) return;
+    try {
+      await this.client.request("queue.reject", { id });
+      this.todayQueueResults = this.todayQueueResults.filter(r => r.id !== id);
+    } catch (e) {
+      console.error("[DecisionCard] Reject failed:", e);
+      this.showToast("Failed to reject", "error");
+    }
+  }
+
+  handleDecisionViewOutput(id: string, outputPath: string) {
+    void this.handleOpenFile(outputPath);
+  }
+
+  handleDecisionOpenChat(id: string) {
+    // Open ally panel and mention the item
+    this.allyPanelOpen = true;
+    this.allyUnread = 0;
+    void this._loadAllyHistory();
+  }
+
+  async handleTodayOpenChatToEdit(itemId: string) {
+    try {
+      // Read queue output
+      const res = await this.client?.request<{
+        outputPath?: string;
+        path?: string;
+        content?: string;
+      }>("queue.readOutput", { id: itemId });
+      const outputPath = res?.outputPath || res?.path;
+
+      // Open sidebar with output
+      if (outputPath) {
+        await this.handleOpenFile(outputPath);
+      }
+
+      // Open ally panel
+      this.allyPanelOpen = true;
+      this.allyUnread = 0;
+
+      // Switch to chat tab so sidebar is visible
+      if (this.tab !== ("chat" as any)) {
+        this.setTab("chat" as import("./navigation.js").Tab);
+      }
+    } catch (e) {
+      console.error("Open chat to edit failed:", e);
+    }
+  }
+
   /**
-   * Seeds a newly opened session with agent output so the user has the
-   * full context from the agent that worked on the task.
-   * Sends the output as a user message so it becomes part of the session
-   * history — the assistant will respond with awareness of the agent's work.
+   * Seeds a newly opened session with agent output context.
+   * Opens the sidebar with the full output (zero token cost) and sends
+   * only a compact summary to the chat to avoid wasting thousands of tokens.
    */
   async seedSessionWithAgentOutput(taskTitle: string, output: string, agentPrompt?: string) {
     if (!this.client || !this.connected) return;
-    const parts: string[] = [
-      `A GodMode agent already worked on this task: **${taskTitle}**`,
-    ];
 
-    if (agentPrompt) {
-      // Extract just the task section from the prompt (skip system boilerplate)
-      const taskMatch = agentPrompt.match(/## Task\n([\s\S]*?)(?=\n## |$)/);
-      if (taskMatch) {
-        parts.push("", "**What the agent was asked to do:**", taskMatch[1].trim());
-      }
-    }
+    // Open sidebar with the full agent output — zero token cost
+    this.handleOpenSidebar(output, {
+      title: `Agent Output: ${taskTitle}`,
+      filePath: null,
+      mimeType: null,
+    });
 
-    parts.push(
-      "",
-      "**Agent's output:**",
-      "",
-      output,
-      "",
-      "---",
-      "",
-      "I'm reviewing this. Help me understand the output, flag anything that needs attention, and suggest what to do next.",
-    );
+    // Extract a compact summary from the ## Summary section
+    const summaryMatch = output.match(/## Summary\n([\s\S]*?)(?=\n## |$)/);
+    const summary = summaryMatch
+      ? summaryMatch[1].trim().split("\n").slice(0, 3).join("\n")
+      : "Output available in sidebar.";
 
-    const contextMessage = parts.join("\n");
+    const compactMessage = [
+      `Agent completed **${taskTitle}**.`,
+      "",
+      summary,
+      "",
+      "Full output is in the sidebar. What would you like to do?",
+    ].join("\n");
+
     try {
       const { sendChatMessage } = await import("./controllers/chat.js");
-      await sendChatMessage(this as any, contextMessage);
+      await sendChatMessage(this as any, compactMessage);
     } catch (err) {
       console.error("[Session] Failed to seed session with agent output:", err);
     }
@@ -1812,6 +1974,16 @@ export class GodModeApp extends LitElement {
     }
   }
 
+  async handlePushToDrive(filePath: string) {
+    try {
+      await this.client?.request("files.pushToDrive", { filePath });
+      this.showToast("Uploaded to Google Drive", "success");
+    } catch (e) {
+      console.error("Push to Drive failed:", e);
+      this.showToast("Push to Drive failed", "error");
+    }
+  }
+
   handleSplitRatioChange(ratio: number) {
     const newRatio = Math.max(0.4, Math.min(0.7, ratio));
     this.splitRatio = newRatio;
@@ -2169,6 +2341,14 @@ export class GodModeApp extends LitElement {
       return;
     }
     await loadMyDayInternal(this);
+    // Also refresh decision cards
+    this._loadDecisionCards();
+  }
+
+  private _loadDecisionCards() {
+    import("./controllers/my-day.js").then(async (mod) => {
+      this.todayQueueResults = await mod.loadTodayQueueResults(this as any);
+    }).catch(() => {});
   }
 
   async handleMyDayTaskStatusChange(taskId: string, newStatus: "pending" | "complete") {

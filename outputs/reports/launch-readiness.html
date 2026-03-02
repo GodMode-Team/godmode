@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>GodMode Launch Readiness</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
+:root{--bg:#08080f;--bg2:#0d0d18;--bg3:#12121e;--border:rgba(255,255,255,0.07);--text:#e8e8f0;--muted:#5a5a72;--green:#22c55e;--red:#ef4444;--yellow:#f59e0b;--accent:#7c6df0;--orange:#f97316;--cyan:#06b6d4;}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;padding:28px;min-height:100vh;
+  background-image:radial-gradient(ellipse 60% 40% at 50% 0%,rgba(124,109,240,0.1) 0%,transparent 60%);}
+
+.header{display:flex;align-items:center;justify-content:space-between;margin-bottom:32px;}
+.title{font-size:24px;font-weight:800;letter-spacing:-0.5px;}
+.title span{color:var(--accent);}
+.subtitle{font-size:13px;color:var(--muted);margin-top:4px;}
+
+/* BIG METER */
+.meter-wrap{background:var(--bg2);border:1px solid var(--border);border-radius:16px;padding:28px;margin-bottom:20px;position:relative;overflow:hidden;}
+.meter-wrap::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,rgba(124,109,240,0.3),transparent);}
+.meter-top{display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:24px;}
+.meter-score{font-size:80px;font-weight:800;line-height:1;letter-spacing:-3px;}
+.meter-score.high{background:linear-gradient(135deg,var(--green),var(--cyan));-webkit-background-clip:text;-webkit-text-fill-color:transparent;}
+.meter-score.mid{background:linear-gradient(135deg,var(--yellow),var(--orange));-webkit-background-clip:text;-webkit-text-fill-color:transparent;}
+.meter-score.low{background:linear-gradient(135deg,var(--red),var(--orange));-webkit-background-clip:text;-webkit-text-fill-color:transparent;}
+.meter-label{font-size:13px;color:var(--muted);margin-bottom:8px;text-align:right;}
+.meter-verdict{font-size:20px;font-weight:700;text-align:right;}
+.bar-outer{height:12px;background:rgba(255,255,255,0.06);border-radius:6px;overflow:hidden;}
+.bar-inner{height:100%;border-radius:6px;background:linear-gradient(90deg,var(--accent),var(--green));transition:width 1.5s cubic-bezier(.4,0,.2,1);}
+
+/* FEATURE GRID */
+.feature-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:20px;}
+.feature-card{background:var(--bg3);border:1px solid var(--border);border-radius:12px;padding:16px;display:flex;gap:12px;align-items:flex-start;}
+.feature-icon{width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;}
+.feature-icon.done{background:rgba(34,197,94,0.15);border:1px solid rgba(34,197,94,0.2);}
+.feature-icon.warn{background:rgba(245,158,11,0.15);border:1px solid rgba(245,158,11,0.2);}
+.feature-icon.fail{background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.15);}
+.feature-name{font-size:13px;font-weight:600;margin-bottom:4px;}
+.feature-note{font-size:11px;color:var(--muted);line-height:1.4;}
+.feature-tag{display:inline-block;margin-top:6px;font-size:9px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;padding:2px 7px;border-radius:4px;}
+.feature-tag.done{background:rgba(34,197,94,0.15);color:var(--green);}
+.feature-tag.warn{background:rgba(245,158,11,0.15);color:var(--yellow);}
+.feature-tag.fail{background:rgba(239,68,68,0.1);color:var(--red);}
+.feature-tag.pending{background:rgba(107,107,114,0.2);color:var(--muted);}
+
+/* BATTLE TEST */
+.section-title{font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin:24px 0 12px;}
+.battle-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;}
+.battle-card{background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:14px;text-align:center;}
+.battle-avatar{font-size:24px;margin-bottom:6px;}
+.battle-name{font-size:12px;font-weight:600;}
+.battle-status{font-size:10px;color:var(--muted);margin-top:2px;}
+.battle-dot{width:8px;height:8px;border-radius:50%;margin:6px auto 0;}
+.battle-dot.ready{background:var(--yellow);box-shadow:0 0 6px var(--yellow);}
+.battle-dot.waiting{background:var(--muted);}
+
+/* BLOCKERS */
+.blocker{display:flex;gap:10px;align-items:flex-start;padding:12px;background:rgba(239,68,68,0.05);border:1px solid rgba(239,68,68,0.15);border-radius:10px;margin-bottom:8px;}
+.blocker-icon{font-size:14px;flex-shrink:0;}
+.blocker-text{font-size:12px;line-height:1.4;}
+.blocker-label{font-size:10px;font-weight:700;color:var(--red);text-transform:uppercase;letter-spacing:.8px;margin-bottom:2px;}
+</style>
+</head>
+<body>
+<div class="header">
+  <div>
+    <div class="title">⚡ GodMode <span>Launch Readiness</span></div>
+    <div class="subtitle">Real feature status · Updated 2026-02-28</div>
+  </div>
+  <div style="text-align:right;">
+    <div style="font-size:12px;color:var(--muted);">Target</div>
+    <div style="font-size:16px;font-weight:700;color:var(--orange);">Battle Test → Mar 2026</div>
+  </div>
+</div>
+
+<!-- METER -->
+<div class="meter-wrap">
+  <div class="meter-top">
+    <div>
+      <div style="font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:8px;">LAUNCH CONFIDENCE</div>
+      <div class="meter-score mid">72%</div>
+    </div>
+    <div>
+      <div class="meter-label">Status</div>
+      <div class="meter-verdict" style="color:var(--yellow);">🟡 Almost Ready</div>
+      <div style="font-size:11px;color:var(--muted);margin-top:4px;">2 critical blockers remaining</div>
+    </div>
+  </div>
+  <div class="bar-outer"><div class="bar-inner" style="width:72%"></div></div>
+  <div style="display:flex;justify-content:space-between;margin-top:8px;font-size:10px;color:var(--muted);">
+    <span>Not started</span><span>Ship it</span>
+  </div>
+</div>
+
+<!-- FEATURE GRID -->
+<div class="section-title">Core Feature Status</div>
+<div class="feature-grid">
+  <div class="feature-card">
+    <div class="feature-icon done">✅</div>
+    <div>
+      <div class="feature-name">Coding Harness</div>
+      <div class="feature-note">Worktree orchestrator, GitHub integration, PR creation, validation gates. All wired.</div>
+      <span class="feature-tag done">Verified</span>
+    </div>
+  </div>
+  <div class="feature-card">
+    <div class="feature-icon done">✅</div>
+    <div>
+      <div class="feature-name">Deep Onboarding</div>
+      <div class="feature-note">7-phase flow, 8-step memory wizard, full-screen takeover, re-launchable from Lab.</div>
+      <span class="feature-tag done">Verified</span>
+    </div>
+  </div>
+  <div class="feature-card">
+    <div class="feature-icon done">✅</div>
+    <div>
+      <div class="feature-name">Consciousness Sync</div>
+      <div class="feature-note">4-state UI feedback, green/red glow, Claude Code session sync on trigger.</div>
+      <span class="feature-tag done">Verified</span>
+    </div>
+  </div>
+  <div class="feature-card">
+    <div class="feature-icon done">✅</div>
+    <div>
+      <div class="feature-name">Daily Brief</div>
+      <div class="feature-note">Calendar working, brief generator built, NBSP bug fixed, bidirectional task sync.</div>
+      <span class="feature-tag done">Verified</span>
+    </div>
+  </div>
+  <div class="feature-card">
+    <div class="feature-icon done">✅</div>
+    <div>
+      <div class="feature-name">Mission Control</div>
+      <div class="feature-note">Toggleable in Lab (default off). Queue, agent activity, inbox all wired.</div>
+      <span class="feature-tag done">Verified</span>
+    </div>
+  </div>
+  <div class="feature-card">
+    <div class="feature-icon done">✅</div>
+    <div>
+      <div class="feature-name">Update System</div>
+      <div class="feature-note">check/run/pluginCheck RPC, topbar pill, post-update health check.</div>
+      <span class="feature-tag done">Verified</span>
+    </div>
+  </div>
+  <div class="feature-card">
+    <div class="feature-icon done">✅</div>
+    <div>
+      <div class="feature-name">License Gate</div>
+      <div class="feature-note">withLicenseGate() on all handlers. API + CLI activation. Dev keys working.</div>
+      <span class="feature-tag done">Verified</span>
+    </div>
+  </div>
+  <div class="feature-card">
+    <div class="feature-icon done">✅</div>
+    <div>
+      <div class="feature-name">Custom Guardrails</div>
+      <div class="feature-note">Runtime-installable guardrails via JSON. No plugin rebuilds required.</div>
+      <span class="feature-tag done">Verified</span>
+    </div>
+  </div>
+  <div class="feature-card">
+    <div class="feature-icon warn">⚠️</div>
+    <div>
+      <div class="feature-name">GitHub Setup</div>
+      <div class="feature-note">Foundational for team memory + coding harness. Often misconfigured. Wizard needed.</div>
+      <span class="feature-tag warn">In Progress</span>
+    </div>
+  </div>
+  <div class="feature-card">
+    <div class="feature-icon fail">❌</div>
+    <div>
+      <div class="feature-name">Fathom Webhook</div>
+      <div class="feature-note">Swarm task failed twice. Meeting → memory pipeline not yet live.</div>
+      <span class="feature-tag fail">Failed × 2</span>
+    </div>
+  </div>
+  <div class="feature-card">
+    <div class="feature-icon warn">🔐</div>
+    <div>
+      <div class="feature-name">Security + 1Password</div>
+      <div class="feature-note">Guide written. Ship as onboarding checklist item. Not blocking MVP.</div>
+      <span class="feature-tag pending">Deferred</span>
+    </div>
+  </div>
+  <div class="feature-card">
+    <div class="feature-icon warn">🧪</div>
+    <div>
+      <div class="feature-name">E2E Test</div>
+      <div class="feature-note">Full build test not completed. Required before handing to battle test team.</div>
+      <span class="feature-tag fail">Blocking</span>
+    </div>
+  </div>
+</div>
+
+<!-- BATTLE TEST -->
+<div class="section-title">Battle Test Roster</div>
+<div class="battle-grid">
+  <div class="battle-card">
+    <div class="battle-avatar">👨‍💻</div>
+    <div class="battle-name">Titus</div>
+    <div class="battle-status">Right hand</div>
+    <div class="battle-dot ready"></div>
+  </div>
+  <div class="battle-card">
+    <div class="battle-avatar">👩‍💼</div>
+    <div class="battle-name">Ashley</div>
+    <div class="battle-status">Team</div>
+    <div class="battle-dot waiting"></div>
+  </div>
+  <div class="battle-card">
+    <div class="battle-avatar">👨‍🔧</div>
+    <div class="battle-name">Iain</div>
+    <div class="battle-status">Team</div>
+    <div class="battle-dot waiting"></div>
+  </div>
+  <div class="battle-card">
+    <div class="battle-avatar">🧑‍💻</div>
+    <div class="battle-name">Shehroze</div>
+    <div class="battle-status">Team</div>
+    <div class="battle-dot waiting"></div>
+  </div>
+</div>
+
+<!-- BLOCKERS -->
+<div class="section-title">Critical Blockers</div>
+<div class="blocker">
+  <div class="blocker-icon">🔴</div>
+  <div>
+    <div class="blocker-label">Blocking Ship</div>
+    <div class="blocker-text">E2E test not completed — can't confidently hand to anyone yet. This is the next action.</div>
+  </div>
+</div>
+<div class="blocker">
+  <div class="blocker-icon">🔴</div>
+  <div>
+    <div class="blocker-label">Blocking Meetings → Memory</div>
+    <div class="blocker-text">Fathom webhook handler failed × 2. Meetings aren't being processed into memory. Atlas misses meeting context.</div>
+  </div>
+</div>
+<div class="blocker" style="background:rgba(245,158,11,0.05);border-color:rgba(245,158,11,0.15);">
+  <div class="blocker-icon">🟡</div>
+  <div>
+    <div class="blocker-label">Open Design Question</div>
+    <div class="blocker-text">Self-surgery problem: GodMode modifying OpenClaw from within OpenClaw = gateway restart risk. External-only (VS Code) or safe-restart protocol needed.</div>
+  </div>
+</div>
+
+<div style="margin-top:24px;padding-top:16px;border-top:1px solid var(--border);font-size:11px;color:var(--muted);">
+  ⚡ Prosper · Launch Readiness · Data from WORKING.md + coding-tasks.json
+</div>
+</body>
+</html>

@@ -46,6 +46,7 @@ import { createTeamMessageTool } from "./src/tools/team-message.js";
 import { createTeamMemoryWriteTool } from "./src/tools/team-memory.js";
 import { createCodingTaskTool } from "./src/tools/coding-task.js";
 // therapy handlers deprecated — old code, not shipping in plugin
+import { integrationsHandlers } from "./src/methods/integrations.js";
 import { uiSlotsHandlers } from "./src/methods/ui-slots.js";
 import { workspacesHandlers } from "./src/methods/workspaces.js";
 import { focusPulseHandlers } from "./src/methods/focus-pulse.js";
@@ -58,7 +59,10 @@ import { createGuardrailTool } from "./src/tools/guardrail.js";
 import { createOnboardTool } from "./src/tools/onboard.js";
 import { createMorningSetTool } from "./src/tools/morning-set.js";
 import { createQueueAddTool } from "./src/tools/queue-add.js";
+import { createXReadTool } from "./src/tools/x-read.js";
 import { queueHandlers } from "./src/methods/queue.js";
+import { xIntelHandlers } from "./src/methods/x-intel.js";
+import { filesHandlers } from "./src/methods/files.js";
 import { dashboardsHandlers } from "./src/methods/dashboards.js";
 import { initAgentLogWriter } from "./src/services/agent-log-writer.js";
 import { CodingOrchestrator } from "./src/services/coding-orchestrator.js";
@@ -628,6 +632,9 @@ const godmodePlugin = {
       ...supportHandlers,
       ...correctionsHandlers,
       ...sessionCoordinationHandlers,
+      ...xIntelHandlers,
+      ...filesHandlers,
+      ...integrationsHandlers,
     };
 
     // Methods that must work before a license is configured (setup flow)
@@ -636,6 +643,11 @@ const godmodePlugin = {
       "onboarding.activateLicense",
       "onboarding.status",
       "onboarding.checklist",
+      "integrations.status",
+      "integrations.test",
+      "integrations.configure",
+      "integrations.setupGuide",
+      "integrations.platformInfo",
     ]);
 
     for (const [method, handler] of Object.entries(allHandlers)) {
@@ -944,6 +956,14 @@ h1{color:#ff6b6b}code{background:#16213e;padding:2px 8px;border-radius:4px}a{col
         api.logger.warn(`[GodMode] Obsidian Sync failed to init: ${String(err)}`);
       }
 
+      // X/Twitter client — connect to browser + validate XAI key
+      try {
+        const { initXClient } = await import("./src/services/x-client.js");
+        await initXClient(api.logger);
+      } catch (err) {
+        api.logger.warn(`[GodMode] X client init failed: ${String(err)}`);
+      }
+
       // CronGuard — scan and patch dangerous isolated cron jobs
       try {
         const { scanAndPatchCronJobs } = await import("./src/services/cron-guard.js");
@@ -959,6 +979,12 @@ h1{color:#ff6b6b}code{background:#16213e;padding:2px 8px;border-radius:4px}a{col
     });
 
     api.on("gateway_stop", async () => {
+      try {
+        const { stopBrave } = await import("./src/services/x-browser.js");
+        stopBrave();
+      } catch {
+        // Non-fatal
+      }
       try {
         const { getCurationAgentService } = await import("./src/services/curation-agent.js");
         getCurationAgentService().stop();
@@ -1519,6 +1545,7 @@ h1{color:#ff6b6b}code{background:#16213e;padding:2px 8px;border-radius:4px}a{col
     api.registerTool((ctx) => createMorningSetTool(ctx));
     api.registerTool((ctx) => createGuardrailTool(ctx));
     api.registerTool((ctx) => createQueueAddTool(ctx));
+    api.registerTool((ctx) => createXReadTool(ctx));
 
     // ── 6. Register CLI commands ──────────────────────────────────
     api.registerCli(

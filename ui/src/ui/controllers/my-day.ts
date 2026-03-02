@@ -5,7 +5,7 @@
 
 import { localDateString } from "../format";
 import type { GatewayBrowserClient } from "../gateway";
-import type { AgentLogData, DailyBriefData } from "../views/my-day";
+import type { AgentLogData, DailyBriefData, DecisionCardItem } from "../views/my-day";
 import type { WorkspaceTask } from "../views/workspaces";
 
 export type MyDayState = {
@@ -297,6 +297,63 @@ export async function loadTodayTasksWithQueueStatus(state: MyDayState): Promise<
   }
 }
 
+// ── Overnight Decision Cards ─────────────────────────────────────
+
+type QueueResultItem = {
+  id: string;
+  type: string;
+  title: string;
+  description?: string;
+  status: string;
+  completedAt?: number;
+  result?: {
+    summary: string;
+    outputPath?: string;
+    prUrl?: string;
+  };
+};
+
+/**
+ * Load queue items that completed overnight (status "review" or "done",
+ * completedAt within the last 24 hours).  These become decision cards
+ * at the top of the Today view.
+ */
+export async function loadTodayQueueResults(state: MyDayState): Promise<DecisionCardItem[]> {
+  if (!state.client || !state.connected) {
+    return [];
+  }
+
+  try {
+    const result = await state.client.request<{ items: QueueResultItem[] }>(
+      "queue.list",
+      { limit: 50 },
+    );
+
+    const items = result?.items ?? [];
+    const cutoff = Date.now() - 24 * 60 * 60 * 1000;
+
+    return items
+      .filter((item) => {
+        if (item.status !== "review" && item.status !== "done") return false;
+        // Include review items regardless of age, done items only within 24h
+        if (item.status === "done" && (item.completedAt ?? 0) < cutoff) return false;
+        return true;
+      })
+      .map((item): DecisionCardItem => ({
+        id: item.id,
+        title: item.title,
+        summary: item.result?.summary ?? item.description ?? "",
+        status: item.status as "review" | "done",
+        completedAt: item.completedAt,
+        outputPath: item.result?.outputPath,
+        prUrl: item.result?.prUrl,
+      }));
+  } catch (err) {
+    console.error("[MyDay] Failed to load queue results for decision cards:", err);
+    return [];
+  }
+}
+
 /**
  * Fire-and-forget: sync tasks between the daily brief and task system.
  */
@@ -396,8 +453,8 @@ export async function loadMyDay(state: MyDayState) {
   state.agentLog = results[2].status === "fulfilled" ? results[2].value : null;
   // todayTasks is set inside loadTodayTasks — no extra assignment needed
 
-  // Fire-and-forget: sync tasks between brief and task system
-  syncTodayTasks(state.client, state.todaySelectedDate);
+  // Task sync removed (F3 decoupling) — page loads no longer trigger task imports.
+  // syncTasksFromBrief runs once per day via morning set or manual invocation.
 
   // Log failures but don't block the page
   const labels = ["Brief", "Brief Notes", "Agent Log", "Today Tasks"];

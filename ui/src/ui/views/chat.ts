@@ -18,6 +18,7 @@ import type { ChatItem, MessageGroup, ToolExecutionInfo } from "../types/chat-ty
 import type { ChatAttachment, ChatQueueItem } from "../ui-types";
 import { validateFilesForUpload } from "../upload-constants";
 import { renderMarkdownSidebar } from "./markdown-sidebar";
+import { renderAllyInline, type AllyChatProps } from "./ally-chat";
 import "../components/resizable-divider";
 
 export type CompactionIndicatorStatus = {
@@ -102,6 +103,11 @@ export type ChatProps = {
   onClearRetry?: () => void;
   // Toast notifications for file upload errors
   showToast?: (message: string, type: ToastType) => void;
+  // Ally inline panel (for split sidebar layout)
+  allyPanelOpen?: boolean;
+  allyProps?: AllyChatProps | null;
+  // Push to Google Drive
+  onPushToDrive?: (filePath: string) => void;
 };
 
 const COMPACTION_TOAST_DURATION_MS = 5000;
@@ -777,27 +783,67 @@ export function renderChat(props: ChatProps) {
                 .splitRatio=${splitRatio}
                 @resize=${(e: CustomEvent) => props.onSplitRatioChange?.(e.detail.splitRatio)}
               ></resizable-divider>
-              <div class="chat-sidebar">
-                ${renderMarkdownSidebar({
-                  content: props.sidebarContent ?? null,
-                  error: props.sidebarError ?? null,
-                  mimeType: props.sidebarMimeType ?? null,
-                  filePath: props.sidebarFilePath ?? null,
-                  title: props.sidebarTitle ?? null,
-                  onClose: props.onCloseSidebar!,
-                  onViewRawText: () => {
-                    if (!props.sidebarContent || !props.onOpenSidebar) {
-                      return;
-                    }
-                    props.onOpenSidebar(props.sidebarContent, {
-                      mimeType: "text/plain",
+              ${props.allyPanelOpen && props.allyProps
+                ? html`
+                  <div class="chat-sidebar chat-sidebar--split">
+                    <div class="chat-sidebar-top">
+                      ${renderMarkdownSidebar({
+                        content: props.sidebarContent ?? null,
+                        error: props.sidebarError ?? null,
+                        mimeType: props.sidebarMimeType ?? null,
+                        filePath: props.sidebarFilePath ?? null,
+                        title: props.sidebarTitle ?? null,
+                        onClose: props.onCloseSidebar!,
+                        onViewRawText: () => {
+                          if (!props.sidebarContent || !props.onOpenSidebar) {
+                            return;
+                          }
+                          props.onOpenSidebar(props.sidebarContent, {
+                            mimeType: "text/plain",
+                            filePath: props.sidebarFilePath ?? null,
+                            title: props.sidebarTitle ?? null,
+                          });
+                        },
+                        onOpenFile: props.onOpenFile,
+                        onPushToDrive: props.onPushToDrive,
+                      })}
+                    </div>
+                    <resizable-divider
+                      direction="vertical"
+                      .splitRatio=${0.6}
+                      .minRatio=${0.2}
+                      .maxRatio=${0.8}
+                    ></resizable-divider>
+                    <div class="chat-sidebar-bottom">
+                      ${renderAllyInline(props.allyProps)}
+                    </div>
+                  </div>
+                `
+                : html`
+                  <div class="chat-sidebar">
+                    ${renderMarkdownSidebar({
+                      content: props.sidebarContent ?? null,
+                      error: props.sidebarError ?? null,
+                      mimeType: props.sidebarMimeType ?? null,
                       filePath: props.sidebarFilePath ?? null,
                       title: props.sidebarTitle ?? null,
-                    });
-                  },
-                  onOpenFile: props.onOpenFile,
-                })}
-              </div>
+                      onClose: props.onCloseSidebar!,
+                      onViewRawText: () => {
+                        if (!props.sidebarContent || !props.onOpenSidebar) {
+                          return;
+                        }
+                        props.onOpenSidebar(props.sidebarContent, {
+                          mimeType: "text/plain",
+                          filePath: props.sidebarFilePath ?? null,
+                          title: props.sidebarTitle ?? null,
+                        });
+                      },
+                      onOpenFile: props.onOpenFile,
+                      onPushToDrive: props.onPushToDrive,
+                    })}
+                  </div>
+                `
+              }
             `
             : nothing
         }

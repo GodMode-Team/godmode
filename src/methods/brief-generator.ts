@@ -535,29 +535,8 @@ type XIntelItem = {
   url?: string;
 };
 
-/**
- * Load the XAI API key from ~/.openclaw/.env (primary) or ~/godmode/.env (fallback).
- */
-function getXaiApiKey(): string {
-  // Primary: ~/.openclaw/.env
-  try {
-    const openclawEnvPath = join(
-      process.env.HOME || process.env.USERPROFILE || "",
-      ".openclaw",
-      ".env",
-    );
-    const raw = readFileSync(openclawEnvPath, "utf-8");
-    for (const line of raw.split("\n")) {
-      if (line.startsWith("XAI_API_KEY=")) {
-        return line.slice("XAI_API_KEY=".length).trim();
-      }
-    }
-  } catch {
-    // not found
-  }
-  // Fallback: ~/godmode/.env
-  return getEnv("XAI_API_KEY");
-}
+// XAI key loading now shared via x-client service
+import { getXaiApiKey } from "../services/x-client.js";
 
 /**
  * Fetch X intelligence via XAI Responses API with x_search tool.

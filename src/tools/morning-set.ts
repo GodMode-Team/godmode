@@ -97,7 +97,7 @@ export function createMorningSetTool(_ctx: ToolContext): AnyAgentTool {
         let syncResult = { added: 0, updated: 0, total: 0 };
         try {
           const { syncTasksFromBrief } = await import("../methods/daily-brief.js");
-          syncResult = await syncTasksFromBrief(today);
+          syncResult = await syncTasksFromBrief(today, { force: true });
         } catch {
           // Task sync is best-effort
         }

@@ -2054,3 +2054,191 @@
 .life-subtab-content {
   padding: 0 24px 24px;
 }
+
+/* ===== Decision Cards (Overnight Agent Results) ===== */
+
+.decision-cards {
+  margin-bottom: 24px;
+}
+
+.decision-cards-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.decision-cards-header h3 {
+  font-size: 15px;
+  font-weight: 600;
+  margin: 0;
+  color: var(--mc-text, var(--text));
+}
+
+.decision-cards-header .count-badge {
+  background: var(--mc-accent, var(--accent, #6366f1));
+  color: white;
+  border-radius: 10px;
+  padding: 2px 8px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.decision-cards-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.decision-cards-list--scroll {
+  max-height: 320px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.decision-cards-list--scroll::-webkit-scrollbar {
+  width: 6px;
+}
+
+.decision-cards-list--scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.decision-cards-list--scroll::-webkit-scrollbar-thumb {
+  background: var(--mc-border, var(--border));
+  border-radius: 3px;
+}
+
+.decision-card {
+  background: var(--mc-bg-tertiary, var(--bg-elevated, #252545));
+  border: 1px solid var(--mc-border, var(--border, #2a2a4a));
+  border-radius: 12px;
+  padding: 16px;
+  transition: border-color 0.15s;
+}
+
+.decision-card:hover {
+  border-color: var(--mc-accent, var(--accent, #6366f1));
+}
+
+.decision-card-status {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 6px;
+  display: inline-block;
+  margin-bottom: 8px;
+}
+
+.decision-card-status--review {
+  background: rgba(245, 158, 11, 0.12);
+  color: #f59e0b;
+}
+
+.decision-card-status--done {
+  background: rgba(34, 197, 94, 0.12);
+  color: #22c55e;
+}
+
+:root[data-theme="light"] .decision-card-status--review {
+  background: rgba(245, 158, 11, 0.1);
+  color: #d97706;
+}
+
+:root[data-theme="light"] .decision-card-status--done {
+  background: rgba(34, 197, 94, 0.1);
+  color: #16a34a;
+}
+
+.decision-card-title {
+  font-size: 15px;
+  font-weight: 600;
+  margin: 0 0 4px 0;
+  color: var(--mc-text, var(--text));
+}
+
+.decision-card-summary {
+  font-size: 13px;
+  color: var(--mc-text-secondary, var(--muted, #a0a0c0));
+  margin: 0 0 12px 0;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  line-height: 1.5;
+}
+
+.decision-card-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.decision-card-btn {
+  padding: 6px 12px;
+  border-radius: 6px;
+  border: none;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: opacity 0.15s, transform 0.1s;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+}
+
+.decision-card-btn:hover {
+  opacity: 0.85;
+}
+
+.decision-card-btn:active {
+  transform: scale(0.97);
+}
+
+.decision-card-btn--approve {
+  background: #22c55e;
+  color: white;
+}
+
+.decision-card-btn--reject {
+  background: transparent;
+  border: 1px solid #ef4444;
+  color: #ef4444;
+}
+
+.decision-card-btn--view {
+  background: var(--mc-bg-secondary, var(--bg-accent, #1a1a2e));
+  color: var(--mc-text, var(--text, #e0e0ff));
+  border: 1px solid var(--mc-border, var(--border, #2a2a4a));
+}
+
+.decision-card-btn--chat {
+  background: var(--mc-accent, var(--accent, #6366f1));
+  color: white;
+}
+
+:root[data-theme="light"] .decision-card-btn--reject {
+  color: #dc2626;
+  border-color: #dc2626;
+}
+
+:root[data-theme="light"] .decision-card-btn--view {
+  background: #f3f4f6;
+  color: #374151;
+  border-color: #d1d5db;
+}
+
+@media (max-width: 768px) {
+  .decision-cards-list--scroll {
+    max-height: 240px;
+  }
+
+  .decision-card-actions {
+    gap: 6px;
+  }
+
+  .decision-card-btn {
+    padding: 5px 10px;
+    font-size: 12px;
+  }
+}

@@ -9,6 +9,7 @@ import {
   readWorkspaceConfig,
   type WorkspaceConfigEntry,
 } from "../lib/workspaces-config.js";
+import { withFileLock } from "openclaw/plugin-sdk";
 import type { GatewayRequestHandler } from "openclaw/plugin-sdk";
 
 const execFile = promisify(execFileCb);
@@ -16,6 +17,17 @@ const execFile = promisify(execFileCb);
 type GatewayRequestHandlers = Record<string, GatewayRequestHandler>;
 
 const TASKS_FILE = join(DATA_DIR, "tasks.json");
+
+const LOCK_OPTIONS = {
+  retries: {
+    retries: 30,
+    factor: 1.35,
+    minTimeout: 20,
+    maxTimeout: 250,
+    randomize: true,
+  },
+  stale: 20_000,
+};
 /** Team tasks are synced to this file inside the workspace directory. */
 const TEAM_TASKS_FILENAME = ".godmode/tasks.json";
 
@@ -24,11 +36,12 @@ type NativeTask = {
   title: string;
   status: "pending" | "complete";
   project: string | null;
+  /** Resolved workspace ID for this task's project */
+  projectId?: string | null;
   dueDate: string | null;
   priority: "high" | "medium" | "low";
   createdAt: string;
   completedAt: string | null;
-  carryOver: boolean;
   source: "chat" | "cron" | "import";
   /** Linked chat session key for task-session linking */
   sessionId: string | null;
@@ -38,22 +51,49 @@ type NativeTask = {
 
 type TasksData = {
   tasks: NativeTask[];
+  archived?: NativeTask[];
   updatedAt: string | null;
 };
 
-async function readTasks(): Promise<TasksData> {
+async function readTasksUnsafe(): Promise<TasksData> {
   try {
     const raw = await readFile(TASKS_FILE, "utf-8");
-    return JSON.parse(raw) as TasksData;
+    const data = JSON.parse(raw) as TasksData;
+    // Strip legacy fields for backward compat
+    for (const task of data.tasks) {
+      delete (task as any).carryOver;
+      delete (task as any).userEdited;
+    }
+    data.archived = data.archived ?? [];
+    return data;
   } catch {
-    return { tasks: [], updatedAt: null };
+    return { tasks: [], archived: [], updatedAt: null };
   }
 }
 
-async function writeTasks(data: TasksData): Promise<void> {
+async function writeTasksUnsafe(data: TasksData): Promise<void> {
   data.updatedAt = new Date().toISOString();
   await mkdir(dirname(TASKS_FILE), { recursive: true });
   await writeFile(TASKS_FILE, JSON.stringify(data, null, 2), "utf-8");
+}
+
+export async function readTasks(): Promise<TasksData> {
+  return withFileLock(TASKS_FILE, LOCK_OPTIONS, async () => readTasksUnsafe());
+}
+
+export async function updateTasks<T>(
+  updater: (data: TasksData) => Promise<T> | T,
+): Promise<{ data: TasksData; result: T }> {
+  return withFileLock(TASKS_FILE, LOCK_OPTIONS, async () => {
+    const data = await readTasksUnsafe();
+    const result = await updater(data);
+    await writeTasksUnsafe(data);
+    return { data, result };
+  });
+}
+
+export async function writeTasks(data: TasksData): Promise<void> {
+  await withFileLock(TASKS_FILE, LOCK_OPTIONS, async () => writeTasksUnsafe(data));
 }
 
 function todayDateStr(): string {
@@ -66,43 +106,6 @@ function todayDateStr(): string {
  * This fixes the case where daily brief regeneration or cleanup deletes tasks
  * that still have active (processing/review) queue work.
  */
-async function reconcileOrphanedQueueItems(data: TasksData): Promise<boolean> {
-  let changed = false;
-  try {
-    const { readQueueState } = await import("../lib/queue-state.js");
-    const queueState = await readQueueState();
-    const taskIds = new Set(data.tasks.map((t) => t.id));
-    const today = todayDateStr();
-
-    for (const qi of queueState.items) {
-      if (!qi.sourceTaskId) continue;
-      if (taskIds.has(qi.sourceTaskId)) continue;
-      // Only reconcile active items (processing, review, failed, pending)
-      if (qi.status === "done") continue;
-
-      // Re-create the task from the queue item
-      data.tasks.push({
-        id: qi.sourceTaskId,
-        title: qi.title,
-        status: "pending",
-        project: null,
-        dueDate: today,
-        priority: qi.priority === "high" ? "high" : qi.priority === "low" ? "low" : "medium",
-        createdAt: new Date(qi.createdAt ?? Date.now()).toISOString(),
-        completedAt: null,
-        carryOver: false,
-        source: "import",
-        sessionId: null,
-      });
-      taskIds.add(qi.sourceTaskId);
-      changed = true;
-    }
-  } catch {
-    // Queue state unavailable — skip reconciliation
-  }
-  return changed;
-}
-
 const listTasks: GatewayRequestHandler = async ({ params, respond }) => {
   const { status, project, dueDate, dueBefore, dueAfter } = params as {
     status?: string;
@@ -112,9 +115,7 @@ const listTasks: GatewayRequestHandler = async ({ params, respond }) => {
     dueAfter?: string;
   };
   const data = await readTasks();
-  if (await reconcileOrphanedQueueItems(data)) {
-    await writeTasks(data);
-  }
+
   let filtered = data.tasks;
 
   if (status) {
@@ -139,9 +140,7 @@ const listTasks: GatewayRequestHandler = async ({ params, respond }) => {
 const todayTasks: GatewayRequestHandler = async ({ params, respond }) => {
   const { date, includeCompleted } = params as { date?: string; includeCompleted?: boolean };
   const data = await readTasks();
-  if (await reconcileOrphanedQueueItems(data)) {
-    await writeTasks(data);
-  }
+
   const today = date || todayDateStr();
   const pending = data.tasks.filter(
     (t) => t.status === "pending" && t.dueDate != null && t.dueDate <= today,
@@ -194,22 +193,43 @@ const createTask: GatewayRequestHandler = async ({ params, respond }) => {
     respond(false, null, { code: "INVALID_REQUEST", message: "Missing task title" });
     return;
   }
+
+  // Try to resolve projectId from workspace config
+  let projectId: string | null = null;
+  if (project) {
+    try {
+      const config = await readWorkspaceConfig({ initializeIfMissing: false });
+      const normalizedProject = project.trim().toLowerCase();
+      const match = config.workspaces.find(
+        (ws) =>
+          ws.id === normalizedProject ||
+          ws.name.toLowerCase() === normalizedProject ||
+          ws.keywords.some((kw) => kw === normalizedProject),
+      );
+      projectId = match?.id ?? null;
+    } catch {
+      // Non-fatal — projectId stays null
+    }
+  }
+
   const task: NativeTask = {
     id: randomUUID(),
     title,
     status: "pending",
     project: project ?? null,
+    projectId,
     dueDate: dueDate ?? null,
     priority: priority ?? "medium",
     createdAt: new Date().toISOString(),
     completedAt: null,
-    carryOver: false,
     source: source ?? "chat",
     sessionId: null,
   };
-  const data = await readTasks();
-  data.tasks.push(task);
-  await writeTasks(data);
+
+  await updateTasks((data) => {
+    data.tasks.push(task);
+    return task;
+  });
   respond(true, task);
 
   // Async team sync if this task belongs to a team workspace
@@ -222,37 +242,39 @@ const updateTask: GatewayRequestHandler = async ({ params, respond }) => {
     respond(false, null, { code: "INVALID_REQUEST", message: "Missing task id" });
     return;
   }
-  const data = await readTasks();
-  const idx = data.tasks.findIndex((t) => t.id === id);
-  if (idx === -1) {
+
+  const { result: task } = await updateTasks((data) => {
+    const idx = data.tasks.findIndex((t) => t.id === id);
+    if (idx === -1) return null;
+    const task = data.tasks[idx];
+    const allowedKeys: (keyof NativeTask)[] = [
+      "title",
+      "status",
+      "project",
+      "projectId",
+      "dueDate",
+      "priority",
+      "completedAt",
+      "source",
+      "sessionId",
+      "briefSection",
+    ];
+    for (const key of allowedKeys) {
+      if (key in updates) {
+        (task as Record<string, unknown>)[key] = (updates as Record<string, unknown>)[key];
+      }
+    }
+    if (updates.status === "complete" && !task.completedAt) {
+      task.completedAt = new Date().toISOString();
+    }
+    data.tasks[idx] = task;
+    return task;
+  });
+
+  if (!task) {
     respond(false, null, { code: "INVALID_REQUEST", message: "Task not found" });
     return;
   }
-  const task = data.tasks[idx];
-  const allowedKeys: (keyof NativeTask)[] = [
-    "title",
-    "status",
-    "project",
-    "dueDate",
-    "priority",
-    "completedAt",
-    "carryOver",
-    "source",
-    "sessionId",
-    "briefSection",
-  ];
-  for (const key of allowedKeys) {
-    if (key in updates) {
-      (task as Record<string, unknown>)[key] = (updates as Record<string, unknown>)[key];
-    }
-  }
-  if (updates.status === "complete" && !task.completedAt) {
-    task.completedAt = new Date().toISOString();
-  }
-  // Mark as user-edited so daily brief sync won't overwrite
-  (task as Record<string, unknown>).userEdited = true;
-  data.tasks[idx] = task;
-  await writeTasks(data);
 
   // Sync brief checkbox when task status changes (complete or un-complete).
   // Only updates the specific task that was changed — brief is authoritative
@@ -279,13 +301,6 @@ const deleteTask: GatewayRequestHandler = async ({ params, respond }) => {
     respond(false, null, { code: "INVALID_REQUEST", message: "Missing task id" });
     return;
   }
-  const data = await readTasks();
-  const idx = data.tasks.findIndex((t) => t.id === id);
-  if (idx === -1) {
-    respond(false, null, { code: "INVALID_REQUEST", message: "Task not found" });
-    return;
-  }
-
   // Guard: don't delete tasks with active queue work unless force=true
   if (!force) {
     try {
@@ -306,37 +321,31 @@ const deleteTask: GatewayRequestHandler = async ({ params, respond }) => {
     }
   }
 
-  const removed = data.tasks.splice(idx, 1)[0];
-  await writeTasks(data);
+  const { result: removed } = await updateTasks((data) => {
+    const idx = data.tasks.findIndex((t) => t.id === id);
+    if (idx === -1) return null;
+    return data.tasks.splice(idx, 1)[0];
+  });
+
+  if (!removed) {
+    respond(false, null, { code: "INVALID_REQUEST", message: "Task not found" });
+    return;
+  }
   respond(true, removed);
 };
 
 const byProject: GatewayRequestHandler = async ({ params, respond }) => {
-  const { project } = params as { project?: string };
-  if (!project) {
-    respond(false, null, { code: "INVALID_REQUEST", message: "Missing project name" });
+  const { project, projectId } = params as { project?: string; projectId?: string };
+  if (!project && !projectId) {
+    respond(false, null, { code: "INVALID_REQUEST", message: "Missing project name or projectId" });
     return;
   }
   const data = await readTasks();
-  const tasks = data.tasks.filter((t) => t.project === project);
+  const tasks = data.tasks.filter((t) => {
+    if (projectId && t.projectId) return t.projectId === projectId;
+    return t.project === project;
+  });
   respond(true, { tasks, updatedAt: data.updatedAt });
-};
-
-const carryOverTasks: GatewayRequestHandler = async ({ params, respond }) => {
-  const { date } = params as { date?: string };
-  const data = await readTasks();
-  const today = date || todayDateStr();
-  let count = 0;
-  for (const task of data.tasks) {
-    if (task.status === "pending" && task.dueDate != null && task.dueDate < today) {
-      task.carryOver = true;
-      count++;
-    }
-  }
-  if (count > 0) {
-    await writeTasks(data);
-  }
-  respond(true, { carried: count });
 };
 
 /**
@@ -355,23 +364,35 @@ const openSession: GatewayRequestHandler = async ({ params, respond }) => {
     respond(false, null, { code: "INVALID_REQUEST", message: "Missing taskId" });
     return;
   }
-  const data = await readTasks();
-  const task = data.tasks.find((t) => t.id === taskId);
+
+  let task: NativeTask | null = null;
+  let created = false;
+  let sessionId: string | null = null;
+
+  const { result } = await updateTasks((data) => {
+    const found = data.tasks.find((t) => t.id === taskId);
+    if (!found) return { task: null, created: false, sessionId: null as string | null };
+
+    let wasCreated = false;
+    let sid = found.sessionId;
+
+    if (!sid) {
+      const uuid = randomUUID();
+      sid = `agent:main:webchat-${uuid.slice(0, 8)}`;
+      found.sessionId = sid;
+      wasCreated = true;
+    }
+
+    return { task: found, created: wasCreated, sessionId: sid };
+  });
+
+  task = result.task;
+  created = result.created;
+  sessionId = result.sessionId;
+
   if (!task) {
     respond(false, null, { code: "INVALID_REQUEST", message: "Task not found" });
     return;
-  }
-
-  let created = false;
-  let sessionId = task.sessionId;
-
-  if (!sessionId) {
-    // Generate a new session key and link it to the task
-    const uuid = randomUUID();
-    sessionId = `agent:main:webchat-${uuid.slice(0, 8)}`;
-    task.sessionId = sessionId;
-    await writeTasks(data);
-    created = true;
   }
 
   // Always check for queue output — the frontend will seed the session
@@ -411,15 +432,18 @@ const linkSession: GatewayRequestHandler = async ({ params, respond }) => {
     respond(false, null, { code: "INVALID_REQUEST", message: "Missing or invalid sessionId" });
     return;
   }
-  const data = await readTasks();
-  const task = data.tasks.find((t) => t.id === taskId);
+
+  const { result: task } = await updateTasks((data) => {
+    const found = data.tasks.find((t) => t.id === taskId);
+    if (!found) return null;
+    found.sessionId = sessionId;
+    return found;
+  });
+
   if (!task) {
     respond(false, null, { code: "INVALID_REQUEST", message: "Task not found" });
     return;
   }
-
-  task.sessionId = sessionId;
-  await writeTasks(data);
   respond(true, { taskId, sessionId, task });
 };
 
@@ -675,11 +699,12 @@ export const tasksHandlers: GatewayRequestHandlers = {
   "tasks.create": createTask,
   "tasks.update": updateTask,
   "tasks.delete": deleteTask,
-  "tasks.carryOver": carryOverTasks,
   "tasks.byProject": byProject,
   "tasks.openSession": openSession,
   "tasks.linkSession": linkSession,
   "tasks.syncTeam": syncTeamHandler,
+  "tasks.archive": archiveHandler,
+  "tasks.archived": archivedHandler,
 };
 
 /**
@@ -688,16 +713,110 @@ export const tasksHandlers: GatewayRequestHandlers = {
  * Returns the session key (existing or newly created).
  */
 export async function ensureTaskSession(taskId: string): Promise<string | null> {
-  const data = await readTasks();
-  const task = data.tasks.find((t) => t.id === taskId);
-  if (!task) return null;
-  if (task.sessionId) return task.sessionId;
+  const { result: sessionId } = await updateTasks((data) => {
+    const task = data.tasks.find((t) => t.id === taskId);
+    if (!task) return null;
+    if (task.sessionId) return task.sessionId;
 
-  const uuid = randomUUID();
-  const sessionId = `agent:main:webchat-${uuid.slice(0, 8)}`;
-  task.sessionId = sessionId;
-  await writeTasks(data);
+    const uuid = randomUUID();
+    const sid = `agent:main:webchat-${uuid.slice(0, 8)}`;
+    task.sessionId = sid;
+    return sid;
+  });
   return sessionId;
 }
 
-export { readTasks, writeTasks, syncTeamTasks, type NativeTask, type TasksData };
+// ── Task Archival + Dedup (F5) ────────────────────────────────────
+
+function archiveCompletedTasks(data: TasksData, daysOld = 7): void {
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - daysOld);
+  const cutoffIso = cutoff.toISOString();
+
+  const toArchive: NativeTask[] = [];
+  const remaining: NativeTask[] = [];
+
+  for (const task of data.tasks) {
+    if (
+      task.status === "complete" &&
+      task.completedAt &&
+      task.completedAt < cutoffIso
+    ) {
+      toArchive.push(task);
+    } else {
+      remaining.push(task);
+    }
+  }
+
+  if (toArchive.length === 0) return;
+
+  data.tasks = remaining;
+  data.archived = data.archived ?? [];
+  data.archived.push(...toArchive);
+
+  // Cap archived at 500 entries (remove oldest)
+  if (data.archived.length > 500) {
+    data.archived = data.archived.slice(data.archived.length - 500);
+  }
+}
+
+function deduplicateTasks(data: TasksData): void {
+  const groups = new Map<string, NativeTask[]>();
+
+  for (const task of data.tasks) {
+    const key = `${task.title.toLowerCase().trim()}|${task.dueDate ?? ""}`;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key)!.push(task);
+  }
+
+  const deduped: NativeTask[] = [];
+  for (const group of groups.values()) {
+    if (group.length <= 1) {
+      deduped.push(...group);
+      continue;
+    }
+    // Keep the entry with more non-null fields
+    let best = group[0];
+    let bestCount = countNonNull(best);
+    for (let i = 1; i < group.length; i++) {
+      const count = countNonNull(group[i]);
+      if (count > bestCount) {
+        best = group[i];
+        bestCount = count;
+      }
+    }
+    deduped.push(best);
+  }
+
+  data.tasks = deduped;
+}
+
+function countNonNull(task: NativeTask): number {
+  let count = 0;
+  for (const value of Object.values(task)) {
+    if (value != null && value !== "") count++;
+  }
+  return count;
+}
+
+export async function runTaskMaintenance(): Promise<void> {
+  await updateTasks((data) => {
+    deduplicateTasks(data);
+    archiveCompletedTasks(data);
+  });
+}
+
+const archiveHandler: GatewayRequestHandler = async ({ params, respond }) => {
+  const { daysOld } = params as { daysOld?: number };
+  await updateTasks((data) => {
+    archiveCompletedTasks(data, daysOld ?? 7);
+  });
+  respond(true, { message: "Archival complete" });
+};
+
+const archivedHandler: GatewayRequestHandler = async ({ params: _params, respond }) => {
+  const data = await readTasks();
+  respond(true, { archived: data.archived ?? [] });
+};
+
+export { syncTeamTasks, type NativeTask, type TasksData };

@@ -211,7 +211,28 @@ const DEPRECATED_X_GUARDRAILS = new Set([
   "block-x-webfetch",
 ]);
 
-export const CUSTOM_DEFAULTS: CustomGuardrail[] = [];
+export const CUSTOM_DEFAULTS: CustomGuardrail[] = [
+  {
+    id: "prefer-x-read-tool",
+    name: "Use x_read for X/Twitter",
+    description:
+      "Redirects browser tool calls targeting X/Twitter to the dedicated x_read tool, " +
+      "which connects directly via CDP without requiring the extension relay.",
+    enabled: true,
+    trigger: {
+      tool: "browser",
+      patterns: ["x.com", "twitter.com"],
+    },
+    action: "redirect",
+    message:
+      "Use the x_read tool instead of browser for X/Twitter content. " +
+      "x_read connects directly to the browser via CDP — no extension needed. " +
+      "Actions: search, tweet, thread, timeline, article, bookmarks. " +
+      'Example: x_read({ action: "bookmarks" }) or x_read({ action: "tweet", query: "https://x.com/..." })',
+    redirectTo: "x_read",
+    createdAt: "2026-03-02T00:00:00.000Z",
+  },
+];
 
 // ── State file ─────────────────────────────────────────────────────
 

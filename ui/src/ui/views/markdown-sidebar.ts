@@ -12,6 +12,7 @@ export type MarkdownSidebarProps = {
   onClose: () => void;
   onViewRawText: () => void;
   onOpenFile?: (filePath: string) => void;
+  onPushToDrive?: (filePath: string) => void;
 };
 
 const MARKDOWN_EXTENSIONS = new Set(["md", "markdown", "mdx"]);
@@ -220,6 +221,13 @@ export function renderMarkdownSidebar(props: MarkdownSidebarProps) {
           }
         </div>
         <div class="sidebar-header-actions">
+          ${props.onPushToDrive && props.filePath
+            ? html`<button
+                class="btn sidebar-open-browser-btn"
+                title="Push to Google Drive"
+                @click=${() => props.onPushToDrive!(props.filePath!)}
+              >&#x2B06; Drive</button>`
+            : nothing}
           ${showOpenInBrowser
             ? html`<button
                 class="btn sidebar-open-browser-btn"

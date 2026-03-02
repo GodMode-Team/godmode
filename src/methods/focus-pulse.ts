@@ -269,7 +269,7 @@ const startMorningSet: GatewayRequestHandler = async ({ respond, context }) => {
   let syncResult = { added: 0, updated: 0, total: 0 };
   try {
     const { syncTasksFromBrief } = await import("./daily-brief.js");
-    syncResult = await syncTasksFromBrief(today);
+    syncResult = await syncTasksFromBrief(today, { force: true });
   } catch {
     // Task sync is best-effort — don't block morning set
   }
@@ -277,8 +277,7 @@ const startMorningSet: GatewayRequestHandler = async ({ respond, context }) => {
   // Morning set workflow: kick overdue items to tomorrow
   let overdueKicked = 0;
   try {
-    const { readTasks, writeTasks } = await import("./tasks.js");
-    const tasksData = await readTasks();
+    const { updateTasks } = await import("./tasks.js");
     const tomorrow = (() => {
       const d = new Date();
       d.setDate(d.getDate() + 1);
@@ -288,21 +287,21 @@ const startMorningSet: GatewayRequestHandler = async ({ respond, context }) => {
     // Items from the Win The Day section are "today's confirmed priorities"
     const winTheDayTitles = new Set(items.map((i) => i.title.toLowerCase()));
 
-    for (const task of tasksData.tasks) {
-      if (task.status !== "pending" || !task.dueDate) continue;
-      // Skip tasks that are part of today's Win The Day set
-      if (task.dueDate === today && winTheDayTitles.has(task.title.toLowerCase())) continue;
-      // Kick overdue tasks (dueDate < today) to tomorrow
-      if (task.dueDate < today) {
-        task.dueDate = tomorrow;
-        task.carryOver = true;
-        overdueKicked++;
+    const { result } = await updateTasks((tasksData) => {
+      let kicked = 0;
+      for (const task of tasksData.tasks) {
+        if (task.status !== "pending" || !task.dueDate) continue;
+        // Skip tasks that are part of today's Win The Day set
+        if (task.dueDate === today && winTheDayTitles.has(task.title.toLowerCase())) continue;
+        // Kick overdue tasks (dueDate < today) to tomorrow
+        if (task.dueDate < today) {
+          task.dueDate = tomorrow;
+          kicked++;
+        }
       }
-    }
-
-    if (overdueKicked > 0) {
-      await writeTasks(tasksData);
-    }
+      return kicked;
+    });
+    overdueKicked = result;
   } catch {
     // Overdue kick is best-effort
   }
@@ -322,6 +321,77 @@ const startMorningSet: GatewayRequestHandler = async ({ respond, context }) => {
   }, { dropIfSlow: true });
 
   broadcastState(context, state);
+
+  // ── Morning brief notification ──────────────────────────────────
+  try {
+    // Gather overnight queue results
+    const { readQueueState } = await import("../lib/queue-state.js");
+    const queueState = await readQueueState();
+    const now = Date.now();
+    const OVERNIGHT = 12 * 60 * 60 * 1000; // 12 hours
+    const overnightItems = queueState.items.filter(
+      (qi) => qi.completedAt && now - qi.completedAt < OVERNIGHT,
+    );
+    const reviewCount = overnightItems.filter((qi) => qi.status === "review").length;
+    const doneCount = overnightItems.filter((qi) => qi.status === "done").length;
+
+    // Try to get today's calendar (via gog CLI)
+    let calendarSummary = "";
+    try {
+      const { execFile: execFileCb } = await import("node:child_process");
+      const { promisify } = await import("node:util");
+      const exec = promisify(execFileCb);
+      const { stdout } = await exec("gog", ["calendar", "today", "--format", "brief"], { timeout: 5000 });
+      if (stdout.trim()) {
+        calendarSummary = stdout.trim().split("\n").slice(0, 3).join(", ");
+      }
+    } catch {
+      // Calendar not available — that's fine
+    }
+
+    // Build focus suggestion from tasks
+    const { readTasks } = await import("./tasks.js");
+    const tasksData = await readTasks();
+    const todayStr = new Date().toISOString().slice(0, 10);
+    const todayTasks = tasksData.tasks.filter(
+      (t) => t.status === "pending" && t.dueDate && t.dueDate <= todayStr,
+    );
+    const highPriority = todayTasks.filter((t) => t.priority === "high");
+    const focusSuggestion = highPriority.length > 0
+      ? `Biggest leverage: ${highPriority[0].title}`
+      : todayTasks.length > 0
+        ? `${todayTasks.length} tasks on deck`
+        : "Clear day — choose your focus";
+
+    // Build message parts
+    const parts: string[] = ["Good morning."];
+    if (doneCount > 0 || reviewCount > 0) {
+      const msgItems: string[] = [];
+      if (doneCount > 0) msgItems.push(`${doneCount} completed`);
+      if (reviewCount > 0) msgItems.push(`${reviewCount} need${reviewCount === 1 ? "s" : ""} review`);
+      parts.push(`Overnight: ${msgItems.join(", ")}.`);
+    }
+    if (calendarSummary) {
+      parts.push(`Calendar: ${calendarSummary}.`);
+    }
+    parts.push(focusSuggestion + ".");
+    parts.push("What's your focus today?");
+
+    // Broadcast to ally
+    context?.broadcast?.(
+      "ally:notification",
+      {
+        type: "morning-brief",
+        summary: parts.join(" "),
+        actions: [
+          { label: "View Brief", action: "navigate", target: "today" },
+        ],
+      },
+      { dropIfSlow: true },
+    );
+  } catch {
+    // Morning brief notification non-fatal
+  }
 
   respond(true, {
     items,
@@ -599,8 +669,7 @@ export async function scopeTasksToWinTheDay(
   date: string,
   winTheDayItems: FocusItem[],
 ): Promise<{ deferred: number }> {
-  const { readTasks, writeTasks } = await import("./tasks.js");
-  const tasksData = await readTasks();
+  const { updateTasks } = await import("./tasks.js");
 
   const wtdTitles = new Set(winTheDayItems.map((i) => i.title.toLowerCase()));
 
@@ -618,21 +687,19 @@ export async function scopeTasksToWinTheDay(
     // Queue state unavailable — proceed without protection
   }
 
-  let deferred = 0;
-
-  for (const task of tasksData.tasks) {
-    if (task.status !== "pending" || task.dueDate !== date) continue;
-    if (wtdTitles.has(task.title.toLowerCase())) continue;
-    // Don't un-date tasks with active queue work
-    if (activeQueueTaskIds.has(task.id)) continue;
-    // Un-date: remove from today without pushing to tomorrow
-    task.dueDate = null;
-    deferred++;
-  }
-
-  if (deferred > 0) {
-    await writeTasks(tasksData);
-  }
+  const { result: deferred } = await updateTasks((tasksData) => {
+    let count = 0;
+    for (const task of tasksData.tasks) {
+      if (task.status !== "pending" || task.dueDate !== date) continue;
+      if (wtdTitles.has(task.title.toLowerCase())) continue;
+      // Don't un-date tasks with active queue work
+      if (activeQueueTaskIds.has(task.id)) continue;
+      // Un-date: remove from today without pushing to tomorrow
+      task.dueDate = null;
+      count++;
+    }
+    return count;
+  });
 
   return { deferred };
 }

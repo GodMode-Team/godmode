@@ -21,6 +21,7 @@ import {
   type QueueItemType,
 } from "../lib/queue-state.js";
 import { resolvePersona, formatHandoff } from "../lib/agent-roster.js";
+import { resolveIdentityDir, getVaultPath, VAULT_FOLDERS } from "../lib/vault-paths.js";
 
 // ── Prompt Templates ───────────────────────────────────────────────
 
@@ -362,6 +363,19 @@ class QueueProcessor {
       personaHint: personaSlug,
       askTrustRating: !!personaSlug,
     });
+
+    // Notify Ally chat so the user sees a notification in real-time
+    try {
+      this.broadcast("ally:notification", {
+        type: "queue-complete",
+        title: completedItem?.title ?? itemId,
+        summary: `Agent finished "${completedItem?.title ?? itemId}" — ready for review.`,
+        actions: [
+          { label: "Review", action: "navigate", target: "today" },
+          { label: "Approve", action: "rpc", method: "queue.approve", params: { id: itemId } },
+        ],
+      });
+    } catch { /* broadcast non-fatal */ }
   }
 
   // ── Failure + retry handler ────────────────────────────────────
@@ -440,6 +454,18 @@ class QueueProcessor {
         `[GodMode][Queue] Item ${itemId} permanently failed after ${item.retryCount} retries: ${errorMsg}`,
       );
       this.broadcast("queue:update", { itemId, status: "failed" });
+
+      // Notify Ally chat about the failure
+      try {
+        this.broadcast("ally:notification", {
+          type: "queue-failed",
+          title: item.title,
+          summary: `Agent failed on "${item.title}" after ${item.retryCount} retries.`,
+          actions: [
+            { label: "View", action: "navigate", target: "today" },
+          ],
+        });
+      } catch { /* broadcast non-fatal */ }
     }
   }
 
@@ -741,6 +767,44 @@ class QueueProcessor {
       );
     }
 
+    // ── Owner identity context ──────────────────────────────────────
+    try {
+      const { path: identityDir } = resolveIdentityDir();
+
+      // USER.md — who the owner is
+      try {
+        const userMd = await fs.readFile(path.join(identityDir, "USER.md"), "utf-8");
+        const userLines = userMd.split("\n").slice(0, 100).join("\n");
+        if (userLines.trim()) {
+          sections.push("", "## Owner Context", userLines);
+        }
+      } catch { /* USER.md not found — that's fine */ }
+
+      // SOUL.md — communication style and personality
+      try {
+        const soulMd = await fs.readFile(path.join(identityDir, "SOUL.md"), "utf-8");
+        const soulLines = soulMd.split("\n").slice(0, 50).join("\n");
+        if (soulLines.trim()) {
+          sections.push("", "## Communication Style", soulLines);
+        }
+      } catch { /* SOUL.md not found — that's fine */ }
+
+      // Today's daily brief — current priorities and context
+      try {
+        const today = new Date().toISOString().slice(0, 10);
+        const vault = getVaultPath();
+        if (vault) {
+          const dailyDir = path.join(vault, VAULT_FOLDERS.daily);
+          const briefPath = path.join(dailyDir, `${today}.md`);
+          const briefMd = await fs.readFile(briefPath, "utf-8");
+          const briefLines = briefMd.split("\n").slice(0, 50).join("\n");
+          if (briefLines.trim()) {
+            sections.push("", "## Today's Context", briefLines);
+          }
+        }
+      } catch { /* Daily brief not found — that's fine */ }
+    } catch { /* Identity dir resolution failed — skip all identity context */ }
+
     if (guardrailsBlock) {
       sections.push("", guardrailsBlock);
     }
@@ -816,6 +880,29 @@ class QueueProcessor {
   }
 }
 
+// ── Expiration — prune stale review/failed items ──────────────────
+
+export async function expireStaleQueueItems(): Promise<void> {
+  const { updateQueueState } = await import("../lib/queue-state.js");
+  await updateQueueState((state) => {
+    const now = Date.now();
+    const SEVEN_DAYS = 7 * 24 * 60 * 60 * 1000;
+    const THREE_DAYS = 3 * 24 * 60 * 60 * 1000;
+
+    state.items = state.items.filter((item) => {
+      // Review items older than 7 days → mark done and remove
+      if (item.status === "review" && item.completedAt && now - item.completedAt > SEVEN_DAYS) {
+        return false;
+      }
+      // Failed items older than 3 days → remove
+      if (item.status === "failed" && item.completedAt && now - item.completedAt > THREE_DAYS) {
+        return false;
+      }
+      return true;
+    });
+  });
+}
+
 // ── Task type classifier ──────────────────────────────────────────
 
 function classifyTaskType(title: string): QueueItemType {
@@ -843,11 +930,12 @@ export async function autoQueueOverdueTasks(): Promise<{ queued: number }> {
   const today = localDateString();
   let queued = 0;
 
-  // Find pending tasks that are overdue or carry-over
+  // Find pending tasks that are overdue
   const overdue = tasksData.tasks.filter(
     (t) =>
       t.status === "pending" &&
-      (t.carryOver === true || (t.dueDate != null && t.dueDate <= today)),
+      t.dueDate != null &&
+      t.dueDate <= today,
   );
 
   if (overdue.length === 0) return { queued: 0 };

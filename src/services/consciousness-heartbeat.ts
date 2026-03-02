@@ -163,8 +163,26 @@ class ConsciousnessHeartbeat {
         const queueResult = await autoQueueOverdueTasks();
         if (queueResult.queued > 0) {
           this.logger.info(`[Consciousness] Auto-queued ${queueResult.queued} overdue tasks`);
+          try {
+            this.broadcast("ally:notification", {
+              type: "cron-result",
+              summary: `Auto-queued ${queueResult.queued} overdue task${queueResult.queued === 1 ? "" : "s"} for processing.`,
+            });
+          } catch { /* broadcast non-fatal */ }
         }
       } catch { /* non-fatal */ }
+
+      // Fire-and-forget: task maintenance (dedup + archival)
+      try {
+        const { runTaskMaintenance } = await import("../methods/tasks.js");
+        runTaskMaintenance().catch(() => {});
+      } catch { /* non-fatal */ }
+
+      // Expire stale queue items
+      try {
+        const { expireStaleQueueItems } = await import("./queue-processor.js");
+        await expireStaleQueueItems();
+      } catch { /* Queue expiration non-fatal */ }
 
       // Fire-and-forget: process pending queue items
       try {
@@ -186,6 +204,12 @@ class ConsciousnessHeartbeat {
           this.logger.info(
             `[Consciousness] Org sweep: ${sweepResult.actions} findings — ${sweepResult.warnings.slice(0, 3).join("; ")}`,
           );
+          try {
+            this.broadcast("ally:notification", {
+              type: "cron-result",
+              summary: `Org sweep: ${sweepResult.actions} finding${sweepResult.actions === 1 ? "" : "s"} — ${sweepResult.warnings.slice(0, 2).join("; ")}`,
+            });
+          } catch { /* broadcast non-fatal */ }
         }
       } catch { /* non-fatal */ }
 
@@ -205,6 +229,12 @@ class ConsciousnessHeartbeat {
             inbox: captureResult.inbox.processed,
             summarized: captureResult.summarization.summarized,
           });
+          try {
+            this.broadcast("ally:notification", {
+              type: "cron-result",
+              summary: `Vault capture: ${captureResult.totalCaptured} captured, ${captureResult.totalProcessed} processed into Second Brain.`,
+            });
+          } catch { /* broadcast non-fatal */ }
         }
       } catch { /* non-fatal */ }
     } catch (err) {

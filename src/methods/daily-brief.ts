@@ -448,11 +448,8 @@ const updateDailyBrief: GatewayRequestHandler = async ({ params, respond }) => {
     console.log(`[DailyBrief] Updated brief for ${briefDate}`);
     respond(true, { date: briefDate, updatedAt: new Date().toISOString() });
 
-    // Sync checkbox state to tasks.json so that checked items don't revert
-    // when syncBriefFromTasks runs later. Fire-and-forget (don't block response).
-    syncTasksFromBrief(briefDate).catch((err) => {
-      console.error("[DailyBrief] Post-save task sync failed:", err);
-    });
+    // Brief saves no longer trigger syncTasksFromBrief (F3 decoupling).
+    // The sync runs once per day via focus-pulse morning set or manually.
   } catch (err) {
     console.error("[DailyBrief] Error writing brief:", err);
     respond(false, null, {
@@ -580,6 +577,9 @@ function exactTitleMatch(a: string, b: string): boolean {
 
 // ── Exported sync functions (called from tasks.ts and RPC) ────────
 
+/** Module-level guard: only run syncTasksFromBrief once per date per session unless forced. */
+const syncedDates = new Set<string>();
+
 /**
  * syncTasksFromBrief — Reads ALL checkbox items from the daily brief
  * and creates/updates tasks.
@@ -587,12 +587,18 @@ function exactTitleMatch(a: string, b: string): boolean {
  * - New items are added as tasks (source: "import") with briefSection tag
  * - Existing tasks are NOT overwritten if user-edited
  * - Completion AND un-completion syncs from brief to tasks
+ * - Only runs once per date per session unless force=true
  */
-export async function syncTasksFromBrief(date: string): Promise<{
+export async function syncTasksFromBrief(date: string, opts?: { force?: boolean }): Promise<{
   added: number;
   updated: number;
   total: number;
 }> {
+  // Once-per-date guard: skip if already synced today unless force=true
+  if (syncedDates.has(date) && !opts?.force) {
+    return { added: 0, updated: 0, total: 0 };
+  }
+
   const vaultPath = getVaultPath();
   if (!vaultPath) {
     return { added: 0, updated: 0, total: 0 };
@@ -611,69 +617,66 @@ export async function syncTasksFromBrief(date: string): Promise<{
     return { added: 0, updated: 0, total: 0 };
   }
 
-  // Use shared task reader from tasks.ts
-  const { readTasks, writeTasks } = await import("./tasks.js");
-  const tasksData = await readTasks();
+  // Use shared locked task updater from tasks.ts
+  const { updateTasks } = await import("./tasks.js");
 
-  let added = 0;
-  let updated = 0;
+  const { randomUUID } = await import("node:crypto");
 
-  for (const item of items) {
-    // Dedup: normalized title + same due date, ignoring section differences.
-    // This prevents the same task from appearing as a duplicate when it moves
-    // between sections (e.g. "Win The Day" vs "Win The Day 2").
-    const existing = tasksData.tasks.find(
-      (t) => exactTitleMatch(t.title, item.title) && t.dueDate === date,
-    );
+  const { result: counts } = await updateTasks((tasksData) => {
+    let added = 0;
+    let updated = 0;
 
-    if (existing) {
-      // Stamp section if missing (migration path for old tasks)
-      if (!(existing as Record<string, unknown>).briefSection) {
-        (existing as Record<string, unknown>).briefSection = item.section;
+    for (const item of items) {
+      // Dedup: normalized title + same due date, ignoring section differences.
+      // This prevents the same task from appearing as a duplicate when it moves
+      // between sections (e.g. "Win The Day" vs "Win The Day 2").
+      const existing = tasksData.tasks.find(
+        (t) => exactTitleMatch(t.title, item.title) && t.dueDate === date,
+      );
+
+      if (existing) {
+        // Stamp section if missing (migration path for old tasks)
+        if (!(existing as Record<string, unknown>).briefSection) {
+          (existing as Record<string, unknown>).briefSection = item.section;
+        }
+        // Brief is authoritative for checkbox/completion state.
+        if (item.completed && existing.status !== "complete") {
+          existing.status = "complete";
+          existing.completedAt = new Date().toISOString();
+          updated++;
+        }
+        if (!item.completed && existing.status === "complete") {
+          existing.status = "pending";
+          existing.completedAt = null;
+          updated++;
+        }
+      } else {
+        // Add new task from daily brief
+        const priority = HIGH_PRIORITY_SECTIONS.test(item.section) ? "high" : "medium";
+        tasksData.tasks.push({
+          id: randomUUID(),
+          title: item.title,
+          status: item.completed ? "complete" : "pending",
+          project: null,
+          dueDate: date,
+          priority,
+          createdAt: new Date().toISOString(),
+          completedAt: item.completed ? new Date().toISOString() : null,
+          source: "import",
+          sessionId: null,
+          briefSection: item.section,
+        });
+        added++;
       }
-      // Brief is authoritative for checkbox/completion state.
-      // userEdited is intentionally NOT checked here — if the user
-      // checked/unchecked a box in the brief (or Obsidian), that
-      // state always flows through to tasks.json.
-      if (item.completed && existing.status !== "complete") {
-        existing.status = "complete";
-        existing.completedAt = new Date().toISOString();
-        (existing as Record<string, unknown>).userEdited = false;
-        updated++;
-      }
-      if (!item.completed && existing.status === "complete") {
-        existing.status = "pending";
-        existing.completedAt = null;
-        (existing as Record<string, unknown>).userEdited = false;
-        updated++;
-      }
-    } else {
-      // Add new task from daily brief
-      const { randomUUID } = await import("node:crypto");
-      const priority = HIGH_PRIORITY_SECTIONS.test(item.section) ? "high" : "medium";
-      tasksData.tasks.push({
-        id: randomUUID(),
-        title: item.title,
-        status: item.completed ? "complete" : "pending",
-        project: null,
-        dueDate: date,
-        priority,
-        createdAt: new Date().toISOString(),
-        completedAt: item.completed ? new Date().toISOString() : null,
-        carryOver: false,
-        source: "import",
-        sessionId: null,
-        briefSection: item.section,
-      });
-      added++;
     }
-  }
 
-  if (added > 0 || updated > 0) {
-    await writeTasks(tasksData);
-  }
+    return { added, updated };
+  });
 
-  return { added, updated, total: items.length };
+  // Mark this date as synced
+  syncedDates.add(date);
+
+  return { added: counts.added, updated: counts.updated, total: items.length };
 }
 
 /**
@@ -769,7 +772,7 @@ export async function syncBriefFromTasks(
 const syncBriefTasks: GatewayRequestHandler = async ({ params, respond }) => {
   const { date } = params as { date?: string };
   const briefDate = date || getTodayDate();
-  const result = await syncTasksFromBrief(briefDate);
+  const result = await syncTasksFromBrief(briefDate, { force: true });
 
   if (result.total === 0) {
     const vaultPath = getVaultPath();
@@ -805,7 +808,7 @@ const syncTasksBidirectional: GatewayRequestHandler = async ({ params, respond }
   // Brief -> Tasks only. The brief markdown is the source of truth for
   // checkbox state. syncBriefFromTasks is only triggered explicitly when a
   // task is toggled via the task UI (see tasks.ts updateTask handler).
-  const fromBrief = await syncTasksFromBrief(briefDate);
+  const fromBrief = await syncTasksFromBrief(briefDate, { force: true });
 
   respond(true, {
     fromBrief: {
@@ -880,10 +883,70 @@ const toggleCheckbox: GatewayRequestHandler = async ({ params, respond }) => {
     console.log(`[DailyBrief] Toggled checkbox #${index} → ${checked ? "checked" : "unchecked"} for ${briefDate}`);
     respond(true, { date: briefDate, toggled: true, checked });
 
-    // Sync the toggled checkbox to tasks.json (fire-and-forget)
-    syncTasksFromBrief(briefDate).catch((err) => {
-      console.error("[DailyBrief] Post-toggle task sync failed:", err);
-    });
+    // Targeted single-task sync: find which checkbox title was toggled and
+    // update only that task in tasks.json (fire-and-forget)
+    void (async () => {
+      try {
+        // Re-parse the updated content to find the checkbox at the given index
+        const updatedContent = newContent.replace(/\u00a0/g, " ");
+        const checkboxItemRegex = /^(?:\d+\.|-|\*)\s*\[[ xX]\]\s+(.+)$/gm;
+        let itemMatch: RegExpExecArray | null;
+        let cbIndex = 0;
+        let toggledTitle: string | null = null;
+        // Walk all checkbox lines to find which one matches the Nth global checkbox
+        const allCheckboxPositions: { title: string; globalIndex: number }[] = [];
+        while ((itemMatch = checkboxItemRegex.exec(updatedContent)) !== null) {
+          // Count how many global checkboxes appear before this line
+          const lineStart = updatedContent.lastIndexOf("\n", itemMatch.index) + 1;
+          const lineText = updatedContent.slice(lineStart, itemMatch.index + itemMatch[0].length);
+          const cbMatch = lineText.match(/\[[ xX]\]/);
+          if (cbMatch) {
+            allCheckboxPositions.push({
+              title: itemMatch[1].replace(/\*\*(.+?)\*\*/g, "$1").replace(/\s*[—–]\s+.+$/, "").trim(),
+              globalIndex: cbIndex,
+            });
+          }
+          cbIndex++;
+        }
+        // The global index approach above won't work reliably, so let's just
+        // count all [x]/[ ] matches to find the title at the given index
+        const allCbs = [...newContent.matchAll(/\[[ xX]\]/g)];
+        if (index < allCbs.length) {
+          const cbPos = allCbs[index].index!;
+          // Find the line containing this checkbox
+          const lineStart = newContent.lastIndexOf("\n", cbPos) + 1;
+          const lineEnd = newContent.indexOf("\n", cbPos);
+          const line = newContent.slice(lineStart, lineEnd === -1 ? undefined : lineEnd);
+          const titleMatch = line.match(/\[[ xX]\]\s+(?:\*\*(.+?)\*\*|(.+))$/);
+          if (titleMatch) {
+            toggledTitle = (titleMatch[1] || titleMatch[2] || "").replace(/\s*[—–]\s+.+$/, "").trim();
+          }
+        }
+
+        if (toggledTitle) {
+          const { updateTasks } = await import("./tasks.js");
+          await updateTasks((data) => {
+            const normalizedToggled = toggledTitle!.toLowerCase();
+            const task = data.tasks.find(
+              (t) =>
+                t.title.toLowerCase() === normalizedToggled &&
+                (t.dueDate === briefDate || (t.dueDate != null && t.dueDate <= briefDate)),
+            );
+            if (task) {
+              if (checked && task.status !== "complete") {
+                task.status = "complete";
+                task.completedAt = new Date().toISOString();
+              } else if (!checked && task.status === "complete") {
+                task.status = "pending";
+                task.completedAt = null;
+              }
+            }
+          });
+        }
+      } catch (err) {
+        console.error("[DailyBrief] Post-toggle targeted task sync failed:", err);
+      }
+    })();
   } catch (err) {
     console.error("[DailyBrief] Error toggling checkbox:", err);
     respond(false, null, {
