@@ -173,6 +173,40 @@ class QueueProcessor {
       };
     }
 
+    // Autonomy gating: check trust level before spawning
+    if (item.personaHint) {
+      try {
+        const { getAutonomyLevel } = await import("../methods/trust-tracker.js");
+        const level = await getAutonomyLevel(item.personaHint);
+
+        if (level === "disabled") {
+          await updateQueueState((state) => {
+            const qi = state.items.find((i) => i.id === item.id);
+            if (qi) {
+              qi.status = "failed";
+              qi.error = `Persona "${item.personaHint}" is disabled (trust < 5.0). Reassign or manually re-enable.`;
+              qi.completedAt = Date.now();
+            }
+          });
+          this.broadcast("queue:update", { itemId: item.id, status: "failed", reason: "trust_disabled" });
+          return { spawned: false, error: "Persona disabled due to low trust" };
+        }
+
+        if (level === "approval" && !item.needsApproval) {
+          await updateQueueState((state) => {
+            const qi = state.items.find((i) => i.id === item.id);
+            if (qi) {
+              qi.needsApproval = true;
+            }
+          });
+          this.broadcast("queue:update", { itemId: item.id, needsApproval: true, reason: "trust_low" });
+          return { spawned: false, error: "Persona requires approval (trust 5-7)" };
+        }
+      } catch {
+        // Trust check failure is non-fatal — proceed with default behavior
+      }
+    }
+
     // Link a session to the source task so opening the task always hits the
     // same session — even before the agent finishes.
     if (item.sourceTaskId) {
@@ -323,6 +357,27 @@ class QueueProcessor {
     const completedItem = queueState.items.find((i) => i.id === itemId);
     const personaSlug = completedItem?.personaHint;
 
+    // If persona has full autonomy, auto-approve instead of going to review
+    if (personaSlug) {
+      try {
+        const { getAutonomyLevel } = await import("../methods/trust-tracker.js");
+        const level = await getAutonomyLevel(personaSlug);
+        if (level === "full") {
+          await updateQueueState((state) => {
+            const qi = state.items.find((i) => i.id === itemId);
+            if (qi) qi.status = "done";
+          });
+          this.logger.info(
+            `[GodMode][Queue] Item ${itemId} auto-approved (full autonomy for "${personaSlug}")`,
+          );
+          this.broadcast("queue:update", { itemId, status: "done", autoApproved: true });
+          return;
+        }
+      } catch {
+        // Trust check failure is non-fatal — fall through to review
+      }
+    }
+
     this.logger.info(
       `[GodMode][Queue] Item ${itemId} completed — status set to review`,
     );
@@ -378,11 +433,12 @@ class QueueProcessor {
       // Auto-rate the persona in trust tracker (permanent failure = poor performance)
       if (item.personaHint) {
         try {
-          const { submitTrustRating } = await import("../methods/trust-tracker.js");
-          await submitTrustRating(
+          const { autoRate } = await import("../methods/trust-tracker.js");
+          await autoRate(
             item.personaHint,
             3,
             `Failed after ${item.retryCount} retries: "${item.title}"`,
+            "auto-fail",
           );
         } catch {
           // Trust rating is best-effort
@@ -690,6 +746,18 @@ class QueueProcessor {
 
     if (guardrailsBlock) {
       sections.push("", guardrailsBlock);
+    }
+
+    // Inject learned lessons for this persona
+    try {
+      const { getLessonsForPrompt, formatLessonsForPrompt } = await import("../lib/agent-lessons.js");
+      const lessons = await getLessonsForPrompt(item.personaHint || undefined);
+      const lessonsBlock = formatLessonsForPrompt(lessons);
+      if (lessonsBlock) {
+        sections.push("", lessonsBlock);
+      }
+    } catch {
+      // Non-fatal — agent runs without lessons
     }
 
     // Include previous error context for retries
