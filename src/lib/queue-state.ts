@@ -64,6 +64,8 @@ export type QueueItem = {
   personaHint?: string;
   /** Which CLI engine to use (claude/codex/gemini). Resolved from persona or explicit. */
   engine?: "claude" | "codex" | "gemini";
+  /** Whether the item requires human approval before execution (set by trust gating). */
+  needsApproval?: boolean;
   /** Structured handoff context from a predecessor agent */
   handoff?: {
     fromAgent: string;

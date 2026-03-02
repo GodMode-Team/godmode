@@ -918,7 +918,7 @@ h1{color:#ff6b6b}code{background:#16213e;padding:2px 8px;border-radius:4px}a{col
       try {
         const { initQueueProcessor } = await import("./src/services/queue-processor.js");
         const queueProcessor = initQueueProcessor(api.logger);
-        queueProcessor.setBroadcast((event, data) => (api as unknown as { broadcast?: (e: string, d: unknown) => void }).broadcast?.(event, data));
+        queueProcessor.setBroadcast((event, data) => (api as unknown as Record<string, Function>).broadcast?.(event, data));
         await queueProcessor.recoverOrphaned();
         queueProcessor.startPolling();
         api.logger.info("[GodMode] Queue processor initialized (10-min polling)");
@@ -930,7 +930,7 @@ h1{color:#ff6b6b}code{background:#16213e;padding:2px 8px;border-radius:4px}a{col
       try {
         const { initObsidianSync } = await import("./src/services/obsidian-sync.js");
         const obsSync = initObsidianSync(api.logger);
-        obsSync.setBroadcast((event, data) => (api as unknown as { broadcast?: (e: string, d: unknown) => void }).broadcast?.(event, data));
+        obsSync.setBroadcast((event, data) => (api as unknown as Record<string, Function>).broadcast?.(event, data));
         await obsSync.init();
         api.logger.info("[GodMode] Obsidian Sync service initialized");
       } catch (err) {

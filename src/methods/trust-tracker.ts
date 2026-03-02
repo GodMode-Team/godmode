@@ -601,6 +601,37 @@ export async function getTrustScore(workflow: string): Promise<number | null> {
   return Math.round(avg * 10) / 10;
 }
 
+// ── Autonomy helpers (used by queue-processor) ───────────────────
+
+export type AutonomyLevel = "full" | "approval" | "disabled";
+
+/**
+ * Determine the autonomy level for a persona based on trust score.
+ * - full (score >= 8): auto-approve results
+ * - approval (score 5-7.9): queue for human review
+ * - disabled (score < 5): block from running
+ * Returns "approval" if not enough ratings yet (safe default).
+ */
+export async function getAutonomyLevel(persona: string): Promise<AutonomyLevel> {
+  const score = await getTrustScore(persona);
+  if (score === null) return "approval";
+  if (score >= 8) return "full";
+  if (score >= 5) return "approval";
+  return "disabled";
+}
+
+/**
+ * Convenience wrapper around submitTrustRating for automated rating.
+ */
+export async function autoRate(
+  persona: string,
+  rating: number,
+  note: string,
+  _source: "auto-approve" | "auto-reject" | "auto-failure",
+): Promise<{ trustScore: number | null; count: number }> {
+  return submitTrustRating(persona, rating, `[${_source}] ${note}`);
+}
+
 // --- Exported for prompt hook (legacy, kept for compatibility) ---
 
 export { readState as readTrustState, computeSummary as computeTrustSummary };

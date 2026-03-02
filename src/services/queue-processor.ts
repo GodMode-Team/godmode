@@ -438,7 +438,7 @@ class QueueProcessor {
             item.personaHint,
             3,
             `Failed after ${item.retryCount} retries: "${item.title}"`,
-            "auto-fail",
+            "auto-failure",
           );
         } catch {
           // Trust rating is best-effort
