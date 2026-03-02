@@ -75,7 +75,6 @@ export async function quickSetup(
   host: GodModeApp,
   name: string,
   licenseKey: string,
-  dailyIntelTopics: string,
 ): Promise<boolean> {
   if (!host.client) return false;
   try {
@@ -83,20 +82,27 @@ export async function quickSetup(
     if (licenseKey) {
       await host.client.request("onboarding.activateLicense", { key: licenseKey });
     }
-    // Run quick setup
+    // Run quick setup (pass empty dailyIntelTopics for backward compat with backend)
     const result = await host.client.request<{ state: OnboardingState }>(
       "onboarding.quickSetup",
-      { name, dailyIntelTopics },
+      { name, dailyIntelTopics: "" },
     );
     const app = host as unknown as {
       onboardingData: OnboardingState | null;
       setupQuickDone: boolean;
       showSetupTab: boolean;
       onboardingActive: boolean;
+      userName: string;
+      settings: import("../storage.js").UiSettings;
+      applySettings: (settings: import("../storage.js").UiSettings) => void;
     };
     app.onboardingData = result.state;
     app.setupQuickDone = true;
     app.onboardingActive = false;
+    // Propagate name to chat display (mirrors handleOnboardingIdentitySubmit pattern)
+    const trimmedName = name.trim().slice(0, 50);
+    app.userName = trimmedName || "You";
+    app.applySettings({ ...app.settings, userName: trimmedName });
     host.showToast(`Welcome, ${name}!`, "success", 3000);
     return true;
   } catch (err) {
