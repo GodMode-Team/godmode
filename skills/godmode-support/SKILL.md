@@ -691,7 +691,7 @@ When users ask about GodMode capabilities, reference this list:
 
 ### Current Version
 
-- **npm package:** `@godmode-team/godmode@1.1.0`
+- **npm package:** `@godmode-team/godmode@1.2.0`
 - **Install:** `openclaw plugin install @godmode-team/godmode`
 - **Team license key:** `GM-DEV-TEAM-2026`
 
@@ -700,10 +700,10 @@ When users ask about GodMode capabilities, reference this list:
 When a user reports a problem, walk them through this:
 
 1. **Gateway running?** → `openclaw gateway status`
-2. **Plugin loaded?** → Open `http://localhost:3000/godmode/health` — should return JSON with `status: "ok"`
+2. **Plugin loaded?** → Open `http://localhost:18789/godmode/health` — should return JSON with `status: "ok"`
 3. **License valid?** → Health endpoint shows `license.status: "valid"`
 4. **UI available?** → Health endpoint shows `ui.available: true`
-5. **Correct version?** → `npm list @godmode-team/godmode` should show `1.1.0`
+5. **Correct version?** → `npm list @godmode-team/godmode` should show `1.2.0`
 
 ### Startup Sequence
 
@@ -806,7 +806,7 @@ $OBSIDIAN_VAULT_PATH or ~/Documents/VAULT/
 ```bash
 # Is plugin installed?
 openclaw plugin list
-# Should show: @godmode-team/godmode@1.1.0
+# Should show: @godmode-team/godmode@1.2.0
 
 # Check logs for errors
 openclaw gateway logs
