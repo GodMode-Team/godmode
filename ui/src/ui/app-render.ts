@@ -670,6 +670,7 @@ export function renderApp(state: AppViewState) {
                                   };
                                 }
                                 const result = await patchSession(state, key, {
+                                  label: newName || null,
                                   displayName: newName || null,
                                 });
                                 // Reload sessions to show updated name
@@ -745,6 +746,7 @@ export function renderApp(state: AppViewState) {
                                     };
                                   }
                                   const result = await patchSession(state, key, {
+                                    label: newName || null,
                                     displayName: newName || null,
                                   });
                                   // Reload sessions to show updated name
@@ -2160,6 +2162,7 @@ export function renderApp(state: AppViewState) {
                 ) => state.handleOpenSidebar(content, opts),
                 onMessageLinkClick: (href: string) => state.handleOpenMessageFileLink(href),
                 onCloseSidebar: () => state.handleCloseSidebar(),
+                onOpenFile: (path: string) => state.handleOpenFile(path),
                 onSplitRatioChange: (ratio: number) => state.handleSplitRatioChange(ratio),
                 onImageClick: (url: string, allImages: import("./chat/lightbox").LightboxImage[], index: number) =>
                   state.handleImageClick(url, allImages, index),
@@ -2486,6 +2489,7 @@ export function renderApp(state: AppViewState) {
                       title: state.sidebarTitle,
                     });
                   },
+                  onOpenFile: (path: string) => state.handleOpenFile(path),
                 })}
               </div>
             </div>

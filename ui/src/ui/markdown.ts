@@ -8,6 +8,39 @@ marked.setOptions({
   mangle: false,
 });
 
+// ── File-path auto-linking ─────────────────────────────────────────────
+// Detects absolute file paths in markdown text (outside code blocks)
+// and wraps them in clickable links with a file:// scheme.
+
+const FILE_EXT_RE = /\.(html?|css|js|ts|tsx|jsx|json|md|txt|csv|py|sh|yaml|yml|xml|svg|png|jpe?g|gif|webp|pdf|log)$/i;
+
+// Match absolute paths like /Users/... or ~/... with a file extension.
+// Negative lookbehind avoids matching paths already inside markdown links.
+const FILE_PATH_RE = /(?<![(\[`])(?:~\/|\/(?:Users|home|tmp|var|opt|etc|godmode)\/)[\w/.+@-]+\.\w+/g;
+
+/**
+ * Pre-process markdown to wrap bare file paths in clickable links.
+ * Skips fenced code blocks (``` ... ```) and inline code (` ... `).
+ */
+export function linkifyFilePaths(markdown: string): string {
+  // Split on fenced code blocks to avoid linkifying inside them
+  const parts = markdown.split(/(```[\s\S]*?```|`[^`\n]+`)/g);
+  for (let i = 0; i < parts.length; i++) {
+    // Odd indices are code blocks/inline code — skip them
+    if (i % 2 !== 0) continue;
+    parts[i] = parts[i].replace(FILE_PATH_RE, (match) => {
+      if (!FILE_EXT_RE.test(match)) return match;
+      // Expand ~ to a placeholder that the click handler resolves
+      const href = match.startsWith("~/")
+        ? `file:///~/${match.slice(2)}`
+        : `file://${match}`;
+      const basename = match.split("/").pop() ?? match;
+      return `[${basename}](${href})`;
+    });
+  }
+  return parts.join("");
+}
+
 const allowedTags = [
   "a",
   "article",
@@ -78,6 +111,10 @@ const allowedAttrs = [
   "style",
 ];
 
+// DOMPurify URI regex — default + file: protocol for local file links
+const ALLOWED_URI_RE =
+  /^(?:(?:(?:f|ht)tps?|mailto|tel|callto|sms|cid|xmpp|file):|[^a-z]|[a-z+.\-]+(?:[^a-z+.\-:]|$))/i;
+
 let hooksInstalled = false;
 const MARKDOWN_CHAR_LIMIT = 140_000;
 const MARKDOWN_PARSE_LIMIT = 140_000;
@@ -147,6 +184,7 @@ export function toSanitizedMarkdownHtml(markdown: string): string {
     const sanitized = DOMPurify.sanitize(html, {
       ALLOWED_TAGS: allowedTags,
       ALLOWED_ATTR: allowedAttrs,
+      ALLOWED_URI_REGEXP: ALLOWED_URI_RE,
     });
     if (input.length <= MARKDOWN_CACHE_MAX_CHARS) {
       setCachedMarkdown(input, sanitized);
@@ -157,6 +195,7 @@ export function toSanitizedMarkdownHtml(markdown: string): string {
   const sanitized = DOMPurify.sanitize(rendered, {
     ALLOWED_TAGS: allowedTags,
     ALLOWED_ATTR: allowedAttrs,
+    ALLOWED_URI_REGEXP: ALLOWED_URI_RE,
   });
   if (input.length <= MARKDOWN_CACHE_MAX_CHARS) {
     setCachedMarkdown(input, sanitized);

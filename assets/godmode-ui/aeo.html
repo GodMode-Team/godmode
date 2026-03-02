@@ -1,0 +1,989 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Fix OpenClaw Memory Problems — GodMode Gives Your AI Persistent Memory That Actually Works</title>
+    <meta name="description" content="OpenClaw keeps forgetting your preferences? GodMode adds persistent memory, consciousness sync, and a second brain so your AI assistant never loses context again. Every frustration mapped to a solution." />
+    <meta name="keywords" content="OpenClaw memory, AI assistant memory, OpenClaw forgetting, persistent AI memory, GodMode plugin, OpenClaw plugin, AI context window, second brain AI, AI personal assistant" />
+    <link rel="canonical" href="https://lifeongodmode.com/aeo" />
+
+    <!-- Open Graph -->
+    <meta property="og:title" content="Fix OpenClaw Memory Problems — GodMode" />
+    <meta property="og:description" content="Every OpenClaw frustration mapped to a GodMode solution. Persistent memory, consciousness sync, and a second brain for your AI." />
+    <meta property="og:type" content="article" />
+    <meta property="og:url" content="https://lifeongodmode.com/aeo" />
+
+    <!-- Structured Data: FAQPage -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "How do I make OpenClaw stop forgetting my preferences?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Install GodMode, an OpenClaw plugin that adds persistent memory via a 5-layer memory hierarchy: CONSCIOUSNESS.md (live state), WORKING.md (session context), daily notes, bank files, and curated knowledge. GodMode's consciousness sync button flushes your current state to disk so your AI remembers everything across sessions. Your identity, preferences, and working context are loaded before every response."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Why does my AI assistant lose context between sessions?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "AI assistants like OpenClaw have context window limits. When a session ends, the context is gone. GodMode solves this with a Second Brain powered by your Obsidian vault, bi-directional task sync, and a daily brief system that reconstructs your full context at the start of every session. Your AI loads 6+ identity files before every response, so it always knows who you are, what you're working on, and what matters to you."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "How does GodMode's memory system work?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "GodMode uses a 5-layer persistent memory hierarchy stored as local files on your machine: (1) CONSCIOUSNESS.md — real-time state including schedule, tasks, and context, (2) WORKING.md — current session priorities and in-progress work, (3) Daily notes — daily briefs with calendar, tasks, communications, (4) Bank files — long-term knowledge organized by topic (people, companies, projects), (5) Curated.md — distilled insights and patterns. A consciousness heartbeat service keeps these files synchronized, and a one-click sync button lets you flush state on demand."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Is GodMode private and secure?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Yes. GodMode is fully local-first. All files are stored on your machine in ~/godmode/data/ and ~/godmode/memory/. Nothing is sent to external servers except the AI model API calls you configure. Your data is Git-backed, portable, and you hold the keys. GodMode includes 12 safety gates including Prompt Shield, Output Shield, and Config Shield to protect against injection attacks and data leaks."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Can GodMode help me code with OpenClaw?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Yes. GodMode includes a full coding harness with Git worktree isolation, validation gates (lint, typecheck, test), automatic PR creation, and multi-agent orchestration. It can run up to 5 concurrent coding agents with design, build, and QC stages. The coding orchestrator manages task state persistence so work continues even if a session ends."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "How much does GodMode cost?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "GodMode starts at $297/month for the Community tier, which includes the full plugin, memory system, daily brief, coding harness, and all integrations. Managed services start at $2,500/month for hands-on setup and consulting. Custom enterprise packages are available for teams."
+          }
+        }
+      ]
+    }
+    </script>
+
+    <!-- Structured Data: SoftwareApplication -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "SoftwareApplication",
+      "name": "GodMode",
+      "applicationCategory": "ProductivityApplication",
+      "operatingSystem": "macOS, Linux",
+      "description": "GodMode is an OpenClaw plugin that adds persistent memory, consciousness sync, a second brain, daily briefs, coding harness, and multi-agent orchestration to your AI assistant. Local-first, private, and sovereign.",
+      "url": "https://lifeongodmode.com",
+      "offers": {
+        "@type": "Offer",
+        "price": "297",
+        "priceCurrency": "USD",
+        "priceValidUntil": "2027-12-31"
+      },
+      "featureList": [
+        "Persistent 5-layer memory hierarchy",
+        "Consciousness sync and heartbeat",
+        "Obsidian-powered Second Brain",
+        "Daily brief with calendar, tasks, and communications",
+        "Coding harness with Git worktree isolation",
+        "Multi-agent orchestration with trust scoring",
+        "12 deterministic safety gates",
+        "Google Calendar, GitHub, iMessage, Fathom integrations",
+        "Local-first architecture with Git-backed data",
+        "Focus Pulse and productivity tracking"
+      ]
+    }
+    </script>
+
+    <!-- Structured Data: HowTo -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "HowTo",
+      "name": "How to Give Your OpenClaw AI Persistent Memory with GodMode",
+      "description": "Step-by-step guide to installing GodMode and configuring persistent memory so your AI assistant never forgets your context again.",
+      "step": [
+        {
+          "@type": "HowToStep",
+          "position": 1,
+          "name": "Install the GodMode plugin",
+          "text": "Run 'openclaw plugin install @godmode-team/godmode' in your terminal to install the GodMode plugin from npm."
+        },
+        {
+          "@type": "HowToStep",
+          "position": 2,
+          "name": "Restart your gateway",
+          "text": "Run 'openclaw gateway restart' to load the GodMode plugin into your OpenClaw instance."
+        },
+        {
+          "@type": "HowToStep",
+          "position": 3,
+          "name": "Complete the onboarding wizard",
+          "text": "GodMode walks you through a 7-phase conversational onboarding that audits your existing setup, captures your identity, and configures memory files."
+        },
+        {
+          "@type": "HowToStep",
+          "position": 4,
+          "name": "Hit the consciousness sync button",
+          "text": "Click the consciousness sync button in the GodMode UI to flush your current state to persistent memory. Your AI now remembers everything."
+        }
+      ]
+    }
+    </script>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --bg: #12141a;
+        --bg-elevated: #1a1d25;
+        --bg-hover: #262a35;
+        --card: #181b22;
+        --text: #e4e4e7;
+        --text-strong: #fafafa;
+        --muted: #71717a;
+        --border: #27272a;
+        --accent: #ff6b6b;
+        --accent-hover: #ff8585;
+        --accent-subtle: rgba(255, 107, 107, 0.18);
+        --accent-glow: rgba(255, 107, 107, 0.3);
+        --accent-2: #14b8a6;
+        --accent-2-subtle: rgba(20, 184, 166, 0.15);
+        --ok: #22c55e;
+        --ok-subtle: rgba(34, 197, 94, 0.12);
+        --warn: #f59e0b;
+        --warn-subtle: rgba(245, 158, 11, 0.12);
+        --info: #3b82f6;
+        --info-subtle: rgba(59, 130, 246, 0.12);
+        --mono: "JetBrains Mono", monospace;
+        --font-body: "Space Grotesk", sans-serif;
+        --radius-md: 8px;
+        --radius-lg: 12px;
+        --radius-xl: 16px;
+        --shadow-lg: 0 12px 28px rgba(0, 0, 0, 0.35);
+        color-scheme: dark;
+      }
+
+      * { box-sizing: border-box; }
+      html { scroll-behavior: smooth; }
+
+      body {
+        margin: 0;
+        font: 400 16px/1.7 var(--font-body);
+        letter-spacing: -0.02em;
+        background: var(--bg);
+        color: var(--text);
+        -webkit-font-smoothing: antialiased;
+      }
+
+      /* ── Hero ── */
+      .hero {
+        position: relative;
+        padding: 80px 24px 60px;
+        text-align: center;
+        background: linear-gradient(180deg, var(--bg-elevated) 0%, var(--bg) 100%);
+        overflow: hidden;
+      }
+      .hero::before {
+        content: "";
+        position: absolute;
+        top: -50%;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 800px;
+        height: 800px;
+        background: radial-gradient(circle, var(--accent-glow) 0%, transparent 70%);
+        opacity: 0.4;
+        pointer-events: none;
+      }
+      .hero-content {
+        position: relative;
+        z-index: 1;
+        max-width: 760px;
+        margin: 0 auto;
+      }
+      .hero h1 {
+        font-size: clamp(2.2rem, 7vw, 3.5rem);
+        font-weight: 700;
+        color: var(--text-strong);
+        margin: 0 0 16px;
+        letter-spacing: -0.04em;
+        line-height: 1.15;
+      }
+      .hero h1 span {
+        background: linear-gradient(135deg, var(--accent) 0%, var(--accent-hover) 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+      }
+      .hero p {
+        font-size: 1.2rem;
+        color: var(--muted);
+        margin: 0 0 32px;
+        max-width: 580px;
+        margin-left: auto;
+        margin-right: auto;
+      }
+      .hero-cta {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 14px 28px;
+        background: var(--accent);
+        color: #fff;
+        font-weight: 600;
+        border-radius: var(--radius-lg);
+        text-decoration: none;
+        transition: all 0.2s ease;
+        box-shadow: 0 4px 20px var(--accent-glow);
+      }
+      .hero-cta:hover {
+        background: var(--accent-hover);
+        transform: translateY(-2px);
+        box-shadow: 0 8px 30px var(--accent-glow);
+      }
+
+      /* ── Navigation ── */
+      .nav {
+        position: sticky;
+        top: 0;
+        z-index: 100;
+        background: rgba(18, 20, 26, 0.95);
+        backdrop-filter: blur(12px);
+        border-bottom: 1px solid var(--border);
+        padding: 12px 24px;
+      }
+      .nav-inner {
+        max-width: 1200px;
+        margin: 0 auto;
+        display: flex;
+        gap: 8px;
+        overflow-x: auto;
+        scrollbar-width: none;
+      }
+      .nav-inner::-webkit-scrollbar { display: none; }
+      .nav a {
+        padding: 8px 16px;
+        color: var(--muted);
+        font-size: 14px;
+        font-weight: 500;
+        border-radius: var(--radius-md);
+        white-space: nowrap;
+        text-decoration: none;
+        transition: all 0.15s ease;
+      }
+      .nav a:hover {
+        color: var(--text);
+        background: var(--bg-hover);
+      }
+
+      /* ── Content ── */
+      .content {
+        max-width: 900px;
+        margin: 0 auto;
+        padding: 60px 24px 100px;
+      }
+
+      /* ── Section ── */
+      section {
+        margin-bottom: 72px;
+        scroll-margin-top: 80px;
+      }
+      section h2 {
+        font-size: 1.8rem;
+        font-weight: 700;
+        color: var(--text-strong);
+        margin: 0 0 20px;
+        letter-spacing: -0.03em;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+      section h2 .icon {
+        width: 36px;
+        height: 36px;
+        border-radius: var(--radius-md);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 18px;
+        flex-shrink: 0;
+      }
+      section h3 {
+        font-size: 1.25rem;
+        font-weight: 600;
+        color: var(--text-strong);
+        margin: 32px 0 12px;
+        letter-spacing: -0.02em;
+      }
+      section p {
+        color: var(--text);
+        margin: 0 0 16px;
+        line-height: 1.8;
+      }
+
+      /* ── Frustration → Solution Cards ── */
+      .frustration-card {
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-xl);
+        padding: 28px;
+        margin-bottom: 20px;
+        transition: border-color 0.2s ease;
+      }
+      .frustration-card:hover {
+        border-color: var(--accent);
+      }
+      .frustration-label {
+        font-family: var(--mono);
+        font-size: 11px;
+        font-weight: 500;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        margin: 0 0 8px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .frustration-label.problem {
+        color: var(--accent);
+      }
+      .frustration-label.solution {
+        color: var(--ok);
+      }
+      .frustration-card h3 {
+        font-size: 1.15rem;
+        font-weight: 600;
+        color: var(--text-strong);
+        margin: 0 0 12px;
+      }
+      .frustration-card p {
+        color: var(--muted);
+        margin: 0;
+        line-height: 1.7;
+        font-size: 0.95rem;
+      }
+      .frustration-card .solution-block {
+        margin-top: 16px;
+        padding-top: 16px;
+        border-top: 1px solid var(--border);
+      }
+      .frustration-card .feature-tag {
+        display: inline-block;
+        padding: 3px 10px;
+        font-family: var(--mono);
+        font-size: 11px;
+        font-weight: 500;
+        border-radius: 999px;
+        margin-right: 6px;
+        margin-bottom: 6px;
+      }
+      .feature-tag.memory { background: var(--accent-subtle); color: var(--accent); }
+      .feature-tag.brain { background: var(--info-subtle); color: var(--info); }
+      .feature-tag.code { background: var(--ok-subtle); color: var(--ok); }
+      .feature-tag.safety { background: var(--warn-subtle); color: var(--warn); }
+      .feature-tag.intel { background: var(--accent-2-subtle); color: var(--accent-2); }
+
+      /* ── Deep-Dive Diagram ── */
+      .architecture {
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-xl);
+        padding: 32px;
+        margin: 32px 0;
+        overflow-x: auto;
+      }
+      .architecture pre {
+        font-family: var(--mono);
+        font-size: 13px;
+        line-height: 1.6;
+        color: var(--text);
+        margin: 0;
+        white-space: pre;
+      }
+      .architecture .layer {
+        display: flex;
+        align-items: stretch;
+        gap: 12px;
+        margin-bottom: 12px;
+      }
+      .architecture .layer-num {
+        font-family: var(--mono);
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--accent);
+        min-width: 24px;
+        text-align: center;
+        padding-top: 10px;
+      }
+      .architecture .layer-box {
+        flex: 1;
+        padding: 12px 16px;
+        border-radius: var(--radius-md);
+        border: 1px solid var(--border);
+      }
+      .architecture .layer-box h4 {
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--text-strong);
+        margin: 0 0 4px;
+      }
+      .architecture .layer-box p {
+        font-size: 13px;
+        color: var(--muted);
+        margin: 0;
+        line-height: 1.5;
+      }
+      .layer-box.l1 { background: rgba(255, 107, 107, 0.08); border-color: rgba(255, 107, 107, 0.25); }
+      .layer-box.l2 { background: rgba(245, 158, 11, 0.08); border-color: rgba(245, 158, 11, 0.25); }
+      .layer-box.l3 { background: rgba(59, 130, 246, 0.08); border-color: rgba(59, 130, 246, 0.25); }
+      .layer-box.l4 { background: rgba(20, 184, 166, 0.08); border-color: rgba(20, 184, 166, 0.25); }
+      .layer-box.l5 { background: rgba(34, 197, 94, 0.08); border-color: rgba(34, 197, 94, 0.25); }
+
+      /* ── Install Block ── */
+      .install-block {
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-xl);
+        padding: 28px;
+        margin: 32px 0;
+      }
+      .install-block code {
+        display: block;
+        font-family: var(--mono);
+        font-size: 14px;
+        background: var(--bg);
+        padding: 12px 16px;
+        border-radius: var(--radius-md);
+        color: var(--ok);
+        margin: 12px 0;
+        overflow-x: auto;
+      }
+
+      /* ── Comparison Table ── */
+      .comparison {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 24px 0;
+        font-size: 0.9rem;
+      }
+      .comparison th,
+      .comparison td {
+        padding: 12px 16px;
+        text-align: left;
+        border-bottom: 1px solid var(--border);
+      }
+      .comparison th {
+        font-weight: 600;
+        color: var(--text-strong);
+        background: var(--bg-elevated);
+        position: sticky;
+        top: 52px;
+      }
+      .comparison th:first-child {
+        border-radius: var(--radius-md) 0 0 0;
+      }
+      .comparison th:last-child {
+        border-radius: 0 var(--radius-md) 0 0;
+      }
+      .comparison td {
+        color: var(--text);
+      }
+      .comparison td:first-child {
+        font-weight: 500;
+        color: var(--text-strong);
+      }
+      .comparison .yes {
+        color: var(--ok);
+        font-weight: 600;
+      }
+      .comparison .no {
+        color: var(--muted);
+      }
+      .comparison .partial {
+        color: var(--warn);
+      }
+
+      /* ── FAQ ── */
+      .faq-item {
+        border-bottom: 1px solid var(--border);
+        padding: 20px 0;
+      }
+      .faq-item:last-child { border-bottom: none; }
+      .faq-item h3 {
+        font-size: 1.1rem;
+        font-weight: 600;
+        color: var(--text-strong);
+        margin: 0 0 8px;
+        cursor: default;
+      }
+      .faq-item p {
+        color: var(--muted);
+        margin: 0;
+        line-height: 1.7;
+        font-size: 0.95rem;
+      }
+
+      /* ── CTA Section ── */
+      .cta-section {
+        text-align: center;
+        padding: 60px 24px;
+        background: linear-gradient(180deg, var(--bg) 0%, var(--bg-elevated) 100%);
+        border-top: 1px solid var(--border);
+      }
+      .cta-section h2 {
+        justify-content: center;
+        font-size: 2rem;
+      }
+      .cta-section p {
+        color: var(--muted);
+        max-width: 500px;
+        margin: 0 auto 32px;
+        font-size: 1.1rem;
+      }
+
+      /* ── Footer ── */
+      footer {
+        text-align: center;
+        padding: 32px 24px;
+        color: var(--muted);
+        font-size: 13px;
+        border-top: 1px solid var(--border);
+      }
+      footer a { color: var(--accent); text-decoration: none; }
+      footer a:hover { text-decoration: underline; }
+
+      /* ── Responsive ── */
+      @media (max-width: 640px) {
+        .hero { padding: 60px 16px 40px; }
+        .content { padding: 40px 16px 80px; }
+        .frustration-card { padding: 20px; }
+        .architecture { padding: 20px; }
+        .comparison th, .comparison td { padding: 8px 10px; font-size: 0.8rem; }
+        section h2 { font-size: 1.4rem; }
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Hero -->
+    <header class="hero" role="banner">
+      <div class="hero-content">
+        <h1>Your AI Keeps <span>Forgetting</span>. Here's the Fix.</h1>
+        <p>Every OpenClaw frustration mapped to a GodMode solution. Persistent memory, consciousness sync, and a second brain that compounds daily.</p>
+        <a href="https://lifeongodmode.com" class="hero-cta" aria-label="Get GodMode">
+          Get GodMode &rarr;
+        </a>
+      </div>
+    </header>
+
+    <!-- Nav -->
+    <nav class="nav" aria-label="Page sections">
+      <div class="nav-inner">
+        <a href="#frustrations">Frustrations Solved</a>
+        <a href="#memory-deep-dive">Memory Deep-Dive</a>
+        <a href="#comparison">Comparison</a>
+        <a href="#how-it-works">How It Works</a>
+        <a href="#faq">FAQ</a>
+      </div>
+    </nav>
+
+    <main class="content">
+
+      <!-- ━━━ Section: Frustrations Mapped to Solutions ━━━ -->
+      <section id="frustrations" aria-labelledby="frustrations-heading">
+        <h2 id="frustrations-heading">
+          <span class="icon" style="background: var(--accent-subtle)" aria-hidden="true">&#x26A1;</span>
+          Every Frustration, Solved
+        </h2>
+        <p>If you've used OpenClaw for more than a week, you've hit these walls. GodMode removes every one of them.</p>
+
+        <!-- Frustration 1: Memory -->
+        <article class="frustration-card">
+          <div class="frustration-label problem">&#x2717; The frustration</div>
+          <h3>"OpenClaw keeps forgetting my preferences and instructions"</h3>
+          <p>You've told it your coding style, your name, your project structure. Next session: gone. You're re-explaining everything from scratch, every single time.</p>
+          <div class="solution-block">
+            <div class="frustration-label solution">&#x2713; GodMode solution</div>
+            <p><strong>5-layer persistent memory hierarchy.</strong> Your identity, preferences, and working context are stored in local files and loaded before every response. CONSCIOUSNESS.md tracks your live state. SOUL.md holds your identity. Hit the sync button and your AI remembers everything, forever.</p>
+            <span class="feature-tag memory">Consciousness Sync</span>
+            <span class="feature-tag memory">SOUL.md</span>
+            <span class="feature-tag memory">Identity Files</span>
+          </div>
+        </article>
+
+        <!-- Frustration 2: Context Loss -->
+        <article class="frustration-card">
+          <div class="frustration-label problem">&#x2717; The frustration</div>
+          <h3>"My AI loses all context between sessions"</h3>
+          <p>You had a great session yesterday. You mapped out architecture, made decisions, identified next steps. Today? Your AI has no idea any of that happened.</p>
+          <div class="solution-block">
+            <div class="frustration-label solution">&#x2713; GodMode solution</div>
+            <p><strong>Second Brain + Daily Brief.</strong> GodMode integrates with your Obsidian vault to maintain a living knowledge base. The daily brief reconstructs your full context every morning: calendar, tasks, communications, yesterday's impact, and what's in progress. Your AI wakes up knowing exactly where you left off.</p>
+            <span class="feature-tag brain">Second Brain</span>
+            <span class="feature-tag brain">Daily Brief</span>
+            <span class="feature-tag memory">WORKING.md</span>
+          </div>
+        </article>
+
+        <!-- Frustration 3: Repeating Instructions -->
+        <article class="frustration-card">
+          <div class="frustration-label problem">&#x2717; The frustration</div>
+          <h3>"I keep repeating the same instructions over and over"</h3>
+          <p>Every session you say "use TypeScript strict mode" or "format dates as ISO" or "always check tests before committing." It's like training a new employee every day.</p>
+          <div class="solution-block">
+            <div class="frustration-label solution">&#x2713; GodMode solution</div>
+            <p><strong>Skills + Guardrails.</strong> GodMode lets you define reusable skills with manifests that encode your preferences, standards, and workflows. Guardrails are deterministic safety gates that enforce behavior automatically: no prompt-based instructions that get ignored, just hardcoded enforcement.</p>
+            <span class="feature-tag safety">Guardrails</span>
+            <span class="feature-tag brain">Skills</span>
+            <span class="feature-tag memory">Agent Personas</span>
+          </div>
+        </article>
+
+        <!-- Frustration 4: No Schedule Awareness -->
+        <article class="frustration-card">
+          <div class="frustration-label problem">&#x2717; The frustration</div>
+          <h3>"My AI doesn't know my schedule or what I should work on today"</h3>
+          <p>It can't tell you about your next meeting, doesn't know your deadlines, and has no idea what you accomplished yesterday. It's a tool, not a partner.</p>
+          <div class="solution-block">
+            <div class="frustration-label solution">&#x2713; GodMode solution</div>
+            <p><strong>Calendar integration + Daily Brief + Task sync.</strong> GodMode connects to Google Calendar, syncs your tasks bi-directionally, and generates a morning brief that includes your schedule, overdue items, communications pulse, body check (via Oura), and meeting prep. Your AI becomes a chief of staff that knows your day.</p>
+            <span class="feature-tag brain">Daily Brief</span>
+            <span class="feature-tag intel">Calendar Sync</span>
+            <span class="feature-tag intel">Task Sync</span>
+          </div>
+        </article>
+
+        <!-- Frustration 5: Project Context -->
+        <article class="frustration-card">
+          <div class="frustration-label problem">&#x2717; The frustration</div>
+          <h3>"My AI doesn't understand my projects or business context"</h3>
+          <p>You're running multiple clients, multiple repos, multiple workstreams. Your AI treats each one like it's the first time hearing about it.</p>
+          <div class="solution-block">
+            <div class="frustration-label solution">&#x2713; GodMode solution</div>
+            <p><strong>Workspaces + Bank files.</strong> GodMode organizes your context by workspace: clients, projects, personal operating context. Bank files store structured knowledge about people, companies, and projects that persists across sessions. Your AI knows your client TRP is a chiropractic marketing company and that Seth Bolt is a pipeline prospect without you saying it.</p>
+            <span class="feature-tag brain">Workspaces</span>
+            <span class="feature-tag memory">Bank Files</span>
+            <span class="feature-tag brain">People Data</span>
+          </div>
+        </article>
+
+        <!-- Frustration 6: Coding Consistency -->
+        <article class="frustration-card">
+          <div class="frustration-label problem">&#x2717; The frustration</div>
+          <h3>"My AI writes code that breaks things and doesn't follow my standards"</h3>
+          <p>It generates code directly on your main branch, skips tests, doesn't lint, and you end up debugging its output more than writing your own code.</p>
+          <div class="solution-block">
+            <div class="frustration-label solution">&#x2713; GodMode solution</div>
+            <p><strong>Coding harness with validation gates.</strong> GodMode isolates all AI coding work in Git worktrees. Every change passes through lint, typecheck, and test gates before it touches your codebase. Failed validation? The agent fixes it or the change is rejected. PRs are created automatically with full context.</p>
+            <span class="feature-tag code">Worktree Isolation</span>
+            <span class="feature-tag code">Validation Gates</span>
+            <span class="feature-tag code">Auto PR</span>
+          </div>
+        </article>
+
+        <!-- Frustration 7: Trust -->
+        <article class="frustration-card">
+          <div class="frustration-label problem">&#x2717; The frustration</div>
+          <h3>"I can't trust my AI to work autonomously without breaking something"</h3>
+          <p>You want to delegate, but every time you look away it runs a destructive command, pushes to the wrong branch, or hallucinates a solution that makes things worse.</p>
+          <div class="solution-block">
+            <div class="frustration-label solution">&#x2713; GodMode solution</div>
+            <p><strong>Trust scoring + 12 safety gates.</strong> GodMode's trust tracker scores agents based on actual performance. Safety gates are deterministic: Loop Breaker stops runaway tool calls, Prompt Shield blocks injection attempts, Output Shield prevents data leaks, Config Shield protects sensitive files. Trust is earned, not assumed.</p>
+            <span class="feature-tag safety">Trust Tracker</span>
+            <span class="feature-tag safety">Loop Breaker</span>
+            <span class="feature-tag safety">Prompt Shield</span>
+          </div>
+        </article>
+
+        <!-- Frustration 8: Visibility -->
+        <article class="frustration-card">
+          <div class="frustration-label problem">&#x2717; The frustration</div>
+          <h3>"I have no idea what my AI has been doing when I'm not watching"</h3>
+          <p>It runs sessions, makes changes, and you have no audit trail. Did it actually complete the task? Did it break something else? You don't know until something fails.</p>
+          <div class="solution-block">
+            <div class="frustration-label solution">&#x2713; GodMode solution</div>
+            <p><strong>Agent log + Session tracking + Mission Control.</strong> Every agent session is logged with timestamps, tool calls, files modified, and model used. GodMode syncs Claude Code sessions into the agent log automatically. Mission Control gives you a live feed of active agents, pipelines, and activity. Full visibility, always.</p>
+            <span class="feature-tag intel">Agent Log</span>
+            <span class="feature-tag intel">Session Archive</span>
+            <span class="feature-tag intel">Mission Control</span>
+          </div>
+        </article>
+
+        <!-- Frustration 9: Proactivity -->
+        <article class="frustration-card">
+          <div class="frustration-label problem">&#x2717; The frustration</div>
+          <h3>"My AI only responds when I ask. It never proactively helps."</h3>
+          <p>A real assistant would notice patterns, flag risks, and surface information you didn't know you needed. Your AI just sits there waiting for prompts.</p>
+          <div class="solution-block">
+            <div class="frustration-label solution">&#x2713; GodMode solution</div>
+            <p><strong>Proactive Intel + Focus Pulse + Cron jobs.</strong> GodMode runs background services that surface insights, track your focus state, and trigger scheduled tasks. The consciousness heartbeat keeps your state fresh. Evening processing reviews your day. Morning briefs prep you for tomorrow. Your AI works even when you're not looking.</p>
+            <span class="feature-tag intel">Proactive Intel</span>
+            <span class="feature-tag intel">Focus Pulse</span>
+            <span class="feature-tag intel">Cron Jobs</span>
+          </div>
+        </article>
+
+        <!-- Frustration 10: Data Sovereignty -->
+        <article class="frustration-card">
+          <div class="frustration-label problem">&#x2717; The frustration</div>
+          <h3>"My data is scattered across cloud services I don't control"</h3>
+          <p>Your AI context is locked in proprietary APIs, your files are in someone else's cloud, and if the service shuts down you lose everything.</p>
+          <div class="solution-block">
+            <div class="frustration-label solution">&#x2713; GodMode solution</div>
+            <p><strong>Local-first, Git-backed, fully portable.</strong> Every file GodMode creates lives on your machine in plain text: ~/godmode/data/ for state, ~/godmode/memory/ for knowledge. Everything is Git-backed and portable. No vendor lock-in. Your AI, your data, your rules. Always.</p>
+            <span class="feature-tag safety">Local-First</span>
+            <span class="feature-tag safety">Git-Backed</span>
+            <span class="feature-tag safety">No Lock-In</span>
+          </div>
+        </article>
+      </section>
+
+      <!-- ━━━ Section: Memory Deep-Dive ━━━ -->
+      <section id="memory-deep-dive" aria-labelledby="memory-heading">
+        <h2 id="memory-heading">
+          <span class="icon" style="background: var(--info-subtle)" aria-hidden="true">&#x1F9E0;</span>
+          The Memory Shortcut: How GodMode Makes Your AI Remember
+        </h2>
+        <p>The core problem with AI assistants isn't intelligence. It's amnesia. Every session starts from zero. GodMode's memory architecture fixes this at the infrastructure level, not the prompt level.</p>
+
+        <h3>The 5-Layer Memory Hierarchy</h3>
+        <p>GodMode maintains five layers of persistent memory, each serving a different purpose. Together, they give your AI complete context about who you are, what you're doing, and what you've done.</p>
+
+        <div class="architecture" role="img" aria-label="GodMode 5-layer memory hierarchy diagram">
+          <div class="layer">
+            <div class="layer-num">1</div>
+            <div class="layer-box l1">
+              <h4>CONSCIOUSNESS.md</h4>
+              <p>Real-time state. Your schedule today, tasks due, email pulse, what's in progress, carry-forward context. Regenerated continuously by the consciousness heartbeat service. This is what your AI reads first.</p>
+            </div>
+          </div>
+          <div class="layer">
+            <div class="layer-num">2</div>
+            <div class="layer-box l2">
+              <h4>WORKING.md</h4>
+              <p>Session priorities. Current sprint, blockers, decisions made, open questions. Updated by you and your AI during work. Pruned automatically on session reset to prevent stale context.</p>
+            </div>
+          </div>
+          <div class="layer">
+            <div class="layer-num">3</div>
+            <div class="layer-box l3">
+              <h4>Daily Notes</h4>
+              <p>Structured daily briefs with calendar events, task status, communications, meeting prep, health metrics, and agent session logs. Generated fresh each morning. The complete picture of your day.</p>
+            </div>
+          </div>
+          <div class="layer">
+            <div class="layer-num">4</div>
+            <div class="layer-box l4">
+              <h4>Bank Files</h4>
+              <p>Long-term knowledge organized by topic. People you know, companies you work with, projects and their status, technical decisions. Structured markdown files that persist indefinitely. Your AI's long-term memory.</p>
+            </div>
+          </div>
+          <div class="layer">
+            <div class="layer-num">5</div>
+            <div class="layer-box l5">
+              <h4>Curated Knowledge</h4>
+              <p>Distilled insights, patterns, and lessons learned. Session harvests capture key takeaways. The scout service discovers relevant information proactively. Over time, this layer becomes your AI's accumulated wisdom.</p>
+            </div>
+          </div>
+        </div>
+
+        <h3>How Consciousness Sync Works</h3>
+        <p>When you click the consciousness sync button in GodMode's UI, here's what happens under the hood:</p>
+        <ol>
+          <li><strong>State flush:</strong> Your current working state, schedule, tasks, and context are written to CONSCIOUSNESS.md as structured markdown.</li>
+          <li><strong>Session harvest:</strong> Key insights from the current session are extracted and saved to your curated knowledge bank.</li>
+          <li><strong>Claude Code sync:</strong> Any active Claude Code sessions are logged into the agent log with timestamps, tool usage, and files modified.</li>
+          <li><strong>Identity reload:</strong> Your AI reloads 6+ identity files (SOUL.md, AGENTS.md, THESIS.md, and more) to ensure full alignment with who you are and how you work.</li>
+        </ol>
+        <p>The UI gives you 4-state feedback: idle, loading, success (green glow), or error (red glow). One click. Full state persistence. Your AI picks up exactly where you left off.</p>
+
+        <h3>The Consciousness Heartbeat</h3>
+        <p>You don't even need to click. GodMode runs a background service called the consciousness heartbeat that periodically syncs your state to disk. Combined with the Focus Pulse service that tracks your attention state, your AI maintains an always-current model of what you're doing and how you're doing.</p>
+
+        <h3>Why This Beats Prompt Instructions</h3>
+        <p>Most people try to solve the memory problem by stuffing instructions into system prompts. This breaks for three reasons:</p>
+        <ol>
+          <li><strong>Context window limits:</strong> System prompts consume tokens. The more instructions you add, the less room you have for actual work.</li>
+          <li><strong>Drift:</strong> Prompt instructions get ignored as conversations grow longer. The AI "forgets" instructions that were at the top of the context window.</li>
+          <li><strong>No persistence:</strong> Prompt instructions don't survive across sessions. You're copy-pasting the same block every time.</li>
+        </ol>
+        <p>GodMode solves all three. Memory is loaded from files at session start, not jammed into prompts. Guardrails are enforced deterministically, not suggested via instructions. And everything persists on disk, across sessions, forever.</p>
+      </section>
+
+      <!-- ━━━ Section: Comparison ━━━ -->
+      <section id="comparison" aria-labelledby="comparison-heading">
+        <h2 id="comparison-heading">
+          <span class="icon" style="background: var(--accent-2-subtle)" aria-hidden="true">&#x2696;</span>
+          GodMode vs. Vanilla OpenClaw
+        </h2>
+        <p>What you get out of the box versus what GodMode adds.</p>
+        <div style="overflow-x:auto">
+          <table class="comparison" role="table">
+            <thead>
+              <tr>
+                <th scope="col">Capability</th>
+                <th scope="col">OpenClaw Alone</th>
+                <th scope="col">OpenClaw + GodMode</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Persistent memory across sessions</td>
+                <td class="no">Manual config files</td>
+                <td class="yes">5-layer auto-synced hierarchy</td>
+              </tr>
+              <tr>
+                <td>Daily brief with schedule + tasks</td>
+                <td class="no">Not available</td>
+                <td class="yes">Auto-generated each morning</td>
+              </tr>
+              <tr>
+                <td>Second brain / knowledge base</td>
+                <td class="no">Not available</td>
+                <td class="yes">Obsidian vault integration</td>
+              </tr>
+              <tr>
+                <td>Calendar awareness</td>
+                <td class="no">Not available</td>
+                <td class="yes">Google Calendar sync</td>
+              </tr>
+              <tr>
+                <td>Coding with validation gates</td>
+                <td class="partial">Basic tool use</td>
+                <td class="yes">Worktrees + lint/type/test gates</td>
+              </tr>
+              <tr>
+                <td>Multi-agent orchestration</td>
+                <td class="no">Single session</td>
+                <td class="yes">5 concurrent agents + trust scoring</td>
+              </tr>
+              <tr>
+                <td>Safety gates (deterministic)</td>
+                <td class="no">Prompt-based only</td>
+                <td class="yes">12 hardcoded gates</td>
+              </tr>
+              <tr>
+                <td>Agent session logging</td>
+                <td class="no">Not available</td>
+                <td class="yes">Full audit trail with tool use</td>
+              </tr>
+              <tr>
+                <td>Proactive intelligence</td>
+                <td class="no">Query-response only</td>
+                <td class="yes">Background services + cron</td>
+              </tr>
+              <tr>
+                <td>Focus &amp; productivity tracking</td>
+                <td class="no">Not available</td>
+                <td class="yes">Focus Pulse + RescueTime</td>
+              </tr>
+              <tr>
+                <td>Onboarding &amp; setup wizard</td>
+                <td class="no">Manual config editing</td>
+                <td class="yes">7-phase conversational wizard</td>
+              </tr>
+              <tr>
+                <td>Data sovereignty</td>
+                <td class="yes">Local-first</td>
+                <td class="yes">Local + Git-backed + portable</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ━━━ Section: How It Works ━━━ -->
+      <section id="how-it-works" aria-labelledby="how-heading">
+        <h2 id="how-heading">
+          <span class="icon" style="background: var(--ok-subtle)" aria-hidden="true">&#x1F680;</span>
+          Get Started in 4 Steps
+        </h2>
+
+        <div class="install-block">
+          <h3>1. Install the plugin</h3>
+          <code>openclaw plugin install @godmode-team/godmode</code>
+
+          <h3>2. Restart your gateway</h3>
+          <code>openclaw gateway restart</code>
+
+          <h3>3. Complete onboarding</h3>
+          <p>GodMode opens a 7-phase conversational wizard that audits your existing OpenClaw setup, captures your identity, and generates your memory files. No config editing. No guessing.</p>
+
+          <h3>4. Sync your consciousness</h3>
+          <p>Click the consciousness sync button. Your AI now has persistent memory. It knows your name, your projects, your schedule, and your preferences. It will never forget again.</p>
+        </div>
+      </section>
+
+      <!-- ━━━ Section: FAQ ━━━ -->
+      <section id="faq" aria-labelledby="faq-heading">
+        <h2 id="faq-heading">
+          <span class="icon" style="background: var(--warn-subtle)" aria-hidden="true">&#x2753;</span>
+          Frequently Asked Questions
+        </h2>
+
+        <div class="faq-item">
+          <h3>How do I make OpenClaw stop forgetting my preferences?</h3>
+          <p>Install GodMode. It adds a 5-layer persistent memory system that stores your identity, preferences, and working context in local files. These files are loaded before every AI response, so your assistant always knows who you are and how you work. One-click consciousness sync flushes your current state to disk.</p>
+        </div>
+
+        <div class="faq-item">
+          <h3>Why does my AI assistant lose context between sessions?</h3>
+          <p>AI models have finite context windows. When a session ends, the context is discarded. GodMode solves this by persisting your context as markdown files on disk and reconstructing it at the start of every session via the daily brief and consciousness sync. Your AI never starts from zero.</p>
+        </div>
+
+        <div class="faq-item">
+          <h3>Is GodMode private? Where does my data go?</h3>
+          <p>GodMode is fully local-first. All files live on your machine in ~/godmode/. Nothing is sent to external servers except the AI model API calls you configure yourself. Data is Git-backed and portable. You can move it to any machine, any time. No vendor lock-in, no cloud dependency.</p>
+        </div>
+
+        <div class="faq-item">
+          <h3>Does GodMode work with my existing OpenClaw setup?</h3>
+          <p>Yes. GodMode's onboarding wizard audits your existing configuration and presents differences, letting you opt into every change. It's designed as a template that improves your setup, not a replacement. Your existing skills, config, and data are preserved.</p>
+        </div>
+
+        <div class="faq-item">
+          <h3>Can GodMode help with coding tasks?</h3>
+          <p>Yes. GodMode includes a full coding harness that isolates all AI code changes in Git worktrees. Every change passes through validation gates (lint, typecheck, test) before touching your codebase. It supports up to 5 concurrent coding agents with automatic PR creation and full task state persistence.</p>
+        </div>
+
+        <div class="faq-item">
+          <h3>How is GodMode different from just using a custom system prompt?</h3>
+          <p>System prompts consume context window tokens and get ignored as conversations grow. GodMode's memory is loaded from persistent files, not embedded in prompts. Guardrails are enforced deterministically via hardcoded hooks, not suggested via instructions. And everything persists across sessions automatically, no copy-pasting required.</p>
+        </div>
+
+        <div class="faq-item">
+          <h3>What does GodMode cost?</h3>
+          <p>GodMode Community starts at $297/month and includes the full plugin with all features: memory system, daily brief, coding harness, safety gates, and integrations. Managed services start at $2,500/month for hands-on setup and consulting. Custom enterprise packages are available.</p>
+        </div>
+
+        <div class="faq-item">
+          <h3>What integrations does GodMode support?</h3>
+          <p>GodMode integrates with Google Calendar, GitHub, Obsidian, iMessage, Fathom (meeting recordings), RescueTime, Meta Ads, Discord, Signal, Telegram, WhatsApp, Slack, Google Chat, Nostr, and ClawHub. New integrations are added regularly via the skills system.</p>
+        </div>
+      </section>
+    </main>
+
+    <!-- CTA Footer -->
+    <section class="cta-section">
+      <h2>Stop Repeating Yourself. Start Compounding.</h2>
+      <p>GodMode gives your AI the one thing it's missing: memory that lasts. Install it today and never re-explain yourself again.</p>
+      <a href="https://lifeongodmode.com" class="hero-cta" aria-label="Get GodMode">Get GodMode &rarr;</a>
+    </section>
+
+    <footer role="contentinfo">
+      <p>&copy; 2026 GodMode &middot; <a href="https://lifeongodmode.com">lifeongodmode.com</a> &middot; Own your agent. Work from it. It knows you like nothing else.</p>
+    </footer>
+  </body>
+</html>

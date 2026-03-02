@@ -91,6 +91,7 @@ export type ChatProps = {
   ) => void;
   onMessageLinkClick?: (href: string) => boolean | Promise<boolean>;
   onCloseSidebar?: () => void;
+  onOpenFile?: (filePath: string) => void;
   onSplitRatioChange?: (ratio: number) => void;
   onImageClick?: (url: string, allImages: LightboxImage[], index: number) => void;
   resolveImageUrl?: (messageIndex: number, imageIndex: number) => string | null;
@@ -794,6 +795,7 @@ export function renderChat(props: ChatProps) {
                       title: props.sidebarTitle ?? null,
                     });
                   },
+                  onOpenFile: props.onOpenFile,
                 })}
               </div>
             `

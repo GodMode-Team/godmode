@@ -866,6 +866,10 @@ export class CodingOrchestrator {
           t.status = "failed";
           t.error = "stale — process not found, auto-reaped";
           t.completedAt = now;
+          // Clean up orphaned worktree
+          if (t.worktreePath) {
+            removeWorktree(this.run, t.repoRoot, t.worktreePath).catch(() => {});
+          }
         }
       }
 
@@ -1158,6 +1162,14 @@ export class CodingOrchestrator {
     // Fire completion callbacks (notifications, etc.)
     if (result.task && (result.task.status === "done" || result.task.status === "failed" || result.task.status === "review")) {
       this.fireTaskCompleted(result.task).catch(() => {});
+
+      // Clean up worktree — task is terminal, worktree no longer needed
+      if (result.task.worktreePath) {
+        this.logger.info(`[GodMode][Coding] Cleaning up worktree for task ${result.task.id} (status: ${result.task.status})`);
+        removeWorktree(this.run, result.task.repoRoot, result.task.worktreePath).catch((err) => {
+          this.logger.warn(`[GodMode][Coding] Worktree cleanup failed for ${result.task!.id}: ${String(err)}`);
+        });
+      }
     }
 
     // If a queued task is now ready, prepare its worktree
@@ -1242,6 +1254,12 @@ export class CodingOrchestrator {
       }
       task.status = "done";
       task.completedAt = Date.now();
+
+      // Clean up worktree — task is approved and done
+      if (task.worktreePath) {
+        removeWorktree(this.run, task.repoRoot, task.worktreePath).catch(() => {});
+      }
+
       return { approved: true };
     });
     return result;

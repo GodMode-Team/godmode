@@ -60,6 +60,49 @@ function todayDateStr(): string {
   return localDateString();
 }
 
+/**
+ * Reconcile orphaned queue items — if a queue item has a sourceTaskId that
+ * doesn't match any task, re-create the task so it shows up in task views.
+ * This fixes the case where daily brief regeneration or cleanup deletes tasks
+ * that still have active (processing/review) queue work.
+ */
+async function reconcileOrphanedQueueItems(data: TasksData): Promise<boolean> {
+  let changed = false;
+  try {
+    const { readQueueState } = await import("../lib/queue-state.js");
+    const queueState = await readQueueState();
+    const taskIds = new Set(data.tasks.map((t) => t.id));
+    const today = todayDateStr();
+
+    for (const qi of queueState.items) {
+      if (!qi.sourceTaskId) continue;
+      if (taskIds.has(qi.sourceTaskId)) continue;
+      // Only reconcile active items (processing, review, failed, pending)
+      if (qi.status === "done") continue;
+
+      // Re-create the task from the queue item
+      data.tasks.push({
+        id: qi.sourceTaskId,
+        title: qi.title,
+        status: "pending",
+        project: null,
+        dueDate: today,
+        priority: qi.priority === "high" ? "high" : qi.priority === "low" ? "low" : "medium",
+        createdAt: new Date(qi.createdAt ?? Date.now()).toISOString(),
+        completedAt: null,
+        carryOver: false,
+        source: "import",
+        sessionId: null,
+      });
+      taskIds.add(qi.sourceTaskId);
+      changed = true;
+    }
+  } catch {
+    // Queue state unavailable — skip reconciliation
+  }
+  return changed;
+}
+
 const listTasks: GatewayRequestHandler = async ({ params, respond }) => {
   const { status, project, dueDate, dueBefore, dueAfter } = params as {
     status?: string;
@@ -69,6 +112,9 @@ const listTasks: GatewayRequestHandler = async ({ params, respond }) => {
     dueAfter?: string;
   };
   const data = await readTasks();
+  if (await reconcileOrphanedQueueItems(data)) {
+    await writeTasks(data);
+  }
   let filtered = data.tasks;
 
   if (status) {
@@ -93,6 +139,9 @@ const listTasks: GatewayRequestHandler = async ({ params, respond }) => {
 const todayTasks: GatewayRequestHandler = async ({ params, respond }) => {
   const { date, includeCompleted } = params as { date?: string; includeCompleted?: boolean };
   const data = await readTasks();
+  if (await reconcileOrphanedQueueItems(data)) {
+    await writeTasks(data);
+  }
   const today = date || todayDateStr();
   const pending = data.tasks.filter(
     (t) => t.status === "pending" && t.dueDate != null && t.dueDate <= today,
@@ -225,7 +274,7 @@ const updateTask: GatewayRequestHandler = async ({ params, respond }) => {
 };
 
 const deleteTask: GatewayRequestHandler = async ({ params, respond }) => {
-  const { id } = params as { id?: string };
+  const { id, force } = params as { id?: string; force?: boolean };
   if (!id) {
     respond(false, null, { code: "INVALID_REQUEST", message: "Missing task id" });
     return;
@@ -236,6 +285,27 @@ const deleteTask: GatewayRequestHandler = async ({ params, respond }) => {
     respond(false, null, { code: "INVALID_REQUEST", message: "Task not found" });
     return;
   }
+
+  // Guard: don't delete tasks with active queue work unless force=true
+  if (!force) {
+    try {
+      const { readQueueState } = await import("../lib/queue-state.js");
+      const queueState = await readQueueState();
+      const activeQueueItem = queueState.items.find(
+        (qi) => qi.sourceTaskId === id && qi.status !== "done",
+      );
+      if (activeQueueItem) {
+        respond(false, null, {
+          code: "HAS_ACTIVE_QUEUE_ITEM",
+          message: `Cannot delete — task has active queue work (status: ${activeQueueItem.status}). Use force=true to override.`,
+        });
+        return;
+      }
+    } catch {
+      // Queue state unavailable — allow deletion
+    }
+  }
+
   const removed = data.tasks.splice(idx, 1)[0];
   await writeTasks(data);
   respond(true, removed);

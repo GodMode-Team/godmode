@@ -1,7 +1,7 @@
 import { html, nothing } from "lit";
 import { unsafeHTML } from "lit/directives/unsafe-html.js";
 import { icons } from "../icons";
-import { sanitizeHtmlFragment, toSanitizedMarkdownHtml } from "../markdown";
+import { linkifyFilePaths, sanitizeHtmlFragment, toSanitizedMarkdownHtml } from "../markdown";
 
 export type MarkdownSidebarProps = {
   content: string | null;
@@ -11,6 +11,7 @@ export type MarkdownSidebarProps = {
   title?: string | null;
   onClose: () => void;
   onViewRawText: () => void;
+  onOpenFile?: (filePath: string) => void;
 };
 
 const MARKDOWN_EXTENSIONS = new Set(["md", "markdown", "mdx"]);
@@ -87,6 +88,41 @@ function normalizeMimeType(props: MarkdownSidebarProps): string {
   return inferMimeFromPath(props.filePath ?? null) ?? "text/markdown";
 }
 
+/**
+ * Extract the local file path from a file:// href.
+ * Returns null if the link is not a local file link.
+ */
+function filePathFromHref(href: string): string | null {
+  if (!href.startsWith("file://")) return null;
+  // file:///Users/... → /Users/...
+  // file:///~/... → ~/...
+  let path = href.slice("file://".length);
+  // file:// URLs have an extra leading / for absolute paths
+  if (path.startsWith("/~/")) {
+    path = "~" + path.slice(2);
+  }
+  return decodeURIComponent(path);
+}
+
+/**
+ * Click handler for the markdown container.
+ * Intercepts clicks on file:// links and routes to onOpenFile.
+ */
+function handleMarkdownClick(e: Event, onOpenFile?: (path: string) => void) {
+  if (!onOpenFile) return;
+  const target = e.target as HTMLElement;
+  const anchor = target.closest("a");
+  if (!anchor) return;
+  const href = anchor.getAttribute("href");
+  if (!href) return;
+  const filePath = filePathFromHref(href);
+  if (!filePath) return;
+  // Intercept — don't open as browser navigation
+  e.preventDefault();
+  e.stopPropagation();
+  onOpenFile(filePath);
+}
+
 function renderBody(props: MarkdownSidebarProps) {
   if (props.error) {
     return html`
@@ -147,7 +183,12 @@ function renderBody(props: MarkdownSidebarProps) {
   }
 
   if (mimeType === "text/markdown" || mimeType === "text/x-markdown") {
-    return html`<div class="sidebar-markdown">${unsafeHTML(toSanitizedMarkdownHtml(content))}</div>`;
+    // Pre-process: auto-link file paths so they're clickable
+    const linked = linkifyFilePaths(content);
+    return html`<div
+      class="sidebar-markdown"
+      @click=${(e: Event) => handleMarkdownClick(e, props.onOpenFile)}
+    >${unsafeHTML(toSanitizedMarkdownHtml(linked))}</div>`;
   }
 
   return html`<pre class="sidebar-plain">${content}</pre>`;

@@ -4,6 +4,36 @@ This file tracks recent development changes so Atlas and other agents can quickl
 
 ---
 
+## 2026-03-02 — Self-Healing Resilience + Session Coordination + Auto-Compat CI
+
+### Why
+OpenClaw 2026.3.1 broke GodMode in 4 ways with zero deprecation warnings. Parallel Claude Code sessions created 12 stashes and 27 branches of scattered work. These systems prevent both problems permanently.
+
+### Self-Healing Host Resilience (3 new files)
+- **`src/lib/host-context.ts`** — Server-side host detection. On every `gateway_start`, probes the host API, caches results to `~/godmode/data/host-compat.json`, and compares against previous scan to log diffs. Provides `extractSessionKey()`, `safeBroadcast()`, `getHostVersion()`.
+- **`ui/src/lib/safe-request.ts`** — Self-healing RPC wrapper. Wraps every UI gateway call with timeout, field alias resolution (`displayName→label`), METHOD_NOT_FOUND fallbacks (`sessions.autoTitle→sessions.patch`), and sessionStorage healing cache.
+- **`ui/src/lib/host-compat.ts`** — UI-side capability detection. On WebSocket connect, probes critical RPCs, caches results, provides `hostPatchSession()`, `hostAutoTitle()`, `readSessionName()`.
+
+### Session Coordination Layer (multi-session discipline)
+- **`src/lib/session-registry.ts`** — Tracks active Claude Code sessions: branch, worktree, modified files, status. File-based with atomic writes.
+- **`src/services/session-coordinator.ts`** — Enforces discipline: branch conflict detection, gateway restart locking (only one session at a time), file modification tracking, structured handoff summaries.
+- **`src/methods/session-coordination.ts`** — 9 RPC handlers: `session.register`, `session.heartbeat`, `session.end`, `session.checkConflict`, `session.acquireGatewayLock`, `session.releaseGatewayLock`, `session.awareness`, `session.list`, `session.registry`.
+- **`scripts/session-guard.sh`** — CLI tool for session management: register, heartbeat, end, status, check-branch. Reads registry directly.
+- **`CLAUDE.md`** updated with Session Coordination rules: branch discipline, gateway restart safety, handoff protocol.
+
+### OpenClaw Auto-Compat CI Pipeline
+- **`.github/workflows/openclaw-compat.yml`** — Scheduled workflow (every 6 hours) checks npm for new OpenClaw versions. On detection: installs new version, runs typecheck + build, runs compat scan. If clean: auto-creates PR with version bump. If breaking: creates GitHub issue with detailed error report.
+- **`scripts/openclaw-compat-scan.mjs`** — Analyzes build/typecheck logs for known breakage patterns (field renames, removed methods, type changes, import path changes, hook signature changes). Produces structured report.
+
+### Other Changes
+- CronGuard wired into `index.ts` (startup scan + runtime check in `message_received`)
+- Corrections handlers wired into `index.ts`
+- 2 unsafe broadcast casts replaced with `safeBroadcast()`
+- 2 explicit sessionKey casts replaced with `extractSessionKey()`
+- Gateway now registers 213 methods (up from 204)
+
+---
+
 ## 2026-03-01 — v1.1.0 Published to npm + CI/CD
 
 ### What

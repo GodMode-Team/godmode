@@ -287,10 +287,19 @@ cmd_update() {
         echo "Pulling latest changes..."
         cd "${godmode_dir}"
 
-        # Check for uncommitted changes
+        # Check for uncommitted changes — commit to WIP branch (never stash)
         if ! git diff-index --quiet HEAD -- 2>/dev/null; then
-            print_warning "Uncommitted changes detected, stashing..."
-            git stash
+            local current_branch
+            current_branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "unknown")
+            if [ "$current_branch" = "main" ]; then
+                local wip_branch="wip/pre-update-$(date +%Y%m%d-%H%M%S)"
+                print_warning "Uncommitted changes on main — saving to ${wip_branch}..."
+                git checkout -b "$wip_branch" && git add -A && git commit -m "WIP: auto-saved before GodMode update"
+                git checkout main
+            else
+                print_warning "Uncommitted changes on ${current_branch} — committing as WIP..."
+                git add -A && git commit -m "WIP: auto-saved before GodMode update on ${current_branch}"
+            fi
         fi
 
         git pull origin main

@@ -1,0 +1,330 @@
+name: OpenClaw Compatibility Watch
+
+on:
+  schedule:
+    # Check every 6 hours for new OpenClaw releases
+    - cron: "0 */6 * * *"
+  workflow_dispatch:
+    inputs:
+      openclaw_version:
+        description: "Specific OpenClaw version to test against (leave blank for latest)"
+        required: false
+        type: string
+      auto_publish:
+        description: "Auto-publish if compat passes"
+        required: false
+        type: boolean
+        default: false
+
+jobs:
+  check-version:
+    runs-on: ubuntu-latest
+    outputs:
+      new_version: ${{ steps.detect.outputs.new_version }}
+      current_version: ${{ steps.detect.outputs.current_version }}
+      needs_update: ${{ steps.detect.outputs.needs_update }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+
+      - id: detect
+        name: Detect OpenClaw version changes
+        run: |
+          # Get current devDep version
+          CURRENT=$(node -p "require('./package.json').devDependencies.openclaw.replace(/^[^0-9]*/, '')")
+          echo "current_version=$CURRENT" >> "$GITHUB_OUTPUT"
+
+          # Get latest from npm (or use manual input)
+          if [ -n "${{ inputs.openclaw_version }}" ]; then
+            LATEST="${{ inputs.openclaw_version }}"
+          else
+            LATEST=$(npm view openclaw version 2>/dev/null || echo "")
+          fi
+
+          if [ -z "$LATEST" ]; then
+            echo "::warning::Could not fetch latest OpenClaw version from npm"
+            echo "needs_update=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "new_version=$LATEST" >> "$GITHUB_OUTPUT"
+
+          if [ "$CURRENT" = "$LATEST" ]; then
+            echo "::notice::OpenClaw $CURRENT is already the latest"
+            echo "needs_update=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::New OpenClaw version: $CURRENT → $LATEST"
+            echo "needs_update=true" >> "$GITHUB_OUTPUT"
+          fi
+
+  compat-test:
+    needs: check-version
+    if: needs.check-version.outputs.needs_update == 'true'
+    runs-on: ubuntu-latest
+    outputs:
+      build_passed: ${{ steps.build.outputs.passed }}
+      typecheck_passed: ${{ steps.typecheck.outputs.passed }}
+      scan_report: ${{ steps.scan.outputs.report }}
+      breaking_changes: ${{ steps.scan.outputs.breaking }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+
+      - name: Update OpenClaw dependency
+        run: |
+          NEW_VERSION="${{ needs.check-version.outputs.new_version }}"
+          echo "Installing openclaw@$NEW_VERSION..."
+          pnpm add -D "openclaw@$NEW_VERSION"
+
+          # Also update peer dependency range if needed
+          node -e "
+            const pkg = require('./package.json');
+            const [major, minor] = '$NEW_VERSION'.split('.');
+            // Ensure peer dep range covers the new version
+            const currentPeer = pkg.peerDependencies?.openclaw || '';
+            console.log('Current peer dep:', currentPeer);
+            // Don't auto-change peer dep — just verify coverage
+            const semver = require('semver');
+          " 2>/dev/null || true
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - id: typecheck
+        name: Typecheck
+        run: |
+          if pnpm typecheck 2>&1 | tee /tmp/typecheck.log; then
+            echo "passed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "passed=false" >> "$GITHUB_OUTPUT"
+          fi
+        continue-on-error: true
+
+      - id: build
+        name: Build
+        run: |
+          if pnpm build 2>&1 | tee /tmp/build.log; then
+            echo "passed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "passed=false" >> "$GITHUB_OUTPUT"
+          fi
+        continue-on-error: true
+
+      - id: scan
+        name: Compat scan
+        run: |
+          node scripts/openclaw-compat-scan.mjs \
+            --old-version "${{ needs.check-version.outputs.current_version }}" \
+            --new-version "${{ needs.check-version.outputs.new_version }}" \
+            --typecheck-log /tmp/typecheck.log \
+            --build-log /tmp/build.log \
+            --typecheck-passed "${{ steps.typecheck.outputs.passed }}" \
+            --build-passed "${{ steps.build.outputs.passed }}" \
+            2>&1 | tee /tmp/scan-report.txt
+
+          # Extract structured data
+          BREAKING=$(grep -c "BREAKING:" /tmp/scan-report.txt 2>/dev/null || echo "0")
+          echo "breaking=$BREAKING" >> "$GITHUB_OUTPUT"
+          # Truncate for output (max 1000 chars for GH output)
+          REPORT=$(head -c 1000 /tmp/scan-report.txt)
+          echo "report<<SCAN_EOF" >> "$GITHUB_OUTPUT"
+          echo "$REPORT" >> "$GITHUB_OUTPUT"
+          echo "SCAN_EOF" >> "$GITHUB_OUTPUT"
+        continue-on-error: true
+
+      - name: Upload scan artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: compat-scan-${{ needs.check-version.outputs.new_version }}
+          path: |
+            /tmp/typecheck.log
+            /tmp/build.log
+            /tmp/scan-report.txt
+          retention-days: 30
+
+  auto-fix:
+    needs: [check-version, compat-test]
+    if: |
+      needs.compat-test.outputs.build_passed == 'true' &&
+      needs.compat-test.outputs.typecheck_passed == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+
+      - name: Update OpenClaw + bump GodMode version
+        run: |
+          NEW_OC="${{ needs.check-version.outputs.new_version }}"
+          OLD_OC="${{ needs.check-version.outputs.current_version }}"
+
+          # Update devDependency
+          pnpm add -D "openclaw@$NEW_OC"
+
+          # Bump GodMode patch version
+          CURRENT_GM=$(node -p "require('./package.json').version")
+          IFS='.' read -r GM_MAJOR GM_MINOR GM_PATCH <<< "$CURRENT_GM"
+          NEW_GM="$GM_MAJOR.$GM_MINOR.$((GM_PATCH + 1))"
+
+          # Update package.json version
+          node -e "
+            const fs = require('fs');
+            const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+            pkg.version = '$NEW_GM';
+            fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
+          "
+
+          # Sync openclaw.plugin.json
+          node scripts/sync-version.mjs
+
+          echo "GM_VERSION=$NEW_GM" >> "$GITHUB_ENV"
+          echo "Updated: OpenClaw $OLD_OC → $NEW_OC, GodMode $CURRENT_GM → $NEW_GM"
+
+      - name: Install + build + verify
+        run: |
+          pnpm install
+          pnpm typecheck
+          pnpm build
+          node scripts/verify-dist.mjs
+
+      - name: Create PR
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          NEW_OC="${{ needs.check-version.outputs.new_version }}"
+          OLD_OC="${{ needs.check-version.outputs.current_version }}"
+          BRANCH="compat/openclaw-${NEW_OC}"
+
+          git config user.name "GodMode Bot"
+          git config user.email "bot@lifeongodmode.com"
+          git checkout -b "$BRANCH"
+          git add -A
+          git commit -m "$(cat <<EOF
+          chore: update OpenClaw $OLD_OC → $NEW_OC
+
+          Auto-detected new OpenClaw release.
+          - Updated devDependency to openclaw@$NEW_OC
+          - Bumped GodMode to v$GM_VERSION
+          - Typecheck: passed
+          - Build: passed
+          - Dist verify: passed
+
+          Generated by OpenClaw Compatibility Watch
+          EOF
+          )"
+
+          git push origin "$BRANCH"
+
+          gh pr create \
+            --title "chore: OpenClaw $OLD_OC → $NEW_OC compat update" \
+            --body "$(cat <<'PREOF'
+          ## OpenClaw Compatibility Update
+
+          | Check | Status |
+          |-------|--------|
+          | Typecheck | :white_check_mark: Passed |
+          | Build | :white_check_mark: Passed |
+          | Dist verify | :white_check_mark: Passed |
+
+          ### Changes
+          - Updated `openclaw` devDependency: `${{ needs.check-version.outputs.current_version }}` → `${{ needs.check-version.outputs.new_version }}`
+          - Bumped GodMode version to `v${{ env.GM_VERSION }}`
+          - Synced `openclaw.plugin.json`
+
+          ### Next steps
+          - [ ] Review scan artifacts for any behavioral changes
+          - [ ] Merge to auto-publish via tag workflow
+
+          > Auto-generated by [OpenClaw Compatibility Watch](.github/workflows/openclaw-compat.yml)
+          PREOF
+          )" \
+            --base main \
+            --head "$BRANCH" \
+            --label "compat,automated"
+
+  alert-breaking:
+    needs: [check-version, compat-test]
+    if: |
+      needs.compat-test.outputs.build_passed == 'false' ||
+      needs.compat-test.outputs.typecheck_passed == 'false'
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create breaking change issue
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          NEW_OC="${{ needs.check-version.outputs.new_version }}"
+          OLD_OC="${{ needs.check-version.outputs.current_version }}"
+          TC_PASS="${{ needs.compat-test.outputs.typecheck_passed }}"
+          BUILD_PASS="${{ needs.compat-test.outputs.build_passed }}"
+          SCAN_REPORT="${{ needs.compat-test.outputs.scan_report }}"
+
+          # Check if issue already exists for this version
+          EXISTING=$(gh issue list --search "OpenClaw $NEW_OC breaking" --state open --json number --jq '.[0].number // empty')
+          if [ -n "$EXISTING" ]; then
+            echo "Issue #$EXISTING already exists for OpenClaw $NEW_OC"
+            exit 0
+          fi
+
+          gh issue create \
+            --title "BREAKING: OpenClaw $NEW_OC incompatible with GodMode" \
+            --label "compat,breaking,urgent" \
+            --body "$(cat <<ISSUE_EOF
+          ## OpenClaw $NEW_OC Breaking Change Detected
+
+          The automated compatibility watch detected that OpenClaw **$NEW_OC** breaks GodMode.
+
+          | Check | Status |
+          |-------|--------|
+          | Typecheck | $([ "$TC_PASS" = "true" ] && echo ":white_check_mark:" || echo ":x:") |
+          | Build | $([ "$BUILD_PASS" = "true" ] && echo ":white_check_mark:" || echo ":x:") |
+
+          ### Scan Report
+          \`\`\`
+          $SCAN_REPORT
+          \`\`\`
+
+          ### Action Required
+          1. Download the scan artifacts from the [workflow run](../actions)
+          2. Review the typecheck and build logs for specific errors
+          3. Fix compatibility issues on a \`compat/openclaw-$NEW_OC\` branch
+          4. The self-healing layer (host-context.ts, safe-request.ts) may handle runtime issues automatically
+
+          ### Previous Version
+          OpenClaw \`$OLD_OC\` was the last compatible version.
+
+          > Auto-generated by [OpenClaw Compatibility Watch](.github/workflows/openclaw-compat.yml)
+          ISSUE_EOF
+          )"

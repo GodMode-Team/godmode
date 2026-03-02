@@ -26,6 +26,7 @@ import { autoTitleCache, loadSessions } from "./controllers/sessions";
 import { startUpdatePolling, stopUpdatePolling } from "./controllers/updates";
 import type { GatewayEventFrame, GatewayHelloOk } from "./gateway";
 import { GatewayBrowserClient } from "./gateway";
+import { initHostCompat } from "../lib/host-compat.js";
 import type { Tab } from "./navigation";
 import type { UiSettings } from "./storage";
 import type {
@@ -488,11 +489,14 @@ async function maybeAutoTitleSession(host: GatewayHost, sessionKey: string) {
       return;
     }
 
-    // Persist the title via sessions.patch
-    await host.client.request("sessions.patch", {
-      key: sessionKey,
-      label: title,
-    });
+    // Persist the title via self-healing session patch (handles field name changes)
+    const { hostPatchSession } = await import("../lib/host-compat.js");
+    const result = await hostPatchSession(host.client, sessionKey, title);
+
+    if (!result.ok) {
+      console.error("[auto-title] patch failed:", result.error);
+      return;
+    }
 
     // Store in persistent cache so it survives sessionsResult overwrites
     autoTitleCache.set(sessionKey, title);
@@ -627,6 +631,9 @@ export function connectGateway(host: GatewayHost) {
         }
         workingSessionClearTimers.clear();
       }
+
+      // Initialize host compatibility layer — probes capabilities in background
+      initHostCompat(hello as unknown as Record<string, unknown>, host.client);
 
       applySnapshot(host, hello);
       void loadAssistantIdentity(host as unknown as GodModeApp);

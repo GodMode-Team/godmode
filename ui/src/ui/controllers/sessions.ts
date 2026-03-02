@@ -132,11 +132,14 @@ export async function patchSession(
     params.reasoningLevel = patch.reasoningLevel;
   }
   try {
-    const result = await state.client.request("sessions.patch", params);
-    // Return the canonical key from the server response immediately
-    // Don't reload all sessions yet to avoid race condition overwriting the change
-    const canonicalKey = result?.key ?? key;
-    return { ok: true, canonicalKey };
+    const { safeRequest } = await import("../../lib/safe-request.js");
+    const res = await safeRequest<Record<string, unknown>>(state.client, "sessions.patch", params);
+    if (res.ok) {
+      const canonicalKey = (res.data?.key as string) ?? key;
+      return { ok: true, canonicalKey };
+    }
+    state.sessionsError = res.error;
+    return { ok: false };
   } catch (err) {
     state.sessionsError = String(err);
     return { ok: false };

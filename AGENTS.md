@@ -69,6 +69,37 @@ This repository is the standalone home for the GodMode OpenClaw plugin.
 - Keep `openclaw.plugin.json` version metadata aligned with package release strategy.
 - Validate standalone build before publishing.
 
+## Session Coordination (Multi-Session Discipline)
+
+When multiple Claude Code sessions work on this repo simultaneously, follow these rules:
+
+### Branch Discipline
+- **NEVER work directly on `main`** — always create or switch to a feature branch.
+- **One branch per task** — each session should have its own branch (e.g., `feat/my-feature`, `fix/bug-name`).
+- **NEVER use `git stash`** — stashes are invisible to other sessions and cause lost work. Commit to your branch instead, even as WIP commits.
+- If you detect you're on `main`, create a branch immediately: `git checkout -b feat/<task-slug>`.
+
+### Gateway Restart Safety
+- Before running `openclaw gateway restart`, check if another session is active:
+  - Run: `./scripts/session-guard.sh status`
+  - Or call RPC: `session.checkConflict` with `operation: "gateway-restart"`
+- Only one session should restart the gateway at a time. The session coordinator enforces a lock.
+
+### File Conflict Awareness
+- Before making significant edits to a file, check if another session is modifying it.
+- If you find conflicts, prefer working on different files or coordinate via branch isolation.
+- Key conflict-prone files: `index.ts`, `src/services/queue-processor.ts`, `ui/src/ui/app-gateway.ts`.
+
+### Session Lifecycle
+- On start: the session coordinator tracks your branch, PID, and working directory.
+- During work: file modifications are tracked automatically via gateway RPCs.
+- On end: generate a handoff summary so the next session knows what happened.
+
+### Handoff Protocol
+- When finishing work, create a structured commit (not a stash).
+- Recent handoff summaries are stored in `~/godmode/data/session-handoffs/`.
+- The next session can read these to understand context.
+
 ## AI Session Checklist
 
 Before shipping changes:
@@ -81,3 +112,4 @@ Before shipping changes:
    - `pnpm ui:sync`
 4. Confirm handlers still export expected RPC methods.
 5. Confirm no host-core-only assumptions were introduced.
+6. If on `main`, move your changes to a feature branch before committing.

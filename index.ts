@@ -99,9 +99,12 @@ import { securityAuditHandlers } from "./src/methods/security-audit.js";
 import { proactiveIntelHandlers } from "./src/methods/proactive-intel.js";
 import { supportHandlers } from "./src/methods/support.js";
 import { correctionsHandlers } from "./src/methods/corrections.js";
+import { sessionCoordinationHandlers } from "./src/methods/session-coordination.js";
 // Static file server for UIs
 import { createStaticFileHandler } from "./src/static-server.js";
 import { DATA_DIR } from "./src/data-paths.js";
+// Host compatibility — self-healing layer
+import { detectHostContext, extractSessionKey, safeBroadcast } from "./src/lib/host-context.js";
 
 // ── Options file reader (for feature flags in HTTP handler) ─────────
 const OPTIONS_FILE_PATH = join(DATA_DIR, "godmode-options.json");
@@ -624,6 +627,7 @@ const godmodePlugin = {
       ...dashboardsHandlers,
       ...supportHandlers,
       ...correctionsHandlers,
+      ...sessionCoordinationHandlers,
     };
 
     // Methods that must work before a license is configured (setup flow)
@@ -773,6 +777,19 @@ h1{color:#ff6b6b}code{background:#16213e;padding:2px 8px;border-radius:4px}a{col
     api.on("gateway_start", async () => {
       api.logger.info("[GodMode] Gateway started — plugin active");
 
+      // Host compatibility scan — detect host changes BEFORE services initialize
+      try {
+        const { changes } = await detectHostContext(api, pluginVersion);
+        if (changes.length > 0) {
+          api.logger.warn(
+            `[GodMode] Host environment changed (${changes.length} change(s)) — self-healing active`,
+          );
+        }
+        // Note: RPC-level compat probing happens client-side via host-compat.ts
+      } catch (err) {
+        api.logger.warn(`[GodMode] Host compat scan failed: ${String(err)}`);
+      }
+
       // Agent log writer
       try {
         const started = await initAgentLogWriter();
@@ -908,7 +925,7 @@ h1{color:#ff6b6b}code{background:#16213e;padding:2px 8px;border-radius:4px}a{col
       try {
         const { initQueueProcessor } = await import("./src/services/queue-processor.js");
         const queueProcessor = initQueueProcessor(api.logger);
-        queueProcessor.setBroadcast((event, data) => (api as unknown as Record<string, Function>).broadcast?.(event, data));
+        queueProcessor.setBroadcast((event, data) => safeBroadcast(api, event, data));
         await queueProcessor.recoverOrphaned();
         queueProcessor.startPolling();
         api.logger.info("[GodMode] Queue processor initialized (10-min polling)");
@@ -920,11 +937,24 @@ h1{color:#ff6b6b}code{background:#16213e;padding:2px 8px;border-radius:4px}a{col
       try {
         const { initObsidianSync } = await import("./src/services/obsidian-sync.js");
         const obsSync = initObsidianSync(api.logger);
-        obsSync.setBroadcast((event, data) => (api as unknown as Record<string, Function>).broadcast?.(event, data));
+        obsSync.setBroadcast((event, data) => safeBroadcast(api, event, data));
         await obsSync.init();
         api.logger.info("[GodMode] Obsidian Sync service initialized");
       } catch (err) {
         api.logger.warn(`[GodMode] Obsidian Sync failed to init: ${String(err)}`);
+      }
+
+      // CronGuard — scan and patch dangerous isolated cron jobs
+      try {
+        const { scanAndPatchCronJobs } = await import("./src/services/cron-guard.js");
+        const patches = await scanAndPatchCronJobs(api.logger);
+        if (patches.length > 0) {
+          api.logger.warn(`[GodMode] CronGuard patched ${patches.length} dangerous cron job(s)`);
+        } else {
+          api.logger.info("[GodMode] CronGuard: all cron jobs safe");
+        }
+      } catch (err) {
+        api.logger.warn(`[GodMode] CronGuard scan failed: ${String(err)}`);
       }
     });
 
@@ -985,10 +1015,22 @@ h1{color:#ff6b6b}code{background:#16213e;padding:2px 8px;border-radius:4px}a{col
       }
     });
 
-    // ── Safety Gates: message_received — Prompt Shield input detection ──
+    // ── Safety Gates: message_received — Prompt Shield + CronGuard ──
     api.on("message_received", async (event, ctx) => {
-      const sessionKey = (ctx as Record<string, unknown>)?.sessionKey as string | undefined;
+      const sessionKey = extractSessionKey(ctx);
       const content = event.content ?? "";
+
+      // CronGuard runtime check — warn if message arrived in an isolated cron session
+      try {
+        const { isCronIsolatedSession } = await import("./src/services/cron-guard.js");
+        if (isCronIsolatedSession(sessionKey)) {
+          api.logger.warn(
+            `[GodMode][CronGuard] User message received in isolated cron session "${sessionKey}" — ` +
+            `this reply may not reach the main session.`,
+          );
+        }
+      } catch { /* non-fatal */ }
+
       if (content) {
         const result = await scanForInjection(sessionKey, content);
         if (result.flagged) {
@@ -1008,6 +1050,7 @@ h1{color:#ff6b6b}code{background:#16213e;padding:2px 8px;border-radius:4px}a{col
 
     // Team workspace bootstrap — inject shared context
     api.on("before_prompt_build", async (event, ctx) => {
+      const sessionKey = extractSessionKey(ctx);
       const prependChunks: string[] = [];
       // Agent persona — always-on behavioral baseline (FIRST, before all other context)
       try {
@@ -1020,7 +1063,7 @@ h1{color:#ff6b6b}code{background:#16213e;padding:2px 8px;border-radius:4px}a{col
         api.logger.warn(`[GodMode] agent persona hook error: ${String(err)}`);
       }
       // Support session context injection — early return to keep support focused
-      if (ctx?.sessionKey === "agent:main:support") {
+      if (sessionKey === "agent:main:support") {
         try {
           const fsP = await import("node:fs/promises");
           const pathM = await import("node:path");
@@ -1073,7 +1116,7 @@ h1{color:#ff6b6b}code{background:#16213e;padding:2px 8px;border-radius:4px}a{col
       // Trust feedback injection — append pending post-skill feedback prompt
       try {
         const { consumePendingTrustFeedback } = await import("./src/hooks/trust-feedback.js");
-        const trustPrompt = consumePendingTrustFeedback(ctx?.sessionKey);
+        const trustPrompt = consumePendingTrustFeedback(sessionKey);
         if (trustPrompt) {
           prependChunks.push(trustPrompt);
         }
@@ -1090,32 +1133,32 @@ h1{color:#ff6b6b}code{background:#16213e;padding:2px 8px;border-radius:4px}a{col
         api.logger.warn(`[GodMode] onboarding context hook error: ${String(err)}`);
       }
       // Exhaustive search gate nudge — injected after a lazy refusal was blocked
-      const searchNudge = consumeSearchGateNudge(ctx?.sessionKey);
+      const searchNudge = consumeSearchGateNudge(sessionKey);
       if (searchNudge) {
         prependChunks.push(searchNudge);
       }
       // Self-service gate nudge — injected after a lazy question was blocked
-      const selfServiceNudge = consumeSelfServiceNudge(ctx?.sessionKey);
+      const selfServiceNudge = consumeSelfServiceNudge(sessionKey);
       if (selfServiceNudge) {
         prependChunks.push(selfServiceNudge);
       }
       // Persistence gate nudge — injected after a premature surrender was blocked
-      const persistenceNudge = consumePersistenceNudge(ctx?.sessionKey);
+      const persistenceNudge = consumePersistenceNudge(sessionKey);
       if (persistenceNudge) {
         prependChunks.push(persistenceNudge);
       }
       // Search retry gate nudge — injected after a premature "not found" was blocked
-      const searchRetryNudge = consumeSearchRetryNudge(ctx?.sessionKey);
+      const searchRetryNudge = consumeSearchRetryNudge(sessionKey);
       if (searchRetryNudge) {
         prependChunks.push(searchRetryNudge);
       }
       // Output Shield nudge — injected after an output leak was blocked
-      const outputNudge = consumeOutputShieldNudge(ctx?.sessionKey);
+      const outputNudge = consumeOutputShieldNudge(sessionKey);
       if (outputNudge) {
         prependChunks.push(outputNudge);
       }
       // Context Pressure nudge — injected when session context is filling up
-      const contextNudge = consumeContextPressureNudge(ctx?.sessionKey);
+      const contextNudge = consumeContextPressureNudge(sessionKey);
       if (contextNudge) {
         prependChunks.push(contextNudge);
       }
@@ -1126,12 +1169,12 @@ h1{color:#ff6b6b}code{background:#16213e;padding:2px 8px;border-radius:4px}a{col
 
         // Session-scoped: if this session is linked to a task, inject that task's queue output
         const sessionScopedTaskIds = new Set<string>();
-        if (ctx?.sessionKey) {
+        if (sessionKey) {
           try {
             const { readTasks } = await import("./src/methods/tasks.js");
             const tasksData = await readTasks();
             const linkedTask = tasksData.tasks.find(
-              (t) => t.sessionId === ctx.sessionKey,
+              (t) => t.sessionId === sessionKey,
             );
             if (linkedTask) {
               const taskQueueItems = queueState.items.filter(
@@ -1188,7 +1231,7 @@ h1{color:#ff6b6b}code{background:#16213e;padding:2px 8px;border-radius:4px}a{col
         // Queue not available — skip silently
       }
       // Prompt Shield nudge — injected when injection detected (HIGHEST PRIORITY — unshift)
-      const promptNudge = consumePromptShieldNudge(ctx?.sessionKey);
+      const promptNudge = consumePromptShieldNudge(sessionKey);
       if (promptNudge) {
         prependChunks.unshift(promptNudge);
       }
@@ -1223,13 +1266,14 @@ h1{color:#ff6b6b}code{background:#16213e;padding:2px 8px;border-radius:4px}a{col
       }
 
       // Reset search tracking for this session
-      resetSearchTracking(ctx?.sessionKey);
+      const sessionKey = extractSessionKey(ctx);
+      resetSearchTracking(sessionKey);
 
       // Reset prompt shield / output shield tracking for this session
-      resetPromptShieldTracking(ctx?.sessionKey);
+      resetPromptShieldTracking(sessionKey);
 
       // Reset context pressure tracking for this session
-      resetContextPressure(ctx?.sessionKey);
+      resetContextPressure(sessionKey);
 
       // Team memory routing — write session memory to team workspace on reset
       try {
@@ -1243,7 +1287,7 @@ h1{color:#ff6b6b}code{background:#16213e;padding:2px 8px;border-radius:4px}a{col
     // ── Safety Gates: before_tool_call ──────────────────────────────
     api.on("before_tool_call", async (event, ctx) => {
       const name = event.toolName?.trim().toLowerCase() ?? "";
-      const sessionKey = ctx?.sessionKey;
+      const sessionKey = extractSessionKey(ctx);
 
       // Gate 1: Loop Breaker — warn then block tools called too many times
       // Pass params for smart loop detection (identical-call detection)
@@ -1354,19 +1398,20 @@ h1{color:#ff6b6b}code{background:#16213e;padding:2px 8px;border-radius:4px}a{col
 
     // ── Safety Gates: after_tool_call — search tracking ────────────
     api.on("after_tool_call", async (event, ctx) => {
+      const sessionKey = extractSessionKey(ctx);
       // Track search tool usage for the exhaustive search gate
-      trackSearchUsage(ctx?.sessionKey, event.toolName ?? "");
+      trackSearchUsage(sessionKey, event.toolName ?? "");
       // Track code-reading tool usage for the self-service gate
-      trackCodeToolUsage(ctx?.sessionKey, event.toolName ?? "");
+      trackCodeToolUsage(sessionKey, event.toolName ?? "");
       // Track investigation depth for the persistence gate
-      trackInvestigationDepth(ctx?.sessionKey, event.toolName ?? "");
+      trackInvestigationDepth(sessionKey, event.toolName ?? "");
       // Track search attempts for the search retry gate
-      trackSearchAttempt(ctx?.sessionKey, event.toolName ?? "");
+      trackSearchAttempt(sessionKey, event.toolName ?? "");
 
       // Trust feedback — detect skill completion and queue feedback prompt
       try {
         const { handlePostToolFeedback } = await import("./src/hooks/trust-feedback.js");
-        await handlePostToolFeedback(event.toolName, ctx?.sessionKey, event.error);
+        await handlePostToolFeedback(event.toolName, sessionKey, event.error);
       } catch (err) {
         api.logger.warn(`[GodMode] trust after_tool_call hook error: ${String(err)}`);
       }
@@ -1374,7 +1419,7 @@ h1{color:#ff6b6b}code{background:#16213e;padding:2px 8px;border-radius:4px}a{col
 
     // ── Safety Gates: message_sending — exhaustive search gate ───
     api.on("message_sending", async (event, ctx) => {
-      const sessionKey = (ctx as Record<string, unknown>)?.sessionKey as string | undefined;
+      const sessionKey = extractSessionKey(ctx);
       const content = event.content ?? "";
       if (await checkLazyRefusal(sessionKey, content)) {
         api.logger.warn(`[GodMode][SafetyGate] exhaustive search gate fired — lazy refusal blocked`);
@@ -1403,14 +1448,15 @@ h1{color:#ff6b6b}code{background:#16213e;padding:2px 8px;border-radius:4px}a{col
 
     // ── Context Pressure: llm_output — track token usage ──────────
     api.on("llm_output", async (event, ctx) => {
+      const sessionKey = extractSessionKey(ctx);
       try {
-        await trackContextPressure(ctx?.sessionKey, event.usage);
+        await trackContextPressure(sessionKey, event.usage);
       } catch (err) {
         api.logger.warn(`[GodMode] context pressure tracking error: ${String(err)}`);
       }
       // Support session logging — assistant messages
       const assistantContent = event.assistantTexts?.join("") ?? "";
-      if (ctx?.sessionKey === "agent:main:support" && assistantContent) {
+      if (sessionKey === "agent:main:support" && assistantContent) {
         try {
           const { logExchangeInternal } = await import("./src/methods/support.js");
           await logExchangeInternal("assistant", assistantContent);
@@ -1420,8 +1466,9 @@ h1{color:#ff6b6b}code{background:#16213e;padding:2px 8px;border-radius:4px}a{col
 
     // ── Context Pressure: after_compaction — reset tracking ───────
     api.on("after_compaction", async (_event, ctx) => {
-      resetContextPressure(ctx?.sessionKey);
-      api.logger.info(`[GodMode] context pressure reset after compaction (session: ${ctx?.sessionKey ?? "unknown"})`);
+      const sessionKey = extractSessionKey(ctx);
+      resetContextPressure(sessionKey);
+      api.logger.info(`[GodMode] context pressure reset after compaction (session: ${sessionKey ?? "unknown"})`);
     });
 
     api.on("subagent_spawning", async (event) => {

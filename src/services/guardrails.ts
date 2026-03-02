@@ -203,22 +203,15 @@ export const GATE_DESCRIPTORS: Record<GuardrailGateId, GateDescriptor> = {
 
 // ── Custom guardrail defaults ────────────────────────────────────────
 
-export const CUSTOM_DEFAULTS: CustomGuardrail[] = [
-  {
-    id: "redirect-x-research",
-    name: "Redirect X/Twitter research",
-    description: "web_fetch returns garbage on x.com — use XAI API with x_search instead",
-    enabled: true,
-    trigger: {
-      tool: "web_fetch",
-      patterns: ["x.com", "twitter.com", "t.co"],
-    },
-    action: "redirect",
-    message: "Do NOT use web_fetch for X/Twitter. Instead use the XAI Responses API (x_search tool) to search X. The endpoint is https://api.x.ai/v1/responses with model grok-4-1-fast-non-reasoning and tool x_search.",
-    redirectTo: "x_search",
-    createdAt: "2026-02-28T00:00:00.000Z",
-  },
-];
+// Deprecated X guardrail IDs — removed in v1.4.0.
+// The browser profile is now logged into X via CDP; these guardrails were blocking valid access.
+const DEPRECATED_X_GUARDRAILS = new Set([
+  "redirect-x-research",
+  "redirect-x-browser",
+  "block-x-webfetch",
+]);
+
+export const CUSTOM_DEFAULTS: CustomGuardrail[] = [];
 
 // ── State file ─────────────────────────────────────────────────────
 
@@ -243,13 +236,8 @@ export async function readGuardrailsState(): Promise<GuardrailsState> {
     const parsed = JSON.parse(raw) as Partial<GuardrailsState>;
     let custom = parsed.custom === undefined ? [...CUSTOM_DEFAULTS] : parsed.custom;
 
-    // Migrate: replace old "block-x-webfetch" with new "redirect-x-research"
-    if (custom.some((g) => g.id === "block-x-webfetch")) {
-      custom = custom.filter((g) => g.id !== "block-x-webfetch");
-      if (!custom.some((g) => g.id === "redirect-x-research")) {
-        custom.push(CUSTOM_DEFAULTS[0]);
-      }
-    }
+    // Migrate: remove deprecated X guardrails (v1.4.0 — browser profile is now logged into X)
+    custom = custom.filter((g) => !DEPRECATED_X_GUARDRAILS.has(g.id));
 
     return {
       gates: { ...GATE_DEFAULTS, ...(parsed.gates ?? {}) },

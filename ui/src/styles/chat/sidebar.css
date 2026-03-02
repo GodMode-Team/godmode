@@ -117,6 +117,27 @@
   line-height: 1.5;
 }
 
+.sidebar-markdown a {
+  color: var(--accent, #7c3aed);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.sidebar-markdown a:hover {
+  opacity: 0.8;
+}
+
+.sidebar-markdown a[href^="file://"] {
+  color: var(--teal, #14b8a6);
+  text-decoration: underline dotted;
+}
+
+.sidebar-markdown a[href^="file://"]:hover {
+  text-decoration: underline solid;
+}
+
 .sidebar-markdown pre {
   background: rgba(0, 0, 0, 0.12);
   border-radius: 4px;

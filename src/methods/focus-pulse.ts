@@ -603,11 +603,28 @@ export async function scopeTasksToWinTheDay(
   const tasksData = await readTasks();
 
   const wtdTitles = new Set(winTheDayItems.map((i) => i.title.toLowerCase()));
+
+  // Protect tasks with active queue work from being un-dated
+  let activeQueueTaskIds = new Set<string>();
+  try {
+    const { readQueueState } = await import("../lib/queue-state.js");
+    const queueState = await readQueueState();
+    activeQueueTaskIds = new Set(
+      queueState.items
+        .filter((qi) => qi.sourceTaskId && qi.status !== "done")
+        .map((qi) => qi.sourceTaskId!),
+    );
+  } catch {
+    // Queue state unavailable — proceed without protection
+  }
+
   let deferred = 0;
 
   for (const task of tasksData.tasks) {
     if (task.status !== "pending" || task.dueDate !== date) continue;
     if (wtdTitles.has(task.title.toLowerCase())) continue;
+    // Don't un-date tasks with active queue work
+    if (activeQueueTaskIds.has(task.id)) continue;
     // Un-date: remove from today without pushing to tomorrow
     task.dueDate = null;
     deferred++;
