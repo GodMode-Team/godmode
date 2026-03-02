@@ -7,8 +7,12 @@ export const TAB_GROUPS = [
   { label: "System", tabs: ["mission-control", "overview", "channels", "instances", "sessions", "cron", "nodes"] },
 ] as const;
 
+/** Tabs that can be dynamically inserted but aren't in static groups. */
+export const DYNAMIC_TABS = ["setup", "onboarding"] as const;
+
 export type Tab =
   | "setup"
+  | "onboarding"
   | "guardrails"
   | "options"
   | "overview"
@@ -36,6 +40,7 @@ export type Tab =
 
 const TAB_PATHS: Record<Tab, string> = {
   setup: "/setup",
+  onboarding: "/onboarding",
   options: "/options",
   overview: "/overview",
   workspaces: "/workspaces",
@@ -162,6 +167,8 @@ export function iconForTab(tab: Tab): IconName {
   switch (tab) {
     case "setup":
       return "zap";
+    case "onboarding":
+      return "zap";
     case "chat":
       return "messageSquare";
     case "today":
@@ -218,6 +225,8 @@ export function titleForTab(tab: Tab) {
   switch (tab) {
     case "setup":
       return "Setup";
+    case "onboarding":
+      return "Onboarding";
     case "chat":
       return "Chat";
     case "today":
@@ -273,6 +282,8 @@ export function titleForTab(tab: Tab) {
 export function emojiForTab(tab: Tab): string {
   switch (tab) {
     case "setup":
+      return "\u{1F680}";
+    case "onboarding":
       return "\u{1F680}";
     case "chat":
       return "\u{1F4AC}";
@@ -330,6 +341,8 @@ export function subtitleForTab(tab: Tab) {
   switch (tab) {
     case "setup":
       return "Get GodMode configured and running.";
+    case "onboarding":
+      return "Set up your integrations and customize your experience.";
     case "chat":
       return "Your command center. Ask anything, customize any view.";
     case "today":

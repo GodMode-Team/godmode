@@ -587,6 +587,44 @@ const sources: GatewayRequestHandler = async ({ respond }) => {
     }
   } catch { /* non-critical */ }
 
+  // 4. Integration registry sources (calendar, health, intelligence, etc.)
+  try {
+    const { getIntegrationsForPlatform, detectAllIntegrations } = await import("../lib/integration-registry.js");
+    const integrations = getIntegrationsForPlatform();
+    const statuses = await detectAllIntegrations();
+
+    const INTEGRATION_ICONS: Record<string, string> = {
+      "x-intelligence": "\u{1F50D}",
+      "tailscale": "\u{1F310}",
+      "google-calendar": "\u{1F4C5}",
+      "obsidian-vault": "\u{1F4D3}",
+      "github-cli": "\u{1F4BB}",
+      "messaging-channel": "\u{1F4F1}",
+      "oura-ring": "\u{2764}\u{FE0F}",
+      "weather": "\u{26C5}",
+      "obsidian-sync": "\u{1F504}",
+    };
+
+    for (const integration of integrations) {
+      // Skip obsidian-vault — already covered by KNOWN_SOURCES
+      if (integration.id === "obsidian-vault" || seenIds.has(integration.id)) continue;
+      seenIds.add(integration.id);
+
+      const status = statuses[integration.id];
+      const isConnected = status?.working || status?.configured;
+
+      result.push({
+        id: integration.id,
+        name: integration.name,
+        type: "integration",
+        status: isConnected ? "connected" : "available",
+        icon: INTEGRATION_ICONS[integration.id] ?? "\u{1F517}",
+        description: integration.description,
+        stats: status?.details ?? undefined,
+      });
+    }
+  } catch { /* integration registry not available — non-critical */ }
+
   const connectedCount = result.filter(s => s.status === "connected").length;
   respond(true, { sources: result, connectedCount, totalCount: result.length });
 };

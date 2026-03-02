@@ -111,6 +111,7 @@ import {
   type OnboardingPhase as OnbPhase,
 } from "./views/onboarding";
 import { renderSetup } from "./views/setup";
+import { renderOnboardingSetup } from "./views/onboarding-setup";
 
 const AVATAR_DATA_RE = /^data:/i;
 const AVATAR_HTTP_RE = /^https?:\/\//i;
@@ -438,6 +439,27 @@ export function renderApp(state: AppViewState) {
                           <span class="nav-item__text">Setup</span>
                           ${state.setupChecklist && (state.setupChecklist as { percentComplete?: number }).percentComplete != null
                             ? html`<span class="nav-item__badge">${(state.setupChecklist as { percentComplete: number }).percentComplete}%</span>`
+                            : nothing}
+                        </a>
+                      `
+                    : nothing
+                }
+                ${
+                  !group.label && !state.godmodeOptions?.["onboarding.complete"]
+                    ? html`
+                        <a
+                          class="nav-item ${state.tab === "onboarding" ? "active" : ""}"
+                          href="#"
+                          @click=${(e: Event) => {
+                            e.preventDefault();
+                            state.setTab("onboarding" as Tab);
+                          }}
+                          title="Set up your integrations and customize your experience."
+                        >
+                          <span class="nav-item__emoji" aria-hidden="true">\u{1F680}</span>
+                          <span class="nav-item__text">Onboarding</span>
+                          ${(state as any).onboardingProgress != null
+                            ? html`<span class="nav-item__badge">${(state as any).onboardingProgress}%</span>`
                             : nothing}
                         </a>
                       `
@@ -1052,6 +1074,32 @@ export function renderApp(state: AppViewState) {
                 onNavigate: (tab) => state.setTab(tab),
                 onRunAssessment: () => state.handleRunAssessment?.(),
                 onOpenSupportChat: () => state.handleOpenSupportChat(),
+              })
+            : nothing
+        }
+
+        ${
+          state.tab === "onboarding"
+            ? renderOnboardingSetup({
+                connected: state.connected,
+                integrations: (state as any).onboardingIntegrations ?? null,
+                coreProgress: (state as any).onboardingCoreProgress ?? null,
+                expandedCard: (state as any).onboardingExpandedCard ?? null,
+                loadingGuide: (state as any).onboardingLoadingGuide ?? null,
+                activeGuide: (state as any).onboardingActiveGuide ?? null,
+                testingId: (state as any).onboardingTestingId ?? null,
+                testResult: (state as any).onboardingTestResult ?? null,
+                configValues: (state as any).onboardingConfigValues ?? {},
+                onLoadIntegrations: () => (state as any).handleLoadIntegrations?.(),
+                onExpandCard: (id: string | null) => (state as any).handleExpandCard?.(id),
+                onLoadGuide: (id: string) => (state as any).handleLoadGuide?.(id),
+                onTestIntegration: (id: string) => (state as any).handleTestIntegration?.(id),
+                onConfigureIntegration: (id: string, values: Record<string, string>) =>
+                  (state as any).handleConfigureIntegration?.(id, values),
+                onUpdateConfigValue: (key: string, value: string) =>
+                  (state as any).handleUpdateConfigValue?.(key, value),
+                onSkipIntegration: (id: string) => (state as any).handleSkipIntegration?.(id),
+                onNavigate: (tab) => state.setTab(tab),
               })
             : nothing
         }
@@ -2043,6 +2091,7 @@ export function renderApp(state: AppViewState) {
                 onCloseSidebar: () => state.handleCloseSidebar(),
                 onOpenFile: (path: string) => state.handleOpenFile(path),
                 onSplitRatioChange: (ratio: number) => state.handleSplitRatioChange(ratio),
+                onPushToDrive: (path: string) => state.handlePushToDrive(path),
                 onImageClick: (url: string, allImages: import("./chat/lightbox").LightboxImage[], index: number) =>
                   state.handleImageClick(url, allImages, index),
                 resolveImageUrl: (msgIdx: number, imgIdx: number) =>
@@ -2386,6 +2435,7 @@ export function renderApp(state: AppViewState) {
                     });
                   },
                   onOpenFile: (path: string) => state.handleOpenFile(path),
+                  onPushToDrive: (path: string) => state.handlePushToDrive(path),
                 })}
               </div>
             </div>
