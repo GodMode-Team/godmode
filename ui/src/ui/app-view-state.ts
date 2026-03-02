@@ -559,7 +559,7 @@ export type AppViewState = {
   handleOnboardingSkipPhase?: () => void;
   handleOnboardingComplete?: () => void;
   // Setup tab handlers
-  handleQuickSetup?: (name: string, licenseKey: string, dailyIntelTopics: string) => void;
+  handleQuickSetup?: (name: string, licenseKey: string) => void;
   handleLoadSetupChecklist?: () => void;
   handleHideSetup?: () => void;
   handleRunAssessment?: () => void;
@@ -580,6 +580,7 @@ export type AppViewState = {
   // Options handlers
   handleOptionsLoad: () => Promise<void>;
   handleOptionToggle: (key: string, value: unknown) => Promise<void>;
+  handleRestoreSetup?: () => Promise<void>;
   // SecondBrain handlers
   handleSecondBrainRefresh: () => Promise<void>;
   handleSecondBrainSubtabChange: (subtab: import("./views/second-brain").SecondBrainSubtab) => void;

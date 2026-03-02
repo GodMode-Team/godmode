@@ -30,6 +30,8 @@ export type OptionsProps = {
   onToggle: (key: string, value: unknown) => void;
   onRefresh: () => void;
   onOpenWizard?: () => void;
+  setupHidden?: boolean;
+  onRestoreSetup?: () => void;
 };
 
 // ===== Render =====
@@ -72,7 +74,7 @@ function renderFeatureCard(
 }
 
 export function renderOptions(props: OptionsProps) {
-  const { connected, loading, options, onToggle, onOpenWizard } = props;
+  const { connected, loading, options, onToggle, onOpenWizard, setupHidden, onRestoreSetup } = props;
 
   if (!connected) {
     return html`
@@ -119,6 +121,27 @@ export function renderOptions(props: OptionsProps) {
                 <div class="options-card-description">
                   Set up your GodMode workspace from scratch. Generates AGENTS.md, memory files,
                   and patches your OC config with optimal settings. Takes about 5 minutes.
+                </div>
+              </div>
+            </div>
+          `
+        : nothing}
+      ${setupHidden && onRestoreSetup
+        ? html`
+            <div class="options-wizard-section">
+              <div class="options-card card">
+                <div class="options-card-header">
+                  <div class="options-card-info">
+                    <span class="options-card-icon">Setup</span>
+                    <span class="options-card-name">Setup Tab</span>
+                  </div>
+                  <button
+                    class="options-wizard-btn"
+                    @click=${onRestoreSetup}
+                  >Restore</button>
+                </div>
+                <div class="options-card-description">
+                  Bring back the setup tab to continue onboarding.
                 </div>
               </div>
             </div>

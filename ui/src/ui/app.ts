@@ -1155,6 +1155,13 @@ export class GodModeApp extends LitElement {
     await saveOption(this, key, value);
   }
 
+  async handleRestoreSetup() {
+    const { saveOption } = await import("./controllers/options.js");
+    await saveOption(this, "onboarding.hidden", false);
+    this.showSetupTab = true;
+    this.showToast("Setup tab restored.", "success", 3000);
+  }
+
   // Second Brain handlers
   async handleSecondBrainRefresh() {
     const { loadSecondBrain } = await import("./controllers/second-brain.js");
@@ -2966,9 +2973,9 @@ export class GodModeApp extends LitElement {
 
   // ── Setup tab handlers ───────────────────────────────────────
 
-  async handleQuickSetup(name: string, licenseKey: string, dailyIntelTopics: string) {
+  async handleQuickSetup(name: string, licenseKey: string) {
     void import("./controllers/setup.js").then(async ({ quickSetup }) => {
-      const success = await quickSetup(this, name, licenseKey, dailyIntelTopics);
+      const success = await quickSetup(this, name, licenseKey);
       if (success) {
         this.setTab("chat" as import("./navigation").Tab);
         // Reload checklist in background
