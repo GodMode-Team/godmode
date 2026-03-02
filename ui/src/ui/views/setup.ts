@@ -1,7 +1,7 @@
 /**
  * Setup tab view — 80/20 fast onboarding.
  *
- * Section 1: Quick Start form (name + license key + daily intel topics)
+ * Section 1: Quick Start form (name + license key)
  * Section 2: Progressive checklist for deeper setup tasks
  */
 import { html, nothing } from "lit";

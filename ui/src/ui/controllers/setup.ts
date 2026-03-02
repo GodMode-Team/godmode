@@ -103,7 +103,7 @@ export async function quickSetup(
     const trimmedName = name.trim().slice(0, 50);
     app.userName = trimmedName || "You";
     app.applySettings({ ...app.settings, userName: trimmedName });
-    host.showToast(`Welcome, ${name}!`, "success", 3000);
+    host.showToast(`Welcome, ${trimmedName}!`, "success", 3000);
     return true;
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Setup failed";

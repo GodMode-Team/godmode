@@ -1156,10 +1156,20 @@ export class GodModeApp extends LitElement {
   }
 
   async handleRestoreSetup() {
-    const { saveOption } = await import("./controllers/options.js");
-    await saveOption(this, "onboarding.hidden", false);
-    this.showSetupTab = true;
-    this.showToast("Setup tab restored.", "success", 3000);
+    if (!this.client || !this.connected) return;
+    try {
+      const result = await this.client.request<{
+        key: string;
+        value: unknown;
+        options: Record<string, unknown>;
+      }>("godmode.options.set", { key: "onboarding.hidden", value: false });
+      (this as unknown as { godmodeOptions: Record<string, unknown> | null }).godmodeOptions =
+        result.options;
+      this.showSetupTab = true;
+      this.showToast("Setup tab restored.", "success", 3000);
+    } catch {
+      this.showToast("Failed to restore setup tab", "error");
+    }
   }
 
   // Second Brain handlers
