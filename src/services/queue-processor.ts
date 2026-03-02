@@ -170,9 +170,9 @@ class QueueProcessor {
 
     // Autonomy gating — check trust level before spawning
     try {
-      const { getAutonomyLevel } = await import("../lib/trust-tracker.js");
+      const { getAutonomyLevel } = await import("../methods/trust-tracker.js");
       const autonomy = await getAutonomyLevel(item.personaHint ?? item.type);
-      if (autonomy === "supervised") {
+      if (autonomy === "approval") {
         this.logger.info(
           `[GodMode][Queue] Skipping "${item.title}" — persona "${item.personaHint ?? item.type}" requires supervision`,
         );
@@ -335,7 +335,7 @@ class QueueProcessor {
     // Auto-approve for full-autonomy personas (skip manual review)
     if (personaSlug) {
       try {
-        const { getAutonomyLevel } = await import("../lib/trust-tracker.js");
+        const { getAutonomyLevel } = await import("../methods/trust-tracker.js");
         const autonomy = await getAutonomyLevel(personaSlug);
         if (autonomy === "full") {
           await updateQueueState((state) => {
@@ -388,6 +388,22 @@ class QueueProcessor {
       return;
     }
 
+    // Engine fallback: if item used a non-claude engine, retry with claude
+    if (item.engine && item.engine !== "claude" && (item.retryCount ?? 0) === 1) {
+      this.logger.info(
+        `[GodMode][Queue] Item ${itemId} failed on "${item.engine}" — falling back to claude`,
+      );
+      await updateQueueState((state) => {
+        const qi = state.items.find((i) => i.id === itemId);
+        if (qi) {
+          qi.status = "pending";
+          qi.engine = "claude";
+        }
+      });
+      this.broadcast("queue:update", { itemId, status: "pending" });
+      return;
+    }
+
     if ((item.retryCount ?? 0) < 2) {
       // Spawn diagnostic agent to analyze failure and write improved prompt
       this.logger.info(
@@ -408,11 +424,12 @@ class QueueProcessor {
       // Auto-rate the persona in trust tracker (permanent failure = poor performance)
       if (item.personaHint) {
         try {
-          const { submitTrustRating } = await import("../methods/trust-tracker.js");
-          await submitTrustRating(
+          const { autoRate } = await import("../methods/trust-tracker.js");
+          await autoRate(
             item.personaHint,
             3,
             `Failed after ${item.retryCount} retries: "${item.title}"`,
+            "auto-failure",
           );
         } catch {
           // Trust rating is best-effort
@@ -695,6 +712,12 @@ class QueueProcessor {
 
     sections.push(
       "",
+      "## Persistence Protocol",
+      "- If something fails, try a different approach. You have multiple tools available.",
+      "- If a tool is unavailable, work around it with another tool.",
+      "- If you get stuck, write what you learned so far and what you'd try next.",
+      "- NEVER give up without writing output. Partial results are better than nothing.",
+      "",
       "## Safety Rules",
       "- Do NOT modify files outside ~/godmode/memory/inbox/.",
       "- Do NOT run destructive commands (rm -rf, git reset --hard).",
@@ -720,6 +743,21 @@ class QueueProcessor {
 
     if (guardrailsBlock) {
       sections.push("", guardrailsBlock);
+    }
+
+    // Inject lessons learned from previous agent runs
+    try {
+      const { getLessonsForPrompt, formatLessonsForPrompt } = await import("../lib/agent-lessons.js");
+      const lessons = await getLessonsForPrompt(item.type);
+      if (lessons.length > 0) {
+        sections.push(
+          "",
+          "## Lessons from Previous Runs",
+          formatLessonsForPrompt(lessons),
+        );
+      }
+    } catch {
+      // agent-lessons module may not exist yet — non-fatal
     }
 
     // Include previous error context for retries
@@ -757,7 +795,9 @@ class QueueProcessor {
       "[Actionable follow-ups for the human or next agent]",
       "```",
       "",
-      "Be thorough but concise. The human reviewing this will continue the work in a chat session with this output as context.",
+      "Do your best work. Be thorough.",
+      "If you get stuck, write what you tried and what you'd do differently.",
+      "The human reviewing this will continue the work in a chat session with this output as context.",
     );
 
     return sections.join("\n");
@@ -814,15 +854,27 @@ export async function autoQueueOverdueTasks(): Promise<{ queued: number }> {
 
   // Read current queue state and check for existing items (dedup by sourceTaskId)
   await updateQueueState((state) => {
+    // Safety check: if queue is empty but >3 overdue tasks exist, skip auto-queuing
+    // to prevent duplicate flood (likely a state reset or first-run scenario)
+    if (state.items.length === 0 && overdue.length > 3) {
+      return;
+    }
+
     const existingSourceIds = new Set(
       state.items
         .filter((i) => i.sourceTaskId)
         .map((i) => i.sourceTaskId),
     );
 
+    // Title dedup set — prevents queueing duplicate titles even without matching sourceTaskId
+    const existingTitles = new Set(
+      state.items.map((i) => i.title.trim().toLowerCase()),
+    );
+
     for (const task of overdue) {
-      // Skip if already queued
+      // Skip if already queued (by sourceTaskId or normalized title)
       if (existingSourceIds.has(task.id)) continue;
+      if (existingTitles.has(task.title.trim().toLowerCase())) continue;
 
       const id = `auto-${task.id}-${Date.now()}`;
       const taskType = classifyTaskType(task.title);
@@ -847,6 +899,10 @@ export async function autoQueueOverdueTasks(): Promise<{ queued: number }> {
         personaHint: persona?.slug,
         createdAt: Date.now(),
       });
+
+      // Add to dedup sets so subsequent iterations in this loop don't duplicate
+      existingSourceIds.add(task.id);
+      existingTitles.add(task.title.trim().toLowerCase());
 
       queued++;
     }
