@@ -13,6 +13,7 @@ import {
 } from "../lib/queue-state.js";
 import { readTasks, writeTasks } from "./tasks.js";
 import type { GatewayRequestHandler } from "openclaw/plugin-sdk";
+import type { LessonCategory } from "../lib/agent-lessons.js";
 
 const execFile = promisify(execFileCb);
 
@@ -192,11 +193,12 @@ const approveItem: GatewayRequestHandler = async ({ params, respond }) => {
   // Auto-rate the persona in the trust tracker (approval = good performance)
   if (result.item.personaHint) {
     try {
-      const { submitTrustRating } = await import("./trust-tracker.js");
-      await submitTrustRating(
+      const { autoRate } = await import("./trust-tracker.js");
+      await autoRate(
         result.item.personaHint,
-        8,
+        7,
         `Approved: "${result.item.title}"`,
+        "auto-approve",
       );
     } catch {
       // Trust rating is best-effort
@@ -204,6 +206,74 @@ const approveItem: GatewayRequestHandler = async ({ params, respond }) => {
   }
 
   respond(true, { item: result.item });
+};
+
+const rejectItem: GatewayRequestHandler = async ({ params, respond }) => {
+  const { id, reason, category, lessonRule } = params as {
+    id?: string;
+    reason?: string;
+    category?: LessonCategory;
+    lessonRule?: string;
+  };
+
+  if (!id) {
+    respond(false, null, { code: "INVALID_REQUEST", message: "Missing id" });
+    return;
+  }
+
+  const { result } = await updateQueueState((state) => {
+    const idx = state.items.findIndex((i) => i.id === id);
+    if (idx === -1) return { item: null, error: "Queue item not found" };
+    const existing = state.items[idx];
+    if (existing.status !== "review") {
+      return { item: null, error: `Cannot reject item with status "${existing.status}"` };
+    }
+    existing.status = "failed";
+    existing.completedAt = Date.now();
+    existing.error = reason || "Rejected by user";
+    state.items[idx] = existing;
+    return { item: existing, error: null };
+  });
+
+  if (result.error || !result.item) {
+    respond(false, null, { code: "INVALID_REQUEST", message: result.error ?? "Queue item not found" });
+    return;
+  }
+
+  const item = result.item;
+
+  // Auto-rate the persona (rejection = poor performance)
+  if (item.personaHint) {
+    try {
+      const { autoRate } = await import("./trust-tracker.js");
+      await autoRate(
+        item.personaHint,
+        3,
+        `Rejected: "${item.title}" — ${reason ?? "no reason given"}`,
+        "auto-reject",
+      );
+    } catch { /* best-effort */ }
+  }
+
+  // Create a lesson from the rejection
+  let lessonCreated = false;
+  if (reason) {
+    try {
+      const { addLesson } = await import("../lib/agent-lessons.js");
+      await addLesson(
+        {
+          rule: lessonRule || reason,
+          category: category || "other",
+          sourceTaskId: item.id,
+          sourceTaskTitle: item.title,
+        },
+        item.personaHint || undefined,
+      );
+      lessonCreated = true;
+    } catch { /* best-effort */ }
+  }
+
+  respond(true, { item, lessonCreated });
 };
 
 const removeItem: GatewayRequestHandler = async ({ params, respond }) => {
@@ -325,6 +395,59 @@ const listRosterItems: GatewayRequestHandler = async ({ params: _params, respond
   respond(true, { roster: listRoster() });
 };
 
+// ── Lesson Management RPCs ────────────────────────────────────────
+
+const listLessons: GatewayRequestHandler = async ({ params, respond }) => {
+  const { persona } = (params ?? {}) as { persona?: string };
+  const { readLessonsState } = await import("../lib/agent-lessons.js");
+  const state = await readLessonsState();
+
+  if (persona) {
+    respond(true, {
+      lessons: state.perPersona[persona] ?? [],
+      global: state.global,
+    });
+  } else {
+    respond(true, state);
+  }
+};
+
+const addLessonManual: GatewayRequestHandler = async ({ params, respond }) => {
+  const { rule, category, persona } = params as {
+    rule?: string;
+    category?: string;
+    persona?: string;
+  };
+  if (!rule) {
+    respond(false, null, { code: "INVALID_REQUEST", message: "Missing rule" });
+    return;
+  }
+
+  const { addLesson } = await import("../lib/agent-lessons.js");
+  const lesson = await addLesson(
+    {
+      rule,
+      category: (category as LessonCategory) || "other",
+      sourceTaskId: "manual",
+      sourceTaskTitle: "Manual lesson from user",
+    },
+    persona || undefined,
+  );
+  respond(true, { lesson });
+};
+
+const removeLessonRpc: GatewayRequestHandler = async ({ params, respond }) => {
+  const { id } = params as { id?: string };
+  if (!id) {
+    respond(false, null, { code: "INVALID_REQUEST", message: "Missing lesson id" });
+    return;
+  }
+
+  const { removeLesson } = await import("../lib/agent-lessons.js");
+  const removed = await removeLesson(id);
+  respond(true, { removed });
+};
+
 // ── Export ────────────────────────────────────────────────────────
 
 export const queueHandlers: Record<string, GatewayRequestHandler> = {
@@ -332,10 +455,14 @@ export const queueHandlers: Record<string, GatewayRequestHandler> = {
   "queue.list": listItems,
   "queue.update": updateItem,
   "queue.approve": approveItem,
+  "queue.reject": rejectItem,
   "queue.remove": removeItem,
   "queue.process": processItem,
   "queue.processAll": processAllItems,
   "queue.prDiff": prDiff,
   "queue.readOutput": readOutput,
   "queue.roster": listRosterItems,
+  "queue.lessons": listLessons,
+  "queue.addLesson": addLessonManual,
+  "queue.removeLesson": removeLessonRpc,
 };

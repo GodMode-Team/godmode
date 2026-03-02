@@ -262,6 +262,7 @@ export class GodModeApp extends LitElement {
   @state() chatQueue: ChatQueueItem[] = [];
   @state() chatAttachments: ChatAttachment[] = [];
   @state() pendingRetry: FailedMessage | null = null;
+  @state() autoRetryAfterCompact = false;
   // Sidebar state for tool output viewing
   @state() sidebarOpen = false;
   @state() sidebarContent: string | null = null;
@@ -1463,7 +1464,9 @@ export class GodModeApp extends LitElement {
     messageOverride?: string,
     opts?: Parameters<typeof handleSendChatInternal>[2],
   ) {
-    // Auto-compact if context is approaching limit (90%+) before sending
+    // Auto-compact if context is approaching limit (90%+) before sending.
+    // Instead of compacting inline and racing with the send, we save the
+    // user's message for automatic retry after compaction completes.
     const activeSession = this.sessionsResult?.sessions?.find((s) => s.key === this.sessionKey);
     if (activeSession) {
       const used = activeSession.totalTokens ?? 0;
@@ -1472,9 +1475,29 @@ export class GodModeApp extends LitElement {
       const usage = max > 0 ? used / max : 0;
 
       if (usage >= 0.9 && !this.compactionStatus?.active) {
-        // Context is at 90%+ - auto-compact before sending
-        this.showToast("Context near limit — auto-compacting...", "info", 3000);
-        await this.handleCompactChat();
+        const message = (messageOverride ?? this.chatMessage).trim();
+        const attachments = messageOverride == null ? [...(this.chatAttachments ?? [])] : [];
+        if (message || attachments.length > 0) {
+          // Save message for auto-retry after compaction
+          this.pendingRetry = { message, attachments, timestamp: Date.now() };
+          this.autoRetryAfterCompact = true;
+
+          // Add optimistic user message so user sees their message in chat
+          this.chatMessages = [
+            ...this.chatMessages,
+            { role: "user", content: [{ type: "text", text: message }], timestamp: Date.now() },
+          ];
+
+          // Clear input field
+          if (messageOverride == null) {
+            this.chatMessage = "";
+            this.chatAttachments = [];
+          }
+
+          this.showToast("Context near limit — auto-compacting...", "info", 3000);
+          void this.handleCompactChat();
+          return; // Will auto-retry after compaction completes
+        }
       }
     }
 

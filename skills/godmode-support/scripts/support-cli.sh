@@ -281,7 +281,7 @@ cmd_update() {
     echo "=== Updating GodMode ==="
     echo ""
 
-    local godmode_dir="${HOME}/Projects/GodMode"
+    local godmode_dir="${HOME}/Projects/godmode-plugin"
 
     if [[ -d "${godmode_dir}" ]]; then
         echo "Pulling latest changes..."

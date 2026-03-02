@@ -20,16 +20,6 @@ import {
 import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk";
-
-/**
- * The host OpenClaw runtime exposes `broadcast` on the plugin API at runtime,
- * but the published SDK types don't declare it yet. Augment locally so we
- * can call it without `as any` everywhere.
- */
-interface GodModePluginApi extends OpenClawPluginApi {
-  broadcast?: (event: string, data: unknown) => void;
-}
-
 // Method handler imports
 import { agentLogHandlers } from "./src/methods/agent-log.js";
 import { briefNotesHandlers } from "./src/methods/brief-notes.js";
@@ -83,6 +73,9 @@ import {
   checkLazyRefusal,
   checkLazyQuestion,
   checkPrematureSurrender,
+  trackSearchAttempt,
+  checkSearchRetry,
+  consumeSearchRetryNudge,
   consumeSearchGateNudge,
   consumeSelfServiceNudge,
   consumePersistenceNudge,
@@ -552,7 +545,7 @@ const godmodePlugin = {
   description: "Personal AI Operating System for entrepreneurs",
 
   // SYNCHRONOUS register — no async, no race condition
-  register(api: GodModePluginApi) {
+  register(api: OpenClawPluginApi) {
     const licenseKey = (api.pluginConfig as { licenseKey?: string } | undefined)?.licenseKey;
 
     if (!licenseKey) {
@@ -913,7 +906,7 @@ h1{color:#ff6b6b}code{background:#16213e;padding:2px 8px;border-radius:4px}a{col
       try {
         const { initQueueProcessor } = await import("./src/services/queue-processor.js");
         const queueProcessor = initQueueProcessor(api.logger);
-        queueProcessor.setBroadcast((event, data) => api.broadcast?.(event, data));
+        queueProcessor.setBroadcast((event, data) => (api as unknown as Record<string, Function>).broadcast?.(event, data));
         await queueProcessor.recoverOrphaned();
         queueProcessor.startPolling();
         api.logger.info("[GodMode] Queue processor initialized (10-min polling)");
@@ -925,7 +918,7 @@ h1{color:#ff6b6b}code{background:#16213e;padding:2px 8px;border-radius:4px}a{col
       try {
         const { initObsidianSync } = await import("./src/services/obsidian-sync.js");
         const obsSync = initObsidianSync(api.logger);
-        obsSync.setBroadcast((event, data) => api.broadcast?.(event, data));
+        obsSync.setBroadcast((event, data) => (api as unknown as Record<string, Function>).broadcast?.(event, data));
         await obsSync.init();
         api.logger.info("[GodMode] Obsidian Sync service initialized");
       } catch (err) {
@@ -992,8 +985,7 @@ h1{color:#ff6b6b}code{background:#16213e;padding:2px 8px;border-radius:4px}a{col
 
     // ── Safety Gates: message_received — Prompt Shield input detection ──
     api.on("message_received", async (event, ctx) => {
-      // Runtime ctx includes sessionKey but SDK type doesn't declare it yet
-      const sessionKey = (ctx as Record<string, unknown> | undefined)?.sessionKey as string | undefined;
+      const sessionKey = (ctx as Record<string, unknown>)?.sessionKey as string | undefined;
       const content = event.content ?? "";
       if (content) {
         const result = await scanForInjection(sessionKey, content);
@@ -1109,6 +1101,11 @@ h1{color:#ff6b6b}code{background:#16213e;padding:2px 8px;border-radius:4px}a{col
       const persistenceNudge = consumePersistenceNudge(ctx?.sessionKey);
       if (persistenceNudge) {
         prependChunks.push(persistenceNudge);
+      }
+      // Search retry gate nudge — injected after a premature "not found" was blocked
+      const searchRetryNudge = consumeSearchRetryNudge(ctx?.sessionKey);
+      if (searchRetryNudge) {
+        prependChunks.push(searchRetryNudge);
       }
       // Output Shield nudge — injected after an output leak was blocked
       const outputNudge = consumeOutputShieldNudge(ctx?.sessionKey);
@@ -1247,7 +1244,12 @@ h1{color:#ff6b6b}code{background:#16213e;padding:2px 8px;border-radius:4px}a{col
       const sessionKey = ctx?.sessionKey;
 
       // Gate 1: Loop Breaker — warn then block tools called too many times
-      const loopCheck = await trackToolCall(sessionKey, name);
+      // Pass params for smart loop detection (identical-call detection)
+      const loopCheck = await trackToolCall(
+        sessionKey,
+        name,
+        (event.params ?? {}) as Record<string, unknown>,
+      );
       if (loopCheck.blocked) {
         api.logger.warn(`[GodMode][SafetyGate] loop breaker fired: ${name}`);
         return { block: true, blockReason: loopCheck.reason };
@@ -1356,6 +1358,8 @@ h1{color:#ff6b6b}code{background:#16213e;padding:2px 8px;border-radius:4px}a{col
       trackCodeToolUsage(ctx?.sessionKey, event.toolName ?? "");
       // Track investigation depth for the persistence gate
       trackInvestigationDepth(ctx?.sessionKey, event.toolName ?? "");
+      // Track search attempts for the search retry gate
+      trackSearchAttempt(ctx?.sessionKey, event.toolName ?? "");
 
       // Trust feedback — detect skill completion and queue feedback prompt
       try {
@@ -1381,6 +1385,11 @@ h1{color:#ff6b6b}code{background:#16213e;padding:2px 8px;border-radius:4px}a{col
       // Persistence Gate — block premature surrender
       if (await checkPrematureSurrender(sessionKey, content)) {
         api.logger.warn(`[GodMode][SafetyGate] persistence gate fired — premature surrender blocked`);
+        return { cancel: true };
+      }
+      // Search Retry Gate — block premature "not found" after too few search attempts
+      if (await checkSearchRetry(sessionKey, content)) {
+        api.logger.warn(`[GodMode][SafetyGate] search retry gate fired — premature "not found" blocked`);
         return { cancel: true };
       }
       // Output Shield — block messages that leak system prompts, keys, or config

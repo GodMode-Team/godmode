@@ -25,24 +25,72 @@ import {
 // Rule: No tool should be called > maxCalls times in windowMinutes per session.
 //
 // v2: Raised threshold from 15→50 and added warning tier + burst detection.
-// 15/30min was too aggressive — agents investigating real issues (e.g. Stripe
-// webhooks, debugging) regularly hit 20-30 exec calls in a session.
-// Now: warn at 40, block at 50, and also detect rapid bursts (10+ calls
-// of the same tool in under 2 minutes — a clear runaway loop).
+// v3: Raised threshold from 50→100. Persistence Protocol tells agents to
+// try 5+ meaningfully different approaches — which can easily mean 50-80
+// tool calls for a thorough investigation.
+// v4: Owner sessions bypass burst detection entirely. Burst detection now
+// uses smart loop detection — checks for *identical repeated calls* (same
+// tool + same param hash) rather than raw call count. Legitimate bulk
+// creation (brain dumps creating 20+ tasks) should never be blocked.
+// Non-owner sessions keep burst detection at 50 calls/2min.
+// Warn at 80% of maxCalls, block at maxCalls (configurable, default 500).
 
-type CallRecord = { tool: string; ts: number };
+type CallRecord = { tool: string; ts: number; paramHash: string };
 const callHistory = new Map<string, CallRecord[]>();
 /** Track which session+tool combos have already been warned (avoid spam). */
 const warnedTools = new Map<string, Set<string>>();
 
 /**
+ * Owner sessions are identified by their sessionKey prefix.
+ * Owner sessions include: main agent sessions, direct iMessage,
+ * direct Slack DMs, webchat, and cron jobs run by the system.
+ * Non-owner sessions are team/client agent sessions.
+ */
+function isOwnerSession(sessionKey: string | undefined): boolean {
+  if (!sessionKey) return true; // default/unknown sessions treated as owner
+  // All owner sessions start with "agent:main:" — this covers webchat,
+  // iMessage, Slack DMs, cron, and the main CLI session.
+  return sessionKey.startsWith("agent:main:");
+}
+
+/**
+ * Create a lightweight hash of tool params for loop detection.
+ * Two calls with identical params produce the same hash.
+ * Different params (e.g., different task titles) produce different hashes.
+ */
+function hashParams(params: Record<string, unknown> | undefined): string {
+  if (!params || Object.keys(params).length === 0) return "__empty__";
+  try {
+    // Sort keys for stable serialization, truncate to avoid huge hashes
+    const sorted = JSON.stringify(params, Object.keys(params).sort());
+    // Simple djb2 hash — fast and sufficient for loop detection
+    let hash = 5381;
+    for (let i = 0; i < sorted.length && i < 2000; i++) {
+      hash = ((hash << 5) + hash + sorted.charCodeAt(i)) | 0;
+    }
+    return hash.toString(36);
+  } catch {
+    return "__unhashable__";
+  }
+}
+
+/**
  * Track a tool call. Returns a block object if the tool has been
  * called too many times in the window. Reads thresholds from config.
- * Includes a warning tier and burst detection for runaway loops.
+ *
+ * For owner sessions: No burst detection. Only blocks on the overall
+ * maxCalls window limit (default 500/30min) or if an actual loop is
+ * detected (same tool + same params repeated 8+ times consecutively).
+ *
+ * For non-owner sessions: Burst detection at 50 calls/2min plus the
+ * overall window limit.
+ *
+ * @param params - Optional tool call params, used for smart loop detection.
  */
 export async function trackToolCall(
   sessionKey: string | undefined,
   toolName: string,
+  params?: Record<string, unknown>,
 ): Promise<{ blocked: boolean; reason?: string; warning?: string }> {
   const config = await readGuardrailsStateCached();
   if (!config.gates.loopBreaker?.enabled) return { blocked: false };
@@ -62,37 +110,74 @@ export async function trackToolCall(
   const key = sessionKey ?? "__default__";
   const now = Date.now();
   const cutoff = now - windowMs;
+  const pHash = hashParams(params);
 
   let records = callHistory.get(key) ?? [];
   records = records.filter((r) => r.ts > cutoff);
   const toolRecords = records.filter((r) => r.tool === toolName);
   const toolCount = toolRecords.length;
 
-  // Burst detection: 10+ calls of the same tool in under 2 minutes = runaway loop
-  const BURST_WINDOW_MS = 2 * 60 * 1000;
-  const BURST_THRESHOLD = 10;
-  const burstCutoff = now - BURST_WINDOW_MS;
-  const recentBurst = toolRecords.filter((r) => r.ts > burstCutoff).length;
+  const owner = isOwnerSession(sessionKey);
 
-  if (recentBurst >= BURST_THRESHOLD) {
-    void logGateActivity(
-      "loopBreaker",
-      "fired",
-      `Burst detected: ${toolName} called ${recentBurst} times in <2min`,
-      sessionKey,
+  // ── Smart loop detection (all sessions) ──
+  // Check for actual runaway loops: same tool + same params repeated
+  // consecutively. This catches stuck retry loops without blocking
+  // legitimate bulk creation (which has different params each time).
+  const CONSECUTIVE_REPEAT_LIMIT = 8;
+  const recentToolRecords = toolRecords.slice(-CONSECUTIVE_REPEAT_LIMIT);
+  if (recentToolRecords.length >= CONSECUTIVE_REPEAT_LIMIT) {
+    const allSameParams = recentToolRecords.every(
+      (r) => r.paramHash === pHash,
     );
-    return {
-      blocked: true,
-      reason: [
-        `Runaway loop detected: \`${toolName}\` has been called ${recentBurst} times in under 2 minutes.`,
-        "",
-        "This is rapid-fire repetition — likely a stuck retry loop.",
-        "Pause, review what's happening, and try a different approach.",
-      ].join("\n"),
-    };
+    if (allSameParams && pHash !== "__empty__" && pHash !== "__unhashable__") {
+      void logGateActivity(
+        "loopBreaker",
+        "fired",
+        `Actual loop detected: ${toolName} called ${CONSECUTIVE_REPEAT_LIMIT}x with identical params`,
+        sessionKey,
+      );
+      return {
+        blocked: true,
+        reason: [
+          `Runaway loop detected: \`${toolName}\` has been called ${CONSECUTIVE_REPEAT_LIMIT} times in a row with identical parameters.`,
+          "",
+          "This is a stuck retry loop — the same call is being repeated without change.",
+          "Pause, review what's happening, and try a different approach or different parameters.",
+        ].join("\n"),
+      };
+    }
   }
 
-  // Hard block at maxCalls
+  // ── Burst detection (non-owner sessions only) ──
+  // Owner sessions skip burst detection entirely — legitimate bulk
+  // operations (brain dumps, task creation, batch processing) should
+  // never be rate-limited for the owner.
+  if (!owner) {
+    const BURST_WINDOW_MS = 2 * 60 * 1000;
+    const BURST_THRESHOLD = 50;
+    const burstCutoff = now - BURST_WINDOW_MS;
+    const recentBurst = toolRecords.filter((r) => r.ts > burstCutoff).length;
+
+    if (recentBurst >= BURST_THRESHOLD) {
+      void logGateActivity(
+        "loopBreaker",
+        "fired",
+        `Burst detected: ${toolName} called ${recentBurst} times in <2min`,
+        sessionKey,
+      );
+      return {
+        blocked: true,
+        reason: [
+          `Runaway loop detected: \`${toolName}\` has been called ${recentBurst} times in under 2 minutes.`,
+          "",
+          "This is rapid-fire repetition — likely a stuck retry loop.",
+          "Pause, review what's happening, and try a different approach.",
+        ].join("\n"),
+      };
+    }
+  }
+
+  // Hard block at maxCalls (applies to all sessions as a safety net)
   if (toolCount >= maxCalls) {
     const windowMin = Math.round(windowMs / 60000);
     void logGateActivity(
@@ -113,7 +198,7 @@ export async function trackToolCall(
   }
 
   // Record the call before checking warning (so count is accurate)
-  records.push({ tool: toolName, ts: now });
+  records.push({ tool: toolName, ts: now, paramHash: pHash });
   callHistory.set(key, records);
 
   // Warning tier — log once per session+tool
@@ -369,6 +454,8 @@ export function resetSearchTracking(sessionKey: string | undefined): void {
   selfServiceBlocked.delete(key);
   investigationToolCount.delete(key);
   persistenceBlocked.delete(key);
+  searchAttemptCount.delete(key);
+  searchRetryBlocked.delete(key);
 }
 
 // ── Self-Service Gate ────────────────────────────────────────────
@@ -707,6 +794,186 @@ export function consumePersistenceNudge(
     "Tell the user what you've tried so far and what you'll try next.",
     "Do NOT tell them you can't — tell them what's next.",
   ].join("\n");
+}
+
+// ── Search Retry Gate ────────────────────────────────────────────
+//
+// Problem: Agent searches once with a bad query, gets no results,
+// immediately tells user "can't find it" and asks for help. This is
+// a guardrail violation — the agent gave up after ONE attempt.
+//
+// The existing exhaustiveSearch gate only checks *whether* a search
+// tool was called (boolean). The persistenceGate checks *distinct*
+// tool types. Neither catches "searched once with the wrong query."
+//
+// Rule: Track TOTAL search/lookup attempts. Block "not found" messages
+// if fewer than N attempts were made. Force the agent to try different
+// queries, endpoints, parameters, and approaches before declaring
+// something unfindable.
+//
+// Flow: after_tool_call increments search attempt counter
+//       → message_sending checks for "not found" language
+//       → before_prompt_build injects "try harder" nudge.
+
+/** Tools that count as search/lookup attempts (broader than SEARCH_TOOLS) */
+const SEARCH_ATTEMPT_TOOLS = new Set([
+  // Dedicated search tools
+  "web_search",
+  "web_fetch",
+  "qmd_search",
+  "qmd_vsearch",
+  "memory_search",
+  // MCP search variants
+  "mcp__qmd__search",
+  "mcp__qmd__vsearch",
+  // File system search
+  "glob",
+  "grep",
+  "search_files",
+  "list_files",
+  // Shell commands (often used for API queries, curl, etc.)
+  "bash",
+  "exec",
+  "shell",
+]);
+
+/** Per-session: total search/lookup attempts */
+const searchAttemptCount = new Map<string, number>();
+
+/** Per-session: was the last response blocked by search retry gate? */
+const searchRetryBlocked = new Map<string, boolean>();
+
+/** Default minimum search attempts before "not found" is allowed */
+const MIN_SEARCH_ATTEMPTS = 3;
+
+/**
+ * Track a search/lookup attempt. Call from after_tool_call.
+ */
+export function trackSearchAttempt(
+  sessionKey: string | undefined,
+  toolName: string,
+): void {
+  const key = sessionKey ?? "__default__";
+  const normalized = toolName.trim().toLowerCase();
+  if (SEARCH_ATTEMPT_TOOLS.has(normalized)) {
+    searchAttemptCount.set(key, (searchAttemptCount.get(key) ?? 0) + 1);
+  }
+}
+
+// ── Search Retry Gate: Detection Patterns ────────────────────────
+//
+// These catch "soft not-found" language — the agent declaring failure
+// on a lookup without the hard surrender patterns. Examples from real
+// violations:
+//   "Can't find it in Front"
+//   "I'm not finding that email"
+//   "No results for that search"
+//   "I couldn't locate the thread"
+
+const NOT_FOUND_PATTERNS: RegExp[] = [
+  // "Can't find" / "couldn't find" / "unable to find" / "not finding"
+  /\b(can'?t|couldn'?t|unable to|not|didn'?t|don'?t) (find|locate|see|spot|pull up|get|retrieve|access)\b/i,
+  // "No results" / "no matches" / "nothing came up" / "nothing found"
+  /\b(no results?|no matches?|nothing (came|comes|turned|turns|showed) up|nothing found|zero results?|came up empty)\b/i,
+  // "Not in" / "not showing up in" / "doesn't appear in"
+  /\b(not in|not showing up|doesn'?t appear|isn'?t showing|isn'?t in|wasn'?t in|not appearing)\b.{0,30}\b/i,
+  // "I don't see it" / "I'm not seeing"
+  /\b(I don'?t see|I'?m not seeing|I can'?t see|I don'?t find)\b/i,
+  // "Searched for X but" / "looked for X but"
+  /\b(searched|looked|hunting|looking) (for|through)\b.{0,60}\b(but|however|unfortunately|no luck|nothing)\b/i,
+  // "it may be in your..." (giving up + redirecting to user)
+  /\bit (may|might|could) be in your\b/i,
+  // "not finding it" / "can't pull it up"
+  /\bnot finding (it|the|that|this|any)\b/i,
+];
+
+/**
+ * Check if an outbound message declares "not found" prematurely.
+ * Returns true (cancel) if not-found language detected AND the agent
+ * hasn't made enough search attempts.
+ */
+export async function checkSearchRetry(
+  sessionKey: string | undefined,
+  content: string,
+): Promise<boolean> {
+  const config = await readGuardrailsStateCached();
+  if (!config.gates.searchRetryGate?.enabled) return false;
+
+  const key = sessionKey ?? "__default__";
+
+  // If agent has made enough search attempts, allow the message
+  const attempts = searchAttemptCount.get(key) ?? 0;
+  const minAttempts =
+    config.gates.searchRetryGate?.thresholds?.minSearchAttempts ??
+    MIN_SEARCH_ATTEMPTS;
+  if (attempts >= minAttempts) return false;
+
+  // Skip very long messages — likely detailed analysis with partial results
+  if (content.length > 1500) return false;
+
+  // Check not-found patterns
+  for (const pattern of NOT_FOUND_PATTERNS) {
+    if (pattern.test(content)) {
+      searchRetryBlocked.set(key, true);
+      void logGateActivity(
+        "searchRetryGate",
+        "fired",
+        `Blocked premature "not found" (${attempts}/${minAttempts} search attempts): "${content.slice(0, 120)}..."`,
+        sessionKey,
+      );
+      return true;
+    }
+  }
+
+  return false;
+}
+
+/**
+ * If the search retry gate blocked the last response, return a nudge
+ * to inject via before_prompt_build.
+ */
+export function consumeSearchRetryNudge(
+  sessionKey: string | undefined,
+): string | undefined {
+  const key = sessionKey ?? "__default__";
+  if (!searchRetryBlocked.get(key)) return undefined;
+
+  searchRetryBlocked.delete(key);
+
+  const attempts = searchAttemptCount.get(key) ?? 0;
+
+  return [
+    "[ENFORCEMENT: Search Retry Gate]",
+    "",
+    "Your previous response was blocked because you declared something",
+    `unfindable after only ${attempts} search attempt(s). That's not enough.`,
+    "",
+    "CORE RULE: One bad query is not a dead end. Try HARDER before giving up.",
+    "",
+    "Before saying 'not found', you MUST try multiple approaches:",
+    "1. Different search terms — synonyms, partial matches, broader queries",
+    "2. Different endpoints or tools — if one API search fails, try another",
+    "3. Different parameters — date ranges, filters, case variations",
+    "4. Broader scope — search adjacent systems, check alternate locations",
+    "5. Ask yourself: what ELSE could I search for to find this?",
+    "",
+    "When a search fails, the response should be: 'That query didn't work,",
+    "let me try a different approach' — NOT 'I can't find it.'",
+    "",
+    "Try at least 3 meaningfully different search strategies before reporting",
+    "that something genuinely cannot be found.",
+  ].join("\n");
+}
+
+/**
+ * Reset search retry tracking for a session.
+ */
+export function resetSearchRetryTracking(
+  sessionKey: string | undefined,
+): void {
+  const key = sessionKey ?? "__default__";
+  searchAttemptCount.delete(key);
+  searchRetryBlocked.delete(key);
 }
 
 // ── Prompt Shield ────────────────────────────────────────────────

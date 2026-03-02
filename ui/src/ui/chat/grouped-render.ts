@@ -814,6 +814,10 @@ function renderGroupedMessageUnsafe(
   if (role === "user" && cleanedText) {
     cleanedText = stripSystemLines(cleanedText);
   }
+  // Strip <system-context> blocks that may leak from prependContext injection
+  if (cleanedText) {
+    cleanedText = cleanedText.replace(/<system-context\b[^>]*>[\s\S]*?<\/system-context>/gi, "").trim() || null;
+  }
   if (hasFileUploads && cleanedText) {
     cleanedText = stripFileUploadText(cleanedText);
   }

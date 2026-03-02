@@ -20,6 +20,7 @@ export type GuardrailGateId =
   | "exhaustiveSearch"
   | "selfServiceGate"
   | "persistenceGate"
+  | "searchRetryGate"
   | "planGate"
   | "spawnGate"
   | "validationGate"
@@ -75,12 +76,13 @@ export type GateDescriptor = {
 // ── Defaults ───────────────────────────────────────────────────────
 
 export const GATE_DEFAULTS: Record<GuardrailGateId, GateConfig> = {
-  loopBreaker: { enabled: true, thresholds: { maxCalls: 50, windowMinutes: 30, warnAt: 40 } },
+  loopBreaker: { enabled: true, thresholds: { maxCalls: 500, windowMinutes: 30, warnAt: 450 } },
   grepBlocker: { enabled: true },
   sessionHygiene: { enabled: true, thresholds: { maxWorkingLines: 100 } },
   exhaustiveSearch: { enabled: true },
   selfServiceGate: { enabled: true },
   persistenceGate: { enabled: true, thresholds: { minInvestigationTools: 3 } },
+  searchRetryGate: { enabled: true, thresholds: { minSearchAttempts: 3 } },
   planGate: { enabled: true },
   spawnGate: { enabled: true },
   validationGate: { enabled: true },
@@ -134,6 +136,14 @@ export const GATE_DESCRIPTORS: Record<GuardrailGateId, GateDescriptor> = {
     icon: "\u{1F4AA}",
     hook: "message_sending",
     thresholdLabels: { minInvestigationTools: "Min tools before surrender allowed" },
+  },
+  searchRetryGate: {
+    name: "Search Retry Gate",
+    description:
+      "Blocks 'not found' responses when the agent hasn't tried enough search variations. One bad query isn't enough — try different terms, endpoints, and approaches before declaring something unfindable.",
+    icon: "\u{1F504}\u{1F50D}",
+    hook: "message_sending",
+    thresholdLabels: { minSearchAttempts: "Min search attempts before 'not found' allowed" },
   },
   planGate: {
     name: "Plan Gate",

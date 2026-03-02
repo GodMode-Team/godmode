@@ -3,6 +3,14 @@ import { stripThinkingTags } from "../format";
 /** Silent reply token used by agents to indicate no user-visible response */
 const SILENT_REPLY_TOKEN = "NO_REPLY";
 
+/** Strip <system-context>...</system-context> blocks injected by GodMode hooks */
+const SYSTEM_CONTEXT_RE = /<system-context\b[^>]*>[\s\S]*?<\/system-context>/gi;
+
+function stripSystemContext(text: string): string {
+  const stripped = text.replace(SYSTEM_CONTEXT_RE, "").trim();
+  return stripped;
+}
+
 const ENVELOPE_PREFIX = /^\[([^\]]+)\]\s*/;
 const ENVELOPE_CHANNELS = [
   "WebChat",
@@ -58,7 +66,9 @@ export function extractText(message: unknown): string | null {
   const role = typeof m.role === "string" ? m.role : "";
   const content = m.content;
   if (typeof content === "string") {
-    const processed = role === "assistant" ? stripThinkingTags(content) : stripEnvelope(content);
+    const cleaned = stripSystemContext(content);
+    if (!cleaned) return null;
+    const processed = role === "assistant" ? stripThinkingTags(cleaned) : stripEnvelope(cleaned);
     // Filter out silent reply tokens
     if (isSilentReply(processed)) {
       return null;
@@ -70,11 +80,11 @@ export function extractText(message: unknown): string | null {
       .map((p) => {
         const item = p as Record<string, unknown>;
         if (item.type === "text" && typeof item.text === "string") {
-          return item.text;
+          return stripSystemContext(item.text);
         }
         return null;
       })
-      .filter((v): v is string => typeof v === "string");
+      .filter((v): v is string => typeof v === "string" && v.length > 0);
     if (parts.length > 0) {
       const joined = parts.join("\n");
       const processed = role === "assistant" ? stripThinkingTags(joined) : stripEnvelope(joined);
@@ -86,7 +96,9 @@ export function extractText(message: unknown): string | null {
     }
   }
   if (typeof m.text === "string") {
-    const processed = role === "assistant" ? stripThinkingTags(m.text) : stripEnvelope(m.text);
+    const cleaned = stripSystemContext(m.text);
+    if (!cleaned) return null;
+    const processed = role === "assistant" ? stripThinkingTags(cleaned) : stripEnvelope(cleaned);
     // Filter out silent reply tokens
     if (isSilentReply(processed)) {
       return null;

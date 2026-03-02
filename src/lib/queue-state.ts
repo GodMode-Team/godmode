@@ -64,6 +64,8 @@ export type QueueItem = {
   personaHint?: string;
   /** Which CLI engine to use (claude/codex/gemini). Resolved from persona or explicit. */
   engine?: "claude" | "codex" | "gemini";
+  /** Whether this item needs human approval before processing */
+  needsApproval?: boolean;
   /** Structured handoff context from a predecessor agent */
   handoff?: {
     fromAgent: string;
@@ -113,18 +115,40 @@ function sanitizeState(input: unknown): QueueState {
 }
 
 async function readStateUnsafe(): Promise<QueueState> {
-  try {
-    const raw = await fs.readFile(QUEUE_FILE, "utf-8");
-    return sanitizeState(JSON.parse(raw));
-  } catch {
-    return createDefaultState();
+  // Try main file first, then .bak if main is missing or corrupt
+  for (const filepath of [QUEUE_FILE, QUEUE_FILE + ".bak"]) {
+    try {
+      const raw = await fs.readFile(filepath, "utf-8");
+      const parsed = JSON.parse(raw);
+      const state = sanitizeState(parsed);
+      if (filepath !== QUEUE_FILE && state.items.length > 0) {
+        // Recovered from backup — restore it as the main file
+        await fs.writeFile(QUEUE_FILE, raw, "utf-8");
+      }
+      return state;
+    } catch {
+      continue;
+    }
   }
+  return createDefaultState();
 }
 
 async function writeStateUnsafe(state: QueueState): Promise<void> {
   const next = { ...state, updatedAt: Date.now() };
   await fs.mkdir(path.dirname(QUEUE_FILE), { recursive: true });
-  await fs.writeFile(QUEUE_FILE, JSON.stringify(next, null, 2) + "\n", "utf-8");
+
+  // Keep a rotating backup so we can recover from corruption
+  try {
+    await fs.access(QUEUE_FILE);
+    await fs.copyFile(QUEUE_FILE, QUEUE_FILE + ".bak");
+  } catch {
+    // No existing file to back up — that's fine
+  }
+
+  // Atomic write: write to .tmp then rename (rename is atomic on POSIX)
+  const tmp = QUEUE_FILE + ".tmp";
+  await fs.writeFile(tmp, JSON.stringify(next, null, 2) + "\n", "utf-8");
+  await fs.rename(tmp, QUEUE_FILE);
 }
 
 // ── Public API ───────────────────────────────────────────────────

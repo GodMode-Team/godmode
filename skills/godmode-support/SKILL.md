@@ -692,7 +692,7 @@ When users ask about GodMode capabilities, reference this list:
 ### Current Version
 
 - **npm package:** `@godmode-team/godmode@1.2.0`
-- **Install:** `openclaw plugin install @godmode-team/godmode`
+- **Install:** `openclaw plugins install @godmode-team/godmode`
 - **Team license key:** `GM-DEV-TEAM-2026`
 
 ### Quick Diagnostic Checklist

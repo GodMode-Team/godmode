@@ -278,8 +278,8 @@ cmd_restart() {
             pkill -f "openclaw-gateway" 2>/dev/null || true
             sleep 2
             # Try to find and run the gateway
-            if [[ -f "${HOME}/Projects/GodMode/dist/gateway.js" ]]; then
-                nohup node "${HOME}/Projects/GodMode/dist/gateway.js" > /tmp/openclaw/gateway.log 2>&1 &
+            if command -v openclaw &>/dev/null; then
+                nohup openclaw gateway start > /tmp/openclaw/gateway.log 2>&1 &
             else
                 print_error "Could not find gateway to restart"
                 exit 1
@@ -357,7 +357,7 @@ cmd_update() {
     echo "=== Updating GodMode ==="
     echo ""
 
-    local godmode_dir="${HOME}/Projects/GodMode"
+    local godmode_dir="${HOME}/Projects/godmode-plugin"
 
     if [[ -d "${godmode_dir}" ]]; then
         echo "Pulling latest changes..."

@@ -967,6 +967,14 @@ export class CodingOrchestrator {
       `- Branch: ${branch}`,
       `- Scope: ${scopeGlobs.join(", ")}`,
       "",
+      "## Persistence Protocol (MANDATORY)",
+      "You are resourceful and relentless. When something fails, try a different approach.",
+      "- Build errors: read the error, fix it, rebuild. Don't give up after one failure.",
+      "- Test failures: diagnose why, fix the root cause, re-run.",
+      "- If stuck, step back and try a completely different implementation strategy.",
+      "- Try at least 5 meaningfully different approaches before reporting you're stuck.",
+      "- NEVER say 'I can't' — say what you tried and what you'll try next.",
+      "",
       "## Safety Rules",
       "- NEVER merge your branch into main. Only push your branch.",
       "- NEVER run `git merge`, `git checkout main`, or `git switch main`.",
@@ -980,7 +988,7 @@ export class CodingOrchestrator {
       "2. Keep changes within the specified scope.",
       "3. Commit all changes with a clear, descriptive message.",
       `4. Push the branch: \`git push -u origin ${branch}\``,
-      "5. When done, output a brief summary of what you built/changed.",
+      "5. When done, output a thorough summary of what you built/changed and any issues resolved.",
     ].join("\n");
 
     try {
