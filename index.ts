@@ -95,6 +95,7 @@ import { secondBrainHandlers } from "./src/methods/second-brain.js";
 import { securityAuditHandlers } from "./src/methods/security-audit.js";
 import { proactiveIntelHandlers } from "./src/methods/proactive-intel.js";
 import { supportHandlers } from "./src/methods/support.js";
+import { correctionsHandlers } from "./src/methods/corrections.js";
 // Static file server for UIs
 import { createStaticFileHandler } from "./src/static-server.js";
 import { DATA_DIR } from "./src/data-paths.js";
@@ -619,6 +620,7 @@ const godmodePlugin = {
       ...queueHandlers,
       ...dashboardsHandlers,
       ...supportHandlers,
+      ...correctionsHandlers,
     };
 
     // Methods that must work before a license is configured (setup flow)
