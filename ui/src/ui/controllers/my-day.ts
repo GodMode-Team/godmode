@@ -429,7 +429,6 @@ export function subscribeToBriefUpdates(
 ) {
   // Listen for daily-brief:update events from the gateway
   const handler = (data: DailyBriefData) => {
-    console.log("[MyDay] Received daily brief update:", data.date);
     onUpdate(data);
   };
 
@@ -446,7 +445,6 @@ export function subscribeToBriefUpdates(
  */
 export function subscribeToAgentLogUpdates(client: GatewayBrowserClient, onUpdate: () => void) {
   const handler = () => {
-    console.log("[MyDay] Received agent log update");
     onUpdate();
   };
 

@@ -200,10 +200,10 @@ function getSessionTabIdentity(key: string, session: ReturnType<typeof findSessi
     return `session:${sessionId}`;
   }
   const displayName =
+    session?.label ??
     session?.displayName ??
     autoTitleCache.get(session?.key ?? key) ??
     autoTitleCache.get(key) ??
-    session?.label ??
     "";
   const normalizedName = normalizeTabIdentityText(collapseRepeatedLabel(displayName));
   if (normalizedName) {
@@ -495,16 +495,13 @@ export function renderApp(state: AppViewState) {
                       getSessionTabIdentity(key, session) === activeSessionTabIdentity;
                     // Generate a clean display name instead of showing raw session keys
                     const getDisplayName = () => {
-                      if (session?.displayName) {
-                        return collapseRepeatedLabel(session.displayName);
+                      if (session?.label || session?.displayName) {
+                        return collapseRepeatedLabel((session.label ?? session.displayName)!);
                       }
                       // Check auto-title cache (survives sessionsResult overwrites)
                       const cachedTitle = autoTitleCache.get(key);
                       if (cachedTitle) {
                         return collapseRepeatedLabel(cachedTitle);
-                      }
-                      if (session?.label) {
-                        return collapseRepeatedLabel(session.label);
                       }
                       // Generate clean fallback name from key
                       if (key === "agent:main:support") {
@@ -644,7 +641,7 @@ export function renderApp(state: AppViewState) {
                             type="text"
                             draggable="false"
                             class="session-tab__name-input"
-                            .value=${session?.displayName ?? session?.label ?? ""}
+                            .value=${session?.label ?? session?.displayName ?? ""}
                             @click=${(e: Event) => e.stopPropagation()}
                             @dblclick=${(e: Event) => e.stopPropagation()}
                             @blur=${async (e: Event) => {
@@ -655,7 +652,7 @@ export function renderApp(state: AppViewState) {
                               }
                               const newName = input.value.trim();
                               state.editingTabKey = null;
-                              const currentName = session?.displayName ?? session?.label ?? "";
+                              const currentName = session?.label ?? session?.displayName ?? "";
                               if (newName !== currentName) {
                                 // Store manual name in cache so it survives loadSessions race conditions
                                 if (newName) {
@@ -668,7 +665,7 @@ export function renderApp(state: AppViewState) {
                                   state.sessionsResult = {
                                     ...state.sessionsResult,
                                     sessions: state.sessionsResult.sessions.map((s) =>
-                                      s.key === key ? { ...s, displayName: newName || undefined } : s,
+                                      s.key === key ? { ...s, label: newName || undefined, displayName: newName || undefined } : s,
                                     ),
                                   };
                                 }
@@ -730,7 +727,7 @@ export function renderApp(state: AppViewState) {
                                   true;
                                 const newName = input.value.trim();
                                 state.editingTabKey = null;
-                                const currentName = session?.displayName ?? session?.label ?? "";
+                                const currentName = session?.label ?? session?.displayName ?? "";
                                 if (newName !== currentName) {
                                   // Store manual name in cache so it survives loadSessions race conditions
                                   if (newName) {
@@ -743,7 +740,7 @@ export function renderApp(state: AppViewState) {
                                     state.sessionsResult = {
                                       ...state.sessionsResult,
                                       sessions: state.sessionsResult.sessions.map((s) =>
-                                        s.key === key ? { ...s, displayName: newName || undefined } : s,
+                                        s.key === key ? { ...s, label: newName || undefined, displayName: newName || undefined } : s,
                                       ),
                                     };
                                   }

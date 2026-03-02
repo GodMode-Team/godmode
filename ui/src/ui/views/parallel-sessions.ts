@@ -18,10 +18,10 @@ function getDisplayName(
   session: GatewaySessionRow | undefined,
   key: string,
 ): string {
+  if (session?.label) return session.label;
   if (session?.displayName) return session.displayName;
   const cached = autoTitleCache.get(key);
   if (cached) return cached;
-  if (session?.label) return session.label;
   if (key.includes("webchat")) {
     const match = key.match(/webchat[:-](\d+)/);
     return match ? `Chat ${match[1]}` : "Chat";

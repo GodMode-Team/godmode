@@ -48,13 +48,11 @@ export class OpenClawClient {
         this.ws = new WebSocket(this.url);
 
         this.ws.addEventListener("open", () => {
-          console.log("[OpenClaw] Connected");
           this.reconnectAttempts = 0;
           resolve();
         });
 
         this.ws.addEventListener("close", () => {
-          console.log("[OpenClaw] Disconnected");
           this.handleReconnect();
         });
 
@@ -111,7 +109,6 @@ export class OpenClawClient {
 
     this.reconnectAttempts++;
     const delay = this.reconnectDelay * Math.pow(2, this.reconnectAttempts - 1);
-    console.log(`[OpenClaw] Reconnecting in ${delay}ms (attempt ${this.reconnectAttempts})`);
 
     setTimeout(() => {
       this.connect().catch(() => {});
@@ -156,7 +153,10 @@ export class OpenClawClient {
   }
 
   async patchSession(key: string, patch: { displayName?: string; label?: string }): Promise<void> {
-    await this.call("sessions.patch", { key, ...patch });
+    // OpenClaw 2026.3.1+ uses 'label' instead of 'displayName'
+    const { displayName, ...rest } = patch;
+    const normalized = { ...rest, label: patch.label ?? displayName };
+    await this.call("sessions.patch", { key, ...normalized });
   }
 
   async deleteSession(key: string): Promise<void> {

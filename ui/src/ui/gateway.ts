@@ -293,15 +293,7 @@ export class GatewayBrowserClient {
   }
 
   request<T = unknown>(method: string, params?: unknown): Promise<T> {
-    console.log("[Gateway] request() called", {
-      method,
-      hasWs: !!this.ws,
-      wsState: this.ws?.readyState,
-      wsOpen: this.ws?.readyState === WebSocket.OPEN,
-    });
-
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
-      console.log("[Gateway] request() - WS not ready, rejecting");
       return Promise.reject(new Error("gateway not connected"));
     }
     const id = generateUUID();
@@ -309,7 +301,6 @@ export class GatewayBrowserClient {
     const p = new Promise<T>((resolve, reject) => {
       this.pending.set(id, { resolve: (v) => resolve(v as T), reject });
     });
-    console.log("[Gateway] Sending frame:", method, id.slice(0, 8));
     this.ws.send(JSON.stringify(frame));
     return p;
   }

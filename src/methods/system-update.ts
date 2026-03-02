@@ -25,6 +25,19 @@ export function setPluginVersion(v: string): void {
 
 // ── Helpers ──────────────────────────────────────────────────────────────
 
+/** Returns true if versionA is strictly greater than versionB (semver). */
+function isNewerVersion(versionA: string, versionB: string): boolean {
+  const partsA = versionA.split(".").map(Number);
+  const partsB = versionB.split(".").map(Number);
+  for (let i = 0; i < Math.max(partsA.length, partsB.length); i++) {
+    const a = partsA[i] ?? 0;
+    const b = partsB[i] ?? 0;
+    if (a > b) return true;
+    if (a < b) return false;
+  }
+  return false;
+}
+
 function runCommand(
   command: string,
   timeoutMs: number,
@@ -99,14 +112,14 @@ const check: GatewayRequestHandler = async ({ respond }) => {
     }
 
     // Fallback update detection via version comparison
-    if (!openclawUpdateAvailable && openclawLatest && openclawLatest !== openclawVersion) {
+    if (!openclawUpdateAvailable && openclawLatest && isNewerVersion(openclawLatest, openclawVersion)) {
       openclawUpdateAvailable = true;
     }
 
     // Check GodMode plugin version
     const pluginLatest = await getNpmLatestVersion("@godmode-team/godmode");
     const pluginUpdateAvailable =
-      pluginLatest !== null && pluginLatest !== _pluginVersion;
+      pluginLatest !== null && isNewerVersion(pluginLatest, _pluginVersion);
 
     respond(true, {
       openclaw: {
@@ -191,7 +204,7 @@ const run: GatewayRequestHandler = async ({ respond }) => {
 const pluginCheck: GatewayRequestHandler = async ({ respond }) => {
   try {
     const latest = await getNpmLatestVersion("@godmode-team/godmode");
-    const updateAvailable = latest !== null && latest !== _pluginVersion;
+    const updateAvailable = latest !== null && isNewerVersion(latest, _pluginVersion);
 
     respond(true, {
       current: _pluginVersion,

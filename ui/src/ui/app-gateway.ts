@@ -416,6 +416,36 @@ function updateSessionTimestamp(host: GatewayHost, sessionKey: string) {
 const autoTitleAttempted = new Set<string>();
 
 /**
+ * Derive a short title from the first user message in a session.
+ * Takes the first line (or sentence), strips markdown, truncates to ~60 chars.
+ */
+function deriveSessionTitle(chatMessages: Array<{ role: string; content: unknown }>): string | null {
+  const firstUser = chatMessages.find((m) => m.role === "user");
+  if (!firstUser) return null;
+
+  let text = "";
+  if (typeof firstUser.content === "string") {
+    text = firstUser.content;
+  } else if (Array.isArray(firstUser.content)) {
+    const textBlock = firstUser.content.find(
+      (b: unknown) => (b as { type?: string }).type === "text",
+    );
+    text = (textBlock as { text?: string })?.text ?? "";
+  }
+
+  // Take first line, strip markdown formatting, trim
+  let title = text.split("\n")[0]?.trim() ?? "";
+  title = title.replace(/^#+\s*/, "").replace(/[*_`~[\]]/g, "").trim();
+  if (!title) return null;
+
+  // Truncate to 60 chars at a word boundary
+  if (title.length > 60) {
+    title = title.slice(0, 57).replace(/\s+\S*$/, "") + "...";
+  }
+  return title;
+}
+
+/**
  * Auto-title an unnamed webchat session after the first response.
  * Fire-and-forget: failures are silent (user can still rename manually).
  */
@@ -435,9 +465,9 @@ async function maybeAutoTitleSession(host: GatewayHost, sessionKey: string) {
     return;
   }
 
-  // Check if session already has a displayName
+  // Check if session already has a label or displayName
   const session = host.sessionsResult?.sessions?.find((s) => s.key === sessionKey);
-  if (session?.displayName?.trim()) {
+  if (session?.label?.trim() || session?.displayName?.trim()) {
     return;
   }
 
@@ -449,29 +479,34 @@ async function maybeAutoTitleSession(host: GatewayHost, sessionKey: string) {
   }
 
   try {
-    const res = await host.client.request("sessions.autoTitle", {
+    // Derive title client-side from the first user message
+    const app = host as unknown as GodModeApp;
+    const title = deriveSessionTitle(app.chatMessages ?? []);
+
+    if (!title) {
+      console.warn("[auto-title] no user message found to derive title");
+      return;
+    }
+
+    // Persist the title via sessions.patch
+    await host.client.request("sessions.patch", {
       key: sessionKey,
+      label: title,
     });
 
-    if (!res?.ok) {
-      console.warn("[auto-title] failed:", res?.reason ?? "unknown");
-    }
+    // Store in persistent cache so it survives sessionsResult overwrites
+    autoTitleCache.set(sessionKey, title);
 
-    if (res?.ok && res.title) {
-      // Store in persistent cache so it survives sessionsResult overwrites
-      autoTitleCache.set(sessionKey, res.title);
-
-      // Update local session data immediately so the tab re-renders
-      if (host.sessionsResult?.sessions) {
-        host.sessionsResult = {
-          ...host.sessionsResult,
-          sessions: host.sessionsResult.sessions.map((s) =>
-            s.key === sessionKey ? { ...s, displayName: res.title } : s,
-          ),
-        };
-      }
-      (host as unknown as { requestUpdate?: () => void }).requestUpdate?.();
+    // Update local session data immediately so the tab re-renders
+    if (host.sessionsResult?.sessions) {
+      host.sessionsResult = {
+        ...host.sessionsResult,
+        sessions: host.sessionsResult.sessions.map((s) =>
+          s.key === sessionKey ? { ...s, label: title, displayName: title } : s,
+        ),
+      };
     }
+    (host as unknown as { requestUpdate?: () => void }).requestUpdate?.();
   } catch (e) {
     console.error("[auto-title] RPC call failed:", e);
   }
@@ -925,7 +960,6 @@ function handleGatewayEventUnsafe(host: GatewayHost, evt: GatewayEventFrame) {
       | undefined;
 
     if (payload) {
-      console.log("[gateway] Daily brief update received:", payload.date);
       // Type assertion to access dailyBrief property
       const appHost = host as unknown as { dailyBrief?: typeof payload };
       appHost.dailyBrief = payload;

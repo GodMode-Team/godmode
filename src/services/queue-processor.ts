@@ -38,7 +38,7 @@ const PROMPT_TEMPLATES: Record<QueueItemType, string> = {
   ops:
     "Handle this operational task: {title}\n{description}\n\nExecute the task, document what was done and any follow-ups needed.",
   task:
-    "Complete this task: {title}\n{description}\n\nWrite thorough but concise results.",
+    "Complete this task: {title}\n{description}\n\nDo whatever it takes to get this done. Show your work.",
   url:
     "Analyze this URL: {url}\n{title}\n{description}\n\nFetch the content, analyze it. Write: Source, Key Points, Relevance, Action Items.",
   idea:
@@ -165,12 +165,21 @@ class QueueProcessor {
       return { spawned: false };
     }
 
-    // Coding tasks delegate to the coding orchestrator
-    if (item.type === "coding") {
-      return {
-        spawned: false,
-        error: "Use coding orchestrator for coding tasks",
-      };
+    // Coding tasks are now processed as regular agent tasks
+    // (Previously delegated to the coding orchestrator)
+
+    // Autonomy gating — check trust level before spawning
+    try {
+      const { getAutonomyLevel } = await import("../lib/trust-tracker.js");
+      const autonomy = await getAutonomyLevel(item.personaHint ?? item.type);
+      if (autonomy === "supervised") {
+        this.logger.info(
+          `[GodMode][Queue] Skipping "${item.title}" — persona "${item.personaHint ?? item.type}" requires supervision`,
+        );
+        return { spawned: false, error: "Requires supervision — autonomy level too low" };
+      }
+    } catch {
+      // Trust tracker not available — proceed (default: allow)
     }
 
     // Link a session to the source task so opening the task always hits the
@@ -322,6 +331,27 @@ class QueueProcessor {
 
     const completedItem = queueState.items.find((i) => i.id === itemId);
     const personaSlug = completedItem?.personaHint;
+
+    // Auto-approve for full-autonomy personas (skip manual review)
+    if (personaSlug) {
+      try {
+        const { getAutonomyLevel } = await import("../lib/trust-tracker.js");
+        const autonomy = await getAutonomyLevel(personaSlug);
+        if (autonomy === "full") {
+          await updateQueueState((state) => {
+            const qi = state.items.find((i) => i.id === itemId);
+            if (qi) qi.status = "done";
+          });
+          this.logger.info(
+            `[GodMode][Queue] Item ${itemId} auto-approved (full autonomy for "${personaSlug}")`,
+          );
+          this.broadcast("queue:update", { itemId, status: "done" });
+          return;
+        }
+      } catch {
+        // Trust tracker not available — fall through to manual review
+      }
+    }
 
     this.logger.info(
       `[GodMode][Queue] Item ${itemId} completed — status set to review`,

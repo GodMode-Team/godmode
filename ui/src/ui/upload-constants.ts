@@ -65,7 +65,7 @@ export function validateFilesForUpload(
     // Check individual file size
     if (file.size > MAX_FILE_SIZE_BYTES) {
       errors.push(
-        `"${file.name}" is too large (${formatFileSize(file.size)}). Max ${formatFileSize(MAX_FILE_SIZE_BYTES)}. For larger files, tell Atlas the file path instead.`,
+        `"${file.name}" is too large (${formatFileSize(file.size)}). Max ${formatFileSize(MAX_FILE_SIZE_BYTES)}. For larger files, mention the file path instead.`,
       );
       continue;
     }

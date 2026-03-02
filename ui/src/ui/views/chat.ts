@@ -902,7 +902,7 @@ export function renderChat(props: ChatProps) {
                     type="button"
                     ?disabled=${props.consciousnessStatus === "loading"}
                     @click=${props.onConsciousnessFlush}
-                    title="Sync consciousness — refreshes Atlas's live context (⌘⇧H)"
+                    title="Sync consciousness — refreshes your agent's live context (⌘⇧H)"
                     aria-label="Sync consciousness"
                   >
                     ${props.consciousnessStatus === "loading"
