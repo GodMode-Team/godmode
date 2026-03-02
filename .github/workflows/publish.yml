@@ -28,10 +28,13 @@ jobs:
       - name: Typecheck
         run: pnpm typecheck
 
-      - name: Build
+      - name: Build plugin
         run: pnpm build
 
-      - name: Verify package contents
+      - name: Verify dist integrity
+        run: node scripts/verify-dist.mjs
+
+      - name: Dry-run pack check
         run: npm pack --dry-run
 
       - name: Validate tag matches package version

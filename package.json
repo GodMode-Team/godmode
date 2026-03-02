@@ -4,6 +4,22 @@
   "private": false,
   "description": "GodMode - Personal AI Operating System plugin for OpenClaw",
   "license": "SEE LICENSE IN LICENSE",
+  "author": "GodMode Team <support@lifeongodmode.com>",
+  "homepage": "https://lifeongodmode.com",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/GodMode-Team/godmode-plugin.git"
+  },
+  "bugs": {
+    "url": "https://github.com/GodMode-Team/godmode-plugin/issues"
+  },
+  "keywords": [
+    "openclaw",
+    "openclaw-plugin",
+    "godmode",
+    "ai-assistant",
+    "personal-operating-system"
+  ],
   "type": "module",
   "main": "dist/index.js",
   "exports": {
@@ -13,26 +29,16 @@
     "./plugin.json": "./openclaw.plugin.json"
   },
   "files": [
-    "dist",
+    "dist/**/*.js",
+    "dist/**/*.css",
+    "dist/**/*.html",
+    "dist/**/*.png",
+    "dist/**/*.webp",
+    "dist/**/*.ico",
+    "dist/**/*.svg",
     "openclaw.plugin.json",
     "LICENSE",
     "README.md"
-  ],
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/GodMode-Team/godmode-plugin.git"
-  },
-  "homepage": "https://lifeongodmode.com",
-  "bugs": {
-    "url": "https://github.com/GodMode-Team/godmode-plugin/issues"
-  },
-  "keywords": [
-    "openclaw",
-    "openclaw-plugin",
-    "godmode",
-    "ai-os",
-    "personal-ai",
-    "productivity"
   ],
   "scripts": {
     "build": "pnpm build:ui && pnpm build:code && pnpm bundle:ui",
@@ -45,11 +51,8 @@
     "clean": "rm -rf dist ui/dist",
     "typecheck": "tsc --noEmit",
     "pack:check": "npm pack --dry-run",
-    "prepublishOnly": "pnpm build && pnpm pack:check",
-    "preversion": "pnpm typecheck",
-    "version": "node scripts/sync-version.mjs && git add openclaw.plugin.json",
-    "postversion": "git push && git push --tags",
-    "release": "npm version patch && npm publish"
+    "prepublishOnly": "pnpm build && node scripts/verify-dist.mjs",
+    "preversion": "pnpm typecheck"
   },
   "dependencies": {
     "@noble/ed25519": "3.0.0",
