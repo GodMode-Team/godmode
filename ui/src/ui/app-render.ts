@@ -1018,8 +1018,8 @@ export function renderApp(state: AppViewState) {
                 quickSetupDone: state.setupQuickDone ?? false,
                 checklist: (state.setupChecklist as import("./views/setup").SetupViewProps["checklist"]) ?? null,
                 checklistLoading: state.setupChecklistLoading ?? false,
-                onQuickSetup: (name, licenseKey, dailyIntelTopics) =>
-                  state.handleQuickSetup?.(name, licenseKey, dailyIntelTopics),
+                onQuickSetup: (name, licenseKey) =>
+                  state.handleQuickSetup?.(name, licenseKey),
                 onHideSetup: () => state.handleHideSetup?.(),
                 onOpenWizard: () => state.handleWizardOpen?.(),
                 onNavigate: (tab) => state.setTab(tab),
@@ -1964,6 +1964,7 @@ export function renderApp(state: AppViewState) {
                         class="welcome-skip"
                         @click=${() => {
                           state.workspaceNeedsSetup = false;
+                          try { sessionStorage.setItem("godmode.setupSkipped", "1"); } catch {}
                         }}
                       >
                         Skip for now
@@ -2199,6 +2200,8 @@ export function renderApp(state: AppViewState) {
                 onToggle: (key, value) => state.handleOptionToggle(key, value),
                 onRefresh: () => state.handleOptionsLoad(),
                 onOpenWizard: state.handleWizardOpen ? () => state.handleWizardOpen?.() : undefined,
+                setupHidden: Boolean(state.godmodeOptions?.["onboarding.hidden"]),
+                onRestoreSetup: () => state.handleRestoreSetup?.(),
               })
             : nothing
         }

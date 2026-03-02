@@ -328,6 +328,14 @@ async function checkWorkspaceSetup(host: GatewayHost) {
   if (!host.client) {
     return;
   }
+  // If user already skipped setup this session, don't re-trigger the banner
+  try {
+    if (sessionStorage.getItem("godmode.setupSkipped")) {
+      const app = host as unknown as { workspaceNeedsSetup?: boolean };
+      app.workspaceNeedsSetup = false;
+      return;
+    }
+  } catch {}
   try {
     const res = await host.client.request("projects.list", {});
     const app = host as unknown as { workspaceNeedsSetup?: boolean };
@@ -366,9 +374,9 @@ async function checkOnboardingStatus(host: GatewayHost) {
       onboardingPhase?: number;
       onboardingData?: unknown;
     };
-    // If onboarding is not yet completed, activate the onboarding experience
+    // If onboarding is not yet completed, show Setup tab (not the full-screen overlay)
     if (res && !res.completedAt) {
-      app.onboardingActive = true;
+      app.onboardingActive = false;
       app.onboardingPhase = res.phase ?? 0;
       app.onboardingData = res;
       // Show setup tab in sidebar for the new 80/20 flow

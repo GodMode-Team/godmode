@@ -692,7 +692,7 @@ When users ask about GodMode capabilities, reference this list:
 ### Current Version
 
 - **npm package:** `@godmode-team/godmode@1.1.0`
-- **Install:** `openclaw plugin install @godmode-team/godmode`
+- **Install:** `openclaw plugins install @godmode-team/godmode`
 - **Team license key:** `GM-DEV-TEAM-2026`
 
 ### Quick Diagnostic Checklist
@@ -816,7 +816,7 @@ lsof -i :3000
 ```
 
 #### UI Shows Blank Page or 404
-- Reinstall: `openclaw plugin install @godmode-team/godmode`
+- Reinstall: `openclaw plugins install @godmode-team/godmode`
 - Check `/godmode/health` — `ui.available` should be `true`
 - If developing locally: `pnpm build` in plugin repo, then restart gateway
 - Asset fallback: `assets/godmode-ui/` is a committed npm snapshot

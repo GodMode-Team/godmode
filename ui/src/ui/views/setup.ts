@@ -1,7 +1,7 @@
 /**
  * Setup tab view — 80/20 fast onboarding.
  *
- * Section 1: Quick Start form (name + license key + daily intel topics)
+ * Section 1: Quick Start form (name + license key)
  * Section 2: Progressive checklist for deeper setup tasks
  */
 import { html, nothing } from "lit";
@@ -38,7 +38,7 @@ export type SetupViewProps = {
   quickSetupDone: boolean;
   checklist: SetupChecklist | null;
   checklistLoading: boolean;
-  onQuickSetup: (name: string, licenseKey: string, dailyIntelTopics: string) => void;
+  onQuickSetup: (name: string, licenseKey: string) => void;
   onHideSetup: () => void;
   onOpenWizard: () => void;
   onNavigate: (tab: Tab) => void;
@@ -46,30 +46,12 @@ export type SetupViewProps = {
   onOpenSupportChat: () => void;
 };
 
-// ── Intel Chips ─────────────────────────────────────────────────
-
-const INTEL_CHIPS = [
-  "AI updates",
-  "Competitor intel",
-  "Market trends",
-  "Industry news",
-  "Tech launches",
-];
-
 // ── Quick Start Form ────────────────────────────────────────────
 
 function renderQuickStart(props: SetupViewProps) {
   let nameValue = "";
   let keyValue = "";
-  let intelValue = "";
   let submitting = false;
-
-  function handleChipClick(chip: string, intelInput: HTMLTextAreaElement | null) {
-    if (!intelInput) return;
-    const current = intelInput.value.trim();
-    if (current.toLowerCase().includes(chip.toLowerCase())) return;
-    intelInput.value = current ? `${current}, ${chip}` : chip;
-  }
 
   function handleSubmit(e: Event) {
     e.preventDefault();
@@ -77,7 +59,6 @@ function renderQuickStart(props: SetupViewProps) {
     const form = e.target as HTMLFormElement;
     const name = (form.querySelector('[name="name"]') as HTMLInputElement)?.value?.trim() ?? "";
     const key = (form.querySelector('[name="licenseKey"]') as HTMLInputElement)?.value?.trim() ?? "";
-    const intel = (form.querySelector('[name="dailyIntel"]') as HTMLTextAreaElement)?.value?.trim() ?? "";
 
     if (!name) {
       const nameInput = form.querySelector('[name="name"]') as HTMLInputElement;
@@ -86,7 +67,7 @@ function renderQuickStart(props: SetupViewProps) {
     }
 
     submitting = true;
-    props.onQuickSetup(name, key, intel);
+    props.onQuickSetup(name, key);
   }
 
   return html`
@@ -123,41 +104,6 @@ function renderQuickStart(props: SetupViewProps) {
             .value=${keyValue}
           />
           <span class="setup-hint">Starts with GM-. Don't have one? Ask your admin.</span>
-        </div>
-
-        <div class="setup-field">
-          <label class="setup-label" for="setup-intel">
-            Daily intelligence
-            <span class="setup-label-optional">(optional)</span>
-          </label>
-          <div class="setup-chips">
-            ${INTEL_CHIPS.map(
-              (chip) => html`
-                <button
-                  type="button"
-                  class="setup-chip"
-                  @click=${(e: Event) => {
-                    const form = (e.target as HTMLElement).closest("form");
-                    const textarea = form?.querySelector('[name="dailyIntel"]') as HTMLTextAreaElement | null;
-                    handleChipClick(chip, textarea);
-                  }}
-                >
-                  ${chip}
-                </button>
-              `,
-            )}
-          </div>
-          <textarea
-            class="setup-textarea"
-            id="setup-intel"
-            name="dailyIntel"
-            rows="2"
-            placeholder="e.g., AI industry news, SaaS competitor analysis, market trends"
-            .value=${intelValue}
-          ></textarea>
-          <span class="setup-hint">
-            This powers your daily brief's intelligence section via X/Twitter search.
-          </span>
         </div>
 
         <button class="setup-submit" type="submit">

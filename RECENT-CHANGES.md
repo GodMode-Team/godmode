@@ -15,7 +15,7 @@ This file tracks recent development changes so Atlas and other agents can quickl
 
 ### Team Install
 ```bash
-openclaw plugin install @godmode-team/godmode
+openclaw plugins install @godmode-team/godmode
 openclaw gateway restart
 ```
 License key: `GM-DEV-TEAM-2026`
