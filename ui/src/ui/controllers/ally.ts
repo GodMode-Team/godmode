@@ -2,10 +2,15 @@ import { titleForTab } from "../navigation.js";
 import type { Tab } from "../navigation.js";
 
 /**
- * The fixed session key used for the ally side-chat.
- * All ally conversations share this single session.
+ * The ally side-chat uses the real main session — same conversation
+ * thread as iMessage, the Chat tab, and all other entry points.
+ *
+ * This is the living nerve center: direct chat with Prosper, notifications,
+ * agent results, morning brief flags, schedule alerts. System plumbing
+ * (heartbeat prompts, consciousness dumps) is filtered at the UI layer
+ * via isAutomatedMessage() in app.ts.
  */
-export const ALLY_SESSION_KEY = "ally-main";
+export const ALLY_SESSION_KEY = "main";
 
 // ── P2: Tab Context Awareness ──────────────────────────────────────
 

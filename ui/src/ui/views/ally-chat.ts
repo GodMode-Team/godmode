@@ -1,6 +1,10 @@
 import { html, nothing } from "lit";
+import { unsafeHTML } from "lit/directives/unsafe-html.js";
 import type { TemplateResult } from "lit";
 import { icons } from "../icons.js";
+import { toSanitizedMarkdownHtml } from "../markdown.js";
+import { toStreamingMarkdownHtml } from "../markdown-streaming.js";
+import type { ChatAttachment } from "../ui-types.js";
 
 // ── Types ──────────────────────────────────────────────────────────
 
@@ -41,6 +45,8 @@ export type AllyChatProps = {
   connected: boolean;
   /** Compact layout mode (less padding) */
   compact: boolean;
+  /** Image/file attachments pending send */
+  attachments: ChatAttachment[];
   /** Toggle panel open/closed */
   onToggle: () => void;
   /** Update the draft text */
@@ -51,6 +57,8 @@ export type AllyChatProps = {
   onAbort?: () => void;
   /** Navigate to the full chat tab with this session */
   onOpenFullChat: () => void;
+  /** Update attachments */
+  onAttachmentsChange: (attachments: ChatAttachment[]) => void;
 };
 
 // ── Helpers ────────────────────────────────────────────────────────
@@ -74,6 +82,48 @@ function adjustTextareaHeight(el: HTMLTextAreaElement) {
   el.style.height = `${Math.min(el.scrollHeight, 120)}px`;
 }
 
+/** Check if a scroll container is near the bottom (within threshold). */
+function isNearBottom(el: HTMLElement, threshold = 80): boolean {
+  return el.scrollHeight - el.scrollTop - el.clientHeight < threshold;
+}
+
+/** Scroll the messages container to the bottom. */
+function scrollToBottom(panel: HTMLElement) {
+  const container = panel.querySelector(".ally-panel__messages");
+  if (container) container.scrollTop = container.scrollHeight;
+}
+
+/**
+ * Auto-scroll to bottom when new messages arrive, but only if the user
+ * was already near the bottom (don't hijack scroll while reading history).
+ */
+let _lastMsgCount = 0;
+let _lastStreamLen = 0;
+function autoScrollIfNeeded(props: AllyChatProps) {
+  const msgCount = props.messages.length;
+  const streamLen = props.stream?.length ?? 0;
+  const isNew = msgCount !== _lastMsgCount || streamLen > _lastStreamLen;
+  _lastMsgCount = msgCount;
+  _lastStreamLen = streamLen;
+  if (!isNew) return;
+  requestAnimationFrame(() => {
+    const panel = document.querySelector(".ally-panel, .ally-inline");
+    if (!panel) return;
+    const container = panel.querySelector(".ally-panel__messages");
+    if (container && isNearBottom(container as HTMLElement, 120)) {
+      scrollToBottom(panel as HTMLElement);
+    }
+  });
+}
+
+/** Show/hide the jump-to-bottom button based on scroll position. */
+function handleMessagesScroll(e: Event) {
+  const el = e.currentTarget as HTMLElement;
+  const btn = el.querySelector(".ally-jump-bottom") as HTMLElement | null;
+  if (!btn) return;
+  btn.classList.toggle("ally-jump-bottom--visible", !isNearBottom(el));
+}
+
 // ── Sub-renderers ──────────────────────────────────────────────────
 
 function renderAvatar(props: AllyChatProps, size: "bubble" | "header") {
@@ -89,7 +139,10 @@ function renderAvatar(props: AllyChatProps, size: "bubble" | "header") {
 }
 
 function renderMessageContent(msg: AllyChatMessage) {
-  // Simple text rendering — future phases can add markdown
+  if (msg.role === "assistant" && msg.content) {
+    const rendered = toSanitizedMarkdownHtml(msg.content);
+    return html`<div class="ally-msg__content chat-text">${unsafeHTML(rendered)}</div>`;
+  }
   return html`<span class="ally-msg__content">${msg.content}</span>`;
 }
 
@@ -136,9 +189,10 @@ function renderMessage(msg: AllyChatMessage, index: number) {
 
 function renderStream(stream: string) {
   if (!stream) return nothing;
+  const rendered = toStreamingMarkdownHtml(stream);
   return html`
     <div class="ally-msg ally-msg--streaming">
-      <span class="ally-msg__content">${stream}</span>
+      <div class="ally-msg__content chat-text">${unsafeHTML(rendered)}</div>
     </div>
   `;
 }
@@ -147,18 +201,70 @@ function renderStatus(props: AllyChatProps) {
   if (!props.connected) {
     return html`<div class="ally-panel__status ally-panel__status--disconnected">Disconnected</div>`;
   }
-  if (props.isWorking || props.sending) {
+  // Don't show "Working..." when stream content is actively rendering
+  if ((props.isWorking || props.sending) && !props.stream) {
     return html`<div class="ally-panel__status ally-panel__status--working">Working...</div>`;
   }
   return nothing;
+}
+
+function handlePaste(e: ClipboardEvent, props: AllyChatProps) {
+  const items = e.clipboardData?.items;
+  if (!items) return;
+  const newAttachments: ChatAttachment[] = [];
+  for (const item of Array.from(items)) {
+    if (!item.type.startsWith("image/")) continue;
+    const file = item.getAsFile();
+    if (!file) continue;
+    e.preventDefault();
+    const reader = new FileReader();
+    const id = `paste-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    reader.onload = () => {
+      const dataUrl = reader.result as string;
+      props.onAttachmentsChange([
+        ...props.attachments,
+        { id, dataUrl, mimeType: file.type, fileName: file.name || "screenshot.png", status: "ready" },
+      ]);
+    };
+    reader.readAsDataURL(file);
+    newAttachments.push({ id, dataUrl: "", mimeType: file.type, fileName: file.name, status: "reading" });
+  }
+  if (newAttachments.length > 0) {
+    props.onAttachmentsChange([...props.attachments, ...newAttachments]);
+  }
+}
+
+function renderAttachmentPreviews(props: AllyChatProps) {
+  if (props.attachments.length === 0) return nothing;
+  return html`
+    <div class="ally-panel__attachments">
+      ${props.attachments.map(
+        (att) => html`
+          <div class="ally-panel__attachment">
+            ${att.dataUrl
+              ? html`<img src=${att.dataUrl} alt=${att.fileName ?? "attachment"} class="ally-panel__attachment-img" />`
+              : html`<span class="ally-panel__attachment-loading">...</span>`}
+            <button
+              type="button"
+              class="ally-panel__attachment-remove"
+              title="Remove"
+              @click=${() => props.onAttachmentsChange(props.attachments.filter((a) => a.id !== att.id))}
+            >${icons.x}</button>
+          </div>
+        `,
+      )}
+    </div>
+  `;
 }
 
 function renderInput(props: AllyChatProps) {
   const placeholder = props.connected
     ? `Message ${props.allyName}...`
     : "Reconnecting...";
+  const hasContent = props.draft.trim() || props.attachments.length > 0;
 
   return html`
+    ${renderAttachmentPreviews(props)}
     <div class="ally-panel__input">
       <textarea
         class="ally-panel__textarea"
@@ -171,6 +277,7 @@ function renderInput(props: AllyChatProps) {
           adjustTextareaHeight(target);
           props.onDraftChange(target.value);
         }}
+        @paste=${(e: ClipboardEvent) => handlePaste(e, props)}
         @keydown=${(e: KeyboardEvent) => {
           if (e.key !== "Enter") return;
           if (e.isComposing || e.keyCode === 229) return;
@@ -183,7 +290,7 @@ function renderInput(props: AllyChatProps) {
       <button
         class="ally-panel__send-btn"
         type="button"
-        ?disabled=${!props.connected || (!props.draft.trim() && !props.sending)}
+        ?disabled=${!props.connected || (!hasContent && !props.sending)}
         title="Send"
         @click=${() => props.onSend()}
       >
@@ -218,6 +325,7 @@ function renderBubble(props: AllyChatProps): TemplateResult {
 // ── Panel Mode ─────────────────────────────────────────────────────
 
 function renderPanelContent(props: AllyChatProps): TemplateResult {
+  autoScrollIfNeeded(props);
   return html`
     <div class="ally-panel__header">
       <div class="ally-panel__header-left">
@@ -236,18 +344,18 @@ function renderPanelContent(props: AllyChatProps): TemplateResult {
         <button
           type="button"
           class="ally-panel__close-btn"
-          title="Close"
-          aria-label="Close ${props.allyName} chat"
+          title="Minimize"
+          aria-label="Minimize ${props.allyName} chat"
           @click=${() => props.onToggle()}
         >
-          ${icons.x}
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="5" y1="12" x2="19" y2="12"/></svg>
         </button>
       </div>
     </div>
 
     ${renderStatus(props)}
 
-    <div class="ally-panel__messages">
+    <div class="ally-panel__messages" @scroll=${handleMessagesScroll}>
       ${props.messages.length === 0 && !props.stream
         ? html`<div class="ally-panel__empty">
             Start a conversation with ${props.allyName}
@@ -255,6 +363,15 @@ function renderPanelContent(props: AllyChatProps): TemplateResult {
         : nothing}
       ${props.messages.map((msg, i) => renderMessage(msg, i))}
       ${props.stream ? renderStream(props.stream) : nothing}
+      <button
+        type="button"
+        class="ally-jump-bottom"
+        title="Jump to latest"
+        @click=${(e: Event) => {
+          const panel = (e.currentTarget as HTMLElement).closest(".ally-panel, .ally-inline");
+          if (panel) scrollToBottom(panel as HTMLElement);
+        }}
+      >${icons.chevronDown}</button>
     </div>
 
     ${renderInput(props)}

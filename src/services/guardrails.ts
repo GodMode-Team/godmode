@@ -260,6 +260,14 @@ export async function readGuardrailsState(): Promise<GuardrailsState> {
     // Migrate: remove deprecated X guardrails (v1.4.0 — browser profile is now logged into X)
     custom = custom.filter((g) => !DEPRECATED_X_GUARDRAILS.has(g.id));
 
+    // Ensure built-in defaults are always present (merge missing ones)
+    const existingIds = new Set(custom.map((g) => g.id));
+    for (const def of CUSTOM_DEFAULTS) {
+      if (!existingIds.has(def.id)) {
+        custom.push(def);
+      }
+    }
+
     return {
       gates: { ...GATE_DEFAULTS, ...(parsed.gates ?? {}) },
       activity: parsed.activity ?? [],

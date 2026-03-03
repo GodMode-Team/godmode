@@ -111,7 +111,7 @@ function buildPhase1Prompt(state: OnboardingState): string {
   if (sp?.desiredWorkflows && sp.desiredWorkflows.length > 0) answered.push("desiredWorkflows");
   if (sp?.confirmBeforeActions && sp.confirmBeforeActions.length > 0) answered.push("confirmBeforeActions");
 
-  const totalFields = 23; // name + role + 21 soul fields
+  const totalFields = 22; // name + role + 20 soul fields
   const progress = Math.round((answered.length / totalFields) * 100);
 
   return `## GodMode Onboarding — Phase 1: Soul Interview
@@ -358,21 +358,39 @@ When done, advance to Phase 4.`;
 
 function buildPhase4Prompt(state: OnboardingState): string {
   const config = state.configuration;
-  return `## GodMode Onboarding — Phase 4: Configuration
+  return `## GodMode Onboarding — Phase 4: Configuration & Integrations
 
-Apply recommended settings based on the assessment and interview.
+Apply recommended settings AND help set up integrations that power the daily brief.
 
 ${config?.changes ? `Changes proposed: ${config.changes.length}, applied: ${config.changes.filter((c) => c.applied).length}` : "No changes proposed yet."}
 
+### Configuration
 Based on the assessment (Phase 0) and interview (Phase 1), propose config changes:
 - Enable disabled features that match their workflows
 - Set thinking level based on their role (higher for technical users)
 - Configure heartbeat, memory search, context pruning
 - Set up Trust Tracker with recommended workflows from Phase 3
 
+### Integration Setup
+Help the user connect their core integrations. Use \`integrations.status\` to check what's configured. For each unconfigured core integration:
+
+1. **X Intelligence** — powers the daily Intel Scan section. Needs XAI_API_KEY from x.ai/api
+2. **Tailscale** — critical for remote/VPS access. Needs tailscale CLI + hostname
+3. **Google Calendar** — powers Calendar & Meeting Prep sections. Needs gog CLI + OAuth
+4. **Obsidian Vault** — Second Brain storage. Needs vault path
+5. **GitHub CLI** — coding task orchestration. Needs gh auth login
+6. **Messaging** — phone notifications. Direct user to the Channels tab in the UI
+
+For each integration:
+- Explain what it powers in the daily brief
+- Provide step-by-step setup for their platform
+- Use \`integrations.configure\` to save API keys/values
+- Use \`integrations.test\` to verify connectivity
+- Everything is optional — respect the user's choice to skip
+
 Present each change and get confirmation before applying.
 Save with \`onboarding.update { configuration: { changes: [...] } }\`.
-When all changes are applied, advance to Phase 5.`;
+When config is applied and user has set up their desired integrations, advance to Phase 5.`;
 }
 
 function buildPhase5Prompt(state: OnboardingState): string {

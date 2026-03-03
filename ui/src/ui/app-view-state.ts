@@ -252,6 +252,7 @@ export type AppViewState = {
   allyUnread?: number;
   allySending?: boolean;
   allyWorking?: boolean;
+  allyAttachments?: import("./ui-types").ChatAttachment[];
   todayQueueResults?: DecisionCardItem[];
   // Daily Brief state
   dailyBrief?: DailyBriefData | null;
@@ -391,6 +392,25 @@ export type AppViewState = {
   secondBrainFileTreeLoading?: boolean;
   secondBrainFileSearchQuery?: string;
   secondBrainFileSearchResults?: import("./views/second-brain").BrainSearchResult[] | null;
+  // Onboarding integrations state
+  onboardingIntegrations: unknown[] | null;
+  onboardingCoreProgress: { connected: number; total: number } | null;
+  onboardingExpandedCard: string | null;
+  onboardingLoadingGuide: string | null;
+  onboardingActiveGuide: { integrationId: string; name: string; steps: string; envVars: Array<{ key: string; label: string; description: string; secret: boolean }>; cliDeps: string[] } | null;
+  onboardingTestingId: string | null;
+  onboardingTestResult: { id: string; result: { success: boolean; message: string } } | null;
+  onboardingConfigValues: Record<string, string>;
+  onboardingProgress: number | null;
+  handleLoadIntegrations: () => void;
+  handleExpandCard: (id: string | null) => void;
+  handleLoadGuide: (id: string) => void;
+  handleTestIntegration: (id: string) => void;
+  handleConfigureIntegration: (id: string, values: Record<string, string>) => void;
+  handleUpdateConfigValue: (key: string, value: string) => void;
+  handleSkipIntegration: (id: string) => void;
+  handleMarkOnboardingComplete?: () => void;
+  handleOpenSupportChat: () => void;
   // Proactive Intel state
   intelInsights: import("./controllers/proactive-intel").IntelInsight[];
   intelDiscoveries: import("./controllers/proactive-intel").ScoutFinding[];
@@ -532,10 +552,11 @@ export type AppViewState = {
   handleAllyDraftChange: (text: string) => void;
   handleAllySend: () => Promise<void>;
   handleAllyOpenFull: () => void;
+  handleAllyAttachmentsChange: (attachments: import("./ui-types").ChatAttachment[]) => void;
   // Decision card handlers
   handleDecisionApprove: (id: string) => Promise<void>;
   handleDecisionReject: (id: string) => Promise<void>;
-  handleDecisionViewOutput: (id: string, outputPath: string) => void;
+  handleDecisionViewOutput: (id: string, outputPath: string) => Promise<void>;
   handleDecisionOpenChat: (id: string) => void;
   // File open handler
   handleOpenFile: (filePath: string) => Promise<void>;

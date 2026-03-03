@@ -295,6 +295,7 @@
   --glass-bg-elevated: rgba(255, 255, 255, 0.92);
   --glass-border: rgba(235, 158, 15, 0.15);
   --glass-border-hover: rgba(235, 158, 15, 0.35);
+  --topbar-border: none;
   --glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.6);
 
   /* Ambient glow — Soft gold shimmer */
@@ -325,7 +326,14 @@
 }
 
 :root[data-theme="lifetrack"] .shell {
-  background: rgba(254, 254, 254, 0.85);
+  background: #fefefe;
+}
+
+/* Kill ambient gradient bleed — topbar is solid so any gradient showing
+   through the transparent content area creates a visible edge/line. */
+:root[data-theme="lifetrack"] .shell::before,
+:root[data-theme="lifetrack"] .shell::after {
+  display: none;
 }
 
 :root[data-theme="lifetrack"] .content {
@@ -337,15 +345,17 @@
 }
 
 :root[data-theme="lifetrack"] .nav {
-  background: rgba(254, 254, 254, 0.80);
-  backdrop-filter: saturate(120%) blur(12px);
-  -webkit-backdrop-filter: saturate(120%) blur(12px);
+  background: var(--bg);
+  border-right: 1px solid var(--border);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
 }
 
 :root[data-theme="lifetrack"] .topbar {
-  background: rgba(254, 254, 254, 0.80);
-  backdrop-filter: saturate(120%) blur(12px);
-  -webkit-backdrop-filter: saturate(120%) blur(12px);
+  background: var(--bg);
+  border-bottom: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
 }
 
 /* Lifetrack — Quantum particle keyframes */

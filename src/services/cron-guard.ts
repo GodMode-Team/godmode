@@ -94,9 +94,6 @@ const MESSAGING_PATTERNS = [
   /check.?in/i,
   /evening.?checkin/i,
   /auto.?checkpoint.*(?:morning|evening)/i,
-  /impact.*snapshot/i,
-  /end.?of.?day.?review/i,
-  /daily.?impact.?report/i,
   /send.*(?:imessage|sms|slack|message)/i,
   /via\s+imessage/i,
 ];
@@ -118,17 +115,24 @@ const PAYLOAD_MESSAGING_KEYWORDS = [
 // ── Core logic ─────────────────────────────────────────────────────
 
 function isMessagingJob(job: CronJob): boolean {
-  const nameAndDesc = `${job.name} ${job.description ?? ""}`;
-  if (MESSAGING_PATTERNS.some((re) => re.test(nameAndDesc))) return true;
-
-  const payloadText = job.payload.message ?? job.payload.text ?? "";
-  if (PAYLOAD_MESSAGING_KEYWORDS.some((kw) => payloadText.includes(kw))) return true;
-
-  // Jobs that deliver via announce to imessage channel can intercept
+  // Direct delivery to iMessage is the strongest signal
   if (
     job.delivery?.mode === "announce" &&
     job.delivery.channel === "imessage"
   ) {
+    return true;
+  }
+
+  // Payload keywords are strong signal regardless of delivery config
+  const payloadText = job.payload.message ?? job.payload.text ?? "";
+  if (PAYLOAD_MESSAGING_KEYWORDS.some((kw) => payloadText.includes(kw))) return true;
+
+  // Name patterns are a weaker signal — if delivery is explicitly "none"
+  // and no payload keywords matched, the job is data processing, not messaging.
+  // This prevents false positives on jobs like "Daily Impact Snapshot".
+  const nameAndDesc = `${job.name} ${job.description ?? ""}`;
+  if (MESSAGING_PATTERNS.some((re) => re.test(nameAndDesc))) {
+    if (job.delivery?.mode === "none") return false;
     return true;
   }
 

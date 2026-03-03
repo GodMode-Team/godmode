@@ -203,29 +203,42 @@ function checkObsidianVault(): boolean {
 function calculateHealthScore(result: Omit<AssessmentResult, "healthScore" | "timestamp">): number {
   let score = 0;
 
-  // Config exists + auth configured: 20 pts
-  if (result.configExists) score += 10;
-  if (result.authMethod !== "none") score += 10;
+  // Config exists + auth configured: 15 pts
+  if (result.configExists) score += 8;
+  if (result.authMethod !== "none") score += 7;
 
-  // Memory dir + MEMORY.md + >3 files: 15 pts
-  if (result.memoryStatus.dirExists) score += 5;
-  if (result.memoryStatus.hasMemoryMd) score += 5;
-  if (result.memoryStatus.fileCount > 3) score += 5;
+  // Memory dir + MEMORY.md + >3 files: 10 pts
+  if (result.memoryStatus.dirExists) score += 3;
+  if (result.memoryStatus.hasMemoryMd) score += 4;
+  if (result.memoryStatus.fileCount > 3) score += 3;
 
-  // At least 1 channel connected: 15 pts
-  if (result.channelsConnected.length > 0) score += 15;
+  // At least 1 channel connected: 5 pts
+  if (result.channelsConnected.length > 0) score += 5;
 
-  // Key features enabled (6 features x 5 pts): 30 pts
+  // Key features enabled (6 features x 4 pts): 24 pts
   for (const f of result.features) {
-    if (f.enabled) score += 5;
+    if (f.enabled) score += 4;
   }
 
-  // Workspace configured: 10 pts
-  if (result.workspaceConfigured) score += 10;
+  // Workspace configured: 6 pts
+  if (result.workspaceConfigured) score += 6;
 
-  // Skills installed: 10 pts
-  if (result.skillsInstalled.length > 0) score += 5;
-  if (result.skillsInstalled.length >= 3) score += 5;
+  // Skills installed: 5 pts
+  if (result.skillsInstalled.length > 0) score += 3;
+  if (result.skillsInstalled.length >= 3) score += 2;
+
+  // Integrations configured: 35 pts (5 pts each for 6 core + 1 for deep presence)
+  if (result.integrationsStatus) {
+    const coreIds = ["x-intelligence", "tailscale", "google-calendar", "obsidian-vault", "github-cli", "messaging-channel"];
+    for (const id of coreIds) {
+      const s = result.integrationsStatus[id];
+      if (s?.configured || s?.working) score += 5;
+    }
+    // Bonus for any deep integrations
+    const deepIds = ["oura-ring", "weather", "obsidian-sync"];
+    const anyDeep = deepIds.some(id => result.integrationsStatus![id]?.configured);
+    if (anyDeep) score += 5;
+  }
 
   return Math.min(100, score);
 }
@@ -559,6 +572,17 @@ export async function runAssessment(): Promise<AssessmentResult> {
   const gwAuth = gateway?.auth as Record<string, unknown> | undefined;
   const gatewayTokenSet = Boolean(gateway?.token) || Boolean(gwAuth?.token);
 
+  // Check integrations from registry
+  let integrationsStatus: Record<string, { configured: boolean; working: boolean }> | undefined;
+  try {
+    const { detectAllIntegrations } = await import("../lib/integration-registry.js");
+    const statuses = await detectAllIntegrations();
+    integrationsStatus = {};
+    for (const [id, s] of Object.entries(statuses)) {
+      integrationsStatus[id] = { configured: s.configured, working: s.working };
+    }
+  } catch { /* integration registry not available */ }
+
   const partial = {
     configExists,
     authMethod,
@@ -575,6 +599,7 @@ export async function runAssessment(): Promise<AssessmentResult> {
     githubReady,
     obsidianVaultConfigured,
     gatewayTokenSet,
+    integrationsStatus,
   };
 
   return {

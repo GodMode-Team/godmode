@@ -96,7 +96,7 @@
   top: 56px;
   right: 0;
   bottom: 0;
-  width: 380px;
+  width: 360px;
   z-index: 100;
   display: flex;
   flex-direction: column;
@@ -119,7 +119,7 @@
 
 /* ── Panel Header ── */
 .ally-panel__header {
-  padding: 12px 16px;
+  padding: 8px 12px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -131,34 +131,34 @@
 .ally-panel__header-left {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   min-width: 0;
 }
 
 .ally-panel__header-avatar {
-  width: 28px;
-  height: 28px;
+  width: 24px;
+  height: 24px;
   border-radius: 50%;
   object-fit: cover;
   flex-shrink: 0;
 }
 
 .ally-panel__header-initial {
-  width: 28px;
-  height: 28px;
+  width: 24px;
+  height: 24px;
   border-radius: 50%;
   background: var(--accent, #ff6b6b);
   color: var(--accent-foreground, #fff);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 600;
   flex-shrink: 0;
 }
 
 .ally-panel__header-name {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
   color: var(--text-strong, #fafafa);
   white-space: nowrap;
@@ -169,7 +169,7 @@
 .ally-panel__header-actions {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 2px;
   flex-shrink: 0;
 }
 
@@ -178,9 +178,9 @@
   border: none;
   color: var(--muted, #71717a);
   cursor: pointer;
-  padding: 4px 8px;
+  padding: 3px 6px;
   border-radius: var(--radius-sm, 6px);
-  font-size: 12px;
+  font-size: 11px;
   transition:
     color var(--duration-fast) var(--ease-out),
     background var(--duration-fast) var(--ease-out);
@@ -196,7 +196,7 @@
   border: none;
   color: var(--muted, #71717a);
   cursor: pointer;
-  padding: 4px;
+  padding: 3px;
   border-radius: var(--radius-sm, 6px);
   display: flex;
   align-items: center;
@@ -211,14 +211,19 @@
   background: var(--bg-hover, #262a35);
 }
 
+.ally-panel__close-btn svg {
+  width: 14px;
+  height: 14px;
+}
+
 /* ── Message List ── */
 .ally-panel__messages {
   flex: 1;
   overflow-y: auto;
-  padding: 16px;
+  padding: 8px 10px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 4px;
 }
 
 .ally-panel__empty {
@@ -227,18 +232,18 @@
   align-items: center;
   justify-content: center;
   color: var(--muted, #71717a);
-  font-size: 13px;
+  font-size: 12px;
   text-align: center;
-  padding: 32px;
-  line-height: 1.5;
+  padding: 24px;
+  line-height: 1.4;
 }
 
 /* ── Messages ── */
 .ally-msg {
-  max-width: 85%;
-  padding: 8px 12px;
-  border-radius: 12px;
-  font-size: 14px;
+  max-width: 88%;
+  padding: 6px 10px;
+  border-radius: 10px;
+  font-size: 13px;
   line-height: 1.45;
   word-break: break-word;
   animation: ally-msg-appear 150ms var(--ease-out) both;
@@ -259,7 +264,7 @@
   align-self: flex-end;
   background: var(--accent, #ff6b6b);
   color: var(--accent-foreground, #fff);
-  border-bottom-right-radius: 4px;
+  border-bottom-right-radius: 3px;
 }
 
 .ally-msg--assistant {
@@ -267,13 +272,18 @@
   background: var(--bg-elevated, #1a1d25);
   color: var(--text, #e4e4e7);
   border: 1px solid var(--border, #27272a);
-  border-bottom-left-radius: 4px;
+  border-bottom-left-radius: 3px;
 }
 
 .ally-msg__time {
-  font-size: 11px;
+  font-size: 10px;
   color: var(--muted, #71717a);
-  margin-top: 4px;
+  margin-top: 2px;
+  opacity: 0;
+  transition: opacity 150ms;
+}
+
+.ally-msg:hover .ally-msg__time {
   opacity: 0.7;
 }
 
@@ -289,24 +299,24 @@
   border: 1px solid var(--accent-2-muted, rgba(20, 184, 166, 0.7));
   border-radius: var(--radius-md, 8px);
   color: var(--text, #e4e4e7);
-  padding: 10px 14px;
+  padding: 6px 10px;
 }
 
 .ally-msg--notification .ally-msg__content {
-  font-size: 13px;
-  line-height: 1.5;
+  font-size: 12px;
+  line-height: 1.4;
 }
 
 .ally-msg__actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
-  margin-top: 8px;
+  gap: 4px;
+  margin-top: 4px;
 }
 
 .ally-msg__action-btn {
-  padding: 4px 10px;
-  font-size: 12px;
+  padding: 2px 8px;
+  font-size: 11px;
   font-weight: 500;
   border-radius: var(--radius-sm, 6px);
   border: 1px solid var(--border, #27272a);
@@ -323,20 +333,62 @@
   border-color: var(--border-strong, #3f3f46);
 }
 
+/* ── Jump to Bottom FAB ── */
+.ally-jump-bottom {
+  position: sticky;
+  bottom: 4px;
+  align-self: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 1px solid var(--border, #27272a);
+  background: var(--panel-strong, #1a1d25);
+  color: var(--muted, #71717a);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    opacity 150ms var(--ease-out),
+    transform 150ms var(--ease-out);
+  transform: translateY(8px);
+  flex-shrink: 0;
+  z-index: 2;
+}
+
+.ally-jump-bottom svg {
+  width: 14px;
+  height: 14px;
+}
+
+.ally-jump-bottom--visible {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+
+.ally-jump-bottom:hover {
+  color: var(--text, #e4e4e7);
+  background: var(--bg-hover, #262a35);
+  border-color: var(--border-strong, #3f3f46);
+}
+
 /* ── Streaming indicator ── */
 .ally-msg--streaming {
   align-self: flex-start;
   background: var(--bg-elevated, #1a1d25);
   color: var(--text, #e4e4e7);
   border: 1px solid var(--border, #27272a);
-  border-bottom-left-radius: 4px;
+  border-bottom-left-radius: 3px;
 }
 
 .ally-msg--streaming::after {
   content: "";
   display: inline-block;
-  width: 6px;
-  height: 14px;
+  width: 5px;
+  height: 12px;
   background: var(--accent, #ff6b6b);
   margin-left: 2px;
   vertical-align: text-bottom;
@@ -350,8 +402,8 @@
 
 /* ── Status Indicators ── */
 .ally-panel__status {
-  padding: 6px 16px;
-  font-size: 12px;
+  padding: 3px 12px;
+  font-size: 11px;
   text-align: center;
   flex-shrink: 0;
 }
@@ -369,11 +421,11 @@
 
 /* ── Input Area ── */
 .ally-panel__input {
-  padding: 12px 16px;
+  padding: 8px 10px;
   border-top: 1px solid var(--border, #27272a);
   flex-shrink: 0;
   display: flex;
-  gap: 8px;
+  gap: 6px;
   align-items: flex-end;
   background: var(--panel, #12141a);
 }
@@ -385,11 +437,11 @@
   border-radius: var(--radius-md, 8px);
   background: var(--bg-elevated, #1a1d25);
   color: var(--text, #e4e4e7);
-  padding: 8px 12px;
-  font-size: 14px;
+  padding: 6px 10px;
+  font-size: 13px;
   line-height: 1.4;
-  min-height: 38px;
-  max-height: 120px;
+  min-height: 34px;
+  max-height: 100px;
   overflow-y: auto;
   transition: border-color var(--duration-fast) var(--ease-out);
 }
@@ -404,8 +456,8 @@
 }
 
 .ally-panel__send-btn {
-  width: 36px;
-  height: 36px;
+  width: 32px;
+  height: 32px;
   border-radius: var(--radius-md, 8px);
   border: none;
   background: var(--accent, #ff6b6b);
@@ -431,8 +483,114 @@
 }
 
 .ally-panel__send-btn svg {
-  width: 16px;
-  height: 16px;
+  width: 14px;
+  height: 14px;
+}
+
+/* ── Attachment Previews ── */
+.ally-panel__attachments {
+  display: flex;
+  gap: 6px;
+  padding: 6px 10px 0;
+  flex-wrap: wrap;
+  flex-shrink: 0;
+}
+
+.ally-panel__attachment {
+  position: relative;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-sm, 6px);
+  overflow: hidden;
+  border: 1px solid var(--border, #27272a);
+}
+
+.ally-panel__attachment-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.ally-panel__attachment-remove {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+.ally-panel__attachment-remove svg {
+  width: 8px;
+  height: 8px;
+}
+
+.ally-panel__attachment-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  color: var(--muted, #71717a);
+  font-size: 10px;
+}
+
+/* ── Markdown in ally messages ── */
+.ally-msg .chat-text {
+  font-size: inherit;
+  line-height: inherit;
+}
+
+.ally-msg .chat-text p {
+  margin: 0 0 0.3em;
+}
+
+.ally-msg .chat-text p:last-child {
+  margin-bottom: 0;
+}
+
+.ally-msg .chat-text ul,
+.ally-msg .chat-text ol {
+  margin: 0.2em 0;
+  padding-left: 1.3em;
+}
+
+.ally-msg .chat-text li {
+  margin-bottom: 0.1em;
+}
+
+.ally-msg .chat-text code {
+  font-size: 0.9em;
+  padding: 1px 3px;
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.15);
+}
+
+.ally-msg .chat-text pre {
+  margin: 0.3em 0;
+  padding: 6px;
+  border-radius: var(--radius-sm, 6px);
+  overflow-x: auto;
+  font-size: 11px;
+  background: rgba(0, 0, 0, 0.15);
+}
+
+.ally-msg .chat-text pre code {
+  padding: 0;
+  background: none;
+}
+
+.ally-msg .chat-text a {
+  color: inherit;
+  text-decoration: underline;
 }
 
 /* ── Inline Variant (for Canvas embedding) ── */
@@ -463,15 +621,5 @@
   .ally-bubble {
     bottom: 16px;
     right: 16px;
-  }
-}
-
-@media (max-width: 480px) {
-  .ally-panel__messages {
-    padding: 12px;
-  }
-
-  .ally-msg {
-    max-width: 92%;
   }
 }

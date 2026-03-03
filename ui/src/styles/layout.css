@@ -124,7 +124,7 @@
   gap: 16px;
   padding: 0 20px;
   height: var(--shell-topbar-height);
-  border-bottom: 1px solid var(--glass-border);
+  border-bottom: var(--topbar-border, 1px solid var(--glass-border));
   background: var(--glass-bg);
   backdrop-filter: saturate(var(--glass-saturate)) blur(var(--glass-blur));
   -webkit-backdrop-filter: saturate(var(--glass-saturate)) blur(var(--glass-blur));
@@ -629,6 +629,16 @@
 .nav-item.active .nav-item__icon {
   opacity: 1;
   color: var(--accent);
+}
+
+.nav-item__badge {
+  font-size: 0.625rem;
+  padding: 0.0625rem 0.375rem;
+  border-radius: 8px;
+  background: var(--accent, #4f9);
+  color: #000;
+  font-weight: 600;
+  margin-left: auto;
 }
 
 /* ===========================================

@@ -53,6 +53,7 @@ import { focusPulseHandlers } from "./src/methods/focus-pulse.js";
 import { optionsHandlers } from "./src/methods/options.js";
 import { trustTrackerHandlers } from "./src/methods/trust-tracker.js";
 import { sessionArchiveHandlers } from "./src/methods/session-archive.js";
+import { sessionSearchHandlers } from "./src/methods/session-search.js";
 import { systemUpdateHandlers, setPluginVersion, runPostUpdateHealthCheck } from "./src/methods/system-update.js";
 import { createTrustRateTool } from "./src/tools/trust-rate.js";
 import { createGuardrailTool } from "./src/tools/guardrail.js";
@@ -619,6 +620,7 @@ const godmodePlugin = {
       ...optionsHandlers,
       ...trustTrackerHandlers,
       ...sessionArchiveHandlers,
+      ...sessionSearchHandlers,
       ...codingHandlers,
       ...systemUpdateHandlers,
       ...guardrailsHandlers,
@@ -648,6 +650,9 @@ const godmodePlugin = {
       "integrations.configure",
       "integrations.setupGuide",
       "integrations.platformInfo",
+      "support.diagnostics",
+      "support.logExchange",
+      "support.escalate",
     ]);
 
     for (const [method, handler] of Object.entries(allHandlers)) {
@@ -690,7 +695,8 @@ const godmodePlugin = {
       ? createStaticFileHandler(godmodeUiRoot, "/godmode")
       : null;
 
-    api.registerHttpHandler(async (req, res) => {
+    // HTTP route handler shared by both old and new API
+    const godmodeHttpHandler = async (req: any, res: any) => {
       const url = req.url ?? "/";
       const pathname = requestPathname(url);
 
@@ -760,7 +766,17 @@ h1{color:#ff6b6b}code{background:#16213e;padding:2px 8px;border-radius:4px}a{col
       }
 
       return false;
-    });
+    };
+
+    // OpenClaw 2026.3.2 changed registerHttpHandler → registerHttpRoute (params object)
+    if (typeof (api as any).registerHttpRoute === "function") {
+      (api as any).registerHttpRoute({ path: "/godmode", auth: "plugin", match: "prefix", handler: godmodeHttpHandler });
+      (api as any).registerHttpRoute({ path: "/ops", auth: "plugin", match: "prefix", handler: godmodeHttpHandler });
+    } else if (typeof (api as any).registerHttpHandler === "function") {
+      (api as any).registerHttpHandler(godmodeHttpHandler);
+    } else {
+      console.warn("[godmode] No HTTP route registration API found — UI and health endpoints unavailable");
+    }
 
     if (godmodeUiRoot) {
       api.logger.info(`[GodMode] Serving UI at /godmode from ${godmodeUiRoot}`);

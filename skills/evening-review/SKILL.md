@@ -90,13 +90,25 @@ Send the composed message using the `message` tool:
 
 ## Reply Handling
 
-The user's reply is automatically captured by the evening check-in system:
+This skill runs in the **main Prosper session** — not an isolated cron session. When the user replies to the iMessage, their reply arrives naturally in the conversation. Prosper handles it like a conversation, not a form.
 
-- Their reflection is saved to the daily brief under "Evening Reflection"
-- If they don't include tomorrow priorities, a warm follow-up asks for a brain dump
-- After full capture, an evening lifetrack is generated and the link is texted
+### What to do with the reply:
 
-The user can reply in any format — freeform text, voice message, short or long. The capture system handles all of it. Never constrain how the user should respond.
+1. **Capture reflection** — Save the user's thoughts to today's daily brief under "Evening Reflection" via `dailyBrief.eveningCapture`. Include their day rating if they gave one.
+
+2. **Extract tasks** — If the user mentions things they need to do ("finish the proposal tomorrow", "follow up with Jon"), create tasks via `tasks.create` with appropriate priority and due dates. Don't ask permission for obvious tasks — just create them.
+
+3. **Queue overnight work** — If the user requests something be worked on ("can you research X tonight?", "queue up the Y feature", "look into Z"), use `queue_add` to add it to the background processing queue. Pick the right type (coding, research, analysis, creative, ops).
+
+4. **Scope tomorrow** — If the user shares tomorrow priorities, acknowledge them. Don't force structure — the morning set conversation is where priorities get locked in. Just capture the intent.
+
+5. **Ask if unclear** — If the user's reply is ambiguous about what they want done, ask a natural follow-up. "Want me to queue that up for overnight, or just add it to tomorrow's list?"
+
+6. **Close warmly** — Once you've captured everything, acknowledge and let the user go to bed. Don't overdo it. A simple "Got it. I'll have tomorrow's brief ready. Sleep well." is plenty.
+
+### Key principle
+
+The user can reply in any format — one word, a paragraph, voice dictation, or a structured brain dump. Prosper interprets it naturally. No pipe-delimited templates. No numbered survey responses. If the reply is complete, close the loop. If there's work to do overnight, queue it and let the user know you're on it.
 
 ## Example Output
 
@@ -162,15 +174,15 @@ Score your day 1-10 and brain dump anything on your mind.
 
 > **IMPORTANT**: This skill MUST use `sessionTarget: "main"` — NEVER `"isolated"`.
 > Isolated sessions create a separate agent context. When the user replies to the
-> check-in message, their reply (brain dump, ideas, reflections) gets captured by
-> the isolated session instead of the main Prosper session, effectively swallowing
-> the message. The main session never sees it.
+> check-in message, their reply gets captured by the isolated session instead of
+> the main Prosper session, effectively swallowing the message. The main session
+> never sees it — and Prosper can't act on the user's brain dump.
 
 ```
 Schedule: 0 21 * * * (9 PM daily, user's timezone)
 Session: main (NEVER isolated — replies get swallowed)
 Payload kind: systemEvent (not agentTurn)
-Delivery: announce to iMessage
+Delivery: none (Prosper sends via message tool directly)
 ```
 
 ### Safe cron job config example
@@ -183,8 +195,9 @@ Delivery: announce to iMessage
   "wakeMode": "now",
   "payload": {
     "kind": "systemEvent",
-    "text": "It's 9 PM. Run the evening-review skill — compose a warm check-in message via iMessage."
+    "text": "EVENING REVIEW (9 PM): Time for the evening check-in. Run the evening-review skill — gather today's context (daily brief, agent log, sessions, tomorrow's calendar), compose a warm personal iMessage check-in (under 800 chars), and send it via the message tool. After sending, stay present for the user's reply. When they respond, handle it naturally: capture their reflection to the daily brief, extract any tasks they mention and create them, queue any work they want done overnight, and if you're not sure what to prioritize, ask. This is a conversation, not a form."
   },
-  "schedule": { "cron": "0 21 * * *" }
+  "delivery": { "mode": "none" },
+  "schedule": { "kind": "cron", "expr": "0 21 * * *", "tz": "America/Chicago" }
 }
 ```

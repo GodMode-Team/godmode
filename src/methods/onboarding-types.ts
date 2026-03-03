@@ -41,6 +41,8 @@ export type AssessmentResult = {
   obsidianVaultConfigured: boolean;
   /** Gateway WebSocket token configured (prevents unauthorized local access) */
   gatewayTokenSet: boolean;
+  /** Integration status from the integration registry */
+  integrationsStatus?: Record<string, { configured: boolean; working: boolean }>;
   timestamp: string;
 };
 
@@ -165,6 +167,9 @@ export type OnboardingState = {
   firstWin: FirstWinResult | null;
   grandReveal: GrandRevealSummary | null;
 
+  // Integration status (which integrations the user has set up)
+  integrations: Record<string, { status: "connected" | "skipped" | "pending"; configuredAt?: string }> | null;
+
   // Legacy fields (backward compat with old onboarding state)
   identity: { name: string; mission: string; emoji: string } | null;
   tools: { id: string; name: string; status: string; icon?: string }[];
@@ -191,6 +196,7 @@ export function emptyOnboardingState(): OnboardingState {
     configuration: null,
     firstWin: null,
     grandReveal: null,
+    integrations: null,
     identity: null,
     tools: [],
     summary: null,

@@ -4,7 +4,41 @@
 
 .guardrails-section {
   padding: 0 1.5rem 1rem;
-  max-width: 720px;
+}
+
+/* Two-column page layout — matches onboarding-setup pattern */
+.guardrails-two-col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2rem;
+  align-items: start;
+}
+@media (max-width: 900px) {
+  .guardrails-two-col {
+    grid-template-columns: 1fr;
+  }
+}
+
+.guardrails-left {
+  min-width: 0;
+}
+
+.guardrails-right {
+  min-width: 0;
+}
+
+/* Column headings — matches onboarding-setup pattern */
+.guardrails-col-heading {
+  font-size: 1.25rem;
+  font-weight: 700;
+  margin: 0 0 0.25rem;
+  color: var(--text-strong, var(--text));
+}
+
+.guardrails-col-subtitle {
+  font-size: 0.85rem;
+  color: var(--text-muted, var(--muted));
+  margin: 0 0 1.25rem;
 }
 
 /* Summary bar */
@@ -140,14 +174,19 @@
 
 /* Activity history */
 .guardrails-history {
-  margin-top: 0.5rem;
+  background: var(--bg-card, var(--bg-secondary));
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 1rem;
 }
 
 .guardrails-history-title {
-  font-size: 0.9375rem;
+  font-size: 0.8125rem;
   font-weight: 600;
-  margin: 0 0 0.625rem;
-  color: var(--text);
+  margin: 0 0 0.75rem;
+  color: var(--text-muted, var(--muted));
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 
 .guardrails-history-list {
@@ -156,22 +195,30 @@
 }
 
 .guardrails-activity-row {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  grid-template-rows: auto auto;
+  gap: 0 0.5rem;
   padding: 0.5rem 0;
   border-bottom: 1px solid var(--border-light, var(--border));
-  font-size: 0.8125rem;
+  font-size: 0.75rem;
+}
+
+.guardrails-activity-row:last-child {
+  border-bottom: none;
 }
 
 .guardrails-badge {
-  font-size: 0.6875rem;
+  font-size: 0.625rem;
   font-weight: 600;
-  padding: 2px 8px;
-  border-radius: 4px;
+  padding: 1px 6px;
+  border-radius: 3px;
   text-transform: uppercase;
   letter-spacing: 0.04em;
   white-space: nowrap;
+  grid-row: 1;
+  grid-column: 1;
+  align-self: center;
 }
 
 .guardrails-badge--fired {
@@ -192,14 +239,21 @@
 .guardrails-activity-gate {
   font-weight: 600;
   font-family: var(--font-mono, monospace);
-  font-size: 0.75rem;
+  font-size: 0.6875rem;
   color: var(--text);
-  min-width: 90px;
+  grid-row: 1;
+  grid-column: 2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  align-self: center;
 }
 
 .guardrails-activity-detail {
   color: var(--text-muted, var(--muted));
-  flex: 1;
+  font-size: 0.6875rem;
+  grid-row: 2;
+  grid-column: 1 / -1;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -207,9 +261,12 @@
 
 .guardrails-activity-time {
   color: var(--text-muted, var(--muted));
-  font-size: 0.75rem;
+  font-size: 0.6875rem;
   white-space: nowrap;
   opacity: 0.7;
+  grid-row: 1;
+  grid-column: 3;
+  align-self: center;
 }
 
 /* Empty / loading states */
@@ -242,21 +299,11 @@
   font-size: 1.25rem;
 }
 
-.guardrails-bottom-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 1.5rem;
-  margin-top: 0.5rem;
-}
-@media (max-width: 900px) {
-  .guardrails-bottom-row {
-    grid-template-columns: 1fr;
-  }
-}
+/* (guardrails-bottom-row removed — replaced by guardrails-two-col) */
 
 .guardrails-custom-section {
   margin-top: 0;
-  margin-bottom: 0;
+  margin-bottom: 1.25rem;
 }
 
 .guardrails-custom-header {

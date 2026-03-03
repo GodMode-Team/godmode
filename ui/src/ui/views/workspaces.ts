@@ -66,6 +66,7 @@ export type WorkspaceDetail = WorkspaceSummary & {
   folderTree?: FolderTreeNode[];
   sessions: WorkspaceSessionEntry[];
   tasks: WorkspaceTask[];
+  memory?: WorkspaceFileEntry[];
 };
 
 export type WorkspaceCreateRequest = {
@@ -464,6 +465,56 @@ function countFilesInTree(nodes: FolderTreeNode[]): number {
   return count;
 }
 
+// ── Recent files helpers ─────────────────────────────────────────────
+
+const MAX_RECENT_FILES = 10;
+
+function getRecentFilesFromTree(
+  nodes: FolderTreeNode[],
+  limit = MAX_RECENT_FILES,
+): WorkspaceFileEntry[] {
+  const files: WorkspaceFileEntry[] = [];
+  function walk(list: FolderTreeNode[]) {
+    for (const node of list) {
+      if (node.type === "file" && node.modified) {
+        files.push({
+          path: node.path,
+          name: node.name,
+          type: node.fileType ?? "text",
+          size: node.size ?? 0,
+          modified: node.modified,
+        });
+      }
+      if (node.children) walk(node.children);
+    }
+  }
+  walk(nodes);
+  return files.sort((a, b) => b.modified.getTime() - a.modified.getTime()).slice(0, limit);
+}
+
+/** Extract a short description from file content (searchText). */
+function extractFileDescription(entry: WorkspaceFileEntry): string | null {
+  if (!entry.searchText) return null;
+  const text = entry.searchText.trim();
+  if (!text) return null;
+  // For markdown: try first heading
+  const headingMatch = text.match(/#+ (.+?)(?:\s#|$)/);
+  if (headingMatch) return headingMatch[1].trim().slice(0, 120);
+  // Skip YAML frontmatter marker
+  const content = text.startsWith("---") ? text.replace(/^---.*?---\s*/s, "") : text;
+  // First 120 chars of content
+  return content.slice(0, 120) || null;
+}
+
+function getRecentFilesFromOutputs(
+  outputs: WorkspaceFileEntry[],
+  limit = MAX_RECENT_FILES,
+): WorkspaceFileEntry[] {
+  return [...outputs]
+    .sort((a, b) => b.modified.getTime() - a.modified.getTime())
+    .slice(0, limit);
+}
+
 type FolderNodeContext = {
   expandedFolders: Set<string>;
   pinnedPaths: Set<string>;
@@ -593,6 +644,35 @@ function renderSectionFileRow(props: {
         <span class="ws-list-title">${entry.name}</span>
         <span class="ws-list-meta">${formatFileSize(entry.size)}</span>
         <span class="ws-list-meta">${formatAgo(entry.modified.getTime())}</span>
+      </button>
+      <button
+        class="ws-pin-btn ${pinned ? "active" : ""}"
+        @click=${() => onPinToggle?.(workspaceId, entry.path, pinned)}
+        title=${pinned ? "Unpin" : "Pin"}
+      >
+        ${pinned ? "Unpin" : "Pin"}
+      </button>
+    </div>
+  `;
+}
+
+/** Recent file row with description subtitle. */
+function renderRecentFileRow(props: {
+  workspaceId: string;
+  entry: WorkspaceFileEntry;
+  pinned: boolean;
+  onOpen?: (item: WorkspaceFileEntry) => void;
+  onPinToggle?: (workspaceId: string, filePath: string, pinned: boolean) => void;
+}) {
+  const { workspaceId, entry, pinned, onOpen, onPinToggle } = props;
+  const desc = extractFileDescription(entry);
+  return html`
+    <div class="ws-list-row">
+      <button class="ws-list-main" @click=${() => onOpen?.(entry)}>
+        <span class="ws-list-icon">${fileIcon(entry.type)}</span>
+        <span class="ws-list-title">${entry.name}</span>
+        <span class="ws-list-meta">${formatAgo(entry.modified.getTime())}</span>
+        ${desc ? html`<span class="ws-list-desc">${desc}</span>` : nothing}
       </button>
       <button
         class="ws-pin-btn ${pinned ? "active" : ""}"
@@ -781,6 +861,10 @@ function renderWorkspaceDetail(props: {
   const showSessionsSection =
     filteredSessions.length > 0 || workspace.sessions.length === 0 || hasItemSearch;
 
+  // Recent files — always use outputs (which have searchText for descriptions)
+  const recentFiles = getRecentFilesFromOutputs(workspace.outputs);
+  const showRecentSection = recentFiles.length > 0 && !hasItemSearch;
+
   // Context for folder tree nodes: shared pin state and callbacks
   const folderCtx: FolderNodeContext = {
     expandedFolders,
@@ -875,6 +959,29 @@ function renderWorkspaceDetail(props: {
           onUpdateTask,
         })}
 
+        ${showRecentSection
+          ? html`
+              <section class="ws-section">
+                <div class="ws-section__header">
+                  <h3>Recent</h3>
+                  <span>${recentFiles.length}</span>
+                </div>
+                <div class="ws-list">
+                  ${recentFiles.map((entry) =>
+                    renderRecentFileRow({
+                      workspaceId: workspace.id,
+                      entry,
+                      pinned: pinnedFilePaths.has(entry.path),
+                      onOpen: onItemClick,
+                      onPinToggle,
+                    }),
+                  )}
+                </div>
+              </section>
+            `
+          : nothing
+        }
+
         <section class="ws-section">
           <div class="ws-section__header">
             <h3>Artifacts</h3>
@@ -940,6 +1047,29 @@ function renderWorkspaceDetail(props: {
                 </section>
               `
             : nothing
+        }
+
+        ${(workspace.memory?.length ?? 0) > 0
+          ? html`
+              <section class="ws-section">
+                <div class="ws-section__header">
+                  <h3>Memory</h3>
+                  <span>${workspace.memory!.length}</span>
+                </div>
+                <div class="ws-list ws-list--scroll">
+                  ${workspace.memory!.map((entry) =>
+                    renderSectionFileRow({
+                      workspaceId: workspace.id,
+                      entry,
+                      pinned: pinnedFilePaths.has(entry.path),
+                      onOpen: onItemClick,
+                      onPinToggle,
+                    }),
+                  )}
+                </div>
+              </section>
+            `
+          : nothing
         }
       </div>
     </div>

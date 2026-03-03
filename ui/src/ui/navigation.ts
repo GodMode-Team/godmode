@@ -166,9 +166,9 @@ export function inferBasePathFromPathname(pathname: string): string {
 export function iconForTab(tab: Tab): IconName {
   switch (tab) {
     case "setup":
-      return "zap";
+      return "compass";
     case "onboarding":
-      return "zap";
+      return "compass";
     case "chat":
       return "messageSquare";
     case "today":
@@ -226,7 +226,7 @@ export function titleForTab(tab: Tab) {
     case "setup":
       return "Setup";
     case "onboarding":
-      return "Onboarding";
+      return "Connect Your World";
     case "chat":
       return "Chat";
     case "today":
@@ -282,9 +282,9 @@ export function titleForTab(tab: Tab) {
 export function emojiForTab(tab: Tab): string {
   switch (tab) {
     case "setup":
-      return "\u{1F680}";
+      return "\u{1F9ED}";
     case "onboarding":
-      return "\u{1F680}";
+      return "\u{1F9ED}";
     case "chat":
       return "\u{1F4AC}";
     case "today":
@@ -342,7 +342,7 @@ export function subtitleForTab(tab: Tab) {
     case "setup":
       return "Get GodMode configured and running.";
     case "onboarding":
-      return "Set up your integrations and customize your experience.";
+      return "Set up the integrations that power your daily brief and agent features. Everything is optional.";
     case "chat":
       return "Your command center. Ask anything, customize any view.";
     case "today":

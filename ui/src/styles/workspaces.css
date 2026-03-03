@@ -413,6 +413,7 @@
 .ws-list-main {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 10px;
   flex: 1;
   border: 0;
@@ -439,6 +440,17 @@
   color: var(--muted);
   font-size: 12px;
   flex-shrink: 0;
+}
+
+.ws-list-desc {
+  flex-basis: 100%;
+  font-size: 11px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding-left: 26px; /* align with title (icon width + gap) */
+  margin-top: -2px;
 }
 
 .ws-pin-btn {

@@ -37,6 +37,8 @@ export type ConfigProps = {
   userName: string;
   userAvatar: string | null;
   onUserProfileUpdate: (name: string, avatar: string) => void;
+  // Model switcher
+  onModelSwitch?: (primary: string, fallbacks: string[]) => void;
 };
 
 // SVG Icons for sidebar (Lucide-style)
@@ -275,6 +277,7 @@ const sidebarIcons = {
 
 // Section definitions
 const SECTIONS: Array<{ key: string; label: string }> = [
+  { key: "model", label: "AI Model" },
   { key: "env", label: "Environment" },
   { key: "update", label: "Updates" },
   { key: "agents", label: "Agents" },
@@ -291,7 +294,7 @@ const SECTIONS: Array<{ key: string; label: string }> = [
 ];
 
 // Sections that always appear (not schema-dependent)
-const FIXED_SECTIONS = new Set(["user"]);
+const FIXED_SECTIONS = new Set(["user", "model"]);
 
 type SubsectionEntry = {
   key: string;
@@ -396,6 +399,147 @@ function truncateValue(value: unknown, maxLen = 40): string {
     return str;
   }
   return str.slice(0, maxLen - 3) + "...";
+}
+
+// ── Model Picker ──────────────────────────────────────────────────────
+
+type ModelOption = {
+  id: string;
+  name: string;
+  provider: string;
+  providerLabel: string;
+  reasoning: boolean;
+  contextWindow: number;
+};
+
+const PROVIDER_COLORS: Record<string, string> = {
+  anthropic: "#d97706",
+  openai: "#10b981",
+  "openai-codex": "#10b981",
+  xai: "#6366f1",
+};
+
+function buildModelOptions(formValue: Record<string, unknown>): ModelOption[] {
+  const available: ModelOption[] = [];
+  const models = formValue.models as Record<string, unknown> | undefined;
+  const agents = formValue.agents as Record<string, unknown> | undefined;
+
+  // From models.providers
+  const providers = (models as any)?.providers;
+  if (providers && typeof providers === "object") {
+    for (const [provKey, prov] of Object.entries(providers)) {
+      const provObj = prov as Record<string, unknown>;
+      for (const m of (provObj.models as any[]) ?? []) {
+        available.push({
+          id: `${provKey}/${m.id}`,
+          name: m.name ?? m.id,
+          provider: provKey,
+          providerLabel: provKey.charAt(0).toUpperCase() + provKey.slice(1),
+          reasoning: m.reasoning ?? false,
+          contextWindow: m.contextWindow ?? 0,
+        });
+      }
+    }
+  }
+
+  // From agents.defaults.models (entries not already in providers)
+  const defaults = (agents as any)?.defaults?.models;
+  if (defaults && typeof defaults === "object") {
+    for (const modelId of Object.keys(defaults)) {
+      if (available.some((m) => m.id === modelId)) continue;
+      const parts = modelId.split("/");
+      available.push({
+        id: modelId,
+        name: parts.slice(1).join("/"),
+        provider: parts[0] ?? "unknown",
+        providerLabel: (parts[0] ?? "unknown")
+          .replace(/-/g, " ")
+          .replace(/\b\w/g, (c) => c.toUpperCase()),
+        reasoning: false,
+        contextWindow: 0,
+      });
+    }
+  }
+
+  return available;
+}
+
+function getDefaultFallback(primary: string): string[] {
+  if (primary.startsWith("anthropic/")) return ["openai-codex/gpt-5.3-codex"];
+  return ["anthropic/claude-sonnet-4-6"];
+}
+
+function renderModelPicker(props: ConfigProps) {
+  const formValue = props.formValue;
+  if (!formValue) {
+    return html`<div class="config-loading"><span>Loading config...</span></div>`;
+  }
+
+  const agents = formValue.agents as any;
+  const currentPrimary: string = agents?.defaults?.model?.primary ?? "";
+  const currentFallbacks: string[] = agents?.defaults?.model?.fallbacks ?? [];
+  const available = buildModelOptions(formValue);
+
+  // Group by provider
+  const byProvider = new Map<string, ModelOption[]>();
+  for (const m of available) {
+    const list = byProvider.get(m.provider) ?? [];
+    list.push(m);
+    byProvider.set(m.provider, list);
+  }
+
+  const isSwitching = props.saving || props.applying;
+
+  return html`
+    <div class="model-picker">
+      <div class="model-picker__current">
+        <div class="model-picker__current-label">Active Model</div>
+        <div class="model-picker__current-value">${currentPrimary || "Not set"}</div>
+        ${currentFallbacks.length > 0
+          ? html`<div class="model-picker__fallback">Fallback: ${currentFallbacks.join(", ")}</div>`
+          : nothing}
+      </div>
+
+      ${isSwitching ? html`<div class="model-picker__status">Switching model...</div>` : nothing}
+
+      ${Array.from(byProvider.entries()).map(
+        ([provKey, models]) => html`
+          <div class="model-picker__group">
+            <div class="model-picker__group-label">
+              <span class="model-picker__group-dot" style="background: ${PROVIDER_COLORS[provKey] ?? "var(--accent)"}"></span>
+              ${models[0]?.providerLabel ?? provKey}
+            </div>
+            <div class="model-picker__cards">
+              ${models.map((model) => {
+                const isActive = model.id === currentPrimary;
+                const color = PROVIDER_COLORS[model.provider] ?? "var(--accent)";
+                return html`
+                  <button
+                    class="model-card ${isActive ? "model-card--active" : ""}"
+                    style="--model-accent: ${color}"
+                    ?disabled=${isSwitching}
+                    @click=${() => {
+                      if (isActive || !props.onModelSwitch) return;
+                      props.onModelSwitch(model.id, getDefaultFallback(model.id));
+                    }}
+                  >
+                    <div class="model-card__body">
+                      <div class="model-card__name">${model.name || model.id}</div>
+                      ${model.reasoning ? html`<span class="model-card__tag">reasoning</span>` : nothing}
+                      ${model.contextWindow > 0
+                        ? html`<span class="model-card__ctx">${Math.round(model.contextWindow / 1000)}k ctx</span>`
+                        : nothing}
+                    </div>
+                    ${isActive ? html`<span class="model-card__check">Active</span>` : nothing}
+                  </button>
+                `;
+              })}
+            </div>
+          </div>
+        `,
+      )}
+    </div>
+  `;
 }
 
 export function renderConfig(props: ConfigProps) {
@@ -663,7 +807,9 @@ export function renderConfig(props: ConfigProps) {
         <!-- Form content -->
         <div class="config-content">
           ${
-            props.activeSection === "user"
+            props.activeSection === "model"
+              ? renderModelPicker(props)
+              : props.activeSection === "user"
               ? renderUserSettings({
                   userName: props.userName,
                   userAvatar: props.userAvatar,

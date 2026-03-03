@@ -193,3 +193,16 @@ export function removeConfigFormValue(state: ConfigState, path: Array<string | n
     state.configRaw = serializeConfigForm(base);
   }
 }
+
+/**
+ * One-click model switch: patches primary + fallbacks, saves, and applies.
+ */
+export async function switchModel(
+  state: ConfigState,
+  primary: string,
+  fallbacks: string[],
+) {
+  updateConfigFormValue(state, ["agents", "defaults", "model", "primary"], primary);
+  updateConfigFormValue(state, ["agents", "defaults", "model", "fallbacks"], fallbacks);
+  await saveConfig(state);
+}

@@ -11,6 +11,25 @@ function stripSystemContext(text: string): string {
   return stripped;
 }
 
+/**
+ * Detect raw API error JSON and convert to a friendly message.
+ * Matches patterns like: {"type":"error","error":{"type":"overloaded_error",...}}
+ */
+const API_ERROR_JSON_RE = /^\s*\{[^{}]*"type"\s*:\s*"error"[^{}]*"error"\s*:\s*\{/;
+
+export function formatApiError(text: string): string | null {
+  if (!API_ERROR_JSON_RE.test(text)) return null;
+  try {
+    const obj = JSON.parse(text);
+    if (obj?.type === "error" && obj?.error?.message) {
+      return `*API error: ${obj.error.message}*`;
+    }
+  } catch {
+    // Not valid JSON — ignore
+  }
+  return null;
+}
+
 const ENVELOPE_PREFIX = /^\[([^\]]+)\]\s*/;
 const ENVELOPE_CHANNELS = [
   "WebChat",

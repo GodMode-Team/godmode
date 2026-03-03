@@ -89,12 +89,12 @@ function fileIcon(name: string): string {
 /**
  * Flatten a potentially nested file tree into a flat list, capped at MAX_DISPLAY_FILES.
  */
-function flattenFiles(items: unknown[]): WorkspaceFile[] {
+function flattenFiles(items: unknown[], limit = MAX_DISPLAY_FILES): WorkspaceFile[] {
   const flat: WorkspaceFile[] = [];
 
   function walk(nodes: unknown[]) {
     for (const node of nodes) {
-      if (flat.length >= MAX_DISPLAY_FILES) {
+      if (flat.length >= limit) {
         return;
       }
       const item = node as WorkspaceFile;
@@ -108,6 +108,64 @@ function flattenFiles(items: unknown[]): WorkspaceFile[] {
 
   walk(items);
   return flat;
+}
+
+/** Max recent files to show */
+const MAX_RECENT_FILES = 8;
+
+/**
+ * Flatten ALL files from a nested tree (no cap) and return sorted by modifiedAt descending.
+ */
+function getRecentFiles(items: unknown[]): WorkspaceFile[] {
+  const flat = flattenFiles(items, 500);
+  return flat
+    .filter((f) => f.modifiedAt != null)
+    .sort((a, b) => (b.modifiedAt ?? 0) - (a.modifiedAt ?? 0))
+    .slice(0, MAX_RECENT_FILES);
+}
+
+/** Format a relative time like "2h ago", "3d ago" */
+function relativeTime(ts: number): string {
+  const now = Date.now();
+  const diff = now - ts;
+  const minutes = Math.floor(diff / 60_000);
+  if (minutes < 1) return "just now";
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 30) return `${days}d ago`;
+  return `${Math.floor(days / 30)}mo ago`;
+}
+
+function renderRecentFiles(files: unknown[], onFileClick?: (path: string) => void) {
+  if (!files || files.length === 0) return nothing;
+
+  const recent = getRecentFiles(files);
+  if (recent.length === 0) return nothing;
+
+  return html`
+    <div class="work-section">
+      <div class="work-section-label">Recent</div>
+      <div class="work-file-list">
+        ${recent.map(
+          (item) => html`
+          <button
+            class="work-file-item"
+            @click=${(e: Event) => {
+              e.stopPropagation();
+              if (item.path && onFileClick) onFileClick(item.path);
+            }}
+          >
+            <span class="work-file-icon">${fileIcon(item.name)}</span>
+            <span class="work-file-name">${item.name}</span>
+            <span class="work-file-meta">${item.modifiedAt ? relativeTime(item.modifiedAt) : ""}</span>
+          </button>
+        `,
+        )}
+      </div>
+    </div>
+  `;
 }
 
 function renderWorkspaceFiles(files: unknown[], onFileClick?: (path: string) => void) {
@@ -194,6 +252,7 @@ function renderProjectCard(
                     `
                   : nothing
               }
+              ${projectFiles.length > 0 ? renderRecentFiles(projectFiles, onFileClick) : nothing}
               ${
                 projectFiles.length > 0
                   ? html`

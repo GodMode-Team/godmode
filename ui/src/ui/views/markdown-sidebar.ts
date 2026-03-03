@@ -3,6 +3,12 @@ import { unsafeHTML } from "lit/directives/unsafe-html.js";
 import { icons } from "../icons";
 import { linkifyFilePaths, sanitizeHtmlFragment, toSanitizedMarkdownHtml } from "../markdown";
 
+export type DriveAccount = {
+  email: string;
+  client: string;
+  label: string;
+};
+
 export type MarkdownSidebarProps = {
   content: string | null;
   error: string | null;
@@ -12,7 +18,13 @@ export type MarkdownSidebarProps = {
   onClose: () => void;
   onViewRawText: () => void;
   onOpenFile?: (filePath: string) => void;
-  onPushToDrive?: (filePath: string) => void;
+  onPushToDrive?: (filePath: string, account?: string) => void;
+  /** Available Google Drive accounts for upload picker. */
+  driveAccounts?: DriveAccount[];
+  /** Whether the drive picker dropdown is currently shown. */
+  showDrivePicker?: boolean;
+  /** Callback to toggle the drive picker (fetches accounts on first open). */
+  onToggleDrivePicker?: () => void;
 };
 
 const MARKDOWN_EXTENSIONS = new Set(["md", "markdown", "mdx"]);
@@ -222,11 +234,36 @@ export function renderMarkdownSidebar(props: MarkdownSidebarProps) {
         </div>
         <div class="sidebar-header-actions">
           ${props.onPushToDrive && props.filePath
-            ? html`<button
-                class="btn sidebar-open-browser-btn"
-                title="Push to Google Drive"
-                @click=${() => props.onPushToDrive!(props.filePath!)}
-              >&#x2B06; Drive</button>`
+            ? html`<div class="sidebar-drive-wrap">
+                <button
+                  class="btn sidebar-open-browser-btn"
+                  title="Push to Google Drive"
+                  @click=${() => props.onToggleDrivePicker
+                    ? props.onToggleDrivePicker()
+                    : props.onPushToDrive!(props.filePath!)}
+                >&#x2B06; Drive</button>
+                ${props.showDrivePicker && props.driveAccounts
+                  ? html`<div class="sidebar-drive-picker">
+                      ${props.driveAccounts.length === 0
+                        ? html`<div class="sidebar-drive-item sidebar-drive-empty">No Google accounts configured</div>`
+                        : props.driveAccounts.map(
+                            (acct) => html`
+                              <button
+                                class="sidebar-drive-item"
+                                @click=${() => {
+                                  props.onPushToDrive!(props.filePath!, acct.email);
+                                  props.onToggleDrivePicker?.();
+                                }}
+                                title=${acct.email}
+                              >
+                                <span class="sidebar-drive-label">${acct.email.split("@")[0]}</span>
+                                <span class="sidebar-drive-domain">@${acct.email.split("@")[1]}</span>
+                              </button>
+                            `,
+                          )}
+                    </div>`
+                  : nothing}
+              </div>`
             : nothing}
           ${showOpenInBrowser
             ? html`<button

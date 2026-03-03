@@ -176,6 +176,66 @@ function resolveOnboardingMode(): boolean {
   return normalized === "1" || normalized === "true" || normalized === "yes" || normalized === "on";
 }
 
+/**
+ * Detect automated system messages that shouldn't show in the ally chat.
+ * Heartbeat prompts, context-only messages, and NO_REPLY markers.
+ */
+/**
+ * Clean a message for ally display: strip system plumbing, return the
+ * human-meaningful content or null if there's nothing worth showing.
+ *
+ * The main session mixes real conversation with heartbeat prompts,
+ * consciousness dumps, cron triggers, and tool output. This function
+ * strips the plumbing and keeps the substance — including HEARTBEAT_OK
+ * responses that contain real flags ("HEARTBEAT_OK  Two flags: ...").
+ */
+function cleanForAlly(text: string, role: string): string | null {
+  let t = text.trim();
+  if (!t) return null;
+
+  // ── Always filter: pure system plumbing ──
+
+  // Heartbeat prompts (user role, sent by cron)
+  if (t.startsWith("Read HEARTBEAT.md") || t.startsWith("Read CONSCIOUSNESS.md")) return null;
+
+  // Cron triggers
+  if (/^System:\s*\[\d{4}-\d{2}-\d{2}/.test(t)) return null;
+
+  // NO_REPLY tokens
+  if (t === "NO_REPLY" || t.startsWith("NO_REPLY\n")) return null;
+
+  // Consciousness/system file dumps (toolResult content shown as message)
+  if (/^#\s*(?:🧠|Atlas Consciousness)/i.test(t)) return null;
+  if (t.startsWith("# WORKING.md") || t.startsWith("# MISTAKES.md")) return null;
+
+  // Pure GodMode Context prefix with no user text
+  if (/^\[GodMode Context:[^\]]*\]\s*$/.test(t)) return null;
+
+  // ── Strip prefixes, keep substance ──
+
+  // Strip HEARTBEAT_OK / CONSCIOUSNESS_OK prefix — keep the useful flags after it
+  t = t.replace(/^(?:HEARTBEAT_OK|CONSCIOUSNESS_OK)\s*/i, "").trim();
+
+  // Strip "Deep work window is yours." prefix
+  t = t.replace(/^Deep work window is yours\.\s*/i, "").trim();
+
+  // If nothing left after stripping, it was pure automation
+  if (!t) return null;
+
+  // ── Heuristic: skip raw structured data dumps ──
+
+  // Raw calendar data (lines of IDs + ISO timestamps)
+  if (/^\w+\s+\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(t) && t.length > 200) return null;
+
+  // Agent roster dumps
+  if (/^##\s*Your Team\s*\(Agent Roster\)/i.test(t)) return null;
+
+  // Schedule table headers
+  if (/^(?:ID\s+START\s+END\s+SUMMARY)/i.test(t)) return null;
+
+  return t;
+}
+
 const CHAT_FILE_LINK_TAB_PREFIXES = new Set([
   "chat",
   "today",
@@ -275,6 +335,10 @@ export class GodModeApp extends LitElement {
   @state() sidebarTitle: string | null = null;
   @state() splitRatio = this.settings.splitRatio;
   @state() lightbox: LightboxState = createLightboxState();
+
+  // Google Drive picker state
+  @state() driveAccounts: Array<{ email: string; client: string; label: string }> = [];
+  @state() showDrivePicker = false;
 
   // Update check state
   @state() updateStatus: {
@@ -391,6 +455,17 @@ export class GodModeApp extends LitElement {
   @state() setupChecklistLoading = false;
   @state() setupQuickDone = false;
 
+  // Onboarding integration setup state
+  @state() onboardingIntegrations: unknown[] | null = null;
+  @state() onboardingCoreProgress: { connected: number; total: number } | null = null;
+  @state() onboardingExpandedCard: string | null = null;
+  @state() onboardingLoadingGuide: string | null = null;
+  @state() onboardingActiveGuide: any | null = null;
+  @state() onboardingTestingId: string | null = null;
+  @state() onboardingTestResult: { id: string; result: { success: boolean; message: string } } | null = null;
+  @state() onboardingConfigValues: Record<string, string> = {};
+  @state() onboardingProgress: number | null = null;
+
   // Workspaces state
   @state() workspaces?: WorkspaceSummary[];
   @state() selectedWorkspace: WorkspaceDetail | null = null;
@@ -442,6 +517,7 @@ export class GodModeApp extends LitElement {
   @state() allyUnread = 0;
   @state() allySending = false;
   @state() allyWorking = false;
+  @state() allyAttachments: import("./ui-types").ChatAttachment[] = [];
   @state() todayQueueResults: DecisionCardItem[] = [];
 
   @state() chatPrivateMode = false;
@@ -990,26 +1066,70 @@ export class GodModeApp extends LitElement {
     this.allyDraft = text;
   }
 
+  handleAllyAttachmentsChange(attachments: import("./ui-types").ChatAttachment[]) {
+    this.allyAttachments = attachments;
+  }
+
   async handleAllySend() {
     const text = this.allyDraft.trim();
-    if (!text || this.allySending) return;
+    const attachments = this.allyAttachments;
+    if ((!text && attachments.length === 0) || this.allySending) return;
 
     // Prepend tab context so the ally knows what the user is looking at
     const context = buildAllyContext(this as any);
-    const messageWithContext = `${context}\n\n${text}`;
+    let msg = text ? `${context}\n\n${text}` : context;
 
     this.allyDraft = "";
+    this.allyAttachments = [];
     this.allySending = true;
-    this.allyMessages = [...this.allyMessages, { role: "user" as const, content: text, timestamp: Date.now() }];
+    this.allyMessages = [...this.allyMessages, { role: "user" as const, content: text || "(image)", timestamp: Date.now() }];
 
     try {
+      // Process image attachments (same pattern as full chat)
+      let imageAttachments: Array<{ type: string; mimeType: string; content: string; fileName?: string }> | undefined;
+      if (attachments.length > 0) {
+        const images: typeof imageAttachments = [];
+        for (const att of attachments) {
+          if (!att.dataUrl) continue;
+          const match = att.dataUrl.match(/^data:([^;]+);base64,(.+)$/);
+          if (!match) continue;
+          const [, mime, content] = match;
+          if (mime.startsWith("image/")) {
+            images.push({ type: "image", mimeType: mime, content, fileName: att.fileName });
+          }
+        }
+        if (images.length > 0) {
+          imageAttachments = images;
+          // Cache images server-side
+          try {
+            await this.client?.request("images.cache", {
+              images: images.map((img) => ({ data: img.content, mimeType: img.mimeType, fileName: img.fileName })),
+              sessionKey: ALLY_SESSION_KEY,
+            });
+          } catch {
+            // Non-blocking
+          }
+        }
+      }
+
+      const idempotencyKey = `ally-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
       await this.client?.request("chat.send", {
         sessionKey: ALLY_SESSION_KEY,
-        message: messageWithContext,
+        message: msg,
         deliver: false,
+        idempotencyKey,
+        attachments: imageAttachments,
       });
+      // Show "Working..." between RPC success and first streaming delta
+      this.allyWorking = true;
     } catch (e) {
-      console.error("[Ally] Failed to send ally message:", e);
+      const errStr = e instanceof Error ? e.message : String(e);
+      console.error("[Ally] Failed to send ally message:", errStr);
+      // Add error message inline so user sees what went wrong
+      this.allyMessages = [
+        ...this.allyMessages,
+        { role: "assistant" as const, content: `*Send failed: ${errStr}*`, timestamp: Date.now() },
+      ];
     } finally {
       this.allySending = false;
     }
@@ -1046,15 +1166,28 @@ export class GodModeApp extends LitElement {
         messages: Array<{ role: string; content: unknown; timestamp?: number }>;
       }>("chat.history", { sessionKey: ALLY_SESSION_KEY, limit: 100 });
       if (res?.messages) {
-        this.allyMessages = res.messages.map((m) => ({
-          role: m.role as "user" | "assistant",
-          content: typeof m.content === "string"
-            ? m.content
-            : Array.isArray(m.content)
-              ? (m.content.find((b: any) => b.type === "text") as any)?.text ?? ""
-              : "",
-          timestamp: m.timestamp,
-        }));
+        const { extractText, formatApiError } = await import("./chat/message-extract.js");
+        this.allyMessages = res.messages
+          .map((m) => {
+            let text = extractText(m);
+            if (!text) return null;
+            // Convert raw API error JSON to friendly message
+            const errMsg = formatApiError(text);
+            if (errMsg) text = errMsg;
+            // Strip [GodMode Context: ...] prefix
+            text = text.replace(/^\[GodMode Context:[^\]]*\]\s*/i, "").trim();
+            if (!text) return null;
+            // Filter system plumbing, keep real content
+            const role = (m.role as string) ?? "assistant";
+            const cleaned = cleanForAlly(text, role);
+            if (!cleaned) return null;
+            return {
+              role: role as "user" | "assistant",
+              content: cleaned,
+              timestamp: m.timestamp,
+            };
+          })
+          .filter((m): m is NonNullable<typeof m> => m !== null);
       }
     } catch {
       // History load failed — start fresh
@@ -1085,30 +1218,62 @@ export class GodModeApp extends LitElement {
     }
   }
 
-  handleDecisionViewOutput(id: string, outputPath: string) {
-    void this.handleOpenFile(outputPath);
+  async handleDecisionViewOutput(id: string, outputPath: string) {
+    if (!this.client || !this.connected) {
+      this.showToast("Not connected to gateway", "error");
+      return;
+    }
+    try {
+      const result = await this.client.request<{ content: string }>(
+        "queue.readOutput",
+        { path: outputPath },
+      );
+      const title = outputPath.split("/").pop() ?? "Agent Output";
+      this.handleOpenSidebar(result.content, {
+        mimeType: "text/markdown",
+        filePath: outputPath,
+        title,
+      });
+    } catch (err) {
+      console.error("[DecisionCard] View output failed:", err);
+      // Fallback to host files.read
+      void this.handleOpenFile(outputPath);
+    }
   }
 
   handleDecisionOpenChat(id: string) {
-    // Open ally panel and mention the item
+    // Open ally panel and pre-fill draft with context about the item
+    const item = this.todayQueueResults?.find((r) => r.id === id);
     this.allyPanelOpen = true;
     this.allyUnread = 0;
     void this._loadAllyHistory();
+    if (item?.title) {
+      this.allyDraft = `Let's discuss the agent result: "${item.title}"`;
+    }
   }
 
   async handleTodayOpenChatToEdit(itemId: string) {
     try {
-      // Read queue output
-      const res = await this.client?.request<{
-        outputPath?: string;
-        path?: string;
-        content?: string;
-      }>("queue.readOutput", { id: itemId });
-      const outputPath = res?.outputPath || res?.path;
+      // Look up outputPath from queue results
+      const item = this.todayQueueResults?.find((r) => r.id === itemId);
+      const outputPath = item?.outputPath;
 
-      // Open sidebar with output
-      if (outputPath) {
-        await this.handleOpenFile(outputPath);
+      // Open sidebar with output if we have a path
+      if (outputPath && this.client && this.connected) {
+        try {
+          const res = await this.client.request<{ content: string }>(
+            "queue.readOutput",
+            { path: outputPath },
+          );
+          this.handleOpenSidebar(res.content, {
+            mimeType: "text/markdown",
+            filePath: outputPath,
+            title: item?.title ?? outputPath.split("/").pop() ?? "Agent Output",
+          });
+        } catch {
+          // Fallback to host files.read
+          await this.handleOpenFile(outputPath);
+        }
       }
 
       // Open ally panel
@@ -1921,6 +2086,7 @@ export class GodModeApp extends LitElement {
 
   handleCloseSidebar() {
     this.sidebarOpen = false;
+    this.showDrivePicker = false;
     // Clear content after transition
     if (this.sidebarCloseTimer != null) {
       window.clearTimeout(this.sidebarCloseTimer);
@@ -1970,13 +2136,45 @@ export class GodModeApp extends LitElement {
     }
   }
 
-  async handlePushToDrive(filePath: string) {
+  async handleToggleDrivePicker() {
+    if (this.showDrivePicker) {
+      this.showDrivePicker = false;
+      return;
+    }
+    // Fetch accounts on first open
+    if (this.driveAccounts.length === 0) {
+      try {
+        const result = await this.client?.request<{
+          accounts: Array<{ email: string; client: string; label: string }>;
+        }>("files.listDriveAccounts", {});
+        this.driveAccounts = result?.accounts ?? [];
+      } catch {
+        this.driveAccounts = [];
+      }
+    }
+    this.showDrivePicker = true;
+  }
+
+  async handlePushToDrive(filePath: string, account?: string) {
+    this.showDrivePicker = false;
     try {
-      await this.client?.request("files.pushToDrive", { filePath });
-      this.showToast("Uploaded to Google Drive", "success");
-    } catch (e) {
+      const params: Record<string, string> = { filePath };
+      if (account) params.account = account;
+      const result = await this.client?.request<{ message?: string; output?: string }>(
+        "files.pushToDrive",
+        params,
+      );
+      const label = account ? ` to ${account.split("@")[0]}` : "";
+      this.showToast(result?.message ?? `Uploaded${label} to Google Drive`, "success");
+    } catch (e: unknown) {
       console.error("Push to Drive failed:", e);
-      this.showToast("Push to Drive failed", "error");
+      const detail =
+        e instanceof Error
+          ? e.message
+          : typeof e === "object" && e !== null && "message" in e
+            ? String((e as { message: unknown }).message)
+            : "Unknown error";
+      this.showToast(`Drive upload failed: ${detail}`, "error");
     }
   }
 
@@ -2131,13 +2329,14 @@ export class GodModeApp extends LitElement {
           content: string | null;
           mime?: string;
           contentType?: string;
+          path?: string;
         }>("workspaces.readFile", { workspaceId, filePath });
         if (typeof result.content !== "string") {
           continue;
         }
         this.handleOpenSidebar(result.content, {
           mimeType: result.contentType ?? result.mime ?? this.inferMimeTypeFromPath(filePath),
-          filePath,
+          filePath: result.path ?? filePath,
           title: this.sidebarTitleForPath(filePath),
         });
         return true;
@@ -2164,6 +2363,31 @@ export class GodModeApp extends LitElement {
       lowered.startsWith("data:")
     ) {
       return [];
+    }
+
+    // Handle file:// URLs — extract the local path directly
+    if (href.startsWith("file://")) {
+      let filePath = href.slice("file://".length);
+      // file:///~/... → ~/...
+      if (filePath.startsWith("/~/")) {
+        filePath = "~" + filePath.slice(2);
+      }
+      try {
+        filePath = decodeURIComponent(filePath);
+      } catch {
+        // keep as-is
+      }
+      candidates.push(filePath);
+      // Don't fall through to URL parsing — file:// is fully handled
+      const normalized: string[] = [];
+      const seen = new Set<string>();
+      for (const candidate of candidates) {
+        const safe = this.normalizeWorkspacePathCandidate(candidate, { allowAbsolute: true });
+        if (!safe || seen.has(safe)) continue;
+        seen.add(safe);
+        normalized.push(safe);
+      }
+      return normalized;
     }
 
     const hasScheme = /^[a-z][a-z0-9+.-]*:/i.test(href);
@@ -2260,11 +2484,12 @@ export class GodModeApp extends LitElement {
         content: string | null;
         mime?: string;
         contentType?: string;
+        path?: string;
       }>("workspaces.readFile", { path: filePath });
       if (typeof result.content === "string") {
         this.handleOpenSidebar(result.content, {
           mimeType: result.contentType ?? result.mime ?? this.inferMimeTypeFromPath(filePath),
-          filePath,
+          filePath: result.path ?? filePath,
           title: this.sidebarTitleForPath(filePath),
         });
         return true;
@@ -2757,6 +2982,7 @@ export class GodModeApp extends LitElement {
         content: string | null;
         mime?: string;
         contentType?: string;
+        path?: string;
         error?: string;
       }>("workspaces.readFile", { path: filePath });
 
@@ -2766,7 +2992,7 @@ export class GodModeApp extends LitElement {
       }
       this.handleOpenSidebar(result.content, {
         mimeType: result.contentType ?? result.mime ?? this.inferMimeTypeFromPath(filePath),
-        filePath,
+        filePath: result.path ?? filePath,
         title: this.sidebarTitleForPath(filePath),
       });
     } catch (err) {
@@ -3267,12 +3493,23 @@ export class GodModeApp extends LitElement {
   }
 
   handleUpdateConfigValue(key: string, value: string) {
-    if (!(this as any).onboardingConfigValues) (this as any).onboardingConfigValues = {};
-    (this as any).onboardingConfigValues[key] = value;
+    this.onboardingConfigValues = { ...this.onboardingConfigValues, [key]: value };
   }
 
-  handleSkipIntegration(_id: string) {
-    void import("./controllers/onboarding-setup.js").then(m => m.skipIntegration(this as any));
+  handleSkipIntegration(id: string) {
+    void import("./controllers/onboarding-setup.js").then(m => m.skipIntegration(this as any, id));
+  }
+
+  async handleMarkOnboardingComplete() {
+    if (!this.client || !this.connected) return;
+    try {
+      await this.client.request("onboarding.complete", {});
+      if (this.godmodeOptions) this.godmodeOptions = { ...this.godmodeOptions, "onboarding.complete": true };
+      this.showSetupTab = false;
+      this.setTab("chat" as import("./navigation").Tab);
+    } catch (err) {
+      console.error("[onboarding] Failed to mark complete:", err);
+    }
   }
 
   render() {

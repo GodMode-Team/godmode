@@ -8,6 +8,7 @@ import { renderCopyAsMarkdownButton } from "./copy-as-markdown";
 import {
   extractTextCached,
   extractThinkingCached,
+  formatApiError,
   formatReasoningMarkdown,
 } from "./message-extract";
 import { isToolResultMessage, normalizeRoleForGrouping } from "./message-normalizer";
@@ -817,6 +818,11 @@ function renderGroupedMessageUnsafe(
   // Strip <system-context> blocks that may leak from prependContext injection
   if (cleanedText) {
     cleanedText = cleanedText.replace(/<system-context\b[^>]*>[\s\S]*?<\/system-context>/gi, "").trim() || null;
+  }
+  // Convert raw API error JSON to friendly message
+  if (cleanedText) {
+    const errMsg = formatApiError(cleanedText);
+    if (errMsg) cleanedText = errMsg;
   }
   if (hasFileUploads && cleanedText) {
     cleanedText = stripFileUploadText(cleanedText);

@@ -89,6 +89,7 @@ type GatewayWorkspaceDetailResult = {
   folderTree?: GatewayFolderTreeNode[];
   sessions: GatewayWorkspaceSession[];
   tasks?: GatewayTask[];
+  memory?: GatewayWorkspaceFile[];
 };
 
 function toDate(value: string | number | undefined, fallback = Date.now()): Date {
@@ -242,6 +243,7 @@ export async function getWorkspace(
       folderTree: result.folderTree ? transformFolderTree(result.folderTree) : undefined,
       sessions: (result.sessions ?? []).map(transformSession),
       tasks: (result.tasks ?? []).map(transformTask),
+      memory: (result.memory ?? []).map(transformFile),
     };
   } catch (err) {
     console.error("[Workspaces] get failed:", err);

@@ -39,6 +39,8 @@ else
 fi
 
 # 2. Evening Review — 9 PM daily (user-facing check-in via iMessage)
+#    MUST use sessionTarget=main + kind=systemEvent so the user's reply
+#    stays in the main Prosper session (isolated sessions swallow replies).
 if job_exists "evening-review"; then
   echo "✓ evening-review already exists, skipping"
 else
@@ -48,11 +50,28 @@ else
     --description "9 PM evening review: warm contextual check-in via iMessage to close the day" \
     --cron "0 21 * * *" \
     --tz "$TZ" \
-    --message "Run the evening-review skill. Check today's sessions, tomorrow's calendar, and today's daily brief. Compose a warm, personal evening check-in message and send it via iMessage. Keep it brief and scannable — one message, under 800 characters." \
-    --announce \
-    --channel "imessage" \
-    --best-effort-deliver
+    --message "EVENING REVIEW (9 PM): Time for the evening check-in. Run the evening-review skill — gather today's context (daily brief, agent log, sessions, tomorrow's calendar), compose a warm personal iMessage check-in (under 800 chars), and send it via the message tool. After sending, stay present for the user's reply. When they respond, handle it naturally: capture their reflection to the daily brief, extract any tasks they mention and create them, queue any work they want done overnight, and if you're not sure what to prioritize, ask."
   echo "✓ evening-review added"
+
+  # Patch to main+systemEvent (CLI defaults to isolated+agentTurn)
+  echo "  Patching evening-review to main session + systemEvent..."
+  node -e "
+    const fs = require('fs');
+    const path = require('path').join(require('os').homedir(), '.openclaw', 'cron', 'jobs.json');
+    if (!fs.existsSync(path)) process.exit(0);
+    const data = JSON.parse(fs.readFileSync(path, 'utf-8'));
+    const job = data.jobs.find(j => j.name === 'evening-review' || j.name === 'Evening Review - 9PM');
+    if (job) {
+      job.sessionTarget = 'main';
+      job.wakeMode = 'now';
+      if (job.payload.message) { job.payload.text = job.payload.message; delete job.payload.message; }
+      job.payload.kind = 'systemEvent';
+      job.delivery = { mode: 'none' };
+      job.updatedAtMs = Date.now();
+      fs.writeFileSync(path, JSON.stringify(data, null, 2));
+      console.log('  ✓ Patched to sessionTarget=main, kind=systemEvent');
+    }
+  "
 fi
 
 # 3. Weekly Coaching — Sunday 8 PM

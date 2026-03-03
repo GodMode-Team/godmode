@@ -9,6 +9,8 @@ import {
   type CompactionStatus,
 } from "./app-tool-stream";
 import { extractImages, type ImageBlock } from "./chat/grouped-render";
+import { extractText as extractTextFromMessage } from "./chat/message-extract";
+import { ALLY_SESSION_KEY } from "./controllers/ally";
 import { loadAgents } from "./controllers/agents";
 import { loadAssistantIdentity } from "./controllers/assistant-identity";
 import { loadChatHistory, loadChatHistoryAfterFinal, getPendingImageCache } from "./controllers/chat";
@@ -417,8 +419,8 @@ function updateSessionTimestamp(host: GatewayHost, sessionKey: string) {
 const autoTitleAttempted = new Set<string>();
 
 /**
- * Derive a short title from the first user message in a session.
- * Takes the first line (or sentence), strips markdown, truncates to ~60 chars.
+ * Derive a short, meaningful title from the first user message in a session.
+ * Scans all sentences for the most "topical" one instead of blindly using the first line.
  */
 function deriveSessionTitle(chatMessages: Array<{ role: string; content: unknown }>): string | null {
   const firstUser = chatMessages.find((m) => m.role === "user");
@@ -434,25 +436,76 @@ function deriveSessionTitle(chatMessages: Array<{ role: string; content: unknown
     text = (textBlock as { text?: string })?.text ?? "";
   }
 
-  // Take first line, strip markdown formatting, trim
-  let title = text.split("\n")[0]?.trim() ?? "";
-  title = title.replace(/^#+\s*/, "").replace(/[*_`~[\]]/g, "").trim();
-  if (!title) return null;
+  if (!text.trim()) return null;
 
-  // Truncate to 60 chars at a word boundary
-  if (title.length > 60) {
-    title = title.slice(0, 57).replace(/\s+\S*$/, "") + "...";
+  // Strip code blocks, inline code, URLs, and image links
+  const cleaned = text
+    .replace(/```[\s\S]*?```/g, "")
+    .replace(/`[^`]+`/g, "")
+    .replace(/https?:\/\/\S+/g, "")
+    .replace(/!\[.*?\]\(.*?\)/g, "");
+
+  // Split into sentences (period/question/exclamation boundaries or newlines)
+  const sentences = cleaned
+    .split(/(?<=[.!?])\s+|\n+/)
+    .map((s) => s.replace(/^#+\s*/, "").replace(/[*_`~[\]]/g, "").trim())
+    .filter((s) => s.length > 5);
+
+  if (sentences.length === 0) return null;
+
+  // Score each sentence for "topic quality" — higher = better title candidate
+  const GREETING_RE = /^(hi|hey|hello|thanks|thank\s+you|thx|ok|okay|sure|alright|great)\b/i;
+  const IMPERATIVE_RE = /^(fix|add|create|update|change|build|implement|remove|delete|refactor|make|set\s+up|configure|enable|disable|show|hide|move|rename|convert|replace|write|edit|debug|test|deploy|install|run|check|review|optimize|improve|clean|reset|open|close|connect|disconnect|sync|upload|download|merge|split|sort|filter|search|format|generate|export|import|migrate|monitor|schedule|cancel|approve|reject|assign|unassign)\b/i;
+  const TECH_RE = /\b(function|component|file|page|button|API|error|bug|feature|config|style|layout|route|test|database|server|client|UI|CSS|HTML|TypeScript|view|sidebar|modal|tab|form|input|output|session|message|chat|title|drive|upload|deploy|build)\b/i;
+
+  function scoreSentence(s: string): number {
+    let score = 0;
+    if (s.includes("?")) score += 3;
+    if (IMPERATIVE_RE.test(s)) score += 5;
+    if (TECH_RE.test(s)) score += 2;
+    if (/^(I |you |we |my |it'?s |this is |that |there )/i.test(s)) score -= 1;
+    if (GREETING_RE.test(s)) score -= 5;
+    if (s.length < 15) score -= 1;
+    if (s.length >= 15 && s.length <= 60) score += 1;
+    return score;
   }
-  return title;
+
+  const scored = sentences.map((s) => ({ text: s, score: scoreSentence(s) }));
+  scored.sort((a, b) => b.score - a.score);
+
+  let title = scored[0].text;
+
+  // Strip common filler prefixes to get to the actual request
+  title = title
+    .replace(/^(can you|could you|would you|will you|I need you to|I want you to|I'd like you to|help me to?|go ahead and)\s+/i, "")
+    .replace(/^(please|pls)\s+/i, "")
+    .trim();
+
+  // Capitalize first letter
+  if (title.length > 0) {
+    title = title[0].toUpperCase() + title.slice(1);
+  }
+
+  // Strip trailing punctuation for cleaner title
+  title = title.replace(/[.!]+$/, "").trim();
+
+  // Truncate to 50 chars at word boundary
+  if (title.length > 50) {
+    title = title.slice(0, 47).replace(/\s+\S*$/, "").trim() + "...";
+  }
+
+  return title || null;
 }
 
 /**
- * Auto-title an unnamed webchat session after the first response.
+ * Auto-title an unnamed session after the first response.
  * Fire-and-forget: failures are silent (user can still rename manually).
  */
 async function maybeAutoTitleSession(host: GatewayHost, sessionKey: string) {
-  // Only auto-title webchat sessions (not Telegram, Slack, etc.)
-  if (!sessionKey.includes("webchat")) {
+  // Skip well-known named sessions and external channel sessions (Telegram, Slack)
+  const SKIP_TITLE_PATTERNS = ["telegram", "slack", "discord", "whatsapp"];
+  const lowerKey = sessionKey.toLowerCase();
+  if (SKIP_TITLE_PATTERNS.some((p) => lowerKey.includes(p))) {
     return;
   }
 
@@ -818,7 +871,7 @@ function handleGatewayEventUnsafe(host: GatewayHost, evt: GatewayEventFrame) {
     // ── Ally side-chat routing ──────────────────────────────────────
     // When the ally-main session receives chat events and is NOT the
     // active full-screen session, route messages to the ally overlay state.
-    if (payload && payload.sessionKey === "ally-main") {
+    if (payload && payload.sessionKey === ALLY_SESSION_KEY) {
       const allyHost = host as unknown as {
         allyMessages?: Array<{ role: string; content: string; timestamp?: number }>;
         allyStream?: string | null;
@@ -828,25 +881,11 @@ function handleGatewayEventUnsafe(host: GatewayHost, evt: GatewayEventFrame) {
         tab?: string;
         requestUpdate?: () => void;
       };
-      const isAllyFullScreen = host.tab === "chat" && host.sessionKey === "ally-main";
-
-      // Extract streaming text from the message payload (same shape as chat events)
-      const extractAllyText = (msg: unknown): string | null => {
-        if (!msg) return null;
-        if (typeof msg === "string") return msg;
-        if (Array.isArray(msg)) {
-          const textBlock = msg.find((b: Record<string, unknown>) => b.type === "text");
-          return (textBlock as { text?: string })?.text ?? null;
-        }
-        if (typeof (msg as Record<string, unknown>).text === "string") {
-          return (msg as { text: string }).text;
-        }
-        return null;
-      };
+      const isAllyFullScreen = host.tab === "chat" && host.sessionKey === ALLY_SESSION_KEY;
 
       if (payload.state === "delta") {
         // Streaming delta: update ally stream
-        const deltaText = extractAllyText(payload.message);
+        const deltaText = extractTextFromMessage(payload.message);
         if (!isAllyFullScreen && typeof deltaText === "string") {
           allyHost.allyStream = deltaText;
           allyHost.allyWorking = true;
@@ -855,7 +894,7 @@ function handleGatewayEventUnsafe(host: GatewayHost, evt: GatewayEventFrame) {
       } else if (payload.state === "final") {
         // Final message: append to ally messages, clear stream
         if (!isAllyFullScreen) {
-          const finalContent = allyHost.allyStream ?? extractAllyText(payload.message) ?? "";
+          const finalContent = allyHost.allyStream ?? extractTextFromMessage(payload.message) ?? "";
           if (finalContent) {
             allyHost.allyMessages = [
               ...(allyHost.allyMessages ?? []),
@@ -870,6 +909,17 @@ function handleGatewayEventUnsafe(host: GatewayHost, evt: GatewayEventFrame) {
           allyHost.requestUpdate?.();
         }
       } else if (payload.state === "error" || payload.state === "aborted") {
+        if (!isAllyFullScreen) {
+          // Show error to user instead of silently swallowing it
+          const errText = extractTextFromMessage(payload.message);
+          const errorMsg = payload.state === "aborted"
+            ? "Response was stopped."
+            : (errText || "Something went wrong — try again.");
+          allyHost.allyMessages = [
+            ...(allyHost.allyMessages ?? []),
+            { role: "assistant", content: `*${errorMsg}*`, timestamp: Date.now() },
+          ];
+        }
         allyHost.allyStream = null;
         allyHost.allyWorking = false;
         allyHost.requestUpdate?.();

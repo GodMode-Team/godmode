@@ -934,6 +934,38 @@ const list: GatewayRequestHandler = async ({ respond }) => {
   });
 };
 
+/**
+ * List memory files from workspace/memory/ directory (team shared knowledge).
+ */
+async function listWorkspaceMemoryFiles(
+  workspace: { path: string; type?: string },
+): Promise<WorkspaceFileEntry[]> {
+  const memoryDir = path.join(workspace.path, "memory");
+  try {
+    const dirEntries = await fs.readdir(memoryDir, { withFileTypes: true });
+    const files: WorkspaceFileEntry[] = [];
+    for (const dirent of dirEntries) {
+      if (!dirent.isFile()) continue;
+      try {
+        const filePath = path.join(memoryDir, dirent.name);
+        const stat = await fs.stat(filePath);
+        files.push({
+          path: `memory/${dirent.name}`,
+          name: dirent.name,
+          type: inferFileType(dirent.name, false),
+          size: stat.size,
+          modified: new Date(stat.mtimeMs).toISOString(),
+        });
+      } catch {
+        // Skip unreadable files
+      }
+    }
+    return files.sort((a, b) => b.modified.localeCompare(a.modified));
+  } catch {
+    return [];
+  }
+}
+
 const get: GatewayRequestHandler = async ({ params, respond }) => {
   const id = typeof params.id === "string" ? String(params.id).trim() : "";
   if (!id) {
@@ -981,6 +1013,9 @@ const get: GatewayRequestHandler = async ({ params, respond }) => {
     (t) => t.project === workspace.name,
   );
 
+  // Load shared memory files (team workspaces store knowledge in memory/)
+  const memoryFiles = await listWorkspaceMemoryFiles(workspace);
+
   respond(true, {
     workspace: {
       ...workspace,
@@ -998,6 +1033,7 @@ const get: GatewayRequestHandler = async ({ params, respond }) => {
     folderTree: buildFolderTree(outputs),
     sessions,
     tasks: workspaceTasks,
+    memory: memoryFiles,
   });
 };
 
@@ -1434,8 +1470,8 @@ const browseFolder: GatewayRequestHandler = async ({ params, respond }) => {
     return;
   }
 
-  // Default to workspace root when no folderPath
-  const targetDir = folderPath
+  // Default to workspace root when no folderPath (or "." from UI browse button)
+  const targetDir = (folderPath && folderPath !== "." && folderPath !== "")
     ? resolvePathInWorkspace(workspace.path, folderPath)
     : workspace.path;
   if (!targetDir) {

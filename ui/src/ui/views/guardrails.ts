@@ -251,58 +251,54 @@ export function renderGuardrails(props: GuardrailsProps) {
 
   return html`
     <section class="tab-body guardrails-section">
-      <div class="guardrails-summary">
-        <span class="guardrails-summary-count">${enabledCount}/${gates.length}</span>
-        <span class="guardrails-summary-label">gates active</span>
-        ${custom.length > 0
-          ? html`
-              <span class="guardrails-summary-sep">&middot;</span>
-              <span class="guardrails-summary-count guardrails-summary-count--custom">${customEnabledCount}</span>
-              <span class="guardrails-summary-label">custom rule${custom.length === 1 ? "" : "s"}</span>
-            `
-          : nothing}
-      </div>
-
-      <div class="guardrails-grid">
-        ${gates.map((gate) => renderGateCard(gate, onToggle, onThresholdChange))}
-      </div>
-
-      <!-- Custom Rules + Recent Activity side-by-side -->
-      <div class="guardrails-bottom-row">
-        <div class="guardrails-custom-section">
-          <div class="guardrails-custom-header">
-            <h3 class="guardrails-custom-title">Custom Rules</h3>
-            <button class="guardrails-add-btn" @click=${() => {
-              if (onOpenAllyChat) {
-                onOpenAllyChat("Create a new guardrail rule: ");
-              } else {
-                onToggleAddForm();
-              }
-            }}>+ Add Rule</button>
+      <div class="guardrails-two-col">
+        <div class="guardrails-left">
+          <h2 class="guardrails-col-heading">Safety Gates</h2>
+          <p class="guardrails-col-subtitle">${enabledCount}/${gates.length} active — prevent runaway loops, bad searches, and lazy responses.</p>
+          <div class="guardrails-grid">
+            ${gates.map((gate) => renderGateCard(gate, onToggle, onThresholdChange))}
           </div>
-
-          ${custom.length > 0
-            ? html`
-                <div class="guardrails-custom-grid">
-                  ${custom.map((rule) => renderCustomCard(rule, onCustomToggle, onCustomDelete))}
-                </div>
-              `
-            : html`
-                <div class="guardrails-custom-empty">
-                  No custom rules yet. Click "+ Add Rule" to tell your ally what to block or redirect.
-                </div>
-              `}
         </div>
 
-        <div class="guardrails-history">
-          <h3 class="guardrails-history-title">Recent Activity</h3>
-          ${activity.length > 0
-            ? html`
-                <div class="guardrails-history-list">
-                  ${activity.slice(0, 30).map(renderActivityRow)}
-                </div>
-              `
-            : html`<div class="guardrails-no-activity">No gate activity recorded yet.</div>`}
+        <div class="guardrails-right">
+          <h2 class="guardrails-col-heading">Custom Rules & Activity</h2>
+          <p class="guardrails-col-subtitle">Your rules${custom.length > 0 ? ` (${customEnabledCount} active)` : ""} and recent gate events.</p>
+
+          <div class="guardrails-custom-section">
+            <div class="guardrails-custom-header">
+              <h3 class="guardrails-custom-title">Custom Rules</h3>
+              <button class="guardrails-add-btn" @click=${() => {
+                if (onOpenAllyChat) {
+                  onOpenAllyChat("Create a new guardrail rule: ");
+                } else {
+                  onToggleAddForm();
+                }
+              }}>+ Add Rule</button>
+            </div>
+
+            ${custom.length > 0
+              ? html`
+                  <div class="guardrails-custom-grid">
+                    ${custom.map((rule) => renderCustomCard(rule, onCustomToggle, onCustomDelete))}
+                  </div>
+                `
+              : html`
+                  <div class="guardrails-custom-empty">
+                    No custom rules yet. Click "+ Add Rule" to tell your ally what to block or redirect.
+                  </div>
+                `}
+          </div>
+
+          <div class="guardrails-history">
+            <h3 class="guardrails-history-title">Recent Activity</h3>
+            ${activity.length > 0
+              ? html`
+                  <div class="guardrails-history-list">
+                    ${activity.slice(0, 30).map(renderActivityRow)}
+                  </div>
+                `
+              : html`<div class="guardrails-no-activity">No gate activity recorded yet.</div>`}
+          </div>
         </div>
       </div>
     </section>

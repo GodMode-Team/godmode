@@ -15,6 +15,7 @@ import {
   loadConfig,
   runUpdate,
   saveConfig,
+  switchModel,
   updateConfigFormValue,
   removeConfigFormValue,
 } from "./controllers/config";
@@ -425,7 +426,7 @@ export function renderApp(state: AppViewState) {
               }
               <div class="nav-group__items">
                 ${
-                  !group.label && state.showSetupTab && !state.godmodeOptions?.["onboarding.hidden"]
+                  !group.label && state.godmodeOptions != null && state.showSetupTab && !state.godmodeOptions?.["onboarding.hidden"]
                     ? html`
                         <a
                           class="nav-item ${state.tab === "setup" ? "active" : ""}"
@@ -436,32 +437,13 @@ export function renderApp(state: AppViewState) {
                           }}
                           title="Get GodMode configured and running."
                         >
-                          <span class="nav-item__emoji" aria-hidden="true">\u{1F680}</span>
+                          <span class="nav-item__emoji" aria-hidden="true">\u{1F9ED}</span>
                           <span class="nav-item__text">Setup</span>
-                          ${state.setupChecklist && (state.setupChecklist as { percentComplete?: number }).percentComplete != null
-                            ? html`<span class="nav-item__badge">${(state.setupChecklist as { percentComplete: number }).percentComplete}%</span>`
-                            : nothing}
-                        </a>
-                      `
-                    : nothing
-                }
-                ${
-                  !group.label && !state.godmodeOptions?.["onboarding.complete"]
-                    ? html`
-                        <a
-                          class="nav-item ${state.tab === "onboarding" ? "active" : ""}"
-                          href="#"
-                          @click=${(e: Event) => {
-                            e.preventDefault();
-                            state.setTab("onboarding" as Tab);
-                          }}
-                          title="Set up your integrations and customize your experience."
-                        >
-                          <span class="nav-item__emoji" aria-hidden="true">\u{1F680}</span>
-                          <span class="nav-item__text">Onboarding</span>
-                          ${(state as any).onboardingProgress != null
-                            ? html`<span class="nav-item__badge">${(state as any).onboardingProgress}%</span>`
-                            : nothing}
+                          ${state.onboardingProgress != null
+                            ? html`<span class="nav-item__badge">${state.onboardingProgress}%</span>`
+                            : state.setupChecklist && (state.setupChecklist as { percentComplete?: number }).percentComplete != null
+                              ? html`<span class="nav-item__badge">${(state.setupChecklist as { percentComplete: number }).percentComplete}%</span>`
+                              : nothing}
                         </a>
                       `
                     : nothing
@@ -495,7 +477,6 @@ export function renderApp(state: AppViewState) {
             ${
               state.tab !== "chat" &&
               state.tab !== "setup" &&
-              state.tab !== "onboarding" &&
               state.tab !== "wheel-of-life" &&
               state.tab !== "vision-board" &&
               state.tab !== "lifetracks"
@@ -1064,19 +1045,46 @@ export function renderApp(state: AppViewState) {
 
         ${
           state.tab === "setup"
-            ? renderSetup({
-                connected: state.connected,
-                quickSetupDone: state.setupQuickDone ?? false,
-                checklist: (state.setupChecklist as import("./views/setup").SetupViewProps["checklist"]) ?? null,
-                checklistLoading: state.setupChecklistLoading ?? false,
-                onQuickSetup: (name, licenseKey, dailyIntelTopics) =>
-                  state.handleQuickSetup?.(name, licenseKey, dailyIntelTopics),
-                onHideSetup: () => state.handleHideSetup?.(),
-                onOpenWizard: () => state.handleWizardOpen?.(),
-                onNavigate: (tab) => state.setTab(tab),
-                onRunAssessment: () => state.handleRunAssessment?.(),
-                onOpenSupportChat: () => state.handleOpenSupportChat(),
-              })
+            ? html`
+                ${renderSetup({
+                  connected: state.connected,
+                  quickSetupDone: state.setupQuickDone ?? false,
+                  checklist: (state.setupChecklist as import("./views/setup").SetupViewProps["checklist"]) ?? null,
+                  checklistLoading: state.setupChecklistLoading ?? false,
+                  onQuickSetup: (name, licenseKey, dailyIntelTopics) =>
+                    state.handleQuickSetup?.(name, licenseKey, dailyIntelTopics),
+                  onHideSetup: () => state.handleHideSetup?.(),
+                  onOpenWizard: () => state.handleWizardOpen?.(),
+                  onNavigate: (tab) => state.setTab(tab),
+                  onRunAssessment: () => state.handleRunAssessment?.(),
+                  onOpenSupportChat: () => state.handleOpenSupportChat(),
+                })}
+                ${state.setupQuickDone
+                  ? renderOnboardingSetup({
+                      connected: state.connected,
+                      integrations: state.onboardingIntegrations ?? null,
+                      coreProgress: state.onboardingCoreProgress ?? null,
+                      expandedCard: state.onboardingExpandedCard ?? null,
+                      loadingGuide: state.onboardingLoadingGuide ?? null,
+                      activeGuide: state.onboardingActiveGuide ?? null,
+                      testingId: state.onboardingTestingId ?? null,
+                      testResult: state.onboardingTestResult ?? null,
+                      configValues: state.onboardingConfigValues ?? {},
+                      onLoadIntegrations: () => state.handleLoadIntegrations(),
+                      onExpandCard: (id: string | null) => state.handleExpandCard(id),
+                      onLoadGuide: (id: string) => state.handleLoadGuide(id),
+                      onTestIntegration: (id: string) => state.handleTestIntegration(id),
+                      onConfigureIntegration: (id: string, values: Record<string, string>) =>
+                        state.handleConfigureIntegration(id, values),
+                      onUpdateConfigValue: (key: string, value: string) =>
+                        state.handleUpdateConfigValue(key, value),
+                      onSkipIntegration: (id: string) => state.handleSkipIntegration(id),
+                      onNavigate: (tab) => state.setTab(tab),
+                      onMarkComplete: () => state.handleMarkOnboardingComplete?.(),
+                      onOpenSupportChat: () => state.handleOpenSupportChat(),
+                    })
+                  : nothing}
+              `
             : nothing
         }
 
@@ -1084,24 +1092,26 @@ export function renderApp(state: AppViewState) {
           state.tab === "onboarding"
             ? renderOnboardingSetup({
                 connected: state.connected,
-                integrations: (state as any).onboardingIntegrations ?? null,
-                coreProgress: (state as any).onboardingCoreProgress ?? null,
-                expandedCard: (state as any).onboardingExpandedCard ?? null,
-                loadingGuide: (state as any).onboardingLoadingGuide ?? null,
-                activeGuide: (state as any).onboardingActiveGuide ?? null,
-                testingId: (state as any).onboardingTestingId ?? null,
-                testResult: (state as any).onboardingTestResult ?? null,
-                configValues: (state as any).onboardingConfigValues ?? {},
-                onLoadIntegrations: () => (state as any).handleLoadIntegrations?.(),
-                onExpandCard: (id: string | null) => (state as any).handleExpandCard?.(id),
-                onLoadGuide: (id: string) => (state as any).handleLoadGuide?.(id),
-                onTestIntegration: (id: string) => (state as any).handleTestIntegration?.(id),
+                integrations: state.onboardingIntegrations ?? null,
+                coreProgress: state.onboardingCoreProgress ?? null,
+                expandedCard: state.onboardingExpandedCard ?? null,
+                loadingGuide: state.onboardingLoadingGuide ?? null,
+                activeGuide: state.onboardingActiveGuide ?? null,
+                testingId: state.onboardingTestingId ?? null,
+                testResult: state.onboardingTestResult ?? null,
+                configValues: state.onboardingConfigValues ?? {},
+                onLoadIntegrations: () => state.handleLoadIntegrations(),
+                onExpandCard: (id: string | null) => state.handleExpandCard(id),
+                onLoadGuide: (id: string) => state.handleLoadGuide(id),
+                onTestIntegration: (id: string) => state.handleTestIntegration(id),
                 onConfigureIntegration: (id: string, values: Record<string, string>) =>
-                  (state as any).handleConfigureIntegration?.(id, values),
+                  state.handleConfigureIntegration(id, values),
                 onUpdateConfigValue: (key: string, value: string) =>
-                  (state as any).handleUpdateConfigValue?.(key, value),
-                onSkipIntegration: (id: string) => (state as any).handleSkipIntegration?.(id),
+                  state.handleUpdateConfigValue(key, value),
+                onSkipIntegration: (id: string) => state.handleSkipIntegration(id),
                 onNavigate: (tab) => state.setTab(tab),
+                onMarkComplete: () => state.handleMarkOnboardingComplete?.(),
+                onOpenSupportChat: () => state.handleOpenSupportChat(),
               })
             : nothing
         }
@@ -2093,7 +2103,10 @@ export function renderApp(state: AppViewState) {
                 onCloseSidebar: () => state.handleCloseSidebar(),
                 onOpenFile: (path: string) => state.handleOpenFile(path),
                 onSplitRatioChange: (ratio: number) => state.handleSplitRatioChange(ratio),
-                onPushToDrive: (path: string) => state.handlePushToDrive(path),
+                onPushToDrive: (path: string, account?: string) => state.handlePushToDrive(path, account),
+                driveAccounts: state.driveAccounts,
+                showDrivePicker: state.showDrivePicker,
+                onToggleDrivePicker: () => state.handleToggleDrivePicker(),
                 onImageClick: (url: string, allImages: import("./chat/lightbox").LightboxImage[], index: number) =>
                   state.handleImageClick(url, allImages, index),
                 resolveImageUrl: (msgIdx: number, imgIdx: number) =>
@@ -2130,10 +2143,12 @@ export function renderApp(state: AppViewState) {
                   unreadCount: 0,
                   connected: state.connected,
                   compact: true,
+                  attachments: state.allyAttachments ?? [],
                   onToggle: () => state.handleAllyToggle(),
                   onDraftChange: (text: string) => state.handleAllyDraftChange(text),
                   onSend: () => state.handleAllySend(),
                   onOpenFullChat: () => state.handleAllyOpenFull(),
+                  onAttachmentsChange: (attachments) => state.handleAllyAttachmentsChange(attachments),
                 } : null,
               })
             : nothing
@@ -2350,6 +2365,7 @@ export function renderApp(state: AppViewState) {
                 userName: state.userName || "",
                 userAvatar: state.userAvatar,
                 onUserProfileUpdate: (name, avatar) => state.handleUpdateUserProfile(name, avatar),
+                onModelSwitch: (primary, fallbacks) => switchModel(state, primary, fallbacks),
               })
             : nothing
         }
@@ -2410,10 +2426,12 @@ export function renderApp(state: AppViewState) {
         unreadCount: state.allyUnread ?? 0,
         connected: state.connected,
         compact: false,
+        attachments: state.allyAttachments ?? [],
         onToggle: () => state.handleAllyToggle(),
         onDraftChange: (text: string) => state.handleAllyDraftChange(text),
         onSend: () => state.handleAllySend(),
         onOpenFullChat: () => state.handleAllyOpenFull(),
+        onAttachmentsChange: (attachments) => state.handleAllyAttachmentsChange(attachments),
       }) : nothing}
       ${renderExecApprovalPrompt(state)}
       ${renderGatewayUrlConfirmation(state)}
@@ -2441,7 +2459,10 @@ export function renderApp(state: AppViewState) {
                     });
                   },
                   onOpenFile: (path: string) => state.handleOpenFile(path),
-                  onPushToDrive: (path: string) => state.handlePushToDrive(path),
+                  onPushToDrive: (path: string, account?: string) => state.handlePushToDrive(path, account),
+                  driveAccounts: state.driveAccounts,
+                  showDrivePicker: state.showDrivePicker,
+                  onToggleDrivePicker: () => state.handleToggleDrivePicker(),
                 })}
               </div>
             </div>

@@ -107,7 +107,10 @@ export type ChatProps = {
   allyPanelOpen?: boolean;
   allyProps?: AllyChatProps | null;
   // Push to Google Drive
-  onPushToDrive?: (filePath: string) => void;
+  onPushToDrive?: (filePath: string, account?: string) => void;
+  driveAccounts?: Array<{ email: string; client: string; label: string }>;
+  showDrivePicker?: boolean;
+  onToggleDrivePicker?: () => void;
 };
 
 const COMPACTION_TOAST_DURATION_MS = 5000;
@@ -806,6 +809,9 @@ export function renderChat(props: ChatProps) {
                         },
                         onOpenFile: props.onOpenFile,
                         onPushToDrive: props.onPushToDrive,
+                        driveAccounts: props.driveAccounts,
+                        showDrivePicker: props.showDrivePicker,
+                        onToggleDrivePicker: props.onToggleDrivePicker,
                       })}
                     </div>
                     <resizable-divider
@@ -840,6 +846,9 @@ export function renderChat(props: ChatProps) {
                       },
                       onOpenFile: props.onOpenFile,
                       onPushToDrive: props.onPushToDrive,
+                      driveAccounts: props.driveAccounts,
+                      showDrivePicker: props.showDrivePicker,
+                      onToggleDrivePicker: props.onToggleDrivePicker,
                     })}
                   </div>
                 `
