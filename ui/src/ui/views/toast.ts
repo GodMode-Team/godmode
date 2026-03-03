@@ -90,7 +90,25 @@ export function renderToasts({ toasts, onDismiss }: ToastProps) {
         (toast) => html`
           <div class="toast toast--${toast.type}">
             <div class="toast__icon">${iconForType(toast.type)}</div>
-            <div class="toast__message">${toast.message}</div>
+            <div class="toast__body">
+              <div class="toast__message">${toast.message}</div>
+              ${toast.action
+                ? html`${toast.action.url
+                    ? html`<a
+                        class="toast__action"
+                        href=${toast.action.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >${toast.action.label} &rarr;</a>`
+                    : html`<button
+                        class="toast__action"
+                        @click=${() => {
+                          toast.action!.onClick?.();
+                          onDismiss(toast.id);
+                        }}
+                      >${toast.action.label}</button>`}`
+                : nothing}
+            </div>
             <button
               class="toast__close"
               @click=${() => onDismiss(toast.id)}

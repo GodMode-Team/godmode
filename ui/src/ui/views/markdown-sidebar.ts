@@ -25,6 +25,8 @@ export type MarkdownSidebarProps = {
   showDrivePicker?: boolean;
   /** Callback to toggle the drive picker (fetches accounts on first open). */
   onToggleDrivePicker?: () => void;
+  /** Whether a Drive upload is currently in progress. */
+  driveUploading?: boolean;
 };
 
 const MARKDOWN_EXTENSIONS = new Set(["md", "markdown", "mdx"]);
@@ -75,6 +77,9 @@ function inferMimeFromPath(filePath: string | null): string | null {
       return "image/jpeg";
     }
     return `image/${extension}`;
+  }
+  if (extension === "pdf") {
+    return "application/pdf";
   }
   if (extension === "json" || extension === "json5") {
     return "application/json";
@@ -174,6 +179,22 @@ function renderBody(props: MarkdownSidebarProps) {
     `;
   }
 
+  if (mimeType === "application/pdf") {
+    // Render PDF in an embedded viewer
+    if (trimmed.startsWith("data:application/pdf")) {
+      return html`<iframe
+        class="sidebar-html-frame sidebar-pdf-frame"
+        src=${trimmed}
+        type="application/pdf"
+      ></iframe>`;
+    }
+    return html`
+      <div class="callout">
+        PDF preview unavailable. Use "Open in Browser" to view.
+      </div>
+    `;
+  }
+
   if (mimeType === "text/html" || mimeType === "application/xhtml+xml") {
     // Render full HTML pages in a sandboxed iframe so styles/layout are preserved
     const blob = new Blob([content], { type: "text/html" });
@@ -236,13 +257,16 @@ export function renderMarkdownSidebar(props: MarkdownSidebarProps) {
           ${props.onPushToDrive && props.filePath
             ? html`<div class="sidebar-drive-wrap">
                 <button
-                  class="btn sidebar-open-browser-btn"
+                  class="btn sidebar-open-browser-btn${props.driveUploading ? " sidebar-drive-uploading" : ""}"
                   title="Push to Google Drive"
-                  @click=${() => props.onToggleDrivePicker
-                    ? props.onToggleDrivePicker()
-                    : props.onPushToDrive!(props.filePath!)}
-                >&#x2B06; Drive</button>
-                ${props.showDrivePicker && props.driveAccounts
+                  ?disabled=${props.driveUploading}
+                  @click=${() => props.driveUploading
+                    ? undefined
+                    : props.onToggleDrivePicker
+                      ? props.onToggleDrivePicker()
+                      : props.onPushToDrive!(props.filePath!)}
+                >${props.driveUploading ? "Uploading..." : "\u2B06 Drive"}</button>
+                ${props.showDrivePicker && props.driveAccounts && !props.driveUploading
                   ? html`<div class="sidebar-drive-picker">
                       ${props.driveAccounts.length === 0
                         ? html`<div class="sidebar-drive-item sidebar-drive-empty">No Google accounts configured</div>`

@@ -532,6 +532,7 @@ export function renderMessageGroup(
   group: MessageGroup,
   opts: {
     onOpenSidebar?: (content: string) => void;
+    onOpenFile?: (filePath: string) => void;
     onImageClick?: (url: string, allImages: LightboxImage[], index: number) => void;
     resolveImageUrl?: (messageIndex: number, imageIndex: number) => string | null;
     showReasoning: boolean;
@@ -574,6 +575,7 @@ export function renderMessageGroup(
               showReasoning: opts.showReasoning,
             },
             opts.onOpenSidebar,
+            opts.onOpenFile,
             opts.onImageClick,
             opts.resolveImageUrl,
           ),
@@ -756,11 +758,12 @@ function renderGroupedMessage(
   message: unknown,
   opts: { isStreaming: boolean; showReasoning: boolean },
   onOpenSidebar?: (content: string) => void,
+  onOpenFile?: (filePath: string) => void,
   onImageClick?: (url: string, allImages: LightboxImage[], index: number) => void,
   resolveImageUrl?: (messageIndex: number, imageIndex: number) => string | null,
 ) {
   try {
-    return renderGroupedMessageUnsafe(message, opts, onOpenSidebar, onImageClick, resolveImageUrl);
+    return renderGroupedMessageUnsafe(message, opts, onOpenSidebar, onOpenFile, onImageClick, resolveImageUrl);
   } catch (err) {
     console.error("[chat] message render error:", err);
     return html`
@@ -775,6 +778,7 @@ function renderGroupedMessageUnsafe(
   message: unknown,
   opts: { isStreaming: boolean; showReasoning: boolean },
   onOpenSidebar?: (content: string) => void,
+  onOpenFile?: (filePath: string) => void,
   onImageClick?: (url: string, allImages: LightboxImage[], index: number) => void,
   resolveImageUrl?: (messageIndex: number, imageIndex: number) => string | null,
 ) {
@@ -847,7 +851,7 @@ function renderGroupedMessageUnsafe(
   if (hasToolCards && isToolResult) {
     return html`
       ${hasImages ? renderMessageImages(images, onImageClick, boundResolver) : nothing}
-      ${toolCards.map((card) => renderToolCardSidebar(card, onOpenSidebar))}
+      ${toolCards.map((card) => renderToolCardSidebar(card, onOpenSidebar, onOpenFile))}
     `;
   }
 
@@ -905,7 +909,7 @@ function renderGroupedMessageUnsafe(
             )}</div>`
           : nothing
       }
-      ${toolCards.map((card) => renderToolCardSidebar(card, onOpenSidebar))}
+      ${toolCards.map((card) => renderToolCardSidebar(card, onOpenSidebar, onOpenFile))}
     </div>
   `;
 }

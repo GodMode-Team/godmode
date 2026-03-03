@@ -37,12 +37,36 @@
   height: 20px;
 }
 
-.toast__message {
+.toast__body {
   flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.toast__message {
   font-size: 14px;
   font-weight: 500;
   line-height: 1.4;
   color: var(--text);
+}
+
+.toast__action {
+  display: inline-block;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--primary);
+  text-decoration: none;
+  cursor: pointer;
+  border: none;
+  background: none;
+  padding: 0;
+  text-align: left;
+}
+
+.toast__action:hover {
+  text-decoration: underline;
 }
 
 .toast__close {

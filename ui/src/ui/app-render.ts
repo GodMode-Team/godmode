@@ -2106,6 +2106,7 @@ export function renderApp(state: AppViewState) {
                 onPushToDrive: (path: string, account?: string) => state.handlePushToDrive(path, account),
                 driveAccounts: state.driveAccounts,
                 showDrivePicker: state.showDrivePicker,
+                driveUploading: state.driveUploading,
                 onToggleDrivePicker: () => state.handleToggleDrivePicker(),
                 onImageClick: (url: string, allImages: import("./chat/lightbox").LightboxImage[], index: number) =>
                   state.handleImageClick(url, allImages, index),
@@ -2462,6 +2463,7 @@ export function renderApp(state: AppViewState) {
                   onPushToDrive: (path: string, account?: string) => state.handlePushToDrive(path, account),
                   driveAccounts: state.driveAccounts,
                   showDrivePicker: state.showDrivePicker,
+                  driveUploading: state.driveUploading,
                   onToggleDrivePicker: () => state.handleToggleDrivePicker(),
                 })}
               </div>

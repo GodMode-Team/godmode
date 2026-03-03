@@ -884,10 +884,16 @@ function handleGatewayEventUnsafe(host: GatewayHost, evt: GatewayEventFrame) {
       const isAllyFullScreen = host.tab === "chat" && host.sessionKey === ALLY_SESSION_KEY;
 
       if (payload.state === "delta") {
-        // Streaming delta: update ally stream
+        // Streaming delta: update ally stream (cumulative — each delta has full text so far)
         const deltaText = extractTextFromMessage(payload.message);
-        if (!isAllyFullScreen && typeof deltaText === "string") {
-          allyHost.allyStream = deltaText;
+        if (!isAllyFullScreen) {
+          if (typeof deltaText === "string") {
+            const current = allyHost.allyStream ?? "";
+            // Only accept if longer (cumulative) — prevents null/short overwrites
+            if (!current || deltaText.length >= current.length) {
+              allyHost.allyStream = deltaText;
+            }
+          }
           allyHost.allyWorking = true;
           allyHost.requestUpdate?.();
         }

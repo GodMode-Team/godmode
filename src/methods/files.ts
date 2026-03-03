@@ -128,7 +128,7 @@ const pushToDrive: GatewayRequestHandler = async ({ params, respond }) => {
     return;
   }
 
-  const args = ["drive", "upload", resolvedPath, "--no-input"];
+  const args = ["drive", "upload", resolvedPath, "--no-input", "--json"];
   if (account) {
     args.push("--account", account);
   }
@@ -143,9 +143,29 @@ const pushToDrive: GatewayRequestHandler = async ({ params, respond }) => {
     });
     const accountLabel = account ? ` (${account})` : "";
     const fileName = path.basename(resolvedPath);
+
+    // Try to parse JSON output for file ID / web link
+    let driveUrl: string | undefined;
+    let fileId: string | undefined;
+    try {
+      const json = JSON.parse(stdout.trim()) as Record<string, unknown>;
+      fileId = (json.id ?? json.fileId ?? json.file_id) as string | undefined;
+      driveUrl =
+        (json.webViewLink ?? json.web_view_link ?? json.link ?? json.url) as string | undefined;
+      if (!driveUrl && fileId) {
+        driveUrl = `https://drive.google.com/file/d/${fileId}/view`;
+      }
+    } catch {
+      // Non-JSON output — try to extract a Drive URL from stdout
+      const urlMatch = (stdout || stderr).match(/https:\/\/drive\.google\.com\/\S+/);
+      if (urlMatch) driveUrl = urlMatch[0];
+    }
+
     respond(true, {
       message: `Uploaded "${fileName}" to Google Drive${accountLabel}`,
       output: (stdout || stderr).trim(),
+      driveUrl,
+      fileId,
     });
   } catch (e: unknown) {
     // Extract useful error details from gog CLI output

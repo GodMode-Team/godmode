@@ -226,6 +226,15 @@
   background: #fff;
 }
 
+.sidebar-pdf-frame {
+  min-height: 80vh;
+}
+
+.sidebar-drive-uploading {
+  opacity: 0.6;
+  cursor: wait;
+}
+
 .sidebar-plain {
   margin: 0;
   white-space: pre-wrap;

@@ -831,6 +831,30 @@ async function readFileForWorkspace(absolutePath: string): Promise<{
     }
   }
 
+  // PDF: encode as base64 data URL for iframe rendering
+  if (extension === ".pdf") {
+    if (stat.size > MAX_IMAGE_READ_SIZE) {
+      return {
+        content: null,
+        size: stat.size,
+        error: `PDF too large (${Math.round(stat.size / 1024)}KB, max ${Math.round(MAX_IMAGE_READ_SIZE / 1024)}KB)`,
+      };
+    }
+    try {
+      const raw = await fs.readFile(absolutePath);
+      const content = `data:application/pdf;base64,${raw.toString("base64")}`;
+      return {
+        content,
+        size: stat.size,
+        modifiedAt: stat.mtimeMs,
+        mime: "application/pdf",
+        contentType: "application/pdf",
+      };
+    } catch (err) {
+      return { content: null, error: err instanceof Error ? err.message : String(err) };
+    }
+  }
+
   if (stat.size > MAX_READ_SIZE) {
     return {
       content: null,

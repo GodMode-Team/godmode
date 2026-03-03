@@ -55,23 +55,56 @@ export function extractToolCards(message: unknown): ToolCard[] {
   return cards;
 }
 
-export function renderToolCardSidebar(card: ToolCard, onOpenSidebar?: (content: string) => void) {
+/** Tool names whose args contain a file path worth opening in the sidebar viewer. */
+const FILE_TOOLS = new Set(["write", "read", "edit", "attach"]);
+
+function extractFilePathFromArgs(args: unknown): string | null {
+  if (!args || typeof args !== "object") return null;
+  const record = args as Record<string, unknown>;
+  const path = record.path ?? record.file_path ?? record.filePath;
+  return typeof path === "string" && path.trim() ? path.trim() : null;
+}
+
+/** Extract an absolute file path from tool result text (e.g. "wrote 9722 bytes to /Users/.../file.md"). */
+function extractFilePathFromText(text: string | undefined): string | null {
+  if (!text) return null;
+  const match = text.match(/(?:\/(?:Users|home|tmp|var)\/\S+|~\/\S+)/);
+  if (!match) return null;
+  // Strip trailing punctuation that isn't part of the path
+  return match[0].replace(/[.,;:!?)'"]+$/, "");
+}
+
+export function renderToolCardSidebar(
+  card: ToolCard,
+  onOpenSidebar?: (content: string) => void,
+  onOpenFile?: (filePath: string) => void,
+) {
   const display = resolveToolDisplay({ name: card.name, args: card.args });
   const detail = formatToolDetail(display);
   const hasText = Boolean(card.text?.trim());
 
-  const canClick = Boolean(onOpenSidebar);
+  const filePath = FILE_TOOLS.has(card.name.toLowerCase())
+    ? (extractFilePathFromArgs(card.args) ?? extractFilePathFromText(card.text))
+    : null;
+  const canClick = Boolean(onOpenSidebar) || Boolean(onOpenFile && filePath);
   const handleClick = canClick
     ? (e: Event) => {
         e.stopPropagation();
-        if (hasText) {
-          onOpenSidebar!(formatToolOutputForSidebar(card.text!));
+        // For file-oriented tools, open the actual file in the sidebar viewer
+        if (onOpenFile && filePath) {
+          onOpenFile(filePath);
           return;
         }
-        const info = `## ${display.label}\n\n${
-          detail ? `**Command:** \`${detail}\`\n\n` : ""
-        }*No output — tool completed successfully.*`;
-        onOpenSidebar!(info);
+        if (onOpenSidebar && hasText) {
+          onOpenSidebar(formatToolOutputForSidebar(card.text!));
+          return;
+        }
+        if (onOpenSidebar) {
+          const info = `## ${display.label}\n\n${
+            detail ? `**Command:** \`${detail}\`\n\n` : ""
+          }*No output — tool completed successfully.*`;
+          onOpenSidebar(info);
+        }
       }
     : undefined;
 

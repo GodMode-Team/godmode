@@ -110,6 +110,7 @@ export type ChatProps = {
   onPushToDrive?: (filePath: string, account?: string) => void;
   driveAccounts?: Array<{ email: string; client: string; label: string }>;
   showDrivePicker?: boolean;
+  driveUploading?: boolean;
   onToggleDrivePicker?: () => void;
 };
 
@@ -662,6 +663,7 @@ export function renderChat(props: ChatProps) {
                 : undefined;
               return renderMessageGroup(item, {
                 onOpenSidebar: props.onOpenSidebar,
+                onOpenFile: props.onOpenFile,
                 onImageClick: props.onImageClick,
                 resolveImageUrl,
                 showReasoning,
@@ -811,6 +813,7 @@ export function renderChat(props: ChatProps) {
                         onPushToDrive: props.onPushToDrive,
                         driveAccounts: props.driveAccounts,
                         showDrivePicker: props.showDrivePicker,
+                        driveUploading: props.driveUploading,
                         onToggleDrivePicker: props.onToggleDrivePicker,
                       })}
                     </div>
@@ -848,6 +851,7 @@ export function renderChat(props: ChatProps) {
                       onPushToDrive: props.onPushToDrive,
                       driveAccounts: props.driveAccounts,
                       showDrivePicker: props.showDrivePicker,
+                      driveUploading: props.driveUploading,
                       onToggleDrivePicker: props.onToggleDrivePicker,
                     })}
                   </div>

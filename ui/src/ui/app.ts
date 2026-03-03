@@ -120,7 +120,7 @@ import type { Tab } from "./navigation";
 import { loadSettings, type UiSettings } from "./storage";
 import type { ResolvedTheme, ThemeMode } from "./theme";
 import type { Toast } from "./toast";
-import { addToast, createToast, removeToast } from "./toast";
+import { addToast, createToast, removeToast, type ToastAction } from "./toast";
 import type {
   AgentsListResult,
   ArchivedSessionEntry,
@@ -339,6 +339,7 @@ export class GodModeApp extends LitElement {
   // Google Drive picker state
   @state() driveAccounts: Array<{ email: string; client: string; label: string }> = [];
   @state() showDrivePicker = false;
+  @state() driveUploading = false;
 
   // Update check state
   @state() updateStatus: {
@@ -1058,7 +1059,7 @@ export class GodModeApp extends LitElement {
     this.allyPanelOpen = !this.allyPanelOpen;
     if (this.allyPanelOpen) {
       this.allyUnread = 0;
-      this._loadAllyHistory();
+      this._loadAllyHistory().then(() => this._scrollAllyToBottom());
     }
   }
 
@@ -1122,6 +1123,16 @@ export class GodModeApp extends LitElement {
       });
       // Show "Working..." between RPC success and first streaming delta
       this.allyWorking = true;
+      // Timeout: if no stream after 45s, show hint that the session may be busy
+      setTimeout(() => {
+        if (this.allyWorking && !this.allyStream) {
+          this.allyMessages = [
+            ...this.allyMessages,
+            { role: "assistant" as const, content: "*Session is busy — your message is queued and will be answered shortly.*", timestamp: Date.now() },
+          ];
+          this.allyWorking = false;
+        }
+      }, 45_000);
     } catch (e) {
       const errStr = e instanceof Error ? e.message : String(e);
       console.error("[Ally] Failed to send ally message:", errStr);
@@ -1158,6 +1169,16 @@ export class GodModeApp extends LitElement {
     this.resetChatScroll();
     void this.loadAssistantIdentity();
     void import("./controllers/chat.js").then(({ loadChatHistory }) => loadChatHistory(this));
+  }
+
+  private _scrollAllyToBottom() {
+    requestAnimationFrame(() => {
+      const panel = this.renderRoot?.querySelector?.(".ally-panel, .ally-inline")
+        ?? document.querySelector(".ally-panel, .ally-inline");
+      if (!panel) return;
+      const container = panel.querySelector(".ally-panel__messages");
+      if (container) container.scrollTop = container.scrollHeight;
+    });
   }
 
   private async _loadAllyHistory() {
@@ -1246,7 +1267,7 @@ export class GodModeApp extends LitElement {
     const item = this.todayQueueResults?.find((r) => r.id === id);
     this.allyPanelOpen = true;
     this.allyUnread = 0;
-    void this._loadAllyHistory();
+    void this._loadAllyHistory().then(() => this._scrollAllyToBottom());
     if (item?.title) {
       this.allyDraft = `Let's discuss the agent result: "${item.title}"`;
     }
@@ -2156,16 +2177,27 @@ export class GodModeApp extends LitElement {
   }
 
   async handlePushToDrive(filePath: string, account?: string) {
+    if (this.driveUploading) return;
     this.showDrivePicker = false;
+    this.driveUploading = true;
     try {
       const params: Record<string, string> = { filePath };
       if (account) params.account = account;
-      const result = await this.client?.request<{ message?: string; output?: string }>(
-        "files.pushToDrive",
-        params,
-      );
+      const result = await this.client?.request<{
+        message?: string;
+        output?: string;
+        driveUrl?: string;
+        fileId?: string;
+      }>("files.pushToDrive", params);
       const label = account ? ` to ${account.split("@")[0]}` : "";
-      this.showToast(result?.message ?? `Uploaded${label} to Google Drive`, "success");
+      const msg = result?.message ?? `Uploaded${label} to Google Drive`;
+      const driveUrl = result?.driveUrl;
+      this.showToast(
+        msg,
+        "success",
+        driveUrl ? 8000 : 5000,
+        driveUrl ? { label: "View in Drive", url: driveUrl } : undefined,
+      );
     } catch (e: unknown) {
       console.error("Push to Drive failed:", e);
       const detail =
@@ -2174,7 +2206,9 @@ export class GodModeApp extends LitElement {
           : typeof e === "object" && e !== null && "message" in e
             ? String((e as { message: unknown }).message)
             : "Unknown error";
-      this.showToast(`Drive upload failed: ${detail}`, "error");
+      this.showToast(`Drive upload failed: ${detail}`, "error", 8000);
+    } finally {
+      this.driveUploading = false;
     }
   }
 
@@ -2539,9 +2573,10 @@ export class GodModeApp extends LitElement {
   showToast(
     message: string,
     type: "success" | "error" | "warning" | "info" = "info",
-    duration = 3000,
+    duration = 5000,
+    action?: ToastAction,
   ) {
-    const toast = createToast(message, type, duration);
+    const toast = createToast(message, type, duration, action);
     this.toasts = addToast(this.toasts, toast);
 
     if (duration > 0) {
