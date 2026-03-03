@@ -221,6 +221,22 @@
   border-radius: 4px;
 }
 
+/* ── Compact Agent Card (simplified mode) ── */
+
+.mc-agent-card--compact {
+  cursor: pointer;
+  padding: 10px 14px;
+  transition: background 0.1s;
+}
+
+.mc-agent-card--compact:hover {
+  background: var(--bg-hover, rgba(255, 255, 255, 0.04));
+}
+
+.mc-agent-card--compact .mc-agent-card-header {
+  gap: 10px;
+}
+
 /* ── Type Badges ── */
 
 .mc-type-badge {

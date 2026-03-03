@@ -168,7 +168,10 @@ type AgentCardCallbacks = {
   onOpenTaskSession?: (taskId: string) => void;
 };
 
-function renderAgentCard(agent: AgentRunView, callbacks: AgentCardCallbacks) {
+// Track which compact cards are expanded inline
+const expandedAgentIds = new Set<string>();
+
+function renderAgentCard(agent: AgentRunView, callbacks: AgentCardCallbacks, compact = false) {
   const duration =
     agent.startedAt
       ? formatDuration(agent.startedAt, agent.endedAt ?? undefined)
@@ -176,13 +179,32 @@ function renderAgentCard(agent: AgentRunView, callbacks: AgentCardCallbacks) {
 
   // Determine the "Open" button variant
   const openBtn = agent.childSessionKey && callbacks.onOpenSession
-    ? html`<button class="mc-open-session-btn" @click=${() => callbacks.onOpenSession!(agent.childSessionKey!)}>Open</button>`
+    ? html`<button class="mc-open-session-btn" @click=${(e: Event) => { e.stopPropagation(); callbacks.onOpenSession!(agent.childSessionKey!); }}>Open</button>`
     : agent.sourceTaskId && callbacks.onOpenTaskSession
-      ? html`<button class="mc-open-session-btn" @click=${() => callbacks.onOpenTaskSession!(agent.sourceTaskId!)}>Open Task</button>`
+      ? html`<button class="mc-open-session-btn" @click=${(e: Event) => { e.stopPropagation(); callbacks.onOpenTaskSession!(agent.sourceTaskId!); }}>Open Task</button>`
       : nothing;
 
+  // Compact mode: show minimal card, click to expand
+  if (compact && !expandedAgentIds.has(agent.id)) {
+    return html`
+      <div class="${statusCardClass(agent.status)} mc-agent-card--compact"
+           @click=${() => { expandedAgentIds.add(agent.id); /* triggers re-render via parent */ }}>
+        <div class="mc-agent-card-header">
+          <div class="mc-agent-card-info">
+            <span class="${typeBadgeClass(agent.type)}">${agent.roleName}</span>
+            <span class="mc-agent-card-task">${agent.task}</span>
+          </div>
+          ${duration ? html`<span class="mc-agent-card-duration">${duration}</span>` : nothing}
+          ${openBtn}
+        </div>
+      </div>
+    `;
+  }
+
   return html`
-    <div class="${statusCardClass(agent.status)}">
+    <div class="${statusCardClass(agent.status)}"
+         ${compact ? html`` : nothing}
+         @click=${compact ? () => { expandedAgentIds.delete(agent.id); } : nothing}>
       <div class="mc-agent-card-header">
         <div class="mc-agent-card-info">
           <span class="${typeBadgeClass(agent.type)}">${agent.roleName}</span>
@@ -190,10 +212,10 @@ function renderAgentCard(agent: AgentRunView, callbacks: AgentCardCallbacks) {
         </div>
         ${openBtn}
         ${agent.canCancel
-          ? html`<button class="mc-cancel-btn" @click=${() => callbacks.onCancel(agent.id)}>Cancel</button>`
+          ? html`<button class="mc-cancel-btn" @click=${(e: Event) => { e.stopPropagation(); callbacks.onCancel(agent.id); }}>Cancel</button>`
           : nothing}
         ${agent.prUrl
-          ? html`<button class="mc-pr-btn" @click=${() => callbacks.onViewDetail(agent)}>View PR</button>`
+          ? html`<button class="mc-pr-btn" @click=${(e: Event) => { e.stopPropagation(); callbacks.onViewDetail(agent); }}>View PR</button>`
           : nothing}
       </div>
       <div class="mc-agent-card-meta">
@@ -207,15 +229,15 @@ function renderAgentCard(agent: AgentRunView, callbacks: AgentCardCallbacks) {
       ${agent.type === "swarm" ? renderSwarmPipeline(agent) : nothing}
       ${agent.status === "failed" ? html`
         <div class="mc-agent-card-actions">
-          <button class="mc-detail-btn" @click=${() => callbacks.onViewDetail(agent)}>View Error</button>
-          <button class="mc-retry-btn" @click=${() => callbacks.onRetry(agent.id)}>Retry</button>
+          <button class="mc-detail-btn" @click=${(e: Event) => { e.stopPropagation(); callbacks.onViewDetail(agent); }}>View Error</button>
+          <button class="mc-retry-btn" @click=${(e: Event) => { e.stopPropagation(); callbacks.onRetry(agent.id); }}>Retry</button>
         </div>
       ` : nothing}
     </div>
   `;
 }
 
-function renderActiveAgents(agents: AgentRunView[], callbacks: AgentCardCallbacks) {
+function renderActiveAgents(agents: AgentRunView[], callbacks: AgentCardCallbacks, compact = false) {
   const active = agents.filter((a) => a.status === "active" || a.status === "queued");
   if (active.length === 0) {
     return html`
@@ -227,7 +249,7 @@ function renderActiveAgents(agents: AgentRunView[], callbacks: AgentCardCallback
   }
   return html`
     <div class="mc-agents-grid">
-      ${active.map((a) => renderAgentCard(a, callbacks))}
+      ${active.map((a) => renderAgentCard(a, callbacks, compact))}
     </div>
   `;
 }
@@ -397,10 +419,27 @@ export function renderMissionControl(props: MissionControlProps) {
 
       ${props.fullControl ? renderStatsBanner(data.stats) : renderStatusLine(data.stats)}
 
-      <div class="mc-two-col">
-        <div class="mc-col-main">
-          <h3 class="mc-section-title">Active Agents</h3>
-          ${renderActiveAgents(data.agents, cardCallbacks)}
+      ${props.fullControl ? html`
+        <div class="mc-two-col">
+          <div class="mc-col-main">
+            <h3 class="mc-section-title">Active Agents</h3>
+            ${renderActiveAgents(data.agents, cardCallbacks)}
+
+            ${renderReviewItems(data.agents, props.onApproveItem, props.onViewDetail, props.onOpenTaskSession)}
+
+            ${renderPendingQueue(data.queueItems, props.onStartQueueItem)}
+
+            ${renderActivityFeed(data.activityFeed, false, props.onViewDetail)}
+          </div>
+
+          <div class="mc-col-side">
+            ${renderRecentCompleted(data.agents, cardCallbacks)}
+          </div>
+        </div>
+      ` : html`
+        <div>
+          <h3 class="mc-section-title">Active</h3>
+          ${renderActiveAgents(data.agents, cardCallbacks, true)}
 
           ${renderReviewItems(data.agents, props.onApproveItem, props.onViewDetail, props.onOpenTaskSession)}
 
@@ -408,11 +447,7 @@ export function renderMissionControl(props: MissionControlProps) {
 
           ${renderActivityFeed(data.activityFeed, false, props.onViewDetail)}
         </div>
-
-        <div class="mc-col-side">
-          ${renderRecentCompleted(data.agents, cardCallbacks)}
-        </div>
-      </div>
+      `}
     </div>
   `;
 }
