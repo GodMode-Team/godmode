@@ -315,6 +315,62 @@ function renderPendingQueue(
   `;
 }
 
+function renderAttentionItems(
+  agents: AgentRunView[],
+  callbacks: AgentCardCallbacks,
+  onApprove: (id: string) => void,
+) {
+  const attention = agents.filter(a => a.isReview === true || a.status === "failed");
+  if (attention.length === 0) {
+    return html`
+      <div class="mc-attention-section">
+        <div class="mc-attention-empty">
+          Nothing needs you right now.
+        </div>
+      </div>
+    `;
+  }
+  return html`
+    <div class="mc-attention-section">
+      <h3 class="mc-section-title">Needs Your Attention</h3>
+      <div class="mc-agents-grid">
+        ${attention.map(item => html`
+          <div class="mc-attention-card mc-agent-card--${item.isReview ? "review" : "failed"}">
+            <div class="mc-agent-card-header">
+              <div class="mc-agent-card-info">
+                <span class="mc-agent-card-task">${item.task}</span>
+              </div>
+              ${item.isReview ? html`
+                <button class="mc-approve-btn" @click=${() => onApprove(item.id)}>Done</button>
+                <button class="mc-detail-btn" @click=${() => callbacks.onViewDetail(item)}>View</button>
+              ` : html`
+                <button class="mc-detail-btn" @click=${() => callbacks.onViewDetail(item)}>View Error</button>
+                <button class="mc-retry-btn" @click=${() => callbacks.onRetry(item.id)}>Retry</button>
+              `}
+            </div>
+          </div>
+        `)}
+      </div>
+    </div>
+  `;
+}
+
+function renderQueueDepthHint(items: QueueItemRpc[]) {
+  const pending = items.filter(i => i.status === "pending");
+  if (pending.length === 0) return nothing;
+  return html`<div class="mc-queue-depth-text">${pending.length} more queued</div>`;
+}
+
+function renderIdleCta(onAskProsper?: () => void) {
+  if (!onAskProsper) return nothing;
+  return html`
+    <div class="mc-idle-cta">
+      <p>Prosper is idle.</p>
+      <button class="mc-open-session-btn" @click=${onAskProsper}>Ask Prosper what to work on</button>
+    </div>
+  `;
+}
+
 function renderFeedItem(item: ActivityFeedItem, onViewDetail?: (agent: AgentRunView) => void) {
   const clickable = (item.type === "failed" || item.type === "completed") && item.agentRef;
   return html`
@@ -438,12 +494,18 @@ export function renderMissionControl(props: MissionControlProps) {
         </div>
       ` : html`
         <div>
-          <h3 class="mc-section-title">Active</h3>
-          ${renderActiveAgents(data.agents, cardCallbacks, true)}
+          ${renderAttentionItems(data.agents, cardCallbacks, props.onApproveItem)}
 
-          ${renderReviewItems(data.agents, props.onApproveItem, props.onViewDetail, props.onOpenTaskSession)}
+          ${data.stats.activeNow > 0 || data.agents.some(a => a.status === "active" || a.status === "queued") ? html`
+            <h3 class="mc-section-title">Active</h3>
+            ${renderActiveAgents(data.agents, cardCallbacks, true)}
+          ` : nothing}
 
-          ${renderPendingQueue(data.queueItems, props.onStartQueueItem)}
+          ${renderQueueDepthHint(data.queueItems)}
+
+          ${data.stats.activeNow === 0 && data.stats.queueDepth === 0
+            ? renderIdleCta(props.onAskProsper)
+            : nothing}
 
           ${renderActivityFeed(data.activityFeed, false, props.onViewDetail)}
         </div>
