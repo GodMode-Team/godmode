@@ -2198,6 +2198,8 @@ export function renderApp(state: AppViewState) {
                 loading: state.missionControlLoading,
                 error: state.missionControlError,
                 data: state.missionControlData ?? null,
+                fullControl: state.missionControlFullControl,
+                onToggleFullControl: () => state.handleMissionControlToggleFullControl(),
                 onRefresh: () => state.handleMissionControlRefresh(),
                 onCancelTask: (id) => state.handleMissionControlCancelTask(id),
                 onApproveItem: (id) => state.handleMissionControlApproveItem(id),
@@ -2207,6 +2209,7 @@ export function renderApp(state: AppViewState) {
                 onOpenSession: (key) => state.handleMissionControlOpenSession(key),
                 onOpenTaskSession: (taskId) => state.handleMissionControlOpenTaskSession(taskId),
                 onStartQueueItem: (id) => state.handleMissionControlStartQueueItem(id),
+                onAskProsper: () => { state.handleAllyToggle(); state.handleAllyDraftChange("What should I focus on next?"); },
               })
             : nothing
         }

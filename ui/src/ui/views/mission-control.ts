@@ -30,6 +30,8 @@ export type MissionControlProps = {
   loading?: boolean;
   error?: string | null;
   data: MissionControlData | null;
+  fullControl: boolean;
+  onToggleFullControl: () => void;
   onRefresh: () => void;
   onCancelTask: (taskId: string) => void;
   onApproveItem: (id: string) => void;
@@ -39,6 +41,7 @@ export type MissionControlProps = {
   onOpenSession?: (sessionKey: string) => void;
   onOpenTaskSession?: (taskId: string) => void;
   onStartQueueItem?: (itemId: string) => void;
+  onAskProsper?: () => void;
 };
 
 // ===== Helpers =====
@@ -369,6 +372,12 @@ export function renderMissionControl(props: MissionControlProps) {
 
   return html`
     <div class="mc-section">
+      <div class="mc-header-row">
+        <button class="mc-full-control-toggle" @click=${props.onToggleFullControl}>
+          ${props.fullControl ? "Simplified" : "Full Control"}
+        </button>
+      </div>
+
       ${renderStatsBanner(data.stats)}
 
       <div class="mc-two-col">

@@ -649,6 +649,9 @@ export class GodModeApp extends LitElement {
   @state() missionControlData: import("./controllers/mission-control.js").MissionControlData | null = null;
   @state() missionControlLoading = false;
   @state() missionControlError: string | null = null;
+  @state() missionControlFullControl = (() => {
+    try { return localStorage.getItem("godmode.mc.fullControl") === "1"; } catch { return true; }
+  })();
   missionControlPollInterval: number | null = null;
 
   // GodMode Options state
@@ -952,6 +955,11 @@ export class GodModeApp extends LitElement {
   }
 
   // Mission Control handlers
+  handleMissionControlToggleFullControl() {
+    this.missionControlFullControl = !this.missionControlFullControl;
+    try { localStorage.setItem("godmode.mc.fullControl", this.missionControlFullControl ? "1" : "0"); } catch { /* non-fatal */ }
+  }
+
   async handleMissionControlRefresh() {
     const { loadMissionControl } = await import("./controllers/mission-control.js");
     await loadMissionControl(this);
