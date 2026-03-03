@@ -32,6 +32,19 @@
   border-color: var(--accent);
 }
 
+/* ── Status Line (simplified mode) ── */
+
+.mc-status-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-muted, var(--muted));
+  margin-bottom: 1.25rem;
+  padding: 10px 0;
+}
+
 /* ── Two-Column Layout ── */
 
 .mc-two-col {

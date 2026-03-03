@@ -95,6 +95,23 @@ function statusCardClass(status: AgentRunView["status"]): string {
 
 // ===== Sub-renders =====
 
+function renderStatusLine(stats: MissionControlStats) {
+  const parts: string[] = [];
+  if (stats.activeNow > 0) parts.push(`${stats.activeNow} agent${stats.activeNow > 1 ? "s" : ""} working`);
+  if (stats.queueReview > 0) parts.push(`${stats.queueReview} need${stats.queueReview > 1 ? "" : "s"} your attention`);
+  if (stats.completedToday > 0) parts.push(`${stats.completedToday} done today`);
+  if (parts.length === 0) {
+    parts.push("Nothing running");
+    if (stats.completedToday > 0) parts.push(`${stats.completedToday} completed today`);
+  }
+  return html`
+    <div class="mc-status-line">
+      ${stats.activeNow > 0 ? html`<span class="mc-active-dot"></span>` : nothing}
+      <span>${parts.join(" \u00B7 ")}</span>
+    </div>
+  `;
+}
+
 function renderStatsBanner(stats: MissionControlStats) {
   return html`
     <div class="mc-stats-banner">
@@ -378,7 +395,7 @@ export function renderMissionControl(props: MissionControlProps) {
         </button>
       </div>
 
-      ${renderStatsBanner(data.stats)}
+      ${props.fullControl ? renderStatsBanner(data.stats) : renderStatusLine(data.stats)}
 
       <div class="mc-two-col">
         <div class="mc-col-main">
