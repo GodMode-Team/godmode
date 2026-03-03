@@ -386,19 +386,42 @@ function renderFeedItem(item: ActivityFeedItem, onViewDetail?: (agent: AgentRunV
   `;
 }
 
+// Module-level state for feed collapse toggle (survives re-renders within same session)
+let feedCollapsed = true;
+
 function renderActivityFeed(
   feed: ActivityFeedItem[],
   expanded: boolean,
   onViewDetail?: (agent: AgentRunView) => void,
+  initiallyCollapsed = false,
 ) {
   if (feed.length === 0) return nothing;
+
+  // In collapsed mode, show only a toggle header
+  if (initiallyCollapsed && feedCollapsed) {
+    return html`
+      <div class="mc-feed">
+        <div class="mc-collapsible-header" @click=${() => { feedCollapsed = false; }}>
+          <span class="mc-collapsible-chevron">\u25B6</span>
+          <h3 class="mc-section-title" style="margin:0">Activity (${feed.length})</h3>
+        </div>
+      </div>
+    `;
+  }
 
   const visible = expanded ? feed : feed.slice(0, 20);
   const hasMore = !expanded && feed.length > 20;
 
   return html`
     <div class="mc-feed">
-      <h3 class="mc-section-title">Activity Feed</h3>
+      ${initiallyCollapsed ? html`
+        <div class="mc-collapsible-header" @click=${() => { feedCollapsed = true; }}>
+          <span class="mc-collapsible-chevron mc-collapsible-chevron--open">\u25B6</span>
+          <h3 class="mc-section-title" style="margin:0">Activity (${feed.length})</h3>
+        </div>
+      ` : html`
+        <h3 class="mc-section-title">Activity Feed</h3>
+      `}
       <div class="mc-feed-list">
         ${visible.map(item => renderFeedItem(item, onViewDetail))}
       </div>
@@ -507,7 +530,7 @@ export function renderMissionControl(props: MissionControlProps) {
             ? renderIdleCta(props.onAskProsper)
             : nothing}
 
-          ${renderActivityFeed(data.activityFeed, false, props.onViewDetail)}
+          ${renderActivityFeed(data.activityFeed, false, props.onViewDetail, true)}
         </div>
       `}
     </div>
