@@ -21,6 +21,7 @@ export type GuardrailsProps = {
   onCustomDelete: (id: string) => void;
   onCustomAdd: (input: AddCustomGuardrailInput) => void;
   onToggleAddForm: () => void;
+  onOpenAllyChat?: (prefill?: string) => void;
 };
 
 // ===== Helpers =====
@@ -219,7 +220,7 @@ function renderActivityRow(entry: GuardrailActivityView) {
 // ===== Main Render =====
 
 export function renderGuardrails(props: GuardrailsProps) {
-  const { connected, loading, data, showAddForm, onToggle, onThresholdChange, onCustomToggle, onCustomDelete, onCustomAdd, onToggleAddForm } = props;
+  const { connected, loading, data, showAddForm, onToggle, onThresholdChange, onCustomToggle, onCustomDelete, onCustomAdd, onToggleAddForm, onOpenAllyChat } = props;
 
   if (!connected) {
     return html`
@@ -266,44 +267,44 @@ export function renderGuardrails(props: GuardrailsProps) {
         ${gates.map((gate) => renderGateCard(gate, onToggle, onThresholdChange))}
       </div>
 
-      <!-- Custom Rules Section -->
-      <div class="guardrails-custom-section">
-        <div class="guardrails-custom-header">
-          <h3 class="guardrails-custom-title">Custom Rules</h3>
-          <button class="guardrails-add-btn" @click=${onToggleAddForm}>
-            ${showAddForm ? "Cancel" : "+ Add Rule"}
-          </button>
+      <!-- Custom Rules + Recent Activity side-by-side -->
+      <div class="guardrails-bottom-row">
+        <div class="guardrails-custom-section">
+          <div class="guardrails-custom-header">
+            <h3 class="guardrails-custom-title">Custom Rules</h3>
+            <button class="guardrails-add-btn" @click=${() => {
+              if (onOpenAllyChat) {
+                onOpenAllyChat("Create a new guardrail rule: ");
+              } else {
+                onToggleAddForm();
+              }
+            }}>+ Add Rule</button>
+          </div>
+
+          ${custom.length > 0
+            ? html`
+                <div class="guardrails-custom-grid">
+                  ${custom.map((rule) => renderCustomCard(rule, onCustomToggle, onCustomDelete))}
+                </div>
+              `
+            : html`
+                <div class="guardrails-custom-empty">
+                  No custom rules yet. Click "+ Add Rule" to tell your ally what to block or redirect.
+                </div>
+              `}
         </div>
 
-        ${showAddForm ? renderAddForm(onCustomAdd, onToggleAddForm) : nothing}
-
-        ${custom.length > 0
-          ? html`
-              <div class="guardrails-custom-grid">
-                ${custom.map((rule) => renderCustomCard(rule, onCustomToggle, onCustomDelete))}
-              </div>
-            `
-          : html`
-              <div class="guardrails-custom-empty">
-                No custom rules yet. Click "+ Add Rule" or tell your agent "never do X" to create one.
-              </div>
-            `}
+        <div class="guardrails-history">
+          <h3 class="guardrails-history-title">Recent Activity</h3>
+          ${activity.length > 0
+            ? html`
+                <div class="guardrails-history-list">
+                  ${activity.slice(0, 30).map(renderActivityRow)}
+                </div>
+              `
+            : html`<div class="guardrails-no-activity">No gate activity recorded yet.</div>`}
+        </div>
       </div>
-
-      ${activity.length > 0
-        ? html`
-            <div class="guardrails-history">
-              <h3 class="guardrails-history-title">Recent Activity</h3>
-              <div class="guardrails-history-list">
-                ${activity.slice(0, 30).map(renderActivityRow)}
-              </div>
-            </div>
-          `
-        : html`
-            <div class="guardrails-history">
-              <div class="guardrails-no-activity">No gate activity recorded yet.</div>
-            </div>
-          `}
     </section>
   `;
 }

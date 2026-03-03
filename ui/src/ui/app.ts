@@ -1016,16 +1016,12 @@ export class GodModeApp extends LitElement {
   }
 
   handleAllyOpenFull() {
-    // Switch to chat tab and activate ally session
+    // Switch to chat tab and activate the pinned ally session
     this.allyPanelOpen = false;
     this.setTab("chat" as import("./navigation.js").Tab);
-    // Ensure ally-main session is open in tabs, then switch to it
-    const openTabs = this.settings.openTabs.includes(ALLY_SESSION_KEY)
-      ? this.settings.openTabs
-      : [ALLY_SESSION_KEY, ...this.settings.openTabs];
+    // Activate ally-main via pinned tab — no need to add to openTabs
     this.applySettings({
       ...this.settings,
-      openTabs,
       sessionKey: ALLY_SESSION_KEY,
       lastActiveSessionKey: ALLY_SESSION_KEY,
       tabLastViewed: {
@@ -3243,6 +3239,40 @@ export class GodModeApp extends LitElement {
       userName: trimmedName,
       userAvatar: trimmedAvatar,
     });
+  }
+
+  // ── Onboarding integration handlers ──────────────────────────────
+  async handleLoadIntegrations() {
+    const mod = await import("./controllers/onboarding-setup.js");
+    await mod.loadIntegrations(this as any);
+  }
+
+  handleExpandCard(id: string | null) {
+    void import("./controllers/onboarding-setup.js").then(m => m.expandCard(this as any, id));
+  }
+
+  async handleLoadGuide(id: string) {
+    const mod = await import("./controllers/onboarding-setup.js");
+    await mod.loadGuide(this as any, id);
+  }
+
+  async handleTestIntegration(id: string) {
+    const mod = await import("./controllers/onboarding-setup.js");
+    await mod.testIntegration(this as any, id);
+  }
+
+  async handleConfigureIntegration(id: string, values: Record<string, string>) {
+    const mod = await import("./controllers/onboarding-setup.js");
+    await mod.configureIntegration(this as any, id, values);
+  }
+
+  handleUpdateConfigValue(key: string, value: string) {
+    if (!(this as any).onboardingConfigValues) (this as any).onboardingConfigValues = {};
+    (this as any).onboardingConfigValues[key] = value;
+  }
+
+  handleSkipIntegration(_id: string) {
+    void import("./controllers/onboarding-setup.js").then(m => m.skipIntegration(this as any));
   }
 
   render() {

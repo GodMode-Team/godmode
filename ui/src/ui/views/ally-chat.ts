@@ -273,7 +273,6 @@ export function renderAllyChat(props: AllyChatProps): TemplateResult | typeof no
   }
 
   return html`
-    ${renderBubble(props)}
     <div class="ally-panel">
       ${renderPanelContent(props)}
     </div>

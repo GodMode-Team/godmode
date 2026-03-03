@@ -222,7 +222,8 @@ function getRenderableSessionTabState(state: AppViewState): {
   activeIdentity: string;
 } {
   const sessions = state.sessionsResult?.sessions;
-  const rawTabKeys = [...new Set(state.settings.openTabs.map((key) => key.trim()).filter(Boolean))];
+  const rawTabKeys = [...new Set(state.settings.openTabs.map((key) => key.trim()).filter(Boolean))]
+    .filter((key) => key !== ALLY_SESSION_KEY); // ally-main handled by pinned tab
   const activeSession = findSessionByKey(sessions, state.sessionKey);
   const activeIdentity = getSessionTabIdentity(state.sessionKey, activeSession);
   const tabsByIdentity = new Map<string, string>();
@@ -494,6 +495,7 @@ export function renderApp(state: AppViewState) {
             ${
               state.tab !== "chat" &&
               state.tab !== "setup" &&
+              state.tab !== "onboarding" &&
               state.tab !== "wheel-of-life" &&
               state.tab !== "vision-board" &&
               state.tab !== "lifetracks"
@@ -2165,6 +2167,10 @@ export function renderApp(state: AppViewState) {
                 onCustomDelete: (id) => state.handleCustomGuardrailDelete(id),
                 onCustomAdd: (input) => state.handleCustomGuardrailAdd(input),
                 onToggleAddForm: () => state.handleToggleGuardrailAddForm(),
+                onOpenAllyChat: (prefill?: string) => {
+                  state.handleAllyToggle();
+                  if (prefill) state.handleAllyDraftChange(prefill);
+                },
               })
             : nothing
         }
