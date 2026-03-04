@@ -358,10 +358,8 @@ img.chat-avatar {
   font-size: 11px;
   font-family: var(--mono);
   margin-top: 2px;
-  max-width: 350px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  max-width: 100%;
+  word-break: break-all;
 }
 
 .chat-working-indicator__details code {

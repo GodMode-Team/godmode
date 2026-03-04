@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GodMode Brief + AI Prompt Pack</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚡</text></svg>">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        :root {
+            --black: #000000;
+            --dark: #0a0a0a;
+            --gray-dark: #1a1a1a;
+            --gray: #666666;
+            --gray-light: #999999;
+            --white: #ffffff;
+            --accent: #00ff88;
+            --accent-dim: rgba(0, 255, 136, 0.1);
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--black);
+            color: var(--white);
+            line-height: 1.7;
+        }
+
+        .container {
+            max-width: 720px;
+            margin: 0 auto;
+            padding: 0 24px;
+        }
+
+        /* Header */
+        .header {
+            padding: 40px 0 20px;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+            margin-bottom: 60px;
+        }
+
+        .header a {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 14px;
+            font-weight: 600;
+            letter-spacing: 4px;
+            text-transform: uppercase;
+            color: var(--accent);
+            text-decoration: none;
+        }
+
+        /* Sections */
+        h1 {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: clamp(32px, 5vw, 48px);
+            font-weight: 700;
+            line-height: 1.1;
+            margin-bottom: 20px;
+        }
+
+        h2 {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 28px;
+            font-weight: 700;
+            margin-top: 60px;
+            margin-bottom: 20px;
+            color: var(--accent);
+        }
+
+        h3 {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 20px;
+            font-weight: 600;
+            margin-top: 40px;
+            margin-bottom: 16px;
+        }
+
+        p {
+            font-size: 17px;
+            color: var(--gray-light);
+            margin-bottom: 20px;
+        }
+
+        .lead {
+            font-size: 20px;
+            color: var(--white);
+            margin-bottom: 40px;
+        }
+
+        .divider {
+            border: none;
+            border-top: 1px solid rgba(255,255,255,0.08);
+            margin: 60px 0;
+        }
+
+        /* Stats grid */
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin: 30px 0;
+        }
+
+        .stat-card {
+            background: var(--gray-dark);
+            border: 1px solid rgba(255,255,255,0.05);
+            border-radius: 12px;
+            padding: 24px;
+            text-align: center;
+        }
+
+        .stat-card .value {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 36px;
+            font-weight: 700;
+            color: var(--accent);
+            display: block;
+            margin-bottom: 8px;
+        }
+
+        .stat-card .label {
+            font-size: 14px;
+            color: var(--gray-light);
+        }
+
+        /* Prompt cards */
+        .prompt-category {
+            margin-top: 30px;
+        }
+
+        .prompt-category h3 {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .prompt {
+            background: var(--gray-dark);
+            border: 1px solid rgba(255,255,255,0.05);
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 12px;
+            font-size: 15px;
+            color: var(--white);
+            line-height: 1.6;
+            cursor: pointer;
+            transition: border-color 0.2s ease;
+            position: relative;
+        }
+
+        .prompt:hover {
+            border-color: rgba(0, 255, 136, 0.3);
+        }
+
+        .prompt .copy-hint {
+            position: absolute;
+            top: 10px;
+            right: 12px;
+            font-size: 11px;
+            color: var(--gray);
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+
+        .prompt:hover .copy-hint {
+            opacity: 1;
+        }
+
+        .prompt.copied .copy-hint {
+            color: var(--accent);
+            opacity: 1;
+        }
+
+        /* CTA */
+        .cta-box {
+            background: linear-gradient(135deg, var(--gray-dark) 0%, var(--dark) 100%);
+            border: 1px solid rgba(0, 255, 136, 0.2);
+            border-radius: 16px;
+            padding: 40px;
+            text-align: center;
+            margin: 60px 0;
+        }
+
+        .cta-box h3 {
+            margin-top: 0;
+            color: var(--white);
+        }
+
+        .cta-box p {
+            color: var(--gray-light);
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            padding: 14px 28px;
+            font-family: 'Inter', sans-serif;
+            font-size: 15px;
+            font-weight: 600;
+            text-decoration: none;
+            border-radius: 8px;
+            transition: all 0.3s ease;
+            background: var(--accent);
+            color: var(--black);
+            border: 2px solid var(--accent);
+        }
+
+        .btn:hover {
+            background: transparent;
+            color: var(--accent);
+        }
+
+        /* Footer */
+        .footer {
+            padding: 40px 0;
+            border-top: 1px solid rgba(255,255,255,0.05);
+            text-align: center;
+        }
+
+        .footer p {
+            font-size: 14px;
+            color: var(--gray);
+        }
+
+        .footer a {
+            color: var(--accent);
+            text-decoration: none;
+        }
+
+        /* Floating AI Audit button */
+        .floating-audit {
+            position: fixed;
+            top: 20px;
+            right: 24px;
+            z-index: 100;
+            font-family: 'Inter', sans-serif;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--black);
+            background: var(--accent);
+            padding: 10px 20px;
+            border-radius: 8px;
+            text-decoration: none;
+            transition: all 0.3s ease;
+        }
+
+        .floating-audit:hover {
+            background: transparent;
+            color: var(--accent);
+            border: 2px solid var(--accent);
+            padding: 8px 18px;
+        }
+
+        @media (max-width: 768px) {
+            .floating-audit {
+                position: relative;
+                display: block;
+                text-align: center;
+                margin: 16px auto 0;
+                width: fit-content;
+                font-size: 12px;
+                padding: 8px 16px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <a href="/ai-audit/" class="floating-audit">Schedule Your AI Audit</a>
+    <div class="container">
+        <div class="header">
+            <a href="/">GodMode</a>
+        </div>
+
+        <!-- Part 1: The GodMode Brief -->
+        <h1>The GodMode Brief</h1>
+        <p class="lead">Real numbers from building and running a personal AI operating system 24/7. What it replaced, what it actually does, and why it compounds the longer it runs.</p>
+
+        <h2>What GodMode Actually Does</h2>
+
+        <p>GodMode is a custom AI system built on <strong style="color: var(--white);">OpenClaw</strong> — an open-source AI agent framework. It runs on my machine, connects to my actual tools (email, calendar, CRM, Discord, iMessage), and operates autonomously around the clock.</p>
+
+        <p>It's not a chatbot. It's an operating system with agents that execute real tasks: drafting communications, researching topics, managing follow-ups, monitoring channels, and delivering a daily briefing every morning.</p>
+
+        <h3>The Daily Brief</h3>
+        <p>Every morning, GodMode delivers a command brief to my phone. It pulls from my calendar, open tasks, recent conversations, and business metrics — then synthesizes it into what I need to focus on today. No opening 6 apps to figure out what matters.</p>
+
+        <h3>Autonomous Agents</h3>
+        <p>Agents run in the background handling things I used to do manually: monitoring inbound messages across channels, drafting responses, running research workflows, and flagging items that need my direct attention. Each agent has guardrails — they operate within defined boundaries.</p>
+
+        <h3>Persistent Memory</h3>
+        <p>Unlike ChatGPT or Claude conversations that reset, GodMode remembers everything — project context, client preferences, past decisions, team dynamics. The longer it runs, the more useful it becomes because it builds on accumulated context.</p>
+
+        <div class="stats">
+            <div class="stat-card">
+                <span class="value">24/7</span>
+                <span class="label">Always running</span>
+            </div>
+            <div class="stat-card">
+                <span class="value">12+</span>
+                <span class="label">Connected channels</span>
+            </div>
+            <div class="stat-card">
+                <span class="value">100s</span>
+                <span class="label">Tasks handled weekly</span>
+            </div>
+        </div>
+
+        <h3>What It Replaced</h3>
+        <p>Before GodMode, my mornings started with checking email, Slack, calendar, CRM, and whatever messages came in overnight — easily 45 minutes of context-gathering before doing real work. Now that's a 2-minute brief read.</p>
+
+        <p>Research that took 30-60 minutes per topic now runs in the background while I do other things. Follow-ups that fell through the cracks get handled automatically. Communication drafts that used to take mental energy are pre-written and waiting for my review.</p>
+
+        <h3>Why It Compounds</h3>
+        <p>Every interaction teaches the system more about how I think, what I prioritize, and how I communicate. Month one was useful. Month three was transformative. The gap between what I can accomplish solo versus what I can accomplish with GodMode keeps widening.</p>
+
+        <hr class="divider">
+
+        <!-- Part 2: AI Prompt Pack -->
+        <h1>AI Prompt Pack</h1>
+        <p class="lead">20 prompts across six categories — built for operators who want leverage, not novelty. Click any prompt to copy it.</p>
+
+        <div class="prompt-category">
+            <h3>🎯 Operations</h3>
+            <div class="prompt" onclick="copyPrompt(this)">
+                <span class="copy-hint">click to copy</span>
+                I need to create a standard operating procedure for [process]. Break it down into numbered steps that anyone on my team could follow. Include decision points where judgment is needed and flag steps that are candidates for automation.
+            </div>
+            <div class="prompt" onclick="copyPrompt(this)">
+                <span class="copy-hint">click to copy</span>
+                Audit my current workflow for [task]. I currently do it this way: [describe process]. Identify bottlenecks, redundant steps, and where AI tools could handle 80% of the work. Be specific about which tools and how.
+            </div>
+            <div class="prompt" onclick="copyPrompt(this)">
+                <span class="copy-hint">click to copy</span>
+                I have these recurring weekly tasks: [list tasks]. Create a time-blocked weekly schedule that batches similar work together, protects deep work time, and identifies which tasks should be delegated to an AI agent.
+            </div>
+        </div>
+
+        <div class="prompt-category">
+            <h3>🔍 Research</h3>
+            <div class="prompt" onclick="copyPrompt(this)">
+                <span class="copy-hint">click to copy</span>
+                Research [topic/company/market] and give me a briefing document. Structure it as: Executive Summary (3 sentences), Key Facts, Recent Developments (last 6 months), Opportunities, Risks, and Recommended Next Steps. Cite your reasoning.
+            </div>
+            <div class="prompt" onclick="copyPrompt(this)">
+                <span class="copy-hint">click to copy</span>
+                I'm evaluating [tool/platform/service] for my business. Compare it against [alternatives] across these dimensions: cost, implementation time, learning curve, integration with existing tools, and long-term scalability. Give me a recommendation with your confidence level.
+            </div>
+            <div class="prompt" onclick="copyPrompt(this)">
+                <span class="copy-hint">click to copy</span>
+                Analyze the competitive landscape for [industry/niche]. Who are the top 5 players, what are they doing well, where are the gaps, and what positioning opportunity exists for a new entrant focused on [your angle]?
+            </div>
+            <div class="prompt" onclick="copyPrompt(this)">
+                <span class="copy-hint">click to copy</span>
+                I need to make a decision about [decision]. Here are the options: [list options]. For each option, give me the best-case outcome, worst-case outcome, and most likely outcome. Then tell me which one you'd pick and why.
+            </div>
+        </div>
+
+        <div class="prompt-category">
+            <h3>✉️ Communication</h3>
+            <div class="prompt" onclick="copyPrompt(this)">
+                <span class="copy-hint">click to copy</span>
+                Draft a follow-up email to [person/company] about [topic]. Context: [provide context]. Tone should be professional but direct — no fluff, no corporate speak. Include a clear ask and make it easy for them to say yes.
+            </div>
+            <div class="prompt" onclick="copyPrompt(this)">
+                <span class="copy-hint">click to copy</span>
+                I need to deliver difficult feedback to [person] about [issue]. Help me structure the conversation using this framework: Observation (what I noticed), Impact (why it matters), Request (what I need), and Support (how I'll help). Keep it honest but constructive.
+            </div>
+            <div class="prompt" onclick="copyPrompt(this)">
+                <span class="copy-hint">click to copy</span>
+                Write a cold outreach message to [target person/role] at [company type]. I want to offer [your service]. Don't be salesy — lead with a specific observation about their business and connect it to a result I've achieved. Under 150 words.
+            </div>
+        </div>
+
+        <div class="prompt-category">
+            <h3>📊 Strategy</h3>
+            <div class="prompt" onclick="copyPrompt(this)">
+                <span class="copy-hint">click to copy</span>
+                I want to grow [business/project] from [current state] to [target state] in [timeframe]. Build me a 90-day plan with monthly milestones, weekly focus areas, and daily habits. Be realistic — I have [X] hours per week to dedicate to this.
+            </div>
+            <div class="prompt" onclick="copyPrompt(this)">
+                <span class="copy-hint">click to copy</span>
+                Challenge my thinking on this business decision: [describe your plan]. Play devil's advocate. What am I missing? What assumptions am I making? What would a smart competitor do to counter this? Don't just agree — push back hard.
+            </div>
+            <div class="prompt" onclick="copyPrompt(this)">
+                <span class="copy-hint">click to copy</span>
+                I'm generating [revenue] with [business model]. Identify the top 3 leverage points where small changes would have outsized impact on growth. For each, give me the specific action, expected impact, and effort required.
+            </div>
+        </div>
+
+        <div class="prompt-category">
+            <h3>🧠 Personal Productivity</h3>
+            <div class="prompt" onclick="copyPrompt(this)">
+                <span class="copy-hint">click to copy</span>
+                I'm feeling overwhelmed by [describe situation]. Help me triage. List everything on my plate, categorize by urgency and importance, identify what can be dropped or delegated, and give me the top 3 things to focus on today.
+            </div>
+            <div class="prompt" onclick="copyPrompt(this)">
+                <span class="copy-hint">click to copy</span>
+                I want to learn [skill/topic] efficiently. Create a learning plan that gets me to functional competency in 30 days. Include the best resources (books, courses, projects), a weekly schedule, and milestones to measure progress.
+            </div>
+            <div class="prompt" onclick="copyPrompt(this)">
+                <span class="copy-hint">click to copy</span>
+                Review my calendar for this week: [paste or describe your schedule]. Tell me where I'm over-committed, which meetings could be async, and where I should protect time for deep work. Be ruthless.
+            </div>
+        </div>
+
+        <div class="prompt-category">
+            <h3>🎨 Creative</h3>
+            <div class="prompt" onclick="copyPrompt(this)">
+                <span class="copy-hint">click to copy</span>
+                I need content ideas for [platform] targeting [audience]. Give me 10 post concepts that share genuine insights from my experience with [topic]. No generic advice — each should have a specific angle or contrarian take that would make someone stop scrolling.
+            </div>
+            <div class="prompt" onclick="copyPrompt(this)">
+                <span class="copy-hint">click to copy</span>
+                Help me write a landing page for [product/service]. Target audience: [describe]. Key benefit: [describe]. Structure: headline, subheadline, 3 bullet points, social proof placeholder, and CTA. Make it specific enough to feel real, not templated.
+            </div>
+            <div class="prompt" onclick="copyPrompt(this)">
+                <span class="copy-hint">click to copy</span>
+                Turn this raw idea into a structured piece of writing: [paste your rough notes]. Organize it into a clear narrative with a hook, key points, and a takeaway. Keep my voice — don't make it sound like AI wrote it.
+            </div>
+        </div>
+
+        <!-- CTA -->
+        <div class="cta-box">
+            <h3>Want a custom GodMode for your business?</h3>
+            <p>We build personal AI systems for entrepreneurs — configured for your specific tools, workflows, and business context.</p>
+            <a href="/ai-audit/" class="btn">Schedule Your AI Audit</a>
+        </div>
+
+        <div class="footer">
+            <p>Built by <a href="mailto:caleb@lifeongodmode.com">Caleb Hodges</a> · <a href="/">lifeongodmode.com</a></p>
+        </div>
+    </div>
+
+    <script>
+        function copyPrompt(el) {
+            const hint = el.querySelector('.copy-hint');
+            const text = el.textContent.replace('click to copy', '').replace('copied!', '').trim();
+            navigator.clipboard.writeText(text).then(() => {
+                el.classList.add('copied');
+                hint.textContent = 'copied!';
+                setTimeout(() => {
+                    el.classList.remove('copied');
+                    hint.textContent = 'click to copy';
+                }, 2000);
+            });
+        }
+    </script>
+</body>
+</html>

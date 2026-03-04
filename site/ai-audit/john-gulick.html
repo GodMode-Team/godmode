@@ -1,0 +1,851 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI Audit Report — John Gulick / iExecute</title>
+  <style>
+    :root {
+      --bg: #0a0d14;
+      --surface: #111520;
+      --surface2: #161c2d;
+      --border: #1e2a42;
+      --text: #e8edf8;
+      --text-muted: #7a8aaa;
+      --text-dim: #4a5670;
+      --accent: #f97316;
+      --accent2: #fb923c;
+      --teal: #2dd4bf;
+      --green: #22c55e;
+      --yellow: #f59e0b;
+      --blue: #4f8ef7;
+      --red: #ef4444;
+      --purple: #a855f7;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.7;
+    }
+
+    nav {
+      position: sticky; top: 0; z-index: 100;
+      background: rgba(10,13,20,0.92);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+      padding: 0 2rem;
+      display: flex; align-items: center; gap: 2rem; height: 56px;
+      overflow-x: auto;
+    }
+    nav .logo { font-size: 0.85rem; font-weight: 700; color: var(--accent); letter-spacing: 0.05em; text-transform: uppercase; white-space: nowrap; }
+    nav a { color: var(--text-muted); text-decoration: none; font-size: 0.82rem; white-space: nowrap; transition: color 0.2s; }
+    nav a:hover { color: var(--text); }
+
+    .hero { padding: 5rem 2rem 4rem; max-width: 960px; margin: 0 auto; border-bottom: 1px solid var(--border); }
+    .hero-tag { display: inline-block; padding: 0.3em 0.8em; background: rgba(249,115,22,0.1); border: 1px solid rgba(249,115,22,0.25); border-radius: 20px; color: var(--accent); font-size: 0.75rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 1.5rem; }
+    .hero h1 { font-size: clamp(2rem, 5vw, 3.2rem); font-weight: 800; line-height: 1.15; letter-spacing: -0.02em; margin-bottom: 1rem; }
+    .hero h1 span { color: var(--accent); }
+    .hero p { color: var(--text-muted); font-size: 1.1rem; max-width: 620px; margin-bottom: 2.5rem; }
+    .hero-meta { display: flex; flex-wrap: wrap; gap: 2rem; }
+    .hero-meta-item .label { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-dim); margin-bottom: 0.2rem; }
+    .hero-meta-item .value { font-size: 0.95rem; font-weight: 600; color: var(--text); }
+
+    section { max-width: 960px; margin: 0 auto; padding: 4rem 2rem; border-bottom: 1px solid var(--border); }
+    section:last-of-type { border-bottom: none; }
+    .section-label { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--accent); font-weight: 700; margin-bottom: 0.6rem; }
+    h2 { font-size: 1.8rem; font-weight: 800; letter-spacing: -0.02em; margin-bottom: 0.5rem; }
+    h3 { font-size: 1.15rem; font-weight: 700; margin-bottom: 0.75rem; }
+    .section-intro { color: var(--text-muted); font-size: 1rem; max-width: 700px; margin-bottom: 2.5rem; }
+
+    .score-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1rem; margin-bottom: 2.5rem; }
+    .score-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 1.5rem 1.25rem; text-align: center; }
+    .score-card .score-value { font-size: 2.8rem; font-weight: 900; line-height: 1; margin-bottom: 0.4rem; }
+    .score-card .score-label { font-size: 0.78rem; color: var(--text-muted); font-weight: 500; }
+    .score-card .score-bar { height: 4px; background: var(--border); border-radius: 2px; margin-top: 0.75rem; overflow: hidden; }
+    .score-card .score-bar-fill { height: 100%; border-radius: 2px; }
+
+    .callout { border-radius: 12px; padding: 1.25rem 1.5rem; margin: 1.5rem 0; display: flex; gap: 1rem; align-items: flex-start; }
+    .callout.info { background: rgba(79,142,247,0.07); border: 1px solid rgba(79,142,247,0.2); }
+    .callout.warning { background: rgba(245,158,11,0.07); border: 1px solid rgba(245,158,11,0.2); }
+    .callout.success { background: rgba(34,197,94,0.07); border: 1px solid rgba(34,197,94,0.2); }
+    .callout.danger { background: rgba(239,68,68,0.07); border: 1px solid rgba(239,68,68,0.2); }
+    .callout.orange { background: rgba(249,115,22,0.07); border: 1px solid rgba(249,115,22,0.2); }
+    .callout-icon { font-size: 1.2rem; flex-shrink: 0; margin-top: 1px; }
+    .callout-body { font-size: 0.9rem; color: var(--text-muted); }
+    .callout-body strong { color: var(--text); display: block; margin-bottom: 0.25rem; }
+
+    .maturity-banner { background: linear-gradient(135deg, rgba(249,115,22,0.08), rgba(245,158,11,0.06)); border: 1px solid rgba(249,115,22,0.2); border-radius: 16px; padding: 2rem; margin-bottom: 2.5rem; display: flex; align-items: center; gap: 2rem; flex-wrap: wrap; }
+    .maturity-score-big { font-size: 5rem; font-weight: 900; color: var(--accent); line-height: 1; min-width: 120px; text-align: center; }
+    .maturity-score-big span { font-size: 2rem; color: var(--text-muted); }
+    .maturity-text h3 { color: var(--accent); margin-bottom: 0.4rem; }
+    .maturity-text p { color: var(--text-muted); font-size: 0.95rem; max-width: 500px; }
+
+    table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; }
+    thead tr { border-bottom: 1px solid var(--border); }
+    th { text-align: left; padding: 0.65rem 1rem; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.07em; color: var(--text-dim); font-weight: 700; }
+    td { padding: 0.85rem 1rem; font-size: 0.9rem; border-bottom: 1px solid rgba(255,255,255,0.04); color: var(--text-muted); vertical-align: top; }
+    td:first-child { color: var(--text); font-weight: 600; }
+    tr:last-child td { border-bottom: none; }
+
+    .pill { display: inline-block; padding: 0.15em 0.55em; border-radius: 4px; font-size: 0.72rem; font-weight: 700; }
+    .pill.fix { background: rgba(239,68,68,0.12); color: var(--red); }
+    .pill.keep { background: rgba(34,197,94,0.12); color: var(--green); }
+    .pill.upgrade { background: rgba(245,158,11,0.12); color: var(--yellow); }
+    .pill.add { background: rgba(79,142,247,0.12); color: var(--blue); }
+    .pill.phase2 { background: rgba(168,85,247,0.12); color: var(--purple); }
+
+    .opp-card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 1.75rem; margin-bottom: 1.25rem; position: relative; overflow: hidden; }
+    .opp-card::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; }
+    .opp-card.p1::before { background: var(--red); }
+    .opp-card.p2::before { background: var(--accent); }
+    .opp-card.p3::before { background: var(--yellow); }
+    .opp-card.p4::before { background: var(--teal); }
+    .opp-card.p5::before { background: var(--blue); }
+    .opp-header { display: flex; align-items: flex-start; gap: 1rem; margin-bottom: 1rem; flex-wrap: wrap; }
+    .opp-number { font-size: 0.7rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; padding: 0.3em 0.7em; border-radius: 6px; white-space: nowrap; }
+    .opp-card.p1 .opp-number { background: rgba(239,68,68,0.15); color: var(--red); }
+    .opp-card.p2 .opp-number { background: rgba(249,115,22,0.15); color: var(--accent); }
+    .opp-card.p3 .opp-number { background: rgba(245,158,11,0.15); color: var(--yellow); }
+    .opp-card.p4 .opp-number { background: rgba(45,212,191,0.15); color: var(--teal); }
+    .opp-card.p5 .opp-number { background: rgba(79,142,247,0.15); color: var(--blue); }
+    .opp-title { font-size: 1.15rem; font-weight: 700; flex: 1; }
+    .opp-tags { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.25rem; }
+    .tag { font-size: 0.7rem; padding: 0.2em 0.6em; border-radius: 4px; font-weight: 600; background: var(--surface2); color: var(--text-muted); border: 1px solid var(--border); }
+    .opp-body { color: var(--text-muted); font-size: 0.95rem; margin-bottom: 1rem; }
+    .opp-impact { display: flex; gap: 2rem; flex-wrap: wrap; }
+    .impact-item .impact-label { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-dim); margin-bottom: 0.2rem; }
+    .impact-item .impact-value { font-size: 0.9rem; font-weight: 700; }
+    .steps-list { margin-top: 1.25rem; border-top: 1px solid var(--border); padding-top: 1.25rem; }
+    .steps-list h4 { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.07em; color: var(--text-dim); margin-bottom: 0.75rem; }
+    .step-item { display: flex; align-items: flex-start; gap: 0.75rem; margin-bottom: 0.6rem; font-size: 0.9rem; color: var(--text-muted); }
+    .step-num { min-width: 22px; height: 22px; background: var(--surface2); border: 1px solid var(--border); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.68rem; font-weight: 700; color: var(--text-dim); flex-shrink: 0; margin-top: 2px; }
+    code { background: var(--surface2); border: 1px solid var(--border); padding: 0.15em 0.45em; border-radius: 4px; font-family: 'SF Mono', 'Fira Code', monospace; font-size: 0.82em; color: var(--teal); }
+
+    .roadmap-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.25rem; }
+    @media (max-width: 700px) { .roadmap-grid { grid-template-columns: 1fr; } }
+    .roadmap-col { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; }
+    .roadmap-header { padding: 1rem 1.25rem; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 0.75rem; }
+    .roadmap-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+    .roadmap-header h3 { font-size: 0.9rem; margin: 0; }
+    .roadmap-sub { font-size: 0.72rem; color: var(--text-dim); margin-top: 0.1rem; }
+    .roadmap-items { padding: 1rem 1.25rem; }
+    .roadmap-item { display: flex; align-items: flex-start; gap: 0.6rem; padding: 0.6rem 0; border-bottom: 1px solid rgba(255,255,255,0.04); font-size: 0.875rem; color: var(--text-muted); }
+    .roadmap-item:last-child { border-bottom: none; }
+    .roadmap-item .ri-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; margin-top: 7px; }
+    .roadmap-item strong { color: var(--text); display: block; font-size: 0.85rem; margin-bottom: 0.1rem; }
+
+    .quickwin-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem; }
+    .quickwin-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 1.5rem; }
+    .quickwin-card .qw-label { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.08em; font-weight: 700; margin-bottom: 0.5rem; }
+    .quickwin-card h3 { font-size: 1rem; margin-bottom: 0.5rem; }
+    .quickwin-card p { font-size: 0.875rem; color: var(--text-muted); }
+    .quickwin-card .qw-time { margin-top: 1rem; font-size: 0.75rem; color: var(--text-dim); }
+
+    .nextsteps-list {}
+    .next-item { display: flex; gap: 1.25rem; padding: 1.25rem 0; border-bottom: 1px solid var(--border); align-items: flex-start; }
+    .next-item:last-child { border-bottom: none; }
+    .next-num { min-width: 36px; height: 36px; border-radius: 50%; background: var(--surface2); border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; font-size: 0.85rem; font-weight: 800; color: var(--accent); flex-shrink: 0; }
+    .next-content h3 { font-size: 1rem; margin-bottom: 0.35rem; }
+    .next-content p { font-size: 0.88rem; color: var(--text-muted); }
+    .next-content .next-when { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.07em; color: var(--text-dim); margin-bottom: 0.3rem; }
+
+    .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+    @media (max-width: 600px) { .two-col { grid-template-columns: 1fr; } }
+    .box { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 1.25rem; }
+    .box h4 { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.07em; color: var(--text-dim); margin-bottom: 0.75rem; }
+    .box-item { font-size: 0.875rem; color: var(--text-muted); padding: 0.3rem 0; border-bottom: 1px solid rgba(255,255,255,0.04); }
+    .box-item:last-child { border-bottom: none; }
+    .box-item span { color: var(--text); font-weight: 600; }
+
+    .metric-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin: 1.5rem 0; }
+    .metric-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 1.25rem; }
+    .metric-card .m-label { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.07em; color: var(--text-dim); margin-bottom: 0.35rem; }
+    .metric-card .m-value { font-size: 1.5rem; font-weight: 800; margin-bottom: 0.25rem; }
+    .metric-card .m-desc { font-size: 0.78rem; color: var(--text-muted); }
+    .metric-card.warn { border-color: rgba(245,158,11,0.3); }
+    .metric-card.danger { border-color: rgba(239,68,68,0.3); }
+    .metric-card.good { border-color: rgba(34,197,94,0.3); }
+
+    .adhd-box { background: linear-gradient(135deg, rgba(249,115,22,0.06), rgba(245,158,11,0.04)); border: 1px solid rgba(249,115,22,0.2); border-radius: 14px; padding: 2rem; margin: 1.5rem 0; }
+    .adhd-box h3 { color: var(--accent); margin-bottom: 0.75rem; font-size: 1.1rem; }
+    .adhd-box p { color: var(--text-muted); font-size: 0.9rem; }
+    .adhd-rule { display: flex; align-items: flex-start; gap: 0.75rem; padding: 0.6rem 0; border-bottom: 1px solid rgba(255,255,255,0.05); font-size: 0.9rem; color: var(--text-muted); }
+    .adhd-rule:last-child { border-bottom: none; }
+    .adhd-num { min-width: 24px; height: 24px; background: rgba(249,115,22,0.15); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.72rem; font-weight: 800; color: var(--accent); flex-shrink: 0; margin-top: 2px; }
+
+    footer { max-width: 960px; margin: 0 auto; padding: 3rem 2rem; text-align: center; color: var(--text-dim); font-size: 0.85rem; }
+    footer strong { color: var(--text-muted); }
+    ul.blist { margin-left: 1.25rem; color: var(--text-muted); font-size: 0.9rem; }
+    ul.blist li { margin: 0.4rem 0; }
+  </style>
+</head>
+<body>
+
+<nav>
+  <div class="logo">⚛️ GodMode AI Audit</div>
+  <a href="#summary">Summary</a>
+  <a href="#diagnosis">Diagnosis</a>
+  <a href="#foundation">Fix First</a>
+  <a href="#opportunities">Opportunities</a>
+  <a href="#roadmap">Roadmap</a>
+  <a href="#stack">Stack</a>
+  <a href="#adhd">Focus Rules</a>
+  <a href="#nextsteps">Next Steps</a>
+</nav>
+
+<div class="hero">
+  <div class="hero-tag">Confidential · AI Audit Report</div>
+  <h1>Stop Running the Machine.<br><span>Build One That Runs Itself.</span></h1>
+  <p>A frank assessment of iExecute's current AI setup, the three things breaking your autonomous operation, and a clear prioritised plan to get your agent working overnight while you sleep.</p>
+  <div class="hero-meta">
+    <div class="hero-meta-item">
+      <div class="label">Prepared for</div>
+      <div class="value">John Gulick — iExecute, LLC</div>
+    </div>
+    <div class="hero-meta-item">
+      <div class="label">Prepared by</div>
+      <div class="value">Caleb Hodges — GodMode AI</div>
+    </div>
+    <div class="hero-meta-item">
+      <div class="label">Date</div>
+      <div class="value">February 24, 2026</div>
+    </div>
+    <div class="hero-meta-item">
+      <div class="label">Operation Scale</div>
+      <div class="value">2–3M emails/day · 30 lists · 15 verticals</div>
+    </div>
+  </div>
+</div>
+
+<!-- EXECUTIVE SUMMARY -->
+<section id="summary">
+  <div class="section-label">01 — Executive Summary</div>
+  <h2>The bottom line</h2>
+  <p class="section-intro">You've spent 150+ hours on OpenClaw. You're not seeing overnight autonomous work yet. The reason isn't your effort — it's three specific, fixable problems that are blocking everything else. Fix those first. Everything else is Phase 2.</p>
+
+  <div class="score-grid">
+    <div class="score-card">
+      <div class="score-value" style="color:var(--yellow)">4.5</div>
+      <div class="score-label">AI Maturity Score</div>
+      <div class="score-bar"><div class="score-bar-fill" style="width:45%;background:var(--yellow)"></div></div>
+    </div>
+    <div class="score-card">
+      <div class="score-value" style="color:var(--accent)">3/5</div>
+      <div class="score-label">Team Readiness</div>
+      <div class="score-bar"><div class="score-bar-fill" style="width:60%;background:var(--accent)"></div></div>
+    </div>
+    <div class="score-card">
+      <div class="score-value" style="color:var(--red)">3</div>
+      <div class="score-label">Foundation Blockers</div>
+      <div class="score-bar"><div class="score-bar-fill" style="width:100%;background:var(--red)"></div></div>
+    </div>
+    <div class="score-card">
+      <div class="score-value" style="color:var(--green)">$800+</div>
+      <div class="score-label">Monthly Savings (Quick Wins)</div>
+      <div class="score-bar"><div class="score-bar-fill" style="width:80%;background:var(--green)"></div></div>
+    </div>
+    <div class="score-card">
+      <div class="score-value" style="color:var(--teal)">10+</div>
+      <div class="score-label">Hrs/Week Recoverable</div>
+      <div class="score-bar"><div class="score-bar-fill" style="width:65%;background:var(--teal)"></div></div>
+    </div>
+  </div>
+
+  <div class="callout orange">
+    <div class="callout-icon">🎯</div>
+    <div class="callout-body">
+      <strong>The core insight from your audit call</strong>
+      You said it exactly right: "I don't want something that takes me 50 hours to set up to save me 30 minutes a day." That's the filter for everything in this report. Every recommendation passes that test. We're not building complexity — we're removing it. The goal is simple: you sleep, your agent works. Right now three things are blocking that. Fix them in order.
+    </div>
+  </div>
+
+  <p style="color:var(--text-muted);font-size:0.95rem;margin-top:1.5rem;">You ran a lead gen company from 2014–2021 and built it big enough to sell. You know this business cold. The AI isn't here to teach you your industry — it's here to get you out of the operator seat and back into the strategist seat. <strong style="color:var(--text)">You know what offers to run. You know your data. You just need the machine to run it without you in it every day.</strong></p>
+</section>
+
+<!-- THE DIAGNOSIS -->
+<section id="diagnosis">
+  <div class="section-label">02 — The Real Diagnosis</div>
+  <h2>Why it's not working yet</h2>
+  <p class="section-intro">You're not stuck because OpenClaw is bad or because you're doing it wrong. You're stuck because three specific foundation problems are cascading into everything else.</p>
+
+  <div class="callout danger">
+    <div class="callout-icon">🔴</div>
+    <div class="callout-body">
+      <strong>Blocker #1: You're running the wrong model (Codex)</strong>
+      You mentioned using Codex as your main agent. Codex is OpenAI's coding model — it has no personality, weak reasoning, and limited context. When your agent tells you to "do it manually" or gives you responses you're not in love with — that's not OpenClaw failing, that's Codex being the wrong tool for an EA/operations agent. Switching to Claude Sonnet 4.6 on a Max subscription will feel like a different product entirely. This one change will fix 40–50% of your frustrations overnight.
+    </div>
+  </div>
+
+  <div class="callout danger">
+    <div class="callout-icon">🔴</div>
+    <div class="callout-body">
+      <strong>Blocker #2: Browser Relay + 1Password = constant interruptions</strong>
+      Your agent can't run overnight because it keeps hitting walls that require you: Chrome blocking the relay, 1Password timing out and asking for a password every 5–10 minutes, auth prompts requiring you to be physically at the machine. Until these are solved, autonomous operation is impossible — not difficult, impossible. These are fixable in an afternoon.
+    </div>
+  </div>
+
+  <div class="callout danger">
+    <div class="callout-icon">🔴</div>
+    <div class="callout-body">
+      <strong>Blocker #3: Memory system just installed — needs time + AGENTS.md rules</strong>
+      You installed Felix's 3-layer memory system 2 days ago. Good move. But memory alone isn't what makes an agent autonomous overnight. You need to add hard rules to your AGENTS.md: "Never ask me to do something you can do yourself. Never tell me you don't know something. Never stop working without logging your progress." Without those rules, the agent pauses and waits. With them, it pushes through and keeps going.
+    </div>
+  </div>
+
+  <div class="callout warning" style="margin-top:1.5rem;">
+    <div class="callout-icon">💡</div>
+    <div class="callout-body">
+      <strong>The pattern underneath all three</strong>
+      Every blocker has the same shape: something requires you physically present to unblock it. The whole game is eliminating those prompts. Fix the model → better reasoning, fewer dead ends. Fix auth → no more password prompts. Fix AGENTS.md → agent pushes through instead of waiting. That's the entire foundation sprint.
+    </div>
+  </div>
+</section>
+
+<!-- FIX THE FOUNDATION FIRST -->
+<section id="foundation">
+  <div class="section-label">03 — Fix First (Before Anything Else)</div>
+  <h2>The foundation sprint</h2>
+  <p class="section-intro">Do these in order. Nothing else matters until these are done. This is your Week 1 — all of it is doable in a single focused afternoon.</p>
+
+  <div class="opp-card p1">
+    <div class="opp-header">
+      <div>
+        <div class="opp-number">🔴 Fix #1 — Do Today</div>
+        <div class="opp-title">Switch to Claude Max Subscription + Set Up VS Code</div>
+        <div class="opp-tags"><span class="tag">Claude</span><span class="tag">VS Code</span><span class="tag">OpenClaw</span></div>
+      </div>
+    </div>
+    <div class="opp-body">
+      You've been running on API credits (expensive) and possibly Codex (wrong model). Switch to Claude Max subscription ($200/mo) and you get unlimited Sonnet + Opus, massive context windows, and a model that actually reasons well. You'll stop hitting rate limits. You'll stop getting "I don't know" answers. The quality jump is immediate and dramatic.
+    </div>
+    <div class="opp-impact">
+      <div class="impact-item"><div class="impact-label">Cost Savings</div><div class="impact-value" style="color:var(--green)">$200–400/mo vs API</div></div>
+      <div class="impact-item"><div class="impact-label">Time to Fix</div><div class="impact-value" style="color:var(--teal)">15 minutes</div></div>
+      <div class="impact-item"><div class="impact-label">Impact</div><div class="impact-value" style="color:var(--accent)">Immediate quality jump</div></div>
+    </div>
+    <div class="steps-list">
+      <h4>Exact Steps</h4>
+      <div class="step-item"><div class="step-num">1</div><div>In terminal on your Mac Mini: run <code>claude setup-token</code> — this gives you a token from your Claude.ai subscription</div></div>
+      <div class="step-item"><div class="step-num">2</div><div>Paste it into OpenClaw: <code>openclaw models auth setup-token --provider anthropic</code></div></div>
+      <div class="step-item"><div class="step-num">3</div><div>Verify: <code>openclaw models status</code> — should show claude-sonnet-4-6 available</div></div>
+      <div class="step-item"><div class="step-num">4</div><div>Set your default model in your agent config to <code>claude-sonnet-4-6</code> for daily operations</div></div>
+      <div class="step-item"><div class="step-num">5</div><div>Download VS Code (free). Install the Claude Code extension. This gives you a proper IDE to build skills and review your agent's work — same subscription, zero extra cost.</div></div>
+    </div>
+  </div>
+
+  <div class="opp-card p1">
+    <div class="opp-header">
+      <div>
+        <div class="opp-number">🔴 Fix #2 — This Afternoon</div>
+        <div class="opp-title">Fix Browser Relay (Brave) + 1Password Timeout</div>
+        <div class="opp-tags"><span class="tag">Brave Browser</span><span class="tag">1Password</span><span class="tag">agent-browser</span></div>
+      </div>
+    </div>
+    <div class="opp-body">
+      Chrome's enterprise policy is blocking the OpenClaw browser relay. The fix: switch to Brave browser for your agent's browser profile. Brave doesn't have those corporate restrictions. For 1Password — the CLI timeout is solvable by either storing credentials in your AGENTS.md context directly (for non-sensitive keys) or using environment variables that don't require re-auth.
+    </div>
+    <div class="opp-impact">
+      <div class="impact-item"><div class="impact-label">Time to Fix</div><div class="impact-value" style="color:var(--teal)">30–60 minutes</div></div>
+      <div class="impact-item"><div class="impact-label">Unlock</div><div class="impact-value" style="color:var(--green)">True overnight operation</div></div>
+    </div>
+    <div class="steps-list">
+      <h4>Exact Steps</h4>
+      <div class="step-item"><div class="step-num">1</div><div>Install Brave browser on your Mac Mini. Create a dedicated browser profile named "Agent" with no extensions except the OpenClaw relay.</div></div>
+      <div class="step-item"><div class="step-num">2</div><div>In OpenClaw config, set your browser profile to Brave. The relay should attach immediately — the orange dot problem goes away.</div></div>
+      <div class="step-item"><div class="step-num">3</div><div>For 1Password: stop using the CLI for your agent entirely. Instead, store your API credentials in a local <code>credentials.json</code> file on your Mac Mini. Your agent reads from that file directly. No prompts, no timeouts, no running upstairs.</div></div>
+      <div class="step-item"><div class="step-num">4</div><div>Alternatively use the <code>agent-browser</code> Vercel tool for browser tasks that don't need the relay — it's headless, handles JS, and never asks for input.</div></div>
+    </div>
+  </div>
+
+  <div class="opp-card p1">
+    <div class="opp-header">
+      <div>
+        <div class="opp-number">🔴 Fix #3 — This Week</div>
+        <div class="opp-title">AGENTS.md Hard Rules for Autonomous Operation</div>
+        <div class="opp-tags"><span class="tag">AGENTS.md</span><span class="tag">Memory</span><span class="tag">OpenClaw</span></div>
+      </div>
+    </div>
+    <div class="opp-body">
+      Your memory system is installed but your agent still pauses and waits for you. That's an instructions problem, not a memory problem. You need hard rules that tell it: never stop, never ask, never give up. These are the exact rules that make the difference between an agent that runs overnight and one that gets stuck at 11pm.
+    </div>
+    <div class="steps-list">
+      <h4>Add These Rules to Your AGENTS.md</h4>
+      <div class="step-item"><div class="step-num">1</div><div><strong style="color:var(--text)">Never ask me to do something you can do yourself.</strong> If you have tool access, use it. Do not instruct me to manually click, copy, or paste anything.</div></div>
+      <div class="step-item"><div class="step-num">2</div><div><strong style="color:var(--text)">Never stop working without logging your progress.</strong> If you hit a blocker, log it to <code>blocks.md</code> and continue with the next task. Do not wait for me.</div></div>
+      <div class="step-item"><div class="step-num">3</div><div><strong style="color:var(--text)">Never tell me you don't know something.</strong> Use your search tools, read your context files, try multiple approaches. "I don't know" is not an acceptable response.</div></div>
+      <div class="step-item"><div class="step-num">4</div><div><strong style="color:var(--text)">Test every change before moving on.</strong> If you make a config change, verify it works before proceeding. Never make changes and assume they worked.</div></div>
+      <div class="step-item"><div class="step-num">5</div><div><strong style="color:var(--text)">One task at a time, fully verified.</strong> Complete and confirm before starting the next. Do not stack changes.</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- TOP OPPORTUNITIES -->
+<section id="opportunities">
+  <div class="section-label">04 — Priority Opportunities</div>
+  <h2>Your highest-leverage moves</h2>
+  <p class="section-intro">After the foundation is fixed, these are your top automations — ranked by weekly time savings and ROI. Implement them in this order, one at a time, fully verified before moving to the next.</p>
+
+  <!-- OPP 1 -->
+  <div class="opp-card p2">
+    <div class="opp-header">
+      <div>
+        <div class="opp-number">🟠 Priority 1 — Biggest ROI</div>
+        <div class="opp-title">SES Account Setup Automation: End Xavier's Manual Grind</div>
+        <div class="opp-tags"><span class="tag">AWS SES API</span><span class="tag">Cloudflare API</span><span class="tag">Python</span><span class="tag">Cron</span></div>
+      </div>
+    </div>
+    <div class="opp-body">
+      You're paying Xavier "a few hundred dollars a week" to manually buy SES accounts, set DNS records, configure SPF/DKIM, and connect to Ongage. This is 100% automatable via API. You use Cloudflare — that's the key. Every DNS record can be written programmatically. The script already exists and has been built during your audit prep. This saves you $800–1,200/month immediately.
+    </div>
+    <div class="opp-impact">
+      <div class="impact-item"><div class="impact-label">Monthly Savings</div><div class="impact-value" style="color:var(--green)">$800–1,200/mo</div></div>
+      <div class="impact-item"><div class="impact-label">Time Saved</div><div class="impact-value" style="color:var(--green)">5–10 hrs/week</div></div>
+      <div class="impact-item"><div class="impact-label">Build Time</div><div class="impact-value" style="color:var(--yellow)">1–2 days</div></div>
+    </div>
+    <div class="steps-list">
+      <h4>How It Works</h4>
+      <div class="step-item"><div class="step-num">1</div><div>You maintain a simple <code>ses-queue.json</code> — a list of domains to set up. That's all you (or Xavier) ever touches.</div></div>
+      <div class="step-item"><div class="step-num">2</div><div>The script runs Monday morning via cron: calls AWS SES v2 API → creates identity → gets DKIM tokens → writes DNS records directly to Cloudflare API → polls until verified → generates SMTP credentials → logs everything to <code>ses-accounts.json</code>.</div></div>
+      <div class="step-item"><div class="step-num">3</div><div>The residential proxy concern: the script can be configured to route through your existing proxy service per account's region. This is a parameter, not a blocker.</div></div>
+      <div class="step-item"><div class="step-num">4</div><div>Verification emails: your catch-all server already handles this. Add a script that monitors the inbox and auto-clicks verification links — fully unattended.</div></div>
+      <div class="step-item"><div class="step-num">5</div><div>Ongage connection: once SMTP credentials are generated, auto-POST to the Ongage vendor API. Both Ongage and Email Element have APIs for this.</div></div>
+      <div class="step-item"><div class="step-num">6</div><div>You wake up to a Telegram message: "✅ 5 new SES accounts live. DNS verified. Connected to Ongage. Credentials logged."</div></div>
+    </div>
+  </div>
+
+  <!-- OPP 2 -->
+  <div class="opp-card p3">
+    <div class="opp-header">
+      <div>
+        <div class="opp-number">🟡 Priority 2 — Eliminate the Blind Spot</div>
+        <div class="opp-title">Bounce Rate & ECPM Alerts: Know Before Amazon Knows</div>
+        <div class="opp-tags"><span class="tag">AWS SES API</span><span class="tag">Ongage API</span><span class="tag">Telegram</span><span class="tag">Cron</span></div>
+      </div>
+    </div>
+    <div class="opp-body">
+      You said it: "There's no alerts when something starts bouncing." Right now you find out when Amazon suspends the account — after the damage is done. A $600 account gone. A monitoring script that checks bounce rates every 3 hours costs nothing to run and saves accounts constantly. Your real metric is ECPM (revenue per thousand emails) — that goes in the daily brief too.
+    </div>
+    <div class="opp-impact">
+      <div class="impact-item"><div class="impact-label">Account Save Value</div><div class="impact-value" style="color:var(--green)">$600+ per alert caught</div></div>
+      <div class="impact-item"><div class="impact-label">Build Time</div><div class="impact-value" style="color:var(--teal)">Half a day</div></div>
+      <div class="impact-item"><div class="impact-label">Runs</div><div class="impact-value" style="color:var(--accent)">Fully autonomous</div></div>
+    </div>
+    <div class="steps-list">
+      <h4>What Gets Monitored</h4>
+      <div class="step-item"><div class="step-num">1</div><div><strong style="color:var(--text)">Bounce rate</strong> — warn at 2%, critical alert + auto-pause at 5% (Amazon's suspension threshold). Telegram alert immediately.</div></div>
+      <div class="step-item"><div class="step-num">2</div><div><strong style="color:var(--text)">Complaint rate</strong> — warn at 0.08%, critical at 0.1%. These get accounts banned faster than bounces.</div></div>
+      <div class="step-item"><div class="step-num">3</div><div><strong style="color:var(--text)">Account sending status</strong> — if Amazon disables an account, immediate Telegram blast. Not the 7am brief — right now.</div></div>
+      <div class="step-item"><div class="step-num">4</div><div><strong style="color:var(--text)">ECPM per campaign</strong> — pulled from Cake/Ongage. Daily brief shows your top 5 campaigns by ECPM and flags anything tanking.</div></div>
+      <div class="step-item"><div class="step-num">5</div><div><strong style="color:var(--text)">Per-domain DKIM status</strong> — if a domain's DKIM goes into FAILED state, immediate alert. That domain is dead and you stop routing to it.</div></div>
+    </div>
+  </div>
+
+  <!-- OPP 3 -->
+  <div class="opp-card p3">
+    <div class="opp-header">
+      <div>
+        <div class="opp-number">🟡 Priority 3 — Creative System</div>
+        <div class="opp-title">Email Creative Automation: Kill the Creative Bottleneck</div>
+        <div class="opp-tags"><span class="tag">Claude</span><span class="tag">OpenClaw</span><span class="tag">Vertical Templates</span></div>
+      </div>
+    </div>
+    <div class="opp-body">
+      You're running 30–70 campaigns a day and doing 2–3M sends. Your creative system is manual. You mentioned this killed your Meta ads (couldn't keep up with Andromeda's creative demands) and it's slowing your email operation too. An AI creative system doesn't replace your judgment on what offers to run — it gives you a 10-minute path from "new offer" to "campaign-ready creative."
+    </div>
+    <div class="opp-impact">
+      <div class="impact-item"><div class="impact-label">Time Saved</div><div class="impact-value" style="color:var(--green)">2–4 hrs/day</div></div>
+      <div class="impact-item"><div class="impact-label">Unlock</div><div class="impact-value" style="color:var(--accent)">Restart Meta ads</div></div>
+      <div class="impact-item"><div class="impact-label">Build Time</div><div class="impact-value" style="color:var(--yellow)">3–5 days</div></div>
+    </div>
+    <div class="steps-list">
+      <h4>The System</h4>
+      <div class="step-item"><div class="step-num">1</div><div>Build vertical-specific creative templates for each of your 15 verticals (roofing, solar, Medicare, auto insurance, etc.). These are stored in Obsidian/markdown — your agent reads them.</div></div>
+      <div class="step-item"><div class="step-num">2</div><div>Telegram command: <code>/creative roofing spring-promo</code> → agent generates 3 subject line variants + 2 email body variants + 1 HTML email → ready for Ongage in 60 seconds.</div></div>
+      <div class="step-item"><div class="step-num">3</div><div>Meta ads: same system, different output format. Command → 5 ad copy variants + 3 headline variants + suggested creative brief. You (or a contractor) do the visual; AI does the copy.</div></div>
+      <div class="step-item"><div class="step-num">4</div><div>ECPM feedback loop: after each campaign, the monitoring script logs performance. After 10 runs, the creative agent starts generating copy based on what's actually converting in each vertical — not just templates.</div></div>
+    </div>
+  </div>
+
+  <!-- OPP 4 -->
+  <div class="opp-card p4">
+    <div class="opp-header">
+      <div>
+        <div class="opp-number">🩵 Priority 4 — New Offer Setup</div>
+        <div class="opp-title">Cake Offer Onboarding: Guided Workflow for New Offers</div>
+        <div class="opp-tags"><span class="tag">Cake</span><span class="tag">Telegram</span><span class="tag">Postback Generator</span></div>
+      </div>
+    </div>
+    <div class="opp-body">
+      Since you're on the affiliate side only, this isn't a Cake API integration — it's a guided workflow. You get 3–5 new offers a week, each requiring postback setup, tracking link config, and logging. The workflow your agent runs saves 30–45 min per offer and — more importantly — keeps a clean log of every offer you've ever run, what it paid, which affiliate it went under, and its status. That log becomes intelligence over time.
+    </div>
+    <div class="opp-impact">
+      <div class="impact-item"><div class="impact-label">Time Saved</div><div class="impact-value" style="color:var(--green)">2–4 hrs/week</div></div>
+      <div class="impact-item"><div class="impact-label">Build Time</div><div class="impact-value" style="color:var(--teal)">1 day</div></div>
+    </div>
+    <div class="steps-list">
+      <h4>The Workflow</h4>
+      <div class="step-item"><div class="step-num">1</div><div>Telegram command: <code>/newoffer [network] [vertical] [payout] [tracking_link]</code></div></div>
+      <div class="step-item"><div class="step-num">2</div><div>Agent identifies the network (HasOffers, Cake, etc.) → selects the right token template for that network → generates your postback URL in the correct format automatically.</div></div>
+      <div class="step-item"><div class="step-num">3</div><div>Returns: offer ID structure, postback URL to place with advertiser, affiliate setup checklist, and logs everything to <code>offers-log.json</code>.</div></div>
+      <div class="step-item"><div class="step-num">4</div><div>Weekly: agent generates a performance summary of all active offers ranked by ECPM — your strategy brief, automated.</div></div>
+    </div>
+  </div>
+
+  <!-- OPP 5 -->
+  <div class="opp-card p5">
+    <div class="opp-header">
+      <div>
+        <div class="opp-number">🔵 Priority 5 — Phase 2</div>
+        <div class="opp-title">AEO Project: B2B Cold Email Pipeline Automation</div>
+        <div class="opp-tags"><span class="tag">AudienceLabs</span><span class="tag">EmailOversight</span><span class="tag">Cold Email</span><span class="tag">OpenClaw</span></div>
+      </div>
+    </div>
+    <div class="opp-body">
+      Your agent is already studying the AEO courses. Good — let it. Don't interrupt that process. Once the foundation (Fixes 1–3) and the top 3 priorities are stable, AEO becomes your Phase 2 build. The pipeline you described — AudienceLabs → EmailOversight clean → website audit → cold email — is a clean, automatable sequence. We design it together on the follow-up call once you're past the foundation work.
+    </div>
+    <div class="opp-impact">
+      <div class="impact-item"><div class="impact-label">Timeline</div><div class="impact-value" style="color:var(--blue)">Weeks 6–12</div></div>
+      <div class="impact-item"><div class="impact-label">Revenue Potential</div><div class="impact-value" style="color:var(--green)">New income stream</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- 90-DAY ROADMAP -->
+<section id="roadmap">
+  <div class="section-label">05 — 90-Day Roadmap</div>
+  <h2>One thing at a time. Verified. Then the next.</h2>
+  <p class="section-intro">This is built around your ADHD reality. No parallel tracks. No "while you're doing X, also do Y." One thing, working, then the next.</p>
+
+  <div class="roadmap-grid">
+    <div class="roadmap-col">
+      <div class="roadmap-header">
+        <div class="roadmap-dot" style="background:var(--red)"></div>
+        <div>
+          <h3>Phase 1 — Fix the Foundation</h3>
+          <div class="roadmap-sub">Week 1 · This is all that matters</div>
+        </div>
+      </div>
+      <div class="roadmap-items">
+        <div class="roadmap-item">
+          <div class="ri-dot" style="background:var(--red)"></div>
+          <div><strong>Claude Max subscription</strong>Run the two commands. Stop burning API credits. Model quality jumps immediately.</div>
+        </div>
+        <div class="roadmap-item">
+          <div class="ri-dot" style="background:var(--red)"></div>
+          <div><strong>VS Code setup</strong>Download, install Claude Code extension, connect same subscription. Heavy coding moves here.</div>
+        </div>
+        <div class="roadmap-item">
+          <div class="ri-dot" style="background:var(--red)"></div>
+          <div><strong>Brave browser relay</strong>Switch profile from Chrome to Brave. Orange dot problem fixed. Browser tools work.</div>
+        </div>
+        <div class="roadmap-item">
+          <div class="ri-dot" style="background:var(--red)"></div>
+          <div><strong>Credentials file (replace 1Password CLI)</strong>Local <code>credentials.json</code> on Mac Mini. No more password timeouts. Agent never needs you upstairs.</div>
+        </div>
+        <div class="roadmap-item">
+          <div class="ri-dot" style="background:var(--red)"></div>
+          <div><strong>AGENTS.md autonomy rules</strong>Add the 5 hard rules. Test: ask agent to do something while you sleep. See if it runs through.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="roadmap-col">
+      <div class="roadmap-header">
+        <div class="roadmap-dot" style="background:var(--yellow)"></div>
+        <div>
+          <h3>Phase 2 — Automate the Grind</h3>
+          <div class="roadmap-sub">Weeks 2–5 · One per week</div>
+        </div>
+      </div>
+      <div class="roadmap-items">
+        <div class="roadmap-item">
+          <div class="ri-dot" style="background:var(--yellow)"></div>
+          <div><strong>SES automation skill</strong>Week 2. Build it, test it on one domain, verify end-to-end, then let it run the full queue. Xavier's manual work is done.</div>
+        </div>
+        <div class="roadmap-item">
+          <div class="ri-dot" style="background:var(--yellow)"></div>
+          <div><strong>Bounce/ECPM alerts live</strong>Week 3. Morning daily brief + critical instant alerts. Never lose an account to a silent bounce problem again.</div>
+        </div>
+        <div class="roadmap-item">
+          <div class="ri-dot" style="background:var(--yellow)"></div>
+          <div><strong>Creative system v1</strong>Week 4. Vertical templates built. First Telegram <code>/creative</code> command working. Start using it for real campaigns.</div>
+        </div>
+        <div class="roadmap-item">
+          <div class="ri-dot" style="background:var(--yellow)"></div>
+          <div><strong>Cake offer workflow</strong>Week 5. Guided onboarding, postback generator, offers-log. First real offer logged through the system.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="roadmap-col">
+      <div class="roadmap-header">
+        <div class="roadmap-dot" style="background:var(--green)"></div>
+        <div>
+          <h3>Phase 3 — Compound</h3>
+          <div class="roadmap-sub">Weeks 6–12 · Start the flywheel</div>
+        </div>
+      </div>
+      <div class="roadmap-items">
+        <div class="roadmap-item">
+          <div class="ri-dot" style="background:var(--green)"></div>
+          <div><strong>Restart Meta ads</strong>Creative system is live. You have a pipeline for creatives. Test $200/day in one vertical. Scale what works.</div>
+        </div>
+        <div class="roadmap-item">
+          <div class="ri-dot" style="background:var(--green)"></div>
+          <div><strong>AEO pipeline build</strong>Agent has been studying. Design the full AudienceLabs → clean → audit → cold email pipeline. Build in sprints.</div>
+        </div>
+        <div class="roadmap-item">
+          <div class="ri-dot" style="background:var(--green)"></div>
+          <div><strong>Smart model routing</strong>Assign Haiku to lightweight cron tasks (monitoring). Sonnet for operations. Opus for creative + strategy. Reduce spend, maintain quality.</div>
+        </div>
+        <div class="roadmap-item">
+          <div class="ri-dot" style="background:var(--green)"></div>
+          <div><strong>First true overnight run</strong>Set 5 tasks before bed. Wake up to all 5 done. That's the milestone. Everything before this was building toward this moment.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- STACK REVIEW -->
+<section id="stack">
+  <div class="section-label">06 — Tech Stack Review</div>
+  <h2>What to fix, keep, and add</h2>
+
+  <table>
+    <thead>
+      <tr><th>Tool</th><th>Status</th><th>Recommendation</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Claude (Codex/API)</td>
+        <td><span class="pill fix">FIX NOW</span></td>
+        <td>Switch to Claude Max subscription ($200/mo). Run <code>claude setup-token</code>. This is the single highest-leverage change you can make. Everything gets better.</td>
+      </tr>
+      <tr>
+        <td>OpenClaw (Mac Mini)</td>
+        <td><span class="pill keep">KEEP</span></td>
+        <td>Right platform, right hardware. The setup pain you experienced is normal and is behind you. Don't switch platforms — fix the three blockers and it becomes what you expected.</td>
+      </tr>
+      <tr>
+        <td>VS Code</td>
+        <td><span class="pill add">ADD NOW</span></td>
+        <td>Free. Install today. Claude Code extension runs on your same Max subscription. This is where you build skills, review code, debug configs. Terminal stays for OpenClaw commands only.</td>
+      </tr>
+      <tr>
+        <td>Brave Browser</td>
+        <td><span class="pill add">ADD NOW</span></td>
+        <td>Replace Chrome for your agent's browser profile. No enterprise policy restrictions. The relay works immediately. Takes 10 minutes.</td>
+      </tr>
+      <tr>
+        <td>1Password CLI</td>
+        <td><span class="pill fix">REPLACE</span></td>
+        <td>The 5–10 min timeout breaks overnight autonomy. Replace with a local <code>credentials.json</code> on your Mac Mini. More secure than copy-pasting. Never times out. Agent reads it directly.</td>
+      </tr>
+      <tr>
+        <td>AWS SES</td>
+        <td><span class="pill upgrade">AUTOMATE</span></td>
+        <td>Keep using it. Stop setting it up manually. The automation script is built — you need to provide AWS credentials + Cloudflare API token to run it.</td>
+      </tr>
+      <tr>
+        <td>Cloudflare</td>
+        <td><span class="pill upgrade">UNLOCK</span></td>
+        <td>You're already on Cloudflare — this is why the SES automation is 100% achievable. The DNS API writes records programmatically. You're one API token away from zero manual DNS.</td>
+      </tr>
+      <tr>
+        <td>Ongage + Email Element</td>
+        <td><span class="pill keep">KEEP</span></td>
+        <td>Both have APIs for vendor/ESP management. Wire them into the SES automation script so new accounts connect automatically. No manual connecting required.</td>
+      </tr>
+      <tr>
+        <td>Telegram</td>
+        <td><span class="pill keep">KEEP</span></td>
+        <td>Good choice for your command interface. Topics for different workstreams is the right call — keep doing that. Your daily briefs, alerts, and commands all route through Telegram.</td>
+      </tr>
+      <tr>
+        <td>Felix (Nat's memory system)</td>
+        <td><span class="pill keep">KEEP</span></td>
+        <td>Good move installing it. Give it a week to fully load context. Pair it with the AGENTS.md autonomy rules and the memory system will start actually working for you.</td>
+      </tr>
+      <tr>
+        <td>Google Gemini</td>
+        <td><span class="pill fix">DROP</span></td>
+        <td>You said it took you an hour to set up and never fully worked. Not worth the pain. Claude handles everything you need. Revisit in 6 months if there's a specific use case.</td>
+      </tr>
+      <tr>
+        <td>Cake (affiliate)</td>
+        <td><span class="pill upgrade">WORKFLOW</span></td>
+        <td>No API integration needed since you're publisher-side only. Build the guided offer onboarding workflow in OpenClaw instead. Same time savings, simpler build.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- Metrics that matter -->
+  <h3 style="margin-top:2rem;">The metrics dashboard John actually needs</h3>
+  <p style="color:var(--text-muted);font-size:0.9rem;margin-bottom:1.25rem;">You said it clearly: you don't care about open rate, you care about ECPM. Build the dashboard around what actually moves the needle for your business.</p>
+  <div class="metric-grid">
+    <div class="metric-card good">
+      <div class="m-label">Primary KPI</div>
+      <div class="m-value" style="color:var(--green)">ECPM</div>
+      <div class="m-desc">Revenue per thousand emails sent. This is the number. Everything else is context for why this number is what it is.</div>
+    </div>
+    <div class="metric-card warn">
+      <div class="m-label">Account Health</div>
+      <div class="m-value" style="color:var(--yellow)">Bounce Rate</div>
+      <div class="m-desc">Alert at 2%. Auto-flag at 5%. Below this, you keep sending. Above this, you stop and investigate before Amazon does it for you.</div>
+    </div>
+    <div class="metric-card danger">
+      <div class="m-label">Highest Risk</div>
+      <div class="m-value" style="color:var(--red)">Complaint Rate</div>
+      <div class="m-desc">Alert at 0.08%. Critical at 0.1%. This gets accounts banned faster than bounces. Most people find out when it's already too late.</div>
+    </div>
+    <div class="metric-card good">
+      <div class="m-label">Signal Metric</div>
+      <div class="m-value" style="color:var(--teal)">Open Rate</div>
+      <div class="m-desc">Not your primary metric, but a leading indicator. If open rate tanks, ECPM follows. Flag campaigns below 5% for review.</div>
+    </div>
+    <div class="metric-card good">
+      <div class="m-label">Offer Intelligence</div>
+      <div class="m-value" style="color:var(--blue)">ECPM by Vertical</div>
+      <div class="m-desc">Which verticals are converting best this week? This tells you where to rotate creative effort and media buying spend.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ADHD FOCUS RULES -->
+<section id="adhd">
+  <div class="section-label">07 — The ADHD Protocol</div>
+  <h2>How to not blow up your own progress</h2>
+  <p class="section-intro">You called it out yourself. ADHD has been your biggest enemy with this setup — wanting to build 10 things at once, not verifying, breaking everything. Here's the operating system that works with how your brain runs.</p>
+
+  <div class="adhd-box">
+    <h3>🧠 The 5 Rules That Will Save You From Yourself</h3>
+    <div class="adhd-rule">
+      <div class="adhd-num">1</div>
+      <div><strong style="color:var(--text)">Brain dump first, build second.</strong> When you have 10 ideas, dump them all to your agent in one message. Say "log all of these and we'll come back." Then pick ONE. Work that one until it's done and verified. The others will be there — they're logged.</div>
+    </div>
+    <div class="adhd-rule">
+      <div class="adhd-num">2</div>
+      <div><strong style="color:var(--text)">The "Verify Before Next" rule.</strong> Your agent told you this and you know it's true: you gave it 10 features, didn't verify any of them, and broke everything. One feature. Test it. Works? Next feature. Doesn't work? Fix it before moving on. No exceptions.</div>
+    </div>
+    <div class="adhd-rule">
+      <div class="adhd-num">3</div>
+      <div><strong style="color:var(--text)">Never start a build after 10pm.</strong> You're up at 5–6am every day grinding. The late-night build sessions when you're tired are where configs get broken and rabbit holes start. After 10pm: planning and reading only. No config changes.</div>
+    </div>
+    <div class="adhd-rule">
+      <div class="adhd-num">4</div>
+      <div><strong style="color:var(--text)">Before sleeping: set 3 tasks, no more.</strong> Tell your agent exactly what to do overnight, with clear success criteria. "Build X, test it does Y, log result to Z." Three things. If it can't do those three things reliably, it can't do ten.</div>
+    </div>
+    <div class="adhd-rule">
+      <div class="adhd-num">5</div>
+      <div><strong style="color:var(--text)">Use this report as your queue.</strong> When the ADHD urge hits to go build something new, come back to this document. If it's not in Priorities 1–5 in order, it goes to a backlog list. Not now. After the current priority is done.</div>
+    </div>
+  </div>
+
+  <div class="callout info" style="margin-top:1rem;">
+    <div class="callout-icon">💬</div>
+    <div class="callout-body">
+      <strong>The honest framing</strong>
+      You've been in this business since 2014. You built it to exit. You know your data, your verticals, your offers better than any AI will for a long time. The AI isn't here to run your strategy — it's here to get the ops off your plate so you can go back to doing what made the first company successful: finding the offers that convert, knowing the audience, making the right bets. Right now the ops is eating your time. Fix that first. The strategy follows.
+    </div>
+  </div>
+</section>
+
+<!-- GODMODE -->
+<section>
+  <div class="section-label">08 — GodMode</div>
+  <h2>What you saw on the call</h2>
+
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:1.75rem;">
+    <h3 style="margin-bottom:0.75rem;">⚛️ Why GodMode makes sense for your operation</h3>
+    <p style="color:var(--text-muted);font-size:0.9rem;margin-bottom:1.25rem;">You've spent 150+ hours fighting with terminal configs, broken setups, and an agent that won't run autonomously. GodMode is the harness that removes most of that friction — pre-built memory architecture, security hardening, skill library, multi-tab interface, and daily briefing system included out of the box.</p>
+    <div class="two-col">
+      <div class="box">
+        <h4>What it replaces</h4>
+        <div class="box-item">The 3-day install hell — <span>pre-configured</span></div>
+        <div class="box-item">Manual memory setup — <span>built in</span></div>
+        <div class="box-item">Security hardening research — <span>already done</span></div>
+        <div class="box-item">Telegram-only interface — <span>proper web UI</span></div>
+        <div class="box-item">Figuring out AGENTS.md from scratch — <span>templates included</span></div>
+      </div>
+      <div class="box">
+        <h4>What you get immediately</h4>
+        <div class="box-item">Multi-tab workspace with <span>green/red status indicators</span></div>
+        <div class="box-item">Daily briefing system — <span>pre-built</span></div>
+        <div class="box-item">SES automation skill — <span>ready to configure</span></div>
+        <div class="box-item">Metrics monitoring skill — <span>ready to configure</span></div>
+        <div class="box-item">Direct support from Caleb — <span>follow-up call included</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- NEXT STEPS -->
+<section id="nextsteps">
+  <div class="section-label">09 — Next Steps</div>
+  <h2>Your action list</h2>
+  <p class="section-intro">In order. Not simultaneously. One at a time.</p>
+
+  <div class="nextsteps-list">
+    <div class="next-item">
+      <div class="next-num">1</div>
+      <div class="next-content">
+        <div class="next-when">Today — 15 minutes</div>
+        <h3>Switch to Claude Max subscription</h3>
+        <p>Instructions in the separate email Caleb sent. Two terminal commands. Done. This is the single highest-impact change you can make right now.</p>
+      </div>
+    </div>
+    <div class="next-item">
+      <div class="next-num">2</div>
+      <div class="next-content">
+        <div class="next-when">Today — 30 minutes</div>
+        <h3>Install VS Code + Claude Code extension</h3>
+        <p>Free download. Connect your same Max subscription. Move all heavy coding to VS Code. Keep OpenClaw for agent conversations and operations.</p>
+      </div>
+    </div>
+    <div class="next-item">
+      <div class="next-num">3</div>
+      <div class="next-content">
+        <div class="next-when">This Afternoon</div>
+        <h3>Fix Brave relay + replace 1Password CLI</h3>
+        <p>Install Brave, create agent browser profile, attach relay. Create <code>credentials.json</code> on Mac Mini for your API keys. Test that your agent runs for 2 hours without needing you.</p>
+      </div>
+    </div>
+    <div class="next-item">
+      <div class="next-num">4</div>
+      <div class="next-content">
+        <div class="next-when">This Week</div>
+        <h3>Add autonomy rules to AGENTS.md</h3>
+        <p>Copy the 5 rules from Section 3 into your AGENTS.md. Test overnight: set 3 tasks before bed. Check results in the morning. That's the milestone.</p>
+      </div>
+    </div>
+    <div class="next-item">
+      <div class="next-num">5</div>
+      <div class="next-content">
+        <div class="next-when">Schedule Now</div>
+        <h3>30-minute follow-up call with Caleb</h3>
+        <p>Walk through this report. Get the SES automation configured for your specific AWS accounts and Cloudflare zones. I'll send the script and walk you through the setup live.</p>
+      </div>
+    </div>
+    <div class="next-item">
+      <div class="next-num">6</div>
+      <div class="next-content">
+        <div class="next-when">Week 2</div>
+        <h3>SES automation — first real run</h3>
+        <p>Provide your AWS credentials and Cloudflare API token. Test on one domain end-to-end. Verify DNS, SMTP, Ongage connection. Then run the full queue. Xavier's weekly DNS grind is done.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <p><strong>Prepared by Caleb Hodges — GodMode AI</strong></p>
+  <p style="margin-top:0.5rem;">Confidential. Prepared exclusively for John Gulick at iExecute, LLC. · February 24, 2026</p>
+  <p style="margin-top:1rem;font-size:0.75rem;">Built with ⚛️ GodMode · Questions? Reply to Caleb's follow-up email or book your 30-min session.</p>
+</footer>
+
+</body>
+</html>

@@ -16,6 +16,20 @@ import { resolveClaudeBin } from "../lib/resolve-claude-bin.js";
 import { resolveSwarmPersona } from "../lib/agent-roster.js";
 import { GODMODE_ROOT } from "../data-paths.js";
 
+// ── Prompt injection sanitization ────────────────────────────────
+
+/** Strip XML-like tags and known prompt-injection patterns from user text. */
+function sanitizeForPrompt(text: string): string {
+  let clean = text;
+  // Strip XML-like tags that could be prompt injections
+  clean = clean.replace(/<\/?[a-zA-Z][a-zA-Z0-9_-]*(?:\s[^>]*)?\s*>/g, '');
+  // Strip known system context patterns
+  clean = clean.replace(/\[godmode[^\]]*\]/gi, '');
+  clean = clean.replace(/persistence protocol/gi, '[filtered]');
+  clean = clean.replace(/<system-context>[\s\S]*?<\/system-context>/gi, '');
+  return clean.trim();
+}
+
 // ── Copy & voice resource paths ────────────────────────────────
 
 const HOME = process.env.HOME ?? process.env.USERPROFILE ?? "/tmp";
@@ -408,11 +422,14 @@ export class SwarmPipeline {
 
   private async buildStagePrompt(
     stage: SwarmStage,
-    task: string,
+    rawTask: string,
     worktreePath: string,
     branch: string,
     scopeGlobs: string[],
   ): Promise<string> {
+    // Sanitize task description to prevent prompt injection
+    const task = sanitizeForPrompt(rawTask);
+
     // Resolve workspace-specific resources from the task description
     const res = await resolveWorkspaceResources(task);
     const projectLabel = res.workspaceName ? ` for ${res.workspaceName}` : "";

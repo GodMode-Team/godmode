@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Welcome to GodMode</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚡</text></svg>">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root {
+            --black: #000000;
+            --dark: #0a0a0a;
+            --card: #121722;
+            --card-2: #151c29;
+            --gray: #666666;
+            --muted: #a0aab8;
+            --white: #ffffff;
+            --accent: #00ff88;
+            --accent-dim: rgba(0, 255, 136, 0.1);
+            --radius: 14px;
+            --max: 680px;
+        }
+
+        html { scroll-behavior: smooth; }
+        body {
+            font-family: 'Inter', -apple-system, sans-serif;
+            background: var(--black);
+            color: var(--white);
+            line-height: 1.6;
+            overflow-x: hidden;
+        }
+
+        body::before {
+            content: "";
+            position: fixed;
+            inset: 0;
+            background:
+                radial-gradient(circle at 12% 18%, rgba(0, 255, 136, 0.1), transparent 42%),
+                radial-gradient(circle at 88% 82%, rgba(0, 200, 255, 0.06), transparent 45%);
+            pointer-events: none;
+        }
+
+        body::after {
+            content: "";
+            position: fixed;
+            inset: 0;
+            background-image:
+                linear-gradient(rgba(255,255,255,0.015) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255,255,255,0.015) 1px, transparent 1px);
+            background-size: 64px 64px;
+            pointer-events: none;
+        }
+
+        .container {
+            position: relative;
+            z-index: 2;
+            max-width: var(--max);
+            margin: 0 auto;
+            padding: 60px 24px 80px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+        .header .badge {
+            display: inline-block;
+            background: var(--accent-dim);
+            color: var(--accent);
+            font-size: 13px;
+            font-weight: 600;
+            padding: 6px 16px;
+            border-radius: 99px;
+            margin-bottom: 16px;
+            letter-spacing: 0.5px;
+        }
+        .header h1 {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 36px;
+            font-weight: 700;
+            line-height: 1.2;
+        }
+        .header p {
+            color: var(--muted);
+            margin-top: 8px;
+            font-size: 16px;
+        }
+
+        .card {
+            background: var(--card);
+            border: 1px solid rgba(255,255,255,0.06);
+            border-radius: var(--radius);
+            padding: 28px;
+            margin-bottom: 20px;
+        }
+        .card h2 {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 16px;
+            color: var(--white);
+        }
+
+        .license-key-box {
+            position: relative;
+            background: #0a0f18;
+            border: 1px solid rgba(0, 255, 136, 0.2);
+            border-radius: 10px;
+            padding: 18px 60px 18px 18px;
+            font-family: 'SF Mono', 'Fira Code', monospace;
+            font-size: 15px;
+            color: var(--accent);
+            word-break: break-all;
+            cursor: pointer;
+            transition: border-color 0.2s;
+        }
+        .license-key-box:hover {
+            border-color: var(--accent);
+        }
+        .copy-btn {
+            position: absolute;
+            right: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: rgba(0, 255, 136, 0.15);
+            border: none;
+            color: var(--accent);
+            padding: 8px 12px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 600;
+            transition: background 0.2s;
+        }
+        .copy-btn:hover {
+            background: rgba(0, 255, 136, 0.25);
+        }
+        .copy-btn.copied {
+            background: var(--accent);
+            color: var(--black);
+        }
+
+        .steps ol {
+            list-style: none;
+            counter-reset: step;
+            padding: 0;
+        }
+        .steps li {
+            counter-increment: step;
+            padding: 14px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+            display: flex;
+            align-items: flex-start;
+            gap: 14px;
+        }
+        .steps li:last-child { border-bottom: none; }
+        .steps li::before {
+            content: counter(step);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 28px;
+            height: 28px;
+            background: var(--accent-dim);
+            color: var(--accent);
+            border-radius: 50%;
+            font-size: 13px;
+            font-weight: 700;
+            margin-top: 2px;
+        }
+        .steps li .step-content { flex: 1; }
+        .steps li .step-title {
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+        .steps li .step-detail {
+            color: var(--muted);
+            font-size: 14px;
+        }
+
+        code {
+            background: #0a0f18;
+            padding: 3px 8px;
+            border-radius: 6px;
+            font-size: 13px;
+            color: var(--accent);
+        }
+
+        pre {
+            background: #0a0f18;
+            border-radius: 10px;
+            padding: 16px;
+            overflow-x: auto;
+            margin: 8px 0;
+            font-size: 13px;
+            line-height: 1.5;
+            color: #ccc;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 60px 0;
+        }
+        .spinner {
+            display: inline-block;
+            width: 32px;
+            height: 32px;
+            border: 3px solid rgba(0, 255, 136, 0.2);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .loading p {
+            color: var(--muted);
+            margin-top: 16px;
+            font-size: 14px;
+        }
+
+        .error-msg {
+            background: rgba(255, 80, 80, 0.1);
+            border: 1px solid rgba(255, 80, 80, 0.3);
+            border-radius: 10px;
+            padding: 16px;
+            color: #ff6b6b;
+            font-size: 14px;
+            margin-bottom: 20px;
+        }
+
+        .links {
+            display: flex;
+            gap: 12px;
+            margin-top: 8px;
+        }
+        .links a {
+            color: var(--accent);
+            text-decoration: none;
+            font-size: 14px;
+            font-weight: 500;
+        }
+        .links a:hover { text-decoration: underline; }
+
+        #content { display: none; }
+
+        @media (max-width: 600px) {
+            .container { padding: 40px 16px 60px; }
+            .header h1 { font-size: 28px; }
+            .license-key-box { font-size: 13px; padding-right: 50px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="badge">PAYMENT CONFIRMED</div>
+            <h1>Welcome to GodMode</h1>
+            <p>Your personal AI operating system is ready.</p>
+        </div>
+
+        <div id="loading" class="loading">
+            <div class="spinner"></div>
+            <p>Retrieving your license key...</p>
+        </div>
+
+        <div id="error" style="display: none;"></div>
+
+        <div id="content">
+            <div class="card">
+                <h2>Your License Key</h2>
+                <div class="license-key-box" onclick="copyKey()" id="keyBox">
+                    <span id="keyText"></span>
+                    <button class="copy-btn" id="copyBtn">Copy</button>
+                </div>
+                <p style="color: var(--muted); font-size: 13px; margin-top: 10px;">
+                    Tier: <strong id="tierText" style="color: var(--white);"></strong>
+                    &mdash; this key was also sent to <strong id="emailText" style="color: var(--white);"></strong>
+                </p>
+            </div>
+
+            <div class="card steps">
+                <h2>Get Started</h2>
+                <ol>
+                    <li>
+                        <div class="step-content">
+                            <div class="step-title">Install OpenClaw</div>
+                            <div class="step-detail">
+                                <code>npm i -g openclaw</code>
+                            </div>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="step-content">
+                            <div class="step-title">Install the GodMode plugin</div>
+                            <div class="step-detail">
+                                <code>openclaw plugins install godmode</code>
+                            </div>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="step-content">
+                            <div class="step-title">Activate your license</div>
+                            <div class="step-detail">
+                                <code id="activateCmd">openclaw godmode activate YOUR-KEY</code>
+                            </div>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="step-content">
+                            <div class="step-title">Start the gateway</div>
+                            <div class="step-detail">
+                                <code>openclaw gateway run</code><br>
+                                <span style="color: var(--muted); font-size: 13px;">Then open <code>http://localhost:18789/godmode</code></span>
+                            </div>
+                        </div>
+                    </li>
+                </ol>
+            </div>
+
+            <div class="card">
+                <h2>Need Help?</h2>
+                <p style="color: var(--muted); font-size: 14px; line-height: 1.7;">
+                    Run <code>openclaw godmode doctor</code> to diagnose any setup issues.
+                </p>
+                <div class="links">
+                    <a href="/support">Support &amp; FAQ</a>
+                    <a href="/billing">Manage Billing</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const params = new URLSearchParams(window.location.search);
+        const sessionId = params.get('session_id');
+
+        if (!sessionId) {
+            showError("No checkout session found. If you just purchased, check your email for your license key.");
+        } else {
+            fetchLicense(sessionId);
+        }
+
+        async function fetchLicense(sid, retries = 0) {
+            try {
+                const res = await fetch(`/api/v1/license/by-session?session_id=${encodeURIComponent(sid)}`);
+                const data = await res.json();
+
+                if (res.status === 202 && data.pending && retries < 8) {
+                    // Webhook hasn't fired yet — retry with backoff
+                    setTimeout(() => fetchLicense(sid, retries + 1), 1500 * (retries + 1));
+                    return;
+                }
+
+                if (!res.ok) {
+                    showError(data.error || "Could not retrieve your license. Check your email — we sent it there too.");
+                    return;
+                }
+
+                showLicense(data.key, data.tier, data.email);
+            } catch (err) {
+                showError("Network error. Your license key was sent to your email.");
+            }
+        }
+
+        function showLicense(key, tier, email) {
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('content').style.display = 'block';
+            document.getElementById('keyText').textContent = key;
+            document.getElementById('tierText').textContent = tier || 'standard';
+            document.getElementById('emailText').textContent = email || 'your email';
+            document.getElementById('activateCmd').textContent = `openclaw godmode activate ${key}`;
+        }
+
+        function showError(msg) {
+            document.getElementById('loading').style.display = 'none';
+            const el = document.getElementById('error');
+            el.style.display = 'block';
+            el.innerHTML = `<div class="error-msg">${msg}</div>
+                <div class="card">
+                    <h2>Already have your key?</h2>
+                    <p style="color: var(--muted); font-size: 14px;">Run <code>openclaw godmode activate YOUR-KEY</code> to get started.</p>
+                    <div class="links" style="margin-top: 12px;">
+                        <a href="/support">Support</a>
+                        <a href="/billing">Billing</a>
+                    </div>
+                </div>`;
+        }
+
+        function copyKey() {
+            const key = document.getElementById('keyText').textContent;
+            navigator.clipboard.writeText(key).then(() => {
+                const btn = document.getElementById('copyBtn');
+                btn.textContent = 'Copied!';
+                btn.classList.add('copied');
+                setTimeout(() => {
+                    btn.textContent = 'Copy';
+                    btn.classList.remove('copied');
+                }, 2000);
+            });
+        }
+    </script>
+</body>
+</html>

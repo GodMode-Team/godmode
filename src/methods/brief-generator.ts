@@ -1445,16 +1445,46 @@ async function generateDailyBrief(date?: string): Promise<GenerateResult> {
   const warnings: string[] = [];
 
   // Preserve existing Notes section (sacred — never touched by AI)
+  // CRITICAL: If extraction fails, keep the ENTIRE original notes section verbatim.
+  // Never silently lose user content.
   let existingNotes = "";
+  let existingNotesRaw = ""; // Full section including header, used as safety fallback
   try {
     const existing = await readFile(filePath, "utf-8");
-    const notesMatch = existing.match(/^## .*Notes\s*\n([\s\S]*?)(?=\n## |\n---\s*\n\*Generated)/m);
-    if (notesMatch?.[1]) {
-      const cleaned = notesMatch[1]
-        .replace(/^\*\(Your notebook.*\)\*\s*\n?/, "")
-        .replace(/^\*Add notes throughout.*\*\s*\n?/, "")
+    // Find the ## Notes header (or variants like ## Your Notes)
+    const notesHeaderMatch = existing.match(/^(## (?:Your )?Notes)\s*$/m);
+    if (notesHeaderMatch) {
+      const headerIdx = existing.indexOf(notesHeaderMatch[0]);
+      const afterHeader = existing.slice(headerIdx + notesHeaderMatch[0].length);
+      // Extract content up to the next ## header or end of file
+      const nextHeaderIdx = afterHeader.search(/\n## /);
+      const sectionBody = nextHeaderIdx >= 0
+        ? afterHeader.slice(0, nextHeaderIdx)
+        : afterHeader;
+      existingNotesRaw = notesHeaderMatch[0] + sectionBody;
+      // Clean the body: strip placeholder text, keep user content
+      const cleaned = sectionBody
+        .replace(/^\*\(Your notebook.*\)\*\s*\n?/gm, "")
+        .replace(/^\*Add notes throughout.*\*\s*\n?/gm, "")
         .trim();
-      if (cleaned) existingNotes = cleaned;
+      if (cleaned) {
+        existingNotes = cleaned;
+      }
+      // Safety check: if the original section had non-whitespace content beyond
+      // the placeholder text, but our cleaned extraction is empty, something went wrong.
+      // Preserve the raw section body as-is to avoid data loss.
+      const rawBodyTrimmed = sectionBody.trim();
+      if (rawBodyTrimmed && !cleaned) {
+        // Check if raw body has meaningful content beyond placeholder text
+        const withoutPlaceholders = rawBodyTrimmed
+          .replace(/\*\(Your notebook.*\)\*/g, "")
+          .replace(/\*Add notes throughout.*\*/g, "")
+          .trim();
+        if (withoutPlaceholders) {
+          console.warn("[BriefGenerator] Notes extraction returned empty but section has content — preserving raw");
+          existingNotes = withoutPlaceholders;
+        }
+      }
     }
   } catch { /* file doesn't exist yet */ }
 
@@ -1498,8 +1528,8 @@ async function generateDailyBrief(date?: string): Promise<GenerateResult> {
   if (xIntel.error) warnings.push(`X Intel: ${xIntel.error}`);
   if (frontInbox.error) warnings.push(`Front: ${frontInbox.error}`);
 
-  // Load tasks for context
-  let pendingTasks: { id: string; title: string; status: string }[] = [];
+  // Load tasks for context — wired into the LLM prompt as a first-class data source
+  let pendingTasks: { id: string; title: string; status: string; dueDate?: string | null; priority?: string }[] = [];
   try {
     const { readTasks } = await import("./tasks.js");
     const tasksData = await readTasks();
@@ -1535,7 +1565,11 @@ async function generateDailyBrief(date?: string): Promise<GenerateResult> {
     : "No inbox data available.";
 
   const tasksRaw = pendingTasks.length > 0
-    ? pendingTasks.map((t) => `- ${t.title}`).join("\n")
+    ? pendingTasks.map((t) => {
+        const due = t.dueDate ? ` (due: ${t.dueDate})` : "";
+        const pri = t.priority && t.priority !== "medium" ? ` [${t.priority}]` : "";
+        return `- ${t.title}${due}${pri}`;
+      }).join("\n")
     : "No pending tasks.";
 
   const carryoverRaw = [
@@ -1567,7 +1601,9 @@ RULES:
 11. If a data source is empty, show a one-line placeholder. Never skip a section.
 12. Body Check: render Oura metrics in compact format. Write a 2-3 sentence energy prescription based on the biometrics — specific, actionable, flowing prose. If no Oura data, show a placeholder.
 13. All Win The Day items must use checkbox format: "1. [ ] **Task** — context"
-14. Bonus items use: "- Task description"`;
+14. Bonus items use: "- Task description"
+
+CRITICAL: The "Tomorrow Handoff" section from yesterday's evening review is your PRIMARY source for today's Win The Day priorities. These are items the user explicitly identified as important for today. Put them FIRST in the numbered priority list, then supplement with pending tasks and carryover items. The "Pending Tasks" from tasks.json are a FIRST-CLASS data source — use them for the Bonus section and to fill any remaining priority slots after the Tomorrow Handoff items.`;
 
   const briefUserPrompt = `Render today's daily brief using the template and data below.
 
@@ -1663,17 +1699,18 @@ ${context.streakDay !== null ? `- ${context.streakLabel}: Day ${context.streakDa
 
 ## RAW DATA
 
-### Evening Review — Tomorrow Handoff (${yesterdayDate()})
-${eveningReview.tomorrowHandoff}
+### PRIORITY SOURCE: Evening Review — Tomorrow Handoff (${yesterdayDate()})
+These are the items the user explicitly committed to last night. Use them FIRST for Win The Day priorities.
+${eveningReview.tomorrowHandoff || "(no evening review from yesterday)"}
 
 ### Evening Reflection (${yesterdayDate()})
 ${eveningReview.reflection || "(none)"}
 
+### Current Pending Tasks (from tasks.json — FIRST-CLASS source for Win The Day)
+${tasksRaw}
+
 ### Impact Report (${yesterdayDate()})
 ${impactRaw}
-
-### Pending Tasks
-${tasksRaw}
 
 ### Front Inbox
 ${frontRaw}

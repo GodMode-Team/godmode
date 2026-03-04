@@ -97,20 +97,23 @@ function scrollToBottom(panel: HTMLElement) {
  * Auto-scroll to bottom when new messages arrive, but only if the user
  * was already near the bottom (don't hijack scroll while reading history).
  */
-let _lastMsgCount = 0;
-let _lastStreamLen = 0;
+const scrollState = new WeakMap<Element, { lastMsgCount: number; lastStreamLen: number }>();
+
 function autoScrollIfNeeded(props: AllyChatProps) {
-  const msgCount = props.messages.length;
-  const streamLen = props.stream?.length ?? 0;
-  const isNew = msgCount !== _lastMsgCount || streamLen > _lastStreamLen;
-  _lastMsgCount = msgCount;
-  _lastStreamLen = streamLen;
-  if (!isNew) return;
   requestAnimationFrame(() => {
     const panel = document.querySelector(".ally-panel, .ally-inline");
     if (!panel) return;
     const container = panel.querySelector(".ally-panel__messages");
-    if (container && isNearBottom(container as HTMLElement, 120)) {
+    if (!container) return;
+
+    const state = scrollState.get(container) ?? { lastMsgCount: 0, lastStreamLen: 0 };
+    const msgCount = props.messages.length;
+    const streamLen = props.stream?.length ?? 0;
+    const isNew = msgCount !== state.lastMsgCount || streamLen > state.lastStreamLen;
+    scrollState.set(container, { lastMsgCount: msgCount, lastStreamLen: streamLen });
+
+    if (!isNew) return;
+    if (isNearBottom(container as HTMLElement, 120)) {
       scrollToBottom(panel as HTMLElement);
     }
   });

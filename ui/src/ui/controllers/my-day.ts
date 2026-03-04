@@ -25,7 +25,7 @@ export type MyDayState = {
   // Date navigation
   todaySelectedDate?: string;
   // View mode
-  todayViewMode?: "my-day" | "agent-log";
+  todayViewMode?: "brief" | "command-center" | "agent-log";
   // Today's tasks
   todayTasks?: WorkspaceTask[];
   todayTasksLoading?: boolean;

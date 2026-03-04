@@ -12,6 +12,7 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 import { join, dirname } from "node:path";
 import type { GatewayRequestHandler } from "openclaw/plugin-sdk";
 import { DATA_DIR, GODMODE_ROOT } from "../data-paths.js";
+import { processMeetingById } from "../services/fathom-processor.js";
 
 type GatewayRequestHandlers = Record<string, GatewayRequestHandler>;
 
@@ -298,6 +299,11 @@ export async function handleFathomWebhookHttp(
   console.log(
     `[GodMode] Fathom: queued "${item.title}" (${item.durationMin}min, ${item.attendees.length} attendees)`,
   );
+
+  // Trigger immediate post-meeting processing (fire-and-forget)
+  processMeetingById(item.id).catch((err) =>
+    console.warn(`[GodMode] Fathom: immediate processing failed for ${item.id}: ${String(err)}`),
+  );
 }
 
 // ── RPC Handlers ─────────────────────────────────────────────────────
@@ -433,6 +439,11 @@ const ingest: GatewayRequestHandler = async ({ params, respond }) => {
 
     console.log(`[GodMode] Fathom: manually ingested recording ${recordingId} — "${item.title}"`);
     respond(true, { meeting: item });
+
+    // Trigger immediate post-meeting processing (fire-and-forget)
+    processMeetingById(item.id).catch((err) =>
+      console.warn(`[GodMode] Fathom: immediate processing failed for ${item.id}: ${String(err)}`),
+    );
   } catch (err) {
     respond(false, null, {
       code: "FATHOM_API_ERROR",
@@ -491,6 +502,11 @@ const webhookReceive: GatewayRequestHandler = async ({ params, respond }) => {
       `[GodMode] Fathom: queued "${item.title}" (${item.durationMin}min, ${item.attendees.length} attendees)`,
     );
     respond(true, { queued: true, recordingId: item.id });
+
+    // Trigger immediate post-meeting processing (fire-and-forget)
+    processMeetingById(item.id).catch((err) =>
+      console.warn(`[GodMode] Fathom: immediate processing failed for ${item.id}: ${String(err)}`),
+    );
   } catch (err) {
     respond(false, null, {
       code: "QUEUE_ERROR",
@@ -557,6 +573,40 @@ const setupWebhook: GatewayRequestHandler = async ({ params, respond }) => {
   }
 };
 
+const processNext: GatewayRequestHandler = async ({ respond }) => {
+  try {
+    const queue = await readMeetingQueue();
+    const pending = queue.meetings
+      .filter((m) => m.status === "pending")
+      .sort((a, b) => new Date(a.receivedAt).getTime() - new Date(b.receivedAt).getTime());
+
+    if (pending.length === 0) {
+      respond(true, { processed: false, message: "No pending meetings in queue" });
+      return;
+    }
+
+    const next = pending[0];
+    await processMeetingById(next.id);
+
+    // Re-read to get updated status
+    const updated = await readMeetingQueue();
+    const meeting = updated.meetings.find((m) => m.id === next.id);
+
+    respond(true, {
+      processed: true,
+      meetingId: next.id,
+      title: next.title,
+      status: meeting?.status ?? "unknown",
+      notes: meeting?.processedNotes ?? null,
+    });
+  } catch (err) {
+    respond(false, null, {
+      code: "PROCESSING_ERROR",
+      message: err instanceof Error ? err.message : String(err),
+    });
+  }
+};
+
 // ── Export ────────────────────────────────────────────────────────────
 
 export const fathomWebhookHandlers: GatewayRequestHandlers = {
@@ -566,4 +616,5 @@ export const fathomWebhookHandlers: GatewayRequestHandlers = {
   "fathom.ingest": ingest,
   "fathom.webhookReceive": webhookReceive,
   "fathom.setupWebhook": setupWebhook,
+  "fathom.processNext": processNext,
 };

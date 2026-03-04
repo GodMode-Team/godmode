@@ -184,6 +184,12 @@
   font-size: 10px;
 }
 
+/* When details is expanded, remove the card's max-height clip */
+.chat-tool-card:has(.chat-tool-card__expandable[open]) {
+  max-height: none;
+  overflow: visible;
+}
+
 .chat-tool-card__expandable[open] summary {
   max-height: none;
   border-bottom-left-radius: 0;

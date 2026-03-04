@@ -196,20 +196,48 @@ function cleanForAlly(text: string, role: string): string | null {
   // ── Always filter: pure system plumbing ──
 
   // Heartbeat prompts (user role, sent by cron)
-  if (t.startsWith("Read HEARTBEAT.md") || t.startsWith("Read CONSCIOUSNESS.md")) return null;
+  if (t.startsWith("Read HEARTBEAT.md") || t.startsWith("Read CONSCIOUSNESS.md")) {
+    console.debug("[Ally] Filtered message:", role, t.substring(0, 100));
+    return null;
+  }
 
   // Cron triggers
-  if (/^System:\s*\[\d{4}-\d{2}-\d{2}/.test(t)) return null;
+  if (/^System:\s*\[\d{4}-\d{2}-\d{2}/.test(t)) {
+    console.debug("[Ally] Filtered message:", role, t.substring(0, 100));
+    return null;
+  }
 
   // NO_REPLY tokens
-  if (t === "NO_REPLY" || t.startsWith("NO_REPLY\n")) return null;
+  if (t === "NO_REPLY" || t.startsWith("NO_REPLY\n")) {
+    console.debug("[Ally] Filtered message:", role, t.substring(0, 100));
+    return null;
+  }
 
   // Consciousness/system file dumps (toolResult content shown as message)
-  if (/^#\s*(?:🧠|Atlas Consciousness)/i.test(t)) return null;
-  if (t.startsWith("# WORKING.md") || t.startsWith("# MISTAKES.md")) return null;
+  if (/^#\s*(?:🧠|Atlas Consciousness)/i.test(t)) {
+    console.debug("[Ally] Filtered message:", role, t.substring(0, 100));
+    return null;
+  }
+  if (t.startsWith("# WORKING.md") || t.startsWith("# MISTAKES.md")) {
+    console.debug("[Ally] Filtered message:", role, t.substring(0, 100));
+    return null;
+  }
+  // Consciousness dump that starts mid-stream (verification checklists, onboarding philosophy, etc.)
+  if (/(?:VERIFIED|FIXED|NEW):\s/.test(t) && /✅|🟡|☑/.test(t) && t.length > 300) {
+    console.debug("[Ally] Filtered message (verification dump):", role, t.substring(0, 100));
+    return null;
+  }
+  // Onboarding philosophy / system architecture blocks
+  if (/^###\s*(?:Onboarding Philosophy|Self-Surgery Problem|Open Architecture)/i.test(t)) {
+    console.debug("[Ally] Filtered message (system block):", role, t.substring(0, 100));
+    return null;
+  }
 
   // Pure GodMode Context prefix with no user text
-  if (/^\[GodMode Context:[^\]]*\]\s*$/.test(t)) return null;
+  if (/^\[GodMode Context:[^\]]*\]\s*$/.test(t)) {
+    console.debug("[Ally] Filtered message:", role, t.substring(0, 100));
+    return null;
+  }
 
   // ── Strip prefixes, keep substance ──
 
@@ -225,13 +253,53 @@ function cleanForAlly(text: string, role: string): string | null {
   // ── Heuristic: skip raw structured data dumps ──
 
   // Raw calendar data (lines of IDs + ISO timestamps)
-  if (/^\w+\s+\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(t) && t.length > 200) return null;
+  if (/^\w+\s+\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(t) && t.length > 200) {
+    console.debug("[Ally] Filtered message:", role, t.substring(0, 100));
+    return null;
+  }
 
-  // Agent roster dumps
-  if (/^##\s*Your Team\s*\(Agent Roster\)/i.test(t)) return null;
+  // Agent roster dumps — only filter if the ENTIRE message is a roster dump
+  // (starts with the header and has no substantial content before it)
+  if (/^##\s*Your Team\s*\(Agent Roster\)/i.test(t) && t.indexOf("\n\n## ") === -1) {
+    console.debug("[Ally] Filtered message:", role, t.substring(0, 100));
+    return null;
+  }
+
+  // Persistence protocol / agent persona echoed back
+  if (/^##?\s*Persistence Protocol/i.test(t) || /^You are resourceful and thorough\.\s*Your job is to GET THE JOB DONE/i.test(t)) {
+    console.debug("[Ally] Filtered message (persona leak):", role, t.substring(0, 100));
+    return null;
+  }
+  // Core Behaviors / Core Principles block (persona sections)
+  if (/^##?\s*Core (?:Behaviors|Principles)/i.test(t)) {
+    console.debug("[Ally] Filtered message (persona leak):", role, t.substring(0, 100));
+    return null;
+  }
+  // Prosper role description echoed
+  if (/^##?\s*Your Role as Prosper/i.test(t)) {
+    console.debug("[Ally] Filtered message (persona leak):", role, t.substring(0, 100));
+    return null;
+  }
+
+  // Multi-signal check: if message contains 2+ system context fingerprints, it's a dump
+  const tLower = t.toLowerCase();
+  const sysSignals = [
+    "persistence protocol", "core principles:", "core behaviors",
+    "your role as prosper", "be diligent first time", "exhaust reasonable options",
+    "assume capability exists", "elite executive assistant",
+    "consciousness context", "working context", "enforcement:",
+    "internal system context injected by godmode",
+  ];
+  if (sysSignals.filter((s) => tLower.includes(s)).length >= 2) {
+    console.debug("[Ally] Filtered message (multi-signal system leak):", role, t.substring(0, 100));
+    return null;
+  }
 
   // Schedule table headers
-  if (/^(?:ID\s+START\s+END\s+SUMMARY)/i.test(t)) return null;
+  if (/^(?:ID\s+START\s+END\s+SUMMARY)/i.test(t)) {
+    console.debug("[Ally] Filtered message:", role, t.substring(0, 100));
+    return null;
+  }
 
   return t;
 }
@@ -493,7 +561,7 @@ export class GodModeApp extends LitElement {
   @state() myDayLoading = false;
   @state() myDayError: string | null = null;
   @state() todaySelectedDate: string = localDateString();
-  @state() todayViewMode: "my-day" | "agent-log" = "my-day";
+  @state() todayViewMode: "brief" | "command-center" | "agent-log" = "brief";
 
   // Daily Brief state
   @state() dailyBrief?: import("./views/daily-brief").DailyBriefData | null;
@@ -743,6 +811,12 @@ export class GodModeApp extends LitElement {
     }
 
     handleConnected(this as unknown as Parameters<typeof handleConnected>[0]);
+
+    // Auto-advance to today if the selected date is stale (e.g. app left open overnight)
+    const today = localDateString();
+    if (this.todaySelectedDate !== today) {
+      this.todaySelectedDate = today;
+    }
 
     if (this.agentLogPollInterval == null) {
       this.agentLogPollInterval = window.setInterval(() => {
@@ -1202,12 +1276,14 @@ export class GodModeApp extends LitElement {
   }
 
   private _scrollAllyToBottom() {
-    requestAnimationFrame(() => {
-      const panel = this.renderRoot?.querySelector?.(".ally-panel, .ally-inline")
-        ?? document.querySelector(".ally-panel, .ally-inline");
-      if (!panel) return;
-      const container = panel.querySelector(".ally-panel__messages");
-      if (container) container.scrollTop = container.scrollHeight;
+    void this.updateComplete.then(() => {
+      requestAnimationFrame(() => {
+        const panel = this.renderRoot?.querySelector?.(".ally-panel, .ally-inline")
+          ?? document.querySelector(".ally-panel, .ally-inline");
+        if (!panel) return;
+        const container = panel.querySelector(".ally-panel__messages");
+        if (container) container.scrollTop = container.scrollHeight;
+      });
     });
   }
 
@@ -2274,7 +2350,22 @@ export class GodModeApp extends LitElement {
           : typeof e === "object" && e !== null && "message" in e
             ? String((e as { message: unknown }).message)
             : "Unknown error";
-      this.showToast(`Drive upload failed: ${detail}`, "error", 8000);
+      // Check for specific gog CLI errors and show helpful setup messages
+      if (detail.includes("GOG_NOT_FOUND") || detail.includes("gog CLI not found")) {
+        this.showToast(
+          "Google Drive not configured. Install gog CLI: npm install -g gog-cli, then run: gog auth add <email> --services drive",
+          "warning",
+          10000,
+        );
+      } else if (detail.includes("GOG_AUTH") || detail.includes("auth") && detail.includes("expired")) {
+        this.showToast(
+          "Google Drive auth expired. Re-authenticate: gog auth add <email> --services drive",
+          "warning",
+          8000,
+        );
+      } else {
+        this.showToast(`Drive upload failed: ${detail}`, "error", 8000);
+      }
     } finally {
       this.driveUploading = false;
     }
@@ -2931,7 +3022,7 @@ export class GodModeApp extends LitElement {
     }
   }
 
-  handleTodayViewModeChange(mode: "my-day" | "agent-log") {
+  handleTodayViewModeChange(mode: "brief" | "command-center" | "agent-log") {
     this.todayViewMode = mode;
     if (mode === "agent-log" && !this.agentLog) {
       void loadAgentLogOnlyInternal(this);
@@ -2984,10 +3075,10 @@ export class GodModeApp extends LitElement {
     if (this.sessionKey === sessionKey) {
       this.chatPrivateMode = false;
       const remaining = this.settings.openTabs.filter((t) => t !== sessionKey);
-      const fallback = remaining[0] || "agent:main:main";
+      const fallback = remaining[0] || ALLY_SESSION_KEY;
       this.applySettings({
         ...this.settings,
-        openTabs: remaining.length > 0 ? remaining : ["agent:main:main"],
+        openTabs: remaining,
         sessionKey: fallback,
         lastActiveSessionKey: fallback,
       });

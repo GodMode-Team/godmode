@@ -60,9 +60,9 @@ export type MyDayProps = {
   onDatePrev?: () => void;
   onDateNext?: () => void;
   onDateToday?: () => void;
-  // View mode: "my-day" (brief) or "agent-log"
-  viewMode?: "my-day" | "agent-log";
-  onViewModeChange?: (mode: "my-day" | "agent-log") => void;
+  // View mode: "brief" (default), "command-center", or "agent-log"
+  viewMode?: "brief" | "command-center" | "agent-log";
+  onViewModeChange?: (mode: "brief" | "command-center" | "agent-log") => void;
   // Agent log props
   agentLog?: AgentLogData | null;
   agentLogLoading?: boolean;
@@ -356,7 +356,7 @@ export function renderMyDayToolbar(props: MyDayProps) {
   const selectedDate = props.selectedDate ?? todayStr;
   const viewingToday = isToday(selectedDate);
   const displayDate = formatDateFromString(selectedDate);
-  const viewMode = props.viewMode ?? "my-day";
+  const viewMode = props.viewMode ?? "brief";
 
   return html`
     <div class="my-day-toolbar">
@@ -372,10 +372,14 @@ export function renderMyDayToolbar(props: MyDayProps) {
           ? html`<button class="today-date-today-btn" @click=${props.onDateToday}>Today</button>`
           : nothing}
       </div>
-      <div class="today-view-toggle">
-        <button class="${viewMode === "my-day" ? "active" : ""}"
-          @click=${() => props.onViewModeChange?.("my-day")}>My Day</button>
-        <button class="${viewMode === "agent-log" ? "active" : ""}"
+      <div class="today-view-tabs">
+        <button class="today-view-tab ${viewMode === "brief" ? "active" : ""}"
+          @click=${() => props.onViewModeChange?.("brief")}>Brief</button>
+        <button class="today-view-tab ${viewMode === "command-center" ? "active" : ""}"
+          @click=${() => props.onViewModeChange?.("command-center")}>Command Center${props.decisionCards && props.decisionCards.items.filter(i => i.status === "review").length > 0
+            ? html`<span class="tab-badge">${props.decisionCards.items.filter(i => i.status === "review").length}</span>`
+            : nothing}</button>
+        <button class="today-view-tab ${viewMode === "agent-log" ? "active" : ""}"
           @click=${() => props.onViewModeChange?.("agent-log")}>Agent Log</button>
       </div>
       ${!props.focusPulseActive && props.onStartMorningSet
@@ -389,12 +393,27 @@ export function renderMyDayToolbar(props: MyDayProps) {
   `;
 }
 
+// ===== Command Center View =====
+
+function renderCommandCenter(props: MyDayProps) {
+  return html`
+    <div class="command-center">
+      ${props.decisionCards && props.decisionCards.items.length > 0
+        ? renderDecisionCards(props.decisionCards)
+        : nothing}
+      <div class="command-center-tasks">
+        ${renderTaskPanel(props)}
+      </div>
+    </div>
+  `;
+}
+
 // ===== Main Render Function =====
 
 export function renderMyDay(props: MyDayProps) {
   const todayStr = localDateString();
   const selectedDate = props.selectedDate ?? todayStr;
-  const viewMode = props.viewMode ?? "my-day";
+  const viewMode = props.viewMode ?? "brief";
   const agentLog = props.agentLog ?? null;
 
   if (props.loading) {
@@ -437,20 +456,11 @@ export function renderMyDay(props: MyDayProps) {
 
   return html`
     <div class="my-day-container">
-      ${props.decisionCards && props.decisionCards.items.length > 0
-        ? renderDecisionCards(props.decisionCards)
-        : nothing}
-      <!-- Two-column layout: Tasks (left) + Brief/AgentLog (right) -->
-      <div class="my-day-columns">
-        <div class="my-day-tasks-col">
-          ${renderTaskPanel(props)}
-        </div>
-        <div class="my-day-brief-col">
-          ${viewMode === "my-day"
-            ? renderDailyBrief(briefProps)
-            : renderAgentLog(props, agentLog, formatDateFromString(selectedDate))}
-        </div>
-      </div>
+      ${viewMode === "brief"
+        ? html`<div class="my-day-brief-full">${renderDailyBrief(briefProps)}</div>`
+        : viewMode === "command-center"
+          ? renderCommandCenter(props)
+          : html`<div class="my-day-brief-full">${renderAgentLog(props, agentLog, formatDateFromString(selectedDate))}</div>`}
     </div>
   `;
 }

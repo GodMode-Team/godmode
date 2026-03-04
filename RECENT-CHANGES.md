@@ -4,6 +4,208 @@ This file tracks recent development changes so Atlas and other agents can quickl
 
 ---
 
+## 2026-03-04 — Deep Audit + Architecture Fix (post mega push)
+
+### Why
+First round of testing revealed the output shield wasn't catching system context leaks — the persistence protocol and consciousness dumps were echoing verbatim into chat. Root cause: hardcoded fingerprint markers were checking for meta-terms ("loop breaker", "gate fired") instead of the actual persona prose the LLM echoes. Additionally, the audit found 5 bugs missed in the original push.
+
+### Architecture Change: Dynamic Leak Detection
+- **New module:** `src/lib/injection-fingerprints.ts` — captures the actual injected system context at injection time, pre-computes 40-char n-grams with 20-char stride for efficient substring matching
+- **`index.ts`**: Calls `captureInjectedContext(sessionKey, joined)` in `before_prompt_build` for both main and support paths
+- **`safety-gates.ts`**: Replaced 4 hardcoded fingerprint checks (`godmode_context_echo`, `system_context_leak`, `persistence_protocol_leak`, `godmode_internals_leak`) with single `dynamic_context_leak` that uses `countContextOverlap()` — self-maintaining, no marker updates needed when persona changes
+- **UI stripping:** `app-gateway.ts` and `app.ts` still have fallback fingerprints for client-side defense, plus multi-signal detection (2+ matches = nuke entire message)
+
+### Bugs Fixed (found by audit)
+- **C5 BROKEN:** `auth-client.ts` — `writeFileSync` now uses `{ mode: 0o600 }`, `mkdirSync` uses `{ mode: 0o700 }` (was writing world-readable tokens)
+- **C1 PARTIAL:** `onboarding-setup.ts` — `renderInlineMarkdown()` now blocks `javascript:`, `data:`, `vbscript:` URL schemes
+- **C4 PARTIAL:** `obsidian-sync.ts` and `x-browser.ts` — added `.on("error", ...)` handlers to uncovered spawn calls
+- **CSS:** `tool-cards.css` — added `.chat-tool-card:has(.chat-tool-card__expandable[open])` to remove max-height when details expanded
+- **Fathom race:** `fathom-processor.ts` — added in-process mutex (`withQueueLock`) to prevent concurrent queue reads/writes, plus stuck "processing" recovery on startup
+- **Fathom decisions:** Added "send", "review", "prepare", "schedule", "update", "follow" to decision-detecting verb pattern
+
+### Test Suite Added
+- `tests/injection-fingerprints.test.ts` — 13 tests for dynamic leak detection (captures, false positive resistance, session isolation)
+- `tests/security-hardening.test.ts` — 31 tests verifying all security fixes, service cleanup, agent persona, brief notes protection
+- **44 tests total, all passing**
+
+### Integration Tests Passed
+- Fathom webhook: queued and processed (status: "processed")
+- Task creation: 2 tasks with correct due dates ("by Friday" → 2026-03-06, "tomorrow" → 2026-03-05)
+- Vault filing: daily note + standalone meeting note with YAML frontmatter
+- Email draft: created for external attendee
+- Deduplication: duplicate webhook correctly rejected
+- CONSCIOUSNESS.md: freshly regenerated on gateway start
+- TypeCheck: clean, Build: clean, No forbidden imports
+
+### Files Modified
+`src/lib/injection-fingerprints.ts` (new), `src/lib/auth-client.ts`, `src/hooks/safety-gates.ts`, `src/services/fathom-processor.ts`, `src/services/obsidian-sync.ts`, `src/services/x-browser.ts`, `ui/src/ui/app.ts`, `ui/src/ui/app-gateway.ts`, `ui/src/ui/views/onboarding-setup.ts`, `ui/src/styles/chat/tool-cards.css`, `index.ts`, `vitest.config.ts` (new), `tests/` (new)
+
+---
+
+## 2026-03-04 — Fathom Post-Meeting Processor
+
+### Why
+The Fathom webhook receiver was already queuing meetings, but nothing processed them. Meetings sat in `meeting-queue.json` unprocessed. Now the full post-meeting pipeline runs automatically.
+
+### What Changed
+- **New service:** `src/services/fathom-processor.ts` — 6-step pipeline per meeting:
+  1. Create tasks from action items (smart date parsing: ISO, "tomorrow", "next week", weekday names)
+  2. File to vault (daily note + standalone meeting note with YAML frontmatter + collapsed transcript)
+  3. Draft follow-up email to external attendees
+  4. Update WORKING.md with decisions
+  5. Broadcast notification event
+  6. Mark as processed
+- **`src/methods/fathom-webhook.ts`**: Auto-triggers processing after webhook receipt + manual ingest. Added `fathom.processNext` RPC for manual trigger.
+- **`index.ts`**: Service registered in `gateway_start` with 5-minute polling interval + `serviceCleanup` pattern.
+- Failed meetings get `status: "failed"` to prevent retry loops.
+
+### How to Test
+1. **Webhook test:** `curl -X POST http://localhost:3131/fathom-webhook -H "Content-Type: application/json" -d '{"title":"Test Meeting","attendees":["alice@example.com"],"action_items":["Follow up on proposal"],"transcript":"..."}'`
+2. **Manual RPC:** Call `fathom.processNext` via gateway
+3. **Single meeting:** Call `fathom.processById` with a meeting ID from `~/godmode/data/meeting-queue.json`
+4. **Verify:** Check `~/godmode/data/tasks.json` for new tasks, `~/Documents/VAULT/01-Daily/` for meeting notes
+
+### Files Modified
+`src/services/fathom-processor.ts` (new), `src/methods/fathom-webhook.ts`, `index.ts`
+
+---
+
+## 2026-03-04 — Mega Stability Push (23 fixes across 5 parallel streams)
+
+### Why
+GodMode had accumulated ~23 bugs across daily brief, side chat, auto-titling, memory system, security, and UI. Core product experience was degraded — daily rhythm loop broken, Prosper side chat unresponsive, memory stale, document tiles non-functional. This push stabilizes everything for team rollout.
+
+### What Changed
+
+**Stream A — Daily Brief + Memory + Prosper Soul (7 fixes):**
+- `brief-generator.ts`: Notes section extraction hardened — never silently loses user content
+- `brief-generator.ts`: Pending tasks now wired into LLM prompt as first-class data source
+- `brief-generator.ts`: Evening check-in / Tomorrow Handoff elevated to PRIMARY source for Win The Day
+- `consciousness-heartbeat.ts`: Once-per-day brief regeneration guard (flag file prevents overwrites)
+- `consciousness-heartbeat.ts`: Built `regenerateConsciousness()` and `regenerateWorking()` natively — no external script dependency
+- `agent-persona.ts`: Persistence protocol rewritten (philosophy-based, not "try 5 things")
+- `agent-persona.ts`: Prosper EA elite behavior embedded (architecture awareness, daily rhythm, context retrieval, task intelligence)
+
+**Stream B — UI Chat Fixes (7 fixes):**
+- `app.ts`: Side chat auto-scroll now waits for Lit `updateComplete` before scrolling
+- `ally-chat.ts`: Singleton state bug fixed — `_lastMsgCount` moved to WeakMap per container
+- `app-gateway.ts`: Real-time event sync triggers scroll on new ally messages
+- `app.ts`: Message filtering narrowed + debug logging added
+- `app-gateway.ts`: Auto-titling fingerprint stripping ported from message-extract.ts (catches tagless echoes)
+- `grouped.css`: Tool execution details no longer truncated at 350px
+- `chat.ts`: Filename truncation limit increased from 20 → 40 chars
+
+**Stream C — Security Hardening (5 fixes):**
+- `onboarding-setup.ts`: XSS via `.innerHTML` fixed — HTML-escape before markdown transforms
+- `second-brain.ts`: `isSymlinkSafe()` added — symlink checks on all file operations
+- `swarm-pipeline.ts`: `sanitizeForPrompt()` strips XML tags and injection patterns before agent prompts
+- `auth-client.ts`: Token file written with `0o600`, directory with `0o700`
+
+**Stream D — Gateway Lifecycle (2 fixes):**
+- `index.ts`: 11 services registered with named cleanup functions on `gateway_stop` — prevents duplicate heartbeats
+- `index.ts` + `safety-gates.ts`: System-context wrapper upgraded to "CRITICAL INSTRUCTION", 3 new output leak fingerprints that BLOCK leaked content
+
+**Stream F — Document Tiles (2 fixes):**
+- `files.ts`: Implemented missing `files.read` RPC (with `isAllowedPath()` security) — "Open" button now works
+- `app.ts`: Drive button shows helpful setup message instead of generic error
+
+### Files Modified (14 source + 5 UI)
+`index.ts`, `src/hooks/agent-persona.ts`, `src/hooks/safety-gates.ts`, `src/methods/brief-generator.ts`, `src/methods/files.ts`, `src/methods/second-brain.ts`, `src/services/consciousness-heartbeat.ts`, `src/services/swarm-pipeline.ts`, `src/lib/auth-client.ts`, `ui/src/ui/app.ts`, `ui/src/ui/app-gateway.ts`, `ui/src/ui/views/ally-chat.ts`, `ui/src/ui/views/chat.ts`, `ui/src/ui/views/onboarding-setup.ts`, `ui/src/styles/chat/grouped.css`
+
+---
+
+## 2026-03-04 — Website Separated + Vercel Consolidated
+
+### Why
+Multiple Claude Code sessions created 5+ duplicate Vercel projects named `lifeongodmode` across different scopes, causing repeated domain/deployment confusion. Fixed permanently.
+
+### What Changed
+- **Website repo created:** `MrCalebH/godmode-website` on GitHub — canonical source for lifeongodmode.com
+- **All site content pushed** to the website repo (landing page, auth pages, API endpoints, audit reports, proposals, etc.)
+- **GitHub connected** to Vercel project for auto-deploy on push to `main`
+- **Domain verified:** `lifeongodmode.com` and `www.lifeongodmode.com` both verified on `patient-autopilot/lifeongodmode`
+- **Original site restored** — was accidentally replaced with a Claude-generated landing page
+- **5 stale Vercel projects deleted:** `godmode-website-v2`, `lifeonogodmode-vercel`, `site`, `godmode-ui`, `godmode`
+- **API helpers renamed** `api/lib/` → `api/_lib/` (underscore = not counted as serverless functions)
+- **All stale reference files updated** in `~/godmode/memory/`, `~/godmode/research/`, and VAULT
+
+### The Rule Going Forward
+| Repo | Purpose | Deploys to |
+|---|---|---|
+| `MrCalebH/godmode-website` | lifeongodmode.com website + API | Vercel → `lifeongodmode.com` |
+| `godmode-plugin` | GodMode OpenClaw plugin | npm `@godmode-team/godmode` |
+
+**One Vercel project:** `patient-autopilot/lifeongodmode` (Pro plan, ID `prj_DoSyx6km5nSCAo3wOIQyQkXFvbiu`). No others.
+
+---
+
+## 2026-03-04 — Today Page Tabbed Layout Redesign
+
+### Why
+Today page was too chaotic — agent results pushed the daily brief below the fold, multiple independent scrolling areas competed for attention, and it was hard to find the brief.
+
+### What Changed
+- **Tabbed layout**: Replaced the two-column grid with 3 tabs: **Brief** (default), **Command Center**, and **Agent Log**
+  - Brief tab: Full-width daily brief editor, clean and distraction-free
+  - Command Center tab: Agent results (with review badge count) + full task list
+  - Agent Log tab: Full-width agent log (preserved from before)
+- **Tab bar in toolbar**: Replaced the old "My Day / Agent Log" segmented toggle with underline-style tabs. Command Center tab shows a red badge when there are items needing review.
+- **Date auto-advance**: Fixed issue where the Today page would show yesterday's date if the app was left open overnight. Now auto-advances on component mount and WS reconnect.
+- **Files modified**: `ui/src/ui/views/my-day.ts`, `ui/src/styles/my-day.css`, `ui/src/ui/app.ts`, `ui/src/ui/app-render.ts`, `ui/src/ui/app-view-state.ts`, `ui/src/ui/app-gateway.ts`, `ui/src/ui/controllers/my-day.ts`
+
+---
+
+## 2026-03-03 — Account Auth + Stripe Payments System
+
+### Why
+Replace license key system with real account-based auth. Users sign up, pay via Stripe, and authenticate via OAuth device flow (works on headless VPS too).
+
+### What Was Built (branch: `feat/account-auth-payments`)
+
+**9 Vercel API endpoints** (`site/api/`):
+- Auth: device flow, token polling, login, register, refresh, /me
+- Payments: Stripe checkout ($297/mo), webhook handler, customer portal
+- Shared helpers: Redis client, JWT (RS256), CORS, scrypt password hashing
+
+**3 web pages** (`site/login/`, `site/pricing/`, `site/account/`):
+- GodMode light theme (Space Grotesk, red accent, white cards)
+- Login: device code + email/password, registration flow
+- Pricing: single $297/mo plan with Stripe checkout
+- Account: subscription management, Stripe portal access
+
+**Plugin integration**:
+- `src/lib/auth-client.ts` — offline JWT validation, device flow, token refresh
+- `src/methods/auth.ts` — 5 RPCs (auth.status, login, loginPoll, logout, account)
+- `index.ts` — license gate updated: JWT primary, GM-DEV-* backward compat
+- Install scripts: account login replaces license key step
+
+### Infrastructure
+- **Upstash Redis** connected to Vercel project (REDIS_URL set)
+- **Stripe** product/price created (test mode): `prod_U5GQlJ6WBHCAcO` / `price_1T75u8EtK2soZQjqiZ11zEU7`
+- **RSA keypair** generated, env vars set on Vercel (all environments)
+- **Deployed** to `patient-autopilot/lifeongodmode` (Pro plan) at `lifeongodmode-iota.vercel.app`
+- API helpers moved to `site/api/_lib/` (underscore prefix = not counted as serverless functions)
+- Removed `api/v1/license/validate-worker.js` (Cloudflare Workers variant, not needed on Vercel)
+
+### Vercel Project Consolidation (2026-03-03)
+- **RESOLVED**: There were multiple `lifeongodmode` projects across Vercel scopes causing repeated confusion.
+- Consolidated to **`patient-autopilot/lifeongodmode`** (Pro plan, project ID `prj_DoSyx6km5nSCAo3wOIQyQkXFvbiu`).
+- Deleted duplicate `lifeongodmode` project from `mrcalebhs-projects` (hobby plan, had 12 function limit).
+- Removed `lifeongodmode.com` domain from stale `godmode-website-v2` project. Added to correct project.
+- Removed `www.lifeongodmode.com` from stale `lifeonogodmode-vercel` project. Added to correct project with 308 redirect.
+- Domain pending TXT verification — update `_vercel.lifeongodmode.com` TXT at GoDaddy.
+
+### Still Needed
+- Update `_vercel.lifeongodmode.com` TXT record at GoDaddy for domain verification
+- `STRIPE_WEBHOOK_SECRET` not set (needs webhook URL in Stripe dashboard)
+- Landing page CTAs still point to /setup instead of /pricing
+- Switch Stripe test → live keys when ready for real payments
+
+### Full reference
+See `VAULT/02-Projects/GodMode/auth-payments-system.md` for complete details.
+
+---
+
 ## 2026-03-02 — Self-Healing Resilience + Session Coordination + Auto-Compat CI
 
 ### Why

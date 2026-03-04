@@ -20,8 +20,10 @@ import {
   accessSync,
   constants as fsConstants,
   existsSync,
+  lstatSync,
   readdirSync,
   readFileSync,
+  realpathSync,
   statSync,
 } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
@@ -54,8 +56,23 @@ type GatewayRequestHandlers = Record<string, GatewayRequestHandler>;
 
 // ── Helpers ──────────────────────────────────────────────────────────
 
+/** Check if a path is a symlink pointing outside allowed roots. Returns true if safe. */
+function isSymlinkSafe(filePath: string): boolean {
+  try {
+    const stat = lstatSync(filePath);
+    if (stat.isSymbolicLink()) {
+      const target = realpathSync(filePath);
+      return isAllowedPath(target);
+    }
+    return true; // Not a symlink — safe
+  } catch {
+    return false;
+  }
+}
+
 function safeReadFile(filePath: string): string | null {
   try {
+    if (!isSymlinkSafe(filePath)) return null;
     return readFileSync(filePath, "utf8");
   } catch {
     return null;
@@ -64,6 +81,7 @@ function safeReadFile(filePath: string): string | null {
 
 function safeFileMtime(filePath: string): string | null {
   try {
+    if (!isSymlinkSafe(filePath)) return null;
     return statSync(filePath).mtime.toISOString();
   } catch {
     return null;
@@ -100,6 +118,7 @@ function listEntries(dirPath: string): FileEntry[] {
         const ext = extname(e.name);
         return ext === ".md" || ext === ".txt";
       })
+      .filter((e) => isSymlinkSafe(join(dirPath, e.name)))
       .map((e) => {
         const fullPath = join(dirPath, e.name);
         if (e.isDirectory()) {
@@ -819,6 +838,10 @@ const addResearch: GatewayRequestHandler = async ({ params, respond }) => {
   const category = typeof p.category === "string" ? sanitizeSlug(p.category) : "";
   const researchDir = getResearchDir();
   const targetDir = category ? join(researchDir, category) : researchDir;
+  if (!isAllowedPath(targetDir)) {
+    respond(false, undefined, { code: "INVALID_REQUEST", message: "Target path is outside allowed directory" });
+    return;
+  }
   await mkdir(targetDir, { recursive: true });
 
   // Generate filename, handle collisions
@@ -1018,6 +1041,7 @@ function buildFileTree(dirPath: string, currentDepth: number, maxDepth: number):
 
   for (const entry of filtered) {
     const fullPath = join(dirPath, entry.name);
+    if (!isSymlinkSafe(fullPath)) continue;
     if (entry.isDirectory()) {
       let childCount = 0;
       try {
@@ -1147,6 +1171,7 @@ const brainSearch: GatewayRequestHandler = async ({ params, respond }) => {
       if (results.length >= limit) break;
       if (entry.name.startsWith(".") || entry.name.startsWith("_")) continue;
       const fullPath = join(dirPath, entry.name);
+      if (!isSymlinkSafe(fullPath)) continue;
 
       if (entry.isDirectory()) {
         if (!TREE_SKIP.has(entry.name)) {
@@ -1165,6 +1190,7 @@ const brainSearch: GatewayRequestHandler = async ({ params, respond }) => {
       // Only read file content for text search if name doesn't match (perf optimization)
       if (!nameMatch) {
         try {
+          if (!isSymlinkSafe(fullPath)) continue;
           const content = readFileSync(fullPath, "utf-8");
           if (content.length > 64_000) continue; // skip huge files
           const lc = content.toLowerCase();
@@ -1271,6 +1297,8 @@ const consolidateResearch: GatewayRequestHandler = async ({ params, respond }) =
       const src = join(GODMODE_ROOT, action.source);
       const dest = join(GODMODE_ROOT, action.destination);
       try {
+        if (!isAllowedPath(src) || !isAllowedPath(dest)) continue;
+        if (!isSymlinkSafe(src)) continue;
         const destDir = dest.substring(0, dest.lastIndexOf("/"));
         await mkdir(destDir, { recursive: true });
         // Copy instead of move to be safe

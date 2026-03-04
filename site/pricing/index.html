@@ -1,0 +1,606 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pricing - GodMode</title>
+<meta name="description" content="Simple pricing for GodMode. One plan, everything included.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><defs><linearGradient id='b' x1='0' y1='0' x2='0' y2='1'><stop offset='0%25' stop-color='%23FFD700'/><stop offset='100%25' stop-color='%23FF8C00'/></linearGradient></defs><path d='M58 2 L22 54 L42 54 L36 98 L78 42 L56 42 Z' fill='url(%23b)'/></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; scroll-behavior: smooth; }
+
+body {
+  font-family: 'Space Grotesk', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: #fafafa;
+  color: #3f3f46;
+  min-height: 100vh;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+a { color: #dc2626; text-decoration: none; transition: color 200ms ease; }
+a:hover { color: #ef4444; }
+
+::selection { background: rgba(220, 38, 38, 0.12); color: #18181b; }
+
+/* Nav */
+.nav {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid #e4e4e7;
+  padding: 0 24px;
+}
+
+.nav-inner {
+  max-width: 800px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 56px;
+}
+
+.nav-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 700;
+  font-size: 17px;
+  color: #18181b;
+  text-decoration: none;
+}
+
+.nav-brand:hover { color: #18181b; text-decoration: none; }
+.nav-brand svg { width: 26px; height: 26px; }
+
+.nav-links {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  list-style: none;
+}
+
+.nav-links a {
+  color: #71717a;
+  font-size: 14px;
+  font-weight: 500;
+  transition: color 200ms ease;
+}
+
+.nav-links a:hover { color: #18181b; text-decoration: none; }
+
+.nav-cta {
+  display: inline-flex;
+  align-items: center;
+  padding: 7px 16px;
+  background: #dc2626;
+  color: #ffffff !important;
+  font-weight: 600;
+  font-size: 13px;
+  border-radius: 8px;
+  transition: all 200ms ease;
+}
+
+.nav-cta:hover {
+  background: #ef4444;
+  text-decoration: none !important;
+  transform: translateY(-1px);
+  box-shadow: 0 0 20px rgba(220, 38, 38, 0.2);
+}
+
+/* Page layout */
+.page {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 0 24px;
+}
+
+/* Hero */
+.pricing-hero {
+  text-align: center;
+  padding: 64px 0 48px;
+}
+
+.pricing-hero h1 {
+  font-size: clamp(28px, 5vw, 40px);
+  font-weight: 700;
+  color: #18181b;
+  letter-spacing: -0.03em;
+  margin-bottom: 8px;
+}
+
+.pricing-hero p {
+  font-size: 17px;
+  color: #71717a;
+}
+
+/* Pricing card */
+.pricing-card {
+  max-width: 480px;
+  margin: 0 auto 48px;
+  background: #ffffff;
+  border: 2px solid #e4e4e7;
+  border-radius: 12px;
+  padding: 40px 36px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.pricing-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, #dc2626, #ef4444, #dc2626);
+}
+
+.pricing-card-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 14px;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 9999px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #dc2626;
+  margin-bottom: 16px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.pricing-card h2 {
+  font-size: 24px;
+  font-weight: 700;
+  color: #18181b;
+  margin-bottom: 16px;
+}
+
+.pricing-amount {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.pricing-amount .currency {
+  font-size: 24px;
+  font-weight: 600;
+  color: #71717a;
+  align-self: flex-start;
+  margin-top: 8px;
+}
+
+.pricing-amount .price {
+  font-size: 56px;
+  font-weight: 700;
+  color: #18181b;
+  letter-spacing: -0.03em;
+  line-height: 1;
+}
+
+.pricing-amount .period {
+  font-size: 16px;
+  color: #71717a;
+  font-weight: 400;
+}
+
+.pricing-per-seat {
+  font-size: 14px;
+  color: #a1a1aa;
+  margin-bottom: 28px;
+}
+
+/* Feature list */
+.feature-list {
+  list-style: none;
+  text-align: left;
+  margin-bottom: 32px;
+}
+
+.feature-list li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  font-size: 15px;
+  color: #3f3f46;
+  border-bottom: 1px solid #f4f4f5;
+}
+
+.feature-list li:last-child {
+  border-bottom: none;
+}
+
+.feature-list .check {
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  background: #f0fdf4;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.feature-list .check svg {
+  width: 12px;
+  height: 12px;
+  color: #22c55e;
+}
+
+/* CTA button */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 14px 28px;
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 16px;
+  font-weight: 600;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  transition: all 200ms ease;
+  text-decoration: none;
+}
+
+.btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.btn-primary {
+  background: #dc2626;
+  color: #ffffff;
+  box-shadow: 0 0 20px rgba(220, 38, 38, 0.2);
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: #ef4444;
+  color: #ffffff;
+  box-shadow: 0 0 28px rgba(220, 38, 38, 0.3);
+  transform: translateY(-1px);
+  text-decoration: none;
+}
+
+/* Account link */
+.account-link {
+  text-align: center;
+  margin-bottom: 56px;
+  font-size: 14px;
+  color: #71717a;
+}
+
+.account-link a { font-weight: 500; }
+
+/* FAQ */
+.faq-section {
+  max-width: 600px;
+  margin: 0 auto;
+  padding-bottom: 64px;
+}
+
+.faq-section h3 {
+  font-size: 22px;
+  font-weight: 700;
+  color: #18181b;
+  text-align: center;
+  margin-bottom: 28px;
+  letter-spacing: -0.01em;
+}
+
+.faq-item {
+  background: #ffffff;
+  border: 1px solid #e4e4e7;
+  border-radius: 12px;
+  padding: 20px 24px;
+  margin-bottom: 12px;
+  transition: border-color 200ms ease, box-shadow 200ms ease;
+}
+
+.faq-item:hover {
+  border-color: #d4d4d8;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.faq-item h4 {
+  font-size: 15px;
+  font-weight: 600;
+  color: #18181b;
+  margin-bottom: 6px;
+}
+
+.faq-item p {
+  font-size: 14px;
+  color: #71717a;
+  line-height: 1.6;
+}
+
+/* Footer */
+.page-footer {
+  border-top: 1px solid #e4e4e7;
+  padding: 24px 0;
+  text-align: center;
+  font-size: 13px;
+  color: #a1a1aa;
+}
+
+.page-footer a { color: #71717a; }
+.page-footer a:hover { color: #dc2626; }
+
+/* Spinner */
+.spinner {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: #ffffff;
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Message */
+.message {
+  padding: 12px 16px;
+  border-radius: 8px;
+  font-size: 14px;
+  margin-bottom: 16px;
+  display: none;
+  text-align: left;
+}
+
+.message-error {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #991b1b;
+}
+
+.message.show { display: block; }
+
+/* Responsive */
+@media (max-width: 640px) {
+  .pricing-card { padding: 28px 24px; }
+  .pricing-amount .price { font-size: 44px; }
+  .nav-links { display: none; }
+}
+
+@media (max-width: 480px) {
+  .pricing-hero { padding: 48px 0 36px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spinner { animation-duration: 1.2s; }
+  .btn { transition: none; }
+}
+</style>
+</head>
+<body>
+
+<!-- Nav -->
+<nav class="nav">
+  <div class="nav-inner">
+    <a href="/" class="nav-brand">
+      <svg viewBox="0 0 100 100"><defs><linearGradient id="bolt" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#FFD700"/><stop offset="100%" stop-color="#FF8C00"/></linearGradient></defs><path d="M58 2 L22 54 L42 54 L36 98 L78 42 L56 42 Z" fill="url(#bolt)"/></svg>
+      GodMode
+    </a>
+    <ul class="nav-links">
+      <li><a href="/">Home</a></li>
+      <li><a href="/support">Support</a></li>
+      <li><a href="/login" class="nav-cta">Sign In</a></li>
+    </ul>
+  </div>
+</nav>
+
+<div class="page">
+
+  <!-- Pricing Hero -->
+  <section class="pricing-hero">
+    <h1>Simple pricing. Powerful results.</h1>
+    <p>One plan. Everything included.</p>
+  </section>
+
+  <!-- Pricing Card -->
+  <div class="pricing-card">
+    <div class="pricing-card-badge">Most Popular</div>
+    <h2>GodMode</h2>
+
+    <div class="pricing-amount">
+      <span class="currency">$</span>
+      <span class="price">297</span>
+      <span class="period">/mo</span>
+    </div>
+    <div class="pricing-per-seat">per seat</div>
+
+    <ul class="feature-list">
+      <li>
+        <span class="check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></span>
+        Full AI Operating System
+      </li>
+      <li>
+        <span class="check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></span>
+        Autonomous daily briefs
+      </li>
+      <li>
+        <span class="check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></span>
+        Coding agent swarms
+      </li>
+      <li>
+        <span class="check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></span>
+        Second brain & Obsidian sync
+      </li>
+      <li>
+        <span class="check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></span>
+        Remote access from any device
+      </li>
+      <li>
+        <span class="check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></span>
+        Priority support
+      </li>
+    </ul>
+
+    <div id="checkoutError" class="message message-error"></div>
+
+    <button class="btn btn-primary" id="ctaBtn" onclick="handleGetStarted()">
+      <span id="ctaBtnText">Get Started</span>
+    </button>
+  </div>
+
+  <!-- Account link -->
+  <div class="account-link">
+    Already have an account? <a href="/account">Manage your subscription</a>
+  </div>
+
+  <!-- FAQ -->
+  <section class="faq-section">
+    <h3>Frequently asked questions</h3>
+
+    <div class="faq-item">
+      <h4>What's a seat?</h4>
+      <p>One seat = one user. If you have a team, add a seat for each member who needs access.</p>
+    </div>
+
+    <div class="faq-item">
+      <h4>Can I cancel anytime?</h4>
+      <p>Yes. Cancel from your account dashboard at any time. Your access continues through the end of the current billing period.</p>
+    </div>
+
+    <div class="faq-item">
+      <h4>What AI models are supported?</h4>
+      <p>GodMode works with any Claude subscription -- Pro, Max, or your own API key. Bring your existing plan.</p>
+    </div>
+
+    <div class="faq-item">
+      <h4>What do I need to get started?</h4>
+      <p>A Mac or Linux machine (or a VPS) and a Claude subscription. The install script handles everything else automatically.</p>
+    </div>
+  </section>
+
+</div>
+
+<!-- Footer -->
+<footer class="page-footer">
+  <div class="page">
+    <a href="/">Home</a> &middot; <a href="/login">Sign In</a> &middot; <a href="/support">Support</a> &middot; <a href="/terms.html">Terms</a> &middot; <a href="/privacy.html">Privacy</a>
+  </div>
+</footer>
+
+<script>
+async function handleGetStarted() {
+  var btn = document.getElementById('ctaBtn');
+  var text = document.getElementById('ctaBtnText');
+  var errorEl = document.getElementById('checkoutError');
+  errorEl.classList.remove('show');
+
+  // Check if user is logged in
+  var token = localStorage.getItem('godmode_access_token');
+
+  if (!token) {
+    // Not logged in, redirect to login with return URL
+    window.location.href = '/login?redirect=/pricing';
+    return;
+  }
+
+  // User is logged in, create checkout session
+  btn.disabled = true;
+  text.innerHTML = '<span class="spinner"></span> Redirecting...';
+
+  try {
+    var res = await fetch('/api/payments/checkout', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + token
+      }
+    });
+
+    if (res.status === 401) {
+      // Token expired, try refresh
+      var refreshed = await tryRefresh();
+      if (!refreshed) {
+        window.location.href = '/login?redirect=/pricing';
+        return;
+      }
+      // Retry with new token
+      token = localStorage.getItem('godmode_access_token');
+      res = await fetch('/api/payments/checkout', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + token
+        }
+      });
+    }
+
+    var data = await res.json();
+
+    if (!res.ok) {
+      throw new Error(data.message || data.error || 'Could not create checkout session.');
+    }
+
+    // Redirect to Stripe checkout
+    if (data.url) {
+      window.location.href = data.url;
+    } else {
+      throw new Error('No checkout URL returned.');
+    }
+  } catch (err) {
+    errorEl.textContent = err.message || 'Something went wrong. Please try again.';
+    errorEl.classList.add('show');
+    btn.disabled = false;
+    text.textContent = 'Get Started';
+  }
+}
+
+async function tryRefresh() {
+  var refreshToken = localStorage.getItem('godmode_refresh_token');
+  if (!refreshToken) return false;
+
+  try {
+    var res = await fetch('/api/auth/refresh', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refresh_token: refreshToken })
+    });
+
+    if (!res.ok) {
+      localStorage.removeItem('godmode_access_token');
+      localStorage.removeItem('godmode_refresh_token');
+      return false;
+    }
+
+    var data = await res.json();
+    localStorage.setItem('godmode_access_token', data.access_token);
+    if (data.refresh_token) {
+      localStorage.setItem('godmode_refresh_token', data.refresh_token);
+    }
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+</script>
+
+</body>
+</html>

@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Support | GodMode</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚡</text></svg>">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root {
+            --black: #000000;
+            --card: #121722;
+            --muted: #a0aab8;
+            --white: #ffffff;
+            --accent: #00ff88;
+            --accent-dim: rgba(0, 255, 136, 0.1);
+            --radius: 14px;
+            --max: 720px;
+        }
+        html { scroll-behavior: smooth; }
+        body {
+            font-family: 'Inter', -apple-system, sans-serif;
+            background: var(--black);
+            color: var(--white);
+            line-height: 1.6;
+        }
+        body::before {
+            content: "";
+            position: fixed;
+            inset: 0;
+            background:
+                radial-gradient(circle at 12% 18%, rgba(0, 255, 136, 0.08), transparent 42%),
+                radial-gradient(circle at 88% 82%, rgba(0, 200, 255, 0.05), transparent 45%);
+            pointer-events: none;
+        }
+
+        .container {
+            position: relative;
+            z-index: 2;
+            max-width: var(--max);
+            margin: 0 auto;
+            padding: 60px 24px 80px;
+        }
+
+        h1 {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 32px;
+            font-weight: 700;
+            text-align: center;
+            margin-bottom: 8px;
+        }
+        .subtitle {
+            text-align: center;
+            color: var(--muted);
+            font-size: 15px;
+            margin-bottom: 40px;
+        }
+
+        .card {
+            background: var(--card);
+            border: 1px solid rgba(255,255,255,0.06);
+            border-radius: var(--radius);
+            padding: 28px;
+            margin-bottom: 20px;
+        }
+        .card h2 {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 16px;
+            color: var(--white);
+        }
+        .card p, .card li {
+            color: var(--muted);
+            font-size: 14px;
+            line-height: 1.7;
+        }
+
+        code {
+            background: #0a0f18;
+            padding: 3px 8px;
+            border-radius: 6px;
+            font-size: 13px;
+            color: var(--accent);
+        }
+
+        pre {
+            background: #0a0f18;
+            border-radius: 10px;
+            padding: 16px;
+            overflow-x: auto;
+            margin: 12px 0;
+            font-size: 13px;
+            line-height: 1.5;
+            color: #ccc;
+        }
+
+        .faq-item {
+            padding: 20px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+        }
+        .faq-item:last-child { border-bottom: none; }
+        .faq-item h3 {
+            font-size: 15px;
+            font-weight: 600;
+            color: var(--white);
+            margin-bottom: 8px;
+        }
+        .faq-item p {
+            color: var(--muted);
+            font-size: 14px;
+        }
+
+        .contact-box {
+            background: var(--accent-dim);
+            border: 1px solid rgba(0, 255, 136, 0.15);
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+            margin-top: 12px;
+        }
+        .contact-box a {
+            color: var(--accent);
+            text-decoration: none;
+            font-weight: 600;
+        }
+        .contact-box a:hover { text-decoration: underline; }
+
+        .links {
+            text-align: center;
+            margin-top: 24px;
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+        }
+        .links a {
+            color: var(--accent);
+            text-decoration: none;
+            font-size: 14px;
+        }
+        .links a:hover { text-decoration: underline; }
+
+        @media (max-width: 600px) {
+            .container { padding: 40px 16px 60px; }
+            h1 { font-size: 26px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>GodMode Support</h1>
+        <p class="subtitle">Setup guides, troubleshooting, and FAQ.</p>
+
+        <div class="card">
+            <h2>Quick Setup</h2>
+            <pre>npm i -g openclaw                         # Install OpenClaw
+openclaw plugins install godmode          # Install GodMode plugin
+openclaw godmode activate GM-PROD-xxx     # Add your license key
+openclaw gateway run                      # Start the gateway</pre>
+            <p style="margin-top: 12px;">Then open <code>http://localhost:18789/godmode</code> in your browser.</p>
+        </div>
+
+        <div class="card">
+            <h2>Troubleshooting</h2>
+
+            <div class="faq-item">
+                <h3>Run the doctor</h3>
+                <p>The built-in diagnostic checks your license, UI assets, workspace, and data directory:</p>
+                <pre>openclaw godmode doctor</pre>
+                <p>This will tell you exactly what's wrong and how to fix it.</p>
+            </div>
+
+            <div class="faq-item">
+                <h3>Check plugin health via HTTP</h3>
+                <p>If the gateway is running, visit <code>http://localhost:18789/godmode/health</code> for a JSON status report including license state, UI availability, and method count.</p>
+            </div>
+
+            <div class="faq-item">
+                <h3>Check plugin status via CLI</h3>
+                <pre>openclaw godmode status         # Human-readable
+openclaw godmode status --json  # Machine-readable</pre>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>FAQ</h2>
+
+            <div class="faq-item">
+                <h3>Where is my license key?</h3>
+                <p>Your license key was emailed to you after purchase. Check for an email from <strong>hello@lifeongodmode.com</strong> with subject "Welcome to GodMode." If you can't find it, contact support.</p>
+            </div>
+
+            <div class="faq-item">
+                <h3>"LICENSE_REQUIRED" error on every call</h3>
+                <p>Your license key isn't configured. Run:</p>
+                <pre>openclaw godmode activate YOUR-KEY-HERE</pre>
+                <p>Then restart the gateway.</p>
+            </div>
+
+            <div class="faq-item">
+                <h3>"LICENSE_INVALID" error</h3>
+                <p>Your license key may be expired or deactivated. Check your subscription status at <a href="/billing" style="color: var(--accent);">Manage Billing</a>. If your payment method failed, update it there.</p>
+            </div>
+
+            <div class="faq-item">
+                <h3>"GodMode UI Not Available" at /godmode</h3>
+                <p>The UI assets weren't included in your install. This can happen with older plugin versions. Try updating:</p>
+                <pre>openclaw plugins update godmode</pre>
+            </div>
+
+            <div class="faq-item">
+                <h3>Can I use GodMode on multiple machines?</h3>
+                <p>Yes. Your license key works on any number of machines you personally own and use. Each machine needs its own OpenClaw + GodMode plugin installation with the same key.</p>
+            </div>
+
+            <div class="faq-item">
+                <h3>What happens if I cancel?</h3>
+                <p>Your license is deactivated, but your data files in <code>~/godmode/data/</code> are yours and never deleted. The base OpenClaw gateway continues to work. Re-subscribe anytime to reactivate your existing key.</p>
+            </div>
+
+            <div class="faq-item">
+                <h3>Do I need to bring my own AI API keys?</h3>
+                <p>Yes. GodMode orchestrates your AI interactions through OpenClaw, which connects to AI providers (Anthropic, OpenAI, Google, etc.) using your own API keys. GodMode itself is the operating system layer on top.</p>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>Contact</h2>
+            <div class="contact-box">
+                <p style="color: var(--white); margin-bottom: 8px;">Need direct help? Email us at</p>
+                <a href="mailto:support@lifeongodmode.com" style="font-size: 16px;">support@lifeongodmode.com</a>
+            </div>
+        </div>
+
+        <div class="links">
+            <a href="/">Home</a>
+            <a href="/billing">Billing</a>
+            <a href="/terms.html">Terms</a>
+            <a href="/privacy.html">Privacy</a>
+        </div>
+    </div>
+</body>
+</html>

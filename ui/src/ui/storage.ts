@@ -55,7 +55,7 @@ export function loadSettings(): UiSettings {
     splitRatio: 0.6,
     navCollapsed: false,
     navGroupsCollapsed: { System: true },
-    openTabs: ["agent:main:main"],
+    openTabs: [],
     tabLastViewed: {},
     userName: "",
     userAvatar: "",

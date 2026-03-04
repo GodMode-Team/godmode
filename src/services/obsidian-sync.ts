@@ -190,6 +190,12 @@ class ObsidianSyncService {
         }
       });
 
+      this.continuousProcess.on("error", (err) => {
+        this.logger.warn(`[ObsidianSync] Spawn error: ${String(err)}`);
+        this.config.lastError = String(err);
+        this.continuousProcess = null;
+      });
+
       this.continuousProcess.on("exit", (code) => {
         this.logger.info(`[ObsidianSync] Continuous sync exited with code ${code}`);
         this.continuousProcess = null;

@@ -65,8 +65,13 @@ function normalizeOpenTabs(openTabs: string[] | undefined, sessionKey: string): 
   const deduped = Array.isArray(openTabs)
     ? [...new Set(openTabs.map((key) => key.trim()).filter((key) => key.length > 0))]
     : [];
-  if (deduped.length === 0) {
-    deduped.push(sessionKey || "main");
+  if (deduped.length === 0 && sessionKey) {
+    // Main session aliases are handled by the pinned Prosper tab — skip them
+    const lower = sessionKey.toLowerCase();
+    const isMainAlias = lower === "main" || lower === "agent:main:main" || lower.endsWith(":main");
+    if (!isMainAlias) {
+      deduped.push(sessionKey);
+    }
   }
   return deduped;
 }
@@ -152,10 +157,14 @@ export function applySettingsFromUrl(host: SettingsHost) {
     const session = sessionRaw.trim();
     if (session) {
       host.sessionKey = session;
-      // Ensure session is in openTabs
-      const openTabs = host.settings.openTabs.includes(session)
+      // Main session aliases are handled by the pinned Prosper tab — don't add to openTabs
+      const lower = session.toLowerCase();
+      const isMainAlias = lower === "main" || lower === "agent:main:main" || lower.endsWith(":main");
+      const openTabs = isMainAlias
         ? host.settings.openTabs
-        : [...host.settings.openTabs, session];
+        : host.settings.openTabs.includes(session)
+          ? host.settings.openTabs
+          : [...host.settings.openTabs, session];
       applySettings(host, {
         ...host.settings,
         sessionKey: session,

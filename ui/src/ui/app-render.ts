@@ -218,13 +218,26 @@ function getSessionTabIdentity(key: string, session: ReturnType<typeof findSessi
   return `key:${key.trim().toLowerCase()}`;
 }
 
+/**
+ * Check if a session key is an alias for the pinned ally/main session.
+ * The pinned Prosper tab handles the main session, so we hide duplicates
+ * like "agent:main:main" or "agent:X:main" from the regular tab bar.
+ */
+function isMainSessionAlias(key: string): boolean {
+  if (key === ALLY_SESSION_KEY) return true;
+  const lower = key.toLowerCase();
+  // "agent:main:main", "agent:X:main" — anything ending in ":main"
+  if (lower === "agent:main:main" || lower.endsWith(":main")) return true;
+  return false;
+}
+
 function getRenderableSessionTabState(state: AppViewState): {
   tabKeys: string[];
   activeIdentity: string;
 } {
   const sessions = state.sessionsResult?.sessions;
   const rawTabKeys = [...new Set(state.settings.openTabs.map((key) => key.trim()).filter(Boolean))]
-    .filter((key) => key !== ALLY_SESSION_KEY); // ally-main handled by pinned tab
+    .filter((key) => !isMainSessionAlias(key)); // ally-main handled by pinned tab
   const activeSession = findSessionByKey(sessions, state.sessionKey);
   const activeIdentity = getSessionTabIdentity(state.sessionKey, activeSession);
   const tabsByIdentity = new Map<string, string>();
@@ -242,8 +255,13 @@ function getRenderableSessionTabState(state: AppViewState): {
   }
 
   const tabKeys = [...tabsByIdentity.values()];
+  // Empty is OK — the pinned Prosper tab always shows the main session.
+  // Only add a fallback if the active session is NOT a main alias.
   if (tabKeys.length === 0) {
-    tabKeys.push(state.sessionKey.trim() || "main");
+    const fallback = state.sessionKey.trim() || "main";
+    if (!isMainSessionAlias(fallback)) {
+      tabKeys.push(fallback);
+    }
   }
   return { tabKeys, activeIdentity };
 }
@@ -973,16 +991,18 @@ export function renderApp(state: AppViewState) {
                               }
                               const newTabs = state.settings.openTabs.filter((t) => t !== key);
                               const wasActive = key === state.sessionKey;
+                              // Fall back to pinned Prosper tab when no other tabs remain
+                              const fallbackKey = newTabs[0] || ALLY_SESSION_KEY;
                               state.applySettings({
                                 ...state.settings,
                                 openTabs: newTabs,
                                 ...(wasActive
-                                  ? { sessionKey: newTabs[0], lastActiveSessionKey: newTabs[0] }
+                                  ? { sessionKey: fallbackKey, lastActiveSessionKey: fallbackKey }
                                   : {}),
                               });
                               if (wasActive) {
-                                state.sessionKey = newTabs[0];
-                                syncUrlWithSessionKey(state, newTabs[0], true);
+                                state.sessionKey = fallbackKey;
+                                syncUrlWithSessionKey(state, fallbackKey, true);
                                 void loadChatHistory(state);
                               }
                             }}
@@ -1019,10 +1039,17 @@ export function renderApp(state: AppViewState) {
                   onDatePrev: () => state.handleDatePrev(),
                   onDateNext: () => state.handleDateNext(),
                   onDateToday: () => state.handleDateToday(),
-                  viewMode: state.todayViewMode ?? "my-day",
+                  viewMode: state.todayViewMode ?? "brief",
                   onViewModeChange: (mode) => state.handleTodayViewModeChange(mode),
                   focusPulseActive: focusPulseActive,
                   onStartMorningSet: focusPulseEnabled ? () => state.handleFocusPulseStartMorning() : undefined,
+                  decisionCards: (state.todayQueueResults ?? []).length > 0 ? {
+                    items: state.todayQueueResults!,
+                    onApprove: () => {},
+                    onReject: () => {},
+                    onViewOutput: () => {},
+                    onOpenChat: () => {},
+                  } : undefined,
                 })
               : nothing}
           </div>
@@ -1467,7 +1494,7 @@ export function renderApp(state: AppViewState) {
                   onDateNext: () => state.handleDateNext(),
                   onDateToday: () => state.handleDateToday(),
                   // View mode toggle
-                  viewMode: state.todayViewMode ?? "my-day",
+                  viewMode: state.todayViewMode ?? "brief",
                   onViewModeChange: (mode) => state.handleTodayViewModeChange(mode),
                   // Agent log props
                   agentLog: state.agentLog ?? null,

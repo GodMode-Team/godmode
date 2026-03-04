@@ -150,56 +150,60 @@
   transition: opacity 0.15s;
 }
 
-/* Today view segmented toggle */
-.today-view-toggle {
+/* Today view tab bar */
+.today-view-tabs {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  padding: 4px;
-  border: 1px solid var(--mc-border, var(--border));
-  border-radius: 11px;
-  background: linear-gradient(
-    180deg,
-    var(--mc-bg-card, var(--card)) 0%,
-    var(--mc-bg-secondary, var(--bg-elevated)) 100%
-  );
-  box-shadow: inset 0 1px 0 var(--card-highlight, rgba(255, 255, 255, 0.05));
+  gap: 0;
+  border-bottom: 1px solid var(--mc-border, var(--border));
 }
 
-.today-view-toggle button {
+.today-view-tab {
   border: none;
-  border-radius: 8px;
+  border-bottom: 2px solid transparent;
   background: transparent;
   color: var(--mc-text-secondary, var(--muted));
   cursor: pointer;
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: 0.01em;
-  padding: 7px 14px;
+  padding: 8px 16px;
+  margin-bottom: -1px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   transition:
-    background var(--duration-fast, 120ms) ease,
-    color var(--duration-fast, 120ms) ease,
-    transform var(--duration-fast, 120ms) ease;
+    border-color var(--duration-fast, 120ms) ease,
+    color var(--duration-fast, 120ms) ease;
 }
 
-.today-view-toggle button:hover {
-  background: var(--mc-bg-hover, var(--bg-hover));
+.today-view-tab:hover {
   color: var(--mc-text, var(--text));
 }
 
-.today-view-toggle button.active {
-  background: rgba(255, 77, 77, 0.1);
+.today-view-tab.active {
+  border-bottom-color: var(--accent, #ff4d4d);
   color: var(--accent, #ff4d4d);
-  box-shadow: none;
 }
 
-.today-view-toggle button:focus-visible {
+.today-view-tab:focus-visible {
   outline: none;
   box-shadow: var(--focus-glow, 0 0 0 2px var(--bg), 0 0 0 4px var(--ring));
 }
 
-:root[data-theme="light"] .today-view-toggle {
-  background: linear-gradient(180deg, #ffffff 0%, #f7f7f8 100%);
+.tab-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: var(--accent, #ff4d4d);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
 }
 
 .today-date-today-btn:hover {
@@ -293,29 +297,36 @@
   box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
 }
 
-/* ===== Two-Column Layout ===== */
+/* ===== Brief Full-Width View ===== */
 
-.my-day-columns {
-  display: grid;
-  grid-template-columns: 3fr 2fr;
-  gap: 16px;
+.my-day-brief-full {
   flex: 1;
-  min-height: 0;
-  overflow: hidden;
-}
-
-.my-day-tasks-col {
   display: flex;
   flex-direction: column;
   min-height: 0;
   overflow-y: auto;
 }
 
-.my-day-brief-col {
+.my-day-brief-full .my-day-card {
+  flex: 1;
+}
+
+/* ===== Command Center View ===== */
+
+.command-center {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.command-center-tasks {
+  flex: 1;
   display: flex;
   flex-direction: column;
   min-height: 0;
-  overflow-y: auto;
 }
 
 /* Task panel fills its column */
@@ -375,18 +386,15 @@
     flex-wrap: wrap;
   }
 
-  .my-day-columns {
-    grid-template-columns: 1fr;
-    overflow-y: auto;
+  .today-view-tabs {
+    width: 100%;
+    justify-content: stretch;
   }
 
-  .my-day-tasks-col {
-    overflow-y: visible;
-    max-height: 50vh;
-  }
-
-  .my-day-brief-col {
-    overflow-y: visible;
+  .today-view-tab {
+    flex: 1;
+    text-align: center;
+    justify-content: center;
   }
 }
 
@@ -1269,13 +1277,14 @@
     gap: 12px;
   }
 
-  .today-view-toggle {
+  .today-view-tabs {
     width: 100%;
-    justify-content: stretch;
   }
 
-  .today-view-toggle button {
+  .today-view-tab {
     flex: 1;
+    text-align: center;
+    justify-content: center;
   }
 
   .today-content {

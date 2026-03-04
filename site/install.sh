@@ -283,7 +283,7 @@ install_system_deps() {
   fi
 
   MISSING=""
-  for dep in curl unzip tar xz-utils; do
+  for dep in curl unzip tar git xz-utils; do
     # xz-utils provides xz for .tar.xz extraction; binary name varies
     if [ "$dep" = "xz-utils" ]; then
       if has xz || has xzcat || has unxz; then
@@ -405,17 +405,27 @@ install_node_direct() {
       ;;
   esac
 
-  NODE_URL="https://nodejs.org/dist/${NODE_VER}/${NODE_DIST}.tar.xz"
   NODE_DIR="$HOME/.local/node"
+
+  # Prefer .tar.xz (smaller) but fall back to .tar.gz if xz not available
+  if has xz || has xzcat; then
+    NODE_URL="https://nodejs.org/dist/${NODE_VER}/${NODE_DIST}.tar.xz"
+    NODE_ARCHIVE="/tmp/node.tar.xz"
+    TAR_FLAG="-xJf"
+  else
+    NODE_URL="https://nodejs.org/dist/${NODE_VER}/${NODE_DIST}.tar.gz"
+    NODE_ARCHIVE="/tmp/node.tar.gz"
+    TAR_FLAG="-xzf"
+  fi
 
   info "Downloading Node.js $NODE_VER..."
 
   mkdir -p "$HOME/.local"
 
   if has curl; then
-    curl -fsSL "$NODE_URL" -o /tmp/node.tar.xz
+    curl -fsSL "$NODE_URL" -o "$NODE_ARCHIVE"
   elif has wget; then
-    wget -q "$NODE_URL" -O /tmp/node.tar.xz
+    wget -q "$NODE_URL" -O "$NODE_ARCHIVE"
   else
     fail "Neither curl nor wget found — cannot download Node.js"
     exit 1
@@ -423,8 +433,8 @@ install_node_direct() {
 
   # Extract
   mkdir -p "$NODE_DIR"
-  tar -xJf /tmp/node.tar.xz -C "$NODE_DIR" --strip-components=1
-  rm -f /tmp/node.tar.xz
+  tar $TAR_FLAG "$NODE_ARCHIVE" -C "$NODE_DIR" --strip-components=1
+  rm -f "$NODE_ARCHIVE"
 
   export PATH="$NODE_DIR/bin:$PATH"
 
@@ -552,7 +562,25 @@ persist_all_binaries
 
 # Step 5: GodMode plugin
 step 5 "Installing GodMode plugin"
-# Always install/update to get the latest version
+# Stop gateway FIRST if running (so we don't rm files it's using)
+STATE_DIR="${OPENCLAW_STATE_DIR:-$HOME/.openclaw}"
+if curl -sf "http://127.0.0.1:${GODMODE_PORT}/health" >/dev/null 2>&1; then
+  info "Stopping running gateway for upgrade..."
+  openclaw gateway stop >/dev/null 2>&1 || true
+  sleep 1
+  if has lsof; then
+    GATEWAY_PID="$(lsof -ti :${GODMODE_PORT} 2>/dev/null || true)"
+    if [ -n "$GATEWAY_PID" ]; then
+      kill "$GATEWAY_PID" 2>/dev/null || true
+      sleep 1
+    fi
+  fi
+fi
+# Remove old plugin if it exists (openclaw plugins install won't overwrite)
+if [ -d "$STATE_DIR/extensions/godmode" ]; then
+  rm -rf "$STATE_DIR/extensions/godmode"
+  info "Removed old plugin version"
+fi
 info "Installing @godmode-team/godmode (latest)..."
 openclaw plugins install @godmode-team/godmode || {
   fail "GodMode plugin install failed"
@@ -561,19 +589,13 @@ openclaw plugins install @godmode-team/godmode || {
 }
 ok "GodMode plugin installed (latest)"
 
-# Step 6: License activation
-step 6 "Activating license"
-if [ -z "$LICENSE_KEY" ]; then
-  # Try to prompt interactively if terminal is available
-  if [ -t 0 ] 2>/dev/null; then
-    printf '\n  Enter your GodMode license key (or press Enter to skip): '
-    read -r LICENSE_KEY
-  fi
-fi
-
-if [ -n "$LICENSE_KEY" ]; then
-  # Write license key directly to openclaw config (avoids chicken-and-egg:
-  # plugin won't load without key, but activate command requires plugin to load)
+# Step 6: GodMode account
+step 6 "GodMode account"
+AUTH_FILE="$HOME/.openclaw/godmode-auth.json"
+if [ -f "$AUTH_FILE" ]; then
+  ok "Already logged in"
+elif [ -n "$LICENSE_KEY" ] && echo "$LICENSE_KEY" | grep -q "^GM-DEV-"; then
+  # Dev key — write to config for backward compat
   STATE_DIR="${OPENCLAW_STATE_DIR:-$HOME/.openclaw}"
   CONFIG_FILE="$STATE_DIR/openclaw.json"
   LICENSE_KEY="$LICENSE_KEY" CONFIG_FILE="$CONFIG_FILE" node -e "
@@ -587,28 +609,76 @@ if [ -n "$LICENSE_KEY" ]; then
     if (!c.plugins.entries.godmode.config) c.plugins.entries.godmode.config = {};
     c.plugins.entries.godmode.config.licenseKey = process.env.LICENSE_KEY;
     fs.writeFileSync(p, JSON.stringify(c, null, 2) + '\n');
-  " 2>/dev/null && ok "License key saved: $LICENSE_KEY" || {
-    warn "Could not write license key to config"
-    info "Set it manually: openclaw godmode activate $LICENSE_KEY"
+  " 2>/dev/null && ok "Dev key saved: $LICENSE_KEY" || {
+    warn "Could not write dev key to config"
   }
 else
-  info "No license key provided — skipping activation"
-  info "Activate later with: openclaw godmode activate YOUR-KEY"
-  info "Or enter it during onboarding in the GodMode UI"
+  info "Set up your GodMode account:"
+  info "  Have a license key?  openclaw godmode activate YOUR-KEY"
+  info "  Need an account?    https://lifeongodmode.com/pricing"
 fi
 
-# Step 7: AI Authentication
-step 7 "Checking AI authentication"
+# Step 7: AI Model — bring your own
+step 7 "Checking AI model"
+AI_FOUND=false
 if openclaw auth status 2>/dev/null | grep -qi "authenticated\|connected\|active"; then
-  ok "Already authenticated with Claude"
-else
-  warn "AI authentication not configured"
-  info "GodMode needs Claude authentication to work. Two options:"
+  ok "Already authenticated"
+  AI_FOUND=true
+fi
+# Check for known provider API keys in environment
+for _envcheck in \
+  "ANTHROPIC_API_KEY:Anthropic (Claude)" \
+  "OPENAI_API_KEY:OpenAI (GPT)" \
+  "GEMINI_API_KEY:Google (Gemini)" \
+  "OPENROUTER_API_KEY:OpenRouter" \
+  "XAI_API_KEY:xAI (Grok)" \
+  "MISTRAL_API_KEY:Mistral" \
+  "TOGETHER_API_KEY:Together AI"; do
+  _varname="${_envcheck%%:*}"
+  _label="${_envcheck#*:}"
+  eval "_val=\"\${${_varname}:-}\""
+  if [ -n "$_val" ]; then
+    ok "$_label key found ($_varname)"
+    AI_FOUND=true
+  fi
+done
+
+if [ "$AI_FOUND" = false ]; then
+  warn "No AI provider configured"
+  info "GodMode works with any major LLM. Pick how you want to connect:"
   printf '\n'
-  info "  Claude Pro/Max subscriber:  openclaw setup-token"
-  info "  API key holder:             openclaw auth login"
+
+  # ── Tier 1: Anthropic API key ──
+  printf '  %s  1  Anthropic API Key (best agent quality)%s\n' "$GRN$BLD" "$RST"
+  printf '  %s     export ANTHROPIC_API_KEY="sk-ant-..."%s\n' "$WHT" "$RST"
+  printf '  %s     Get key: console.anthropic.com/settings/keys%s\n' "$DIM" "$RST"
+  printf '  %s     Official, stable, pay-per-use. Best quality, but costs add up with heavy use.%s\n\n' "$DIM" "$RST"
+
+  # ── Tier 2: OpenAI subscription ──
+  printf '  %s  2  OpenAI Subscription (official, cost-effective)%s\n' "$GRN$BLD" "$RST"
+  printf '  %s     openclaw models auth login  %s-->  select OpenAI%s\n' "$WHT" "$DIM" "$RST"
+  printf '  %s     Uses your ChatGPT Plus ($20/mo), Team ($30/mo), or Pro ($200/mo) subscription.%s\n' "$DIM" "$RST"
+  printf '  %s     Official and stable. Great quality at a predictable monthly cost.%s\n\n' "$DIM" "$RST"
+
+  # ── Tier 3: Claude subscription token ──
+  printf '  %s  3  Claude Subscription Token (community-supported)%s\n' "$YLW$BLD" "$RST"
+  printf '  %s     openclaw models auth setup-token%s\n' "$WHT" "$RST"
+  printf '  %s     Then in a separate terminal:  claude setup-token%s\n' "$WHT" "$RST"
+  printf '  %s     Uses your Claude Pro ($20/mo) or Max ($100-200/mo) subscription.%s\n' "$DIM" "$RST"
+  printf '  %s     Not officially sanctioned by Anthropic — may need periodic re-auth.%s\n\n' "$DIM" "$RST"
+
+  # ── Other providers ──
+  printf '  %s  Other providers (API key — add to ~/.bashrc):%s\n' "$DIM" "$RST"
+  printf '  %s  4  Google Gemini          GEMINI_API_KEY       aistudio.google.com/apikey%s\n' "$DIM" "$RST"
+  printf '  %s  5  OpenRouter (100+ LLMs) OPENROUTER_API_KEY   openrouter.ai/keys%s\n' "$DIM" "$RST"
+  printf '  %s  6  xAI Grok               XAI_API_KEY          console.x.ai%s\n' "$DIM" "$RST"
+  printf '  %s  7  Mistral                MISTRAL_API_KEY      console.mistral.ai/api-keys%s\n' "$DIM" "$RST"
+  printf '  %s  8  Ollama (free, local)   no key needed        ollama.com%s\n' "$DIM" "$RST"
   printf '\n'
-  info "Run one of these commands after this installer finishes."
+
+  info "For option 1 and 4-8, add the key to your shell profile:"
+  printf '  %s  echo '\''export ANTHROPIC_API_KEY="sk-ant-..."'\'' >> ~/.bashrc && source ~/.bashrc%s\n' "$WHT" "$RST"
+  printf '\n'
 fi
 
 # Step 8: Configure gateway
@@ -616,6 +686,28 @@ step 8 "Configuring gateway"
 openclaw config set gateway.mode local 2>/dev/null && ok "gateway.mode = local" || warn "Could not set gateway.mode"
 openclaw config set gateway.controlUi.enabled true 2>/dev/null && ok "gateway.controlUi.enabled = true" || warn "Could not set controlUi"
 openclaw config set plugins.enabled true 2>/dev/null && ok "plugins.enabled = true" || warn "Could not set plugins.enabled"
+
+# VPS / headless: configure network binding so remote access works
+TAILSCALE_CONFIGURED=false
+if [ "$IS_HEADLESS" = true ]; then
+  # Detect Tailscale
+  if has tailscale && tailscale status >/dev/null 2>&1; then
+    TAILSCALE_IP="$(tailscale ip -4 2>/dev/null || true)"
+    if [ -n "$TAILSCALE_IP" ]; then
+      ok "Tailscale detected — IP: $TAILSCALE_IP"
+      # Use tailscale serve mode — exposes gateway to tailnet securely
+      openclaw config set gateway.tailscale.mode serve 2>/dev/null && ok "gateway.tailscale.mode = serve" || warn "Could not set tailscale mode"
+      openclaw config set gateway.auth.allowTailscale true 2>/dev/null || true
+      # Bind to LAN so Tailscale serve can reach the gateway
+      openclaw config set gateway.bind lan 2>/dev/null && ok "gateway.bind = lan (Tailscale + SSH)" || true
+      TAILSCALE_CONFIGURED=true
+    fi
+  else
+    # No Tailscale — still bind to LAN for SSH tunnel access
+    openclaw config set gateway.bind lan 2>/dev/null && ok "gateway.bind = lan (for SSH tunnel access)" || true
+    info "Install Tailscale for easy remote access: curl -fsSL https://tailscale.com/install.sh | sh"
+  fi
+fi
 
 # Generate security token if missing
 STATE_DIR="${OPENCLAW_STATE_DIR:-$HOME/.openclaw}"
@@ -641,33 +733,24 @@ fi
 
 # Step 9: Start gateway
 step 9 "Starting gateway"
-if openclaw gateway status 2>/dev/null | grep -qi running; then
-  info "Gateway already running — restarting with new config..."
-  openclaw gateway restart 2>/dev/null && ok "Gateway restarted" || warn "Restart failed — try: openclaw gateway restart"
-else
-  # On VPS: use "gateway run" (foreground mode) with nohup, because
-  # "gateway start" requires systemctl which doesn't work as root
-  if [ "$IS_HEADLESS" = true ]; then
-    nohup openclaw gateway run >/dev/null 2>&1 &
-    sleep 3
-    if curl -sf "http://127.0.0.1:${GODMODE_PORT}/health" >/dev/null 2>&1; then
-      ok "Gateway started (background)"
-    else
-      warn "Gateway may still be starting"
-      info "Check with: curl -sf http://127.0.0.1:${GODMODE_PORT}/health"
-      info "Or start manually: nohup openclaw gateway run &"
-    fi
-  else
-    openclaw gateway start 2>/dev/null && ok "Gateway started" || {
-      warn "Could not start gateway automatically"
-      info "Start manually: openclaw gateway start"
-    }
-  fi
+
+# Gateway was already stopped in step 5 if it was running.
+# Start gateway — try "gateway start" first (uses systemd/launchd).
+# Don't trust exit codes — check if the health endpoint actually responds.
+# If not, fall back to "gateway run" which works everywhere.
+openclaw gateway start >/dev/null 2>&1 || true
+
+# Give gateway start a few seconds to spin up
+sleep 5
+
+if ! curl -sf "http://127.0.0.1:${GODMODE_PORT}/health" >/dev/null 2>&1; then
+  # gateway start didn't work — use direct run mode (works on VPS, root, etc.)
+  nohup openclaw gateway run >/dev/null 2>&1 &
 fi
 
-# Wait for gateway to be ready (up to 15 seconds)
+# Wait for gateway to be ready (up to 25 seconds)
 READY=false
-for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15; do
+for _wait in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25; do
   if curl -sf "http://127.0.0.1:${GODMODE_PORT}/health" >/dev/null 2>&1; then
     READY=true
     break
@@ -676,12 +759,9 @@ for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15; do
 done
 
 if [ "$READY" = true ]; then
-  ok "Gateway is ready on port $GODMODE_PORT"
+  ok "Gateway is running on port $GODMODE_PORT"
 else
-  warn "Gateway did not respond on port $GODMODE_PORT within 15s"
-  info "This is normal on first run — it may take a moment to initialize."
-  info "Check status: openclaw gateway status"
-  info "Start manually: openclaw gateway start"
+  warn "Gateway is still starting up — this can take a moment on first run"
 fi
 
 # ── Done ────────────────────────────────────────────────────────────────────
@@ -710,28 +790,42 @@ if [ "$IS_HEADLESS" = true ]; then
 
   STEP_NUM=1
 
-  if [ -z "$LICENSE_KEY" ]; then
-    printf '  %s%s.%s Activate your license:\n' "$CYN" "$STEP_NUM" "$RST"
-    printf '     openclaw godmode activate GM-YOUR-KEY\n\n'
+  if [ ! -f "$AUTH_FILE" ]; then
+    printf '  %s%s.%s GodMode account:\n' "$CYN" "$STEP_NUM" "$RST"
+    printf '     openclaw godmode activate YOUR-KEY   %s# if you have a license key%s\n' "$DIM" "$RST"
+    printf '     %sSign up at: https://lifeongodmode.com/pricing%s\n\n' "$DIM" "$RST"
     STEP_NUM=$((STEP_NUM + 1))
   fi
 
-  printf '  %s%s.%s Set up AI authentication:\n' "$CYN" "$STEP_NUM" "$RST"
-  printf '     openclaw auth login    %s(API key)%s\n' "$DIM" "$RST"
-  printf '     openclaw setup-token   %s(Claude Pro/Max)%s\n\n' "$DIM" "$RST"
-  STEP_NUM=$((STEP_NUM + 1))
+  if [ "$AI_FOUND" = false ]; then
+    printf '  %s%s.%s Connect an AI model:\n' "$CYN" "$STEP_NUM" "$RST"
+    printf '     %sA) Anthropic API key (best quality, pay-per-use):%s\n' "$GRN" "$RST"
+    printf '        export ANTHROPIC_API_KEY="sk-ant-..."  %s# add to ~/.bashrc%s\n\n' "$DIM" "$RST"
+    printf '     %sB) OpenAI subscription (official, cost-effective):%s\n' "$GRN" "$RST"
+    printf '        openclaw models auth login  %s# select OpenAI, uses ChatGPT sub%s\n\n' "$DIM" "$RST"
+    printf '     %sC) Claude subscription token (community-supported):%s\n' "$YLW" "$RST"
+    printf '        openclaw models auth setup-token  %s# then: claude setup-token%s\n\n' "$DIM" "$RST"
+    STEP_NUM=$((STEP_NUM + 1))
+  fi
 
-  printf '  %s%s.%s Access GodMode remotely:\n' "$CYN" "$STEP_NUM" "$RST"
-  printf '     %sOption A — SSH tunnel (quick):%s\n' "$DIM" "$RST"
-  printf '     ssh -L %s:localhost:%s user@your-server\n' "$GODMODE_PORT" "$GODMODE_PORT"
-  printf '     Then open: %s%s%s\n\n' "$CYN" "$GODMODE_URL" "$RST"
-  printf '     %sOption B — Tailscale (recommended for persistent access):%s\n' "$DIM" "$RST"
-  printf '     curl -fsSL https://tailscale.com/install.sh | sh\n'
-  printf '     tailscale up\n'
-  printf '     Then open: http://<tailscale-ip>:%s/godmode/onboarding\n\n' "$GODMODE_PORT"
-  STEP_NUM=$((STEP_NUM + 1))
+  if [ "$TAILSCALE_CONFIGURED" = true ]; then
+    # Tailscale already configured — show the access URL
+    printf '  %s%s.%s Access GodMode via Tailscale:\n' "$CYN" "$STEP_NUM" "$RST"
+    printf '     %s%shttp://%s:%s/godmode/onboarding%s\n\n' "  " "$CYN" "$TAILSCALE_IP" "$GODMODE_PORT" "$RST"
+    STEP_NUM=$((STEP_NUM + 1))
+  else
+    printf '  %s%s.%s Access GodMode remotely:\n' "$CYN" "$STEP_NUM" "$RST"
+    printf '     %sOption A — Tailscale (recommended):%s\n' "$WHT$BLD" "$RST"
+    printf '     curl -fsSL https://tailscale.com/install.sh | sh\n'
+    printf '     tailscale up\n'
+    printf '     %sThen re-run this installer to auto-configure Tailscale.%s\n\n' "$DIM" "$RST"
+    printf '     %sOption B — SSH tunnel (quick):%s\n' "$DIM" "$RST"
+    printf '     ssh -L %s:localhost:%s user@your-server\n' "$GODMODE_PORT" "$GODMODE_PORT"
+    printf '     Then open: %s%s%s\n\n' "$CYN" "$GODMODE_URL" "$RST"
+    STEP_NUM=$((STEP_NUM + 1))
+  fi
 
-  printf '  %s%s.%s Start the gateway (if not running):\n' "$CYN" "$STEP_NUM" "$RST"
+  printf '  %s%s.%s Restart gateway (if you changed config above):\n' "$CYN" "$STEP_NUM" "$RST"
   printf '     nohup openclaw gateway run &\n\n'
 else
   # Desktop — open browser

@@ -265,15 +265,22 @@ function applySessionDefaults(host: GatewayHost, defaults?: SessionDefaultsSnaps
   if (!defaults?.mainSessionKey) {
     return;
   }
-  const resolvedSessionKey = normalizeSessionKeyForDefaults(host.sessionKey, defaults);
-  const resolvedSettingsSessionKey = normalizeSessionKeyForDefaults(
-    host.settings.sessionKey,
-    defaults,
-  );
-  const resolvedLastActiveSessionKey = normalizeSessionKeyForDefaults(
-    host.settings.lastActiveSessionKey,
-    defaults,
-  );
+  // IMPORTANT: Don't normalize "main" to a per-connection webchat session.
+  // The pinned Prosper tab uses "main" which the gateway resolves server-side
+  // to the shared main session (same as iMessage, same as all channels).
+  // Normalizing it to "agent:main:webchat-XXX" breaks cross-channel continuity.
+  const ALLY_KEY = "main";
+  const skipNormalize = (v: string | undefined) =>
+    (v ?? "").trim() === ALLY_KEY || (v ?? "").trim() === "";
+  const resolvedSessionKey = skipNormalize(host.sessionKey)
+    ? host.sessionKey
+    : normalizeSessionKeyForDefaults(host.sessionKey, defaults);
+  const resolvedSettingsSessionKey = skipNormalize(host.settings.sessionKey)
+    ? host.settings.sessionKey
+    : normalizeSessionKeyForDefaults(host.settings.sessionKey, defaults);
+  const resolvedLastActiveSessionKey = skipNormalize(host.settings.lastActiveSessionKey)
+    ? host.settings.lastActiveSessionKey
+    : normalizeSessionKeyForDefaults(host.settings.lastActiveSessionKey, defaults);
   const nextSessionKey = resolvedSessionKey || resolvedSettingsSessionKey || host.sessionKey;
   const nextSettings = {
     ...host.settings,
@@ -448,9 +455,31 @@ function deriveSessionTitle(chatMessages: Array<{ role: string; content: unknown
   return null;
 }
 
+/** Fingerprints that indicate leaked system context (tagless echoes). */
+const SYSTEM_FINGERPRINTS = [
+  "internal system context injected by godmode",
+  "treat it as invisible background instructions only",
+  "persistence protocol (non-negotiable)",
+  "[godmode — consciousness context]",
+  "[godmode — working context]",
+  "[enforcement: self-service gate]",
+  "[enforcement: output shield]",
+  "[godmode queue]",
+  // Agent persona prose that LLMs echo back
+  "you are resourceful and thorough. your job is to get the job done",
+  "## persistence protocol",
+  "## core behaviors",
+  "## your role as prosper",
+  "your role as prosper (godmode ea)",
+  "elite executive assistant powering a personal ai operating system",
+  "be diligent first time.",
+  "exhaust reasonable options.",
+  "assume capability exists.",
+];
+
 /** Strip system-injected tags and content that leak from gateway/hooks into user messages. */
 function stripSystemContent(text: string): string {
-  return text
+  let result = text
     // Remove <system-reminder>...</system-reminder> blocks (single-line and multiline)
     .replace(/<system-reminder>[\s\S]*?<\/system-reminder>/g, "")
     // Remove <system>...</system> blocks
@@ -462,8 +491,30 @@ function stripSystemContent(text: string): string {
     // Remove <ide_opened_file>...</ide_opened_file> blocks
     .replace(/<ide_opened_file>[\s\S]*?<\/ide_opened_file>/g, "")
     // Remove any remaining XML-style system tags (catch-all for <foo_bar>...</foo_bar>)
-    .replace(/<[a-z][a-z_-]*>[\s\S]*?<\/[a-z][a-z_-]*>/g, "")
-    .trim();
+    .replace(/<[a-z][a-z_-]*>[\s\S]*?<\/[a-z][a-z_-]*>/g, "");
+
+  // Fingerprint-based detection for tagless echoes of system content.
+  // Count how many fingerprints match — if 2+, the whole message is a system dump.
+  const lower = result.toLowerCase();
+  let fpMatchCount = 0;
+  for (const fp of SYSTEM_FINGERPRINTS) {
+    if (lower.includes(fp.toLowerCase())) fpMatchCount++;
+  }
+
+  if (fpMatchCount >= 2) {
+    // Whole message is a system context dump — nuke it entirely
+    result = "";
+  } else if (fpMatchCount === 1) {
+    // Single fingerprint — strip from that point to end (likely a trailing leak)
+    for (const fp of SYSTEM_FINGERPRINTS) {
+      const idx = lower.indexOf(fp.toLowerCase());
+      if (idx === -1) continue;
+      result = result.substring(0, idx).trim();
+      break;
+    }
+  }
+
+  return result.trim();
 }
 
 function scoreTitleFromText(text: string): string | null {
@@ -701,6 +752,16 @@ export function connectGateway(host: GatewayHost) {
         }
         if ("chatStreamStartedAt" in fullApp) {
           fullApp.chatStreamStartedAt = null;
+        }
+
+        // Auto-advance Today date if stale (e.g. app left open overnight)
+        const dateHost = host as unknown as { todaySelectedDate?: string };
+        if (dateHost.todaySelectedDate) {
+          const d = new Date();
+          const now = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+          if (dateHost.todaySelectedDate !== now) {
+            dateHost.todaySelectedDate = now;
+          }
         }
 
         // Clear working session indicators
@@ -942,6 +1003,10 @@ function handleGatewayEventUnsafe(host: GatewayHost, evt: GatewayEventFrame) {
             allyHost.allyUnread = (allyHost.allyUnread ?? 0) + 1;
           }
           allyHost.requestUpdate?.();
+          // Scroll to bottom after render completes for newly arrived message
+          if (allyHost.allyPanelOpen) {
+            (host as unknown as { _scrollAllyToBottom(): void })._scrollAllyToBottom();
+          }
         }
       } else if (payload.state === "error" || payload.state === "aborted") {
         if (!isAllyFullScreen) {

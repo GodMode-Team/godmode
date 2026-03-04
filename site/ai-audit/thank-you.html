@@ -1,0 +1,752 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>You're In | GodMode AI Audit — Complete Your Intake</title>
+  <meta name="description" content="Complete your intake form and book your 45-minute AI audit call.">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚡</text></svg>">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #050608;
+      --bg-soft: #0b0e13;
+      --card: #121722;
+      --card-2: #151c29;
+      --text: #f4f7fb;
+      --muted: #a0aab8;
+      --line: rgba(255, 255, 255, 0.08);
+      --accent: #00e38c;
+      --accent-bright: #00ff9d;
+      --accent-2: #33d4ff;
+      --shadow: 0 14px 36px rgba(0, 0, 0, 0.35);
+      --radius: 14px;
+      --radius-sm: 10px;
+      --max: 720px;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.65;
+      overflow-x: hidden;
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      background:
+        radial-gradient(circle at 12% 18%, rgba(0, 227, 140, 0.12), transparent 42%),
+        radial-gradient(circle at 88% 82%, rgba(51, 212, 255, 0.09), transparent 45%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    body::after {
+      content: "";
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(255, 255, 255, 0.015) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 255, 255, 0.015) 1px, transparent 1px);
+      background-size: 64px 64px;
+      pointer-events: none;
+      z-index: 0;
+      mask-image: linear-gradient(180deg, rgba(0,0,0,0.75), rgba(0,0,0,0.2));
+    }
+
+    .wrap {
+      position: relative;
+      z-index: 1;
+      width: min(var(--max), calc(100% - 2rem));
+      margin-inline: auto;
+    }
+
+    /* ── TOPBAR ── */
+    .topbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 1.1rem 0;
+      border-bottom: 1px solid var(--line);
+    }
+    .brand {
+      font-family: "Space Grotesk", sans-serif;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      font-size: 0.82rem;
+      font-weight: 700;
+      color: var(--accent);
+    }
+
+    /* ── CONFIRMATION HERO ── */
+    .confirm-hero {
+      padding: 2.5rem 0 1.5rem;
+      text-align: center;
+      animation: fadeUp 0.7s ease both;
+    }
+
+    .confirm-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      border: 1px solid rgba(0, 227, 140, 0.45);
+      background: rgba(0, 227, 140, 0.1);
+      color: #9df9cc;
+      border-radius: 999px;
+      padding: 0.4rem 0.9rem;
+      font-size: 0.82rem;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      text-transform: uppercase;
+      margin-bottom: 1rem;
+    }
+
+    .confirm-badge::before { content: "\2713\0020"; }
+
+    h1 {
+      font-family: "Space Grotesk", sans-serif;
+      font-weight: 800;
+      font-size: clamp(1.7rem, 4vw, 2.5rem);
+      line-height: 1.12;
+      letter-spacing: -0.02em;
+    }
+
+    .confirm-hero p {
+      margin-top: 0.8rem;
+      color: var(--muted);
+      font-size: 1.02rem;
+      max-width: 580px;
+      margin-inline: auto;
+    }
+
+    /* ── PROGRESS STEPS ── */
+    .progress-bar {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 0.5rem;
+      margin: 1.5rem 0;
+    }
+
+    .progress-step {
+      text-align: center;
+      padding: 0.7rem 0.5rem;
+      border-radius: var(--radius-sm);
+      font-size: 0.82rem;
+      font-weight: 600;
+      border: 1px solid var(--line);
+      background: rgba(255, 255, 255, 0.02);
+      color: var(--muted);
+      transition: all 0.3s ease;
+    }
+
+    .progress-step.done {
+      border-color: rgba(0, 227, 140, 0.4);
+      background: rgba(0, 227, 140, 0.08);
+      color: #9df9cc;
+    }
+
+    .progress-step.active {
+      border-color: rgba(51, 212, 255, 0.5);
+      background: rgba(51, 212, 255, 0.1);
+      color: var(--accent-2);
+    }
+
+    .progress-step .step-label {
+      display: block;
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 0.2rem;
+      opacity: 0.7;
+    }
+
+    /* ── SECTIONS ── */
+    .section {
+      padding: 1.5rem 0;
+    }
+
+    .section h2 {
+      font-family: "Space Grotesk", sans-serif;
+      font-size: clamp(1.3rem, 2.8vw, 1.7rem);
+      margin-bottom: 0.4rem;
+      letter-spacing: -0.01em;
+    }
+
+    .section-sub {
+      color: var(--muted);
+      margin-bottom: 1rem;
+      font-size: 0.94rem;
+    }
+
+    .divider {
+      height: 1px;
+      background: var(--line);
+      margin: 0.5rem 0;
+    }
+
+    /* ── FORM ── */
+    .intake-form {
+      background: linear-gradient(160deg, var(--card), var(--card-2));
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 1.3rem;
+      box-shadow: var(--shadow);
+    }
+
+    .form-group {
+      margin-bottom: 1rem;
+    }
+
+    .form-group:last-of-type { margin-bottom: 0; }
+
+    .form-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.75rem;
+    }
+
+    label {
+      display: block;
+      font-size: 0.85rem;
+      color: #c8d3e3;
+      font-weight: 600;
+      margin-bottom: 0.35rem;
+    }
+
+    label .required { color: #ff6b6b; }
+
+    input, select, textarea {
+      width: 100%;
+      padding: 0.72rem 0.8rem;
+      border-radius: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      background: rgba(5, 6, 8, 0.6);
+      color: var(--text);
+      font: inherit;
+      font-size: 0.95rem;
+      outline: none;
+      transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    input:focus, select:focus, textarea:focus {
+      border-color: rgba(0, 227, 140, 0.7);
+      box-shadow: 0 0 0 3px rgba(0, 227, 140, 0.14);
+    }
+
+    select {
+      appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' fill='%23a0aab8'%3E%3Cpath d='M6 8L0 0h12z'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 0.8rem center;
+      padding-right: 2.2rem;
+      cursor: pointer;
+    }
+
+    select option {
+      background: #121722;
+      color: var(--text);
+    }
+
+    textarea {
+      min-height: 100px;
+      resize: vertical;
+    }
+
+    .form-hint {
+      font-size: 0.78rem;
+      color: #7a8494;
+      margin-top: 0.25rem;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      text-decoration: none;
+      border-radius: 10px;
+      padding: 0.9rem 1.5rem;
+      font-weight: 800;
+      border: none;
+      cursor: pointer;
+      font-size: 1.05rem;
+      font-family: "Inter", sans-serif;
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .btn-submit {
+      color: #00160d;
+      background: linear-gradient(135deg, var(--accent), #00f0a3);
+      box-shadow: 0 10px 28px rgba(0, 227, 140, 0.3);
+      width: 100%;
+      margin-top: 1rem;
+      font-size: 1.05rem;
+    }
+
+    .btn-submit:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 14px 34px rgba(0, 227, 140, 0.4);
+    }
+
+    .btn-submit:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    /* ── CALENDAR SECTION ── */
+    .calendar-section {
+      background: linear-gradient(160deg, var(--card), var(--card-2));
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 1.3rem;
+      text-align: center;
+    }
+
+    .calendar-embed {
+      margin-top: 1rem;
+      border-radius: 10px;
+      overflow: hidden;
+      min-height: 600px;
+      background: rgba(0, 0, 0, 0.3);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .calendar-embed iframe {
+      width: 100%;
+      min-height: 600px;
+      border: none;
+      border-radius: 10px;
+    }
+
+    .calendar-placeholder {
+      padding: 3rem 1rem;
+      color: var(--muted);
+      font-size: 0.92rem;
+    }
+
+    .calendar-placeholder a {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      text-decoration: none;
+      border-radius: 10px;
+      padding: 0.85rem 1.5rem;
+      font-weight: 700;
+      color: #00160d;
+      background: linear-gradient(135deg, var(--accent), #00f0a3);
+      box-shadow: 0 8px 22px rgba(0, 227, 140, 0.25);
+      margin-top: 1rem;
+      font-size: 1rem;
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .calendar-placeholder a:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 12px 28px rgba(0, 227, 140, 0.35);
+    }
+
+    /* ── WHAT'S NEXT ── */
+    .next-steps {
+      display: grid;
+      gap: 0.5rem;
+    }
+
+    .next-step {
+      display: grid;
+      grid-template-columns: 38px 1fr;
+      gap: 0.7rem;
+      align-items: start;
+      padding: 0.8rem 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    .next-step:last-child { border-bottom: 0; }
+
+    .next-num {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: rgba(0, 227, 140, 0.15);
+      border: 1px solid rgba(0, 227, 140, 0.3);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: "Space Grotesk", sans-serif;
+      font-weight: 700;
+      font-size: 0.85rem;
+      color: var(--accent);
+    }
+
+    .next-step h3 { font-size: 0.95rem; margin-bottom: 0.15rem; }
+    .next-step p { color: var(--muted); font-size: 0.88rem; }
+
+    /* ── SUCCESS MESSAGE ── */
+    .success-msg {
+      display: none;
+      text-align: center;
+      padding: 1.5rem;
+      border: 1px solid rgba(0, 227, 140, 0.4);
+      background: rgba(0, 227, 140, 0.08);
+      border-radius: var(--radius);
+      margin-bottom: 1rem;
+    }
+
+    .success-msg h3 {
+      color: var(--accent-bright);
+      font-family: "Space Grotesk", sans-serif;
+      margin-bottom: 0.3rem;
+    }
+
+    .success-msg p { color: #c8e8d9; font-size: 0.92rem; }
+
+    /* ── FOOTER ── */
+    footer {
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+      padding: 1.2rem 0 2rem;
+      text-align: center;
+      color: #6b7585;
+      font-size: 0.82rem;
+    }
+
+    footer a { color: var(--accent); text-decoration: none; }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(14px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    @media (max-width: 640px) {
+      .wrap { width: min(var(--max), calc(100% - 1.2rem)); }
+      .form-row { grid-template-columns: 1fr; }
+      .progress-bar { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <!-- ═══ TOPBAR ═══ -->
+    <header class="topbar">
+      <a href="/" class="brand" style="text-decoration: none;">GodMode | AI Audit</a>
+    </header>
+
+    <!-- ═══ CONFIRMATION ═══ -->
+    <section class="confirm-hero">
+      <div class="confirm-badge">Payment confirmed</div>
+      <h1>You're in. Let's get your audit started.</h1>
+      <p>Two quick steps below: fill out the intake form so we come prepared, then book your 45-minute interview on the calendar.</p>
+    </section>
+
+    <!-- ═══ PROGRESS ═══ -->
+    <div class="progress-bar">
+      <div class="progress-step done">
+        <span class="step-label">Step 1</span>
+        Purchase complete
+      </div>
+      <div class="progress-step active" id="step2">
+        <span class="step-label">Step 2</span>
+        Intake form
+      </div>
+      <div class="progress-step" id="step3">
+        <span class="step-label">Step 3</span>
+        Book your call
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <!-- ═══ INTAKE FORM ═══ -->
+    <section class="section" id="intake-section">
+      <h2>Tell us about your business</h2>
+      <p class="section-sub">This takes about 5 minutes. The more context you give, the more specific your audit will be.</p>
+
+      <div class="success-msg" id="formSuccess">
+        <h3>Intake form submitted</h3>
+        <p>Got it. Now book your 45-minute interview below and we'll come fully prepared.</p>
+      </div>
+
+      <form class="intake-form" id="intakeForm">
+        <!-- ── Contact Info ── -->
+        <div class="form-row">
+          <div class="form-group">
+            <label>First name <span class="required">*</span></label>
+            <input type="text" name="first_name" required autocomplete="given-name">
+          </div>
+          <div class="form-group">
+            <label>Last name <span class="required">*</span></label>
+            <input type="text" name="last_name" required autocomplete="family-name">
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label>Email <span class="required">*</span></label>
+            <input type="email" name="email" required autocomplete="email">
+          </div>
+          <div class="form-group">
+            <label>Phone</label>
+            <input type="tel" name="phone" autocomplete="tel">
+          </div>
+        </div>
+
+        <!-- ── Business Context ── -->
+        <div class="form-group">
+          <label>Company / business name <span class="required">*</span></label>
+          <input type="text" name="company" required autocomplete="organization">
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label>Industry / niche <span class="required">*</span></label>
+            <input type="text" name="industry" required placeholder="e.g. Real estate, SaaS, Agency, E-commerce">
+          </div>
+          <div class="form-group">
+            <label>What does your business do? <span class="required">*</span></label>
+            <input type="text" name="business_description" required placeholder="One sentence description">
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label>Team size</label>
+            <select name="team_size">
+              <option value="">Select...</option>
+              <option value="solo">Just me</option>
+              <option value="2-5">2-5 people</option>
+              <option value="6-15">6-15 people</option>
+              <option value="16-50">16-50 people</option>
+              <option value="50+">50+ people</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Annual revenue range</label>
+            <select name="revenue_range">
+              <option value="">Prefer not to say</option>
+              <option value="pre-revenue">Pre-revenue / startup</option>
+              <option value="under-250k">Under $250K</option>
+              <option value="250k-1m">$250K - $1M</option>
+              <option value="1m-5m">$1M - $5M</option>
+              <option value="5m-20m">$5M - $20M</option>
+              <option value="20m+">$20M+</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- ── Current State ── -->
+        <div class="form-group">
+          <label>What tools does your team use day-to-day? <span class="required">*</span></label>
+          <textarea name="current_tools" required placeholder="e.g. Slack, HubSpot, Google Workspace, Notion, Excel, Zapier..." style="min-height: 70px;"></textarea>
+          <p class="form-hint">List the main tools your team relies on. Doesn't have to be exhaustive.</p>
+        </div>
+
+        <div class="form-group">
+          <label>Which of these tasks eat the most time each week?</label>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.4rem 1rem; margin-top: 0.3rem;">
+            <label style="font-weight: 400; font-size: 0.9rem; display: flex; align-items: center; gap: 0.4rem; cursor: pointer;">
+              <input type="checkbox" name="time_tasks" value="Email / communication" style="width: auto; accent-color: var(--accent);"> Email / communication
+            </label>
+            <label style="font-weight: 400; font-size: 0.9rem; display: flex; align-items: center; gap: 0.4rem; cursor: pointer;">
+              <input type="checkbox" name="time_tasks" value="Data entry" style="width: auto; accent-color: var(--accent);"> Data entry
+            </label>
+            <label style="font-weight: 400; font-size: 0.9rem; display: flex; align-items: center; gap: 0.4rem; cursor: pointer;">
+              <input type="checkbox" name="time_tasks" value="Reporting" style="width: auto; accent-color: var(--accent);"> Reporting
+            </label>
+            <label style="font-weight: 400; font-size: 0.9rem; display: flex; align-items: center; gap: 0.4rem; cursor: pointer;">
+              <input type="checkbox" name="time_tasks" value="Content creation" style="width: auto; accent-color: var(--accent);"> Content creation
+            </label>
+            <label style="font-weight: 400; font-size: 0.9rem; display: flex; align-items: center; gap: 0.4rem; cursor: pointer;">
+              <input type="checkbox" name="time_tasks" value="Customer follow-up" style="width: auto; accent-color: var(--accent);"> Customer follow-up
+            </label>
+            <label style="font-weight: 400; font-size: 0.9rem; display: flex; align-items: center; gap: 0.4rem; cursor: pointer;">
+              <input type="checkbox" name="time_tasks" value="Scheduling & coordination" style="width: auto; accent-color: var(--accent);"> Scheduling &amp; coordination
+            </label>
+            <label style="font-weight: 400; font-size: 0.9rem; display: flex; align-items: center; gap: 0.4rem; cursor: pointer;">
+              <input type="checkbox" name="time_tasks" value="Manual file management" style="width: auto; accent-color: var(--accent);"> Manual file management
+            </label>
+            <label style="font-weight: 400; font-size: 0.9rem; display: flex; align-items: center; gap: 0.4rem; cursor: pointer;">
+              <input type="checkbox" name="time_tasks" value="Invoicing / billing" style="width: auto; accent-color: var(--accent);"> Invoicing / billing
+            </label>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Describe your #1 workflow bottleneck in detail <span class="required">*</span></label>
+          <textarea name="bottleneck" required placeholder="Walk us through the specific task or handoff that causes the most friction. What happens, who's involved, and why does it take so long?"></textarea>
+        </div>
+
+        <div class="form-group">
+          <label>How many hours per week does your team spend on repetitive tasks?</label>
+          <select name="repetitive_hours">
+            <option value="">Select...</option>
+            <option value="under-5">Under 5 hours</option>
+            <option value="5-10">5-10 hours</option>
+            <option value="10-20">10-20 hours</option>
+            <option value="20-40">20-40 hours</option>
+            <option value="40+">40+ hours</option>
+          </select>
+        </div>
+
+        <!-- ── Goals & Readiness ── -->
+        <div class="form-group">
+          <label>If you reclaimed 5-10 hours per week, what would you do with that time? <span class="required">*</span></label>
+          <textarea name="time_goal" required placeholder="e.g. Focus on sales, build a new product line, spend time on strategy, take Fridays off..."></textarea>
+        </div>
+
+        <div class="form-group">
+          <label>Have you tried any AI tools before? Which ones?</label>
+          <textarea name="ai_experience" placeholder="e.g. ChatGPT, Jasper, Zapier AI, Claude, Midjourney, none yet..." style="min-height: 70px;"></textarea>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label>How ready is your team to adopt new tools?</label>
+            <select name="team_readiness">
+              <option value="">Select...</option>
+              <option value="1">1 - Not ready at all</option>
+              <option value="2">2 - Hesitant</option>
+              <option value="3">3 - Open to it</option>
+              <option value="4">4 - Eager</option>
+              <option value="5">5 - Already experimenting</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Implementation timeline</label>
+            <select name="timeline">
+              <option value="">Select...</option>
+              <option value="asap">ASAP</option>
+              <option value="30-days">Next 30 days</option>
+              <option value="90-days">Next 90 days</option>
+              <option value="exploring">Just exploring</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- ── Open-Ended ── -->
+        <div class="form-group">
+          <label>Anything else we should know before the call?</label>
+          <textarea name="additional_context" placeholder="Specific goals, constraints, team dynamics, past failed implementations, or anything else that will help us prepare..."></textarea>
+        </div>
+
+        <button class="btn btn-submit" type="submit" id="submitBtn">Submit Intake Form &amp; Continue to Booking</button>
+      </form>
+    </section>
+
+    <div class="divider"></div>
+
+    <!-- ═══ CALENDAR BOOKING ═══ -->
+    <section class="section" id="calendar-section">
+      <h2>Book your 45-minute interview</h2>
+      <p class="section-sub">Pick a time that works. This is your current-state audit and needs analysis call.</p>
+
+      <div class="calendar-section">
+        <div class="calendar-embed" id="calendarEmbed">
+          <iframe src="https://api.leadconnectorhq.com/widget/booking/caleb-hodges-personal-calendar-pcmpwm4da" scrolling="no" style="width: 100%; min-height: 700px; border: none; border-radius: 10px;"></iframe>
+        </div>
+      </div>
+    </section>
+
+    <div class="divider"></div>
+
+    <!-- ═══ WHAT'S NEXT ═══ -->
+    <section class="section">
+      <h2>What happens next</h2>
+      <div class="next-steps">
+        <div class="next-step">
+          <div class="next-num">1</div>
+          <div>
+            <h3>Confirmation email</h3>
+            <p>You'll get a calendar invite with a Zoom link within minutes of booking.</p>
+          </div>
+        </div>
+        <div class="next-step">
+          <div class="next-num">2</div>
+          <div>
+            <h3>45-minute interview call</h3>
+            <p>We dive into your workflows, tools, and bottlenecks. Come with your #1 time drain in mind.</p>
+          </div>
+        </div>
+        <div class="next-step">
+          <div class="next-num">3</div>
+          <div>
+            <h3>Deep report delivered (within 48 hrs)</h3>
+            <p>Personalized analysis, priority map, and implementation blueprint sent to your inbox.</p>
+          </div>
+        </div>
+        <div class="next-step">
+          <div class="next-num">4</div>
+          <div>
+            <h3>30-minute findings presentation</h3>
+            <p>We walk through the report live, answer every question, and hand you a clear implementation roadmap.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══ FOOTER ═══ -->
+    <footer>
+      <p>Questions? <a href="mailto:caleb@lifeongodmode.com">caleb@lifeongodmode.com</a></p>
+    </footer>
+  </div>
+
+  <script>
+    const form = document.getElementById('intakeForm');
+    const submitBtn = document.getElementById('submitBtn');
+    const successMsg = document.getElementById('formSuccess');
+    const step2 = document.getElementById('step2');
+    const step3 = document.getElementById('step3');
+    const calendarSection = document.getElementById('calendar-section');
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Submitting...';
+
+      const formData = new FormData(form);
+      const data = Object.fromEntries(formData.entries());
+      // Handle multi-select checkboxes
+      data.time_tasks = formData.getAll('time_tasks').join(', ');
+
+      // Save locally as backup
+      localStorage.setItem('godmode_audit_intake', JSON.stringify(data));
+
+      try {
+        // Submit to serverless API (proxies to GHL securely)
+        const res = await fetch('/api/intake', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data),
+        });
+
+        if (!res.ok) {
+          console.warn('[intake] API returned', res.status);
+        }
+      } catch (err) {
+        console.warn('[intake] Submission failed, data saved locally:', err);
+      }
+
+      // Always show success
+      form.style.display = 'none';
+      successMsg.style.display = 'block';
+
+      // Update progress
+      step2.classList.remove('active');
+      step2.classList.add('done');
+      step3.classList.add('active');
+
+      // Scroll to calendar
+      setTimeout(() => {
+        calendarSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 600);
+    });
+  </script>
+</body>
+</html>

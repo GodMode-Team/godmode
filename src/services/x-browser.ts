@@ -417,6 +417,10 @@ export async function setupLogin(): Promise<{ message: string } | { error: strin
     "--no-default-browser-check",
   ], { stdio: "ignore", detached: true });
 
+  proc.on("error", (err) => {
+    console.error(`[x-browser] Login spawn error: ${err.message}`);
+  });
+
   proc.unref();
 
   return {

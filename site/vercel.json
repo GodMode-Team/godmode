@@ -2,14 +2,20 @@
   "rewrites": [
     { "source": "/install.sh", "destination": "/install.sh" },
     { "source": "/setup", "destination": "/setup/index.html" },
-    { "source": "/support", "destination": "/support/index.html" }
+    { "source": "/support", "destination": "/support/index.html" },
+    { "source": "/login", "destination": "/login/index.html" },
+    { "source": "/pricing", "destination": "/pricing/index.html" },
+    { "source": "/account", "destination": "/account/index.html" },
+    { "source": "/v1/:path*", "destination": "/api/v1/:path*" }
   ],
   "headers": [
     {
       "source": "/install.sh",
       "headers": [
         { "key": "Content-Type", "value": "text/plain; charset=utf-8" },
-        { "key": "Access-Control-Allow-Origin", "value": "*" }
+        { "key": "Access-Control-Allow-Origin", "value": "*" },
+        { "key": "Cache-Control", "value": "no-cache, no-store, must-revalidate" },
+        { "key": "CDN-Cache-Control", "value": "no-cache" }
       ]
     },
     {
@@ -17,6 +23,14 @@
       "headers": [
         { "key": "Content-Type", "value": "text/plain; charset=utf-8" },
         { "key": "Access-Control-Allow-Origin", "value": "*" }
+      ]
+    },
+    {
+      "source": "/api/(.*)",
+      "headers": [
+        { "key": "Access-Control-Allow-Origin", "value": "*" },
+        { "key": "Access-Control-Allow-Methods", "value": "GET, POST, OPTIONS" },
+        { "key": "Access-Control-Allow-Headers", "value": "Content-Type, Authorization" }
       ]
     }
   ]

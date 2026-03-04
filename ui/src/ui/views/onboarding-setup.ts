@@ -10,6 +10,7 @@
  */
 
 import { html, nothing, type TemplateResult } from "lit";
+import { unsafeHTML } from "lit/directives/unsafe-html.js";
 import type { Tab } from "../navigation.js";
 
 // ── Types ──────────────────────────────────────────────────────────────
@@ -323,14 +324,27 @@ function renderMarkdownish(text: string): TemplateResult {
   return html`${parts}`;
 }
 
+function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
 function renderInlineMarkdown(text: string): TemplateResult | string {
-  // Replace `code` with styled spans
-  const codeRe = /`([^`]+)`/g;
-  const linkRe = /\[([^\]]+)\]\(([^)]+)\)/g;
-  let result = text;
-  result = result.replace(linkRe, '<a href="$2" target="_blank" rel="noopener">$1</a>');
-  result = result.replace(codeRe, '<code>$1</code>');
+  // Escape user input first to prevent XSS, then apply markdown transforms
+  let result = escapeHtml(text);
+  result = result.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_match, text, url) => {
+    // Block dangerous URL schemes
+    const scheme = url.trim().toLowerCase();
+    if (scheme.startsWith("javascript:") || scheme.startsWith("data:") || scheme.startsWith("vbscript:")) {
+      return text; // Render as plain text, discard the link
+    }
+    return `<a href="${url}" target="_blank" rel="noopener">${text}</a>`;
+  });
+  result = result.replace(/`([^`]+)`/g, '<code>$1</code>');
   result = result.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
-  // Use unsafeHTML-like pattern with innerHTML
-  return html`<span .innerHTML=${result}></span>`;
+  return html`<span>${unsafeHTML(result)}</span>`;
 }

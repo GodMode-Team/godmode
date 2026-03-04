@@ -269,6 +269,12 @@ function normalizeOpenTabs(host: LifecycleHost, sessions: SessionsListResult["se
     return;
   }
 
+  // Main session aliases are handled by the pinned Prosper tab — strip them
+  const isMainAlias = (k: string): boolean => {
+    const lower = k.toLowerCase();
+    return lower === "main" || lower === "agent:main:main" || lower.endsWith(":main");
+  };
+
   const toSessionIdentity = (
     session: SessionsListResult["sessions"][number] | undefined,
     canonicalKey: string,
@@ -311,6 +317,11 @@ function normalizeOpenTabs(host: LifecycleHost, sessions: SessionsListResult["se
       changed = true;
       continue;
     }
+    // Strip main session aliases — pinned tab handles these
+    if (isMainAlias(key)) {
+      changed = true;
+      continue;
+    }
     const session = findSessionByKey(sessions, key);
     const canonicalKey = session?.key ?? key;
     if (canonicalKey !== rawKey) {
@@ -328,9 +339,8 @@ function normalizeOpenTabs(host: LifecycleHost, sessions: SessionsListResult["se
   const didDedup = dedupedTabs.length !== host.settings.openTabs.length;
 
   if (changed || didDedup) {
-    if (dedupedTabs.length === 0) {
-      dedupedTabs.push(host.sessionKey.trim() || "main");
-    }
+    // Empty openTabs is OK — the pinned Prosper tab handles the main session.
+    // Only add a fallback if the current session is NOT a main alias.
 
     const normalizedTabLastViewed: Record<string, number> = {};
     for (const [oldKey, timestamp] of Object.entries(host.settings.tabLastViewed)) {
@@ -355,10 +365,10 @@ function normalizeOpenTabs(host: LifecycleHost, sessions: SessionsListResult["se
     const canonicalSessionKey =
       identityToTabKey.get(currentSessionIdentity) ??
       currentSession?.key ??
-      (host.sessionKey.trim() || dedupedTabs[0]);
+      (host.sessionKey.trim() || dedupedTabs[0] || "main");
     const resolvedSessionKey = dedupedTabs.includes(canonicalSessionKey)
       ? canonicalSessionKey
-      : dedupedTabs[0];
+      : (dedupedTabs[0] || "main");
 
     host.applySettings({
       ...host.settings,

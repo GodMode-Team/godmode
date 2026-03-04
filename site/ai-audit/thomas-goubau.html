@@ -1,0 +1,1255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI Audit Report — Thomas Goubau / Q7Leader</title>
+  <style>
+    :root {
+      --bg: #0a0d14;
+      --surface: #111520;
+      --surface2: #161c2d;
+      --border: #1e2a42;
+      --text: #e8edf8;
+      --text-muted: #7a8aaa;
+      --text-dim: #4a5670;
+      --accent: #4f8ef7;
+      --accent2: #7c5cfc;
+      --teal: #2dd4bf;
+      --green: #22c55e;
+      --yellow: #f59e0b;
+      --orange: #f97316;
+      --red: #ef4444;
+      --gold: #eab308;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.7;
+    }
+
+    /* NAV */
+    nav {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: rgba(10, 13, 20, 0.92);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+      padding: 0 2rem;
+      display: flex;
+      align-items: center;
+      gap: 2rem;
+      height: 56px;
+    }
+    nav .logo { font-size: 0.85rem; font-weight: 700; color: var(--accent); letter-spacing: 0.05em; text-transform: uppercase; white-space: nowrap; }
+    nav a { color: var(--text-muted); text-decoration: none; font-size: 0.82rem; white-space: nowrap; transition: color 0.2s; }
+    nav a:hover { color: var(--text); }
+
+    /* HERO */
+    .hero {
+      padding: 5rem 2rem 4rem;
+      max-width: 960px;
+      margin: 0 auto;
+      border-bottom: 1px solid var(--border);
+    }
+    .hero-tag {
+      display: inline-block;
+      padding: 0.3em 0.8em;
+      background: rgba(79, 142, 247, 0.1);
+      border: 1px solid rgba(79, 142, 247, 0.25);
+      border-radius: 20px;
+      color: var(--accent);
+      font-size: 0.75rem;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      margin-bottom: 1.5rem;
+    }
+    .hero h1 {
+      font-size: clamp(2rem, 5vw, 3.2rem);
+      font-weight: 800;
+      line-height: 1.15;
+      letter-spacing: -0.02em;
+      margin-bottom: 1rem;
+    }
+    .hero h1 span { color: var(--accent); }
+    .hero p { color: var(--text-muted); font-size: 1.1rem; max-width: 620px; margin-bottom: 2.5rem; }
+    .hero-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 2rem;
+    }
+    .hero-meta-item { }
+    .hero-meta-item .label { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-dim); margin-bottom: 0.2rem; }
+    .hero-meta-item .value { font-size: 0.95rem; font-weight: 600; color: var(--text); }
+
+    /* SECTIONS */
+    section {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 4rem 2rem;
+      border-bottom: 1px solid var(--border);
+    }
+    section:last-child { border-bottom: none; }
+    .section-label {
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--accent);
+      font-weight: 700;
+      margin-bottom: 0.6rem;
+    }
+    h2 {
+      font-size: 1.8rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      margin-bottom: 0.5rem;
+      color: var(--text);
+    }
+    h3 {
+      font-size: 1.15rem;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 0.75rem;
+    }
+    .section-intro {
+      color: var(--text-muted);
+      font-size: 1rem;
+      max-width: 700px;
+      margin-bottom: 2.5rem;
+    }
+
+    /* SCORE CARDS */
+    .score-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 1rem;
+      margin-bottom: 2.5rem;
+    }
+    .score-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.5rem 1.25rem;
+      text-align: center;
+    }
+    .score-card .score-value {
+      font-size: 2.8rem;
+      font-weight: 900;
+      line-height: 1;
+      margin-bottom: 0.4rem;
+    }
+    .score-card .score-label { font-size: 0.78rem; color: var(--text-muted); font-weight: 500; }
+    .score-card .score-bar {
+      height: 4px;
+      background: var(--border);
+      border-radius: 2px;
+      margin-top: 0.75rem;
+      overflow: hidden;
+    }
+    .score-card .score-bar-fill { height: 100%; border-radius: 2px; transition: width 1s ease; }
+    .color-green { color: var(--green); }
+    .color-teal { color: var(--teal); }
+    .color-accent { color: var(--accent); }
+    .color-yellow { color: var(--yellow); }
+    .color-orange { color: var(--orange); }
+    .bg-green { background: var(--green); }
+    .bg-teal { background: var(--teal); }
+    .bg-accent { background: var(--accent); }
+    .bg-yellow { background: var(--yellow); }
+    .bg-orange { background: var(--orange); }
+
+    /* MATURITY METER */
+    .maturity-banner {
+      background: linear-gradient(135deg, rgba(79,142,247,0.08), rgba(124,92,252,0.08));
+      border: 1px solid rgba(79,142,247,0.2);
+      border-radius: 16px;
+      padding: 2rem;
+      margin-bottom: 2.5rem;
+      display: flex;
+      align-items: center;
+      gap: 2rem;
+      flex-wrap: wrap;
+    }
+    .maturity-score-big {
+      font-size: 5rem;
+      font-weight: 900;
+      color: var(--accent);
+      line-height: 1;
+      min-width: 120px;
+      text-align: center;
+    }
+    .maturity-score-big span { font-size: 2rem; color: var(--text-muted); }
+    .maturity-text h3 { color: var(--accent); margin-bottom: 0.4rem; }
+    .maturity-text p { color: var(--text-muted); font-size: 0.95rem; max-width: 500px; }
+
+    /* OPPORTUNITY CARDS */
+    .opp-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 1.75rem;
+      margin-bottom: 1.25rem;
+      position: relative;
+      overflow: hidden;
+    }
+    .opp-card::before {
+      content: '';
+      position: absolute;
+      left: 0; top: 0; bottom: 0;
+      width: 4px;
+    }
+    .opp-card.p1::before { background: var(--red); }
+    .opp-card.p2::before { background: var(--orange); }
+    .opp-card.p3::before { background: var(--yellow); }
+    .opp-card.p4::before { background: var(--teal); }
+    .opp-card.p5::before { background: var(--accent); }
+    .opp-header {
+      display: flex;
+      align-items: flex-start;
+      gap: 1rem;
+      margin-bottom: 1rem;
+      flex-wrap: wrap;
+    }
+    .opp-number {
+      font-size: 0.7rem;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      padding: 0.3em 0.7em;
+      border-radius: 6px;
+      white-space: nowrap;
+    }
+    .opp-card.p1 .opp-number { background: rgba(239,68,68,0.15); color: var(--red); }
+    .opp-card.p2 .opp-number { background: rgba(249,115,22,0.15); color: var(--orange); }
+    .opp-card.p3 .opp-number { background: rgba(245,158,11,0.15); color: var(--yellow); }
+    .opp-card.p4 .opp-number { background: rgba(45,212,191,0.15); color: var(--teal); }
+    .opp-card.p5 .opp-number { background: rgba(79,142,247,0.15); color: var(--accent); }
+    .opp-title { font-size: 1.15rem; font-weight: 700; flex: 1; }
+    .opp-tags { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.25rem; }
+    .tag {
+      font-size: 0.7rem;
+      padding: 0.2em 0.6em;
+      border-radius: 4px;
+      font-weight: 600;
+      background: var(--surface2);
+      color: var(--text-muted);
+      border: 1px solid var(--border);
+    }
+    .opp-body { color: var(--text-muted); font-size: 0.95rem; margin-bottom: 1rem; }
+    .opp-impact {
+      display: flex;
+      gap: 2rem;
+      flex-wrap: wrap;
+    }
+    .impact-item .impact-label { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-dim); margin-bottom: 0.2rem; }
+    .impact-item .impact-value { font-size: 0.9rem; font-weight: 700; }
+    .steps-list {
+      margin-top: 1.25rem;
+      border-top: 1px solid var(--border);
+      padding-top: 1.25rem;
+    }
+    .steps-list h4 { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.07em; color: var(--text-dim); margin-bottom: 0.75rem; }
+    .step-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.75rem;
+      margin-bottom: 0.6rem;
+      font-size: 0.9rem;
+      color: var(--text-muted);
+    }
+    .step-num {
+      min-width: 22px;
+      height: 22px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.68rem;
+      font-weight: 700;
+      color: var(--text-dim);
+      flex-shrink: 0;
+      margin-top: 2px;
+    }
+    code {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      padding: 0.15em 0.45em;
+      border-radius: 4px;
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      font-size: 0.82em;
+      color: var(--teal);
+    }
+
+    /* ROADMAP */
+    .roadmap-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1.25rem;
+    }
+    @media (max-width: 700px) { .roadmap-grid { grid-template-columns: 1fr; } }
+    .roadmap-col {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      overflow: hidden;
+    }
+    .roadmap-header {
+      padding: 1rem 1.25rem;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+    .roadmap-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+    .roadmap-header h3 { font-size: 0.9rem; margin: 0; }
+    .roadmap-sub { font-size: 0.72rem; color: var(--text-dim); margin-top: 0.1rem; }
+    .roadmap-items { padding: 1rem 1.25rem; }
+    .roadmap-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.6rem;
+      padding: 0.6rem 0;
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+      font-size: 0.875rem;
+      color: var(--text-muted);
+    }
+    .roadmap-item:last-child { border-bottom: none; }
+    .roadmap-item .ri-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; margin-top: 7px; }
+    .roadmap-item strong { color: var(--text); display: block; font-size: 0.85rem; margin-bottom: 0.1rem; }
+
+    /* ARCHITECTURE */
+    .arch-box {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 1.75rem;
+      margin-bottom: 1.25rem;
+    }
+    .arch-header { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1rem; }
+    .arch-icon { font-size: 1.5rem; }
+    .arch-box h3 { margin: 0; }
+    .arch-body { color: var(--text-muted); font-size: 0.95rem; margin-bottom: 1rem; }
+    .compare-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+    }
+    @media (max-width: 600px) { .compare-grid { grid-template-columns: 1fr; } }
+    .compare-box {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1.25rem;
+    }
+    .compare-box h4 { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.07em; color: var(--text-dim); margin-bottom: 0.75rem; }
+    .compare-item { font-size: 0.875rem; color: var(--text-muted); padding: 0.3rem 0; border-bottom: 1px solid rgba(255,255,255,0.04); }
+    .compare-item:last-child { border-bottom: none; }
+    .compare-item span { color: var(--text); font-weight: 600; }
+
+    /* STACK TABLE */
+    table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; }
+    thead tr { border-bottom: 1px solid var(--border); }
+    th { text-align: left; padding: 0.65rem 1rem; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.07em; color: var(--text-dim); font-weight: 700; }
+    td { padding: 0.85rem 1rem; font-size: 0.9rem; border-bottom: 1px solid rgba(255,255,255,0.04); color: var(--text-muted); vertical-align: top; }
+    td:first-child { color: var(--text); font-weight: 600; }
+    tr:last-child td { border-bottom: none; }
+    .pill {
+      display: inline-block;
+      padding: 0.15em 0.55em;
+      border-radius: 4px;
+      font-size: 0.72rem;
+      font-weight: 700;
+    }
+    .pill.keep { background: rgba(34,197,94,0.12); color: var(--green); }
+    .pill.upgrade { background: rgba(245,158,11,0.12); color: var(--yellow); }
+    .pill.add { background: rgba(79,142,247,0.12); color: var(--accent); }
+    .pill.replace { background: rgba(239,68,68,0.12); color: var(--red); }
+
+    /* QUICK WIN BOX */
+    .quickwin-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem; }
+    .quickwin-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.5rem;
+      position: relative;
+    }
+    .quickwin-card .qw-label {
+      font-size: 0.68rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      font-weight: 700;
+      margin-bottom: 0.5rem;
+    }
+    .quickwin-card h3 { font-size: 1rem; margin-bottom: 0.5rem; }
+    .quickwin-card p { font-size: 0.875rem; color: var(--text-muted); }
+    .quickwin-card .qw-time {
+      margin-top: 1rem;
+      font-size: 0.75rem;
+      color: var(--text-dim);
+      display: flex;
+      align-items: center;
+      gap: 0.35rem;
+    }
+
+    /* CALLOUT */
+    .callout {
+      border-radius: 12px;
+      padding: 1.25rem 1.5rem;
+      margin: 1.5rem 0;
+      display: flex;
+      gap: 1rem;
+      align-items: flex-start;
+    }
+    .callout.info { background: rgba(79,142,247,0.07); border: 1px solid rgba(79,142,247,0.2); }
+    .callout.warning { background: rgba(245,158,11,0.07); border: 1px solid rgba(245,158,11,0.2); }
+    .callout.success { background: rgba(34,197,94,0.07); border: 1px solid rgba(34,197,94,0.2); }
+    .callout-icon { font-size: 1.2rem; flex-shrink: 0; margin-top: 1px; }
+    .callout-body { font-size: 0.9rem; color: var(--text-muted); }
+    .callout-body strong { color: var(--text); display: block; margin-bottom: 0.25rem; }
+
+    /* MODEL TABLE */
+    .model-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; }
+    .model-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.25rem;
+    }
+    .model-card .model-name { font-size: 1rem; font-weight: 700; color: var(--text); margin-bottom: 0.25rem; }
+    .model-card .model-role { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.07em; color: var(--text-dim); margin-bottom: 0.75rem; }
+    .model-card .model-use { font-size: 0.85rem; color: var(--text-muted); }
+    .model-badge { display: inline-block; padding: 0.2em 0.5em; border-radius: 4px; font-size: 0.68rem; font-weight: 700; margin-bottom: 0.5rem; }
+    .badge-primary { background: rgba(79,142,247,0.15); color: var(--accent); }
+    .badge-heavy { background: rgba(124,92,252,0.15); color: var(--accent2); }
+    .badge-light { background: rgba(34,197,94,0.1); color: var(--green); }
+
+    /* NEXT STEPS */
+    .nextsteps-list { }
+    .next-item {
+      display: flex;
+      gap: 1.25rem;
+      padding: 1.25rem 0;
+      border-bottom: 1px solid var(--border);
+      align-items: flex-start;
+    }
+    .next-item:last-child { border-bottom: none; }
+    .next-num {
+      min-width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.85rem;
+      font-weight: 800;
+      color: var(--accent);
+      flex-shrink: 0;
+    }
+    .next-content h3 { font-size: 1rem; margin-bottom: 0.35rem; }
+    .next-content p { font-size: 0.88rem; color: var(--text-muted); }
+    .next-content .next-when { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.07em; color: var(--text-dim); margin-bottom: 0.3rem; }
+
+    /* FOOTER */
+    footer {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 3rem 2rem;
+      text-align: center;
+      color: var(--text-dim);
+      font-size: 0.85rem;
+    }
+    footer strong { color: var(--text-muted); }
+
+    /* UTILS */
+    .mt1 { margin-top: 0.5rem; }
+    .mt2 { margin-top: 1rem; }
+    .mt3 { margin-top: 1.5rem; }
+    .divider { height: 1px; background: var(--border); margin: 1.5rem 0; }
+    ul.bullet-list { margin-left: 1.25rem; color: var(--text-muted); font-size: 0.9rem; }
+    ul.bullet-list li { margin: 0.4rem 0; }
+  </style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <div class="logo">⚛️ GodMode AI Audit</div>
+  <a href="#summary">Summary</a>
+  <a href="#maturity">Maturity</a>
+  <a href="#opportunities">Opportunities</a>
+  <a href="#roadmap">Roadmap</a>
+  <a href="#architecture">Architecture</a>
+  <a href="#stack">Stack</a>
+  <a href="#quickwins">Quick Wins</a>
+  <a href="#nextsteps">Next Steps</a>
+</nav>
+
+<!-- HERO -->
+<div class="hero">
+  <div class="hero-tag">Confidential · AI Audit Report</div>
+  <h1>Your <span>AI Operating System</span><br>Diagnostic & Roadmap</h1>
+  <p>A thorough analysis of Q7Leader's current AI implementation, gaps, and a prioritised 90-day action plan to accelerate from experimentation to industrialisation.</p>
+  <div class="hero-meta">
+    <div class="hero-meta-item">
+      <div class="label">Prepared for</div>
+      <div class="value">Thomas Goubau, CEO — Q7Leader</div>
+    </div>
+    <div class="hero-meta-item">
+      <div class="label">Prepared by</div>
+      <div class="value">Caleb Hodges — GodMode AI</div>
+    </div>
+    <div class="hero-meta-item">
+      <div class="label">Date</div>
+      <div class="value">February 24, 2026</div>
+    </div>
+    <div class="hero-meta-item">
+      <div class="label">Company Stage</div>
+      <div class="value">€2M ARR → €3.5M target (2026)</div>
+    </div>
+  </div>
+</div>
+
+<!-- EXECUTIVE SUMMARY -->
+<section id="summary">
+  <div class="section-label">01 — Executive Summary</div>
+  <h2>The bottom line</h2>
+  <p class="section-intro">Thomas and Q7Leader are operating in the top 5% of AI adoption globally. The gap is not adoption — it's systematisation. The opportunity is to convert your current experiments into a reliable, industrial-grade AI operating layer.</p>
+
+  <div class="score-grid">
+    <div class="score-card">
+      <div class="score-value color-green">8.5</div>
+      <div class="score-label">AI Maturity Score</div>
+      <div class="score-bar"><div class="score-bar-fill bg-green" style="width:85%"></div></div>
+    </div>
+    <div class="score-card">
+      <div class="score-value color-teal">5/5</div>
+      <div class="score-label">Team Readiness</div>
+      <div class="score-bar"><div class="score-bar-fill bg-teal" style="width:100%"></div></div>
+    </div>
+    <div class="score-card">
+      <div class="score-value color-accent">5</div>
+      <div class="score-label">Priority Opportunities</div>
+      <div class="score-bar"><div class="score-bar-fill bg-accent" style="width:100%"></div></div>
+    </div>
+    <div class="score-card">
+      <div class="score-value color-yellow">12+</div>
+      <div class="score-label">Hours/Week Recoverable</div>
+      <div class="score-bar"><div class="score-bar-fill bg-yellow" style="width:70%"></div></div>
+    </div>
+    <div class="score-card">
+      <div class="score-value color-orange">90</div>
+      <div class="score-label">Days to Full System</div>
+      <div class="score-bar"><div class="score-bar-fill bg-orange" style="width:50%"></div></div>
+    </div>
+  </div>
+
+  <div class="callout success">
+    <div class="callout-icon">🎯</div>
+    <div class="callout-body">
+      <strong>The core insight from your audit call</strong>
+      You said it perfectly: "I don't know what I don't know — I want to go from experimenting and taking quite a bit of benefits to industrialising." That's the exact right framing. You've done the hard part (adoption + exec buy-in). The remaining work is architecture and systematisation, not convincing anyone AI is worth it.
+    </div>
+  </div>
+
+  <p style="color: var(--text-muted); font-size: 0.95rem; margin-top: 1.5rem;">
+    You went from €200K to €2M ARR in two years. You're profitable. You have 26 people and an exec team already running on OpenClaw. Your biggest lever right now is not more AI tools — it's <strong style="color: var(--text)">turning the AI you already have into a reliable system</strong> that compounds daily without your direct involvement.
+  </p>
+</section>
+
+<!-- AI MATURITY -->
+<section id="maturity">
+  <div class="section-label">02 — AI Maturity Assessment</div>
+  <h2>Where you stand</h2>
+  <p class="section-intro">Across six dimensions of enterprise AI readiness, Q7Leader is significantly ahead of the market. The primary gaps are in systematisation and knowledge infrastructure — not tooling.</p>
+
+  <div class="maturity-banner">
+    <div class="maturity-score-big">8.5<span>/10</span></div>
+    <div class="maturity-text">
+      <h3>Advanced Practitioner</h3>
+      <p>You are in the top 5% of SME CEOs globally for AI adoption. You have agents running, your exec team is onboarded, your workflows are partially automated, and you think in systems. The next level is "Industrialised" — where AI reliably executes without prompting or babysitting.</p>
+    </div>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Dimension</th>
+        <th>Score</th>
+        <th>Current State</th>
+        <th>Gap to Close</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Tool Adoption</td>
+        <td><span class="color-green" style="font-weight:800">9/10</span></td>
+        <td>Claude, OpenClaw, Fathom, HubSpot, Odoo, Relay, N8N, Make, Whisper, Superhuman</td>
+        <td>Minor — await Superhuman MCP</td>
+      </tr>
+      <tr>
+        <td>Agent Architecture</td>
+        <td><span class="color-teal" style="font-weight:800">7/10</span></td>
+        <td>Patricia + Vicky live. Weekly cadence agent working. Daily briefing agent running.</td>
+        <td>Vicky needs proper context architecture; CRM agent missing</td>
+      </tr>
+      <tr>
+        <td>Knowledge Infrastructure</td>
+        <td><span class="color-yellow" style="font-weight:800">5/10</span></td>
+        <td>Google Docs, Apple Notes, scattered. No unified second brain.</td>
+        <td>Obsidian + shared exec memory = major unlock</td>
+      </tr>
+      <tr>
+        <td>Workflow Automation</td>
+        <td><span class="color-teal" style="font-weight:800">8/10</span></td>
+        <td>Fathom → Airtable → Todoist pipeline. Weekly reporting auto-generated. Daily briefings.</td>
+        <td>Customer follow-up loop not closed. CRM health not automated.</td>
+      </tr>
+      <tr>
+        <td>Team Enablement</td>
+        <td><span class="color-teal" style="font-weight:800">7/10</span></td>
+        <td>Exec team on OpenClaw. Head of finance creating views. Head of marketing semi-enabled.</td>
+        <td>Shared memory + co-work processes not yet standardised</td>
+      </tr>
+      <tr>
+        <td>Systematisation</td>
+        <td><span class="color-yellow" style="font-weight:800">5/10</span></td>
+        <td>Most workflows are personal + manual-start. Heavy CEO involvement required to trigger.</td>
+        <td>Trust Tracker + cron jobs + mission control = path to autonomy</td>
+      </tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- TOP OPPORTUNITIES -->
+<section id="opportunities">
+  <div class="section-label">03 — Priority Opportunities</div>
+  <h2>The 5 highest-leverage moves</h2>
+  <p class="section-intro">Ranked by ROI, time-to-implement, and direct connection to your stated goals: recovering time, growing to €3.5M, and making Q7Leader look bigger than it is.</p>
+
+  <!-- OPP 1 -->
+  <div class="opp-card p1">
+    <div class="opp-header">
+      <div>
+        <div class="opp-number">🔴 Priority 1 — Highest Impact</div>
+        <div class="opp-title">Unified Mission Control: One Dashboard for Everything That Matters</div>
+        <div class="opp-tags">
+          <span class="tag">OpenClaw</span>
+          <span class="tag">Obsidian</span>
+          <span class="tag">HubSpot</span>
+          <span class="tag">Todoist</span>
+          <span class="tag">Google Sheets</span>
+        </div>
+      </div>
+    </div>
+    <div class="opp-body">
+      You told me exactly what you want: "On Sunday you prepare the week, look at quarterly goals, monthly goals, weekly objectives, KPIs — I want AI to help me significantly with that." Right now this lives across Google Sheets, Todoist, AkiFlow, and your head. The opportunity is to build a single Morning Briefing that pulls everything together automatically. You wake up, you have your week.
+    </div>
+    <div class="opp-impact">
+      <div class="impact-item">
+        <div class="impact-label">Time Saved</div>
+        <div class="impact-value color-green">3–5 hrs/week</div>
+      </div>
+      <div class="impact-item">
+        <div class="impact-label">Effort</div>
+        <div class="impact-value color-yellow">Medium (2–3 weeks)</div>
+      </div>
+      <div class="impact-item">
+        <div class="impact-label">Complexity</div>
+        <div class="impact-value color-accent">Moderate</div>
+      </div>
+    </div>
+    <div class="steps-list">
+      <h4>Implementation Steps</h4>
+      <div class="step-item"><div class="step-num">1</div><div>Set up Obsidian as your primary knowledge base (see Section 6). Connect it to OpenClaw via the Obsidian MCP or CLI tool.</div></div>
+      <div class="step-item"><div class="step-num">2</div><div>Create a <code>weekly-review.md</code> template in Obsidian that maps to your existing rhythm: Q/M/W goals → big 3 tasks → KPI status.</div></div>
+      <div class="step-item"><div class="step-num">3</div><div>Build a Sunday cron job in OpenClaw that: (a) pulls your OKR sheet from Google Sheets, (b) reads Todoist open tasks, (c) pulls HubSpot pipeline status, (d) synthesises into your weekly-review template with AI-generated recommendations.</div></div>
+      <div class="step-item"><div class="step-num">4</div><div>Add a Monday 7am briefing that gives you the 3 things you need to focus on today based on the week's objectives.</div></div>
+      <div class="step-item"><div class="step-num">5</div><div>Outputs go directly into Obsidian + Todoist. No manual action required.</div></div>
+    </div>
+  </div>
+
+  <!-- OPP 2 -->
+  <div class="opp-card p2">
+    <div class="opp-header">
+      <div>
+        <div class="opp-number">🟠 Priority 2 — High Impact</div>
+        <div class="opp-title">CRM Intelligence Layer: Close the HubSpot Blind Spot</div>
+        <div class="opp-tags">
+          <span class="tag">HubSpot MCP</span>
+          <span class="tag">OpenClaw</span>
+          <span class="tag">Fathom</span>
+        </div>
+      </div>
+    </div>
+    <div class="opp-body">
+      You said it directly: "I have not cracked the CRM." HubSpot is your sales brain but right now it's a black box to your AI agents. You have no daily visibility on pipeline health, no AI-assisted follow-up, and no feedback loop from your Fathom call data back into contact records. This is leaving deals on the table and costing you hours in manual CRM hygiene weekly.
+    </div>
+    <div class="opp-impact">
+      <div class="impact-item">
+        <div class="impact-label">Revenue Impact</div>
+        <div class="impact-value color-green">High — direct pipeline visibility</div>
+      </div>
+      <div class="impact-item">
+        <div class="impact-label">Time Saved</div>
+        <div class="impact-value color-green">2–4 hrs/week</div>
+      </div>
+      <div class="impact-item">
+        <div class="impact-label">Effort</div>
+        <div class="impact-value color-yellow">Medium (1–2 weeks)</div>
+      </div>
+    </div>
+    <div class="steps-list">
+      <h4>Implementation Steps</h4>
+      <div class="step-item"><div class="step-num">1</div><div>Install the HubSpot MCP into your OpenClaw instance. This gives Vicky read/write access to your CRM without going through Zapier (which was timing out).</div></div>
+      <div class="step-item"><div class="step-num">2</div><div>Create a daily 6pm CRM health brief: "Here are your 5 hottest deals, what's stalled, who hasn't been contacted in 7+ days, and what follow-ups are due tomorrow."</div></div>
+      <div class="step-item"><div class="step-num">3</div><div>Connect Fathom → HubSpot: After every client call, your Fathom summary auto-logs to the contact's activity timeline in HubSpot. Vicky then drafts the follow-up email and adds the next action to Todoist.</div></div>
+      <div class="step-item"><div class="step-num">4</div><div>Create an Obsidian markdown file per key prospect/client (mirroring HubSpot). Vicky keeps both in sync. Now your AI agents have narrative context on every relationship — not just CRM fields.</div></div>
+      <div class="step-item"><div class="step-num">5</div><div>For ISO 27001 new client onboarding: build a cron job that auto-fills your security questionnaire answers from your existing documentation when a new enterprise deal moves to a specific HubSpot stage.</div></div>
+    </div>
+  </div>
+
+  <!-- OPP 3 -->
+  <div class="opp-card p3">
+    <div class="opp-header">
+      <div>
+        <div class="opp-number">🟡 Priority 3 — High Impact</div>
+        <div class="opp-title">Vicky 2.0: Rebuild Your EA Agent the Right Way</div>
+        <div class="opp-tags">
+          <span class="tag">OpenClaw</span>
+          <span class="tag">Superhuman MCP</span>
+          <span class="tag">Google Calendar</span>
+          <span class="tag">Todoist</span>
+        </div>
+      </div>
+    </div>
+    <div class="opp-body">
+      You asked the right question: "Should I decompose Vicky into multiple agents?" The answer is <strong style="color:var(--text)">no — but you need to restructure her context files</strong>. The reason Vicky feels unstable is not because she's doing too much — it's because she doesn't have reliable access to the right information. Siloed agents won't fix this. Better context architecture will.
+    </div>
+    <div class="opp-impact">
+      <div class="impact-item">
+        <div class="impact-label">Time Saved</div>
+        <div class="impact-value color-green">2–3 hrs/week</div>
+      </div>
+      <div class="impact-item">
+        <div class="impact-label">Effort</div>
+        <div class="impact-value color-teal">Low–Medium (3–5 days)</div>
+      </div>
+      <div class="impact-item">
+        <div class="impact-label">Unlock</div>
+        <div class="impact-value color-accent">Superhuman MCP (imminent)</div>
+      </div>
+    </div>
+    <div class="steps-list">
+      <h4>Implementation Steps</h4>
+      <div class="step-item"><div class="step-num">1</div><div>Give Vicky three dedicated context files she always reads: <code>vicky-contacts.md</code> (key people + relationship notes), <code>vicky-calendar-rules.md</code> (scheduling preferences, travel blocks, no-meeting times), <code>vicky-email-rules.md</code> (tone, who gets what level of response, priorities).</div></div>
+      <div class="step-item"><div class="step-num">2</div><div>Implement a Trust Tracker: after each email batch, Vicky asks you "Quality score 1–10?" After 10 scores you get an average. This forces a feedback loop and makes Vicky measurably better over time. It also tells you when to trust her without reviewing.</div></div>
+      <div class="step-item"><div class="step-num">3</div><div>Switch Vicky's model to <code>claude-sonnet-4-6</code> for email triage and drafting (fast, cheap, good enough). Reserve Opus for drafting your board packs, investor memos, or sensitive executive communications.</div></div>
+      <div class="step-item"><div class="step-num">4</div><div>When Superhuman MCP drops: wire Vicky directly into Superhuman. She drafts in Superhuman (not Gmail drafts). Your current AppScript bridge becomes redundant — cleaner architecture.</div></div>
+      <div class="step-item"><div class="step-num">5</div><div>Add a calendar conflict detector cron: runs every morning, flags any scheduling issues, travel time gaps, or back-to-backs that need your input. You review one flag, not a full calendar scan.</div></div>
+    </div>
+  </div>
+
+  <!-- OPP 4 -->
+  <div class="opp-card p4">
+    <div class="opp-header">
+      <div>
+        <div class="opp-number">🩵 Priority 4 — Strategic</div>
+        <div class="opp-title">Content Engine: Make Q7Leader Look Bigger Than You Are</div>
+        <div class="opp-tags">
+          <span class="tag">LinkedIn</span>
+          <span class="tag">YouTube</span>
+          <span class="tag">OpenClaw</span>
+          <span class="tag">Book Project</span>
+        </div>
+      </div>
+    </div>
+    <div class="opp-body">
+      You said this yourself: "I want to make us look bigger than we are." And you're already posting on LinkedIn and starting to draft video scripts. The gap is systematisation — right now it's a "hobby finished in bed tonight." A content engine turns this into a reliable weekly output with 80% less effort from you.
+    </div>
+    <div class="opp-impact">
+      <div class="impact-item">
+        <div class="impact-label">Business Impact</div>
+        <div class="impact-value color-green">Brand → pipeline → €3.5M</div>
+      </div>
+      <div class="impact-item">
+        <div class="impact-label">Time Required</div>
+        <div class="impact-value color-yellow">30 min/week (after setup)</div>
+      </div>
+      <div class="impact-item">
+        <div class="impact-label">Effort</div>
+        <div class="impact-value color-yellow">Medium (2 weeks to build)</div>
+      </div>
+    </div>
+    <div class="steps-list">
+      <h4>Implementation Steps</h4>
+      <div class="step-item"><div class="step-num">1</div><div>Create a "Content Agent" in OpenClaw with a persona file: your tone, your audience (HR directors and CEOs at 50–500 person companies), your key themes (data-driven HR, right people right seat, CEO operating system).</div></div>
+      <div class="step-item"><div class="step-num">2</div><div>Weekly input: a 5-minute voice memo (via Whisper Flow) of "what did I learn or observe this week?" → agent turns it into 3 LinkedIn post drafts + 1 short-form video script. You pick one and approve it. Done.</div></div>
+      <div class="step-item"><div class="step-num">3</div><div>For your book: use Claude Projects (not OpenClaw) for the long-context co-authoring work. Structure it as a shared project with your context docs, and have the agent write chapter drafts based on your Whisper Flow voice dumps from ideas you capture throughout the week.</div></div>
+      <div class="step-item"><div class="step-num">4</div><div>Repurpose your existing Fathom call highlights (especially your AI audit calls) as LinkedIn content. You're having fascinating conversations — these are stories your audience wants to read.</div></div>
+      <div class="step-item"><div class="step-num">5</div><div>Website redesign (March): give your Content Agent access to your full company context and have it generate your new website copy. Validate with your team, publish. Your website should speak to the "data-driven HR" buyer in their language.</div></div>
+    </div>
+  </div>
+
+  <!-- OPP 5 -->
+  <div class="opp-card p5">
+    <div class="opp-header">
+      <div>
+        <div class="opp-number">🔵 Priority 5 — Multiplier</div>
+        <div class="opp-title">Shared Exec Memory: One Brain Across Your Whole Leadership Team</div>
+        <div class="opp-tags">
+          <span class="tag">OpenClaw</span>
+          <span class="tag">GitHub</span>
+          <span class="tag">Obsidian</span>
+          <span class="tag">GitSync</span>
+        </div>
+      </div>
+    </div>
+    <div class="opp-body">
+      <div class="callout info" style="margin-bottom:1rem;">
+        <div class="callout-icon">🔀</div>
+        <div class="callout-body">
+          <strong>Two separate systems — don't confuse them</strong>
+          <strong style="color:var(--text)">Obsidian</strong> (Priority 1 + Quick Wins) is <em>yours personally</em> — your second brain, your Apple Notes replacement, your private context for Vicky. Your team never sees it.<br><br>
+          <strong style="color:var(--text)">GitHub shared memory</strong> (this section) is the <em>team play</em> — structured company-wide context that every exec's OpenClaw instance reads from. Obsidian is the personal layer. GitHub is the collective layer. Both are needed. Neither replaces the other.
+        </div>
+      </div>
+      Your exec team is already on OpenClaw — this is your single biggest multiplier. Right now each person's agent has private context. When your Head of Finance, Head of Marketing, and Head of Product all operate from the same shared memory about company strategy, OKRs, clients, and decisions — the AI agents become a collective intelligence layer, not just personal assistants.
+    </div>
+    <div class="opp-impact">
+      <div class="impact-item">
+        <div class="impact-label">Multiplier Effect</div>
+        <div class="impact-value color-green">5× individual agent value</div>
+      </div>
+      <div class="impact-item">
+        <div class="impact-label">Effort</div>
+        <div class="impact-value color-teal">Low (1 week to set up)</div>
+      </div>
+      <div class="impact-item">
+        <div class="impact-label">Risk</div>
+        <div class="impact-value color-accent">Low (GitHub = auditable)</div>
+      </div>
+    </div>
+    <div class="steps-list">
+      <h4>Implementation Steps</h4>
+      <div class="step-item"><div class="step-num">1</div><div>Create a private GitHub repo: <code>q7leader-shared-memory</code>. Structure: <code>/company</code> (strategy, OKRs, positioning), <code>/clients</code> (one MD file per key account), <code>/products</code> (roadmap, features, decisions), <code>/team</code> (roles, responsibilities, working agreements).</div></div>
+      <div class="step-item"><div class="step-num">2</div><div>Each exec's OpenClaw workspace adds the shared repo as a read context source. Their agents now have company-wide awareness without each person having to manually maintain their own context files.</div></div>
+      <div class="step-item"><div class="step-num">3</div><div>Use GitSync (or a simple cron + git pull) to keep each local Obsidian/OpenClaw instance updated whenever the shared repo changes. Git gives you a full audit trail — important for ISO 27001 compliance.</div></div>
+      <div class="step-item"><div class="step-num">4</div><div>Designate one person as "memory keeper" per domain. They own keeping their section updated. AI agents automatically have fresh context within hours of any update.</div></div>
+      <div class="step-item"><div class="step-num">5</div><div>Add a weekly "memory review" to your all-hands: what changed this week that the shared memory should know? Takes 5 minutes. Compounds weekly.</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- 90-DAY ROADMAP -->
+<section id="roadmap">
+  <div class="section-label">04 — 90-Day Implementation Roadmap</div>
+  <h2>From experimentation to industrialisation</h2>
+  <p class="section-intro">Built around your existing rhythm. No big-bang implementations. Each phase builds on the last.</p>
+
+  <div class="roadmap-grid">
+    <div class="roadmap-col">
+      <div class="roadmap-header">
+        <div class="roadmap-dot" style="background:var(--red)"></div>
+        <div>
+          <h3>Phase 1 — Stabilise</h3>
+          <div class="roadmap-sub">Weeks 1–2 · Fix the foundation</div>
+        </div>
+      </div>
+      <div class="roadmap-items">
+        <div class="roadmap-item">
+          <div class="ri-dot" style="background:var(--red)"></div>
+          <div><strong>Claude subscription fix</strong>Run <code>claude setup-token</code> and reconnect. Save €50–200/month vs API immediately.</div>
+        </div>
+        <div class="roadmap-item">
+          <div class="ri-dot" style="background:var(--red)"></div>
+          <div><strong>Model strategy reset</strong>Sonnet 4.6 for Vicky/daily tasks. Opus for board packs, book, heavy analysis. Haiku for lightweight cron tasks.</div>
+        </div>
+        <div class="roadmap-item">
+          <div class="ri-dot" style="background:var(--red)"></div>
+          <div><strong>Apple Notes → Obsidian</strong>Run the importer. 6,000+ notes become searchable and AI-accessible overnight.</div>
+        </div>
+        <div class="roadmap-item">
+          <div class="ri-dot" style="background:var(--red)"></div>
+          <div><strong>Vicky context files</strong>Write <code>vicky-contacts.md</code>, <code>vicky-calendar-rules.md</code>, <code>vicky-email-rules.md</code>. 2 hours → significant Vicky quality improvement.</div>
+        </div>
+        <div class="roadmap-item">
+          <div class="ri-dot" style="background:var(--red)"></div>
+          <div><strong>Trust Tracker live</strong>Add post-email quality scoring to Vicky's workflow. Start building her reliability score.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="roadmap-col">
+      <div class="roadmap-header">
+        <div class="roadmap-dot" style="background:var(--yellow)"></div>
+        <div>
+          <h3>Phase 2 — Automate</h3>
+          <div class="roadmap-sub">Weeks 3–6 · Build the systems</div>
+        </div>
+      </div>
+      <div class="roadmap-items">
+        <div class="roadmap-item">
+          <div class="ri-dot" style="background:var(--yellow)"></div>
+          <div><strong>HubSpot MCP integration</strong>Install MCP. Wire Fathom → HubSpot auto-logging. Daily CRM health brief live.</div>
+        </div>
+        <div class="roadmap-item">
+          <div class="ri-dot" style="background:var(--yellow)"></div>
+          <div><strong>ISO 27001 questionnaire agent</strong>Auto-fill security questionnaires from your documentation when new enterprise deal advances in HubSpot.</div>
+        </div>
+        <div class="roadmap-item">
+          <div class="ri-dot" style="background:var(--yellow)"></div>
+          <div><strong>GitHub shared exec memory</strong>Create the repo. Onboard your exec team. First shared context files published.</div>
+        </div>
+        <div class="roadmap-item">
+          <div class="ri-dot" style="background:var(--yellow)"></div>
+          <div><strong>Content engine v1</strong>Voice memo → 3 LinkedIn drafts workflow. First post published from system.</div>
+        </div>
+        <div class="roadmap-item">
+          <div class="ri-dot" style="background:var(--yellow)"></div>
+          <div><strong>Website redesign prep</strong>Content agent ingests all company docs. Generates website copy drafts for March project.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="roadmap-col">
+      <div class="roadmap-header">
+        <div class="roadmap-dot" style="background:var(--green)"></div>
+        <div>
+          <h3>Phase 3 — Compound</h3>
+          <div class="roadmap-sub">Weeks 7–12 · Scale the flywheel</div>
+        </div>
+      </div>
+      <div class="roadmap-items">
+        <div class="roadmap-item">
+          <div class="ri-dot" style="background:var(--green)"></div>
+          <div><strong>Mission control live</strong>Sunday briefing + Monday priorities fully automated. Weekly review ritual replaced by AI synthesis.</div>
+        </div>
+        <div class="roadmap-item">
+          <div class="ri-dot" style="background:var(--green)"></div>
+          <div><strong>Superhuman MCP</strong>When available: wire Vicky directly. Retire Gmail drafts AppScript bridge.</div>
+        </div>
+        <div class="roadmap-item">
+          <div class="ri-dot" style="background:var(--green)"></div>
+          <div><strong>Book v1 draft</strong>Claude Projects + voice dump workflow produces first full chapter drafts.</div>
+        </div>
+        <div class="roadmap-item">
+          <div class="ri-dot" style="background:var(--green)"></div>
+          <div><strong>Customer follow-up automation</strong>HubSpot sequences + AI-personalised touchpoints. No deal stalls silently.</div>
+        </div>
+        <div class="roadmap-item">
+          <div class="ri-dot" style="background:var(--green)"></div>
+          <div><strong>Full exec team enablement</strong>All 5 exec team members operating from shared memory. Weekly memory review in all-hands.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- VICKY ARCHITECTURE -->
+<section id="architecture">
+  <div class="section-label">05 — Agent Architecture Decision</div>
+  <h2>One Vicky, structured right</h2>
+  <p class="section-intro">You asked whether to decompose Vicky into multiple agents. Here's the answer — and the architecture that makes one agent dramatically more powerful.</p>
+
+  <div class="callout info">
+    <div class="callout-icon">💡</div>
+    <div class="callout-body">
+      <strong>The recommendation: Keep Vicky as one unified EA agent</strong>
+      Peter Steinberger (creator of OpenClaw) runs his entire operation through a single agent. The reason Vicky feels unstable or hits API limits isn't because she's overloaded — it's because she lacks structured context and you're triggering her in expensive, unoptimised ways. Fix the context. Fix the model routing. Don't add agents.
+    </div>
+  </div>
+
+  <div class="compare-grid" style="margin-top: 1.5rem;">
+    <div class="compare-box">
+      <h4>❌ Multiple Siloed Agents (Don't Do)</h4>
+      <div class="compare-item">Still hits the same API rate limits per OpenClaw install</div>
+      <div class="compare-item">Email agent has no calendar context → misses scheduling conflicts</div>
+      <div class="compare-item">Calendar agent has no CRM context → can't prioritise client meetings</div>
+      <div class="compare-item">More agents = more AGENTS.md files = more maintenance</div>
+      <div class="compare-item">You lose the "whole picture" EA effect</div>
+    </div>
+    <div class="compare-box">
+      <h4>✅ One Vicky, Better Architecture (Do This)</h4>
+      <div class="compare-item"><span>Sonnet 4.6</span> for email triage, drafts, calendar checks (fast + cheap)</div>
+      <div class="compare-item"><span>Haiku</span> for lightweight cron jobs (e.g., conflict detection every 2hrs)</div>
+      <div class="compare-item"><span>Opus</span> for sensitive comms only (board packs, investor emails)</div>
+      <div class="compare-item">3 context files give her full situational awareness</div>
+      <div class="compare-item">Trust Tracker builds reliability over time</div>
+    </div>
+  </div>
+
+  <div class="arch-box" style="margin-top: 1.5rem;">
+    <div class="arch-header">
+      <div class="arch-icon">🏗️</div>
+      <h3>Vicky's Recommended Context Architecture</h3>
+    </div>
+    <div class="arch-body">Three files. Vicky reads these at the start of every email or calendar task. This is what gives her the "EA who's been with you for 5 years" effect.</div>
+    <table>
+      <thead>
+        <tr><th>File</th><th>Contents</th><th>Who updates it</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>vicky-contacts.md</code></td>
+          <td>Key relationships: name, company, context, communication preferences, last interaction summary, how to address them</td>
+          <td>You + Vicky (after calls)</td>
+        </tr>
+        <tr>
+          <td><code>vicky-calendar-rules.md</code></td>
+          <td>No-meeting days, preferred meeting times, travel blocks, buffer rules, priority meeting types, commute/travel time estimates</td>
+          <td>You (quarterly review)</td>
+        </tr>
+        <tr>
+          <td><code>vicky-email-rules.md</code></td>
+          <td>Tone guide per relationship type, response time expectations, which emails you always write yourself, subject line templates, sign-off preferences</td>
+          <td>You (monthly tweak based on Trust Tracker)</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- TECH STACK -->
+<section id="stack">
+  <div class="section-label">06 — Tech Stack Review</div>
+  <h2>What to keep, add, upgrade, and prep for</h2>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Tool</th>
+        <th>Status</th>
+        <th>Recommendation</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>OpenClaw (Mac Mini)</td>
+        <td><span class="pill keep">KEEP</span></td>
+        <td>Core platform. Don't switch. Stable, open source, most powerful option. Await iOS app (developer account).</td>
+      </tr>
+      <tr>
+        <td>Claude (Subscription)</td>
+        <td><span class="pill upgrade">UPGRADE</span></td>
+        <td>Switch back from API → subscription immediately (instructions sent). Use Sonnet 4.6 as daily driver. Opus for heavy work.</td>
+      </tr>
+      <tr>
+        <td>HubSpot</td>
+        <td><span class="pill upgrade">UPGRADE</span></td>
+        <td>Install HubSpot MCP. Add AI layer on top. This turns HubSpot from a CRM you manage into a CRM that reports to you.</td>
+      </tr>
+      <tr>
+        <td>Odoo (ERP)</td>
+        <td><span class="pill keep">KEEP</span></td>
+        <td>Strong foundation. Your Head of Finance is already making progress. Explore Odoo MCP for deeper AI integration as next step.</td>
+      </tr>
+      <tr>
+        <td>Fathom</td>
+        <td><span class="pill upgrade">UPGRADE</span></td>
+        <td>Improve the Fathom → HubSpot pipeline. Auto-log call summaries to contact records. Stop the Airtable middle step if you can route directly.</td>
+      </tr>
+      <tr>
+        <td>Superhuman</td>
+        <td><span class="pill keep">KEEP</span></td>
+        <td>Best email client for your use case. Await MCP (should be soon). When it drops, wire Vicky directly. Your AppScript bridge becomes redundant.</td>
+      </tr>
+      <tr>
+        <td>Todoist + AkiFlow</td>
+        <td><span class="pill keep">KEEP</span></td>
+        <td>Your current workflow here is working. Add Todoist MCP to OpenClaw so Vicky can read/write tasks directly. Don't change the tool, just add the integration.</td>
+      </tr>
+      <tr>
+        <td>Apple Notes</td>
+        <td><span class="pill replace">MIGRATE</span></td>
+        <td>Migrate to Obsidian. All-markdown, CLI-accessible, OpenClaw-native. Apple Notes importer exists. Your 6,000+ notes come with you.</td>
+      </tr>
+      <tr>
+        <td>Zapier</td>
+        <td><span class="pill replace">PHASE OUT</span></td>
+        <td>You already said it was timing out. Replace remaining Zapier workflows with MCPs (direct integrations via OpenClaw) or N8N for anything complex.</td>
+      </tr>
+      <tr>
+        <td>Obsidian</td>
+        <td><span class="pill add">ADD</span></td>
+        <td>Your new second brain and AI context backbone. CLI tool makes it fully OpenClaw-native. Install on Mac Mini + iPhone. Sync via iCloud or GitHub.</td>
+      </tr>
+      <tr>
+        <td>Claude Projects</td>
+        <td><span class="pill add">ADD</span></td>
+        <td>Use exclusively for your book project. 1M context window + persistent project memory = the best long-form co-author available. Not a replacement for OpenClaw — complementary.</td>
+      </tr>
+      <tr>
+        <td>Whisper Flow</td>
+        <td><span class="pill keep">KEEP</span></td>
+        <td>Already using. Excellent for voice → notes → tasks. Make sure your content agent is consuming Whisper Flow outputs as the primary idea input.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- MODEL STRATEGY -->
+  <div style="margin-top: 2.5rem;">
+    <h3>Model Usage Strategy</h3>
+    <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 1.25rem;">This is how to avoid hitting limits while keeping your most important tasks at top quality.</p>
+    <div class="model-cards">
+      <div class="model-card">
+        <div class="model-badge badge-primary">Daily Driver</div>
+        <div class="model-name">claude-sonnet-4-6</div>
+        <div class="model-role">Main Agent Model</div>
+        <div class="model-use">Vicky email triage + drafts, calendar management, daily briefings, CRM health checks, LinkedIn drafts, general research.</div>
+      </div>
+      <div class="model-card">
+        <div class="model-badge badge-heavy">Heavy Work</div>
+        <div class="model-name">claude-opus-4-5</div>
+        <div class="model-role">Strategic + Creative</div>
+        <div class="model-use">Board packs, investor memos, book chapters, complex analysis, website copy, sensitive executive communications. Use intentionally, not by default.</div>
+      </div>
+      <div class="model-card">
+        <div class="model-badge badge-light">Lightweight</div>
+        <div class="model-name">claude-haiku</div>
+        <div class="model-role">Cron & Automation</div>
+        <div class="model-use">Calendar conflict detection (runs every 2hrs), task tagging, simple categorisation, lightweight cron jobs. Dramatically reduces API spend on automated tasks.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- QUICK WINS -->
+<section id="quickwins">
+  <div class="section-label">07 — Quick Wins</div>
+  <h2>Do these this week</h2>
+  <p class="section-intro">Zero dependencies. High return. Can be done before your next call.</p>
+
+  <div class="quickwin-grid">
+    <div class="quickwin-card">
+      <div class="qw-label" style="color: var(--red)">🔴 Do Today</div>
+      <h3>Fix Claude Subscription</h3>
+      <p>Run <code>claude setup-token</code> then <code>openclaw models auth setup-token --provider anthropic</code>. Saves you €50–200/month vs API immediately. Instructions already sent separately.</p>
+      <div class="qw-time">⏱ 5 minutes</div>
+    </div>
+
+    <div class="quickwin-card">
+      <div class="qw-label" style="color: var(--red)">🔴 Do Today</div>
+      <h3>Watch the Steinberger Interview</h3>
+      <p>4hr Lex Friedman interview with Peter Steinberger (OpenClaw creator). Watch at 2x on a long drive. Changes how you think about your entire agent architecture. Link sent in Zoom chat.</p>
+      <div class="qw-time">⏱ 2hrs at 2× speed</div>
+    </div>
+
+    <div class="quickwin-card">
+      <div class="qw-label" style="color: var(--orange)">🟠 This Week</div>
+      <h3>Write Vicky's 3 Context Files</h3>
+      <p>Spend 2 hours writing <code>vicky-contacts.md</code>, <code>vicky-calendar-rules.md</code>, <code>vicky-email-rules.md</code>. This single investment will improve Vicky's quality significantly and immediately.</p>
+      <div class="qw-time">⏱ 2 hours</div>
+    </div>
+
+    <div class="quickwin-card">
+      <div class="qw-label" style="color: var(--orange)">🟠 This Week</div>
+      <h3>Migrate Apple Notes → Obsidian</h3>
+      <p>Install Obsidian. Run the Apple Notes importer. Add Obsidian MCP to OpenClaw. Your entire knowledge history becomes AI-accessible. GodMode can send you step-by-step instructions.</p>
+      <div class="qw-time">⏱ 1–2 hours</div>
+    </div>
+
+    <div class="quickwin-card">
+      <div class="qw-label" style="color: var(--yellow)">🟡 This Week</div>
+      <h3>Install HubSpot MCP</h3>
+      <p>One-time install that gives all your agents CRM read access. Immediately enables the CRM health brief, contact context in emails, and the ISO 27001 automation you mentioned.</p>
+      <div class="qw-time">⏱ 1 hour</div>
+    </div>
+
+    <div class="quickwin-card">
+      <div class="qw-label" style="color: var(--yellow)">🟡 This Week</div>
+      <h3>Create GitHub Shared Memory Repo</h3>
+      <p>10 minutes to create <code>q7leader-shared-memory</code> as a private repo. Start with just a <code>company/strategy.md</code> and <code>company/okrs.md</code>. Invite your exec team. Grow it from there.</p>
+      <div class="qw-time">⏱ 30 minutes</div>
+    </div>
+  </div>
+</section>
+
+<!-- GODMODE NOTE -->
+<section>
+  <div class="section-label">08 — GodMode</div>
+  <h2>The UI you saw on the call</h2>
+  <p class="section-intro">You asked about the interface I demoed. Here's what it is and how to get set up.</p>
+
+  <div class="arch-box">
+    <div class="arch-header">
+      <div class="arch-icon">⚛️</div>
+      <h3>What is GodMode?</h3>
+    </div>
+    <div class="arch-body">GodMode is a custom OpenClaw harness built for knowledge workers and entrepreneurs. It adds a polished web UI, multi-panel chat, status indicators (green = thinking, red = ready), pre-built skills (email briefing, LinkedIn drafting, meeting prep), a daily review ritual, shared memory architecture, and a session management layer — on top of a standard OpenClaw install.</div>
+    <div class="callout info" style="margin-top: 1rem; margin-bottom: 0;">
+      <div class="callout-icon">📋</div>
+      <div class="callout-body">
+        <strong>Getting started</strong>
+        Caleb will send you onboarding instructions and a follow-up call to get your GodMode instance set up. This is especially relevant for your exec team onboarding — the interface is significantly more approachable than a raw terminal for non-technical team members.
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- NEXT STEPS -->
+<section id="nextsteps">
+  <div class="section-label">09 — Next Steps</div>
+  <h2>What happens from here</h2>
+
+  <div class="nextsteps-list">
+    <div class="next-item">
+      <div class="next-num">1</div>
+      <div class="next-content">
+        <div class="next-when">Today</div>
+        <h3>Fix Claude subscription (5 min)</h3>
+        <p>Instructions already in your inbox. Run the two commands. Saves money immediately.</p>
+      </div>
+    </div>
+    <div class="next-item">
+      <div class="next-num">2</div>
+      <div class="next-content">
+        <div class="next-when">This Week</div>
+        <h3>Complete your Quick Wins (from Section 7)</h3>
+        <p>Vicky context files + Obsidian migration + HubSpot MCP + GitHub shared repo. These are the foundation everything else builds on.</p>
+      </div>
+    </div>
+    <div class="next-item">
+      <div class="next-num">3</div>
+      <div class="next-content">
+        <div class="next-when">Schedule Now</div>
+        <h3>30-minute follow-up call with Caleb</h3>
+        <p>Deep dive on implementation. Bring your questions from reviewing this report. We'll prioritise your Phase 1 list and I'll walk you through the Obsidian setup and Vicky restructure live if helpful.</p>
+      </div>
+    </div>
+    <div class="next-item">
+      <div class="next-num">4</div>
+      <div class="next-content">
+        <div class="next-when">Weeks 3–6</div>
+        <h3>Phase 2 — Build the automation layer</h3>
+        <p>HubSpot intelligence, content engine, shared exec memory. This is where your 5–10 hrs/week of time savings start compounding.</p>
+      </div>
+    </div>
+    <div class="next-item">
+      <div class="next-num">5</div>
+      <div class="next-content">
+        <div class="next-when">Ongoing</div>
+        <h3>90-day check-in: measure the delta</h3>
+        <p>At the 90-day mark, re-score against the maturity assessment in this report. You should be at 9.5/10. If you're not, we iterate.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <p><strong>Prepared by Caleb Hodges — GodMode AI</strong></p>
+  <p style="margin-top: 0.5rem;">This report is confidential and prepared exclusively for Thomas Goubau at Q7Leader. · February 24, 2026</p>
+  <p style="margin-top: 1rem; font-size: 0.75rem;">Questions? Reply to this email or book your follow-up at the link Caleb will send. Built with ⚛️ GodMode.</p>
+</footer>
+
+</body>
+</html>

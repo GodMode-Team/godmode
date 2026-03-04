@@ -1,0 +1,632 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sign In - GodMode</title>
+<meta name="description" content="Sign in to your GodMode account or create a new one.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><defs><linearGradient id='b' x1='0' y1='0' x2='0' y2='1'><stop offset='0%25' stop-color='%23FFD700'/><stop offset='100%25' stop-color='%23FF8C00'/></linearGradient></defs><path d='M58 2 L22 54 L42 54 L36 98 L78 42 L56 42 Z' fill='url(%23b)'/></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  font-family: 'Space Grotesk', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: #fafafa;
+  color: #3f3f46;
+  min-height: 100vh;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+a { color: #dc2626; text-decoration: none; transition: color 200ms ease; }
+a:hover { color: #ef4444; }
+
+::selection { background: rgba(220, 38, 38, 0.12); color: #18181b; }
+
+/* Logo header */
+.logo-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 32px;
+}
+
+.logo-header svg { width: 40px; height: 40px; }
+
+.logo-header h1 {
+  font-size: 22px;
+  font-weight: 700;
+  color: #18181b;
+  letter-spacing: -0.02em;
+}
+
+/* Card */
+.card {
+  width: 100%;
+  max-width: 440px;
+  background: #ffffff;
+  border: 1px solid #e4e4e7;
+  border-radius: 12px;
+  padding: 32px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.card-title {
+  font-size: 20px;
+  font-weight: 600;
+  color: #18181b;
+  margin-bottom: 4px;
+}
+
+.card-subtitle {
+  font-size: 14px;
+  color: #71717a;
+  margin-bottom: 24px;
+}
+
+/* Device code section */
+.device-code-section {
+  margin-bottom: 24px;
+  padding-bottom: 24px;
+  border-bottom: 1px solid #e4e4e7;
+}
+
+.device-code-display {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  background: #fafafa;
+  border: 1px solid #e4e4e7;
+  border-radius: 8px;
+  margin-top: 12px;
+}
+
+.device-code-display .code-label {
+  font-size: 13px;
+  color: #71717a;
+  white-space: nowrap;
+}
+
+.device-code-display .code-value {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 18px;
+  font-weight: 500;
+  color: #18181b;
+  letter-spacing: 0.08em;
+}
+
+.device-code-input-wrap {
+  margin-top: 12px;
+}
+
+.device-code-input-wrap label {
+  display: block;
+  font-size: 13px;
+  font-weight: 500;
+  color: #3f3f46;
+  margin-bottom: 6px;
+}
+
+.device-code-input-wrap input {
+  width: 100%;
+  padding: 10px 14px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 16px;
+  letter-spacing: 0.08em;
+  border: 1px solid #e4e4e7;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #18181b;
+  outline: none;
+  transition: border-color 200ms ease, box-shadow 200ms ease;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.device-code-input-wrap input:focus {
+  border-color: #dc2626;
+  box-shadow: 0 0 0 2px #fafafa, 0 0 0 4px #dc2626;
+}
+
+.device-code-input-wrap input::placeholder {
+  color: #d4d4d8;
+  text-transform: none;
+  letter-spacing: normal;
+}
+
+/* Form */
+.form-group {
+  margin-bottom: 16px;
+}
+
+.form-group label {
+  display: block;
+  font-size: 14px;
+  font-weight: 500;
+  color: #3f3f46;
+  margin-bottom: 6px;
+}
+
+.form-group input {
+  width: 100%;
+  padding: 10px 14px;
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 15px;
+  border: 1px solid #e4e4e7;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #18181b;
+  outline: none;
+  transition: border-color 200ms ease, box-shadow 200ms ease;
+}
+
+.form-group input:focus {
+  border-color: #dc2626;
+  box-shadow: 0 0 0 2px #fafafa, 0 0 0 4px #dc2626;
+}
+
+.form-group input::placeholder {
+  color: #a1a1aa;
+}
+
+/* Buttons */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 12px 24px;
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 15px;
+  font-weight: 600;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  transition: all 200ms ease;
+  text-decoration: none;
+}
+
+.btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.btn-primary {
+  background: #dc2626;
+  color: #ffffff;
+  box-shadow: 0 0 20px rgba(220, 38, 38, 0.2);
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: #ef4444;
+  box-shadow: 0 0 24px rgba(220, 38, 38, 0.3);
+  transform: translateY(-1px);
+}
+
+.btn-ghost {
+  background: #ffffff;
+  color: #3f3f46;
+  border: 1px solid #e4e4e7;
+}
+
+.btn-ghost:hover:not(:disabled) {
+  background: #fafafa;
+  border-color: #d4d4d8;
+}
+
+/* Toggle link */
+.toggle-link {
+  text-align: center;
+  margin-top: 20px;
+  font-size: 14px;
+  color: #71717a;
+}
+
+.toggle-link a {
+  font-weight: 500;
+}
+
+/* Error / Success messages */
+.message {
+  padding: 12px 16px;
+  border-radius: 8px;
+  font-size: 14px;
+  margin-bottom: 16px;
+  display: none;
+}
+
+.message-error {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #991b1b;
+}
+
+.message-success {
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  color: #166534;
+}
+
+.message.show {
+  display: block;
+}
+
+/* Success screen */
+.success-screen {
+  display: none;
+  text-align: center;
+  padding: 16px 0;
+}
+
+.success-screen .check-circle {
+  width: 64px;
+  height: 64px;
+  margin: 0 auto 20px;
+  background: #f0fdf4;
+  border: 2px solid #22c55e;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.success-screen .check-circle svg {
+  width: 32px;
+  height: 32px;
+  color: #22c55e;
+}
+
+.success-screen h2 {
+  font-size: 20px;
+  font-weight: 600;
+  color: #18181b;
+  margin-bottom: 8px;
+}
+
+.success-screen p {
+  font-size: 14px;
+  color: #71717a;
+  line-height: 1.5;
+}
+
+/* Spinner */
+.spinner {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: #ffffff;
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Footer */
+.page-footer {
+  margin-top: 24px;
+  text-align: center;
+  font-size: 13px;
+  color: #a1a1aa;
+}
+
+.page-footer a { color: #71717a; }
+.page-footer a:hover { color: #dc2626; }
+
+/* Hidden */
+.hidden { display: none !important; }
+
+/* Responsive */
+@media (max-width: 480px) {
+  body { padding: 16px; }
+  .card { padding: 24px; }
+  .device-code-display .code-value { font-size: 16px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spinner { animation-duration: 1.2s; }
+  .btn { transition: none; }
+}
+</style>
+</head>
+<body>
+
+<div class="logo-header">
+  <a href="/">
+    <svg viewBox="0 0 100 100"><defs><linearGradient id="bolt" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#FFD700"/><stop offset="100%" stop-color="#FF8C00"/></linearGradient></defs><path d="M58 2 L22 54 L42 54 L36 98 L78 42 L56 42 Z" fill="url(#bolt)"/></svg>
+  </a>
+  <h1>GodMode</h1>
+</div>
+
+<div class="card" id="authCard">
+  <!-- Device Code Section -->
+  <div class="device-code-section" id="deviceCodeSection">
+    <div id="deviceCodeDisplay" class="hidden">
+      <div style="font-size: 14px; font-weight: 500; color: #18181b;">Device Code</div>
+      <div class="device-code-display">
+        <span class="code-label">Code:</span>
+        <span class="code-value" id="codeDisplayValue"></span>
+      </div>
+      <p style="margin-top: 8px; font-size: 13px; color: #71717a;">Sign in below to link this device to your account.</p>
+    </div>
+    <div id="deviceCodeInput">
+      <div class="device-code-input-wrap">
+        <label for="userCode">Enter the code from your terminal</label>
+        <input type="text" id="userCode" placeholder="XXXX-XXXX" maxlength="9" autocomplete="off" spellcheck="false">
+      </div>
+      <p style="margin-top: 8px; font-size: 13px; color: #71717a;">Paste the code shown in your terminal, then sign in below.</p>
+    </div>
+  </div>
+
+  <!-- Login Form -->
+  <div id="loginForm">
+    <div class="card-title">Sign in to your account</div>
+    <div class="card-subtitle">Enter your email and password to continue.</div>
+
+    <div id="loginError" class="message message-error"></div>
+
+    <form onsubmit="handleLogin(event)">
+      <div class="form-group">
+        <label for="loginEmail">Email</label>
+        <input type="email" id="loginEmail" placeholder="you@example.com" required autocomplete="email">
+      </div>
+      <div class="form-group">
+        <label for="loginPassword">Password</label>
+        <input type="password" id="loginPassword" placeholder="Your password" required autocomplete="current-password">
+      </div>
+      <button type="submit" class="btn btn-primary" id="loginBtn">
+        <span id="loginBtnText">Sign In</span>
+      </button>
+    </form>
+
+    <div class="toggle-link">
+      Don't have an account? <a href="#" onclick="showRegister(event)">Create account</a>
+    </div>
+  </div>
+
+  <!-- Register Form -->
+  <div id="registerForm" class="hidden">
+    <div class="card-title">Create your account</div>
+    <div class="card-subtitle">Get started with GodMode in seconds.</div>
+
+    <div id="registerError" class="message message-error"></div>
+
+    <form onsubmit="handleRegister(event)">
+      <div class="form-group">
+        <label for="registerName">Name</label>
+        <input type="text" id="registerName" placeholder="Your name" required autocomplete="name">
+      </div>
+      <div class="form-group">
+        <label for="registerEmail">Email</label>
+        <input type="email" id="registerEmail" placeholder="you@example.com" required autocomplete="email">
+      </div>
+      <div class="form-group">
+        <label for="registerPassword">Password</label>
+        <input type="password" id="registerPassword" placeholder="Choose a password" required autocomplete="new-password" minlength="8">
+      </div>
+      <button type="submit" class="btn btn-primary" id="registerBtn">
+        <span id="registerBtnText">Create Account</span>
+      </button>
+    </form>
+
+    <div class="toggle-link">
+      Already have an account? <a href="#" onclick="showLogin(event)">Sign in</a>
+    </div>
+  </div>
+
+  <!-- Success Screen -->
+  <div class="success-screen" id="successScreen">
+    <div class="check-circle">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="20 6 9 17 4 12"></polyline>
+      </svg>
+    </div>
+    <h2>You're logged in!</h2>
+    <p id="successMessage">You can close this window and return to your terminal.</p>
+    <div style="margin-top: 20px;">
+      <a href="/account" class="btn btn-ghost" style="width: auto; display: inline-flex;">Go to Account</a>
+    </div>
+  </div>
+</div>
+
+<div class="page-footer">
+  <a href="/">Home</a> &middot; <a href="/pricing">Pricing</a> &middot; <a href="/support">Support</a>
+</div>
+
+<script>
+var userCode = '';
+
+// Check URL for ?code= param
+(function init() {
+  var params = new URLSearchParams(window.location.search);
+  var code = params.get('code');
+
+  if (code) {
+    userCode = code.trim();
+    document.getElementById('deviceCodeDisplay').classList.remove('hidden');
+    document.getElementById('deviceCodeInput').classList.add('hidden');
+    document.getElementById('codeDisplayValue').textContent = userCode;
+  }
+
+  // If already logged in and no device code, redirect to account
+  var token = localStorage.getItem('godmode_access_token');
+  if (token && !userCode) {
+    window.location.href = '/account';
+  }
+})();
+
+// Read user code from input if manually entered
+function getUserCode() {
+  if (userCode) return userCode;
+  var input = document.getElementById('userCode');
+  return input ? input.value.trim() : '';
+}
+
+function showError(containerId, msg) {
+  var el = document.getElementById(containerId);
+  el.textContent = msg;
+  el.classList.add('show');
+}
+
+function clearErrors() {
+  document.querySelectorAll('.message').forEach(function(el) {
+    el.classList.remove('show');
+  });
+}
+
+function setLoading(btnId, textId, loading, loadingText) {
+  var btn = document.getElementById(btnId);
+  var text = document.getElementById(textId);
+  btn.disabled = loading;
+  if (loading) {
+    text.innerHTML = '<span class="spinner"></span> ' + (loadingText || 'Loading...');
+  } else {
+    text.textContent = btnId === 'loginBtn' ? 'Sign In' : 'Create Account';
+  }
+}
+
+function showRegister(e) {
+  e.preventDefault();
+  clearErrors();
+  document.getElementById('loginForm').classList.add('hidden');
+  document.getElementById('registerForm').classList.remove('hidden');
+}
+
+function showLogin(e) {
+  e.preventDefault();
+  clearErrors();
+  document.getElementById('registerForm').classList.add('hidden');
+  document.getElementById('loginForm').classList.remove('hidden');
+}
+
+function handleSuccess(data) {
+  // Store tokens
+  if (data.access_token) {
+    localStorage.setItem('godmode_access_token', data.access_token);
+  }
+  if (data.refresh_token) {
+    localStorage.setItem('godmode_refresh_token', data.refresh_token);
+  }
+
+  var code = getUserCode();
+
+  if (code) {
+    // Device flow: show success and tell user to return to terminal
+    document.getElementById('loginForm').classList.add('hidden');
+    document.getElementById('registerForm').classList.add('hidden');
+    document.getElementById('deviceCodeSection').classList.add('hidden');
+    document.getElementById('successScreen').style.display = 'block';
+    document.getElementById('successMessage').textContent =
+      'Your device has been linked. You can close this window and return to your terminal.';
+  } else {
+    // Direct browser login: redirect to account
+    window.location.href = '/account';
+  }
+}
+
+async function handleLogin(e) {
+  e.preventDefault();
+  clearErrors();
+
+  var email = document.getElementById('loginEmail').value.trim();
+  var password = document.getElementById('loginPassword').value;
+  var code = getUserCode();
+
+  if (!email || !password) {
+    showError('loginError', 'Please enter your email and password.');
+    return;
+  }
+
+  setLoading('loginBtn', 'loginBtnText', true, 'Signing in...');
+
+  try {
+    var body = { email: email, password: password };
+    if (code) body.user_code = code;
+
+    var res = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+
+    var data = await res.json();
+
+    if (!res.ok) {
+      showError('loginError', data.message || data.error || 'Invalid email or password.');
+      return;
+    }
+
+    handleSuccess(data);
+  } catch (err) {
+    showError('loginError', 'Unable to connect. Please try again.');
+  } finally {
+    setLoading('loginBtn', 'loginBtnText', false);
+  }
+}
+
+async function handleRegister(e) {
+  e.preventDefault();
+  clearErrors();
+
+  var name = document.getElementById('registerName').value.trim();
+  var email = document.getElementById('registerEmail').value.trim();
+  var password = document.getElementById('registerPassword').value;
+  var code = getUserCode();
+
+  if (!name || !email || !password) {
+    showError('registerError', 'Please fill in all fields.');
+    return;
+  }
+
+  if (password.length < 8) {
+    showError('registerError', 'Password must be at least 8 characters.');
+    return;
+  }
+
+  setLoading('registerBtn', 'registerBtnText', true, 'Creating account...');
+
+  try {
+    var body = { name: name, email: email, password: password };
+    if (code) body.user_code = code;
+
+    var res = await fetch('/api/auth/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+
+    var data = await res.json();
+
+    if (!res.ok) {
+      var msg = data.message || data.error || 'Could not create account.';
+      if (res.status === 409) msg = 'An account with this email already exists.';
+      showError('registerError', msg);
+      return;
+    }
+
+    handleSuccess(data);
+  } catch (err) {
+    showError('registerError', 'Unable to connect. Please try again.');
+  } finally {
+    setLoading('registerBtn', 'registerBtnText', false);
+  }
+}
+</script>
+
+</body>
+</html>

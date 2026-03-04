@@ -1,4 +1,5 @@
 import { execFile as execFileCb } from "node:child_process";
+import { readFileSync, statSync } from "node:fs";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { promisify } from "node:util";
@@ -308,9 +309,60 @@ const taskFiles: GatewayRequestHandler = async ({ params, respond }) => {
   }
 };
 
+/**
+ * Read a file's content and metadata. Validates that the path falls within
+ * allowed roots (GODMODE_ROOT or Obsidian vault) before reading.
+ */
+const readFile: GatewayRequestHandler = async ({ params, respond }) => {
+  const filePath = (params as { path?: string }).path;
+  if (!filePath) {
+    respond(false, null, { code: "MISSING_PARAM", message: "path is required" });
+    return;
+  }
+
+  // SECURITY: Validate path is within allowed roots
+  const { isAllowedPath } = await import("../lib/vault-paths.js");
+  const resolvedPath = path.resolve(filePath);
+  if (!isAllowedPath(resolvedPath)) {
+    respond(false, null, { code: "ACCESS_DENIED", message: `Path not allowed: ${filePath}` });
+    return;
+  }
+
+  try {
+    const stat = statSync(resolvedPath);
+    if (!stat.isFile()) {
+      respond(false, null, { code: "NOT_FILE", message: "Path is not a file" });
+      return;
+    }
+
+    const MAX_SIZE = 100 * 1024; // 100KB
+    const size = stat.size;
+    const truncated = size > MAX_SIZE;
+
+    const content = readFileSync(resolvedPath, "utf-8").substring(0, MAX_SIZE);
+
+    // Detect content type from extension
+    const ext = path.extname(resolvedPath).toLowerCase().slice(1);
+    const mimeMap: Record<string, string> = {
+      html: "text/html", md: "text/markdown", json: "application/json",
+      js: "text/javascript", ts: "text/typescript", css: "text/css",
+      txt: "text/plain", yaml: "text/yaml", yml: "text/yaml",
+      xml: "text/xml", csv: "text/csv", py: "text/x-python",
+      sh: "text/x-shellscript", svg: "image/svg+xml",
+    };
+    const contentType = mimeMap[ext] || "text/plain";
+
+    respond(true, { content, size, truncated, contentType });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    respond(false, null, { code: "READ_ERROR", message: msg });
+  }
+};
+
 // ── Export ────────────────────────────────────────────────────────
 
 export const filesHandlers: Record<string, GatewayRequestHandler> = {
+  "files.read": readFile,
   "files.listDriveAccounts": listDriveAccounts,
   "files.pushToDrive": pushToDrive,
   "files.batchPushToDrive": batchPushToDrive,

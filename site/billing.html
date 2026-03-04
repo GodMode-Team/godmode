@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Manage Billing | GodMode</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚡</text></svg>">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root {
+            --black: #000000;
+            --card: #121722;
+            --muted: #a0aab8;
+            --white: #ffffff;
+            --accent: #00ff88;
+            --accent-dim: rgba(0, 255, 136, 0.1);
+            --red: #ff6b6b;
+            --radius: 14px;
+            --max: 480px;
+        }
+        html { scroll-behavior: smooth; }
+        body {
+            font-family: 'Inter', -apple-system, sans-serif;
+            background: var(--black);
+            color: var(--white);
+            line-height: 1.6;
+        }
+        body::before {
+            content: "";
+            position: fixed;
+            inset: 0;
+            background:
+                radial-gradient(circle at 12% 18%, rgba(0, 255, 136, 0.08), transparent 42%),
+                radial-gradient(circle at 88% 82%, rgba(0, 200, 255, 0.05), transparent 45%);
+            pointer-events: none;
+        }
+
+        .container {
+            position: relative;
+            z-index: 2;
+            max-width: var(--max);
+            margin: 0 auto;
+            padding: 80px 24px;
+        }
+
+        h1 {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 28px;
+            font-weight: 700;
+            text-align: center;
+            margin-bottom: 8px;
+        }
+        .subtitle {
+            text-align: center;
+            color: var(--muted);
+            font-size: 15px;
+            margin-bottom: 36px;
+        }
+
+        .card {
+            background: var(--card);
+            border: 1px solid rgba(255,255,255,0.06);
+            border-radius: var(--radius);
+            padding: 28px;
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--muted);
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        input[type="email"] {
+            width: 100%;
+            padding: 14px 16px;
+            background: #0a0f18;
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 10px;
+            color: var(--white);
+            font-size: 15px;
+            font-family: inherit;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        input[type="email"]:focus {
+            border-color: var(--accent);
+        }
+
+        .btn {
+            display: block;
+            width: 100%;
+            padding: 14px;
+            margin-top: 16px;
+            background: var(--accent);
+            color: var(--black);
+            border: none;
+            border-radius: 10px;
+            font-size: 15px;
+            font-weight: 700;
+            font-family: inherit;
+            cursor: pointer;
+            transition: opacity 0.2s;
+        }
+        .btn:hover { opacity: 0.9; }
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .error {
+            color: var(--red);
+            font-size: 14px;
+            margin-top: 12px;
+            display: none;
+        }
+
+        .links {
+            text-align: center;
+            margin-top: 24px;
+        }
+        .links a {
+            color: var(--accent);
+            text-decoration: none;
+            font-size: 14px;
+        }
+        .links a:hover { text-decoration: underline; }
+
+        @media (max-width: 500px) {
+            .container { padding: 60px 16px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Manage Billing</h1>
+        <p class="subtitle">Update your payment method, view invoices, or cancel your subscription.</p>
+
+        <div class="card">
+            <form id="billingForm" onsubmit="openPortal(event)">
+                <label for="email">Your email address</label>
+                <input type="email" id="email" name="email" placeholder="you@example.com" required autocomplete="email">
+                <button type="submit" class="btn" id="submitBtn">Open Billing Portal</button>
+                <div class="error" id="error"></div>
+            </form>
+        </div>
+
+        <div class="links">
+            <a href="/">Back to GodMode</a>
+        </div>
+    </div>
+
+    <script>
+        async function openPortal(e) {
+            e.preventDefault();
+            const email = document.getElementById('email').value.trim();
+            const btn = document.getElementById('submitBtn');
+            const errorEl = document.getElementById('error');
+
+            if (!email) return;
+
+            btn.disabled = true;
+            btn.textContent = 'Opening...';
+            errorEl.style.display = 'none';
+
+            try {
+                const res = await fetch('/api/v1/stripe/portal', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email }),
+                });
+
+                const data = await res.json();
+
+                if (!res.ok) {
+                    errorEl.textContent = data.error || 'Could not open billing portal.';
+                    errorEl.style.display = 'block';
+                    btn.disabled = false;
+                    btn.textContent = 'Open Billing Portal';
+                    return;
+                }
+
+                window.location.href = data.url;
+            } catch (err) {
+                errorEl.textContent = 'Network error. Please try again.';
+                errorEl.style.display = 'block';
+                btn.disabled = false;
+                btn.textContent = 'Open Billing Portal';
+            }
+        }
+    </script>
+</body>
+</html>

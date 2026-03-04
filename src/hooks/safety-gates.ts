@@ -18,6 +18,7 @@ import {
   logGateActivity,
   GATE_DEFAULTS,
 } from "../services/guardrails.js";
+import { countContextOverlap } from "../lib/injection-fingerprints.js";
 
 // ── Loop Breaker ────────────────────────────────────────────────
 //
@@ -451,6 +452,7 @@ export function resetSearchTracking(sessionKey: string | undefined): void {
   searchUsage.delete(key);
   searchGateBlocked.delete(key);
   codeToolUsage.delete(key);
+  memoryToolUsage.delete(key);
   selfServiceBlocked.delete(key);
   investigationToolCount.delete(key);
   persistenceBlocked.delete(key);
@@ -493,8 +495,23 @@ const INVESTIGATION_TOOLS = new Set([
   "memory_search",
 ]);
 
-/** Per-session: has an investigation tool been used? */
-const codeToolUsage = new Map<string, boolean>();
+/** Tools that specifically access memory/consciousness — the agent's own knowledge */
+const MEMORY_TOOLS = new Set([
+  "memory_search",
+  "qmd_search",
+  "qmd_vsearch",
+  "mcp__qmd__search",
+  "mcp__qmd__vsearch",
+]);
+
+/** Minimum investigation tool calls before the gate disarms */
+const MIN_INVESTIGATION_CALLS = 3;
+
+/** Per-session: count of investigation tools used (not a boolean!) */
+const codeToolUsage = new Map<string, number>();
+
+/** Per-session: has a memory-specific tool been used? */
+const memoryToolUsage = new Map<string, boolean>();
 
 /** Per-session: was the last response blocked by self-service gate? */
 const selfServiceBlocked = new Map<string, boolean>();
@@ -502,6 +519,11 @@ const selfServiceBlocked = new Map<string, boolean>();
 /**
  * Record that an investigation tool was used in this session.
  * Call from after_tool_call for every tool invocation.
+ *
+ * Tracks count (not boolean) so the gate doesn't disarm after one
+ * accidental read. Also separately tracks memory-specific tool usage
+ * since the gate should require memory check before allowing questions
+ * about things the agent should already know.
  */
 export function trackCodeToolUsage(
   sessionKey: string | undefined,
@@ -510,7 +532,10 @@ export function trackCodeToolUsage(
   const key = sessionKey ?? "__default__";
   const normalized = toolName.trim().toLowerCase();
   if (INVESTIGATION_TOOLS.has(normalized)) {
-    codeToolUsage.set(key, true);
+    codeToolUsage.set(key, (codeToolUsage.get(key) ?? 0) + 1);
+  }
+  if (MEMORY_TOOLS.has(normalized)) {
+    memoryToolUsage.set(key, true);
   }
 }
 
@@ -598,8 +623,18 @@ export async function checkLazyQuestion(
 
   const key = sessionKey ?? "__default__";
 
-  // If investigation tools have been used, allow the message
-  if (codeToolUsage.get(key)) return false;
+  const investigationCount = codeToolUsage.get(key) ?? 0;
+  const hasCheckedMemory = memoryToolUsage.get(key) ?? false;
+
+  // If the agent has done substantial investigation (3+ tool calls)
+  // AND has checked memory, allow the message. Both conditions required
+  // so one grep doesn't permanently disarm the gate.
+  if (investigationCount >= MIN_INVESTIGATION_CALLS && hasCheckedMemory) return false;
+
+  // Even without memory check, if they've done extensive investigation
+  // (6+ tool calls), they've earned the right to ask. This prevents
+  // blocking agents that are genuinely stuck after thorough work.
+  if (investigationCount >= MIN_INVESTIGATION_CALLS * 2) return false;
 
   // Skip very long messages — likely detailed analysis, not delegation
   if (content.length > 2000) return false;
@@ -608,13 +643,11 @@ export async function checkLazyQuestion(
   for (const { patterns, category } of ALL_DELEGATION_CHECKS) {
     for (const pattern of patterns) {
       if (pattern.test(content)) {
+        const reason = !hasCheckedMemory
+          ? `Blocked ${category} (memory not checked, ${investigationCount} tools used): "${content.slice(0, 120)}..."`
+          : `Blocked ${category} (only ${investigationCount}/${MIN_INVESTIGATION_CALLS} tools used): "${content.slice(0, 120)}..."`;
         selfServiceBlocked.set(key, true);
-        void logGateActivity(
-          "selfServiceGate",
-          "fired",
-          `Blocked ${category}: "${content.slice(0, 120)}..."`,
-          sessionKey,
-        );
+        void logGateActivity("selfServiceGate", "fired", reason, sessionKey);
         return true;
       }
     }
@@ -634,22 +667,39 @@ export function consumeSelfServiceNudge(
   if (!selfServiceBlocked.get(key)) return undefined;
 
   selfServiceBlocked.delete(key);
+
+  const key2 = sessionKey ?? "__default__";
+  const hasMemory = memoryToolUsage.get(key2) ?? false;
+  const toolCount = codeToolUsage.get(key2) ?? 0;
+
+  const memoryWarning = !hasMemory
+    ? [
+        "",
+        "!! YOU HAVE NOT CHECKED YOUR MEMORY YET !!",
+        "Your CONSCIOUSNESS.md and WORKING.md contain decisions, context,",
+        "and answers that were already discussed. CHECK THEM FIRST.",
+        "Use `memory_search` or `qmd search` before asking the user anything.",
+        "",
+      ].join("\n")
+    : "";
+
   return [
     "[ENFORCEMENT: Self-Service Gate]",
     "",
     "Your previous response was blocked because you tried to delegate",
-    "investigation or verification to the user — without using your",
-    "own tools first.",
-    "",
+    "investigation or verification to the user — without doing enough",
+    "investigation yourself first.",
+    `(Investigation tools used: ${toolCount}/${MIN_INVESTIGATION_CALLS} required, memory checked: ${hasMemory})`,
+    memoryWarning,
     "CORE RULE: Never ask the user to check, confirm, verify, investigate,",
     "or look into ANYTHING that you could look up or figure out yourself.",
     "You are the agent. You have the tools. USE THEM.",
     "",
     "Before asking the user anything, you MUST exhaust your resources:",
-    "1. `read` / `glob` / `grep` — read code and search the codebase",
-    "2. `bash` — run commands, check APIs, inspect logs, query databases",
-    "3. `web_search` / `web_fetch` — research external systems",
-    "4. `qmd search` / `memory_search` — check notes and memory",
+    "1. `memory_search` / `qmd search` — CHECK YOUR MEMORY FIRST",
+    "2. `read` / `glob` / `grep` — read code and search the codebase",
+    "3. `bash` — run commands, check APIs, inspect logs, query databases",
+    "4. `web_search` / `web_fetch` — research external systems",
     "",
     "If after using your tools you genuinely need human-only input",
     "(a password, a physical confirmation, a business decision),",
@@ -1186,7 +1236,7 @@ export function consumePromptShieldNudge(
 /** Per-session: was the last response blocked by output shield? */
 const outputShieldFired = new Map<string, string>();
 
-const OUTPUT_LEAK_CHECKS: { name: string; check: (content: string) => boolean }[] = [
+const OUTPUT_LEAK_CHECKS: { name: string; check: (content: string, sessionKey?: string) => boolean }[] = [
   {
     name: "api_key_leak",
     check: (content) =>
@@ -1204,6 +1254,16 @@ const OUTPUT_LEAK_CHECKS: { name: string; check: (content: string) => boolean }[
         "your role is to",
       ];
       return markers.filter((m) => lower.includes(m)).length >= 3;
+    },
+  },
+  {
+    name: "dynamic_context_leak",
+    check: (content, sessionKey) => {
+      // Dynamic detection: compare output against the ACTUAL injected system
+      // context using n-gram substring matching. Self-maintaining — no hardcoded
+      // fingerprints needed. 3+ hits means ~80+ chars of system context leaked.
+      if (content.length < 200) return false;
+      return countContextOverlap(sessionKey, content) >= 3;
     },
   },
   {
@@ -1256,6 +1316,9 @@ const OUTPUT_LEAK_CHECKS: { name: string; check: (content: string) => boolean }[
       return markers.filter((m) => lower.includes(m)).length >= 3;
     },
   },
+  // system_context_leak, persistence_protocol_leak, and godmode_internals_leak
+  // are all handled by dynamic_context_leak above (n-gram matching against
+  // the actual injected text). No hardcoded markers needed.
 ];
 
 /**
@@ -1274,7 +1337,7 @@ export async function checkOutputLeak(
   const key = sessionKey ?? "__default__";
 
   for (const check of OUTPUT_LEAK_CHECKS) {
-    if (check.check(content)) {
+    if (check.check(content, sessionKey)) {
       outputShieldFired.set(key, check.name);
       void logGateActivity(
         "outputShield",

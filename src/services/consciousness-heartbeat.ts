@@ -10,10 +10,10 @@
  */
 
 import { exec as nodeExec } from "node:child_process";
-import { accessSync, constants as fsConstants, existsSync, readFileSync, statSync, writeFileSync } from "node:fs";
-import { copyFile } from "node:fs/promises";
+import { accessSync, constants as fsConstants, existsSync, readFileSync, statSync, writeFileSync, mkdirSync } from "node:fs";
+import { copyFile, readFile, writeFile, mkdir } from "node:fs/promises";
 import { join } from "node:path";
-import { GODMODE_ROOT, MEMORY_DIR } from "../data-paths.js";
+import { GODMODE_ROOT, MEMORY_DIR, DATA_DIR, localDateString, DAILY_FOLDER, resolveVaultPath } from "../data-paths.js";
 import { getVaultPath, VAULT_FOLDERS, ensureVaultStructure } from "../lib/vault-paths.js";
 import { syncClaudeCodeSessions } from "./claude-code-sync.js";
 import { listRoster, setTrustScores } from "../lib/agent-roster.js";
@@ -94,33 +94,38 @@ class ConsciousnessHeartbeat {
     this.tickInFlight = true;
 
     try {
-      // Check script availability
-      if (!existsSync(CONSCIOUSNESS_SCRIPT)) {
-        this.logger.warn("[Consciousness] Heartbeat tick skipped — consciousness-sync.sh not found");
-        return;
-      }
-      try {
-        accessSync(CONSCIOUSNESS_SCRIPT, fsConstants.R_OK | fsConstants.X_OK);
-      } catch {
-        this.logger.warn("[Consciousness] Heartbeat tick skipped — script not readable/executable");
-        return;
-      }
-
       // Broadcast syncing status
       this.broadcast("consciousness:status", { status: "syncing", source: "heartbeat" });
 
-      const { stdout, stderr } = await this.runScript();
+      // Try the external script first for backward compat; fall back to native regeneration
+      let steps: Record<string, string> = {};
+      let scriptWorked = false;
 
-      // Parse step statuses (same as manual flush handler)
-      const harvestOk = stdout.includes("Session harvest complete");
-      const harvestFailed =
-        stdout.includes("Session harvest failed") || stderr.includes("Session harvest failed");
-      const steps = {
-        harvest: harvestOk ? "ok" : harvestFailed ? "failed" : "skipped",
-        clawvault: stdout.includes("ClawVault reflect complete") ? "ok" : "skipped",
-        sessionReflect: stdout.includes("ClawVault session reflect complete") ? "ok" : "skipped",
-        heartbeat: stdout.includes("CONSCIOUSNESS.md updated") ? "ok" : "failed",
-      };
+      if (existsSync(CONSCIOUSNESS_SCRIPT)) {
+        try {
+          accessSync(CONSCIOUSNESS_SCRIPT, fsConstants.R_OK | fsConstants.X_OK);
+          const { stdout, stderr } = await this.runScript();
+          const harvestOk = stdout.includes("Session harvest complete");
+          const harvestFailed =
+            stdout.includes("Session harvest failed") || stderr.includes("Session harvest failed");
+          steps = {
+            harvest: harvestOk ? "ok" : harvestFailed ? "failed" : "skipped",
+            clawvault: stdout.includes("ClawVault reflect complete") ? "ok" : "skipped",
+            sessionReflect: stdout.includes("ClawVault session reflect complete") ? "ok" : "skipped",
+            heartbeat: stdout.includes("CONSCIOUSNESS.md updated") ? "ok" : "failed",
+          };
+          scriptWorked = true;
+        } catch {
+          this.logger.warn("[Consciousness] External script failed — falling back to native regeneration");
+        }
+      }
+
+      if (!scriptWorked) {
+        // Native regeneration — no external script dependency
+        await this.regenerateConsciousness();
+        await this.regenerateWorking();
+        steps = { heartbeat: "ok", working: "ok" };
+      }
 
       // Read the regenerated file
       let lineCount = 0;
@@ -145,7 +150,7 @@ class ConsciousnessHeartbeat {
 
       this.logger.info(
         `[Consciousness] Heartbeat tick complete — ${lineCount} lines ` +
-          `(harvest: ${steps.harvest}, vault: ${steps.clawvault}, heartbeat: ${steps.heartbeat})`,
+          `(heartbeat: ${steps.heartbeat})`,
       );
 
       // Append agent roster summary to CONSCIOUSNESS.md so Prosper sees the team
@@ -238,20 +243,21 @@ class ConsciousnessHeartbeat {
         }
       } catch { /* non-fatal */ }
 
-      // Auto-generate daily brief if it doesn't exist yet for today
+      // Auto-generate daily brief if it doesn't exist yet for today.
+      // Once-per-day guard: write a flag file after generation to prevent repeated regeneration
+      // that risks overwriting user-edited notes. The `dailyBrief.generate` RPC bypasses this guard.
       try {
-        const { existsSync } = await import("node:fs");
-        const { join } = await import("node:path");
-        const { resolveVaultPath, DAILY_FOLDER, localDateString } = await import("../data-paths.js");
         const vault = resolveVaultPath();
         const today = localDateString();
-        if (vault) {
+        const briefFlagFile = join(DATA_DIR, `brief-generated-${today}.flag`);
+        const briefAlreadyGenerated = existsSync(briefFlagFile);
+
+        if (vault && !briefAlreadyGenerated) {
           const dailyPath = join(vault, DAILY_FOLDER, `${today}.md`);
           const fileExists = existsSync(dailyPath);
           // Generate if file doesn't exist, or if it only has Agent Sessions (minimal stub)
           let needsGeneration = !fileExists;
           if (fileExists && !needsGeneration) {
-            const { readFile } = await import("node:fs/promises");
             const content = await readFile(dailyPath, "utf-8");
             // If the file has no ## Win The Day or ## Chief Aim, it's a stub
             needsGeneration = !content.includes("## Win The Day") && !content.includes("## Chief Aim");
@@ -264,6 +270,11 @@ class ConsciousnessHeartbeat {
               this.logger.info("[Consciousness] Auto-generating daily brief (not yet created today)");
               const result = await generateDailyBrief();
               this.logger.info(`[Consciousness] Daily brief generated: ${result.sections.length} sections`);
+              // Write the flag file to prevent re-generation on subsequent ticks
+              try {
+                mkdirSync(DATA_DIR, { recursive: true });
+                writeFileSync(briefFlagFile, new Date().toISOString(), "utf-8");
+              } catch { /* flag write non-fatal */ }
               try {
                 this.broadcast("ally:notification", {
                   type: "cron-result",
@@ -285,6 +296,255 @@ class ConsciousnessHeartbeat {
       });
     } finally {
       this.tickInFlight = false;
+    }
+  }
+
+  // ── Native Consciousness Regeneration ────────────────────────────
+
+  /**
+   * Regenerate CONSCIOUSNESS.md directly (no external script dependency).
+   * Assembles current schedule, tasks, daily brief status, and session harvest
+   * into a fresh consciousness snapshot.
+   */
+  private async regenerateConsciousness(): Promise<void> {
+    const now = new Date();
+    const lines: string[] = [];
+    const today = localDateString();
+
+    lines.push(`# Consciousness — ${now.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" })} ${now.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}`);
+    lines.push("");
+
+    // Schedule today
+    try {
+      const { fetchCalendarEvents } = await import("../methods/brief-generator.js");
+      const cal = await fetchCalendarEvents();
+      if (cal.events.length > 0) {
+        lines.push("## Schedule Today");
+        lines.push("");
+        for (const ev of cal.events) {
+          const start = new Date(ev.startTime).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+          const end = ev.endTime ? new Date(ev.endTime).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }) : "";
+          lines.push(`- ${start}${end ? "–" + end : ""}: ${ev.title}`);
+        }
+      } else {
+        lines.push("## Schedule Today");
+        lines.push("");
+        lines.push("_No meetings scheduled._");
+      }
+    } catch {
+      lines.push("## Schedule Today");
+      lines.push("");
+      lines.push("_Calendar unavailable._");
+    }
+    lines.push("");
+
+    // Tasks summary
+    try {
+      const { readTasks } = await import("../methods/tasks.js");
+      const data = await readTasks();
+      const pending = data.tasks.filter((t: { status: string }) => t.status === "pending");
+      const overdue = pending.filter((t: { dueDate: string | null }) => t.dueDate != null && t.dueDate <= today);
+      const completed = data.tasks.filter((t: { status: string }) => t.status === "complete");
+      lines.push("## Tasks");
+      lines.push("");
+      lines.push(`- ${overdue.length} overdue, ${pending.length} pending, ${completed.length} completed`);
+      if (overdue.length > 0) {
+        lines.push(`- Overdue: ${overdue.map((t: { title: string }) => t.title).join(", ")}`);
+      }
+      if (pending.length > 0) {
+        const topPending = pending.slice(0, 5);
+        lines.push(`- Next up: ${topPending.map((t: { title: string }) => t.title).join(", ")}`);
+      }
+    } catch {
+      lines.push("## Tasks");
+      lines.push("");
+      lines.push("_Tasks unavailable._");
+    }
+    lines.push("");
+
+    // Daily brief status
+    lines.push("## Daily Brief");
+    lines.push("");
+    try {
+      const vault = resolveVaultPath();
+      if (vault) {
+        const dailyPath = join(vault, DAILY_FOLDER, `${today}.md`);
+        if (existsSync(dailyPath)) {
+          const stat = statSync(dailyPath);
+          const modTime = stat.mtime.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+          lines.push(`- Today's brief exists (last modified: ${modTime})`);
+          // Extract Win The Day section for quick context
+          try {
+            const briefContent = readFileSync(dailyPath, "utf-8");
+            const wtdMatch = briefContent.match(/## Win The Day\s*\n([\s\S]*?)(?=\n---|\n## )/);
+            if (wtdMatch?.[1]) {
+              const priorities = wtdMatch[1].trim().split("\n").filter((l: string) => l.match(/^\d+\.\s/)).slice(0, 3);
+              if (priorities.length > 0) {
+                lines.push("- Top priorities:");
+                for (const p of priorities) lines.push(`  ${p}`);
+              }
+            }
+          } catch { /* non-fatal */ }
+        } else {
+          lines.push("- Today's brief has not been generated yet.");
+        }
+      } else {
+        lines.push("- Vault not configured.");
+      }
+    } catch {
+      lines.push("- Status check failed.");
+    }
+    lines.push("");
+
+    // What's in progress (from WORKING.md)
+    lines.push("## What's In Progress");
+    lines.push("");
+    try {
+      const workingPath = join(MEMORY_DIR, "WORKING.md");
+      if (existsSync(workingPath)) {
+        const working = readFileSync(workingPath, "utf-8");
+        // Extract current focus items (lines starting with - or * under first heading)
+        const focusLines = working.split("\n")
+          .filter((l: string) => l.match(/^[-*]\s/) || l.match(/^#+\s/))
+          .slice(0, 10);
+        if (focusLines.length > 0) {
+          for (const l of focusLines) lines.push(l);
+        } else {
+          lines.push("_No active focus items._");
+        }
+      } else {
+        lines.push("_WORKING.md not found._");
+      }
+    } catch {
+      lines.push("_Could not read WORKING.md._");
+    }
+    lines.push("");
+
+    // Recent session harvest
+    lines.push("## Recent Session Harvest");
+    lines.push("");
+    try {
+      const agentLogDir = join(MEMORY_DIR, "agent-log");
+      if (existsSync(agentLogDir)) {
+        // Read the most recent agent-log entries
+        const { readdirSync } = await import("node:fs");
+        const files = readdirSync(agentLogDir)
+          .filter((f: string) => f.endsWith(".md"))
+          .sort()
+          .reverse()
+          .slice(0, 3);
+        if (files.length > 0) {
+          for (const f of files) {
+            try {
+              const content = readFileSync(join(agentLogDir, f), "utf-8");
+              const firstLine = content.split("\n").find((l: string) => l.trim().length > 0) || f;
+              lines.push(`- ${firstLine.replace(/^#+\s*/, "")}`);
+            } catch { /* skip unreadable */ }
+          }
+        } else {
+          lines.push("_No recent agent sessions logged._");
+        }
+      } else {
+        lines.push("_Agent log directory not found._");
+      }
+    } catch {
+      lines.push("_Session harvest unavailable._");
+    }
+    lines.push("");
+
+    // Timestamp
+    lines.push("---");
+    lines.push(`_Updated at ${now.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })} by GodMode consciousness heartbeat_`);
+
+    // Write to CONSCIOUSNESS.md
+    const content = lines.join("\n");
+    try {
+      mkdirSync(join(MEMORY_DIR), { recursive: true });
+      writeFileSync(CONSCIOUSNESS_FILE, content, "utf-8");
+    } catch (err) {
+      this.logger.error(`[Consciousness] Failed to write CONSCIOUSNESS.md: ${String(err)}`);
+    }
+  }
+
+  /**
+   * Regenerate WORKING.md from the daily brief's Win The Day section
+   * and in-progress tasks. Keeps it concise and current.
+   */
+  private async regenerateWorking(): Promise<void> {
+    const now = new Date();
+    const today = localDateString();
+    const workingPath = join(MEMORY_DIR, "WORKING.md");
+    const lines: string[] = [];
+
+    lines.push(`# WORKING.md — ${now.toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" })}`);
+    lines.push("");
+    lines.push("## Current Focus");
+    lines.push("");
+
+    // Pull from daily brief's Win The Day
+    try {
+      const vault = resolveVaultPath();
+      if (vault) {
+        const dailyPath = join(vault, DAILY_FOLDER, `${today}.md`);
+        if (existsSync(dailyPath)) {
+          const brief = readFileSync(dailyPath, "utf-8");
+          const wtdMatch = brief.match(/## Win The Day\s*\n([\s\S]*?)(?=\n---|\n## )/);
+          if (wtdMatch?.[1]) {
+            const priorities = wtdMatch[1].trim().split("\n").filter((l: string) => l.trim().length > 0);
+            for (const p of priorities.slice(0, 10)) lines.push(p);
+            lines.push("");
+          }
+        }
+      }
+    } catch { /* non-fatal */ }
+
+    // In-progress tasks
+    try {
+      const { readTasks } = await import("../methods/tasks.js");
+      const data = await readTasks();
+      const pending = data.tasks.filter((t: { status: string }) => t.status === "pending");
+      if (pending.length > 0) {
+        lines.push("## Pending Tasks");
+        lines.push("");
+        for (const t of pending.slice(0, 15)) {
+          const due = (t as { dueDate?: string | null }).dueDate ? ` (due: ${(t as { dueDate: string }).dueDate})` : "";
+          lines.push(`- ${t.title}${due}`);
+        }
+        lines.push("");
+      }
+    } catch { /* non-fatal */ }
+
+    // Preserve any user-authored sections from existing WORKING.md
+    try {
+      if (existsSync(workingPath)) {
+        const existing = readFileSync(workingPath, "utf-8");
+        // Look for user sections: ## Decisions, ## Open Questions, ## Blockers
+        const userSections = ["## Decisions", "## Open Questions", "## Blockers", "## Notes"];
+        for (const header of userSections) {
+          const idx = existing.indexOf(header);
+          if (idx >= 0) {
+            const afterHeader = existing.slice(idx);
+            const nextHeader = afterHeader.indexOf("\n## ", 1);
+            const sectionContent = nextHeader > 0
+              ? afterHeader.slice(0, nextHeader)
+              : afterHeader;
+            if (sectionContent.trim().split("\n").length > 1) {
+              lines.push(sectionContent.trimEnd());
+              lines.push("");
+            }
+          }
+        }
+      }
+    } catch { /* non-fatal */ }
+
+    lines.push("---");
+    lines.push(`_Auto-updated at ${now.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })} by consciousness heartbeat_`);
+
+    try {
+      mkdirSync(join(MEMORY_DIR), { recursive: true });
+      writeFileSync(workingPath, lines.join("\n"), "utf-8");
+    } catch (err) {
+      this.logger.error(`[Consciousness] Failed to write WORKING.md: ${String(err)}`);
     }
   }
 

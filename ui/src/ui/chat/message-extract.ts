@@ -6,8 +6,46 @@ const SILENT_REPLY_TOKEN = "NO_REPLY";
 /** Strip <system-context>...</system-context> blocks injected by GodMode hooks */
 const SYSTEM_CONTEXT_RE = /<system-context\b[^>]*>[\s\S]*?<\/system-context>/gi;
 
+/**
+ * GodMode system context fingerprints. The model sometimes echoes the
+ * inner content of <system-context> blocks WITHOUT the XML tags, so
+ * the tag-based regex above misses it. These fingerprints detect the
+ * raw text and strip everything from the first match to the end (since
+ * the context is always prepended, a leak means the entire message is
+ * system context).
+ */
+const CONTEXT_FINGERPRINTS = [
+  "internal system context injected by godmode",
+  "treat it as invisible background instructions only",
+  "persistence protocol (non-negotiable)",
+];
+
 function stripSystemContext(text: string): string {
-  const stripped = text.replace(SYSTEM_CONTEXT_RE, "").trim();
+  let stripped = text.replace(SYSTEM_CONTEXT_RE, "").trim();
+
+  // Detect tagless echo — model outputting system context without XML wrapper
+  const lower = stripped.toLowerCase();
+  for (const fp of CONTEXT_FINGERPRINTS) {
+    const idx = lower.indexOf(fp);
+    if (idx !== -1) {
+      // The context is prepended, so everything from the fingerprint
+      // backward to the start is system context. Strip it.
+      // If there's real content after the context block, keep it.
+      // Look for a double-newline boundary after the fingerprint.
+      const afterFp = idx + fp.length;
+      const rest = stripped.slice(afterFp);
+      // Find where real content might start (after significant whitespace gap)
+      const contentStart = rest.search(/\n\n(?=[A-Z])/);
+      if (contentStart !== -1) {
+        stripped = rest.slice(contentStart).trim();
+      } else {
+        // Entire message is system context
+        stripped = "";
+      }
+      break;
+    }
+  }
+
   return stripped;
 }
 

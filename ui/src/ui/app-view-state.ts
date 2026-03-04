@@ -238,7 +238,7 @@ export type AppViewState = {
   myDayLoading?: boolean;
   myDayError?: string | null;
   todaySelectedDate?: string;
-  todayViewMode?: "my-day" | "agent-log";
+  todayViewMode?: "brief" | "command-center" | "agent-log";
   // Today tasks
   todayTasks?: WorkspaceTask[];
   todayTasksLoading?: boolean;
@@ -545,7 +545,7 @@ export type AppViewState = {
   handleBriefSave: (content: string) => Promise<void>;
   handleBriefToggleCheckbox: (index: number, checked: boolean) => Promise<void>;
   // Today view mode handler
-  handleTodayViewModeChange: (mode: "my-day" | "agent-log") => void;
+  handleTodayViewModeChange: (mode: "brief" | "command-center" | "agent-log") => void;
   handlePrivateModeToggle: () => void;
   // Ally side-chat handlers
   handleAllyToggle: () => void;

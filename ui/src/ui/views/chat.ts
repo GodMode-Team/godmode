@@ -10,6 +10,7 @@ import {
 } from "../chat/grouped-render";
 import type { LightboxImage } from "../chat/lightbox";
 import { normalizeMessage, normalizeRoleForGrouping } from "../chat/message-normalizer";
+import { isSystemPromptNoise } from "../chat/system-noise-filter";
 import type { FailedMessage } from "../controllers/chat";
 import { icons } from "../icons";
 import type { ToastType } from "../toast";
@@ -453,7 +454,7 @@ function renderAttachmentPreview(props: ChatProps) {
       ${attachments.map((att) => {
         const isImage = att.mimeType.startsWith("image/");
         const fileName = att.fileName || "file";
-        const shortName = fileName.length > 20 ? fileName.slice(0, 17) + "..." : fileName;
+        const shortName = fileName.length > 40 ? fileName.slice(0, 37) + "..." : fileName;
 
         return html`
           <div class="chat-attachment ${isImage ? "" : "chat-attachment--file"}">
@@ -1091,6 +1092,11 @@ function buildChatItems(props: ChatProps): Array<ChatItem | MessageGroup> {
         key: `compaction:${i}`,
         message: msg,
       } as ChatItem);
+      continue;
+    }
+
+    // Hide system prompt injections (persona, consciousness dumps, heartbeat prompts)
+    if (isSystemPromptNoise(msg)) {
       continue;
     }
 
