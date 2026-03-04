@@ -423,21 +423,50 @@ const autoTitleAttempted = new Set<string>();
  * Scans all sentences for the most "topical" one instead of blindly using the first line.
  */
 function deriveSessionTitle(chatMessages: Array<{ role: string; content: unknown }>): string | null {
-  const firstUser = chatMessages.find((m) => m.role === "user");
-  if (!firstUser) return null;
+  // Try each user message in order — skip ones that are entirely system-injected content
+  const userMessages = chatMessages.filter((m) => m.role === "user");
+  if (userMessages.length === 0) return null;
 
-  let text = "";
-  if (typeof firstUser.content === "string") {
-    text = firstUser.content;
-  } else if (Array.isArray(firstUser.content)) {
-    const textBlock = firstUser.content.find(
-      (b: unknown) => (b as { type?: string }).type === "text",
-    );
-    text = (textBlock as { text?: string })?.text ?? "";
+  for (const userMsg of userMessages) {
+    let raw = "";
+    if (typeof userMsg.content === "string") {
+      raw = userMsg.content;
+    } else if (Array.isArray(userMsg.content)) {
+      const textBlock = userMsg.content.find(
+        (b: unknown) => (b as { type?: string }).type === "text",
+      );
+      raw = (textBlock as { text?: string })?.text ?? "";
+    }
+
+    const text = stripSystemContent(raw);
+    if (!text.trim()) continue;
+
+    const title = scoreTitleFromText(text);
+    if (title) return title;
   }
 
-  if (!text.trim()) return null;
+  return null;
+}
 
+/** Strip system-injected tags and content that leak from gateway/hooks into user messages. */
+function stripSystemContent(text: string): string {
+  return text
+    // Remove <system-reminder>...</system-reminder> blocks (single-line and multiline)
+    .replace(/<system-reminder>[\s\S]*?<\/system-reminder>/g, "")
+    // Remove <system>...</system> blocks
+    .replace(/<system>[\s\S]*?<\/system>/g, "")
+    // Remove <context>...</context> blocks
+    .replace(/<context>[\s\S]*?<\/context>/g, "")
+    // Remove <ide_selection>...</ide_selection> blocks
+    .replace(/<ide_selection>[\s\S]*?<\/ide_selection>/g, "")
+    // Remove <ide_opened_file>...</ide_opened_file> blocks
+    .replace(/<ide_opened_file>[\s\S]*?<\/ide_opened_file>/g, "")
+    // Remove any remaining XML-style system tags (catch-all for <foo_bar>...</foo_bar>)
+    .replace(/<[a-z][a-z_-]*>[\s\S]*?<\/[a-z][a-z_-]*>/g, "")
+    .trim();
+}
+
+function scoreTitleFromText(text: string): string | null {
   // Strip code blocks, inline code, URLs, and image links
   const cleaned = text
     .replace(/```[\s\S]*?```/g, "")

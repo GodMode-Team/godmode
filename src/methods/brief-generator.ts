@@ -283,30 +283,49 @@ async function fetchCalendarEvents(): Promise<{
 
   try {
     const { stdout } = await execAsync(
-      `gog calendar events --account ${account} --client ${client} --json 2>/dev/null || gog calendar events --account ${account} --client ${client}`,
+      `gog calendar events --account ${account} --client ${client} --today --json`,
       {
         timeout: EXEC_TIMEOUT,
         env: {
           ...process.env,
           PATH: `/opt/homebrew/bin:/usr/local/bin:${process.env.PATH}`,
+          GOG_KEYRING_PASSWORD: getEnv("GOG_KEYRING_PASSWORD") || "",
         },
       },
     );
 
-    // Try JSON parse first
+    // Parse Google Calendar API JSON format (gog returns raw GCal objects)
     try {
       const parsed = JSON.parse(stdout);
-      if (Array.isArray(parsed)) {
-        return { events: parsed };
+      const rawEvents = Array.isArray(parsed) ? parsed : parsed.events ?? [];
+      const events: CalendarEvent[] = [];
+      for (const e of rawEvents) {
+        // Google Calendar API: start/end are objects with dateTime or date
+        const startStr = e.start?.dateTime ?? e.start?.date ?? e.startTime;
+        const endStr = e.end?.dateTime ?? e.end?.date ?? e.endTime;
+        if (!startStr) continue;
+        const startTime = new Date(startStr).getTime();
+        const endTime = endStr ? new Date(endStr).getTime() : startTime;
+        if (isNaN(startTime)) continue;
+        events.push({
+          id: e.id ?? "",
+          title: e.summary ?? e.title ?? "(no title)",
+          startTime,
+          endTime,
+          duration: Math.round((endTime - startTime) / 60_000),
+          location: e.location,
+          attendees: e.attendees
+            ?.filter((a: { self?: boolean }) => !a.self)
+            .map((a: { email?: string }) => a.email)
+            .filter(Boolean),
+        });
       }
-      if (parsed.events) {
-        return { events: parsed.events };
-      }
+      return { events };
     } catch {
       // Fall back to text parsing
     }
 
-    // Text format: id\tstartStr\tendStr\ttitle
+    // Text format fallback: id\tstartStr\tendStr\ttitle
     const events: CalendarEvent[] = [];
     for (const line of stdout.trim().split("\n").filter(Boolean)) {
       const parts = line.split(/\s{2,}|\t/).map((p) => p.trim());
@@ -315,6 +334,7 @@ async function fetchCalendarEvents(): Promise<{
       try {
         const startTime = new Date(startStr).getTime();
         const endTime = new Date(endStr).getTime();
+        if (isNaN(startTime)) continue;
         events.push({
           id,
           title: titleParts.join(" "),
