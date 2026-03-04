@@ -531,6 +531,54 @@ const obsidianSync: IntegrationProvider = {
   },
 };
 
+const rescueTime: IntegrationProvider = {
+  id: "rescuetime",
+  name: "RescueTime",
+  description: "Automatic productivity tracking — powers Focus Pulse alignment scoring",
+  briefSection: "Focus Pulse",
+  tier: "deep",
+  platforms: ["darwin", "linux", "win32"],
+  envVars: [
+    {
+      key: "RESCUETIME_API_KEY",
+      label: "RescueTime API Key",
+      description: "Get your API key from rescuetime.com/anapi/manage",
+      secret: true,
+      target: "env",
+    },
+  ],
+  cliDeps: [],
+  detect: async () => {
+    const key = getEnvVar("RESCUETIME_API_KEY");
+    return {
+      configured: !!key,
+      cliInstalled: true, // no CLI needed
+      authenticated: !!key,
+      working: false,
+      details: key ? "API key configured" : "RESCUETIME_API_KEY not set",
+    };
+  },
+  test: async () => {
+    const key = getEnvVar("RESCUETIME_API_KEY");
+    if (!key) return { success: false, message: "RESCUETIME_API_KEY not set" };
+    try {
+      const resp = await fetch(
+        `https://www.rescuetime.com/anapi/data?key=${key}&format=json&perspective=rank&restrict_kind=overview&restrict_begin=${new Date().toISOString().split("T")[0]}&restrict_end=${new Date().toISOString().split("T")[0]}`,
+        { signal: AbortSignal.timeout(10_000) },
+      );
+      if (!resp.ok) return { success: false, message: `API returned ${resp.status}` };
+      return { success: true, message: "RescueTime API connected" };
+    } catch (err) {
+      return { success: false, message: `Connection failed: ${err instanceof Error ? err.message : String(err)}` };
+    }
+  },
+  setupSteps: {
+    darwin: "1. Go to [rescuetime.com/anapi/manage](https://www.rescuetime.com/anapi/manage)\n2. Create an API key\n3. Paste your key below",
+    linux: "1. Go to [rescuetime.com/anapi/manage](https://www.rescuetime.com/anapi/manage)\n2. Create an API key\n3. Paste your key below",
+    win32: "1. Go to [rescuetime.com/anapi/manage](https://www.rescuetime.com/anapi/manage)\n2. Create an API key\n3. Paste your key below",
+  },
+};
+
 // ── Registry ───────────────────────────────────────────────────────────
 
 /** All available integrations. Core first, then deep. */
@@ -542,10 +590,11 @@ export const INTEGRATIONS: IntegrationProvider[] = [
   obsidianVault,
   githubCli,
   messagingChannel,
-  // Deep (3)
+  // Deep (4)
   ouraRing,
   weather,
   obsidianSync,
+  rescueTime,
 ];
 
 /** Get integrations filtered by tier. */

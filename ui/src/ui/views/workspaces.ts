@@ -123,6 +123,7 @@ export type WorkspacesProps = {
   onBrowseSearch?: (query: string) => void;
   onBrowseBack?: () => void;
   onCreateFolder?: (path: string) => void;
+  onBatchPushToDrive?: (filePaths: string[]) => void;
 };
 
 function formatFileSize(size: number): string {
@@ -820,6 +821,7 @@ function renderWorkspaceDetail(props: {
   onBrowseSearch?: (query: string) => void;
   onBrowseBack?: () => void;
   onCreateFolder?: (path: string) => void;
+  onBatchPushToDrive?: (filePaths: string[]) => void;
 }) {
   const {
     workspace,
@@ -840,6 +842,7 @@ function renderWorkspaceDetail(props: {
     editingTaskId,
     onEditTask,
     onUpdateTask,
+    onBatchPushToDrive,
   } = props;
 
   const filteredPinned = filterFiles(itemSearchQuery, workspace.pinned).toSorted(
@@ -986,6 +989,12 @@ function renderWorkspaceDetail(props: {
           <div class="ws-section__header">
             <h3>Artifacts</h3>
             <span>${hasFolderTree ? filteredFolderTree.length : filteredArtifacts.length}</span>
+            ${onBatchPushToDrive && filteredArtifacts.length > 0
+              ? html`<button class="ws-export-drive-btn" @click=${() => {
+                  const paths = filteredArtifacts.map((e) => e.path);
+                  onBatchPushToDrive(paths);
+                }}>Export to Drive</button>`
+              : nothing}
           </div>
           <div class="ws-list ws-list--scroll">
             ${
@@ -1214,6 +1223,7 @@ export function renderWorkspaces(props: WorkspacesProps) {
       onBrowseSearch: props.onBrowseSearch,
       onBrowseBack: props.onBrowseBack,
       onCreateFolder: props.onCreateFolder,
+      onBatchPushToDrive: props.onBatchPushToDrive,
     });
   }
 

@@ -664,6 +664,7 @@ export function renderChat(props: ChatProps) {
               return renderMessageGroup(item, {
                 onOpenSidebar: props.onOpenSidebar,
                 onOpenFile: props.onOpenFile,
+                onPushToDrive: props.onPushToDrive,
                 onImageClick: props.onImageClick,
                 resolveImageUrl,
                 showReasoning,

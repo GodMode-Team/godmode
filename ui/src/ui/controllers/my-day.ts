@@ -306,6 +306,7 @@ type QueueResultItem = {
   description?: string;
   status: string;
   completedAt?: number;
+  sourceTaskId?: string;
   result?: {
     summary: string;
     outputPath?: string;
@@ -347,6 +348,7 @@ export async function loadTodayQueueResults(state: MyDayState): Promise<Decision
         completedAt: item.completedAt,
         outputPath: item.result?.outputPath,
         prUrl: item.result?.prUrl,
+        sourceTaskId: item.sourceTaskId,
       }));
   } catch (err) {
     console.error("[MyDay] Failed to load queue results for decision cards:", err);

@@ -14,10 +14,11 @@
  */
 
 import { readFile, writeFile, mkdir } from "node:fs/promises";
-import { readFileSync } from "node:fs";
+import { readFileSync, existsSync } from "node:fs";
 import { exec } from "node:child_process";
 import { promisify } from "node:util";
 import { join } from "node:path";
+import { homedir } from "node:os";
 import type { GatewayRequestHandler } from "openclaw/plugin-sdk";
 import {
   DATA_DIR,
@@ -56,6 +57,171 @@ function loadEnv(): Record<string, string> {
 
 function getEnv(key: string): string {
   return process.env[key] || loadEnv()[key] || "";
+}
+
+// ── LLM helpers ──────────────────────────────────────────────────────────────
+
+/** Resolve Anthropic API key: env var → godmode .env → OpenClaw auth profiles */
+function resolveAnthropicAuth(): string | null {
+  // 1. Environment variable
+  const envKey = process.env.ANTHROPIC_API_KEY || loadEnv().ANTHROPIC_API_KEY;
+  if (envKey) return envKey;
+
+  // 2. OpenClaw .env
+  try {
+    const oclawEnv = join(homedir(), ".openclaw", ".env");
+    const raw = readFileSync(oclawEnv, "utf-8");
+    for (const line of raw.split("\n")) {
+      if (line.startsWith("ANTHROPIC_API_KEY=")) {
+        const val = line.slice("ANTHROPIC_API_KEY=".length).trim();
+        if (val && !val.startsWith("#")) return val;
+      }
+    }
+  } catch { /* not found */ }
+
+  // 3. OpenClaw auth-profiles.json (OAuth token)
+  try {
+    const profilesPath = join(homedir(), ".openclaw", "auth-profiles.json");
+    const raw = JSON.parse(readFileSync(profilesPath, "utf-8")) as {
+      profiles?: Record<string, { token?: string }>;
+    };
+    const oauthProfile = raw.profiles?.["anthropic:oauth"];
+    if (oauthProfile?.token) return oauthProfile.token;
+  } catch { /* not found */ }
+
+  return null;
+}
+
+/** Call Claude via direct API (API key) or `claude` CLI (OAuth/Claude Max). */
+async function callClaude(
+  systemPrompt: string,
+  userPrompt: string,
+  opts?: { model?: string; maxTokens?: number },
+): Promise<string | null> {
+  const apiKey = resolveAnthropicAuth();
+  const isOAuth = apiKey?.startsWith("sk-ant-oat01-");
+
+  // If we have a direct API key (not OAuth), use the Messages API
+  if (apiKey && !isOAuth) {
+    return callClaudeDirectAPI(apiKey, systemPrompt, userPrompt, opts);
+  }
+
+  // Otherwise use the `claude` CLI which handles OAuth/Max auth natively
+  return callClaudeCLI(systemPrompt, userPrompt, opts);
+}
+
+/** Direct Anthropic Messages API call (requires API key, not OAuth). */
+async function callClaudeDirectAPI(
+  apiKey: string,
+  systemPrompt: string,
+  userPrompt: string,
+  opts?: { model?: string; maxTokens?: number },
+): Promise<string | null> {
+  const model = opts?.model ?? "claude-sonnet-4-6-20250514";
+  const maxTokens = opts?.maxTokens ?? 8192;
+
+  try {
+    const resp = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01",
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        model,
+        max_tokens: maxTokens,
+        system: systemPrompt,
+        messages: [{ role: "user", content: userPrompt }],
+      }),
+      signal: AbortSignal.timeout(120_000),
+    });
+
+    if (!resp.ok) {
+      const body = await resp.text().catch(() => "");
+      console.error(`[BriefGenerator] Claude API ${resp.status}: ${body.slice(0, 300)}`);
+      return null;
+    }
+
+    const data = (await resp.json()) as {
+      content?: Array<{ type: string; text?: string }>;
+      error?: { message?: string };
+    };
+
+    if (data.error?.message) {
+      console.error(`[BriefGenerator] Claude API error: ${data.error.message}`);
+      return null;
+    }
+
+    return data.content?.find((c) => c.type === "text")?.text ?? null;
+  } catch (err) {
+    console.error(`[BriefGenerator] Claude API call failed: ${err instanceof Error ? err.message : "unknown"}`);
+    return null;
+  }
+}
+
+/** Call Claude via the `claude` CLI in print mode. Handles OAuth/Max auth natively. */
+async function callClaudeCLI(
+  systemPrompt: string,
+  userPrompt: string,
+  opts?: { model?: string; maxTokens?: number },
+): Promise<string | null> {
+  const { spawn } = await import("node:child_process");
+
+  // Map full model IDs to CLI-friendly aliases
+  const modelMap: Record<string, string> = {
+    "claude-sonnet-4-6-20250514": "sonnet",
+    "claude-opus-4-6": "opus",
+    "claude-haiku-4-5-20251001": "haiku",
+  };
+  const rawModel = opts?.model ?? "claude-sonnet-4-6-20250514";
+  const model = modelMap[rawModel] ?? rawModel;
+
+  try {
+    console.log(`[BriefGenerator] Using claude CLI (model: ${model})...`);
+
+    // Use spawn + stdin to avoid ARG_MAX limits with large prompts
+    const combined = `<system>${systemPrompt}</system>\n\n${userPrompt}`;
+
+    return new Promise<string | null>((resolve) => {
+      const child = spawn("claude", ["-p", "--model", model], {
+        stdio: ["pipe", "pipe", "pipe"],
+        timeout: 180_000,
+        env: { ...process.env, PATH: `/opt/homebrew/bin:/usr/local/bin:${process.env.PATH}` },
+      });
+
+      const chunks: Buffer[] = [];
+      const errChunks: Buffer[] = [];
+
+      child.stdout.on("data", (d: Buffer) => chunks.push(d));
+      child.stderr.on("data", (d: Buffer) => errChunks.push(d));
+
+      child.on("close", (code) => {
+        const out = Buffer.concat(chunks).toString("utf-8").trim();
+        const err = Buffer.concat(errChunks).toString("utf-8").trim();
+
+        if (err) console.warn(`[BriefGenerator] claude CLI stderr: ${err.slice(0, 200)}`);
+
+        if (code !== 0 || !out) {
+          console.error(`[BriefGenerator] claude CLI exit ${code}, output length=${out.length}`);
+          resolve(null);
+          return;
+        }
+        resolve(out);
+      });
+
+      child.on("error", (e) => {
+        console.error(`[BriefGenerator] claude CLI spawn error: ${e.message}`);
+        resolve(null);
+      });
+
+      child.stdin.write(combined);
+      child.stdin.end();
+    });
+  } catch (err) {
+    console.error(`[BriefGenerator] claude CLI failed: ${err instanceof Error ? err.message.slice(0, 300) : "unknown"}`);
+    return null;
+  }
 }
 
 // ── Date helpers ─────────────────────────────────────────────────────────────
@@ -811,6 +977,155 @@ async function formatOvernightWorkSection(): Promise<string | null> {
   return lines.join("\n");
 }
 
+// ── Data source: Front Inbox (Communications) ───────────────────────────────
+
+type FrontConversation = {
+  subject: string;
+  status: string;
+  assignee: string;
+  lastFrom: string;
+  snippet: string;
+  tags: string[];
+};
+
+async function fetchFrontInbox(): Promise<{
+  conversations: FrontConversation[];
+  error?: string;
+}> {
+  const token = getEnv("FRONT_API_TOKEN");
+  if (!token) {
+    return { conversations: [], error: "FRONT_API_TOKEN not set" };
+  }
+
+  try {
+    const resp = await fetch(
+      "https://api2.frontapp.com/conversations?limit=25&sort_by=date&sort_order=desc",
+      {
+        headers: { Authorization: `Bearer ${token}` },
+        signal: AbortSignal.timeout(10_000),
+      },
+    );
+
+    if (!resp.ok) {
+      return { conversations: [], error: `Front API ${resp.status}` };
+    }
+
+    const data = (await resp.json()) as {
+      _results?: Array<{
+        subject?: string;
+        status?: string;
+        assignee?: { email?: string };
+        tags?: Array<{ name?: string }>;
+        last_message?: { author?: { email?: string }; body?: string };
+      }>;
+    };
+
+    const conversations: FrontConversation[] = (data._results ?? [])
+      .slice(0, 25)
+      .map((c) => ({
+        subject: c.subject || "(no subject)",
+        status: c.status || "unknown",
+        assignee: c.assignee?.email || "unassigned",
+        lastFrom: c.last_message?.author?.email || "unknown",
+        snippet: (c.last_message?.body ?? "").slice(0, 200),
+        tags: (c.tags ?? []).map((t) => t.name ?? ""),
+      }));
+
+    return { conversations };
+  } catch (err) {
+    return {
+      conversations: [],
+      error: `Front fetch failed: ${err instanceof Error ? err.message : "unknown"}`,
+    };
+  }
+}
+
+// ── Data source: Evening Review / Tomorrow Handoff ──────────────────────────
+
+async function extractEveningReview(
+  vaultPath: string,
+): Promise<{ tomorrowHandoff: string; reflection: string }> {
+  const yesterday = yesterdayDate();
+  const filePath = join(vaultPath, DAILY_FOLDER, `${yesterday}.md`);
+
+  let content: string;
+  try {
+    content = await readFile(filePath, "utf-8");
+  } catch {
+    return { tomorrowHandoff: "_No evening review from last night._", reflection: "" };
+  }
+
+  // Extract Tomorrow Handoff section
+  const handoffMatch = content.match(
+    /##\s*Tomorrow\s*(?:Handoff|Plan|Priorities)\s*\n([\s\S]*?)(?=\n##\s[^#]|\n---)/m,
+  );
+  const tomorrowHandoff = handoffMatch?.[1]?.trim() || "_No evening review from last night._";
+
+  // Extract Evening Reflection / Evening Review section
+  const reflectionMatch = content.match(
+    /##\s*(?:Evening\s*(?:Review|Reflection)|Caleb\s*Reflection)\s*\n([\s\S]*?)(?=\n##\s[^#]|\n---)/m,
+  );
+  const reflection = reflectionMatch?.[1]?.trim() || "";
+
+  return { tomorrowHandoff, reflection };
+}
+
+// ── Data source: Quote of the Day ───────────────────────────────────────────
+
+const QUOTES: string[] = [
+  '"The best time to plant a tree was twenty years ago. The second best time is now."|Chinese Proverb',
+  '"Your work is going to fill a large part of your life. Don\'t settle."|Steve Jobs',
+  '"The only way to do great work is to love what you do."|Steve Jobs',
+  '"What you seek is seeking you."|Rumi',
+  '"Be the change you wish to see in the world."|Mahatma Gandhi',
+  '"The future belongs to those who believe in the beauty of their dreams."|Eleanor Roosevelt',
+  '"It is not the critic who counts."|Theodore Roosevelt',
+  '"The impediment to action advances action. What stands in the way becomes the way."|Marcus Aurelius',
+  '"I have not failed. I\'ve just found 10,000 ways that won\'t work."|Thomas Edison',
+  '"Simplicity is the ultimate sophistication."|Leonardo da Vinci',
+  '"In the middle of difficulty lies opportunity."|Albert Einstein',
+  '"The only person you are destined to become is the person you decide to be."|Ralph Waldo Emerson',
+  '"Do not go where the path may lead, go instead where there is no path and leave a trail."|Ralph Waldo Emerson',
+  '"Courage is not the absence of fear, but the triumph over it."|Nelson Mandela',
+  '"The wound is the place where the Light enters you."|Rumi',
+  '"You miss 100% of the shots you don\'t take."|Wayne Gretzky',
+  '"Everything you\'ve ever wanted is on the other side of fear."|George Addair',
+  '"The mind is everything. What you think you become."|Buddha',
+  '"God does not call the qualified. He qualifies the called."|Rick Warren',
+  '"Stop trying to calm the storm. Calm yourself. The storm will pass."|Timber Hawkeye',
+  '"Action is the foundational key to all success."|Pablo Picasso',
+  '"We are what we repeatedly do. Excellence, then, is not an act, but a habit."|Aristotle',
+  '"Life shrinks or expands in proportion to one\'s courage."|Anaïs Nin',
+  '"The best way to predict the future is to create it."|Peter Drucker',
+  '"Faith is taking the first step even when you don\'t see the whole staircase."|Martin Luther King Jr.',
+  '"Let go of who you think you are supposed to be and embrace who you are."|Brené Brown',
+  '"It always seems impossible until it\'s done."|Nelson Mandela',
+  '"The quieter you become, the more you can hear."|Ram Dass',
+  '"You are never too old to set another goal or to dream a new dream."|C.S. Lewis',
+  '"Not all those who wander are lost."|J.R.R. Tolkien',
+];
+
+function getQuoteOfDay(): { text: string; author: string } {
+  // Try to read from a quotes file first (user-customizable)
+  const quotesPath = join(GODMODE_ROOT, "data", "quotes.md");
+  let lines = QUOTES;
+  try {
+    const raw = readFileSync(quotesPath, "utf-8");
+    const fileLines = raw.split("\n").filter((l) => l.trim() && l.includes("|"));
+    if (fileLines.length > 0) lines = fileLines;
+  } catch { /* use built-in quotes */ }
+
+  const now = new Date();
+  const startOfYear = new Date(now.getFullYear(), 0, 0);
+  const dayOfYear = Math.floor((now.getTime() - startOfYear.getTime()) / 86_400_000);
+  const pick = lines[dayOfYear % lines.length];
+
+  const parts = pick.split("|");
+  const text = (parts[0] ?? "").replace(/^"/, "").replace(/"$/, "").trim();
+  const author = (parts[1] ?? "Unknown").trim();
+  return { text, author };
+}
+
 // ── Data source: Yesterday's brief (carry-forward + action items) ────────────
 
 type CarryForwardResult = {
@@ -839,13 +1154,16 @@ async function extractCarryForward(vaultPath: string): Promise<CarryForwardResul
   }
 
   // Extract unchecked tasks from Win The Day
+  // NOTE: Don't use $ in the lookahead — in multiline mode $ matches end-of-line,
+  // causing the lazy quantifier to match zero characters on the heading line itself.
   const wtdMatch = content.match(
-    /##\s*(?:🎯\s*)?Win The Day[\s\S]*?(?=^##\s[^#]|\n---\n|$)/m,
+    /##\s*(?:🎯\s*)?Win The Day\s*\n([\s\S]*?)(?=\n##\s[^#]|\n---)/m,
   );
   if (wtdMatch) {
+    const sectionBody = wtdMatch[1];
     const checkboxRegex = /^(?:\d+\.|-|\*)\s*\[ \]\s*(.+)$/gm;
     let match;
-    while ((match = checkboxRegex.exec(wtdMatch[0])) !== null) {
+    while ((match = checkboxRegex.exec(sectionBody)) !== null) {
       const title = match[1]
         .replace(/\*\*(.+?)\*\*/g, "$1")
         .replace(/\s*[—–]\s+.+$/, "")
@@ -856,12 +1174,11 @@ async function extractCarryForward(vaultPath: string): Promise<CarryForwardResul
 
   // Extract Tomorrow Handoff section
   const handoffMatch = content.match(
-    /##\s*Tomorrow\s*(?:Handoff|Plan|Priorities)[\s\S]*?(?=^##\s[^#]|\n---\n|$)/m,
+    /##\s*Tomorrow\s*(?:Handoff|Plan|Priorities)\s*\n([\s\S]*?)(?=\n##\s[^#]|\n---)/m,
   );
   if (handoffMatch) {
-    const items = handoffMatch[0]
+    const items = handoffMatch[1]
       .split("\n")
-      .slice(1) // skip heading
       .map((l) => l.replace(/^\s*[-*]\s*/, "").trim())
       .filter(Boolean);
     result.tomorrowHandoff = items;
@@ -869,13 +1186,10 @@ async function extractCarryForward(vaultPath: string): Promise<CarryForwardResul
 
   // Extract Yesterday's Impact section for reference
   const impactMatch = content.match(
-    /##\s*(?:📈\s*)?(?:Yesterday'?s?\s*)?Impact[\s\S]*?(?=^##\s[^#]|\n---\n|$)/m,
+    /##\s*(?:📈\s*)?(?:Yesterday'?s?\s*)?Impact\s*\n([\s\S]*?)(?=\n##\s[^#]|\n---)/m,
   );
   if (impactMatch) {
-    result.yesterdayImpact = impactMatch[0]
-      .split("\n")
-      .slice(1)
-      .join("\n")
+    result.yesterdayImpact = impactMatch[1]
       .trim()
       .slice(0, 500);
   }
@@ -1051,14 +1365,30 @@ async function readContextData(): Promise<ContextData> {
     // CONTEXT.md not found
   }
 
-  // Read chief aim from THESIS.md (no hardcoded fallback)
+  // Read chief aim: goals.json first, then THESIS.md heading/label fallback
   let chiefAim = "";
   try {
-    const thesis = await readFile(join(MEMORY_DIR, "THESIS.md"), "utf-8");
-    const aimMatch = thesis.match(/(?:chief\s*aim|vision|mission)[:\s]*>?\s*(.+)/i);
-    if (aimMatch) chiefAim = aimMatch[1].trim();
-  } catch {
-    // No THESIS.md — chief aim stays empty
+    const goalsRaw = await readFile(join(DATA_DIR, "goals.json"), "utf-8");
+    const goals = JSON.parse(goalsRaw) as { chiefAim?: string; goals?: Array<{ text?: string }> };
+    if (goals.chiefAim) {
+      chiefAim = goals.chiefAim;
+    } else if (goals.goals && goals.goals.length > 0 && goals.goals[0].text) {
+      chiefAim = goals.goals[0].text;
+    }
+  } catch { /* goals.json not found or invalid */ }
+
+  if (!chiefAim) {
+    try {
+      const thesis = await readFile(join(MEMORY_DIR, "THESIS.md"), "utf-8");
+      // Only match when used as a label at start of line (heading or bold),
+      // followed by a colon/separator — not inline mentions
+      const aimMatch = thesis.match(
+        /^(?:#+\s*|\*{2})?(?:chief\s*aim|vision|mission)\b(?:\*{2})?\s*[:—]\s*>?\s*(.+)/im,
+      );
+      if (aimMatch) chiefAim = aimMatch[1].trim();
+    } catch {
+      // No THESIS.md — chief aim stays empty
+    }
   }
 
   return {
@@ -1094,284 +1424,313 @@ async function generateDailyBrief(date?: string): Promise<GenerateResult> {
   const filePath = join(vaultPath, DAILY_FOLDER, `${briefDate}.md`);
   const warnings: string[] = [];
 
-  // Fetch all data sources in parallel
-  const [calendar, oura, weather, context, xIntel, carryForward] = await Promise.all([
-    fetchCalendarEvents().catch((e) => ({
-      events: [] as CalendarEvent[],
-      error: String(e),
-    })),
+  // Preserve existing Notes section (sacred — never touched by AI)
+  let existingNotes = "";
+  try {
+    const existing = await readFile(filePath, "utf-8");
+    const notesMatch = existing.match(/^## .*Notes\s*\n([\s\S]*?)(?=\n## |\n---\s*\n\*Generated)/m);
+    if (notesMatch?.[1]) {
+      const cleaned = notesMatch[1]
+        .replace(/^\*\(Your notebook.*\)\*\s*\n?/, "")
+        .replace(/^\*Add notes throughout.*\*\s*\n?/, "")
+        .trim();
+      if (cleaned) existingNotes = cleaned;
+    }
+  } catch { /* file doesn't exist yet */ }
+
+  // Preserve existing Agent Sessions section
+  let agentSessionsBlock = "";
+  try {
+    const existing = await readFile(filePath, "utf-8");
+    const sessionIdx = existing.indexOf("## Agent Sessions");
+    if (sessionIdx >= 0) {
+      const afterSession = existing.slice(sessionIdx);
+      const nextHeading = afterSession.indexOf("\n## ", 1);
+      agentSessionsBlock =
+        "\n" + (nextHeading > 0 ? afterSession.slice(0, nextHeading) : afterSession).trimEnd() + "\n";
+    }
+  } catch { /* file doesn't exist yet */ }
+
+  // ── Gather all data sources in parallel ──────────────────────────
+  const [
+    calendar, oura, weather, context, xIntel, carryForward,
+    frontInbox, eveningReview, overnightWork, intelSection,
+  ] = await Promise.all([
+    fetchCalendarEvents().catch((e) => ({ events: [] as CalendarEvent[], error: String(e) })),
     fetchOuraData().catch(() => ({
-      readiness: null,
-      sleepScore: null,
-      sleepDuration: null,
-      hrv: null,
-      rhr: null,
-      mode: "Unknown",
-      insight: "Oura fetch failed.",
+      readiness: null, sleepScore: null, sleepDuration: null,
+      hrv: null, rhr: null, mode: "Unknown", insight: "Oura fetch failed.",
     })),
-    fetchWeather().catch(() => ({
-      temp: null as number | null,
-      condition: "Unknown",
-      icon: "🌤️",
-    })),
+    fetchWeather().catch(() => ({ temp: null as number | null, condition: "Unknown", icon: "🌤️" })),
     readContextData(),
-    fetchXIntelligence().catch(() => ({
-      items: [] as XIntelItem[],
-      error: "X fetch failed",
-    })),
+    fetchXIntelligence().catch(() => ({ items: [] as XIntelItem[], error: "X fetch failed" })),
     extractCarryForward(vaultPath).catch(() => ({
-      unfinishedTasks: [] as string[],
-      tomorrowHandoff: [] as string[],
-      actionItems: [] as string[],
-      yesterdayImpact: null as string | null,
+      unfinishedTasks: [] as string[], tomorrowHandoff: [] as string[],
+      actionItems: [] as string[], yesterdayImpact: null as string | null,
     })),
+    fetchFrontInbox().catch(() => ({ conversations: [] as FrontConversation[], error: "Front fetch failed" })),
+    extractEveningReview(vaultPath).catch(() => ({ tomorrowHandoff: "", reflection: "" })),
+    formatOvernightWorkSection().catch(() => null),
+    formatIntelligenceSection().catch(() => null),
   ]);
 
   if (calendar.error) warnings.push(`Calendar: ${calendar.error}`);
   if (xIntel.error) warnings.push(`X Intel: ${xIntel.error}`);
+  if (frontInbox.error) warnings.push(`Front: ${frontInbox.error}`);
 
-  // Determine day type
-  const meetingCount = calendar.events.filter((e) => {
-    const s = new Date();
-    s.setHours(0, 0, 0, 0);
-    return e.startTime >= s.getTime() && e.startTime < s.getTime() + 86_400_000;
-  }).length;
-  const dayType =
-    meetingCount === 0
-      ? "**Focus Day** — Deep work, building, minimal meetings"
-      : meetingCount <= 2
-        ? "**Buffer Day** — Meetings + focused work"
-        : "**Meeting Day** — Execution between calls";
-
-  // Weather line
-  const userLocation = getUserLocation();
-  const unit = getTempUnit();
-  const weatherLine =
-    weather.temp !== null && userLocation
-      ? `${weather.icon} ${weather.condition} ${weather.temp}°${unit} · ${userLocation}`
-      : userLocation
-        ? userLocation
-        : "";
-
-  // Build carry-forward section for Win The Day
-  const allCarryItems = [
-    ...carryForward.tomorrowHandoff,
-    ...carryForward.unfinishedTasks.filter(
-      (t) => !carryForward.tomorrowHandoff.some((h) => h.toLowerCase().includes(t.toLowerCase())),
-    ),
-  ];
-
-  // Win The Day: carry-forward items as numbered checkboxes + session links
-  // Load tasks and queue data for session linking
-  let tasksForLinking: { id: string; title: string; sessionId: string | null; status: string }[] = [];
-  let queueItemsForLinking: { sourceTaskId?: string; status: string }[] = [];
-  const godmodeHost = process.env.GODMODE_WEB_HOST ?? process.env.TAILSCALE_HOSTNAME ?? "";
+  // Load tasks for context
+  let pendingTasks: { id: string; title: string; status: string }[] = [];
   try {
     const { readTasks } = await import("./tasks.js");
     const tasksData = await readTasks();
-    tasksForLinking = tasksData.tasks.filter(t => t.status === "pending");
-  } catch { /* non-fatal */ }
-  try {
-    const { readQueueState } = await import("../lib/queue-state.js");
-    const queueState = await readQueueState();
-    queueItemsForLinking = queueState.items;
+    pendingTasks = tasksData.tasks.filter((t: { status: string }) => t.status === "pending");
   } catch { /* non-fatal */ }
 
-  const winTheDayLines: string[] = [];
-  let idx = 1;
-  for (const item of allCarryItems.slice(0, 6)) {
-    let sessionLink = "";
-    if (godmodeHost) {
-      // Try to match carry-forward item to a tasks.json task
-      const matchedTask = tasksForLinking.find(
-        t => t.title.toLowerCase() === item.toLowerCase() ||
-             item.toLowerCase().includes(t.title.toLowerCase()),
-      );
-      if (matchedTask) {
-        const hasWork = queueItemsForLinking.some(
-          qi => qi.sourceTaskId === matchedTask.id && (qi.status === "review" || qi.status === "done"),
-        );
-        if (hasWork && matchedTask.sessionId) {
-          sessionLink = ` [→ Review](${godmodeHost}/godmode/chat?session=${encodeURIComponent(matchedTask.sessionId)})`;
-        } else if (matchedTask.sessionId) {
-          sessionLink = ` [→ Open](${godmodeHost}/godmode/chat?session=${encodeURIComponent(matchedTask.sessionId)})`;
-        } else {
-          sessionLink = ` [→ Open](${godmodeHost}/godmode/chat?openTask=${encodeURIComponent(matchedTask.id)})`;
-        }
-      }
-    }
-    winTheDayLines.push(`${idx}. [ ] **${item}**${sessionLink}`);
-    idx++;
-  }
-  if (winTheDayLines.length === 0) {
-    winTheDayLines.push("*Set your top priorities for today.*");
-  }
+  // Quote of the day
+  const quote = getQuoteOfDay();
 
-  // Action items from yesterday's notes
-  const actionItemLines: string[] = [];
-  if (carryForward.actionItems.length > 0) {
-    for (const item of carryForward.actionItems.slice(0, 8)) {
-      actionItemLines.push(`- [ ] ${item}`);
-    }
-  }
+  // Context values
+  const userLocation = getUserLocation();
+  const unit = getTempUnit();
+  const weatherStr = weather.temp !== null
+    ? `${weather.condition} ${weather.temp}°${unit}`
+    : "Weather unavailable";
+  const dateDisplay = formattedDate();
+  const dow = new Date().getDay(); // 0=Sun
+  const dayType = [1, 3, 5].includes(dow) ? "Focus Day — Deep work, building, minimal meetings"
+    : [2, 4].includes(dow) ? "Buffer Day — Meetings, admin, catch-up"
+    : "Weekend — Recharge, family, strategic thinking";
 
-  // Assemble sections
+  // Format raw data blocks for the LLM prompt
+  const calendarRaw = calendar.events.length > 0
+    ? calendar.events.map((e) => {
+        const start = new Date(e.startTime).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: getUserTimezone() });
+        const end = e.endTime ? new Date(e.endTime).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: getUserTimezone() }) : "";
+        return `${start}–${end}: ${e.title}`;
+      }).join("\n")
+    : "No meetings scheduled.";
+
+  const frontRaw = frontInbox.conversations.length > 0
+    ? JSON.stringify(frontInbox.conversations.slice(0, 20), null, 2)
+    : "No inbox data available.";
+
+  const tasksRaw = pendingTasks.length > 0
+    ? pendingTasks.map((t) => `- ${t.title}`).join("\n")
+    : "No pending tasks.";
+
+  const carryoverRaw = [
+    ...carryForward.unfinishedTasks.map((t) => `- [ ] ${t}`),
+    ...carryForward.actionItems.map((t) => `- [ ] ${t}`),
+  ].join("\n") || "All clear from yesterday.";
+
+  const impactRaw = carryForward.yesterdayImpact || "No impact report.";
+  const xIntelRaw = xIntel.items.length > 0
+    ? formatXIntelligence(xIntel.items, xIntel.error)
+    : xIntel.error || "No X intel scan today.";
+
+  const ouraRaw = `Readiness: ${oura.readiness ?? "--"} | Sleep: ${oura.sleepScore ?? "--"} (${oura.sleepDuration ?? "--"}) | HRV: ${oura.hrv ?? "--"}ms | RHR: ${oura.rhr ?? "--"}bpm | Mode: ${oura.mode}`;
+
+  // ── Build LLM prompt ────────────────────────────────────────────
+  const BRIEF_SYSTEM_PROMPT = `You are a daily brief renderer for GodMode, a personal AI operating system. Given a template and raw data, produce a clean, scannable markdown daily brief that a founder looks forward to reading.
+
+RULES:
+1. Output ONLY the rendered markdown. No explanations, no code fences, no preamble.
+2. Follow the template structure EXACTLY — sections in this order: Chief Aim, LifeTrack, Win The Day, Calendar, Communications, Yesterday's Impact, X Intelligence, Body Check. Never add or reorder.
+3. NO emoji in section headers. Clean: "## Chief Aim" not "## 🎯 Chief Aim"
+4. Do NOT include the Notes section — it is appended separately after you.
+5. The brief should end after the Body Check section (with its trailing ---).
+6. Be CONCISE. This must be scannable in 60 seconds. Respect the reader's time.
+7. For Calendar, calculate deep work windows (gaps of 90+ minutes with no meetings).
+8. For Meeting Prep, only prep EXTERNAL meetings (skip internal huddles/standups). Include context about attendees if available.
+9. For Communications, categorize by urgency: Action Needed (🟡), FYI.
+10. Win The Day priorities: FIRST use evening review carryover (Tomorrow Handoff from yesterday). Then fill Bonus section with remaining tasks. Deduplicate.
+11. If a data source is empty, show a one-line placeholder. Never skip a section.
+12. Body Check: render Oura metrics in compact format. Write a 2-3 sentence energy prescription based on the biometrics — specific, actionable, flowing prose. If no Oura data, show a placeholder.
+13. All Win The Day items must use checkbox format: "1. [ ] **Task** — context"
+14. Bonus items use: "- Task description"`;
+
+  const briefUserPrompt = `Render today's daily brief using the template and data below.
+
+## Pre-computed Values
+- Date Display: ${dateDisplay}
+- Day Type: ${dayType}
+- Weather: ${weatherStr}
+- Location: ${userLocation || "Not configured"}
+- Quote: "${quote.text}"
+- Quote Author: ${quote.author}
+- Yesterday: ${yesterdayDate()}
+${context.chiefAim ? `- Chief Aim: ${context.chiefAim}` : "- Chief Aim: (not configured — omit section)"}
+${context.streakDay !== null ? `- ${context.streakLabel}: Day ${context.streakDay}` : ""}
+
+## Template Structure
+
+# Daily Brief — {date_display}
+
+**Day {n}** · {weather} · {location}
+
+---
+
+## Chief Aim
+
+> {chief_aim}
+
+**{streak_label}:** Day {streak_days} 🔥
+**{day_type}**
+
+---
+
+## LifeTrack
+
+> *{quote}*
+> — {author}
+
+---
+
+## Win The Day
+
+{PRIORITY SOURCE: Use evening review carryover (Tomorrow Handoff) as the PRIMARY source for numbered priorities. These are what the user committed to last night. If no evening review exists, fall back to pending tasks + carryover items.}
+
+1. [ ] **{priority 1}** — {context}
+2. [ ] **{priority 2}** — {context}
+3. [ ] **{priority 3}** — {context}
+
+### Bonus
+
+{Remaining tasks not already covered by the priorities above. Deduplicate. Format: - task description}
+
+---
+
+## Calendar
+
+{Calendar events as time table. Show full day.}
+
+**Deep Work Windows:** {list 90+ min gaps}
+
+### Meeting Prep
+
+{External meetings only. For each: name, time, context, prep. If none: _No external meetings today._}
+
+---
+
+## Communications
+
+{From Front inbox data. Categorize:}
+**Action Needed:** 🟡 items
+**FYI:** items
+{If empty: _Inbox clear. Nice._}
+
+---
+
+## Yesterday's Impact
+
+{Compact metrics line + 2-3 bullet key wins. Keep it tight.}
+
+---
+
+## X Intelligence
+
+{From X intel data. If available, extract actionable signals. If not: _No X intel scan today._}
+
+---
+
+## Body Check
+
+**Readiness: {score} {emoji} {mode}** · Sleep {score} ({duration}) · HRV {n}ms · RHR {n}bpm
+
+{2-3 sentence energy prescription based on biometrics. Specific and actionable. Flowing prose.}
+
+---
+
+## RAW DATA
+
+### Evening Review — Tomorrow Handoff (${yesterdayDate()})
+${eveningReview.tomorrowHandoff}
+
+### Evening Reflection (${yesterdayDate()})
+${eveningReview.reflection || "(none)"}
+
+### Impact Report (${yesterdayDate()})
+${impactRaw}
+
+### Pending Tasks
+${tasksRaw}
+
+### Front Inbox
+${frontRaw}
+
+### Calendar (${briefDate})
+${calendarRaw}
+
+### X Intelligence
+${xIntelRaw}
+
+### Carryover (incomplete from yesterday)
+${carryoverRaw}
+
+### Oura Biometrics
+${ouraRaw}
+
+### Agent Work Overnight
+${overnightWork || "(none)"}
+
+### GodMode Intelligence
+${intelSection || "(none)"}`;
+
+  // ── Call Claude to render the brief ─────────────────────────────
+  console.log("[BriefGenerator] Calling Claude Sonnet 4.6 to render brief...");
+  let briefContent = await callClaude(BRIEF_SYSTEM_PROMPT, briefUserPrompt, {
+    model: "claude-sonnet-4-6-20250514",
+    maxTokens: 8192,
+  });
+
   const sections: string[] = [];
-  const brief: string[] = [];
 
-  // Header — compact context line
-  brief.push(`# Daily Brief — ${formattedDate()}`);
-  const headerParts = [weatherLine, dayType].filter(Boolean);
-  brief.push(headerParts.join(" · "));
-  brief.push("");
-
-  // Chief Aim — single blockquote (only if configured)
-  if (context.chiefAim) {
-    brief.push(`> ${context.chiefAim}`);
-    brief.push("");
-  }
-
-  // Win The Day — the core of the brief, first real content
-  sections.push("Win The Day");
-  brief.push("## Win The Day");
-  brief.push("");
-  brief.push(winTheDayLines.join("\n"));
-  brief.push("");
-
-  // Action Items from Yesterday (if any)
-  if (actionItemLines.length > 0) {
-    sections.push("Action Items from Yesterday");
-    brief.push("### Action Items from Yesterday");
-    brief.push("");
-    brief.push(actionItemLines.join("\n"));
-    brief.push("");
-  }
-
-  // Streak counter — only shown if user has configured a streak in CONTEXT.md
-  if (context.streakDay !== null) {
-    brief.push(`**${context.streakLabel}:** Day ${context.streakDay}`);
-    brief.push("");
-  }
-  brief.push("---");
-  brief.push("");
-
-  // Overnight Work (from queue processor)
-  try {
-    const overnightSection = await formatOvernightWorkSection();
-    if (overnightSection) {
-      sections.push("Your Agents Overnight");
-      brief.push("## Your Agents Overnight");
-      brief.push("");
-      brief.push(overnightSection);
-      brief.push("");
-      brief.push("---");
-      brief.push("");
+  if (briefContent) {
+    // Extract section names for the response
+    const headingRegex = /^## (.+)$/gm;
+    let match;
+    while ((match = headingRegex.exec(briefContent)) !== null) {
+      sections.push(match[1].trim());
     }
-  } catch {
-    // Queue not available — skip silently
+    console.log(`[BriefGenerator] LLM rendered ${sections.length} sections`);
+  } else {
+    // Fallback: template-based assembly when no LLM available
+    console.warn("[BriefGenerator] No LLM available — using template fallback");
+    warnings.push("LLM unavailable — brief generated with template fallback");
+    briefContent = [
+      `# Daily Brief — ${dateDisplay}`,
+      `${weatherStr} · ${userLocation || ""} · **${dayType}**`,
+      "",
+      context.chiefAim ? `> ${context.chiefAim}\n` : "",
+      context.streakDay !== null ? `**${context.streakLabel}:** Day ${context.streakDay}\n` : "",
+      "---", "",
+      "## Win The Day", "",
+      carryForward.unfinishedTasks.length > 0
+        ? carryForward.unfinishedTasks.map((t, i) => `${i + 1}. [ ] **${t}**`).join("\n")
+        : "*Set your top priorities for today.*",
+      "", "---", "",
+      "## Calendar", "", calendarRaw, "", "---", "",
+      "## Communications", "",
+      frontInbox.conversations.length > 0
+        ? frontInbox.conversations.slice(0, 10).map((c) => `- **${c.subject}** (${c.status})`).join("\n")
+        : "*Check your inbox for urgent items.*",
+      "", "---", "",
+      carryForward.yesterdayImpact ? `## Yesterday's Impact\n\n${carryForward.yesterdayImpact}\n\n---\n` : "",
+      "## Body Check", "", formatBodyCheck(oura), "", "---",
+    ].filter(Boolean).join("\n");
+    sections.push("Win The Day", "Calendar", "Communications", "Body Check");
   }
 
-  // Calendar & Comms — merged section for external inputs
-  sections.push("Calendar & Comms");
-  brief.push("## Calendar & Comms");
-  brief.push("");
-  brief.push("**Schedule:**");
-  brief.push(formatCalendarSection(calendar.events, calendar.error));
-  brief.push("");
-
-  // Meeting Prep
-  const meetingPrep = await formatMeetingPrepSection(calendar.events);
-  if (meetingPrep && meetingPrep !== "_No external meetings today._") {
-    brief.push("### Meeting Prep");
-    brief.push("");
-    brief.push(meetingPrep);
-    brief.push("");
-  }
-
-  // Communications
-  brief.push("**Comms — Action Needed:**");
-  brief.push("*Check Front inbox for urgent items.*");
-  brief.push("");
-  brief.push("---");
-  brief.push("");
-
-  // Yesterday's Impact
-  if (carryForward.yesterdayImpact) {
-    sections.push("Yesterday's Impact");
-    brief.push("## Yesterday's Impact");
-    brief.push("");
-    brief.push(carryForward.yesterdayImpact);
-    brief.push("");
-    brief.push("---");
-    brief.push("");
-  }
-
-  // X Intelligence
-  sections.push("X Intelligence");
-  brief.push("## X Intelligence");
-  brief.push("");
-  brief.push(formatXIntelligence(xIntel.items, xIntel.error));
-  brief.push("");
-  brief.push("---");
-  brief.push("");
-
-  // GodMode Intelligence (from Proactive Intel system)
-  try {
-    const intelSection = await formatIntelligenceSection();
-    if (intelSection) {
-      sections.push("GodMode Intelligence");
-      brief.push("## GodMode Intelligence");
-      brief.push("");
-      brief.push(intelSection);
-      brief.push("");
-      brief.push("---");
-      brief.push("");
-    }
-  } catch {
-    // Proactive Intel not available — skip silently
-  }
-
-  // Notes — user's notebook, never touched by AI
+  // Append Notes section (sacred — never touched by AI)
+  briefContent += "\n\n## Notes\n\n*(Your notebook — never touched by AI)*\n\n";
+  if (existingNotes) briefContent += existingNotes + "\n\n";
   sections.push("Notes");
-  brief.push("## Notes");
-  brief.push("");
-  brief.push("*(Your notebook — never touched by AI)*");
-  brief.push("");
-  brief.push("---");
-  brief.push("");
 
-  // Body Check — below the fold, informational not motivational
-  sections.push("Body Check");
-  brief.push("## Body Check");
-  brief.push("");
-  brief.push(formatBodyCheck(oura));
-  brief.push("");
-  brief.push("---");
-  brief.push("");
-
-  // Today's Impact (Evening) — filled at end of day
-  sections.push("Today's Impact");
-  brief.push("## Today's Impact (Evening)");
-  brief.push("");
-  brief.push("");
-
-  // Evening Review — filled at 9PM
-  sections.push("Evening Review");
-  brief.push("## Evening Review");
-  brief.push("");
-  brief.push("");
-
-  // Streak reminder in evening (only if configured)
-  if (context.streakDay !== null) {
-    brief.push(`**${context.streakLabel}:** Day ${context.streakDay} — Well done.`);
-    brief.push("");
-  }
-
-  // Retain — session harvests
-  sections.push("Retain");
-  brief.push("## Retain");
-  brief.push("");
-  brief.push("");
+  // Append evening placeholders
+  briefContent += "---\n\n## Today's Impact (Evening)\n\n\n";
+  briefContent += "## Evening Review\n\n\n";
+  briefContent += "## Tomorrow Handoff\n\n\n";
+  sections.push("Today's Impact", "Evening Review", "Tomorrow Handoff");
 
   // Footer
   const now = new Date();
@@ -1380,15 +1739,21 @@ async function generateDailyBrief(date?: string): Promise<GenerateResult> {
     minute: "2-digit",
     timeZone: getUserTimezone(),
   });
-  brief.push("---");
-  brief.push("");
-  brief.push(`*Generated at ${timeStr} CT · GodMode daily brief generator*`);
+  briefContent += `---\n\n*Generated at ${timeStr} CT · GodMode daily brief generator*\n`;
 
-  const briefContent = brief.join("\n");
+  // Append preserved Agent Sessions
+  if (agentSessionsBlock) briefContent += agentSessionsBlock;
 
   // Write to vault
   await mkdir(join(vaultPath, DAILY_FOLDER), { recursive: true });
   await writeFile(filePath, briefContent, "utf-8");
+
+  // Backup to godmode memory
+  const backupDir = join(MEMORY_DIR, "daily");
+  try {
+    await mkdir(backupDir, { recursive: true });
+    await writeFile(join(backupDir, `${briefDate}.md`), briefContent, "utf-8");
+  } catch { /* backup non-fatal */ }
 
   return {
     date: briefDate,
@@ -1511,4 +1876,4 @@ export const briefGeneratorHandlers: GatewayRequestHandlers = {
 };
 
 // Export for use by other modules
-export { fetchCalendarEvents, fetchOuraData, fetchWeather, fetchXIntelligence, extractCarryForward };
+export { fetchCalendarEvents, fetchOuraData, fetchWeather, fetchXIntelligence, extractCarryForward, generateDailyBrief, resolveAnthropicAuth };

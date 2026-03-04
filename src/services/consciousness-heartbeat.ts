@@ -237,6 +237,45 @@ class ConsciousnessHeartbeat {
           } catch { /* broadcast non-fatal */ }
         }
       } catch { /* non-fatal */ }
+
+      // Auto-generate daily brief if it doesn't exist yet for today
+      try {
+        const { existsSync } = await import("node:fs");
+        const { join } = await import("node:path");
+        const { resolveVaultPath, DAILY_FOLDER, localDateString } = await import("../data-paths.js");
+        const vault = resolveVaultPath();
+        const today = localDateString();
+        if (vault) {
+          const dailyPath = join(vault, DAILY_FOLDER, `${today}.md`);
+          const fileExists = existsSync(dailyPath);
+          // Generate if file doesn't exist, or if it only has Agent Sessions (minimal stub)
+          let needsGeneration = !fileExists;
+          if (fileExists && !needsGeneration) {
+            const { readFile } = await import("node:fs/promises");
+            const content = await readFile(dailyPath, "utf-8");
+            // If the file has no ## Win The Day or ## Chief Aim, it's a stub
+            needsGeneration = !content.includes("## Win The Day") && !content.includes("## Chief Aim");
+          }
+          if (needsGeneration) {
+            const { resolveAnthropicAuth } = await import("../methods/brief-generator.js");
+            // Only auto-generate if we have LLM auth (avoid creating a template-only brief)
+            if (resolveAnthropicAuth()) {
+              const { generateDailyBrief } = await import("../methods/brief-generator.js");
+              this.logger.info("[Consciousness] Auto-generating daily brief (not yet created today)");
+              const result = await generateDailyBrief();
+              this.logger.info(`[Consciousness] Daily brief generated: ${result.sections.length} sections`);
+              try {
+                this.broadcast("ally:notification", {
+                  type: "cron-result",
+                  summary: `Daily brief generated — ${result.sections.length} sections. Check your vault.`,
+                });
+              } catch { /* broadcast non-fatal */ }
+            }
+          }
+        }
+      } catch (briefErr) {
+        this.logger.error(`[Consciousness] Brief auto-gen failed: ${String(briefErr)}`);
+      }
     } catch (err) {
       this.logger.error(`[Consciousness] Heartbeat tick error: ${String(err)}`);
       this.broadcast("consciousness:status", {

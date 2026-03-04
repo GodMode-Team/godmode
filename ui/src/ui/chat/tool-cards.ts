@@ -1,4 +1,5 @@
 import { html, nothing } from "lit";
+import { getFileIcon, getFileTypeLabel } from "./file-utils";
 import { icons } from "../icons";
 import { formatToolDetail, resolveToolDisplay } from "../tool-display";
 import type { ToolCard } from "../types/chat-types";
@@ -78,6 +79,7 @@ export function renderToolCardSidebar(
   card: ToolCard,
   onOpenSidebar?: (content: string) => void,
   onOpenFile?: (filePath: string) => void,
+  onPushToDrive?: (filePath: string) => void,
 ) {
   const display = resolveToolDisplay({ name: card.name, args: card.args });
   const detail = formatToolDetail(display);
@@ -86,6 +88,35 @@ export function renderToolCardSidebar(
   const filePath = FILE_TOOLS.has(card.name.toLowerCase())
     ? (extractFilePathFromArgs(card.args) ?? extractFilePathFromText(card.text))
     : null;
+
+  // Rich artifact card for file tool results with a detected path
+  if (filePath && card.kind === "result") {
+    const fileName = filePath.split("/").pop() || filePath;
+    const ext = fileName.split(".").pop()?.toLowerCase() || "";
+    const icon = getFileIcon(fileName);
+    const typeLabel = getFileTypeLabel(ext, fileName);
+
+    return html`
+      <div class="chat-artifact-card">
+        <div class="chat-artifact-card__icon">${icon}</div>
+        <div class="chat-artifact-card__info">
+          <span class="chat-artifact-card__name" title=${filePath}>${fileName}</span>
+          <span class="chat-artifact-card__type">${typeLabel}</span>
+        </div>
+        <div class="chat-artifact-card__actions">
+          ${onOpenFile
+            ? html`<button class="chat-artifact-card__btn" @click=${(e: Event) => { e.stopPropagation(); onOpenFile(filePath); }}>Open</button>`
+            : onOpenSidebar && hasText
+              ? html`<button class="chat-artifact-card__btn" @click=${(e: Event) => { e.stopPropagation(); onOpenSidebar(formatToolOutputForSidebar(card.text!)); }}>View</button>`
+              : nothing}
+          ${onPushToDrive
+            ? html`<button class="chat-artifact-card__btn chat-artifact-card__btn--drive" @click=${(e: Event) => { e.stopPropagation(); onPushToDrive(filePath); }}>Drive</button>`
+            : nothing}
+        </div>
+      </div>
+    `;
+  }
+
   const canClick = Boolean(onOpenSidebar) || Boolean(onOpenFile && filePath);
   const handleClick = canClick
     ? (e: Event) => {

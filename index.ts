@@ -64,6 +64,7 @@ import { createXReadTool } from "./src/tools/x-read.js";
 import { queueHandlers } from "./src/methods/queue.js";
 import { xIntelHandlers } from "./src/methods/x-intel.js";
 import { filesHandlers } from "./src/methods/files.js";
+import { rescuetimeHandlers } from "./src/methods/rescuetime.js";
 import { dashboardsHandlers } from "./src/methods/dashboards.js";
 import { initAgentLogWriter } from "./src/services/agent-log-writer.js";
 import { CodingOrchestrator } from "./src/services/coding-orchestrator.js";
@@ -636,6 +637,7 @@ const godmodePlugin = {
       ...sessionCoordinationHandlers,
       ...xIntelHandlers,
       ...filesHandlers,
+      ...rescuetimeHandlers,
       ...integrationsHandlers,
     };
 
@@ -915,6 +917,16 @@ h1{color:#ff6b6b}code{background:#16213e;padding:2px 8px;border-radius:4px}a{col
         api.logger.warn(`[GodMode] Focus Pulse heartbeat failed to init: ${String(err)}`);
       }
 
+      // RescueTime data fetcher — daily pull for Focus Pulse scoring
+      try {
+        const { initRescueTimeFetcher, startRescueTimeFetcher } = await import("./src/services/rescuetime-fetcher.js");
+        initRescueTimeFetcher(api.logger);
+        startRescueTimeFetcher();
+        api.logger.info("[GodMode] RescueTime fetcher service started");
+      } catch (err) {
+        api.logger.warn(`[GodMode] RescueTime fetcher failed to start: ${String(err)}`);
+      }
+
       // Consciousness heartbeat — hourly auto-sync of CONSCIOUSNESS.md
       try {
         const { initConsciousnessHeartbeat, startConsciousnessHeartbeat } = await import("./src/services/consciousness-heartbeat.js");
@@ -1034,6 +1046,12 @@ h1{color:#ff6b6b}code{background:#16213e;padding:2px 8px;border-radius:4px}a{col
       try {
         const { stopConsciousnessHeartbeat } = await import("./src/services/consciousness-heartbeat.js");
         stopConsciousnessHeartbeat();
+      } catch {
+        // Non-fatal
+      }
+      try {
+        const { stopRescueTimeFetcher } = await import("./src/services/rescuetime-fetcher.js");
+        stopRescueTimeFetcher();
       } catch {
         // Non-fatal
       }

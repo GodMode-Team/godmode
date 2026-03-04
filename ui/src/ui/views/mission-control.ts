@@ -42,6 +42,7 @@ export type MissionControlProps = {
   onOpenTaskSession?: (taskId: string) => void;
   onStartQueueItem?: (itemId: string) => void;
   onAskProsper?: () => void;
+  onViewTaskFiles?: (itemId: string) => void;
 };
 
 // ===== Helpers =====
@@ -259,6 +260,7 @@ function renderReviewItems(
   onApprove: (id: string) => void,
   onViewDetail: (agent: AgentRunView) => void,
   onOpenTaskSession?: (taskId: string) => void,
+  onViewTaskFiles?: (itemId: string) => void,
 ) {
   const reviewItems = agents.filter(a => a.isReview === true);
   if (reviewItems.length === 0) return nothing;
@@ -275,6 +277,9 @@ function renderReviewItems(
               </div>
               ${item.sourceTaskId && onOpenTaskSession
                 ? html`<button class="mc-open-session-btn" @click=${() => onOpenTaskSession(item.sourceTaskId!)}>Open Session</button>`
+                : nothing}
+              ${onViewTaskFiles
+                ? html`<button class="mc-detail-btn" @click=${() => onViewTaskFiles(item.id)}>Files</button>`
                 : nothing}
               <button class="mc-approve-btn" @click=${() => onApprove(item.id)}>Done</button>
               <button class="mc-detail-btn" @click=${() => onViewDetail(item)}>View Output</button>
@@ -504,7 +509,7 @@ export function renderMissionControl(props: MissionControlProps) {
             <h3 class="mc-section-title">Active Agents</h3>
             ${renderActiveAgents(data.agents, cardCallbacks)}
 
-            ${renderReviewItems(data.agents, props.onApproveItem, props.onViewDetail, props.onOpenTaskSession)}
+            ${renderReviewItems(data.agents, props.onApproveItem, props.onViewDetail, props.onOpenTaskSession, props.onViewTaskFiles)}
 
             ${renderPendingQueue(data.queueItems, props.onStartQueueItem)}
 

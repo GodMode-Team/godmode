@@ -1438,6 +1438,7 @@ export function renderApp(state: AppViewState) {
                 onBrowseSearch: (query: string) => state.handleWorkspaceBrowseSearch(query),
                 onBrowseBack: () => state.handleWorkspaceBrowseBack(),
                 onCreateFolder: (path: string) => state.handleWorkspaceCreateFolder(path),
+                onBatchPushToDrive: (paths: string[]) => state.handleBatchPushToDrive(paths),
               })
             : nothing
         }
@@ -2209,6 +2210,7 @@ export function renderApp(state: AppViewState) {
                 onOpenSession: (key) => state.handleMissionControlOpenSession(key),
                 onOpenTaskSession: (taskId) => state.handleMissionControlOpenTaskSession(taskId),
                 onStartQueueItem: (id) => state.handleMissionControlStartQueueItem(id),
+                onViewTaskFiles: (id) => state.handleMissionControlViewTaskFiles(id),
                 onAskProsper: () => { state.handleAllyToggle(); state.handleAllyDraftChange("What should I focus on next?"); },
               })
             : nothing

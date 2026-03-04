@@ -1061,6 +1061,28 @@ export class GodModeApp extends LitElement {
     await this.handleMissionControlOpenTaskSession(itemId);
   }
 
+  async handleMissionControlViewTaskFiles(itemId: string) {
+    try {
+      const result = await this.client?.request<{
+        files?: Array<{ path: string; name: string; size: number; type: string }>;
+      }>("queue.taskFiles", { itemId });
+      const files = result?.files ?? [];
+      if (files.length === 0) {
+        this.showToast("No files found for this task", "info");
+        return;
+      }
+      // Format as markdown for sidebar
+      const lines = files.map(
+        (f) => `- **${f.name}** (${f.type}, ${(f.size / 1024).toFixed(1)} KB)\n  \`${f.path}\``
+      );
+      const md = `## Task Files\n\n${lines.join("\n\n")}`;
+      this.handleOpenSidebar(md, { title: "Task Files" });
+    } catch (e: unknown) {
+      console.error("Failed to load task files:", e);
+      this.showToast("Failed to load task files", "error");
+    }
+  }
+
   // ── Ally Side-Chat Handlers ──────────────────────────────────────────
 
   handleAllyToggle() {
@@ -1270,14 +1292,43 @@ export class GodModeApp extends LitElement {
     }
   }
 
-  handleDecisionOpenChat(id: string) {
-    // Open ally panel and pre-fill draft with context about the item
+  async handleDecisionOpenChat(id: string) {
+    // Open a main chat session with agent output context pre-seeded
     const item = this.todayQueueResults?.find((r) => r.id === id);
-    this.allyPanelOpen = true;
-    this.allyUnread = 0;
-    void this._loadAllyHistory().then(() => this._scrollAllyToBottom());
-    if (item?.title) {
-      this.allyDraft = `Let's discuss the agent result: "${item.title}"`;
+    if (!item) return;
+
+    // If the queue item is linked to a task, use the task session flow
+    // (creates/reuses session, seeds output, navigates to chat tab)
+    if (item.sourceTaskId) {
+      await this.handleMissionControlOpenTaskSession(item.sourceTaskId);
+      return;
+    }
+
+    // No linked task — create a fresh session and seed it with the output
+    const { createNewSession } = await import("./app-render.helpers.js");
+    createNewSession(this);
+    this.setTab("chat" as import("./navigation.js").Tab);
+
+    // Title the session tab with the agent result name
+    const { autoTitleCache } = await import("./controllers/sessions.js");
+    autoTitleCache.set(this.sessionKey, item.title);
+
+    // Seed with agent output if we have an outputPath
+    if (item.outputPath && this.client && this.connected) {
+      try {
+        const res = await this.client.request<{ content: string }>(
+          "queue.readOutput",
+          { path: item.outputPath },
+        );
+        if (res?.content) {
+          await this.seedSessionWithAgentOutput(item.title, res.content);
+        }
+      } catch {
+        // Fallback: seed with just the summary
+        await this.seedSessionWithAgentOutput(item.title, item.summary);
+      }
+    } else if (item.summary) {
+      await this.seedSessionWithAgentOutput(item.title, item.summary);
     }
   }
 
@@ -2187,6 +2238,15 @@ export class GodModeApp extends LitElement {
   async handlePushToDrive(filePath: string, account?: string) {
     if (this.driveUploading) return;
     this.showDrivePicker = false;
+
+    // If we have a pending batch, redirect to batch handler
+    if (this._pendingBatchPaths && this._pendingBatchPaths.length > 0) {
+      const paths = this._pendingBatchPaths;
+      this._pendingBatchPaths = undefined;
+      await this._executeBatchDrive(paths, account);
+      return;
+    }
+
     this.driveUploading = true;
     try {
       const params: Record<string, string> = { filePath };
@@ -2219,6 +2279,64 @@ export class GodModeApp extends LitElement {
       this.driveUploading = false;
     }
   }
+
+  async handleBatchPushToDrive(filePaths: string[]) {
+    if (this.driveUploading || filePaths.length === 0) return;
+
+    // If Drive accounts are available and picker isn't shown yet, trigger picker first
+    if (!this.driveAccounts || this.driveAccounts.length === 0) {
+      // Try loading accounts; if none, proceed without account
+      try {
+        const res = await this.client?.request<{ accounts?: Array<{ email: string }> }>("files.listDriveAccounts");
+        this.driveAccounts = res?.accounts ?? [];
+      } catch { /* proceed without account selection */ }
+    }
+
+    // If multiple accounts, show picker — store pending batch and let picker callback handle it
+    if (this.driveAccounts && this.driveAccounts.length > 1) {
+      this._pendingBatchPaths = filePaths;
+      this.showDrivePicker = true;
+      return;
+    }
+
+    const account = this.driveAccounts?.[0]?.email;
+    await this._executeBatchDrive(filePaths, account);
+  }
+
+  /** @internal Execute batch Drive upload. */
+  private async _executeBatchDrive(filePaths: string[], account?: string) {
+    this.driveUploading = true;
+    this.showToast(`Uploading ${filePaths.length} files to Drive...`, "info", 0);
+    try {
+      const params: Record<string, unknown> = { filePaths };
+      if (account) params.account = account;
+      const result = await this.client?.request<{
+        message?: string;
+        results?: Array<{ path: string; success: boolean; driveUrl?: string; error?: string }>;
+      }>("files.batchPushToDrive", params);
+
+      // Dismiss the progress toast
+      this.dismissAllToasts();
+
+      const successCount = result?.results?.filter((r) => r.success).length ?? 0;
+      const total = result?.results?.length ?? filePaths.length;
+      if (successCount === total) {
+        this.showToast(`Uploaded ${successCount} files to Google Drive`, "success", 5000);
+      } else {
+        this.showToast(`Uploaded ${successCount}/${total} files (${total - successCount} failed)`, "warning", 8000);
+      }
+    } catch (e: unknown) {
+      this.dismissAllToasts();
+      const detail = e instanceof Error ? e.message : "Unknown error";
+      this.showToast(`Batch Drive upload failed: ${detail}`, "error", 8000);
+    } finally {
+      this.driveUploading = false;
+      this._pendingBatchPaths = undefined;
+    }
+  }
+
+  /** Pending batch paths awaiting account selection from Drive picker. */
+  private _pendingBatchPaths?: string[];
 
   handleSplitRatioChange(ratio: number) {
     const newRatio = Math.max(0.4, Math.min(0.7, ratio));
@@ -2596,6 +2714,10 @@ export class GodModeApp extends LitElement {
 
   dismissToast(id: string) {
     this.toasts = removeToast(this.toasts, id);
+  }
+
+  dismissAllToasts() {
+    this.toasts = [];
   }
 
   // My Day handlers

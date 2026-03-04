@@ -13,6 +13,7 @@ import {
 } from "./message-extract";
 import { isToolResultMessage, normalizeRoleForGrouping } from "./message-normalizer";
 import type { LightboxImage } from "./lightbox";
+import { getFileIcon, getFileTypeLabel } from "./file-utils";
 import { extractToolCards, renderToolCardSidebar } from "./tool-cards";
 
 // Fun verbs for different tool types
@@ -60,86 +61,7 @@ type ParsedFileUpload = {
   mimeType: string;
 };
 
-// File extension to icon mapping
-const FILE_ICONS: Record<string, string> = {
-  // Documents
-  pdf: "📕",
-  doc: "📘",
-  docx: "📘",
-  txt: "📄",
-  rtf: "📄",
-  // Spreadsheets
-  xls: "📗",
-  xlsx: "📗",
-  csv: "📊",
-  // Presentations
-  ppt: "📙",
-  pptx: "📙",
-  // Images
-  jpg: "🖼️",
-  jpeg: "🖼️",
-  png: "🖼️",
-  gif: "🖼️",
-  webp: "🖼️",
-  svg: "🖼️",
-  // Audio
-  mp3: "🎵",
-  wav: "🎵",
-  m4a: "🎵",
-  // Video
-  mp4: "🎬",
-  mov: "🎬",
-  avi: "🎬",
-  // Archives
-  zip: "📦",
-  rar: "📦",
-  "7z": "📦",
-  tar: "📦",
-  gz: "📦",
-  // Code
-  js: "📜",
-  ts: "📜",
-  py: "📜",
-  json: "📜",
-  html: "📜",
-  css: "📜",
-  md: "📜",
-  // Default
-  default: "📎",
-};
-
-function getFileIcon(fileName: string): string {
-  const ext = fileName.split(".").pop()?.toLowerCase() || "";
-  return FILE_ICONS[ext] ?? FILE_ICONS.default;
-}
-
-function getFileTypeLabel(mimeType: string, fileName: string): string {
-  const ext = fileName.split(".").pop()?.toLowerCase() || "";
-
-  // Common type labels
-  const typeLabels: Record<string, string> = {
-    pdf: "PDF Document",
-    doc: "Word Document",
-    docx: "Word Document",
-    xls: "Excel Spreadsheet",
-    xlsx: "Excel Spreadsheet",
-    csv: "CSV File",
-    ppt: "PowerPoint",
-    pptx: "PowerPoint",
-    txt: "Text File",
-    md: "Markdown",
-    json: "JSON File",
-    zip: "ZIP Archive",
-    png: "PNG Image",
-    jpg: "JPEG Image",
-    jpeg: "JPEG Image",
-    gif: "GIF Image",
-    mp3: "Audio File",
-    mp4: "Video File",
-  };
-
-  return typeLabels[ext] || mimeType.split("/")[1]?.toUpperCase() || "File";
-}
+// FILE_ICONS, getFileIcon, getFileTypeLabel imported from ./file-utils
 
 /**
  * Parse "[Files uploaded: filename (fileId: xxx, size: XXkb, type: mime/type)]" patterns
@@ -533,6 +455,7 @@ export function renderMessageGroup(
   opts: {
     onOpenSidebar?: (content: string) => void;
     onOpenFile?: (filePath: string) => void;
+    onPushToDrive?: (filePath: string) => void;
     onImageClick?: (url: string, allImages: LightboxImage[], index: number) => void;
     resolveImageUrl?: (messageIndex: number, imageIndex: number) => string | null;
     showReasoning: boolean;
@@ -578,6 +501,7 @@ export function renderMessageGroup(
             opts.onOpenFile,
             opts.onImageClick,
             opts.resolveImageUrl,
+            opts.onPushToDrive,
           ),
         )}
         <div class="chat-group-footer">
@@ -761,9 +685,10 @@ function renderGroupedMessage(
   onOpenFile?: (filePath: string) => void,
   onImageClick?: (url: string, allImages: LightboxImage[], index: number) => void,
   resolveImageUrl?: (messageIndex: number, imageIndex: number) => string | null,
+  onPushToDrive?: (filePath: string) => void,
 ) {
   try {
-    return renderGroupedMessageUnsafe(message, opts, onOpenSidebar, onOpenFile, onImageClick, resolveImageUrl);
+    return renderGroupedMessageUnsafe(message, opts, onOpenSidebar, onOpenFile, onImageClick, resolveImageUrl, onPushToDrive);
   } catch (err) {
     console.error("[chat] message render error:", err);
     return html`
@@ -781,6 +706,7 @@ function renderGroupedMessageUnsafe(
   onOpenFile?: (filePath: string) => void,
   onImageClick?: (url: string, allImages: LightboxImage[], index: number) => void,
   resolveImageUrl?: (messageIndex: number, imageIndex: number) => string | null,
+  onPushToDrive?: (filePath: string) => void,
 ) {
   const m = message as Record<string, unknown>;
   const role = typeof m.role === "string" ? m.role : "unknown";
@@ -851,7 +777,7 @@ function renderGroupedMessageUnsafe(
   if (hasToolCards && isToolResult) {
     return html`
       ${hasImages ? renderMessageImages(images, onImageClick, boundResolver) : nothing}
-      ${toolCards.map((card) => renderToolCardSidebar(card, onOpenSidebar, onOpenFile))}
+      ${toolCards.map((card) => renderToolCardSidebar(card, onOpenSidebar, onOpenFile, onPushToDrive))}
     `;
   }
 
@@ -909,7 +835,7 @@ function renderGroupedMessageUnsafe(
             )}</div>`
           : nothing
       }
-      ${toolCards.map((card) => renderToolCardSidebar(card, onOpenSidebar, onOpenFile))}
+      ${toolCards.map((card) => renderToolCardSidebar(card, onOpenSidebar, onOpenFile, onPushToDrive))}
     </div>
   `;
 }

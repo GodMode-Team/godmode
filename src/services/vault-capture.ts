@@ -361,13 +361,27 @@ export async function captureSessionsToDailyNotes(logger: Logger): Promise<Captu
       captured++;
     }
 
-    // Read existing daily note or create new one
+    // Read existing daily note — never create a minimal stub.
+    // If the brief generator hasn't run yet, we skip writing and DON'T mark
+    // sessions as captured so they get appended on the next tick after the
+    // real brief is generated.
     const dailyNotePath = join(dailyDir, `${today}.md`);
-    let existingContent = "";
 
-    if (existsSync(dailyNotePath)) {
-      existingContent = await readFile(dailyNotePath, "utf-8");
+    if (!existsSync(dailyNotePath)) {
+      // No daily note yet — brief generator hasn't run. Defer.
+      logger.info(
+        `[VaultCapture] Sessions→Daily: skipping ${captured} sessions — daily note not yet generated`,
+      );
+      // Undo the captured tracking so these get picked up next time
+      state.capturedSessionPaths = state.capturedSessionPaths.filter(
+        (p) => !p.startsWith(`${today}:`),
+      );
+      captured = 0;
+      await saveCaptureState(state);
+      return { captured: 0, skipped: newSessions.length, errors };
     }
+
+    let existingContent = await readFile(dailyNotePath, "utf-8");
 
     // Check if ## Agent Sessions section already exists
     if (existingContent.includes("## Agent Sessions")) {
@@ -383,30 +397,9 @@ export async function captureSessionsToDailyNotes(logger: Logger): Promise<Captu
       const after = nextHeading > 0 ? afterSection.slice(nextHeading) : "";
 
       existingContent = before + existingSessionContent + sessionLines.join("\n") + "\n" + after;
-    } else if (existingContent) {
+    } else {
       // Append new section at the end
       existingContent += `\n## Agent Sessions\n\n${sessionLines.join("\n")}\n`;
-    } else {
-      // Create new daily note with frontmatter
-      const dayLabel = new Date().toLocaleDateString("en-US", {
-        weekday: "long",
-        month: "long",
-        day: "numeric",
-        year: "numeric",
-      });
-      existingContent = [
-        "---",
-        `date: ${today}`,
-        `type: daily`,
-        "---",
-        "",
-        `# ${dayLabel}`,
-        "",
-        "## Agent Sessions",
-        "",
-        sessionLines.join("\n"),
-        "",
-      ].join("\n");
     }
 
     await writeFile(dailyNotePath, existingContent, "utf-8");

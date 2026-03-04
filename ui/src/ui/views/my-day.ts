@@ -21,6 +21,7 @@ export type DecisionCardItem = {
   completedAt?: number;
   outputPath?: string;
   prUrl?: string;
+  sourceTaskId?: string;
 };
 
 export type DecisionCardsProps = {

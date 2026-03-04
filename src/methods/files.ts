@@ -3,6 +3,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { promisify } from "node:util";
 import type { GatewayRequestHandler } from "openclaw/plugin-sdk";
+import { readQueueState } from "../lib/queue-state.js";
 import { readWorkspaceConfig } from "../lib/workspaces-config.js";
 
 const execFile = promisify(execFileCb);
@@ -12,6 +13,46 @@ const GOG_ENV = {
   ...process.env,
   GOG_KEYRING_PASSWORD: process.env.GOG_KEYRING_PASSWORD || "godmode2026",
 };
+
+// ── Helpers ──────────────────────────────────────────────────────
+
+/**
+ * Resolve a file path that may be relative to a workspace or godmode root.
+ * Returns the resolved absolute path or null if not found.
+ */
+async function resolveFilePath(filePath: string): Promise<string | null> {
+  let resolved = filePath;
+  if (path.isAbsolute(resolved)) {
+    try { await fs.access(resolved); return resolved; } catch { return null; }
+  }
+
+  // Expand ~ prefix
+  if (resolved.startsWith("~/")) {
+    resolved = path.join(process.env.HOME ?? "", resolved.slice(2));
+    try { await fs.access(resolved); return resolved; } catch { return null; }
+  }
+
+  // Try godmode roots first, then all workspace directories
+  const godmodeRoot = process.env.GODMODE_ROOT ?? path.join(process.env.HOME ?? "", "godmode");
+  const candidates = [
+    path.join(godmodeRoot, resolved),
+    path.join(godmodeRoot, "data", resolved),
+  ];
+
+  try {
+    const wsConfig = await readWorkspaceConfig({ initializeIfMissing: false });
+    for (const ws of wsConfig.workspaces) {
+      candidates.push(path.join(ws.path, resolved));
+    }
+  } catch {
+    // Workspace config unavailable
+  }
+
+  for (const candidate of candidates) {
+    try { await fs.access(candidate); return candidate; } catch { /* next */ }
+  }
+  return null;
+}
 
 // ── RPC Handlers ─────────────────────────────────────────────────
 
@@ -61,59 +102,9 @@ const pushToDrive: GatewayRequestHandler = async ({ params, respond }) => {
     return;
   }
 
-  // Resolve the file path — might be relative to a workspace or godmode root
-  let resolvedPath = filePath;
-  if (!path.isAbsolute(resolvedPath)) {
-    // Expand ~ prefix
-    if (resolvedPath.startsWith("~/")) {
-      resolvedPath = path.join(process.env.HOME ?? "", resolvedPath.slice(2));
-    } else {
-      // Try godmode roots first, then all workspace directories
-      const godmodeRoot = process.env.GODMODE_ROOT ?? path.join(process.env.HOME ?? "", "godmode");
-      const candidates = [
-        path.join(godmodeRoot, resolvedPath),
-        path.join(godmodeRoot, "data", resolvedPath),
-      ];
-
-      // Also search all workspace directories
-      try {
-        const wsConfig = await readWorkspaceConfig({ initializeIfMissing: false });
-        for (const ws of wsConfig.workspaces) {
-          candidates.push(path.join(ws.path, resolvedPath));
-        }
-      } catch {
-        // Workspace config unavailable — skip
-      }
-
-      let found = false;
-      for (const candidate of candidates) {
-        try {
-          await fs.access(candidate);
-          resolvedPath = candidate;
-          found = true;
-          break;
-        } catch {
-          // try next
-        }
-      }
-      if (!found) {
-        respond(false, null, {
-          code: "FILE_NOT_FOUND",
-          message: `File not found: ${filePath}`,
-        });
-        return;
-      }
-    }
-  }
-
-  // Verify file exists before calling gog
-  try {
-    await fs.access(resolvedPath);
-  } catch {
-    respond(false, null, {
-      code: "FILE_NOT_FOUND",
-      message: `File not found: ${resolvedPath}`,
-    });
+  const resolvedPath = await resolveFilePath(filePath);
+  if (!resolvedPath) {
+    respond(false, null, { code: "FILE_NOT_FOUND", message: `File not found: ${filePath}` });
     return;
   }
 
@@ -183,9 +174,145 @@ const pushToDrive: GatewayRequestHandler = async ({ params, respond }) => {
   }
 };
 
+/**
+ * Upload multiple files to Google Drive in a single batch.
+ * Processes sequentially (one at a time) with a max of 20 files.
+ */
+const batchPushToDrive: GatewayRequestHandler = async ({ params, respond }) => {
+  const { filePaths, account, parentFolderId } = params as {
+    filePaths?: string[];
+    account?: string;
+    parentFolderId?: string;
+  };
+
+  if (!filePaths || !Array.isArray(filePaths) || filePaths.length === 0) {
+    respond(false, null, { code: "INVALID_REQUEST", message: "Missing or empty filePaths array" });
+    return;
+  }
+
+  if (filePaths.length > 20) {
+    respond(false, null, { code: "INVALID_REQUEST", message: "Maximum 20 files per batch" });
+    return;
+  }
+
+  // Check gog availability once
+  try {
+    await execFile("which", ["gog"]);
+  } catch {
+    respond(false, null, { code: "GOG_NOT_FOUND", message: "gog CLI not found. Install: npm install -g gog-cli" });
+    return;
+  }
+
+  const results: Array<{ path: string; success: boolean; driveUrl?: string; error?: string }> = [];
+
+  for (const fp of filePaths) {
+    const resolved = await resolveFilePath(fp);
+    if (!resolved) {
+      results.push({ path: fp, success: false, error: `File not found: ${fp}` });
+      continue;
+    }
+
+    const args = ["drive", "upload", resolved, "--no-input", "--json"];
+    if (account) args.push("--account", account);
+    if (parentFolderId) args.push("--parent", parentFolderId);
+
+    try {
+      const { stdout, stderr } = await execFile("gog", args, { timeout: 60_000, env: GOG_ENV });
+      let driveUrl: string | undefined;
+      try {
+        const json = JSON.parse(stdout.trim()) as Record<string, unknown>;
+        const fileId = (json.id ?? json.fileId ?? json.file_id) as string | undefined;
+        driveUrl = (json.webViewLink ?? json.web_view_link ?? json.link ?? json.url) as string | undefined;
+        if (!driveUrl && fileId) driveUrl = `https://drive.google.com/file/d/${fileId}/view`;
+      } catch {
+        const urlMatch = (stdout || stderr).match(/https:\/\/drive\.google\.com\/\S+/);
+        if (urlMatch) driveUrl = urlMatch[0];
+      }
+      results.push({ path: path.basename(resolved), success: true, driveUrl });
+    } catch (e: unknown) {
+      let message = "Upload failed";
+      if (e instanceof Error) {
+        const stderr = (e as { stderr?: string }).stderr?.trim();
+        message = stderr || e.message;
+        if (message.includes("\n")) message = message.split("\n")[0];
+      }
+      results.push({ path: path.basename(resolved), success: false, error: message });
+    }
+  }
+
+  const successCount = results.filter((r) => r.success).length;
+  respond(true, {
+    message: `Uploaded ${successCount}/${results.length} files to Google Drive`,
+    results,
+  });
+};
+
+/**
+ * List files associated with a queue task item.
+ * Checks the item's outputPath and scans inbox for related files.
+ */
+const taskFiles: GatewayRequestHandler = async ({ params, respond }) => {
+  const { itemId } = params as { itemId?: string };
+  if (!itemId) {
+    respond(false, null, { code: "INVALID_REQUEST", message: "Missing itemId" });
+    return;
+  }
+
+  const files: Array<{ path: string; name: string; size: number; type: string }> = [];
+
+  try {
+    const queueState = await readQueueState();
+    const item = queueState.items.find((i) => i.id === itemId);
+
+    // Check the main output file
+    if (item?.result?.outputPath) {
+      const outputPath = item.result.outputPath.startsWith("~/")
+        ? path.join(process.env.HOME ?? "", item.result.outputPath.slice(2))
+        : item.result.outputPath;
+      try {
+        const stat = await fs.stat(outputPath);
+        files.push({
+          path: outputPath,
+          name: path.basename(outputPath),
+          size: stat.size,
+          type: path.extname(outputPath).slice(1) || "file",
+        });
+      } catch { /* file may not exist */ }
+    }
+
+    // Scan inbox for files prefixed with the item ID
+    const godmodeRoot = process.env.GODMODE_ROOT ?? path.join(process.env.HOME ?? "", "godmode");
+    const inboxDir = path.join(godmodeRoot, "memory", "inbox");
+    try {
+      const entries = await fs.readdir(inboxDir);
+      for (const entry of entries) {
+        if (!entry.startsWith(itemId)) continue;
+        const fullPath = path.join(inboxDir, entry);
+        try {
+          const stat = await fs.stat(fullPath);
+          if (stat.isFile() && !files.some((f) => f.path === fullPath)) {
+            files.push({
+              path: fullPath,
+              name: entry,
+              size: stat.size,
+              type: path.extname(entry).slice(1) || "file",
+            });
+          }
+        } catch { /* skip unreadable */ }
+      }
+    } catch { /* inbox dir may not exist */ }
+
+    respond(true, { files });
+  } catch {
+    respond(true, { files });
+  }
+};
+
 // ── Export ────────────────────────────────────────────────────────
 
 export const filesHandlers: Record<string, GatewayRequestHandler> = {
   "files.listDriveAccounts": listDriveAccounts,
   "files.pushToDrive": pushToDrive,
+  "files.batchPushToDrive": batchPushToDrive,
+  "queue.taskFiles": taskFiles,
 };
