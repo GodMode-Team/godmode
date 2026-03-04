@@ -7,15 +7,16 @@
 #
 # What it does:
 #   1. Detects your platform (macOS / Linux)
-#   2. Checks Node.js 22+ (installs via fnm if missing)
-#   3. Installs OpenClaw CLI globally
-#   4. Installs GodMode plugin
-#   5. Activates your license key (if provided)
-#   6. Checks AI authentication
-#   7. Configures gateway
-#   8. Starts gateway and opens GodMode
+#   2. Installs system dependencies if needed
+#   3. Checks Node.js 22+ (installs if missing)
+#   4. Installs OpenClaw CLI globally
+#   5. Installs GodMode plugin
+#   6. Activates your license key (if provided)
+#   7. Checks AI authentication
+#   8. Configures gateway
+#   9. Starts gateway and opens GodMode
 #
-# POSIX-compliant. No bashisms.
+# POSIX-compliant. No bashisms. Works on bare VPS.
 
 set -e
 
@@ -23,49 +24,56 @@ set -e
 cleanup() {
   EXIT_CODE=$?
   if [ "$EXIT_CODE" -ne 0 ]; then
-    printf "\n  ${RED}${BOLD}Installation did not complete (exit code %s).${RESET}\n" "$EXIT_CODE"
-    printf "  ${DIM}Check the error above and re-run this script.${RESET}\n"
-    printf "  ${DIM}For help: https://lifeongodmode.com/support${RESET}\n\n"
+    printf '\n  Installation did not complete (exit code %s).\n' "$EXIT_CODE"
+    printf '  Check the error above and re-run this script.\n'
+    printf '  For help: https://lifeongodmode.com/support\n\n'
   fi
 }
 trap cleanup EXIT
 
-# ── ANSI colors (auto-detect) ──────────────────────────────────────────────
+# ── ANSI colors ──────────────────────────────────────────────────────────
+# When piped (curl | sh), stdout is not a TTY. Force plain text.
+# Users who run `sh install.sh` directly in a terminal get colors.
 
+USE_COLOR=false
 if [ -t 1 ] && [ -z "${NO_COLOR:-}" ] && [ "${TERM:-dumb}" != "dumb" ]; then
-  RESET='\033[0m'
-  BOLD='\033[1m'
-  DIM='\033[2m'
-  GREEN='\033[32m'
-  RED='\033[31m'
-  YELLOW='\033[33m'
-  CYAN='\033[36m'
-  MAGENTA='\033[35m'
-  WHITE='\033[37m'
+  USE_COLOR=true
+fi
+
+if [ "$USE_COLOR" = true ]; then
+  RST=$(printf '\033[0m')
+  BLD=$(printf '\033[1m')
+  DIM=$(printf '\033[2m')
+  GRN=$(printf '\033[32m')
+  RED=$(printf '\033[31m')
+  YLW=$(printf '\033[33m')
+  CYN=$(printf '\033[36m')
+  MAG=$(printf '\033[35m')
+  WHT=$(printf '\033[37m')
 else
-  RESET='' BOLD='' DIM='' GREEN='' RED='' YELLOW='' CYAN='' MAGENTA='' WHITE=''
+  RST='' BLD='' DIM='' GRN='' RED='' YLW='' CYN='' MAG='' WHT=''
 fi
 
 # ── Output helpers ──────────────────────────────────────────────────────────
 
 step() {
-  printf "\n${CYAN}${BOLD}[%s/%s]${RESET} ${WHITE}${BOLD}%s${RESET}\n" "$1" "$TOTAL_STEPS" "$2"
+  printf '\n%s[%s/%s]%s %s%s%s\n' "$CYN$BLD" "$1" "$TOTAL_STEPS" "$RST" "$WHT$BLD" "$2" "$RST"
 }
 
 ok() {
-  printf "  ${GREEN}✔${RESET}  %s\n" "$1"
+  printf '  %s✔%s  %s\n' "$GRN" "$RST" "$1"
 }
 
 warn() {
-  printf "  ${YELLOW}⚠${RESET}  ${YELLOW}%s${RESET}\n" "$1"
+  printf '  %s⚠  %s%s\n' "$YLW" "$1" "$RST"
 }
 
 fail() {
-  printf "  ${RED}✖${RESET}  ${RED}%s${RESET}\n" "$1"
+  printf '  %s✖  %s%s\n' "$RED" "$1" "$RST"
 }
 
 info() {
-  printf "  ${DIM}%s${RESET}\n" "$1"
+  printf '  %s%s%s\n' "$DIM" "$1" "$RST"
 }
 
 # ── Platform detection ──────────────────────────────────────────────────────
@@ -97,6 +105,61 @@ has() {
   command -v "$1" >/dev/null 2>&1
 }
 
+# ── Install system dependencies (Linux) ─────────────────────────────────────
+
+install_system_deps() {
+  if [ "$PLATFORM" != "linux" ]; then
+    return 0
+  fi
+
+  MISSING=""
+  for dep in curl unzip tar; do
+    if ! has "$dep"; then
+      MISSING="$MISSING $dep"
+    fi
+  done
+
+  if [ -z "$MISSING" ]; then
+    ok "System dependencies present"
+    return 0
+  fi
+
+  info "Installing missing system packages:$MISSING"
+
+  if has apt-get; then
+    apt-get update -qq >/dev/null 2>&1 || true
+    # shellcheck disable=SC2086
+    apt-get install -y -qq $MISSING >/dev/null 2>&1 && ok "Installed:$MISSING" || {
+      warn "Could not install$MISSING via apt-get (try running as root)"
+      warn "Run: sudo apt-get install -y$MISSING"
+    }
+  elif has yum; then
+    # shellcheck disable=SC2086
+    yum install -y -q $MISSING >/dev/null 2>&1 && ok "Installed:$MISSING" || {
+      warn "Could not install$MISSING via yum (try running as root)"
+      warn "Run: sudo yum install -y$MISSING"
+    }
+  elif has dnf; then
+    # shellcheck disable=SC2086
+    dnf install -y -q $MISSING >/dev/null 2>&1 && ok "Installed:$MISSING" || {
+      warn "Could not install$MISSING via dnf (try running as root)"
+      warn "Run: sudo dnf install -y$MISSING"
+    }
+  elif has apk; then
+    # shellcheck disable=SC2086
+    apk add --quiet $MISSING >/dev/null 2>&1 && ok "Installed:$MISSING" || {
+      warn "Could not install$MISSING via apk"
+    }
+  elif has pacman; then
+    # shellcheck disable=SC2086
+    pacman -S --noconfirm $MISSING >/dev/null 2>&1 && ok "Installed:$MISSING" || {
+      warn "Could not install$MISSING via pacman"
+    }
+  else
+    warn "Unknown package manager — please install manually:$MISSING"
+  fi
+}
+
 # ── Node.js version check ──────────────────────────────────────────────────
 
 check_node() {
@@ -110,9 +173,11 @@ check_node() {
   return 1
 }
 
-# ── Install Node.js via fnm ────────────────────────────────────────────────
+# ── Install Node.js ─────────────────────────────────────────────────────────
+# Try in order: fnm, nvm, direct binary download
 
 install_node() {
+  # Try existing fnm
   if has fnm; then
     ok "fnm detected — installing Node.js 22"
     fnm install 22
@@ -121,7 +186,7 @@ install_node() {
     return 0
   fi
 
-  # nvm is a shell function — try sourcing it if not available as command
+  # Try nvm (shell function — source it first)
   if [ -s "$HOME/.nvm/nvm.sh" ]; then
     . "$HOME/.nvm/nvm.sh"
   fi
@@ -132,30 +197,102 @@ install_node() {
     return 0
   fi
 
-  warn "No version manager found — installing fnm"
-
+  # Try installing fnm
+  info "No version manager found — trying fnm"
   if [ "$PLATFORM" = "macos" ] && has brew; then
-    brew install fnm
-  else
-    curl -fsSL https://fnm.vercel.app/install | sh
+    brew install fnm 2>/dev/null && {
+      eval "$(fnm env)" 2>/dev/null || true
+      fnm install 22 && fnm use 22
+      eval "$(fnm env)" 2>/dev/null || true
+      return 0
+    }
   fi
 
-  # Source fnm into current shell
-  export PATH="$HOME/.local/share/fnm:$PATH"
-  if has fnm; then
-    eval "$(fnm env)" 2>/dev/null || true
-    fnm install 22
-    fnm use 22
-    eval "$(fnm env)" 2>/dev/null || true
-    # Verify node is now available
-    if ! has node; then
-      export PATH="$HOME/.local/share/fnm/aliases/default/bin:$PATH"
+  # fnm installer needs unzip + curl
+  if has curl && has unzip; then
+    curl -fsSL https://fnm.vercel.app/install 2>/dev/null | sh 2>/dev/null && {
+      export PATH="$HOME/.local/share/fnm:$PATH"
+      if has fnm; then
+        eval "$(fnm env)" 2>/dev/null || true
+        fnm install 22 && fnm use 22
+        eval "$(fnm env)" 2>/dev/null || true
+        if ! has node; then
+          export PATH="$HOME/.local/share/fnm/aliases/default/bin:$PATH"
+        fi
+        return 0
+      fi
+    }
+  fi
+
+  # Fallback: direct Node.js binary download
+  info "fnm unavailable — downloading Node.js directly"
+  install_node_direct
+}
+
+install_node_direct() {
+  NODE_VER="v22.14.0"
+
+  case "$PLATFORM" in
+    macos)
+      case "$ARCH_LABEL" in
+        arm64) NODE_DIST="node-${NODE_VER}-darwin-arm64" ;;
+        *)     NODE_DIST="node-${NODE_VER}-darwin-x64" ;;
+      esac
+      ;;
+    linux)
+      case "$ARCH_LABEL" in
+        arm64) NODE_DIST="node-${NODE_VER}-linux-arm64" ;;
+        *)     NODE_DIST="node-${NODE_VER}-linux-x64" ;;
+      esac
+      ;;
+  esac
+
+  NODE_URL="https://nodejs.org/dist/${NODE_VER}/${NODE_DIST}.tar.xz"
+  NODE_DIR="$HOME/.local/node"
+
+  info "Downloading Node.js $NODE_VER..."
+
+  mkdir -p "$HOME/.local"
+
+  if has curl; then
+    curl -fsSL "$NODE_URL" -o /tmp/node.tar.xz
+  elif has wget; then
+    wget -q "$NODE_URL" -O /tmp/node.tar.xz
+  else
+    fail "Neither curl nor wget found — cannot download Node.js"
+    exit 1
+  fi
+
+  # Extract
+  mkdir -p "$NODE_DIR"
+  tar -xJf /tmp/node.tar.xz -C "$NODE_DIR" --strip-components=1
+  rm -f /tmp/node.tar.xz
+
+  export PATH="$NODE_DIR/bin:$PATH"
+
+  if has node; then
+    ok "Node.js $(node --version) installed to $NODE_DIR"
+
+    # Add to shell profile so it persists
+    PROFILE_FILE=""
+    if [ -f "$HOME/.bashrc" ]; then
+      PROFILE_FILE="$HOME/.bashrc"
+    elif [ -f "$HOME/.profile" ]; then
+      PROFILE_FILE="$HOME/.profile"
     fi
+
+    if [ -n "$PROFILE_FILE" ]; then
+      if ! grep -q "$NODE_DIR/bin" "$PROFILE_FILE" 2>/dev/null; then
+        printf '\n# Node.js (installed by GodMode)\nexport PATH="%s/bin:$PATH"\n' "$NODE_DIR" >> "$PROFILE_FILE"
+        info "Added Node.js to $PROFILE_FILE"
+      fi
+    fi
+
     return 0
   fi
 
-  fail "Could not install Node.js automatically"
-  info "Please install Node.js 22+ manually: https://nodejs.org/en/download"
+  fail "Node.js download succeeded but binary not working"
+  info "Install Node.js 22+ manually: https://nodejs.org/en/download"
   exit 1
 }
 
@@ -175,25 +312,29 @@ open_browser() {
 # ── Main ────────────────────────────────────────────────────────────────────
 
 LICENSE_KEY="${1:-}"
-TOTAL_STEPS=8
+TOTAL_STEPS=9
 GODMODE_URL="http://127.0.0.1:18789/godmode/onboarding"
 
-printf "\n${MAGENTA}${BOLD}=== GodMode Installer ===${RESET}\n"
+printf '\n%s=== GodMode Installer ===%s\n' "$MAG$BLD" "$RST"
 
 # Step 1: Platform
 step 1 "Detecting platform"
 detect_platform
-ok "Platform: ${BOLD}${PLATFORM}${RESET} (${ARCH_LABEL})"
+ok "Platform: $PLATFORM ($ARCH_LABEL)"
 
-# Step 2: Node.js
-step 2 "Checking Node.js"
+# Step 2: System dependencies
+step 2 "Checking system dependencies"
+install_system_deps
+
+# Step 3: Node.js
+step 3 "Checking Node.js"
 if check_node; then
-  ok "Node.js ${BOLD}${NODE_VERSION}${RESET}"
+  ok "Node.js $NODE_VERSION"
 else
   warn "Node.js 22+ required"
   install_node
   if check_node; then
-    ok "Node.js ${BOLD}${NODE_VERSION}${RESET} installed"
+    ok "Node.js $NODE_VERSION installed"
   else
     fail "Node.js installation failed"
     info "Install Node.js 22+ manually: https://nodejs.org/en/download"
@@ -209,11 +350,11 @@ if ! has npm; then
   exit 1
 fi
 
-# Step 3: OpenClaw CLI
-step 3 "Installing OpenClaw CLI"
+# Step 4: OpenClaw CLI
+step 4 "Installing OpenClaw CLI"
 if has openclaw; then
   OC_VERSION="$(openclaw --version 2>/dev/null || echo "(version unknown)")"
-  ok "OpenClaw CLI already installed — ${OC_VERSION}"
+  ok "OpenClaw CLI already installed — $OC_VERSION"
 else
   info "Installing openclaw globally via npm..."
   npm install -g openclaw || {
@@ -232,8 +373,8 @@ else
   fi
 fi
 
-# Step 4: GodMode plugin
-step 4 "Installing GodMode plugin"
+# Step 5: GodMode plugin
+step 5 "Installing GodMode plugin"
 PLUGIN_INSTALLED=false
 if openclaw plugins list 2>/dev/null | grep -qi godmode; then
   PLUGIN_INSTALLED=true
@@ -251,10 +392,10 @@ else
   ok "GodMode plugin installed"
 fi
 
-# Step 5: License activation
-step 5 "Activating license"
+# Step 6: License activation
+step 6 "Activating license"
 if [ -n "$LICENSE_KEY" ]; then
-  openclaw godmode activate "$LICENSE_KEY" && ok "License activated: ${BOLD}${LICENSE_KEY}${RESET}" || {
+  openclaw godmode activate "$LICENSE_KEY" && ok "License activated: $LICENSE_KEY" || {
     warn "License activation failed — you can activate later in the UI"
     info "openclaw godmode activate YOUR-LICENSE-KEY"
   }
@@ -264,23 +405,23 @@ else
   info "Or enter it during onboarding in the GodMode UI"
 fi
 
-# Step 6: AI Authentication
-step 6 "Checking AI authentication"
+# Step 7: AI Authentication
+step 7 "Checking AI authentication"
 if openclaw auth status 2>/dev/null | grep -qi "authenticated\|connected\|active"; then
   ok "Already authenticated with Claude"
 else
   warn "AI authentication not configured"
   info "GodMode needs Claude authentication to work. Two options:"
-  printf "\n"
+  printf '\n'
   info "  Claude Pro/Max subscriber:  openclaw setup-token"
   info "  API key holder:             openclaw auth login"
-  printf "\n"
+  printf '\n'
   info "Run one of these commands after this installer finishes,"
   info "or set it up in the GodMode UI."
 fi
 
-# Step 7: Configure gateway
-step 7 "Configuring gateway"
+# Step 8: Configure gateway
+step 8 "Configuring gateway"
 openclaw config set gateway.mode local 2>/dev/null && ok "gateway.mode = local" || warn "Could not set gateway.mode"
 openclaw config set gateway.controlUi.enabled true 2>/dev/null && ok "gateway.controlUi.enabled = true" || warn "Could not set controlUi"
 openclaw config set plugins.enabled true 2>/dev/null && ok "plugins.enabled = true" || warn "Could not set plugins.enabled"
@@ -293,7 +434,6 @@ if [ -f "$CONFIG_FILE" ]; then
     ok "Gateway security token already set"
   else
     TOKEN="$(openssl rand -hex 32 2>/dev/null || head -c 64 /dev/urandom | od -An -tx1 | tr -d ' \n' | head -c 64)"
-    # Use node with env vars to avoid shell injection
     CONFIG_FILE="$CONFIG_FILE" GATEWAY_TOKEN="$TOKEN" node -e "
       const fs = require('fs');
       const p = process.env.CONFIG_FILE;
@@ -308,8 +448,8 @@ if [ -f "$CONFIG_FILE" ]; then
   fi
 fi
 
-# Step 8: Start gateway
-step 8 "Starting gateway"
+# Step 9: Start gateway
+step 9 "Starting gateway"
 if openclaw gateway status 2>/dev/null | grep -qi running; then
   info "Gateway already running — restarting with new config..."
   openclaw gateway restart 2>/dev/null && ok "Gateway restarted" || warn "Restart failed — try: openclaw gateway restart"
@@ -338,17 +478,17 @@ fi
 
 # ── Done ────────────────────────────────────────────────────────────────────
 
-printf "\n${GREEN}${BOLD}================================================${RESET}\n"
-printf "${GREEN}${BOLD}  GodMode installed successfully!${RESET}\n"
-printf "${GREEN}${BOLD}================================================${RESET}\n"
-printf "\n"
-printf "  ${WHITE}${BOLD}Opening GodMode...${RESET}\n"
-printf "    ${CYAN}%s${RESET}\n" "$GODMODE_URL"
-printf "\n"
+printf '\n%s================================================%s\n' "$GRN$BLD" "$RST"
+printf '%s  GodMode installed successfully!%s\n' "$GRN$BLD" "$RST"
+printf '%s================================================%s\n' "$GRN$BLD" "$RST"
+printf '\n'
+printf '  %sOpening GodMode...%s\n' "$WHT$BLD" "$RST"
+printf '    %s%s%s\n' "$CYN" "$GODMODE_URL" "$RST"
+printf '\n'
 
 # Brief pause so user sees the message
 sleep 1
 open_browser "$GODMODE_URL"
 
-printf "  ${DIM}Run this script again at any time — it is safe to re-run.${RESET}\n"
-printf "  ${DIM}Need help? https://lifeongodmode.com/support${RESET}\n\n"
+printf '  %sRun this script again at any time — it is safe to re-run.%s\n' "$DIM" "$RST"
+printf '  %sNeed help? https://lifeongodmode.com/support%s\n\n' "$DIM" "$RST"
