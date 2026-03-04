@@ -580,9 +580,24 @@ if [ -z "$LICENSE_KEY" ]; then
 fi
 
 if [ -n "$LICENSE_KEY" ]; then
-  openclaw godmode activate "$LICENSE_KEY" && ok "License activated: $LICENSE_KEY" || {
-    warn "License activation failed — you can activate later"
-    info "openclaw godmode activate YOUR-LICENSE-KEY"
+  # Write license key directly to openclaw config (avoids chicken-and-egg:
+  # plugin won't load without key, but activate command requires plugin to load)
+  STATE_DIR="${OPENCLAW_STATE_DIR:-$HOME/.openclaw}"
+  CONFIG_FILE="$STATE_DIR/openclaw.json"
+  LICENSE_KEY="$LICENSE_KEY" CONFIG_FILE="$CONFIG_FILE" node -e "
+    const fs = require('fs');
+    const p = process.env.CONFIG_FILE;
+    let c = {};
+    try { c = JSON.parse(fs.readFileSync(p, 'utf-8')); } catch {}
+    if (!c.plugins) c.plugins = {};
+    if (!c.plugins.entries) c.plugins.entries = {};
+    if (!c.plugins.entries.godmode) c.plugins.entries.godmode = {};
+    if (!c.plugins.entries.godmode.config) c.plugins.entries.godmode.config = {};
+    c.plugins.entries.godmode.config.licenseKey = process.env.LICENSE_KEY;
+    fs.writeFileSync(p, JSON.stringify(c, null, 2) + '\n');
+  " 2>/dev/null && ok "License key saved: $LICENSE_KEY" || {
+    warn "Could not write license key to config"
+    info "Set it manually: openclaw godmode activate $LICENSE_KEY"
   }
 else
   info "No license key provided — skipping activation"
@@ -639,17 +654,18 @@ if openclaw gateway status 2>/dev/null | grep -qi running; then
   openclaw gateway restart 2>/dev/null && ok "Gateway restarted" || warn "Restart failed — try: openclaw gateway restart"
 else
   # Start in background with nohup so it survives shell exit on VPS
+  # Use --foreground to bypass systemctl (often unavailable on VPS/root)
   if [ "$IS_HEADLESS" = true ]; then
-    nohup openclaw gateway start >/dev/null 2>&1 &
-    sleep 2
-    if openclaw gateway status 2>/dev/null | grep -qi running; then
+    nohup openclaw gateway start --foreground >/dev/null 2>&1 &
+    sleep 3
+    if curl -sf "http://127.0.0.1:${GODMODE_PORT}/health" >/dev/null 2>&1; then
+      ok "Gateway started (background)"
+    elif openclaw gateway status 2>/dev/null | grep -qi running; then
       ok "Gateway started (background)"
     else
-      # Try direct start
-      openclaw gateway start 2>/dev/null && ok "Gateway started" || {
-        warn "Could not start gateway automatically"
-        info "Start manually: openclaw gateway start"
-      }
+      warn "Gateway may still be starting"
+      info "Check with: curl -sf http://127.0.0.1:${GODMODE_PORT}/health"
+      info "Or start manually: nohup openclaw gateway start --foreground &"
     fi
   else
     openclaw gateway start 2>/dev/null && ok "Gateway started" || {
