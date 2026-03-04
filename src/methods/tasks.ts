@@ -904,6 +904,149 @@ const archivedHandler: GatewayRequestHandler = async ({ params: _params, respond
   respond(true, { archived: data.archived ?? [] });
 };
 
+// ── Fuzzy title matching for markDoneByTitle ───────────────────────
+
+/**
+ * Score how similar two task titles are (0-100).
+ *
+ * Tier 1 (100): Normalized titles are identical (case-insensitive, bold/em-dash stripped).
+ * Tier 2 (85): One normalized title contains the other (substring match).
+ * Tier 3 (0-80): Word overlap via Jaccard similarity (only when fuzzy=true).
+ */
+function titleSimilarity(a: string, b: string, fuzzy: boolean): number {
+  // Dynamic import would be async — inline the normalization instead.
+  // Same logic as normalizeTitle from daily-brief.ts:
+  const normalize = (raw: string): string => {
+    let t = raw
+      .replace(/\*\*(.+?)\*\*/g, "$1")
+      .replace(/\s*[—–]\s+.+$/, "")
+      .trim();
+    t = t.replace(/[,.]$/, "").trim();
+    t = t.replace(/\s{2,}/g, " ");
+    return t.toLowerCase();
+  };
+
+  const na = normalize(a);
+  const nb = normalize(b);
+
+  // Tier 1: exact match
+  if (na === nb) return 100;
+
+  // Tier 2: substring match
+  if (na.includes(nb) || nb.includes(na)) return 85;
+
+  if (!fuzzy) return 0;
+
+  // Tier 3: word overlap (Jaccard similarity)
+  const wordsA = new Set(na.split(/\s+/).filter(Boolean));
+  const wordsB = new Set(nb.split(/\s+/).filter(Boolean));
+  if (wordsA.size === 0 || wordsB.size === 0) return 0;
+
+  let intersection = 0;
+  for (const w of wordsA) {
+    if (wordsB.has(w)) intersection++;
+  }
+  const union = new Set([...wordsA, ...wordsB]).size;
+  return Math.round((intersection / union) * 80);
+}
+
+/**
+ * tasks.markDoneByTitle — Mark a pending task as complete by title match.
+ *
+ * Params: { title: string, fuzzy?: boolean }
+ * Returns the matched task with score, or an error with candidates.
+ */
+const markDoneByTitle: GatewayRequestHandler = async ({ params, respond }) => {
+  const { title, fuzzy } = params as { title?: string; fuzzy?: boolean };
+  if (!title || typeof title !== "string") {
+    respond(false, null, { code: "INVALID_REQUEST", message: "Missing title parameter" });
+    return;
+  }
+
+  const useFuzzy = fuzzy === true;
+  const THRESHOLD = 80;
+
+  const data = await readTasks();
+  const pendingTasks = data.tasks.filter((t) => t.status === "pending");
+
+  if (pendingTasks.length === 0) {
+    respond(false, null, {
+      code: "NO_MATCH",
+      message: `No pending tasks to match against '${title}'.`,
+    });
+    return;
+  }
+
+  // Score all pending tasks
+  const scored = pendingTasks
+    .map((t) => ({ task: t, score: titleSimilarity(title, t.title, useFuzzy) }))
+    .sort((a, b) => b.score - a.score);
+
+  const best = scored[0];
+  const aboveThreshold = scored.filter((s) => s.score >= THRESHOLD);
+
+  // No match
+  if (aboveThreshold.length === 0) {
+    const hint = useFuzzy
+      ? "Try the exact title."
+      : "Try with fuzzy: true or use the exact title.";
+    respond(false, null, {
+      code: "NO_MATCH",
+      message: `No pending task matching '${title}'. Best candidate: '${best.task.title}' at ${best.score}%. ${hint}`,
+    });
+    return;
+  }
+
+  // Ambiguous match
+  if (aboveThreshold.length > 1) {
+    respond(false, null, {
+      code: "AMBIGUOUS_MATCH",
+      message: `Multiple pending tasks match '${title}': ${aboveThreshold.map((s) => `'${s.task.title}' (${s.score}%)`).join(", ")}. Specify the full title.`,
+      details: aboveThreshold.map((s) => ({
+        id: s.task.id,
+        title: s.task.title,
+        score: s.score,
+      })),
+    });
+    return;
+  }
+
+  // Single match — mark complete
+  const matched = aboveThreshold[0];
+  const { result: updatedTask } = await updateTasks((taskData) => {
+    const task = taskData.tasks.find((t) => t.id === matched.task.id);
+    if (!task) return null;
+    task.status = "complete";
+    task.completedAt = new Date().toISOString();
+    return task;
+  });
+
+  if (!updatedTask) {
+    respond(false, null, { code: "NO_MATCH", message: "Task disappeared during update." });
+    return;
+  }
+
+  respond(true, {
+    task: updatedTask,
+    matchScore: matched.score,
+    matchedTitle: matched.task.title,
+  });
+
+  // Fire-and-forget: sync brief checkbox
+  void (async () => {
+    try {
+      const { syncBriefFromTasks } = await import("./daily-brief.js");
+      const syncDate = updatedTask.dueDate || todayDateStr();
+      await syncBriefFromTasks(syncDate, { taskTitle: updatedTask.title });
+    } catch {
+      // Brief sync is best-effort
+    }
+  })();
+
+  // Fire-and-forget: team sync
+  triggerTeamSyncIfNeeded(updatedTask.project);
+};
+
 export const tasksHandlers: GatewayRequestHandlers = {
   "tasks.list": listTasks,
   "tasks.today": todayTasks,
@@ -918,6 +1061,7 @@ export const tasksHandlers: GatewayRequestHandlers = {
   "tasks.syncTeam": syncTeamHandler,
   "tasks.archive": archiveHandler,
   "tasks.archived": archivedHandler,
+  "tasks.markDoneByTitle": markDoneByTitle,
 };
 
 export { syncTeamTasks, type NativeTask, type TasksData };

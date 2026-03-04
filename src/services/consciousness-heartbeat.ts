@@ -158,6 +158,9 @@ class ConsciousnessHeartbeat {
         this.logger.warn(`[Consciousness] Cron skills processing failed: ${String(err)}`);
       }
 
+      // 3b. Append task dashboard to CONSCIOUSNESS.md
+      await this.appendTaskDashboard().catch(() => {});
+
       // 4. Auto-queue overdue tasks from tasks.json
       try {
         const { autoQueueOverdueTasks } = await import("./queue-processor.js");
@@ -300,6 +303,89 @@ class ConsciousnessHeartbeat {
         type: "cron-result",
         summary: `${queued} cron skill${queued === 1 ? "" : "s"} fired and queued for processing.`,
       });
+    }
+  }
+
+  /**
+   * Append a "Task Pulse" section to CONSCIOUSNESS.md showing pending/completed
+   * task counts and top-priority items. Replaces any existing section.
+   */
+  private async appendTaskDashboard(): Promise<void> {
+    if (!existsSync(CONSCIOUSNESS_FILE)) return;
+
+    const { readTasks } = await import("../methods/tasks.js");
+    const { localDateString } = await import("../data-paths.js");
+    const data = await readTasks();
+    const today = localDateString();
+
+    const allTasks = data.tasks;
+    const archived = data.archived ?? [];
+
+    const pending = allTasks.filter((t) => t.status === "pending");
+    const completedToday = allTasks.filter(
+      (t) => t.status === "complete" && t.completedAt && t.completedAt.slice(0, 10) === today,
+    );
+    const total = allTasks.length;
+
+    // Top 3 pending by priority then due date
+    const priorityOrder: Record<string, number> = { high: 0, medium: 1, low: 2 };
+    const topPending = [...pending]
+      .sort((a, b) => {
+        const pa = priorityOrder[a.priority] ?? 1;
+        const pb = priorityOrder[b.priority] ?? 1;
+        if (pa !== pb) return pa - pb;
+        if (a.dueDate && b.dueDate) return a.dueDate.localeCompare(b.dueDate);
+        if (a.dueDate) return -1;
+        if (b.dueDate) return 1;
+        return a.createdAt.localeCompare(b.createdAt);
+      })
+      .slice(0, 3);
+
+    // Recently completed (from active + archived), sorted by completedAt desc, top 3
+    const allCompleted = [
+      ...allTasks.filter((t) => t.status === "complete" && t.completedAt),
+      ...archived.filter((t) => t.status === "complete" && t.completedAt),
+    ]
+      .sort((a, b) => (b.completedAt ?? "").localeCompare(a.completedAt ?? ""))
+      .slice(0, 3);
+
+    // Build section
+    const lines = [
+      "",
+      "## Task Pulse",
+      "",
+      `**${pending.length} pending** · ${completedToday.length} completed today · ${total} total`,
+      "",
+    ];
+
+    if (topPending.length > 0) {
+      lines.push("### Top Priority");
+      for (const t of topPending) {
+        const due = t.dueDate ? `due: ${t.dueDate}, ` : "";
+        lines.push(`- [ ] ${t.title} (${due}${t.priority})`);
+      }
+      lines.push("");
+    }
+
+    if (allCompleted.length > 0) {
+      lines.push("### Recently Completed");
+      for (const t of allCompleted) {
+        const date = t.completedAt ? t.completedAt.slice(0, 10) : "unknown";
+        lines.push(`- [x] ${t.title} (completed: ${date})`);
+      }
+      lines.push("");
+    }
+
+    const dashboardBlock = lines.join("\n");
+
+    try {
+      let content = readFileSync(CONSCIOUSNESS_FILE, "utf-8");
+      // Remove existing Task Pulse section
+      content = content.replace(/\n## Task Pulse\n[\s\S]*?(?=\n## |\n$|$)/, "");
+      content = content.trimEnd() + "\n" + dashboardBlock;
+      writeFileSync(CONSCIOUSNESS_FILE, content, "utf-8");
+    } catch {
+      // Non-fatal
     }
   }
 

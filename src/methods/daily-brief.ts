@@ -497,7 +497,7 @@ const HIGH_PRIORITY_SECTIONS = /win the day|today's mission|priority|urgent/i;
  * - Strip trailing comma / period
  * - Collapse whitespace
  */
-function normalizeTitle(raw: string): string {
+export function normalizeTitle(raw: string): string {
   let t = raw
     // Remove bold markers
     .replace(/\*\*(.+?)\*\*/g, "$1")
@@ -563,7 +563,7 @@ function parseAllBriefCheckboxes(content: string): BriefItem[] {
  * Case-insensitive substring match for deduplicating tasks against brief items.
  * Used by syncBriefFromTasks where fuzzy matching is needed.
  */
-function titlesMatch(taskTitle: string, briefTitle: string): boolean {
+export function titlesMatch(taskTitle: string, briefTitle: string): boolean {
   const a = taskTitle.toLowerCase().trim();
   const b = briefTitle.toLowerCase().trim();
   return a === b || a.includes(b) || b.includes(a);
