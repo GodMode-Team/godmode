@@ -106,11 +106,13 @@ import { proactiveIntelHandlers } from "./src/methods/proactive-intel.js";
 import { supportHandlers } from "./src/methods/support.js";
 import { correctionsHandlers } from "./src/methods/corrections.js";
 import { sessionCoordinationHandlers } from "./src/methods/session-coordination.js";
+import { fathomWebhookHandlers, handleFathomWebhookHttp } from "./src/methods/fathom-webhook.js";
 // Static file server for UIs
 import { createStaticFileHandler } from "./src/static-server.js";
 import { DATA_DIR } from "./src/data-paths.js";
 // Host compatibility — self-healing layer
 import { detectHostContext, extractSessionKey, safeBroadcast } from "./src/lib/host-context.js";
+import { killZombieGateways } from "./src/lib/zombie-guard.js";
 
 // ── Options file reader (for feature flags in HTTP handler) ─────────
 const OPTIONS_FILE_PATH = join(DATA_DIR, "godmode-options.json");
@@ -639,6 +641,7 @@ const godmodePlugin = {
       ...filesHandlers,
       ...rescuetimeHandlers,
       ...integrationsHandlers,
+      ...fathomWebhookHandlers,
     };
 
     // Methods that must work before a license is configured (setup flow)
@@ -746,6 +749,24 @@ const godmodePlugin = {
         return true;
       }
 
+      // Fathom webhook endpoint (must be before the /godmode UI catch-all)
+      if (pathname === "/godmode/webhooks/fathom" && req.method === "POST") {
+        const chunks: Buffer[] = [];
+        req.on("data", (c: Buffer) => chunks.push(c));
+        req.on("end", () => {
+          // Respond 200 immediately (Fathom requirement)
+          res.writeHead(200, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ ok: true }));
+          // Process async in background
+          const body = Buffer.concat(chunks).toString("utf8");
+          const hdrs = req.headers as Record<string, string>;
+          handleFathomWebhookHttp(body, hdrs).catch((err) => {
+            console.error("[GodMode] Fathom webhook processing error:", err);
+          });
+        });
+        return true;
+      }
+
       // GodMode UI
       if (pathname === "/godmode" || pathname.startsWith("/godmode/")) {
         if (godmodeHandler) {
@@ -806,6 +827,12 @@ h1{color:#ff6b6b}code{background:#16213e;padding:2px 8px;border-radius:4px}a{col
     // ── 5. Lifecycle hooks ────────────────────────────────────────
     api.on("gateway_start", async () => {
       api.logger.info("[GodMode] Gateway started — plugin active");
+
+      // Kill zombie gateway processes that survived previous restarts
+      const zombies = killZombieGateways(api.logger);
+      if (zombies.length > 0) {
+        api.logger.warn(`[GodMode] Cleaned up ${zombies.length} zombie gateway process(es)`);
+      }
 
       // Host compatibility scan — detect host changes BEFORE services initialize
       try {
