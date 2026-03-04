@@ -552,22 +552,14 @@ persist_all_binaries
 
 # Step 5: GodMode plugin
 step 5 "Installing GodMode plugin"
-PLUGIN_INSTALLED=false
-if openclaw plugins list 2>/dev/null | grep -qi godmode; then
-  PLUGIN_INSTALLED=true
-fi
-
-if [ "$PLUGIN_INSTALLED" = true ]; then
-  ok "GodMode plugin already installed"
-else
-  info "Installing @godmode-team/godmode..."
-  openclaw plugins install @godmode-team/godmode || {
-    fail "GodMode plugin install failed"
-    info "Try: openclaw plugins install @godmode-team/godmode"
-    exit 1
-  }
-  ok "GodMode plugin installed"
-fi
+# Always install/update to get the latest version
+info "Installing @godmode-team/godmode (latest)..."
+openclaw plugins install @godmode-team/godmode || {
+  fail "GodMode plugin install failed"
+  info "Try: openclaw plugins install @godmode-team/godmode"
+  exit 1
+}
+ok "GodMode plugin installed (latest)"
 
 # Step 6: License activation
 step 6 "Activating license"
@@ -653,19 +645,17 @@ if openclaw gateway status 2>/dev/null | grep -qi running; then
   info "Gateway already running — restarting with new config..."
   openclaw gateway restart 2>/dev/null && ok "Gateway restarted" || warn "Restart failed — try: openclaw gateway restart"
 else
-  # Start in background with nohup so it survives shell exit on VPS
-  # Use --foreground to bypass systemctl (often unavailable on VPS/root)
+  # On VPS: use "gateway run" (foreground mode) with nohup, because
+  # "gateway start" requires systemctl which doesn't work as root
   if [ "$IS_HEADLESS" = true ]; then
-    nohup openclaw gateway start --foreground >/dev/null 2>&1 &
+    nohup openclaw gateway run >/dev/null 2>&1 &
     sleep 3
     if curl -sf "http://127.0.0.1:${GODMODE_PORT}/health" >/dev/null 2>&1; then
-      ok "Gateway started (background)"
-    elif openclaw gateway status 2>/dev/null | grep -qi running; then
       ok "Gateway started (background)"
     else
       warn "Gateway may still be starting"
       info "Check with: curl -sf http://127.0.0.1:${GODMODE_PORT}/health"
-      info "Or start manually: nohup openclaw gateway start --foreground &"
+      info "Or start manually: nohup openclaw gateway run &"
     fi
   else
     openclaw gateway start 2>/dev/null && ok "Gateway started" || {
@@ -742,7 +732,7 @@ if [ "$IS_HEADLESS" = true ]; then
   STEP_NUM=$((STEP_NUM + 1))
 
   printf '  %s%s.%s Start the gateway (if not running):\n' "$CYN" "$STEP_NUM" "$RST"
-  printf '     openclaw gateway start\n\n'
+  printf '     nohup openclaw gateway run &\n\n'
 else
   # Desktop — open browser
   printf '  %sOpening GodMode...%s\n' "$WHT$BLD" "$RST"
