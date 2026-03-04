@@ -159,22 +159,80 @@ ensure_npm_bin_on_path() {
   fi
 }
 
-# ── Create persistent symlink for openclaw ──────────────────────────────────
-# When Node is installed via fnm/nvm, the global bin lives deep inside the
-# version manager's directory tree. This function creates a symlink in a
-# directory that's ALREADY on PATH in every shell (no sourcing needed).
+# ── Symlink a binary into /usr/local/bin ────────────────────────────────────
+# When Node is installed via fnm/nvm/direct-download, binaries live in
+# non-standard directories. Symlinking to /usr/local/bin makes them
+# available immediately in ANY shell — no sourcing .bashrc needed.
 
-persist_openclaw_on_path() {
-  # Find the real openclaw binary
+symlink_to_system_bin() {
+  BIN_NAME="$1"
+  BIN_PATH="$2"  # full path to the actual binary
+
+  if [ -z "$BIN_PATH" ] || [ ! -x "$BIN_PATH" ]; then
+    return 1
+  fi
+
+  # Already in a system bin directory — nothing to do
+  case "$BIN_PATH" in
+    /usr/local/bin/*|/usr/bin/*) return 0 ;;
+  esac
+
+  # Ensure /usr/local/bin exists
+  if [ ! -d "/usr/local/bin" ]; then
+    mkdir -p /usr/local/bin 2>/dev/null || sudo mkdir -p /usr/local/bin 2>/dev/null || true
+  fi
+
+  # Try to symlink (as current user, then sudo)
+  if [ -d "/usr/local/bin" ]; then
+    if [ -w "/usr/local/bin" ]; then
+      ln -sf "$BIN_PATH" "/usr/local/bin/$BIN_NAME" 2>/dev/null && return 0
+    elif has sudo; then
+      sudo ln -sf "$BIN_PATH" "/usr/local/bin/$BIN_NAME" 2>/dev/null && return 0
+    fi
+  fi
+
+  # Fallback: ~/.local/bin
+  mkdir -p "$HOME/.local/bin" 2>/dev/null
+  ln -sf "$BIN_PATH" "$HOME/.local/bin/$BIN_NAME" 2>/dev/null && {
+    export PATH="$HOME/.local/bin:$PATH"
+    return 0
+  }
+
+  return 1
+}
+
+# Symlink node, npm, npx, and openclaw so they survive the subshell exit
+persist_all_binaries() {
+  LINKED=""
+
+  # Find the bin directory where node lives
+  NODE_BIN_DIR=""
+  if has node; then
+    NODE_REAL="$(command -v node 2>/dev/null)"
+    NODE_BIN_DIR="$(dirname "$NODE_REAL")"
+  fi
+
+  # Symlink node + npm + npx (they share the same bin dir)
+  for bin in node npm npx; do
+    BIN_REAL=""
+    if has "$bin"; then
+      BIN_REAL="$(command -v "$bin" 2>/dev/null)"
+    elif [ -n "$NODE_BIN_DIR" ] && [ -x "$NODE_BIN_DIR/$bin" ]; then
+      BIN_REAL="$NODE_BIN_DIR/$bin"
+    fi
+
+    if [ -n "$BIN_REAL" ]; then
+      symlink_to_system_bin "$bin" "$BIN_REAL" && LINKED="$LINKED $bin"
+    fi
+  done
+
+  # Symlink openclaw
   OC_REAL=""
   if has openclaw; then
     OC_REAL="$(command -v openclaw 2>/dev/null)"
-  fi
-
-  # If not on PATH yet, search known locations
-  if [ -z "$OC_REAL" ]; then
+  else
+    # Search known npm global bin locations
     for candidate in \
-      "$(npm bin -g 2>/dev/null)/openclaw" \
       "$(npm config get prefix 2>/dev/null)/bin/openclaw" \
       "$HOME/.local/share/fnm/aliases/default/bin/openclaw" \
       "$HOME/.local/node/bin/openclaw"; do
@@ -185,65 +243,34 @@ persist_openclaw_on_path() {
     done
   fi
 
-  if [ -z "$OC_REAL" ]; then
-    return 1
+  if [ -n "$OC_REAL" ]; then
+    symlink_to_system_bin "openclaw" "$OC_REAL" && LINKED="$LINKED openclaw"
   fi
 
-  # Resolve symlinks to get the actual file
-  OC_RESOLVED="$OC_REAL"
-  if has readlink; then
-    OC_RESOLVED="$(readlink -f "$OC_REAL" 2>/dev/null || echo "$OC_REAL")"
+  if [ -n "$LINKED" ]; then
+    ok "Binaries linked to /usr/local/bin:$LINKED"
   fi
 
-  # If openclaw is already in /usr/local/bin or /usr/bin, nothing to do
-  case "$OC_REAL" in
-    /usr/local/bin/*|/usr/bin/*) return 0 ;;
-  esac
-
-  # Try to symlink into /usr/local/bin (on PATH for virtually every system)
-  if [ -d "/usr/local/bin" ] && [ -w "/usr/local/bin" ]; then
-    ln -sf "$OC_RESOLVED" /usr/local/bin/openclaw 2>/dev/null && {
-      info "Symlinked openclaw → /usr/local/bin/openclaw"
-      return 0
-    }
+  # Also ensure shell profile has the npm global bin for future npm installs
+  NPM_BIN=""
+  if has npm; then
+    NPM_BIN="$(npm config get prefix 2>/dev/null)/bin"
   fi
 
-  # Try with sudo if available and we're not root
-  if [ "$(id -u)" != "0" ] && has sudo; then
-    sudo ln -sf "$OC_RESOLVED" /usr/local/bin/openclaw 2>/dev/null && {
-      info "Symlinked openclaw → /usr/local/bin/openclaw (sudo)"
-      return 0
-    }
+  PROFILE_FILE=""
+  if [ -f "$HOME/.bashrc" ]; then
+    PROFILE_FILE="$HOME/.bashrc"
+  elif [ -f "$HOME/.zshrc" ]; then
+    PROFILE_FILE="$HOME/.zshrc"
+  elif [ -f "$HOME/.profile" ]; then
+    PROFILE_FILE="$HOME/.profile"
   fi
 
-  # Fallback: $HOME/.local/bin (many systems add this to PATH via .profile)
-  mkdir -p "$HOME/.local/bin" 2>/dev/null
-  if [ -d "$HOME/.local/bin" ]; then
-    ln -sf "$OC_RESOLVED" "$HOME/.local/bin/openclaw" 2>/dev/null && {
-      export PATH="$HOME/.local/bin:$PATH"
-      info "Symlinked openclaw → ~/.local/bin/openclaw"
-
-      # Ensure ~/.local/bin is in shell profile
-      PROFILE_FILE=""
-      if [ -f "$HOME/.bashrc" ]; then
-        PROFILE_FILE="$HOME/.bashrc"
-      elif [ -f "$HOME/.zshrc" ]; then
-        PROFILE_FILE="$HOME/.zshrc"
-      elif [ -f "$HOME/.profile" ]; then
-        PROFILE_FILE="$HOME/.profile"
-      fi
-
-      if [ -n "$PROFILE_FILE" ]; then
-        if ! grep -q 'HOME/.local/bin' "$PROFILE_FILE" 2>/dev/null; then
-          printf '\n# Local bin (added by GodMode installer)\nexport PATH="$HOME/.local/bin:$PATH"\n' >> "$PROFILE_FILE"
-        fi
-      fi
-
-      return 0
-    }
+  if [ -n "$PROFILE_FILE" ] && [ -n "$NPM_BIN" ] && [ -d "$NPM_BIN" ]; then
+    if ! grep -q "$NPM_BIN" "$PROFILE_FILE" 2>/dev/null; then
+      printf '\n# npm global bin (added by GodMode installer)\nexport PATH="%s:$PATH"\n' "$NPM_BIN" >> "$PROFILE_FILE"
+    fi
   fi
-
-  return 1
 }
 
 # ── Install system dependencies (Linux) ─────────────────────────────────────
@@ -320,10 +347,12 @@ check_node() {
 }
 
 # ── Install Node.js ─────────────────────────────────────────────────────────
-# Try in order: fnm, nvm, direct binary download
+# Use existing version managers if present, otherwise direct binary download.
+# We do NOT install fnm/nvm from scratch — direct download is simpler and
+# puts binaries in a predictable location we can symlink.
 
 install_node() {
-  # Try existing fnm
+  # Try existing fnm (already installed by user)
   if has fnm; then
     ok "fnm detected — installing Node.js 22"
     fnm install 22
@@ -332,7 +361,7 @@ install_node() {
     return 0
   fi
 
-  # Try nvm (shell function — source it first)
+  # Try existing nvm (shell function — source it first)
   if [ -s "$HOME/.nvm/nvm.sh" ]; then
     . "$HOME/.nvm/nvm.sh"
   fi
@@ -343,35 +372,17 @@ install_node() {
     return 0
   fi
 
-  # Try installing fnm
-  info "No version manager found — trying fnm"
+  # Try brew on macOS
   if [ "$PLATFORM" = "macos" ] && has brew; then
-    brew install fnm 2>/dev/null && {
-      eval "$(fnm env)" 2>/dev/null || true
-      fnm install 22 && fnm use 22
-      eval "$(fnm env)" 2>/dev/null || true
+    info "Installing Node.js via Homebrew..."
+    brew install node@22 2>/dev/null && {
+      brew link --overwrite node@22 2>/dev/null || true
       return 0
     }
   fi
 
-  # fnm installer needs unzip + curl
-  if has curl && has unzip; then
-    curl -fsSL https://fnm.vercel.app/install 2>/dev/null | sh 2>/dev/null && {
-      export PATH="$HOME/.local/share/fnm:$PATH"
-      if has fnm; then
-        eval "$(fnm env)" 2>/dev/null || true
-        fnm install 22 && fnm use 22
-        eval "$(fnm env)" 2>/dev/null || true
-        if ! has node; then
-          export PATH="$HOME/.local/share/fnm/aliases/default/bin:$PATH"
-        fi
-        return 0
-      fi
-    }
-  fi
-
-  # Fallback: direct Node.js binary download
-  info "fnm unavailable — downloading Node.js directly"
+  # Direct binary download — predictable location, easy to symlink
+  info "Downloading Node.js directly..."
   install_node_direct
 }
 
@@ -534,9 +545,9 @@ else
   fi
 fi
 
-# Create a persistent symlink so openclaw is available in new shells immediately
-# (without needing to source .bashrc)
-persist_openclaw_on_path
+# Symlink node, npm, and openclaw into /usr/local/bin so they work
+# in the user's shell immediately (without sourcing .bashrc)
+persist_all_binaries
 
 # Step 5: GodMode plugin
 step 5 "Installing GodMode plugin"
