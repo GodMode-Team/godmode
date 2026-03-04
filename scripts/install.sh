@@ -6,15 +6,15 @@
 #   curl -fsSL https://lifeongodmode.com/install.sh | sh -s -- GM-YOUR-KEY
 #
 # What it does:
-#   1. Detects your platform (macOS / Linux)
+#   1. Detects your platform (macOS / Linux / headless VPS)
 #   2. Installs system dependencies if needed
 #   3. Checks Node.js 22+ (installs if missing)
 #   4. Installs OpenClaw CLI globally
 #   5. Installs GodMode plugin
-#   6. Activates your license key (if provided)
+#   6. Activates your license key (prompts if not provided)
 #   7. Checks AI authentication
 #   8. Configures gateway
-#   9. Starts gateway and opens GodMode
+#   9. Starts gateway
 #
 # POSIX-compliant. No bashisms. Works on bare VPS.
 
@@ -33,7 +33,6 @@ trap cleanup EXIT
 
 # ── ANSI colors ──────────────────────────────────────────────────────────
 # When piped (curl | sh), stdout is not a TTY. Force plain text.
-# Users who run `sh install.sh` directly in a terminal get colors.
 
 USE_COLOR=false
 if [ -t 1 ] && [ -z "${NO_COLOR:-}" ] && [ "${TERM:-dumb}" != "dumb" ]; then
@@ -78,6 +77,8 @@ info() {
 
 # ── Platform detection ──────────────────────────────────────────────────────
 
+IS_HEADLESS=false
+
 detect_platform() {
   OS="$(uname -s)"
   ARCH="$(uname -m)"
@@ -97,6 +98,13 @@ detect_platform() {
     arm64|aarch64)   ARCH_LABEL="arm64" ;;
     *)               ARCH_LABEL="$ARCH" ;;
   esac
+
+  # Detect headless/VPS environment
+  if [ "$PLATFORM" = "linux" ]; then
+    if [ -z "${DISPLAY:-}" ] && [ -z "${WAYLAND_DISPLAY:-}" ] && ! command -v xdg-open >/dev/null 2>&1; then
+      IS_HEADLESS=true
+    fi
+  fi
 }
 
 # ── Command existence check ─────────────────────────────────────────────────
@@ -105,18 +113,71 @@ has() {
   command -v "$1" >/dev/null 2>&1
 }
 
+# ── Ensure npm global bin is on PATH ─────────────────────────────────────────
+# After npm install -g, the binary may not be on PATH depending on how
+# Node.js was installed (fnm, nvm, direct download, distro package).
+
+ensure_npm_bin_on_path() {
+  NPM_BIN=""
+
+  # Method 1: ask npm where its global bin is
+  if has npm; then
+    NPM_BIN="$(npm config get prefix 2>/dev/null)/bin"
+  fi
+
+  # Method 2: common locations to check
+  for dir in \
+    "$NPM_BIN" \
+    "$HOME/.local/share/fnm/aliases/default/bin" \
+    "$HOME/.local/node/bin" \
+    "$HOME/.nvm/versions/node/$(node --version 2>/dev/null)/bin" \
+    "$HOME/.npm-global/bin" \
+    "/usr/local/bin" \
+    "/usr/bin"; do
+    if [ -n "$dir" ] && [ -d "$dir" ]; then
+      case ":$PATH:" in
+        *":$dir:"*) ;; # already on PATH
+        *) export PATH="$dir:$PATH" ;;
+      esac
+    fi
+  done
+
+  # Persist to shell profile if we had to add paths
+  PROFILE_FILE=""
+  if [ -f "$HOME/.bashrc" ]; then
+    PROFILE_FILE="$HOME/.bashrc"
+  elif [ -f "$HOME/.zshrc" ]; then
+    PROFILE_FILE="$HOME/.zshrc"
+  elif [ -f "$HOME/.profile" ]; then
+    PROFILE_FILE="$HOME/.profile"
+  fi
+
+  if [ -n "$PROFILE_FILE" ] && [ -n "$NPM_BIN" ] && [ -d "$NPM_BIN" ]; then
+    if ! grep -q "$NPM_BIN" "$PROFILE_FILE" 2>/dev/null; then
+      printf '\n# npm global bin (added by GodMode installer)\nexport PATH="%s:$PATH"\n' "$NPM_BIN" >> "$PROFILE_FILE"
+    fi
+  fi
+}
+
 # ── Install system dependencies (Linux) ─────────────────────────────────────
 
 install_system_deps() {
   if [ "$PLATFORM" != "linux" ]; then
+    ok "System dependencies present"
     return 0
   fi
 
   MISSING=""
-  for dep in curl unzip tar; do
-    if ! has "$dep"; then
-      MISSING="$MISSING $dep"
+  for dep in curl unzip tar xz-utils; do
+    # xz-utils provides xz for .tar.xz extraction; binary name varies
+    if [ "$dep" = "xz-utils" ]; then
+      if has xz || has xzcat || has unxz; then
+        continue
+      fi
+    elif has "$dep"; then
+      continue
     fi
+    MISSING="$MISSING $dep"
   done
 
   if [ -z "$MISSING" ]; then
@@ -131,19 +192,17 @@ install_system_deps() {
     # shellcheck disable=SC2086
     apt-get install -y -qq $MISSING >/dev/null 2>&1 && ok "Installed:$MISSING" || {
       warn "Could not install$MISSING via apt-get (try running as root)"
-      warn "Run: sudo apt-get install -y$MISSING"
+      info "Run: sudo apt-get install -y$MISSING"
     }
   elif has yum; then
     # shellcheck disable=SC2086
     yum install -y -q $MISSING >/dev/null 2>&1 && ok "Installed:$MISSING" || {
       warn "Could not install$MISSING via yum (try running as root)"
-      warn "Run: sudo yum install -y$MISSING"
     }
   elif has dnf; then
     # shellcheck disable=SC2086
     dnf install -y -q $MISSING >/dev/null 2>&1 && ok "Installed:$MISSING" || {
       warn "Could not install$MISSING via dnf (try running as root)"
-      warn "Run: sudo dnf install -y$MISSING"
     }
   elif has apk; then
     # shellcheck disable=SC2086
@@ -304,23 +363,26 @@ open_browser() {
     open "$URL" 2>/dev/null || true
   elif has xdg-open; then
     xdg-open "$URL" 2>/dev/null || true
-  else
-    info "Open in your browser: $URL"
   fi
+  # On headless, don't try to open — handled separately
 }
 
 # ── Main ────────────────────────────────────────────────────────────────────
 
 LICENSE_KEY="${1:-}"
 TOTAL_STEPS=9
-GODMODE_URL="http://127.0.0.1:18789/godmode/onboarding"
+GODMODE_PORT=18789
 
 printf '\n%s=== GodMode Installer ===%s\n' "$MAG$BLD" "$RST"
 
 # Step 1: Platform
 step 1 "Detecting platform"
 detect_platform
-ok "Platform: $PLATFORM ($ARCH_LABEL)"
+if [ "$IS_HEADLESS" = true ]; then
+  ok "Platform: $PLATFORM ($ARCH_LABEL) — headless/VPS"
+else
+  ok "Platform: $PLATFORM ($ARCH_LABEL)"
+fi
 
 # Step 2: System dependencies
 step 2 "Checking system dependencies"
@@ -360,16 +422,28 @@ else
   npm install -g openclaw || {
     fail "OpenClaw CLI install failed"
     info "Try: npm install -g openclaw"
-    info "If permission denied: npm install -g openclaw --prefix ~/.local"
+    info "If permission denied, try: npm install -g openclaw --prefix ~/.local"
     exit 1
   }
+
+  # Ensure npm global bin directory is on PATH
+  ensure_npm_bin_on_path
+
   if has openclaw; then
     ok "OpenClaw CLI installed"
   else
-    fail "OpenClaw CLI not found after install"
-    info "Try: npm install -g openclaw"
-    info "If permission denied: npm install -g openclaw --prefix ~/.local"
-    exit 1
+    # Last resort: find the binary
+    OC_PATH="$(npm root -g 2>/dev/null)/../../bin"
+    if [ -x "$OC_PATH/openclaw" ]; then
+      export PATH="$OC_PATH:$PATH"
+      ok "OpenClaw CLI installed (added $OC_PATH to PATH)"
+    else
+      fail "OpenClaw CLI installed but not found on PATH"
+      info "npm global bin: $(npm bin -g 2>/dev/null || echo 'unknown')"
+      info "Try: export PATH=\"\$(npm bin -g):\$PATH\" && openclaw --version"
+      info "Then re-run this script."
+      exit 1
+    fi
   fi
 fi
 
@@ -394,14 +468,22 @@ fi
 
 # Step 6: License activation
 step 6 "Activating license"
+if [ -z "$LICENSE_KEY" ]; then
+  # Try to prompt interactively if terminal is available
+  if [ -t 0 ] 2>/dev/null; then
+    printf '\n  Enter your GodMode license key (or press Enter to skip): '
+    read -r LICENSE_KEY
+  fi
+fi
+
 if [ -n "$LICENSE_KEY" ]; then
   openclaw godmode activate "$LICENSE_KEY" && ok "License activated: $LICENSE_KEY" || {
-    warn "License activation failed — you can activate later in the UI"
+    warn "License activation failed — you can activate later"
     info "openclaw godmode activate YOUR-LICENSE-KEY"
   }
 else
   info "No license key provided — skipping activation"
-  info "You can activate later: openclaw godmode activate YOUR-KEY"
+  info "Activate later with: openclaw godmode activate YOUR-KEY"
   info "Or enter it during onboarding in the GodMode UI"
 fi
 
@@ -416,8 +498,7 @@ else
   info "  Claude Pro/Max subscriber:  openclaw setup-token"
   info "  API key holder:             openclaw auth login"
   printf '\n'
-  info "Run one of these commands after this installer finishes,"
-  info "or set it up in the GodMode UI."
+  info "Run one of these commands after this installer finishes."
 fi
 
 # Step 8: Configure gateway
@@ -454,16 +535,31 @@ if openclaw gateway status 2>/dev/null | grep -qi running; then
   info "Gateway already running — restarting with new config..."
   openclaw gateway restart 2>/dev/null && ok "Gateway restarted" || warn "Restart failed — try: openclaw gateway restart"
 else
-  openclaw gateway start 2>/dev/null && ok "Gateway started" || {
-    warn "Could not start gateway automatically"
-    info "Start manually: openclaw gateway start"
-  }
+  # Start in background with nohup so it survives shell exit on VPS
+  if [ "$IS_HEADLESS" = true ]; then
+    nohup openclaw gateway start >/dev/null 2>&1 &
+    sleep 2
+    if openclaw gateway status 2>/dev/null | grep -qi running; then
+      ok "Gateway started (background)"
+    else
+      # Try direct start
+      openclaw gateway start 2>/dev/null && ok "Gateway started" || {
+        warn "Could not start gateway automatically"
+        info "Start manually: openclaw gateway start"
+      }
+    fi
+  else
+    openclaw gateway start 2>/dev/null && ok "Gateway started" || {
+      warn "Could not start gateway automatically"
+      info "Start manually: openclaw gateway start"
+    }
+  fi
 fi
 
-# Wait for gateway to be ready (up to 10 seconds)
+# Wait for gateway to be ready (up to 15 seconds)
 READY=false
-for i in 1 2 3 4 5 6 7 8 9 10; do
-  if curl -sf "http://127.0.0.1:18789/health" >/dev/null 2>&1; then
+for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15; do
+  if curl -sf "http://127.0.0.1:${GODMODE_PORT}/health" >/dev/null 2>&1; then
     READY=true
     break
   fi
@@ -471,24 +567,58 @@ for i in 1 2 3 4 5 6 7 8 9 10; do
 done
 
 if [ "$READY" = true ]; then
-  ok "Gateway is ready"
+  ok "Gateway is ready on port $GODMODE_PORT"
 else
-  warn "Gateway may still be starting — opening browser anyway"
+  warn "Gateway did not respond on port $GODMODE_PORT within 15s"
+  info "This is normal on first run — it may take a moment to initialize."
+  info "Check status: openclaw gateway status"
+  info "Start manually: openclaw gateway start"
 fi
 
 # ── Done ────────────────────────────────────────────────────────────────────
+
+GODMODE_URL="http://127.0.0.1:${GODMODE_PORT}/godmode/onboarding"
 
 printf '\n%s================================================%s\n' "$GRN$BLD" "$RST"
 printf '%s  GodMode installed successfully!%s\n' "$GRN$BLD" "$RST"
 printf '%s================================================%s\n' "$GRN$BLD" "$RST"
 printf '\n'
-printf '  %sOpening GodMode...%s\n' "$WHT$BLD" "$RST"
-printf '    %s%s%s\n' "$CYN" "$GODMODE_URL" "$RST"
-printf '\n'
 
-# Brief pause so user sees the message
-sleep 1
-open_browser "$GODMODE_URL"
+if [ "$IS_HEADLESS" = true ]; then
+  # VPS/headless-specific instructions
+  printf '  %sNext steps for your server:%s\n\n' "$WHT$BLD" "$RST"
+
+  if [ -z "$LICENSE_KEY" ]; then
+    printf '  %s1.%s Activate your license:\n' "$CYN" "$RST"
+    printf '     openclaw godmode activate GM-YOUR-KEY\n\n'
+  fi
+
+  printf '  %s2.%s Set up AI authentication:\n' "$CYN" "$RST"
+  printf '     openclaw auth login    %s(API key)%s\n' "$DIM" "$RST"
+  printf '     openclaw setup-token   %s(Claude Pro/Max)%s\n\n' "$DIM" "$RST"
+
+  printf '  %s3.%s Access GodMode remotely:\n' "$CYN" "$RST"
+  printf '     %sOption A — SSH tunnel (quick):%s\n' "$DIM" "$RST"
+  printf '     ssh -L %s:localhost:%s user@your-server\n' "$GODMODE_PORT" "$GODMODE_PORT"
+  printf '     Then open: %s%s%s\n\n' "$CYN" "$GODMODE_URL" "$RST"
+  printf '     %sOption B — Tailscale (recommended for persistent access):%s\n' "$DIM" "$RST"
+  printf '     curl -fsSL https://tailscale.com/install.sh | sh\n'
+  printf '     tailscale up\n'
+  printf '     Then open: http://<tailscale-ip>:%s/godmode/onboarding\n\n' "$GODMODE_PORT"
+
+  printf '  %s4.%s Start the gateway (if not running):\n' "$CYN" "$RST"
+  printf '     openclaw gateway start\n\n'
+
+  # Remind about PATH for new shells
+  printf '  %sNote: If "openclaw" is not found in a new terminal, run:%s\n' "$DIM" "$RST"
+  printf '  source ~/.bashrc  %s(or ~/.profile)%s\n\n' "$DIM" "$RST"
+else
+  # Desktop — open browser
+  printf '  %sOpening GodMode...%s\n' "$WHT$BLD" "$RST"
+  printf '    %s%s%s\n\n' "$CYN" "$GODMODE_URL" "$RST"
+  sleep 1
+  open_browser "$GODMODE_URL"
+fi
 
 printf '  %sRun this script again at any time — it is safe to re-run.%s\n' "$DIM" "$RST"
 printf '  %sNeed help? https://lifeongodmode.com/support%s\n\n' "$DIM" "$RST"
