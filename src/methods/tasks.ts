@@ -914,8 +914,7 @@ const archivedHandler: GatewayRequestHandler = async ({ params: _params, respond
  * Tier 3 (0-80): Word overlap via Jaccard similarity (only when fuzzy=true).
  */
 function titleSimilarity(a: string, b: string, fuzzy: boolean): number {
-  // Dynamic import would be async — inline the normalization instead.
-  // Same logic as normalizeTitle from daily-brief.ts:
+  // Inlined from normalizeTitle (daily-brief.ts) + toLowerCase for comparison:
   const normalize = (raw: string): string => {
     let t = raw
       .replace(/\*\*(.+?)\*\*/g, "$1")
