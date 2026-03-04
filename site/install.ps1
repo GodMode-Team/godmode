@@ -187,36 +187,6 @@ if ($nodeMajor -ge 22) {
         }
     }
 
-    # Install fnm then use it
-    if (-not $nodeInstalled -and -not (Test-CommandExists "fnm")) {
-        Write-Info "Installing fnm (Fast Node Manager)..."
-        try {
-            if (Test-CommandExists "winget") {
-                & winget install Schniz.fnm --accept-source-agreements --accept-package-agreements --silent 2>$null
-                Refresh-PathEnv
-            } else {
-                # Install fnm via PowerShell bootstrap
-                Invoke-WebRequest -Uri "https://fnm.vercel.app/install" -UseBasicParsing | Select-Object -ExpandProperty Content | & { $input | & "$env:COMSPEC" /c "bash" } 2>$null
-                Refresh-PathEnv
-            }
-
-            if (Test-CommandExists "fnm") {
-                & fnm install 22
-                & fnm use 22
-                & fnm env --shell powershell | Out-String | Invoke-Expression
-                Refresh-PathEnv
-                $nodeMajor = Get-NodeMajorVersion
-                if ($nodeMajor -ge 22) {
-                    $nodeVersion = & node --version 2>$null
-                    Write-Ok "Node.js $nodeVersion installed via fnm"
-                    $nodeInstalled = $true
-                }
-            }
-        } catch {
-            Write-Info "Automatic fnm installation did not succeed."
-        }
-    }
-
     if (-not $nodeInstalled) {
         Write-Fail "Could not install Node.js automatically"
         Write-Info "Please install Node.js 22+ manually: https://nodejs.org/en/download"

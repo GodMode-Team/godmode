@@ -88,7 +88,8 @@ detect_platform() {
     Linux)  PLATFORM="linux" ;;
     *)
       fail "Unsupported operating system: $OS"
-      info "GodMode supports macOS and Linux. Windows users: use WSL2."
+      info "GodMode supports macOS and Linux with this script."
+      info "Windows users: irm https://lifeongodmode.com/install.ps1 | iex"
       exit 1
       ;;
   esac

@@ -347,6 +347,36 @@ body::after {
   height: 16px;
 }
 
+.install-tabs {
+  display: flex;
+  justify-content: center;
+  gap: 4px;
+  margin-bottom: 10px;
+}
+
+.install-tab {
+  padding: 6px 16px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-muted);
+  font-family: var(--font-body);
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.install-tab:hover {
+  border-color: var(--border-hover);
+  color: var(--text);
+}
+
+.install-tab--active {
+  background: rgba(56, 189, 248, 0.1);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
 .install-hint {
   text-align: center;
   margin-top: 12px;
@@ -794,8 +824,12 @@ body::after {
 
       <!-- Install Command -->
       <div class="install-block fade-up fade-up-4">
+        <div class="install-tabs">
+          <button class="install-tab install-tab--active" onclick="switchPlatform('unix')" id="tabUnix">macOS / Linux</button>
+          <button class="install-tab" onclick="switchPlatform('win')" id="tabWin">Windows</button>
+        </div>
         <div class="install-cmd" id="installCmd">
-          <span class="install-cmd-prefix">$</span>
+          <span class="install-cmd-prefix" id="cmdPrefix">$</span>
           <span class="install-cmd-text" id="cmdText">curl -fsSL https://lifeongodmode.com/install.sh | sh</span>
           <button class="install-cmd-copy" id="copyBtn" onclick="copyInstall()" aria-label="Copy install command">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -805,7 +839,7 @@ body::after {
             <span id="copyLabel">Copy</span>
           </button>
         </div>
-        <p class="install-hint">Installs OpenClaw + GodMode. macOS &amp; Linux. Requires Node.js 22+.</p>
+        <p class="install-hint">Installs everything automatically &mdash; Node.js, OpenClaw, and GodMode.</p>
       </div>
 
       <!-- Hero Actions -->
@@ -969,8 +1003,23 @@ body::after {
 </div>
 
 <script>
+var currentPlatform = 'unix';
+var commands = {
+  unix: 'curl -fsSL https://lifeongodmode.com/install.sh | sh',
+  win: 'irm https://lifeongodmode.com/install.ps1 | iex'
+};
+var prefixes = { unix: '$', win: 'PS>' };
+
+function switchPlatform(platform) {
+  currentPlatform = platform;
+  document.getElementById('cmdText').textContent = commands[platform];
+  document.getElementById('cmdPrefix').textContent = prefixes[platform];
+  document.getElementById('tabUnix').className = 'install-tab' + (platform === 'unix' ? ' install-tab--active' : '');
+  document.getElementById('tabWin').className = 'install-tab' + (platform === 'win' ? ' install-tab--active' : '');
+}
+
 function copyInstall() {
-  const text = 'curl -fsSL https://lifeongodmode.com/install.sh | sh';
+  const text = commands[currentPlatform];
   const label = document.getElementById('copyLabel');
 
   if (navigator.clipboard && navigator.clipboard.writeText) {
