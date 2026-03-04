@@ -159,6 +159,93 @@ ensure_npm_bin_on_path() {
   fi
 }
 
+# ── Create persistent symlink for openclaw ──────────────────────────────────
+# When Node is installed via fnm/nvm, the global bin lives deep inside the
+# version manager's directory tree. This function creates a symlink in a
+# directory that's ALREADY on PATH in every shell (no sourcing needed).
+
+persist_openclaw_on_path() {
+  # Find the real openclaw binary
+  OC_REAL=""
+  if has openclaw; then
+    OC_REAL="$(command -v openclaw 2>/dev/null)"
+  fi
+
+  # If not on PATH yet, search known locations
+  if [ -z "$OC_REAL" ]; then
+    for candidate in \
+      "$(npm bin -g 2>/dev/null)/openclaw" \
+      "$(npm config get prefix 2>/dev/null)/bin/openclaw" \
+      "$HOME/.local/share/fnm/aliases/default/bin/openclaw" \
+      "$HOME/.local/node/bin/openclaw"; do
+      if [ -n "$candidate" ] && [ -x "$candidate" ]; then
+        OC_REAL="$candidate"
+        break
+      fi
+    done
+  fi
+
+  if [ -z "$OC_REAL" ]; then
+    return 1
+  fi
+
+  # Resolve symlinks to get the actual file
+  OC_RESOLVED="$OC_REAL"
+  if has readlink; then
+    OC_RESOLVED="$(readlink -f "$OC_REAL" 2>/dev/null || echo "$OC_REAL")"
+  fi
+
+  # If openclaw is already in /usr/local/bin or /usr/bin, nothing to do
+  case "$OC_REAL" in
+    /usr/local/bin/*|/usr/bin/*) return 0 ;;
+  esac
+
+  # Try to symlink into /usr/local/bin (on PATH for virtually every system)
+  if [ -d "/usr/local/bin" ] && [ -w "/usr/local/bin" ]; then
+    ln -sf "$OC_RESOLVED" /usr/local/bin/openclaw 2>/dev/null && {
+      info "Symlinked openclaw → /usr/local/bin/openclaw"
+      return 0
+    }
+  fi
+
+  # Try with sudo if available and we're not root
+  if [ "$(id -u)" != "0" ] && has sudo; then
+    sudo ln -sf "$OC_RESOLVED" /usr/local/bin/openclaw 2>/dev/null && {
+      info "Symlinked openclaw → /usr/local/bin/openclaw (sudo)"
+      return 0
+    }
+  fi
+
+  # Fallback: $HOME/.local/bin (many systems add this to PATH via .profile)
+  mkdir -p "$HOME/.local/bin" 2>/dev/null
+  if [ -d "$HOME/.local/bin" ]; then
+    ln -sf "$OC_RESOLVED" "$HOME/.local/bin/openclaw" 2>/dev/null && {
+      export PATH="$HOME/.local/bin:$PATH"
+      info "Symlinked openclaw → ~/.local/bin/openclaw"
+
+      # Ensure ~/.local/bin is in shell profile
+      PROFILE_FILE=""
+      if [ -f "$HOME/.bashrc" ]; then
+        PROFILE_FILE="$HOME/.bashrc"
+      elif [ -f "$HOME/.zshrc" ]; then
+        PROFILE_FILE="$HOME/.zshrc"
+      elif [ -f "$HOME/.profile" ]; then
+        PROFILE_FILE="$HOME/.profile"
+      fi
+
+      if [ -n "$PROFILE_FILE" ]; then
+        if ! grep -q 'HOME/.local/bin' "$PROFILE_FILE" 2>/dev/null; then
+          printf '\n# Local bin (added by GodMode installer)\nexport PATH="$HOME/.local/bin:$PATH"\n' >> "$PROFILE_FILE"
+        fi
+      fi
+
+      return 0
+    }
+  fi
+
+  return 1
+}
+
 # ── Install system dependencies (Linux) ─────────────────────────────────────
 
 install_system_deps() {
@@ -426,7 +513,7 @@ else
     exit 1
   }
 
-  # Ensure npm global bin directory is on PATH
+  # Ensure npm global bin directory is on PATH (for this script's subshell)
   ensure_npm_bin_on_path
 
   if has openclaw; then
@@ -446,6 +533,10 @@ else
     fi
   fi
 fi
+
+# Create a persistent symlink so openclaw is available in new shells immediately
+# (without needing to source .bashrc)
+persist_openclaw_on_path
 
 # Step 5: GodMode plugin
 step 5 "Installing GodMode plugin"
@@ -588,16 +679,31 @@ if [ "$IS_HEADLESS" = true ]; then
   # VPS/headless-specific instructions
   printf '  %sNext steps for your server:%s\n\n' "$WHT$BLD" "$RST"
 
-  if [ -z "$LICENSE_KEY" ]; then
-    printf '  %s1.%s Activate your license:\n' "$CYN" "$RST"
-    printf '     openclaw godmode activate GM-YOUR-KEY\n\n'
+  # Check if openclaw will be found in a new shell
+  NEEDS_SOURCE=false
+  if [ ! -x "/usr/local/bin/openclaw" ] && [ ! -x "$HOME/.local/bin/openclaw" ]; then
+    NEEDS_SOURCE=true
   fi
 
-  printf '  %s2.%s Set up AI authentication:\n' "$CYN" "$RST"
+  if [ "$NEEDS_SOURCE" = true ]; then
+    printf '  %s%s!! IMPORTANT — Run this first in your current shell: !!%s\n' "$YLW" "$BLD" "$RST"
+    printf '  %ssource ~/.bashrc%s  %s(or: source ~/.profile)%s\n\n' "$WHT$BLD" "$RST" "$DIM" "$RST"
+  fi
+
+  STEP_NUM=1
+
+  if [ -z "$LICENSE_KEY" ]; then
+    printf '  %s%s.%s Activate your license:\n' "$CYN" "$STEP_NUM" "$RST"
+    printf '     openclaw godmode activate GM-YOUR-KEY\n\n'
+    STEP_NUM=$((STEP_NUM + 1))
+  fi
+
+  printf '  %s%s.%s Set up AI authentication:\n' "$CYN" "$STEP_NUM" "$RST"
   printf '     openclaw auth login    %s(API key)%s\n' "$DIM" "$RST"
   printf '     openclaw setup-token   %s(Claude Pro/Max)%s\n\n' "$DIM" "$RST"
+  STEP_NUM=$((STEP_NUM + 1))
 
-  printf '  %s3.%s Access GodMode remotely:\n' "$CYN" "$RST"
+  printf '  %s%s.%s Access GodMode remotely:\n' "$CYN" "$STEP_NUM" "$RST"
   printf '     %sOption A — SSH tunnel (quick):%s\n' "$DIM" "$RST"
   printf '     ssh -L %s:localhost:%s user@your-server\n' "$GODMODE_PORT" "$GODMODE_PORT"
   printf '     Then open: %s%s%s\n\n' "$CYN" "$GODMODE_URL" "$RST"
@@ -605,13 +711,10 @@ if [ "$IS_HEADLESS" = true ]; then
   printf '     curl -fsSL https://tailscale.com/install.sh | sh\n'
   printf '     tailscale up\n'
   printf '     Then open: http://<tailscale-ip>:%s/godmode/onboarding\n\n' "$GODMODE_PORT"
+  STEP_NUM=$((STEP_NUM + 1))
 
-  printf '  %s4.%s Start the gateway (if not running):\n' "$CYN" "$RST"
+  printf '  %s%s.%s Start the gateway (if not running):\n' "$CYN" "$STEP_NUM" "$RST"
   printf '     openclaw gateway start\n\n'
-
-  # Remind about PATH for new shells
-  printf '  %sNote: If "openclaw" is not found in a new terminal, run:%s\n' "$DIM" "$RST"
-  printf '  source ~/.bashrc  %s(or ~/.profile)%s\n\n' "$DIM" "$RST"
 else
   # Desktop — open browser
   printf '  %sOpening GodMode...%s\n' "$WHT$BLD" "$RST"
