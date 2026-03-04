@@ -691,21 +691,7 @@ const syncTeamHandler: GatewayRequestHandler = async ({ params, respond }) => {
   respond(true, result);
 };
 
-export const tasksHandlers: GatewayRequestHandlers = {
-  "tasks.list": listTasks,
-  "tasks.today": todayTasks,
-  "tasks.upcoming": upcomingTasks,
-  "tasks.get": getTask,
-  "tasks.create": createTask,
-  "tasks.update": updateTask,
-  "tasks.delete": deleteTask,
-  "tasks.byProject": byProject,
-  "tasks.openSession": openSession,
-  "tasks.linkSession": linkSession,
-  "tasks.syncTeam": syncTeamHandler,
-  "tasks.archive": archiveHandler,
-  "tasks.archived": archivedHandler,
-};
+// tasksHandlers is defined at the bottom of this file (after archiveHandler/archivedHandler).
 
 /**
  * Ensures a task has a linked session. Called by the queue processor when
@@ -817,6 +803,22 @@ const archiveHandler: GatewayRequestHandler = async ({ params, respond }) => {
 const archivedHandler: GatewayRequestHandler = async ({ params: _params, respond }) => {
   const data = await readTasks();
   respond(true, { archived: data.archived ?? [] });
+};
+
+export const tasksHandlers: GatewayRequestHandlers = {
+  "tasks.list": listTasks,
+  "tasks.today": todayTasks,
+  "tasks.upcoming": upcomingTasks,
+  "tasks.get": getTask,
+  "tasks.create": createTask,
+  "tasks.update": updateTask,
+  "tasks.delete": deleteTask,
+  "tasks.byProject": byProject,
+  "tasks.openSession": openSession,
+  "tasks.linkSession": linkSession,
+  "tasks.syncTeam": syncTeamHandler,
+  "tasks.archive": archiveHandler,
+  "tasks.archived": archivedHandler,
 };
 
 export { syncTeamTasks, type NativeTask, type TasksData };
