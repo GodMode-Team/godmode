@@ -26,6 +26,7 @@ function countsByStatus(items: QueueItem[]): Record<QueueItemStatus, number> {
     pending: 0,
     processing: 0,
     review: 0,
+    "needs-review": 0,
     done: 0,
     failed: 0,
   };
