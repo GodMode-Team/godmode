@@ -106,6 +106,26 @@ export async function generateSnapshot(): Promise<string> {
     // No brief yet — skip
   }
 
+  // Goals (active goals from goals.json)
+  try {
+    const goalsPath = join(DATA_DIR, "goals.json");
+    const goalsRaw = await readFile(goalsPath, "utf-8");
+    const goalsData = JSON.parse(goalsRaw) as {
+      goals?: Array<{ title: string; area?: string; progress?: number; status?: string }>;
+    };
+    const active = goalsData.goals?.filter(g => !g.status || g.status === "active") ?? [];
+    if (active.length > 0) {
+      lines.push("## Goals");
+      for (const g of active.slice(0, 3)) {
+        const progress = g.progress != null ? ` (${g.progress}%)` : "";
+        lines.push(`- ${g.title}${progress}`);
+      }
+      if (active.length > 3) lines.push(`- +${active.length - 3} more`);
+    }
+  } catch {
+    // No goals — skip
+  }
+
   // Task counts
   try {
     const { readTasks } = await import("../methods/tasks.js");
@@ -148,6 +168,29 @@ export async function generateSnapshot(): Promise<string> {
     }
   } catch {
     // Skills registry unavailable
+  }
+
+  // Agent activity summary (today's agent log)
+  try {
+    const agentLogPath = join(DATA_DIR, "..", "memory", "agent-log", `${today}.json`);
+    const logRaw = await readFile(agentLogPath, "utf-8");
+    const logData = JSON.parse(logRaw) as {
+      completed?: Array<unknown>;
+      needsReview?: Array<unknown>;
+      errors?: Array<unknown>;
+    };
+    const completed = logData.completed?.length ?? 0;
+    const review = logData.needsReview?.length ?? 0;
+    const errors = logData.errors?.length ?? 0;
+    if (completed > 0 || review > 0 || errors > 0) {
+      const parts: string[] = [];
+      if (completed > 0) parts.push(`${completed} completed`);
+      if (review > 0) parts.push(`${review} needs review`);
+      if (errors > 0) parts.push(`${errors} errors`);
+      lines.push(`## Agent Activity: ${parts.join(", ")}`);
+    }
+  } catch {
+    // No agent log today — skip
   }
 
   // Trust tracker summary (if data exists)

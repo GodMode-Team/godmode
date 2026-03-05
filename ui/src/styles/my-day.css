@@ -2251,3 +2251,151 @@
     font-size: 12px;
   }
 }
+
+/* ── Readiness Score Badge ───────────────────────────────────── */
+
+.brief-readiness {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 12px;
+  padding: 2px 8px;
+  background: var(--mc-bg-secondary);
+  border-radius: 6px;
+  font-size: 12px;
+}
+
+.readiness-score {
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--mc-text);
+}
+
+.readiness-label {
+  color: var(--mc-text-muted);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.brief-task-progress {
+  margin-left: 8px;
+  padding: 2px 6px;
+  background: var(--mc-bg-secondary);
+  border-radius: 6px;
+  font-size: 11px;
+  color: var(--mc-text-muted);
+  font-weight: 500;
+}
+
+/* ── Generate Brief Button (empty state) ─────────────────────── */
+
+.brief-generate-btn {
+  margin-top: 12px;
+  padding: 10px 24px;
+  background: #3b82f6;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.brief-generate-btn:hover {
+  background: #2563eb;
+}
+
+/* ── Quick Actions Bar ───────────────────────────────────────── */
+
+.today-quick-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.today-evening-btn {
+  padding: 4px 10px;
+  background: var(--mc-bg-secondary);
+  border: 1px solid var(--mc-border);
+  border-radius: 6px;
+  font-size: 12px;
+  cursor: pointer;
+  color: var(--mc-text);
+  transition: background 0.15s;
+}
+
+.today-evening-btn:hover {
+  background: var(--mc-bg-tertiary);
+}
+
+/* ── Goals Section ───────────────────────────────────────────── */
+
+.goals-section {
+  margin-bottom: 8px;
+}
+
+.goals-section--empty .my-day-card-content {
+  padding: 12px 16px;
+}
+
+.goals-empty-hint {
+  font-size: 13px;
+  color: var(--mc-text-muted);
+  font-style: italic;
+}
+
+.goals-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 16px;
+}
+
+.goal-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.goal-item-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.goal-item-title {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--mc-text);
+}
+
+.goal-item-area {
+  font-size: 11px;
+  padding: 1px 6px;
+  background: var(--mc-bg-tertiary);
+  border-radius: 4px;
+  color: var(--mc-text-muted);
+  text-transform: lowercase;
+}
+
+.goal-progress-bar {
+  height: 4px;
+  background: var(--mc-bg-tertiary);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.goal-progress-fill {
+  height: 100%;
+  background: #3b82f6;
+  border-radius: 2px;
+  transition: width 0.3s ease;
+}
+
+/* ── Command Center Empty State ──────────────────────────────── */
+
+.command-center-empty {
+  padding: 16px;
+}

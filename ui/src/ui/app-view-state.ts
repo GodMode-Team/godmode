@@ -617,7 +617,7 @@ export type AppViewState = {
   handleDashboardsRefresh: () => Promise<void>;
   handleDashboardSelect: (id: string) => Promise<void>;
   handleDashboardDelete: (id: string) => Promise<void>;
-  handleDashboardCreateViaChat: () => void;
+  handleDashboardCreateViaChat: (prompt?: string) => void;
   handleDashboardBack: () => void;
   handleDashboardOpenSession: (dashboardId: string) => Promise<void>;
   // Proactive Intel handlers

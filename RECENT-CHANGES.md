@@ -4,6 +4,61 @@ This file tracks recent development changes so Atlas and other agents can quickl
 
 ---
 
+## v1.6.0 Product Polish — 6-Tab UX Overhaul (2026-03-05)
+
+### Phase 1: Daily Rhythm Bulletproofing
+- Fixed goals schema mismatch in brief-generator (`goal.text` → `goal.title`)
+- Added active goals to awareness snapshot (top 3 + overflow count)
+- Added agent activity summary to awareness snapshot
+- Fixed AI Packet display (backend returns `snapshot`, UI expected `consciousness/working`)
+- Expanded starter tips from 5 to 15 (was cycling every 5 days)
+- Added goals section to starter brief
+- Added readiness score display in daily brief header
+- Improved empty state with "Generate Brief Now" CTA
+
+### Phase 2: Dashboards 10x (175 → 370 lines)
+- Added 6 dashboard template cards with starter prompts
+- Added category filter bar (6 categories: overview, personal, productivity, finance, system, content)
+- Added pin/unpin support with pinned-first sorting
+- Added staleness indicators (>24h since last refresh)
+- Added dashboard count display
+- Auto-categorization from title/description keywords
+- Created `assets/dashboard-templates/` with 6 template files
+
+### Phase 3: Goals in Today Tab
+- Added goals section to Today tab with progress bars
+- Added evening capture button to toolbar
+- Wired goals loading into my-day refresh cycle
+
+### Phase 4: Second Brain Polish
+- Replaced dead Insights placeholder with readiness checklist
+- Added context health score (0-100% across 5 criteria)
+- Added "Update via Chat" button to Identity panel
+- Fixed Research Quick Add button (was unreachable)
+
+### Phase 5: UX Polish
+- Improved Work tab empty states (workspaces, artifacts, sessions) with helpful hints and CTAs
+
+### Files Changed
+- `src/lib/awareness-snapshot.ts` — goals section, agent activity summary
+- `src/methods/brief-generator.ts` — goals schema fix, 15 starter tips, goals in prompt
+- `ui/src/ui/views/dashboards.ts` — complete rewrite with templates, categories, pinning
+- `ui/src/ui/views/my-day.ts` — goals section, evening capture, empty state
+- `ui/src/ui/views/daily-brief.ts` — readiness score, generate button, task progress
+- `ui/src/ui/views/second-brain.ts` — insights panel, health score, identity chat button
+- `ui/src/ui/views/workspaces.ts` — improved empty states
+- `ui/src/ui/controllers/second-brain.ts` — sync data shape fix
+- `ui/src/ui/app.ts` — dashboard prompt passthrough, goals refresh
+- `ui/src/ui/app-render.ts` — evening capture, goals props, dashboard prompt
+- `ui/src/ui/app-view-state.ts` — dashboard create type update
+- `ui/src/styles/dashboards.css` — categories, templates, pinning, staleness
+- `ui/src/styles/my-day.css` — readiness, goals, generate button, evening capture
+- `ui/src/styles/second-brain.css` — health score, chat button
+- `ui/src/styles/workspaces.css` — empty state hints
+- `assets/dashboard-templates/*.md` — 6 new template files
+
+---
+
 ## v1.6.0 Stabilization — Bug Hunt + Content Expansion (2026-03-05)
 
 ### Bug Fixes (12 bugs found and fixed via 6-agent adversarial review)

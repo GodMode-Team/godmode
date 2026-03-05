@@ -1314,6 +1314,7 @@ function isActionItem(text: string): boolean {
 
 type ContextData = {
   chiefAim: string;
+  activeGoals: Array<{ title: string; area?: string; progress?: number }>;
   streakDay: number | null;
   streakLabel: string;
   streakStart: string | null;
@@ -1347,13 +1348,25 @@ async function readContextData(): Promise<ContextData> {
 
   // Read chief aim: goals.json first, then THESIS.md heading/label fallback
   let chiefAim = "";
+  let activeGoals: Array<{ title: string; area?: string; progress?: number }> = [];
   try {
     const goalsRaw = await readFile(join(DATA_DIR, "goals.json"), "utf-8");
-    const goals = JSON.parse(goalsRaw) as { chiefAim?: string; goals?: Array<{ text?: string }> };
-    if (goals.chiefAim) {
-      chiefAim = goals.chiefAim;
-    } else if (goals.goals && goals.goals.length > 0 && goals.goals[0].text) {
-      chiefAim = goals.goals[0].text;
+    const goalsData = JSON.parse(goalsRaw) as {
+      chiefAim?: string;
+      goals?: Array<{ title?: string; text?: string; area?: string; progress?: number; status?: string }>;
+    };
+    if (goalsData.chiefAim) {
+      chiefAim = goalsData.chiefAim;
+    } else if (goalsData.goals && goalsData.goals.length > 0) {
+      const firstGoal = goalsData.goals[0];
+      chiefAim = firstGoal.title || firstGoal.text || "";
+    }
+    // Collect active goals for the brief
+    if (goalsData.goals) {
+      activeGoals = goalsData.goals
+        .filter(g => !g.status || g.status === "active")
+        .map(g => ({ title: g.title || g.text || "", area: g.area, progress: g.progress }))
+        .filter(g => g.title);
     }
   } catch { /* goals.json not found or invalid */ }
 
@@ -1373,6 +1386,7 @@ async function readContextData(): Promise<ContextData> {
 
   return {
     chiefAim,
+    activeGoals,
     streakDay: streakStart ? daysSince(streakStart) : null,
     streakLabel,
     streakStart,
@@ -1684,6 +1698,11 @@ ${xIntelRaw}
 ### Carryover (incomplete from yesterday)
 ${carryoverRaw}
 
+### Active Goals
+${context.activeGoals.length > 0
+  ? context.activeGoals.map(g => `- ${g.title}${g.area ? ` [${g.area}]` : ""}${g.progress != null ? ` (${g.progress}%)` : ""}`).join("\n")
+  : "(no goals set)"}
+
 ### Oura Biometrics
 ${ouraRaw}
 
@@ -1789,10 +1808,20 @@ ${intelSection || "(none)"}`;
 
 const STARTER_TIPS = [
   "Try saying 'queue a research task on [topic]' to delegate work to an agent.",
-  "You can connect your Google Calendar for a richer morning brief \u2014 ask me how.",
+  "You can connect your Google Calendar for a richer morning brief — ask me how.",
   "Want me to set up a recurring skill? Just tell me what you want done and when.",
-  "Your Second Brain in Obsidian is where all your agent outputs land \u2014 check it out.",
-  "Rate your agent outputs to build trust scores \u2014 the system learns from your feedback.",
+  "Your Second Brain in Obsidian is where all your agent outputs land — check it out.",
+  "Rate your agent outputs to build trust scores — the system learns from your feedback.",
+  "Tell me your top 3 goals and I'll weave them into every morning brief.",
+  "Ask me to create a dashboard — I'll build a live view of anything you want to track.",
+  "You can say 'evening capture' at the end of the day to reflect and set up tomorrow.",
+  "Try 'what should I focus on?' and I'll analyze your tasks, calendar, and energy.",
+  "Ask me to write a persona for a specific role — content writer, researcher, admin.",
+  "Your daily brief gets smarter over time as I learn your patterns and preferences.",
+  "Say 'review my queue' to see what your agents have been working on overnight.",
+  "Connect your Oura ring for biometric-aware energy prescriptions in your brief.",
+  "You can teach me about yourself — just chat naturally and I'll remember what matters.",
+  "Try 'help me plan my week' and I'll pull from your goals, tasks, and calendar.",
 ];
 
 /**
@@ -1862,6 +1891,25 @@ async function generateStarterBrief(): Promise<{
     }
   } catch { /* non-fatal */ }
 
+  // Goals
+  let goalsLines = "";
+  try {
+    const goalsRaw = await readFile(join(DATA_DIR, "goals.json"), "utf-8");
+    const goalsData = JSON.parse(goalsRaw) as {
+      goals?: Array<{ title?: string; text?: string; area?: string; progress?: number; status?: string }>;
+    };
+    const active = (goalsData.goals ?? [])
+      .filter(g => !g.status || g.status === "active")
+      .filter(g => g.title || g.text);
+    if (active.length > 0) {
+      goalsLines = active.slice(0, 4).map(g => {
+        const title = g.title || g.text || "";
+        const progress = g.progress != null ? ` — ${g.progress}%` : "";
+        return `- ${title}${progress}`;
+      }).join("\n");
+    }
+  } catch { /* non-fatal */ }
+
   // Tip of the day (rotate by day of year)
   const dayOfYear = Math.floor((Date.now() - new Date(new Date().getFullYear(), 0, 0).getTime()) / 86_400_000);
   const tip = STARTER_TIPS[dayOfYear % STARTER_TIPS.length];
@@ -1872,6 +1920,11 @@ async function generateStarterBrief(): Promise<{
     "",
     "---",
     "",
+    ...(goalsLines ? [
+      "## Goals",
+      goalsLines,
+      "",
+    ] : []),
     "## Today's Focus",
     taskLines,
     "",

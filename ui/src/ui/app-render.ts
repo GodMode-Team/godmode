@@ -1078,6 +1078,10 @@ export function renderApp(state: AppViewState) {
                     onViewOutput: () => {},
                     onOpenChat: () => {},
                   } : undefined,
+                  onEveningCapture: () => {
+                    state.setTab("chat" as import("./navigation").Tab);
+                    void state.handleSendChat("Let's do my evening capture. Ask me: What went well today? What didn't get done? What should tomorrow's brief prioritize?");
+                  },
                 })
               : nothing}
           </div>
@@ -1556,6 +1560,14 @@ export function renderApp(state: AppViewState) {
                     onViewOutput: (id: string, path: string) => state.handleDecisionViewOutput(id, path),
                     onOpenChat: (id: string) => state.handleDecisionOpenChat(id),
                   } : undefined,
+                  // Evening capture
+                  onEveningCapture: () => {
+                    state.setTab("chat" as import("./navigation").Tab);
+                    void state.handleSendChat("Let's do my evening capture. Ask me: What went well today? What didn't get done? What should tomorrow's brief prioritize?");
+                  },
+                  // Goals
+                  goals: state.goals,
+                  goalsLoading: state.goalsLoading,
                 })
             : nothing
         }
@@ -2324,7 +2336,7 @@ export function renderApp(state: AppViewState) {
                     : false,
                   onSelectDashboard: (id) => state.handleDashboardSelect(id),
                   onDeleteDashboard: (id) => state.handleDashboardDelete(id),
-                  onCreateViaChat: () => state.handleDashboardCreateViaChat(),
+                  onCreateViaChat: (prompt?: string) => state.handleDashboardCreateViaChat(prompt),
                   onBack: () => state.handleDashboardBack(),
                   onRefresh: () => state.handleDashboardsRefresh(),
                   onOpenSession: (id) => state.handleDashboardOpenSession(id),

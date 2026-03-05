@@ -1475,12 +1475,12 @@ export class GodModeApp extends LitElement {
     await deleteDashboard(this, id);
   }
 
-  async handleDashboardCreateViaChat() {
+  async handleDashboardCreateViaChat(prompt?: string) {
     this.setTab("chat" as import("./navigation").Tab);
     const { createNewSession } = await import("./app-render.helpers.js");
     createNewSession(this);
     void this.handleSendChat(
-      "I want to create a custom dashboard. Ask me what data I want to see and design it for me. You can use any of GodMode's data — tasks, calendar, focus pulse, goals, trust scores, agent activity, queue status, coding tasks, workspace stats, and more.",
+      prompt ?? "I want to create a custom dashboard. Ask me what data I want to see and design it for me. You can use any of GodMode's data — tasks, calendar, focus pulse, goals, trust scores, agent activity, queue status, coding tasks, workspace stats, and more.",
     );
   }
 
@@ -2658,8 +2658,9 @@ export class GodModeApp extends LitElement {
       return;
     }
     await loadMyDayInternal(this);
-    // Also refresh decision cards
+    // Also refresh decision cards and goals
     this._loadDecisionCards();
+    this.handleGoalsRefresh().catch(() => {});
   }
 
   private _loadDecisionCards() {

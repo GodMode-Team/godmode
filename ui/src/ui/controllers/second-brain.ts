@@ -147,11 +147,13 @@ export async function syncSecondBrain(state: SecondBrainState): Promise<void> {
   try {
     const result = await state.client.request<{
       ok: boolean;
-      consciousness: SecondBrainAiPacketData["consciousness"];
-      working: SecondBrainAiPacketData["working"];
+      snapshot?: { content: string; updatedAt?: string; lineCount: number };
+      consciousness?: SecondBrainAiPacketData["consciousness"];
+      working?: SecondBrainAiPacketData["working"];
     }>("secondBrain.sync", {});
 
     state.secondBrainAiPacket = {
+      snapshot: result.snapshot ?? null,
       consciousness: result.consciousness ?? null,
       working: result.working ?? null,
     } as SecondBrainAiPacketData;

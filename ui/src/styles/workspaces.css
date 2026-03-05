@@ -310,6 +310,14 @@
   font-size: 30px;
 }
 
+.workspaces-empty-hint {
+  font-size: 12px;
+  max-width: 300px;
+  text-align: center;
+  line-height: 1.5;
+  opacity: 0.7;
+}
+
 .workspace-back-btn {
   width: 30px;
   height: 30px;
@@ -508,6 +516,12 @@
   padding: 14px;
   color: var(--muted);
   font-size: 12px;
+}
+
+.ws-empty-hint {
+  display: block;
+  line-height: 1.5;
+  opacity: 0.7;
 }
 
 /* Folder tree */

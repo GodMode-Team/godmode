@@ -85,6 +85,11 @@ export type MyDayProps = {
   onToggleCompletedTasks?: () => void;
   // Decision cards (overnight agent results)
   decisionCards?: DecisionCardsProps;
+  // Evening capture
+  onEveningCapture?: () => void;
+  // Goals
+  goals?: Array<{ id: string; title: string; area?: string; progress?: number; status: string }>;
+  goalsLoading?: boolean;
 };
 
 // ===== Helper Functions =====
@@ -382,15 +387,80 @@ export function renderMyDayToolbar(props: MyDayProps) {
         <button class="today-view-tab ${viewMode === "agent-log" ? "active" : ""}"
           @click=${() => props.onViewModeChange?.("agent-log")}>Agent Log</button>
       </div>
-      ${!props.focusPulseActive && props.onStartMorningSet
-        ? html`<button class="today-morning-set-btn" @click=${props.onStartMorningSet}
-            title="Start your morning focus ritual">\u2600\uFE0F Start Morning Set</button>`
-        : nothing}
-      ${props.onRefresh
-        ? html`<button class="my-day-refresh-btn" @click=${props.onRefresh} title="Refresh">&#x21BB;</button>`
-        : null}
+      <div class="today-quick-actions">
+        ${!props.focusPulseActive && props.onStartMorningSet
+          ? html`<button class="today-morning-set-btn" @click=${props.onStartMorningSet}
+              title="Start your morning focus ritual">\u2600\uFE0F Morning Set</button>`
+          : nothing}
+        ${props.onEveningCapture
+          ? html`<button class="today-evening-btn" @click=${props.onEveningCapture}
+              title="Reflect on your day and set up tomorrow">\uD83C\uDF19 Evening Capture</button>`
+          : nothing}
+        ${props.onRefresh
+          ? html`<button class="my-day-refresh-btn" @click=${props.onRefresh} title="Refresh / Generate Brief">&#x21BB;</button>`
+          : null}
+      </div>
     </div>
   `;
+}
+
+// ===== Goals Section (compact, for Today tab) =====
+
+function renderGoalsSection(props: MyDayProps) {
+  const goals = props.goals?.filter(g => g.status === "active") ?? [];
+
+  if (props.goalsLoading) {
+    return html`<div class="my-day-card goals-section">
+      <div class="my-day-card-header">
+        <div class="my-day-card-title">
+          <span class="my-day-card-icon">\uD83C\uDFAF</span>
+          <span>GOALS</span>
+        </div>
+      </div>
+      <div class="my-day-card-content">
+        <div class="brief-loading"><div class="spinner"></div><span>Loading goals...</span></div>
+      </div>
+    </div>`;
+  }
+
+  if (goals.length === 0) {
+    return html`<div class="my-day-card goals-section goals-section--empty">
+      <div class="my-day-card-header">
+        <div class="my-day-card-title">
+          <span class="my-day-card-icon">\uD83C\uDFAF</span>
+          <span>GOALS</span>
+        </div>
+      </div>
+      <div class="my-day-card-content">
+        <div class="goals-empty-hint">No goals set yet. Tell your ally what you're working toward.</div>
+      </div>
+    </div>`;
+  }
+
+  return html`<div class="my-day-card goals-section">
+    <div class="my-day-card-header">
+      <div class="my-day-card-title">
+        <span class="my-day-card-icon">\uD83C\uDFAF</span>
+        <span>GOALS</span>
+      </div>
+      <span class="today-tasks-count">${goals.length} active</span>
+    </div>
+    <div class="my-day-card-content goals-list">
+      ${goals.slice(0, 6).map(g => html`
+        <div class="goal-item">
+          <div class="goal-item-header">
+            <span class="goal-item-title">${g.title}</span>
+            ${g.area ? html`<span class="goal-item-area">${g.area}</span>` : nothing}
+          </div>
+          ${g.progress != null ? html`
+            <div class="goal-progress-bar">
+              <div class="goal-progress-fill" style="width: ${Math.min(100, Math.max(0, g.progress))}%"></div>
+            </div>
+          ` : nothing}
+        </div>
+      `)}
+    </div>
+  </div>`;
 }
 
 // ===== Command Center View =====
@@ -400,7 +470,9 @@ function renderCommandCenter(props: MyDayProps) {
     <div class="command-center">
       ${props.decisionCards && props.decisionCards.items.length > 0
         ? renderDecisionCards(props.decisionCards)
-        : nothing}
+        : html`<div class="command-center-empty">
+            <div class="my-day-empty">Your overnight agent results will appear here. Queue tasks for your agents and check back in the morning.</div>
+          </div>`}
       <div class="command-center-tasks">
         ${renderTaskPanel(props)}
       </div>
@@ -457,7 +529,10 @@ export function renderMyDay(props: MyDayProps) {
   return html`
     <div class="my-day-container">
       ${viewMode === "brief"
-        ? html`<div class="my-day-brief-full">${renderDailyBrief(briefProps)}</div>`
+        ? html`<div class="my-day-brief-full">
+            ${renderGoalsSection(props)}
+            ${renderDailyBrief(briefProps)}
+          </div>`
         : viewMode === "command-center"
           ? renderCommandCenter(props)
           : html`<div class="my-day-brief-full">${renderAgentLog(props, agentLog, formatDateFromString(selectedDate))}</div>`}
