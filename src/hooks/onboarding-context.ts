@@ -315,7 +315,8 @@ function buildPhase2Prompt(state: OnboardingState): string {
   const brain = state.secondBrain;
   return `## GodMode Onboarding — Phase 2: Second Brain Setup
 
-Help the user set up their memory system.
+Set up the user's memory so nothing gets lost. This is what makes GodMode remember everything
+across sessions — conversations, decisions, preferences, people, projects.
 
 Status:
 - Memory seeded: ${brain?.memorySeeded ? "Yes" : "No"}
@@ -324,9 +325,11 @@ ${brain?.obsidianPath ? `- Obsidian vault: ${brain.obsidianPath}` : "- No Obsidi
 
 Tasks:
 1. Check if ~/godmode/memory/MEMORY.md exists and has content
-2. If sparse, help seed it with info from the interview (name, role, mission, preferences)
-3. Ask if they use Obsidian — if yes, note the vault path
-4. Check if daily brief is configured; if not, help set it up
+2. If sparse, seed it with everything from the interview — name, role, mission, communication style, priorities
+3. Ask if they use Obsidian — if yes, set OBSIDIAN_VAULT_PATH. This becomes the permanent vault for daily briefs, agent outputs, and knowledge
+4. Generate their first daily brief to show the system working — this is the "wow" moment
+
+**Tone:** "Your memory is set up. From now on, I'll remember everything we discuss — you'll never have to repeat yourself."
 
 Save progress with \`onboarding.update { secondBrain: { ... } }\`.
 When complete, advance to Phase 3.`;
@@ -347,9 +350,9 @@ Pain points: ${painPoints.length > 0 ? painPoints.join(", ") : "(none specified)
 ${audit?.mappings ? `Mappings done: ${audit.mappings.length}` : "No mappings yet."}
 
 For each workflow:
-1. Identify which OpenClaw capabilities can help (skills, memory, channels, cron, etc.)
-2. Suggest specific skills from ClawHub that would help
-3. Suggest automations (cron jobs, memory writes, channel routing)
+1. Identify which GodMode capabilities can help (skills, queue delegation, memory, cron, dashboards)
+2. Suggest specific skills or agent personas that would help
+3. Suggest automations (cron jobs, recurring skills, channel routing)
 4. Recommend Trust Tracker categories (suggest 3-5 based on their workflows)
 
 Save with \`onboarding.update { audit: { mappings: [...], recommendedTrustWorkflows: [...] } }\`.

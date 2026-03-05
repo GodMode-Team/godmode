@@ -1,6 +1,6 @@
 ---
 name: evening-processing
-description: "End-of-day review: tag sessions by project, process highlights, save daily snapshot, generate impact summary"
+description: "End-of-day background prep: tag sessions by project, capture agent log to vault, update task status"
 ---
 
 # Evening Processing (Background)
@@ -19,33 +19,31 @@ Runs at 8 PM daily via cron. This is **silent background data prep** — no user
    - Match sessions to projects in `~/godmode/data/projects.json` by content
    - Update project task lists with any new items discovered
 
-2. **Process Email Highlights**
-   - If Front skill is available, fetch today's starred/important emails
-   - Extract action items and add to relevant projects
+2. **Sync Agent Log to Vault**
+   - Ensure today's agent log has been captured to the daily brief
+   - The vault-capture pipeline handles this automatically, but verify it ran
+   - If the daily note exists but has no Agent Sessions section, the next heartbeat tick will handle it
 
-3. **Save Daily Snapshot**
-   - Read current state of `~/godmode/data/projects.json`, `~/godmode/data/people/`, `~/godmode/data/goals.json`
-   - Write snapshot to `~/godmode/data/snapshots/YYYY-MM-DD.json`
-   - Include: project status counts, people contacted, goals progress
+3. **Update Task Status**
+   - Read today's daily brief and sync checkbox state to tasks (via `dailyBrief.syncTasks`)
+   - Flag any overdue tasks that weren't addressed today
+   - These carry forward automatically into tomorrow's brief
 
 4. **Generate Impact Summary**
-   - Count: sessions run, tasks completed, messages sent
-   - Highlight top 3 accomplishments
+   - Count: sessions run, tasks completed, queue items processed
+   - Highlight top 3 accomplishments from the agent log
    - Flag any unresolved items that need attention tomorrow
-   - Deliver summary to the user
+   - Write summary to the agent log for the evening-review skill to reference
 
 ## Output Format
 
-Deliver a concise end-of-day summary:
-
-- What got done (by project)
-- What needs attention tomorrow
-- Daily snapshot saved confirmation
+This is a silent background process. Output goes to the agent log, not to the user.
+The evening-review skill (9 PM) handles user-facing communication.
 
 ## Cron Setup
 
 ```
 Schedule: 0 20 * * * (8 PM daily, user's timezone)
 Session: isolated
-Delivery: announce to last active channel
+Delivery: none (silent background processing)
 ```

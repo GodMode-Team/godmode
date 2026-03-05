@@ -23,7 +23,8 @@ const CACHE_TTL_MS = 60_000; // 1 min — heartbeat regenerates every 15 min
  */
 export async function generateSnapshot(): Promise<string> {
   const today = localDateString();
-  const lines: string[] = [`# Today — ${today}`];
+  const dayOfWeek = new Date().toLocaleDateString("en-US", { weekday: "long" });
+  const lines: string[] = [`# Today — ${dayOfWeek}, ${today}`];
 
   // Identity anchor — who the user is and how to serve them (cached from USER.md)
   try {
@@ -135,6 +136,9 @@ export async function generateSnapshot(): Promise<string> {
       (t: { dueDate?: string | null }) => t.dueDate != null && t.dueDate <= today,
     );
     lines.push(`## Tasks: ${pending.length} pending, ${overdue.length} overdue`);
+    if (overdue.length > 0) {
+      lines.push("Proactively surface overdue tasks early in the conversation.");
+    }
   } catch {
     // Tasks unavailable
   }
@@ -147,6 +151,9 @@ export async function generateSnapshot(): Promise<string> {
     const review = qs.items.filter((i: { status: string }) => i.status === "review").length;
     if (processing > 0 || review > 0) {
       lines.push(`## Queue: ${processing} processing, ${review} ready for review`);
+      if (review > 0) {
+        lines.push("Prompt the user to review completed queue items.");
+      }
     }
   } catch {
     // Queue unavailable
@@ -193,7 +200,7 @@ export async function generateSnapshot(): Promise<string> {
     // No agent log today — skip
   }
 
-  // Trust tracker summary (if data exists)
+  // Trust scores (top workflow scores for autonomy awareness)
   try {
     const trustPath = join(DATA_DIR, "trust-tracker.json");
     const trustRaw = await readFile(trustPath, "utf-8");

@@ -4,6 +4,7 @@ This file tracks recent development changes so Atlas and other agents can quickl
 
 ---
 
+<<<<<<< HEAD
 ## v1.6.0 Product Polish — 6-Tab UX Overhaul (2026-03-05)
 
 ### Phase 1: Daily Rhythm Bulletproofing
@@ -199,6 +200,42 @@ This file tracks recent development changes so Atlas and other agents can quickl
 - `ui/src/ui/app-gateway.ts` — ally sync fix for chat.final events
 - `src/hooks/agent-persona.ts` — dashboard-building instruction
 - `src/lib/awareness-snapshot.ts` — trust tracker summary
+
+---
+
+## 2026-03-05 — v1.6.0: Core Identity & Memory Audit
+
+### What
+9-phase audit of every file that defines WHO the ally is, HOW it remembers, and WHAT it proactively does. Quality improvements only — zero new services, zero new dependencies.
+
+### Changes
+
+**Ally Identity (`src/hooks/agent-persona.ts`):**
+- Rewrote 27-line identity from scratch (23 lines, within budget)
+- Changed "executive assistant, chief of staff" → "deeply contextual coworker, proactive partner"
+- Added 8 specific behavior directives: investigate before asking, solve don't list, parse brain-dumps, scope before delegating, be proactive, remember everything, be honest and direct, treat time as sacred
+- Added capabilities summary: tasks, goals, queue, trust tracking, skills, dashboards, vault
+
+**Awareness Snapshot (`src/lib/awareness-snapshot.ts`):**
+- Added day of week to header (enables weekly rhythm awareness — Monday planning, Friday review)
+- Added active goals with progress percentages
+- Added trust scores summary (workflow scores from trust-tracker.json)
+- Added proactive nudge lines: "Surface overdue tasks early" when overdue > 0, "Prompt user to review queue items" when review > 0
+
+**Onboarding Prompts (`src/hooks/onboarding-context.ts`):**
+- Phase 2 (Second Brain): Rewrote from dry "help set up memory system" to warm copy that communicates the value — "nothing gets lost", "never repeat yourself", "wow moment"
+- Phase 3 (Workflow Audit): Removed killed "ClawHub" reference, updated to "GodMode capabilities"
+
+**Skills:**
+- `weekly-coaching`: Removed killed wheel-of-life.json and snapshots/ references, replaced with goals + trust scores + daily briefs as data sources
+- `evening-processing`: Removed killed snapshots/ reference, aligned with actual vault-capture pipeline, changed delivery to "none" (silent background)
+
+### Files Changed
+- `src/hooks/agent-persona.ts` — identity rewrite
+- `src/lib/awareness-snapshot.ts` — goals, trust, day-of-week, proactive nudges
+- `src/hooks/onboarding-context.ts` — Phase 2 + Phase 3 prompt improvements
+- `skills/weekly-coaching/SKILL.md` — removed dead references
+- `skills/evening-processing/SKILL.md` — removed dead references
 
 ---
 
