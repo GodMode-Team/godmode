@@ -1214,17 +1214,6 @@ function handleGatewayEventUnsafe(host: GatewayHost, evt: GatewayEventFrame) {
     return;
   }
 
-  // Focus Pulse live updates
-  if (evt.event === "focusPulse:update") {
-    const payload = evt.payload as Record<string, unknown> | undefined;
-    if (payload) {
-      const app = host as unknown as { focusPulseData?: unknown; requestUpdate?: () => void };
-      app.focusPulseData = payload;
-      app.requestUpdate?.();
-    }
-    return;
-  }
-
   // Guardrails live updates
   if (evt.event === "guardrails:update") {
     const app = host as unknown as GodModeApp;

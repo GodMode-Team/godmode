@@ -1,5 +1,6 @@
 /**
- * Focus Pulse controller — RPC helpers for the Focus Pulse feature.
+ * Focus Pulse controller — RETIRED in lean audit.
+ * Type export kept for backward compat with app-view-state.ts.
  */
 import type { GodModeApp } from "../app.js";
 
@@ -21,92 +22,10 @@ export type FocusPulseData = {
   lastCheckReason: string;
 };
 
-export async function loadFocusPulse(host: GodModeApp): Promise<void> {
-  if (!host.client || !host.connected) return;
-  try {
-    const result = await host.client.request<FocusPulseData>(
-      "focusPulse.getState",
-      {},
-    );
-    host.focusPulseData = result;
-  } catch {
-    // Focus Pulse may not be registered — silent fail
-    host.focusPulseData = null;
-  }
-}
-
-export async function startMorningSet(host: GodModeApp): Promise<void> {
-  if (!host.client || !host.connected) return;
-  try {
-    const result = await host.client.request<{
-      items: FocusPulseItem[];
-      noteFound: boolean;
-      message: string;
-    }>("focusPulse.startMorningSet", {});
-    host.showToast(result.message, "info", 4000);
-    await loadFocusPulse(host);
-  } catch (err) {
-    host.showToast("Failed to start morning set", "error");
-    console.error("[FocusPulse] startMorningSet error:", err);
-  }
-}
-
-export async function setFocus(
-  host: GodModeApp,
-  index: number,
-): Promise<void> {
-  if (!host.client || !host.connected) return;
-  try {
-    const result = await host.client.request<{
-      currentFocus: FocusPulseItem;
-      message: string;
-    }>("focusPulse.setFocus", { index });
-    host.showToast(result.message, "success", 3000);
-    await loadFocusPulse(host);
-  } catch (err) {
-    host.showToast("Failed to set focus", "error");
-    console.error("[FocusPulse] setFocus error:", err);
-  }
-}
-
-export async function completeFocus(host: GodModeApp): Promise<void> {
-  if (!host.client || !host.connected) return;
-  try {
-    const result = await host.client.request<{
-      completed: string;
-      nextFocus: string | null;
-      message: string;
-    }>("focusPulse.complete", {});
-    host.showToast(result.message, "success", 4000);
-    await loadFocusPulse(host);
-  } catch (err) {
-    host.showToast("Failed to complete focus", "error");
-    console.error("[FocusPulse] completeFocus error:", err);
-  }
-}
-
-export async function runPulseCheck(host: GodModeApp): Promise<void> {
-  if (!host.client || !host.connected) return;
-  try {
-    await host.client.request("focusPulse.pulseCheck", {});
-    await loadFocusPulse(host);
-  } catch (err) {
-    console.error("[FocusPulse] pulseCheck error:", err);
-  }
-}
-
-export async function endDay(host: GodModeApp): Promise<void> {
-  if (!host.client || !host.connected) return;
-  try {
-    const result = await host.client.request<{
-      score: number;
-      streak: number;
-      message: string;
-    }>("focusPulse.endDay", {});
-    host.showToast(result.message, "info", 5000);
-    await loadFocusPulse(host);
-  } catch (err) {
-    host.showToast("Failed to end day", "error");
-    console.error("[FocusPulse] endDay error:", err);
-  }
-}
+/** No-op stubs — focus pulse service was removed in lean audit. */
+export async function loadFocusPulse(_host: GodModeApp): Promise<void> {}
+export async function startMorningSet(_host: GodModeApp): Promise<void> {}
+export async function setFocus(_host: GodModeApp, _index: number): Promise<void> {}
+export async function completeFocus(_host: GodModeApp): Promise<void> {}
+export async function runPulseCheck(_host: GodModeApp): Promise<void> {}
+export async function endDay(_host: GodModeApp): Promise<void> {}

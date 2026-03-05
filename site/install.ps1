@@ -20,6 +20,7 @@
     .\install.ps1
     .\install.ps1 -LicenseKey GM-YOUR-KEY
     irm https://lifeongodmode.com/install.ps1 | iex
+    $env:GODMODE_LICENSE='GM-YOUR-KEY'; irm https://lifeongodmode.com/install.ps1 | iex
 
 .NOTES
     Compatible with Windows PowerShell 5.1 and PowerShell 7+.
@@ -31,6 +32,11 @@ param(
     [Parameter(Position = 0)]
     [string]$LicenseKey = ""
 )
+
+# Support passing license key via env var (needed for irm|iex piped installs)
+if (-not $LicenseKey -and $env:GODMODE_LICENSE) {
+    $LicenseKey = $env:GODMODE_LICENSE
+}
 
 $ErrorActionPreference = 'Stop'
 
@@ -241,26 +247,25 @@ if (Test-CommandExists "openclaw") {
 
 Write-Step 4 "Installing GodMode plugin"
 
-$pluginInstalled = $false
-try {
-    $pluginList = & openclaw plugins list 2>$null
-    if ($pluginList -match "(?i)godmode") {
-        $pluginInstalled = $true
-    }
-} catch {}
+# Stop gateway before plugin update to prevent file locks
+try { & openclaw gateway stop 2>$null } catch {}
 
-if ($pluginInstalled) {
-    Write-Ok "GodMode plugin already installed"
-} else {
-    Write-Info "Installing @godmode-team/godmode..."
-    try {
-        & openclaw plugins install @godmode-team/godmode 2>&1 | Out-Null
-        Write-Ok "GodMode plugin installed"
-    } catch {
-        Write-Fail "GodMode plugin install failed"
-        Write-Info "Try: openclaw plugins install @godmode-team/godmode"
-        exit 1
-    }
+# Remove old plugin to ensure clean update
+$stateDir = if ($env:OPENCLAW_STATE_DIR) { $env:OPENCLAW_STATE_DIR } else { Join-Path $HOME ".openclaw" }
+$oldPlugin = Join-Path $stateDir "extensions" "godmode"
+if (Test-Path $oldPlugin) {
+    Remove-Item -Recurse -Force $oldPlugin 2>$null
+    Write-Info "Removed old GodMode plugin"
+}
+
+Write-Info "Installing @godmode-team/godmode..."
+try {
+    & openclaw plugins install @godmode-team/godmode 2>&1 | Out-Null
+    Write-Ok "GodMode plugin installed"
+} catch {
+    Write-Fail "GodMode plugin install failed"
+    Write-Info "Try: openclaw plugins install @godmode-team/godmode"
+    exit 1
 }
 
 # ── Step 5: License activation ──────────────────────────────────────────────

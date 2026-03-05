@@ -16,23 +16,18 @@ import {
   type AppendCategory,
 } from "../lib/agent-log.js";
 import { localDateString } from "../data-paths.js";
-import { syncClaudeCodeSessions } from "../services/claude-code-sync.js";
+// claude-code-sync removed in lean audit
 import type { GatewayRequestHandler } from "openclaw/plugin-sdk";
 
 type GatewayRequestHandlers = Record<string, GatewayRequestHandler>;
 
+// IDE activity watcher removed in lean audit
 let broadcastWired = false;
 async function wireBroadcastToWatcher(
-  broadcast: (event: string, payload: unknown, opts?: { dropIfSlow?: boolean }) => void,
+  _broadcast: (event: string, payload: unknown, opts?: { dropIfSlow?: boolean }) => void,
 ): Promise<void> {
   if (broadcastWired) return;
   broadcastWired = true;
-  try {
-    const { getIDEActivityWatcher } = await import("../services/ide-activity-watcher.js");
-    getIDEActivityWatcher().setBroadcastFn(broadcast);
-  } catch {
-    // Watcher not started yet — that's fine, it'll work without broadcast
-  }
 }
 
 const AGENT_DAY_CANDIDATES = [
@@ -197,17 +192,8 @@ export const agentLogHandlers: GatewayRequestHandlers = {
     respond(true, { ok: true, resolved: false, reason: "item not found" }, undefined);
   },
 
-  "agentLog.syncClaudeCode": async ({ respond, context }) => {
-    try {
-      const result = await syncClaudeCodeSessions();
-      if (result.synced > 0) {
-        const date = todayDate();
-        context.broadcast("agent-log:update", { date }, { dropIfSlow: true });
-      }
-      respond(true, { ok: true, ...result }, undefined);
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      respond(false, undefined, { code: "SYNC_FAILED", message: msg });
-    }
+  "agentLog.syncClaudeCode": async ({ respond }) => {
+    // Claude Code sync removed in lean audit
+    respond(true, { ok: true, synced: 0, message: "Claude Code sync removed" }, undefined);
   },
 };

@@ -20,8 +20,6 @@ export type Tab =
   | "today"
   | "work"
   | "my-day"
-  | "wheel-of-life"
-  | "vision-board"
   | "channels"
   | "instances"
   | "sessions"
@@ -34,7 +32,6 @@ export type Tab =
   | "debug"
   | "logs"
   | "second-brain"
-  | "intel"
   | "mission-control"
   | "dashboards";
 
@@ -47,8 +44,6 @@ const TAB_PATHS: Record<Tab, string> = {
   today: "/today",
   work: "/work",
   "my-day": "/today",
-  "wheel-of-life": "/wheel-of-life",
-  "vision-board": "/vision-board",
   channels: "/channels",
   instances: "/instances",
   sessions: "/sessions",
@@ -62,7 +57,6 @@ const TAB_PATHS: Record<Tab, string> = {
   debug: "/debug",
   logs: "/logs",
   "second-brain": "/second-brain",
-  intel: "/intel",
   "mission-control": "/mission-control",
   dashboards: "/dashboards",
 };
@@ -180,10 +174,6 @@ export function iconForTab(tab: Tab): IconName {
       return "barChart";
     case "workspaces":
       return "folder";
-    case "wheel-of-life":
-      return "pieChart";
-    case "vision-board":
-      return "star";
     case "channels":
       return "link";
     case "instances":
@@ -204,8 +194,6 @@ export function iconForTab(tab: Tab): IconName {
       return "shield";
     case "second-brain":
       return "brain";
-    case "intel":
-      return "radio";
     case "mission-control":
       return "radio";
     case "dashboards":
@@ -238,10 +226,6 @@ export function titleForTab(tab: Tab) {
       return "Overview";
     case "workspaces":
       return "Work";
-    case "wheel-of-life":
-      return "Wheel of Life";
-    case "vision-board":
-      return "Vision Board";
     case "channels":
       return "Channels";
     case "instances":
@@ -262,8 +246,6 @@ export function titleForTab(tab: Tab) {
       return "Guardrails";
     case "second-brain":
       return "Second Brain";
-    case "intel":
-      return "Intel";
     case "mission-control":
       return "Mission Control";
     case "dashboards":
@@ -296,10 +278,6 @@ export function emojiForTab(tab: Tab): string {
       return "\u{1F3AF}";
     case "workspaces":
       return "\u{1F4C2}";
-    case "wheel-of-life":
-      return "\u{1F3A1}";
-    case "vision-board":
-      return "\u{1F320}";
     case "channels":
       return "\u{1F517}";
     case "instances":
@@ -320,8 +298,6 @@ export function emojiForTab(tab: Tab): string {
       return "\u{1F6A7}";
     case "second-brain":
       return "\u{1F9E0}";
-    case "intel":
-      return "\u{1F4E1}";
     case "mission-control":
       return "\u{1F6F0}\uFE0F";
     case "dashboards":
@@ -354,10 +330,6 @@ export function subtitleForTab(tab: Tab) {
       return "Gateway status, entry points, and a fast health read.";
     case "workspaces":
       return "Projects, clients, and personal operating context.";
-    case "wheel-of-life":
-      return "Track balance across 8 life dimensions with scores, targets, and trends.";
-    case "vision-board":
-      return "Your Chief Definite Aim, annual themes, values, and identity statements.";
     case "channels":
       return "Manage channels and settings.";
     case "instances":
@@ -378,8 +350,6 @@ export function subtitleForTab(tab: Tab) {
       return "Safety gates that prevent runaway loops, bad searches, and lazy responses.";
     case "second-brain":
       return "Your Obsidian-powered second brain — identity, knowledge, and live AI context.";
-    case "intel":
-      return "Proactive intelligence — discoveries, insights, and pattern analysis.";
     case "mission-control":
       return "Live command center — active agents, pipelines, and activity feed.";
     case "dashboards":

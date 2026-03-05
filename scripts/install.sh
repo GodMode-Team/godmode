@@ -302,32 +302,36 @@ install_system_deps() {
 
   info "Installing missing system packages:$MISSING"
 
+  # Map package names for non-apt package managers (xz-utils is Debian-specific)
+  PKG_MISSING="$MISSING"
+  NON_APT_MISSING="$(echo "$MISSING" | sed 's/xz-utils/xz/g')"
+
   if has apt-get; then
     apt-get update -qq >/dev/null 2>&1 || true
     # shellcheck disable=SC2086
-    apt-get install -y -qq $MISSING >/dev/null 2>&1 && ok "Installed:$MISSING" || {
-      warn "Could not install$MISSING via apt-get (try running as root)"
-      info "Run: sudo apt-get install -y$MISSING"
+    apt-get install -y -qq $PKG_MISSING >/dev/null 2>&1 && ok "Installed:$PKG_MISSING" || {
+      warn "Could not install$PKG_MISSING via apt-get (try running as root)"
+      info "Run: sudo apt-get install -y$PKG_MISSING"
     }
   elif has yum; then
     # shellcheck disable=SC2086
-    yum install -y -q $MISSING >/dev/null 2>&1 && ok "Installed:$MISSING" || {
-      warn "Could not install$MISSING via yum (try running as root)"
+    yum install -y -q $NON_APT_MISSING >/dev/null 2>&1 && ok "Installed:$NON_APT_MISSING" || {
+      warn "Could not install$NON_APT_MISSING via yum (try running as root)"
     }
   elif has dnf; then
     # shellcheck disable=SC2086
-    dnf install -y -q $MISSING >/dev/null 2>&1 && ok "Installed:$MISSING" || {
-      warn "Could not install$MISSING via dnf (try running as root)"
+    dnf install -y -q $NON_APT_MISSING >/dev/null 2>&1 && ok "Installed:$NON_APT_MISSING" || {
+      warn "Could not install$NON_APT_MISSING via dnf (try running as root)"
     }
   elif has apk; then
     # shellcheck disable=SC2086
-    apk add --quiet $MISSING >/dev/null 2>&1 && ok "Installed:$MISSING" || {
-      warn "Could not install$MISSING via apk"
+    apk add --quiet $NON_APT_MISSING >/dev/null 2>&1 && ok "Installed:$NON_APT_MISSING" || {
+      warn "Could not install$NON_APT_MISSING via apk"
     }
   elif has pacman; then
     # shellcheck disable=SC2086
-    pacman -S --noconfirm $MISSING >/dev/null 2>&1 && ok "Installed:$MISSING" || {
-      warn "Could not install$MISSING via pacman"
+    pacman -S --noconfirm $NON_APT_MISSING >/dev/null 2>&1 && ok "Installed:$NON_APT_MISSING" || {
+      warn "Could not install$NON_APT_MISSING via pacman"
     }
   else
     warn "Unknown package manager — please install manually:$MISSING"
@@ -443,7 +447,9 @@ install_node_direct() {
 
     # Add to shell profile so it persists
     PROFILE_FILE=""
-    if [ -f "$HOME/.bashrc" ]; then
+    if [ -f "$HOME/.zshrc" ]; then
+      PROFILE_FILE="$HOME/.zshrc"
+    elif [ -f "$HOME/.bashrc" ]; then
       PROFILE_FILE="$HOME/.bashrc"
     elif [ -f "$HOME/.profile" ]; then
       PROFILE_FILE="$HOME/.profile"

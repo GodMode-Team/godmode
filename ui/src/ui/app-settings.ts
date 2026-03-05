@@ -19,16 +19,12 @@ import { loadDebug } from "./controllers/debug";
 import { loadGuardrails } from "./controllers/guardrails";
 import { loadDevices } from "./controllers/devices";
 import { loadExecApprovals } from "./controllers/exec-approvals";
-import { loadLifetracks } from "./controllers/lifetracks";
 import { loadLogs } from "./controllers/logs";
 import { loadMyDay } from "./controllers/my-day";
 import { loadNodes } from "./controllers/nodes";
-import { loadPeople } from "./controllers/people";
 import { loadPresence } from "./controllers/presence";
 import { loadArchivedSessions, loadSessions } from "./controllers/sessions";
 import { loadSkills } from "./controllers/skills";
-import { loadVisionBoard } from "./controllers/vision-board";
-import { loadWheelOfLife } from "./controllers/wheel-of-life";
 import { loadWork } from "./controllers/work";
 import { loadWorkspaces } from "./controllers/workspaces";
 import {
@@ -274,9 +270,6 @@ export async function refreshActiveTab(host: SettingsHost) {
   if (host.tab === "work") {
     await loadWork(host as unknown as GodModeApp);
   }
-  if (host.tab === "people") {
-    await loadPeople(host as unknown as GodModeApp);
-  }
   if (host.tab === "workspaces") {
     await loadWorkspaces(host as unknown as GodModeApp);
     // Load all tasks for the workspaces landing page
@@ -285,23 +278,6 @@ export async function refreshActiveTab(host: SettingsHost) {
         host as unknown as GodModeApp,
       );
     });
-  }
-  if (host.tab === "wheel-of-life") {
-    await loadWheelOfLife(host as unknown as GodModeApp);
-  }
-  if (host.tab === "vision-board") {
-    await loadVisionBoard(host as unknown as GodModeApp);
-  }
-  if (host.tab === "lifetracks") {
-    await loadLifetracks(host as unknown as GodModeApp);
-  }
-  if (host.tab === "life") {
-    await Promise.all([
-      loadWheelOfLife(host as unknown as GodModeApp),
-      loadVisionBoard(host as unknown as GodModeApp),
-      loadLifetracks(host as unknown as GodModeApp),
-    ]);
-    // Goals are loaded on-demand when the subtab is selected (see handleLifeSubtabChange)
   }
   if (host.tab === "data") {
     const app = host as unknown as GodModeApp;

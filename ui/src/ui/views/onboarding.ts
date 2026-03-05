@@ -57,6 +57,7 @@ export type AssessmentResult = {
 	workspaceConfigured: boolean;
 	githubReady: boolean;
 	obsidianVaultConfigured: boolean;
+	gatewayTokenSet: boolean;
 	timestamp: string;
 };
 

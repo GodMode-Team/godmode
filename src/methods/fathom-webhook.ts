@@ -72,7 +72,11 @@ function loadEnv(): Record<string, string> {
       if (line.startsWith("#") || !line.includes("=")) continue;
       const eqIdx = line.indexOf("=");
       const key = line.slice(0, eqIdx).trim();
-      const value = line.slice(eqIdx + 1).trim();
+      let value = line.slice(eqIdx + 1).trim();
+      // Strip surrounding quotes (single or double)
+      if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
+        value = value.slice(1, -1);
+      }
       if (key) vars[key] = value;
     }
   } catch {
@@ -266,13 +270,12 @@ export async function handleFathomWebhookHttp(
 
   const queue = await readMeetingQueue();
 
-  // Signature verification (warn-only for v1)
+  // Signature verification — reject on failure when secret is configured
   if (queue.webhookSecret) {
     const valid = verifyWebhookSignatureFromHeaders(queue.webhookSecret, headers, body);
     if (!valid) {
-      console.warn(
-        "[GodMode] Fathom: webhook signature verification failed — processing anyway (v1 permissive mode)",
-      );
+      console.error("[GodMode] Fathom: webhook signature verification FAILED — rejecting payload");
+      return;
     }
   }
 
@@ -466,14 +469,14 @@ const webhookReceive: GatewayRequestHandler = async ({ params, respond }) => {
 
     const queue = await readMeetingQueue();
 
-    // Signature verification (warn-only)
+    // Signature verification — reject on failure when secret is configured
     if (queue.webhookSecret && headers) {
       const bodyStr = typeof payload === "string" ? payload : JSON.stringify(payload);
       const valid = verifyWebhookSignatureFromHeaders(queue.webhookSecret, headers, bodyStr);
       if (!valid) {
-        console.warn(
-          "[GodMode] Fathom: webhook signature verification failed — processing anyway (v1 permissive mode)",
-        );
+        console.error("[GodMode] Fathom: webhook signature verification FAILED — rejecting payload");
+        respond(false, null, { code: "SIGNATURE_INVALID", message: "Webhook signature verification failed" });
+        return;
       }
     }
 

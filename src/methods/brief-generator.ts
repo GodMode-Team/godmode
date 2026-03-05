@@ -46,7 +46,11 @@ function loadEnv(): Record<string, string> {
       if (line.startsWith("#") || !line.includes("=")) continue;
       const eqIdx = line.indexOf("=");
       const key = line.slice(0, eqIdx).trim();
-      const value = line.slice(eqIdx + 1).trim();
+      let value = line.slice(eqIdx + 1).trim();
+      // Strip surrounding quotes (single or double)
+      if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
+        value = value.slice(1, -1);
+      }
       if (key) vars[key] = value;
     }
   } catch {
@@ -898,53 +902,9 @@ async function formatIntelligenceSection(): Promise<string | null> {
     // Options not available — proceed with defaults (enabled)
   }
 
-  try {
-    const { getActiveInsights } = await import("../services/advisor.js");
-    const { readUserPatterns } = await import("../services/observer.js");
-
-    const insights = await getActiveInsights();
-    const patterns = await readUserPatterns();
-
-    if (insights.length === 0 && !patterns) return null;
-
-    const lines: string[] = [];
-
-    // Top insights
-    if (insights.length > 0) {
-      const topInsights = insights.slice(0, 5);
-      lines.push(`**${insights.length} active insight${insights.length === 1 ? "" : "s"}:**`);
-      lines.push("");
-      for (const insight of topInsights) {
-        const prio = insight.priority === "high" || insight.priority === "urgent" ? "**!!**" : "";
-        lines.push(`- ${prio} ${insight.title}`);
-      }
-      if (insights.length > 5) {
-        lines.push(`\n*+${insights.length - 5} more — check Discoveries tab*`);
-      }
-    }
-
-    // Pattern summary
-    if (patterns) {
-      lines.push("");
-      const parts: string[] = [];
-      if (patterns.taskPatterns.completionRate7d > 0) {
-        parts.push(`Completion rate: ${Math.round(patterns.taskPatterns.completionRate7d * 100)}%`);
-      }
-      if (patterns.taskPatterns.stuckTasks.length > 0) {
-        parts.push(`${patterns.taskPatterns.stuckTasks.length} stuck task${patterns.taskPatterns.stuckTasks.length === 1 ? "" : "s"}`);
-      }
-      if (patterns.goalStatus.stalledGoals.length > 0) {
-        parts.push(`${patterns.goalStatus.stalledGoals.length} stalled goal${patterns.goalStatus.stalledGoals.length === 1 ? "" : "s"}`);
-      }
-      if (parts.length > 0) {
-        lines.push(`**Patterns:** ${parts.join(" · ")}`);
-      }
-    }
-
-    return lines.length > 0 ? lines.join("\n") : null;
-  } catch {
-    return null;
-  }
+  // Scout/Observer/Advisor subsystems removed in lean audit.
+  // Proactive intel section will be rebuilt in Phase 2.
+  return null;
 }
 
 // ── Data source: Overnight Agent Work (queue processor) ──────────────────────

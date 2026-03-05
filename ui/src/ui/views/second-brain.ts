@@ -8,7 +8,6 @@
 import { html, nothing } from "lit";
 import { unsafeHTML } from "lit/directives/unsafe-html.js";
 import { toSanitizedMarkdownHtml } from "../markdown";
-import { renderProactiveIntel, type ProactiveIntelProps } from "./proactive-intel.js";
 import { formatAgo } from "../format";
 
 // ── Types ────────────────────────────────────────────────────────────
@@ -230,8 +229,6 @@ export type SecondBrainProps = {
   onFileTreeRefresh?: () => Promise<void>;
   onFileSearch?: (query: string) => void;
   onFileSelect?: (path: string) => void;
-  // Proactive Intel props (for intel subtab)
-  intelProps?: ProactiveIntelProps;
   // Community Resources props (for resources subtab)
   communityResources?: CommunityResourcesData | null;
   communityResourceAddFormOpen?: boolean;
@@ -1027,9 +1024,7 @@ export function renderSecondBrain(props: SecondBrainProps) {
       </div>
 
       ${subtab === "intel"
-        ? props.intelProps
-          ? renderProactiveIntel(props.intelProps)
-          : html`<div class="second-brain-loading"><div class="second-brain-loading-spinner"></div>Loading...</div>`
+        ? html`<div class="muted" style="padding: 16px;">Intel has been folded into the daily brief.</div>`
         : loading
           ? html`<div class="second-brain-loading"><div class="second-brain-loading-spinner"></div>Loading...</div>`
           : subtab === "identity"

@@ -38,7 +38,8 @@ export function getXaiApiKey(): string {
     const raw = readFileSync(envPath, "utf-8");
     for (const line of raw.split("\n")) {
       if (line.startsWith("XAI_API_KEY=")) {
-        return line.slice("XAI_API_KEY=".length).trim();
+        const v = line.slice("XAI_API_KEY=".length).trim();
+        return (v.startsWith('"') && v.endsWith('"')) || (v.startsWith("'") && v.endsWith("'")) ? v.slice(1, -1) : v;
       }
     }
   } catch {
@@ -50,7 +51,8 @@ export function getXaiApiKey(): string {
     const raw = readFileSync(join(root, ".env"), "utf-8");
     for (const line of raw.split("\n")) {
       if (line.startsWith("XAI_API_KEY=")) {
-        return line.slice("XAI_API_KEY=".length).trim();
+        const v = line.slice("XAI_API_KEY=".length).trim();
+        return (v.startsWith('"') && v.endsWith('"')) || (v.startsWith("'") && v.endsWith("'")) ? v.slice(1, -1) : v;
       }
     }
   } catch {

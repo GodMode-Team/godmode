@@ -8,7 +8,7 @@
  */
 
 import { existsSync, mkdirSync, readdirSync, statSync } from "node:fs";
-import { join } from "node:path";
+import { join, resolve, sep } from "node:path";
 import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { GODMODE_ROOT, MEMORY_DIR, resolveVaultPath } from "../data-paths.js";
 
@@ -362,7 +362,6 @@ export async function writeVaultManifest(manifest: VaultManifest): Promise<void>
  * (trailing separator) to prevent prefix collisions like `/home/god` matching `/home/godmode`.
  */
 export function isAllowedPath(filePath: string): boolean {
-  const { resolve, sep } = require("node:path") as typeof import("node:path");
   const resolved = resolve(filePath);
   const godmodePrefix = GODMODE_ROOT.endsWith(sep) ? GODMODE_ROOT : GODMODE_ROOT + sep;
   if (resolved === GODMODE_ROOT || resolved.startsWith(godmodePrefix)) return true;

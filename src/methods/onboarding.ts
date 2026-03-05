@@ -7,7 +7,7 @@
  *   Phase 2: Second Brain (memory setup, Obsidian, daily brief)
  *   Phase 3: Workflow Audit (capability mapping, skill recommendations)
  *   Phase 4: Configuration (apply optimal settings)
- *   Phase 5: First Win (demo daily brief + focus pulse)
+ *   Phase 5: First Win (demo daily brief)
  *   Phase 6: Grand Reveal (summary, before/after)
  *
  * State persisted to ~/godmode/data/onboarding.json
@@ -663,9 +663,8 @@ export const onboardingHandlers: GatewayRequestHandlers = {
 
       // Code/dev-related
       if (wf.includes("code") || wf.includes("review") || wf.includes("pr") || wf.includes("dev")) {
-        capabilities.push("sub-agents", "extended thinking", "coding orchestrator");
+        capabilities.push("sub-agents", "extended thinking", "background queue");
         recommendedSkills.push("code-review", "git-workflow");
-        automations.push("coding task: PR reviews");
       }
 
       // Meeting-related
@@ -689,7 +688,7 @@ export const onboardingHandlers: GatewayRequestHandlers = {
 
       // Planning/management
       if (wf.includes("plan") || wf.includes("project") || wf.includes("manag")) {
-        capabilities.push("memory", "daily brief", "focus pulse");
+        capabilities.push("memory", "daily brief", "background queue");
         recommendedSkills.push("project-tracker", "weekly-review");
         automations.push("cron: weekly review prompt");
       }

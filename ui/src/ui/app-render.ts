@@ -81,7 +81,6 @@ import { renderDebug } from "./views/debug";
 import { renderExecApprovalPrompt } from "./views/exec-approval";
 import { renderGatewayUrlConfirmation } from "./views/gateway-url-confirmation";
 import { renderInstances } from "./views/instances";
-import { renderLifetracks } from "./views/lifetracks";
 import { renderLogs } from "./views/logs";
 import { renderMarkdownSidebar } from "./views/markdown-sidebar";
 import { renderMyDay, renderMyDayToolbar } from "./views/my-day";
@@ -92,8 +91,6 @@ import { renderSkills } from "./views/skills";
 import { renderLightbox } from "./chat/lightbox";
 import { getResolvedImageUrl } from "./app-gateway";
 import { renderToasts } from "./views/toast";
-import { renderVisionBoard } from "./views/vision-board";
-import { renderWheelOfLife } from "./views/wheel-of-life";
 import { renderOptions } from "./views/options";
 import { renderOnboardingWizard, type WizardStep } from "./views/onboarding-wizard";
 import { renderTrustTracker } from "./views/trust-tracker";
@@ -324,9 +321,8 @@ export function renderApp(state: AppViewState) {
   const showThinking = state.onboarding ? false : state.settings.chatShowThinking;
   const assistantAvatarUrl = resolveAssistantAvatarUrl(state);
   const chatAvatarUrl = state.chatAvatarUrl ?? assistantAvatarUrl ?? null;
-  const focusPulseEnabled = Boolean(state.godmodeOptions?.["focusPulse.enabled"] ?? true);
-  const focusPulseActive = Boolean(state.focusPulseData?.active);
-  const showFocusPulseWidget = focusPulseEnabled && focusPulseActive && Boolean(state.focusPulseData?.currentFocus);
+  // Focus pulse retired in lean audit — variables kept as false for downstream prop compatibility
+  const focusPulseActive = false;
   const { tabKeys: renderSessionTabKeys, activeIdentity: activeSessionTabIdentity } =
     getRenderableSessionTabState(state);
 
@@ -357,17 +353,7 @@ export function renderApp(state: AppViewState) {
           </div>
         </div>
         <div class="topbar-center">
-          ${showFocusPulseWidget
-            ? html`
-              <div class="focus-pulse-widget ${!state.focusPulseData.aligned ? 'focus-pulse-widget--misaligned' : ''}">
-                <span>\u{1F3AF}</span>
-                <span class="focus-pulse-widget__focus">${state.focusPulseData.currentFocus.title}</span>
-                <span class="focus-pulse-widget__score">${state.focusPulseData.score}/100</span>
-                ${state.focusPulseData.streak > 0 ? html`<span class="focus-pulse-widget__streak">\u{1F525} ${state.focusPulseData.streak}d</span>` : nothing}
-                <button class="focus-pulse-widget__complete-btn" @click=${() => state.handleFocusPulseComplete()} title="Mark current focus complete">\u2713 Done</button>
-              </div>
-            `
-            : nothing}
+          ${nothing}
         </div>
         <div class="topbar-status">
           ${
@@ -494,10 +480,7 @@ export function renderApp(state: AppViewState) {
           <div>
             ${
               state.tab !== "chat" &&
-              state.tab !== "setup" &&
-              state.tab !== "wheel-of-life" &&
-              state.tab !== "vision-board" &&
-              state.tab !== "lifetracks"
+              state.tab !== "setup"
                 ? html`
               <div class="page-title">${titleForTab(state.tab)}</div>
               <div class="page-sub">${subtitleForTab(state.tab)}</div>
@@ -1041,8 +1024,7 @@ export function renderApp(state: AppViewState) {
                   onDateToday: () => state.handleDateToday(),
                   viewMode: state.todayViewMode ?? "brief",
                   onViewModeChange: (mode) => state.handleTodayViewModeChange(mode),
-                  focusPulseActive: focusPulseActive,
-                  onStartMorningSet: focusPulseEnabled ? () => state.handleFocusPulseStartMorning() : undefined,
+                  focusPulseActive: false,
                   decisionCards: (state.todayQueueResults ?? []).length > 0 ? {
                     items: state.todayQueueResults!,
                     onApprove: () => {},
@@ -1502,8 +1484,7 @@ export function renderApp(state: AppViewState) {
                   agentLogError: state.agentLogError ?? null,
                   onAgentLogRefresh: () => state.handleMyDayRefresh(),
                   // Focus Pulse
-                  focusPulseActive: focusPulseActive,
-                  onStartMorningSet: focusPulseEnabled ? () => state.handleFocusPulseStartMorning() : undefined,
+                  focusPulseActive: false,
                   // Today's tasks
                   todayTasks: state.todayTasks ?? [],
                   todayTasksLoading: state.todayTasksLoading ?? false,
@@ -1551,60 +1532,6 @@ export function renderApp(state: AppViewState) {
                   onFileClick: (path) => state.handleWorkFileClick(path),
                   onSkillClick: (skill, projectName) =>
                     state.handleWorkSkillClick(skill, projectName),
-                })
-            : nothing
-        }
-
-        ${
-          state.tab === "wheel-of-life"
-            ? state.dynamicSlots["wheel-of-life"]
-              ? renderDynamicSlot(state, "wheel-of-life")
-              : renderWheelOfLife({
-                  connected: state.connected,
-                  data: state.wheelOfLifeData ?? null,
-                  loading: state.wheelOfLifeLoading ?? false,
-                  error: state.wheelOfLifeError ?? null,
-                  editMode: state.wheelOfLifeEditMode ?? false,
-                  onRefresh: () => state.handleWheelOfLifeRefresh(),
-                  onEdit: () => state.handleWheelOfLifeEdit(),
-                  onSave: (updates) => state.handleWheelOfLifeSave(updates),
-                  onCancel: () => state.handleWheelOfLifeCancel(),
-                })
-            : nothing
-        }
-
-        ${
-          state.tab === "vision-board"
-            ? state.dynamicSlots["vision-board"]
-              ? renderDynamicSlot(state, "vision-board")
-              : renderVisionBoard({
-                  connected: state.connected,
-                  data: state.visionBoardData ?? null,
-                  identityToday: state.visionBoardIdentityToday ?? null,
-                  loading: state.visionBoardLoading ?? false,
-                  error: state.visionBoardError ?? null,
-                  onRefresh: () => state.handleVisionBoardRefresh(),
-                })
-            : nothing
-        }
-
-        ${
-          state.tab === "lifetracks"
-            ? state.dynamicSlots["lifetracks"]
-              ? renderDynamicSlot(state, "lifetracks")
-              : renderLifetracks({
-                  connected: state.connected,
-                  data: state.lifetracksData ?? null,
-                  currentTrack: state.lifetracksCurrentTrack ?? null,
-                  loading: state.lifetracksLoading ?? false,
-                  error: state.lifetracksError ?? null,
-                  config: state.lifetracksConfig ?? null,
-                  generating: state.lifetracksGenerating ?? false,
-                  generationError: state.lifetracksGenerationError ?? null,
-                  onRefresh: () => state.handleLifetracksRefresh(),
-                  onSelectTrack: (track) => state.handleLifetracksSelectTrack(track),
-                  onEnable: () => state.handleLifetracksEnable(),
-                  onGenerate: () => state.handleLifetracksGenerate(),
                 })
             : nothing
         }

@@ -116,7 +116,7 @@ function parseSections(content: string): string[] {
   return sections;
 }
 
-function getTodayDate(): string {
+export function getTodayDate(): string {
   return localDateString();
 }
 
@@ -955,6 +955,160 @@ const toggleCheckbox: GatewayRequestHandler = async ({ params, respond }) => {
     });
   }
 };
+
+// --- Win The Day helpers (migrated from focus-pulse.ts) ---
+
+export type FocusItem = {
+  index: number;
+  title: string;
+  context: string;
+  completed: boolean;
+};
+
+/**
+ * Parse Win The Day items from a daily note's markdown content.
+ */
+export function parseWinTheDay(content: string): FocusItem[] {
+  // Note: `$` in a multiline regex matches end-of-line, not end-of-string,
+  // which caused the lazy `[\s\S]*?` to capture nothing. Use `\n##\s` as the
+  // section boundary and fall back to end-of-string via alternation with `$`
+  // only when the `m` flag is OFF (i.e. match the very end of the string).
+  const sectionMatch = content.match(
+    /##\s*(?:\u{1F3AF}\s*)?(?:Win The Day|Today's Mission)\n([\s\S]*?)(?=\n##\s)/u,
+  ) ?? content.match(
+    /##\s*(?:\u{1F3AF}\s*)?(?:Win The Day|Today's Mission)\n([\s\S]*)$/u,
+  );
+  if (!sectionMatch) return [];
+
+  const sectionContent = sectionMatch[1];
+  const items: FocusItem[] = [];
+  const numberedRegex = /^(\d+)\.\s*\[([ x])\]\s*\*\*(.+?)\*\*(?:\s*[—–-]\s*(.+))?$/gm;
+  let match;
+  while ((match = numberedRegex.exec(sectionContent)) !== null) {
+    items.push({
+      index: parseInt(match[1], 10),
+      title: match[3].trim(),
+      context: match[4]?.trim() ?? "",
+      completed: match[2] === "x",
+    });
+  }
+
+  if (items.length === 0) {
+    const bulletRegex = /^[-*]\s*\[([ x])\]\s*\*\*(.+?)\*\*(?:\s*[—–-]\s*(.+))?$/gm;
+    let idx = 1;
+    while ((match = bulletRegex.exec(sectionContent)) !== null) {
+      items.push({
+        index: idx++,
+        title: match[2].trim(),
+        context: match[3]?.trim() ?? "",
+        completed: match[1] === "x",
+      });
+    }
+  }
+
+  return items;
+}
+
+/**
+ * Rewrite the Win The Day section in the daily note with refined items.
+ * Preserves [x] state for items whose titles match existing completed items.
+ */
+export async function rewriteWinTheDay(
+  date: string,
+  items: FocusItem[],
+): Promise<{ rewritten: boolean; error?: string }> {
+  const vaultPath = getVaultPath();
+  if (!vaultPath) return { rewritten: false, error: "No vault path configured" };
+
+  const filePath = join(vaultPath, getDailyFolder(), `${date}.md`);
+  let content: string;
+  try {
+    content = await readFile(filePath, "utf-8");
+  } catch {
+    return { rewritten: false, error: "Daily note not found" };
+  }
+
+  const existing = parseWinTheDay(content);
+  const completedTitles = new Set(
+    existing.filter((i) => i.completed).map((i) => i.title.toLowerCase()),
+  );
+
+  const lines = items.map((item, idx) => {
+    const checked = completedTitles.has(item.title.toLowerCase()) ? "x" : " ";
+    const ctx = item.context ? ` — ${item.context}` : "";
+    return `${idx + 1}. [${checked}] **${item.title}**${ctx}`;
+  });
+  const newBody = "\n" + lines.join("\n") + "\n";
+
+  // Match the Win The Day section: heading + body until next ## or end of file.
+  // Two-pass: first try with a next-section boundary, then fall back to end-of-string.
+  const sectionMatch = content.match(
+    /^(##\s*(?:\u{1F3AF}\s*)?(?:Win The Day|Today's Mission)[^\n]*)\n([\s\S]*?)(?=\n##\s)/mu,
+  ) ?? content.match(
+    /^(##\s*(?:\u{1F3AF}\s*)?(?:Win The Day|Today's Mission)[^\n]*)\n([\s\S]*)$/mu,
+  );
+
+  let updated: string;
+  if (sectionMatch) {
+    const heading = sectionMatch[1];
+    const fullMatch = sectionMatch[0];
+    updated = content.replace(fullMatch, heading + newBody);
+  } else {
+    const firstH2 = content.match(/^##\s/m);
+    if (firstH2 && firstH2.index != null) {
+      const afterFirst = content.slice(firstH2.index);
+      const nextH2 = afterFirst.slice(1).search(/^##\s/m);
+      const insertPos = nextH2 >= 0 ? firstH2.index + 1 + nextH2 : content.length;
+      const newSection = "\n## Win The Day\n" + lines.join("\n") + "\n\n";
+      updated = content.slice(0, insertPos) + newSection + content.slice(insertPos);
+    } else {
+      updated = content + "\n\n## Win The Day\n" + lines.join("\n") + "\n";
+    }
+  }
+
+  await writeFile(filePath, updated, "utf-8");
+  return { rewritten: true };
+}
+
+/**
+ * Scope today's tasks to only Win The Day items.
+ * Un-dates pending tasks for today that aren't in the WTD set.
+ */
+export async function scopeTasksToWinTheDay(
+  date: string,
+  winTheDayItems: FocusItem[],
+): Promise<{ deferred: number }> {
+  const { updateTasks } = await import("./tasks.js");
+
+  const wtdTitles = new Set(winTheDayItems.map((i) => i.title.toLowerCase()));
+
+  let activeQueueTaskIds = new Set<string>();
+  try {
+    const { readQueueState } = await import("../lib/queue-state.js");
+    const queueState = await readQueueState();
+    activeQueueTaskIds = new Set(
+      queueState.items
+        .filter((qi) => qi.sourceTaskId && qi.status !== "done")
+        .map((qi) => qi.sourceTaskId!),
+    );
+  } catch {
+    // Queue state unavailable
+  }
+
+  const { result: deferred } = await updateTasks((tasksData) => {
+    let count = 0;
+    for (const task of tasksData.tasks) {
+      if (task.status !== "pending" || task.dueDate !== date) continue;
+      if (wtdTitles.has(task.title.toLowerCase())) continue;
+      if (activeQueueTaskIds.has(task.id)) continue;
+      task.dueDate = null;
+      count++;
+    }
+    return count;
+  });
+
+  return { deferred };
+}
 
 export const dailyBriefHandlers: GatewayRequestHandlers = {
   "dailyBrief.get": getDailyBrief,

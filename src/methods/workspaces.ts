@@ -1314,12 +1314,6 @@ const createWorkspace: GatewayRequestHandler = async ({ params, respond }) => {
   config.workspaces.push(workspace);
   await writeWorkspaceConfig(config);
 
-  // Refresh IDE activity watcher with updated workspace list
-  try {
-    const { getIDEActivityWatcher } = await import("../services/ide-activity-watcher.js");
-    void getIDEActivityWatcher().refresh(config.workspaces);
-  } catch { /* non-fatal */ }
-
   respond(true, {
     workspace: {
       ...workspace,
@@ -1344,12 +1338,6 @@ const deleteWorkspace: GatewayRequestHandler = async ({ params, respond }) => {
 
   const removed = config.workspaces.splice(index, 1)[0];
   await writeWorkspaceConfig(config);
-
-  // Refresh IDE activity watcher with updated workspace list
-  try {
-    const { getIDEActivityWatcher } = await import("../services/ide-activity-watcher.js");
-    void getIDEActivityWatcher().refresh(config.workspaces);
-  } catch { /* non-fatal */ }
 
   respond(true, {
     deleted: { id: removed.id, name: removed.name },

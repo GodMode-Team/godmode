@@ -22,40 +22,28 @@ import { fileURLToPath } from "node:url";
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk";
 // Method handler imports
 import { agentLogHandlers } from "./src/methods/agent-log.js";
-import { briefNotesHandlers } from "./src/methods/brief-notes.js";
 import { calendarHandlers } from "./src/methods/calendar.js";
-// clickup removed — stub, not shipping
 import { consciousnessHandlers } from "./src/methods/consciousness.js";
 import { dailyBriefHandlers } from "./src/methods/daily-brief.js";
 import { briefGeneratorHandlers } from "./src/methods/brief-generator.js";
 import { dataSourcesHandlers } from "./src/methods/data-sources.js";
 import { goalsHandlers } from "./src/methods/goals.js";
-// inner-work removed — stub, not shipping
-import { lifeDashboardsHandlers } from "./src/methods/life-dashboards.js";
-// lifetracks hidden — deferred, keeping code for future
 import { onboardingHandlers } from "./src/methods/onboarding.js";
 import { peopleDataHandlers } from "./src/methods/people-data.js";
 import { projectsHandlers } from "./src/methods/projects.js";
-import { subagentRunsHandlers } from "./src/methods/subagent-runs.js";
-import { createCodingTaskHandlers } from "./src/methods/coding-tasks.js";
 import { tasksHandlers } from "./src/methods/tasks.js";
 import { teamCommsHandlers } from "./src/methods/team-comms.js";
 import { teamCurationHandlers } from "./src/methods/team-curation.js";
 import { teamWorkspaceHandlers } from "./src/methods/team-workspace.js";
 import { createTeamMessageTool } from "./src/tools/team-message.js";
 import { createTeamMemoryWriteTool } from "./src/tools/team-memory.js";
-import { createCodingTaskTool } from "./src/tools/coding-task.js";
-// therapy handlers deprecated — old code, not shipping in plugin
+// coding-task tool removed in lean audit
 import { integrationsHandlers } from "./src/methods/integrations.js";
 import { uiSlotsHandlers } from "./src/methods/ui-slots.js";
 import { workspacesHandlers } from "./src/methods/workspaces.js";
-import { focusPulseHandlers } from "./src/methods/focus-pulse.js";
 import { optionsHandlers } from "./src/methods/options.js";
 import { trustTrackerHandlers } from "./src/methods/trust-tracker.js";
-import { sessionArchiveHandlers } from "./src/methods/session-archive.js";
-import { sessionSearchHandlers } from "./src/methods/session-search.js";
 import { systemUpdateHandlers, setPluginVersion, runPostUpdateHealthCheck } from "./src/methods/system-update.js";
-import { createTrustRateTool } from "./src/tools/trust-rate.js";
 import { createGuardrailTool } from "./src/tools/guardrail.js";
 import { createOnboardTool } from "./src/tools/onboard.js";
 import { createMorningSetTool } from "./src/tools/morning-set.js";
@@ -64,28 +52,10 @@ import { createXReadTool } from "./src/tools/x-read.js";
 import { queueHandlers } from "./src/methods/queue.js";
 import { xIntelHandlers } from "./src/methods/x-intel.js";
 import { filesHandlers } from "./src/methods/files.js";
-import { rescuetimeHandlers } from "./src/methods/rescuetime.js";
 import { dashboardsHandlers } from "./src/methods/dashboards.js";
 import { initAgentLogWriter } from "./src/services/agent-log-writer.js";
-import { CodingOrchestrator } from "./src/services/coding-orchestrator.js";
-import { CodingNotificationService } from "./src/services/coding-notification.js";
 import {
   trackToolCall,
-  checkGrepOnMemory,
-  cleanWorkingMd,
-  trackSearchUsage,
-  trackCodeToolUsage,
-  trackInvestigationDepth,
-  checkLazyRefusal,
-  checkLazyQuestion,
-  checkPrematureSurrender,
-  trackSearchAttempt,
-  checkSearchRetry,
-  consumeSearchRetryNudge,
-  consumeSearchGateNudge,
-  consumeSelfServiceNudge,
-  consumePersistenceNudge,
-  resetSearchTracking,
   scanForInjection,
   consumePromptShieldNudge,
   checkOutputLeak,
@@ -96,19 +66,14 @@ import {
   consumeContextPressureNudge,
   resetContextPressure,
 } from "./src/hooks/safety-gates.js";
-import { isGateEnabled, checkCustomGuardrails, logGateActivity } from "./src/services/guardrails.js";
+import { checkCustomGuardrails, logGateActivity } from "./src/services/guardrails.js";
 import { guardrailsHandlers } from "./src/methods/guardrails.js";
 import { imageCacheHandlers } from "./src/methods/image-cache.js";
-import { clawhubHandlers } from "./src/methods/clawhub.js";
 import { secondBrainHandlers } from "./src/methods/second-brain.js";
-import { securityAuditHandlers } from "./src/methods/security-audit.js";
 import { proactiveIntelHandlers } from "./src/methods/proactive-intel.js";
 import { supportHandlers } from "./src/methods/support.js";
-import { correctionsHandlers } from "./src/methods/corrections.js";
-import { sessionCoordinationHandlers } from "./src/methods/session-coordination.js";
 import { fathomWebhookHandlers, handleFathomWebhookHttp } from "./src/methods/fathom-webhook.js";
 import { authHandlers } from "./src/methods/auth.js";
-import { captureInjectedContext } from "./src/lib/injection-fingerprints.js";
 // Auth client — JWT-based authentication
 import {
   loadAuthTokens,
@@ -117,7 +82,7 @@ import {
 } from "./src/lib/auth-client.js";
 // Static file server for UIs
 import { createStaticFileHandler } from "./src/static-server.js";
-import { DATA_DIR, MEMORY_DIR } from "./src/data-paths.js";
+import { DATA_DIR } from "./src/data-paths.js";
 // Host compatibility — self-healing layer
 import { detectHostContext, extractSessionKey, safeBroadcast } from "./src/lib/host-context.js";
 import { killZombieGateways } from "./src/lib/zombie-guard.js";
@@ -129,7 +94,6 @@ let cachedOptions: Record<string, unknown> = {};
 let optionsCachedAt = 0;
 
 const OPTIONS_DEFAULTS: Record<string, unknown> = {
-  "focusPulse.enabled": true,
   "missionControl.enabled": false,
   "proactiveIntel.enabled": true,
 };
@@ -623,70 +587,35 @@ const godmodePlugin = {
     }
 
     // ── 1. Register all gateway RPC methods (license-gated) ───────
-    const codingOrchestrator = new CodingOrchestrator(api);
-    const codingNotification = new CodingNotificationService(api);
-
-    // Wire up completion notifications for detached agent processes.
-    // Without this, tasks completed by spawned CLI agents never send notifications.
-    codingOrchestrator.onTaskCompleted(async (task) => {
-      await codingNotification.sendCompletionNotification({
-        taskId: task.id,
-        description: task.description,
-        outcome: task.status === "done"
-          ? "completed"
-          : task.status === "review"
-            ? "ready for review"
-            : "failed",
-        prUrl: task.prUrl,
-        error: task.error,
-      });
-    });
-
-    const codingHandlers = createCodingTaskHandlers(codingOrchestrator);
-
     const allHandlers: Record<string, unknown> = {
       ...projectsHandlers,
       ...tasksHandlers,
       ...workspacesHandlers,
       ...dailyBriefHandlers,
       ...briefGeneratorHandlers,
-      ...lifeDashboardsHandlers,
-      // lifetracks + inner-work removed from registration
       ...goalsHandlers,
       ...peopleDataHandlers,
       ...dataSourcesHandlers,
       ...agentLogHandlers,
-      ...briefNotesHandlers,
-      // clickup removed from registration
       ...calendarHandlers,
-      ...subagentRunsHandlers,
       ...uiSlotsHandlers,
       ...onboardingHandlers,
       ...consciousnessHandlers,
       ...teamWorkspaceHandlers,
       ...teamCommsHandlers,
       ...teamCurationHandlers,
-      ...focusPulseHandlers,
       ...optionsHandlers,
       ...trustTrackerHandlers,
-      ...sessionArchiveHandlers,
-      ...sessionSearchHandlers,
-      ...codingHandlers,
       ...systemUpdateHandlers,
       ...guardrailsHandlers,
       ...imageCacheHandlers,
-      ...clawhubHandlers,
       ...secondBrainHandlers,
       ...proactiveIntelHandlers,
-      ...securityAuditHandlers,
       ...queueHandlers,
       ...dashboardsHandlers,
       ...supportHandlers,
-      ...correctionsHandlers,
-      ...sessionCoordinationHandlers,
       ...xIntelHandlers,
       ...filesHandlers,
-      ...rescuetimeHandlers,
       ...integrationsHandlers,
       ...fathomWebhookHandlers,
       ...authHandlers,
@@ -698,6 +627,15 @@ const godmodePlugin = {
       "onboarding.activateLicense",
       "onboarding.status",
       "onboarding.checklist",
+      "onboarding.update",
+      "onboarding.complete",
+      "onboarding.reset",
+      "onboarding.assess",
+      "onboarding.recommend",
+      "onboarding.configAudit",
+      "onboarding.wizard.status",
+      "onboarding.wizard.preview",
+      "onboarding.wizard.generate",
       "integrations.status",
       "integrations.test",
       "integrations.configure",
@@ -967,16 +905,6 @@ h1{color:#ff6b6b}code{background:#16213e;padding:2px 8px;border-radius:4px}a{col
         api.logger.warn(`[GodMode] curation service failed to start: ${String(err)}`);
       }
 
-      // Session auto-archive service
-      try {
-        const { startAutoArchiveService, stopAutoArchiveService } = await import("./src/services/session-archiver.js");
-        await startAutoArchiveService(api.logger);
-        serviceCleanup.push({ name: "session-archiver", fn: () => stopAutoArchiveService() });
-        api.logger.info("[GodMode] session auto-archive service initialized");
-      } catch (err) {
-        api.logger.warn(`[GodMode] session auto-archive service failed to start: ${String(err)}`);
-      }
-
       // Image cache cleanup
       try {
         const { cleanupCache } = await import("./src/services/image-cache.js");
@@ -986,30 +914,6 @@ h1{color:#ff6b6b}code{background:#16213e;padding:2px 8px;border-radius:4px}a{col
         }
       } catch (err) {
         api.logger.warn(`[GodMode] image cache cleanup failed: ${String(err)}`);
-      }
-
-      // Claude Code session sync (populate agent log)
-      try {
-        const { syncClaudeCodeSessions } = await import("./src/services/claude-code-sync.js");
-        syncClaudeCodeSessions().then((result) => {
-          if (result.synced > 0) {
-            api.logger.info(`[GodMode] Claude Code sync: ${result.synced} sessions synced`);
-          }
-        }).catch((err) => {
-          api.logger.warn(`[GodMode] Claude Code sync failed: ${String(err)}`);
-        });
-      } catch (err) {
-        api.logger.warn(`[GodMode] Claude Code sync import failed: ${String(err)}`);
-      }
-
-      // IDE Activity Watcher — real-time Claude Code + git commit tracking
-      try {
-        const { startIDEActivityWatcher, getIDEActivityWatcher } = await import("./src/services/ide-activity-watcher.js");
-        await startIDEActivityWatcher(api.logger);
-        serviceCleanup.push({ name: "ide-activity-watcher", fn: () => getIDEActivityWatcher().stop() });
-        api.logger.info("[GodMode] IDE activity watcher initialized");
-      } catch (err) {
-        api.logger.warn(`[GodMode] IDE activity watcher failed to start: ${String(err)}`);
       }
 
       // Post-update compatibility check
@@ -1024,28 +928,6 @@ h1{color:#ff6b6b}code{background:#16213e;padding:2px 8px;border-radius:4px}a{col
         runPostUpdateHealthCheck(currentOcVersion, Object.keys(allHandlers).length, api.logger);
       } catch (err) {
         api.logger.warn(`[GodMode] Post-update health check error: ${String(err)}`);
-      }
-
-      // Focus Pulse heartbeat service — init and resume if active
-      try {
-        const { initHeartbeat, resumeHeartbeatIfActive, stopHeartbeat } = await import("./src/services/focus-pulse-heartbeat.js");
-        initHeartbeat(api.logger);
-        await resumeHeartbeatIfActive();
-        serviceCleanup.push({ name: "focus-pulse-heartbeat", fn: () => stopHeartbeat() });
-        api.logger.info("[GodMode] Focus Pulse heartbeat service ready");
-      } catch (err) {
-        api.logger.warn(`[GodMode] Focus Pulse heartbeat failed to init: ${String(err)}`);
-      }
-
-      // RescueTime data fetcher — daily pull for Focus Pulse scoring
-      try {
-        const { initRescueTimeFetcher, startRescueTimeFetcher, stopRescueTimeFetcher } = await import("./src/services/rescuetime-fetcher.js");
-        initRescueTimeFetcher(api.logger);
-        startRescueTimeFetcher();
-        serviceCleanup.push({ name: "rescuetime-fetcher", fn: () => stopRescueTimeFetcher() });
-        api.logger.info("[GodMode] RescueTime fetcher service started");
-      } catch (err) {
-        api.logger.warn(`[GodMode] RescueTime fetcher failed to start: ${String(err)}`);
       }
 
       // Consciousness heartbeat — hourly auto-sync of CONSCIOUSNESS.md
@@ -1069,19 +951,6 @@ h1{color:#ff6b6b}code{background:#16213e;padding:2px 8px;border-radius:4px}a{col
         api.logger.info("[GodMode] Proactive Intelligence service initialized");
       } catch (err) {
         api.logger.warn(`[GodMode] Proactive Intelligence failed to start: ${String(err)}`);
-      }
-
-      // Recover orphaned coding tasks from previous gateway instance
-      if (codingOrchestrator.isEnabled()) {
-        codingOrchestrator.recoverOrphanedTasks().then((result) => {
-          if (result.recovered > 0 || result.reattached > 0) {
-            api.logger.info(
-              `[GodMode] Coding task recovery: ${result.recovered} recovered, ${result.reattached} re-attached`,
-            );
-          }
-        }).catch((err) => {
-          api.logger.warn(`[GodMode] Coding task recovery failed: ${String(err)}`);
-        });
       }
 
       // Queue processor — autonomous background task execution
@@ -1133,19 +1002,6 @@ h1{color:#ff6b6b}code{background:#16213e;padding:2px 8px;border-radius:4px}a{col
         api.logger.warn(`[GodMode] X client init failed: ${String(err)}`);
       }
 
-      // CronGuard — scan and patch dangerous isolated cron jobs
-      try {
-        const { scanAndPatchCronJobs } = await import("./src/services/cron-guard.js");
-        const patches = await scanAndPatchCronJobs(api.logger);
-        if (patches.length > 0) {
-          api.logger.warn(`[GodMode] CronGuard patched ${patches.length} dangerous cron job(s)`);
-        } else {
-          api.logger.info("[GodMode] CronGuard: all cron jobs safe");
-        }
-      } catch (err) {
-        api.logger.warn(`[GodMode] CronGuard scan failed: ${String(err)}`);
-      }
-
       api.logger.info(`[GodMode] Gateway startup complete — ${serviceCleanup.length} service(s) registered for cleanup`);
     });
 
@@ -1165,21 +1021,10 @@ h1{color:#ff6b6b}code{background:#16213e;padding:2px 8px;border-radius:4px}a{col
       api.logger.info(`[GodMode] Gateway stopped — ${cleaned} service(s) cleaned up`);
     });
 
-    // ── Safety Gates: message_received — Prompt Shield + CronGuard ──
+    // ── Safety Gates: message_received — Prompt Shield ──
     api.on("message_received", async (event, ctx) => {
       const sessionKey = extractSessionKey(ctx);
       const content = event.content ?? "";
-
-      // CronGuard runtime check — warn if message arrived in an isolated cron session
-      try {
-        const { isCronIsolatedSession } = await import("./src/services/cron-guard.js");
-        if (isCronIsolatedSession(sessionKey)) {
-          api.logger.warn(
-            `[GodMode][CronGuard] User message received in isolated cron session "${sessionKey}" — ` +
-            `this reply may not reach the main session.`,
-          );
-        }
-      } catch { /* non-fatal */ }
 
       if (content) {
         const result = await scanForInjection(sessionKey, content);
@@ -1242,7 +1087,6 @@ h1{color:#ff6b6b}code{background:#16213e;padding:2px 8px;border-radius:4px}a{col
           ].join("\n");
           prependChunks.push(supportContext);
           const supportJoined = prependChunks.join("\n\n---\n\n");
-          captureInjectedContext(sessionKey, supportJoined);
           const supportWrapped =
             `<system-context>\n` +
             `CRITICAL INSTRUCTION: The following is internal system context injected by GodMode. ` +
@@ -1265,16 +1109,6 @@ h1{color:#ff6b6b}code{background:#16213e;padding:2px 8px;border-radius:4px}a{col
       } catch (err) {
         api.logger.warn(`[GodMode] team bootstrap hook error: ${String(err)}`);
       }
-      // Trust feedback injection — append pending post-skill feedback prompt
-      try {
-        const { consumePendingTrustFeedback } = await import("./src/hooks/trust-feedback.js");
-        const trustPrompt = consumePendingTrustFeedback(sessionKey);
-        if (trustPrompt) {
-          prependChunks.push(trustPrompt);
-        }
-      } catch (err) {
-        api.logger.warn(`[GodMode] trust feedback hook error: ${String(err)}`);
-      }
       try {
         const { loadOnboardingContext } = await import("./src/hooks/onboarding-context.js");
         const onboardingResult = await loadOnboardingContext();
@@ -1284,149 +1118,39 @@ h1{color:#ff6b6b}code{background:#16213e;padding:2px 8px;border-radius:4px}a{col
       } catch (err) {
         api.logger.warn(`[GodMode] onboarding context hook error: ${String(err)}`);
       }
-      // ── Consciousness injection — Prosper's working memory ─────────
-      // Without this, Prosper has no visibility into CONSCIOUSNESS.md,
-      // WORKING.md, or decisions/context stored in memory files.
-      // Background agents (queue-processor) already inject this; the main
-      // chat path was missing it, causing Prosper to ask questions whose
-      // answers are already in its own files.
+      // ── Awareness Snapshot — lean cross-session context (~50 lines) ───
+      // Replaces raw CONSCIOUSNESS.md (~300 lines) + WORKING.md (~150 lines)
       try {
-        const fsP = await import("node:fs/promises");
-        const pathM = await import("node:path");
-        const consciousnessPath = pathM.join(MEMORY_DIR, "CONSCIOUSNESS.md");
-        const workingPath = pathM.join(MEMORY_DIR, "WORKING.md");
-
-        const [consciousnessRaw, workingRaw] = await Promise.all([
-          fsP.readFile(consciousnessPath, "utf-8").catch(() => ""),
-          fsP.readFile(workingPath, "utf-8").catch(() => ""),
-        ]);
-
-        if (consciousnessRaw) {
-          // First 300 lines — more generous than queue-processor's 200
-          // because Prosper is the primary conversational agent.
-          const consciousnessLines = consciousnessRaw.split("\n").slice(0, 300).join("\n");
+        const { readSnapshot } = await import("./src/lib/awareness-snapshot.js");
+        const snapshot = await readSnapshot();
+        if (snapshot) {
           prependChunks.push(
-            "[GodMode — Consciousness Context]\n" +
-            "This is your current awareness state from CONSCIOUSNESS.md. " +
-            "Use this context to answer questions — do NOT ask the user for " +
-            "information that is already here.\n\n" +
-            consciousnessLines,
-          );
-        }
-
-        if (workingRaw) {
-          const workingLines = workingRaw.split("\n").slice(0, 150).join("\n");
-          prependChunks.push(
-            "[GodMode — Working Context]\n" +
-            "This is your current working state from WORKING.md. " +
-            "It contains decisions, plans, and in-progress context. " +
-            "Do NOT re-ask the user for information documented here.\n\n" +
-            workingLines,
+            "[GodMode — Current Awareness]\n" +
+            "This is your current state. Use it to ground your responses.\n\n" +
+            snapshot,
           );
         }
       } catch (err) {
-        api.logger.warn(`[GodMode] consciousness injection error: ${String(err)}`);
+        api.logger.warn(`[GodMode] awareness snapshot error: ${String(err)}`);
       }
 
-      // Exhaustive search gate nudge — injected after a lazy refusal was blocked
-      const searchNudge = consumeSearchGateNudge(sessionKey);
-      if (searchNudge) {
-        prependChunks.push(searchNudge);
-      }
-      // Self-service gate nudge — injected after a lazy question was blocked
-      const selfServiceNudge = consumeSelfServiceNudge(sessionKey);
-      if (selfServiceNudge) {
-        prependChunks.push(selfServiceNudge);
-      }
-      // Persistence gate nudge — injected after a premature surrender was blocked
-      const persistenceNudge = consumePersistenceNudge(sessionKey);
-      if (persistenceNudge) {
-        prependChunks.push(persistenceNudge);
-      }
-      // Search retry gate nudge — injected after a premature "not found" was blocked
-      const searchRetryNudge = consumeSearchRetryNudge(sessionKey);
-      if (searchRetryNudge) {
-        prependChunks.push(searchRetryNudge);
-      }
-      // Output Shield nudge — injected after an output leak was blocked
+      // Safety nudges (conditional — only if a gate fired)
       const outputNudge = consumeOutputShieldNudge(sessionKey);
-      if (outputNudge) {
-        prependChunks.push(outputNudge);
-      }
-      // Context Pressure nudge — injected when session context is filling up
+      if (outputNudge) prependChunks.push(outputNudge);
       const contextNudge = consumeContextPressureNudge(sessionKey);
-      if (contextNudge) {
-        prependChunks.push(contextNudge);
-      }
-      // Queue context injection — session-scoped + global
+      if (contextNudge) prependChunks.push(contextNudge);
+
+      // Queue review count (lean — just a count, not full output injection)
       try {
         const { readQueueState } = await import("./src/lib/queue-state.js");
-        const queueState = await readQueueState();
-
-        // Session-scoped: if this session is linked to a task, inject that task's queue output
-        const sessionScopedTaskIds = new Set<string>();
-        if (sessionKey) {
-          try {
-            const { readTasks } = await import("./src/methods/tasks.js");
-            const tasksData = await readTasks();
-            const linkedTask = tasksData.tasks.find(
-              (t) => t.sessionId === sessionKey,
-            );
-            if (linkedTask) {
-              const taskQueueItems = queueState.items.filter(
-                (i) =>
-                  i.sourceTaskId === linkedTask.id &&
-                  (i.status === "review" || i.status === "processing"),
-              );
-              for (const qi of taskQueueItems) {
-                sessionScopedTaskIds.add(qi.id);
-                if (qi.status === "processing") {
-                  prependChunks.push(
-                    `[GodMode — Task Context] An agent (${qi.type}) is currently working on "${qi.title}" for this task. It's still in progress.`,
-                  );
-                } else if (qi.status === "review" && qi.result?.outputPath) {
-                  let outputPreview = "";
-                  try {
-                    const fsP = await import("node:fs/promises");
-                    const raw = await fsP.readFile(qi.result.outputPath, "utf-8");
-                    outputPreview = raw.split("\n").slice(0, 200).join("\n");
-                  } catch {
-                    outputPreview = `(Output file at ${qi.result.outputPath} could not be read)`;
-                  }
-                  prependChunks.push(
-                    `[GodMode — Task Context] I worked on "${qi.title}" autonomously for this task. ` +
-                      `Here's what I prepared:\n\n${outputPreview}\n\n` +
-                      `The user should review this output. Discuss the findings and ask if they'd like to mark it done.`,
-                  );
-                }
-              }
-            }
-          } catch {
-            // Task lookup failed — non-fatal
-          }
+        const qs = await readQueueState();
+        const review = qs.items.filter((i: { status: string }) => i.status === "review").length;
+        if (review > 0) {
+          prependChunks.push(`[GodMode Queue] ${review} item(s) ready for review. Mention this to the user.`);
         }
+      } catch { /* Queue unavailable */ }
 
-        // Global: notify about review items not already covered by session-scoped injection
-        const reviewItems = queueState.items.filter(
-          (i) => i.status === "review" && !sessionScopedTaskIds.has(i.id),
-        );
-        if (reviewItems.length > 0) {
-          const summaries = reviewItems
-            .slice(0, 5)
-            .map(
-              (i) =>
-                `- "${i.title}" (${i.type}) — output at ${i.result?.outputPath ?? "pending"}`,
-            )
-            .join("\n");
-          prependChunks.push(
-            `[GodMode Queue] ${reviewItems.length} other item(s) ready for review:\n${summaries}\n\n` +
-              `You can mention these to the user proactively. They should check Mission Control when ready.`,
-          );
-        }
-      } catch {
-        // Queue not available — skip silently
-      }
-      // Prompt Shield nudge — injected when injection detected (HIGHEST PRIORITY — unshift)
+      // Prompt Shield nudge (HIGHEST PRIORITY — unshift)
       const promptNudge = consumePromptShieldNudge(sessionKey);
       if (promptNudge) {
         prependChunks.unshift(promptNudge);
@@ -1437,8 +1161,6 @@ h1{color:#ff6b6b}code{background:#16213e;padding:2px 8px;border-radius:4px}a{col
       // Wrap in <system-context> so the LLM treats this as invisible system
       // instructions — NOT content to echo, quote, or reference in its response.
       const joined = prependChunks.join("\n\n---\n\n");
-      // Capture for dynamic leak detection (replaces hardcoded fingerprints)
-      captureInjectedContext(sessionKey, joined);
       const wrapped =
         `<system-context>\n` +
         `CRITICAL INSTRUCTION: The following is internal system context injected by GodMode. ` +
@@ -1450,23 +1172,9 @@ h1{color:#ff6b6b}code{background:#16213e;padding:2px 8px;border-radius:4px}a{col
       return { prependContext: wrapped };
     });
 
-    // ── Safety Gates: before_reset — session hygiene ───────────────
+    // ── before_reset — cleanup session state ───────────────
     api.on("before_reset", async (event, ctx) => {
-      // Clean WORKING.md on session end
-      try {
-        const result = await cleanWorkingMd();
-        if (result.cleaned) {
-          api.logger.info(
-            `[GodMode][SafetyGate] session hygiene: removed ${result.removedDone} [DONE] items, trimmed ${result.trimmedLines} lines`,
-          );
-        }
-      } catch (err) {
-        api.logger.warn(`[GodMode] session hygiene error: ${String(err)}`);
-      }
-
-      // Reset search tracking for this session
       const sessionKey = extractSessionKey(ctx);
-      resetSearchTracking(sessionKey);
 
       // Reset prompt shield / output shield tracking for this session
       resetPromptShieldTracking(sessionKey);
@@ -1523,121 +1231,12 @@ h1{color:#ff6b6b}code{background:#16213e;padding:2px 8px;border-radius:4px}a{col
         return { block: true, blockReason: configBlock };
       }
 
-      // Gate 2: Grep Blocker + Coding Bypass Blocker — exec/bash/shell commands
-      if (name === "exec" || name === "bash" || name === "shell") {
-        const command =
-          typeof event.params?.command === "string"
-            ? event.params.command
-            : typeof event.params?.cmd === "string"
-              ? event.params.cmd
-              : "";
-        if (command) {
-          const grepBlock = await checkGrepOnMemory(command, sessionKey);
-          if (grepBlock) {
-            api.logger.warn(`[GodMode][SafetyGate] grep blocker fired`);
-            return { block: true, blockReason: grepBlock };
-          }
-
-          // Gate 2b: Block exec-based coding agent bypass (claude -p, claude --dangerously-skip-permissions)
-          if (codingOrchestrator.isEnabled() && await isGateEnabled("spawnGate")) {
-            const lowerCmd = command.toLowerCase();
-            const isCodingBypass =
-              /\bclaude\b/.test(lowerCmd) &&
-              (/\s-p\s|\s-p$|\s--print\b|\s--dangerously-skip-permissions\b/.test(lowerCmd));
-            if (isCodingBypass) {
-              api.logger.warn(`[GodMode][SafetyGate] coding bypass blocked: ${command.slice(0, 100)}`);
-              return {
-                block: true,
-                blockReason: [
-                  "Running `claude -p` or `claude --dangerously-skip-permissions` via exec bypasses the coding orchestration layer.",
-                  "",
-                  "Use the `coding_task` tool instead. It handles everything:",
-                  "- Isolated git worktree and branch",
-                  "- Spawns the coding agent automatically",
-                  "- Validation gates (lint, typecheck, test) on completion",
-                  "- PR creation and notifications",
-                  "",
-                  "Example: coding_task({ task: \"Build the signup form\", repoRoot: \"/path/to/repo\" })",
-                ].join("\n"),
-              };
-            }
-          }
-        }
-      }
-
-      // Gate 3: Coding spawn isolation
-      const isSpawn = name === "sessions_spawn" || name === "task" || name.endsWith(".sessions_spawn");
-      if (!isSpawn || !codingOrchestrator.isEnabled()) return;
-      if (!(await isGateEnabled("spawnGate"))) return;
-
-      const params = event.params ?? {};
-      const label = typeof params.label === "string" ? params.label : undefined;
-
-      const task = await codingOrchestrator.findTaskForSpawn(label);
-      if (task) {
-        api.logger.info(`[GodMode][Coding] spawn allowed for task ${task.id}`);
-        return;
-      }
-
-      api.logger.info(`[GodMode][Coding] spawn blocked — no matching coding_task (label=${label ?? "none"})`);
-      return {
-        block: true,
-        blockReason: [
-          "Coding tasks require worktree isolation to prevent overwrites between sessions.",
-          "",
-          "Call the `coding_task` tool first with your task description.",
-          "It will create an isolated worktree and branch, then give you",
-          "the exact spawn instructions (including the label) to use.",
-          "",
-          "Example: coding_task({ task: \"Build signup form\" })",
-          "Then use the returned spawn instructions to call sessions_spawn.",
-        ].join("\n"),
-      };
     });
 
-    // ── Safety Gates: after_tool_call — search tracking ────────────
-    api.on("after_tool_call", async (event, ctx) => {
-      const sessionKey = extractSessionKey(ctx);
-      // Track search tool usage for the exhaustive search gate
-      trackSearchUsage(sessionKey, event.toolName ?? "");
-      // Track code-reading tool usage for the self-service gate
-      trackCodeToolUsage(sessionKey, event.toolName ?? "");
-      // Track investigation depth for the persistence gate
-      trackInvestigationDepth(sessionKey, event.toolName ?? "");
-      // Track search attempts for the search retry gate
-      trackSearchAttempt(sessionKey, event.toolName ?? "");
-
-      // Trust feedback — detect skill completion and queue feedback prompt
-      try {
-        const { handlePostToolFeedback } = await import("./src/hooks/trust-feedback.js");
-        await handlePostToolFeedback(event.toolName, sessionKey, event.error);
-      } catch (err) {
-        api.logger.warn(`[GodMode] trust after_tool_call hook error: ${String(err)}`);
-      }
-    });
-
-    // ── Safety Gates: message_sending — exhaustive search gate ───
+    // ── Safety Gates: message_sending — output shield ───
     api.on("message_sending", async (event, ctx) => {
       const sessionKey = extractSessionKey(ctx);
       const content = event.content ?? "";
-      if (await checkLazyRefusal(sessionKey, content)) {
-        api.logger.warn(`[GodMode][SafetyGate] exhaustive search gate fired — lazy refusal blocked`);
-        return { cancel: true };
-      }
-      if (await checkLazyQuestion(sessionKey, content)) {
-        api.logger.warn(`[GodMode][SafetyGate] self-service gate fired — lazy question blocked`);
-        return { cancel: true };
-      }
-      // Persistence Gate — block premature surrender
-      if (await checkPrematureSurrender(sessionKey, content)) {
-        api.logger.warn(`[GodMode][SafetyGate] persistence gate fired — premature surrender blocked`);
-        return { cancel: true };
-      }
-      // Search Retry Gate — block premature "not found" after too few search attempts
-      if (await checkSearchRetry(sessionKey, content)) {
-        api.logger.warn(`[GodMode][SafetyGate] search retry gate fired — premature "not found" blocked`);
-        return { cancel: true };
-      }
       // Output Shield — block messages that leak system prompts, keys, or config
       if (await checkOutputLeak(sessionKey, content)) {
         api.logger.warn(`[GodMode][SafetyGate] output shield fired — leak blocked`);
@@ -1670,50 +1269,9 @@ h1{color:#ff6b6b}code{background:#16213e;padding:2px 8px;border-radius:4px}a{col
       api.logger.info(`[GodMode] context pressure reset after compaction (session: ${sessionKey ?? "unknown"})`);
     });
 
-    api.on("subagent_spawning", async (event) => {
-      api.logger.info(`[GodMode][Coding] subagent spawning: ${event.childSessionKey} (${event.label ?? "unlabeled"})`);
-      // Link child session to the orchestrated task so subagent_ended can correlate
-      if (event.label) {
-        try {
-          await codingOrchestrator.registerTaskSpawn(event.label, event.childSessionKey);
-        } catch (err) {
-          api.logger.warn(`[GodMode][Coding] failed to register spawn: ${String(err)}`);
-        }
-      }
-      return { status: "ok" as const };
-    });
-
-    api.on("subagent_ended", async (event) => {
-      try {
-        const { task } = await codingOrchestrator.handleTaskCompleted({
-          childSessionKey: event.targetSessionKey,
-          label: (event as Record<string, unknown>).label as string | undefined,
-          outcome: event.outcome,
-          error: event.error,
-        });
-        if (task) {
-          await codingNotification.sendCompletionNotification({
-            taskId: task.id,
-            description: task.description,
-            outcome: task.status === "done"
-              ? "completed"
-              : task.status === "review"
-                ? "ready for review"
-                : "failed",
-            prUrl: task.prUrl,
-            error: task.error,
-          });
-        }
-      } catch (err) {
-        api.logger.warn(`[GodMode] coding subagent_ended hook error: ${String(err)}`);
-      }
-    });
-
-    // Team + coding tools
+    // Tools
     api.registerTool((ctx) => createTeamMessageTool(ctx));
     api.registerTool((ctx) => createTeamMemoryWriteTool(ctx));
-    api.registerTool((ctx) => createCodingTaskTool(ctx, { orchestrator: codingOrchestrator, logger: api.logger }));
-    api.registerTool((ctx) => createTrustRateTool(ctx));
     api.registerTool((ctx) => createOnboardTool(ctx));
     api.registerTool((ctx) => createMorningSetTool(ctx));
     api.registerTool((ctx) => createGuardrailTool(ctx));

@@ -1,29 +1,21 @@
 /**
  * proactive-intel.ts — RPC handlers for Proactive Intelligence.
  *
- * Exposes the Scout/Observer/Advisor system to the UI and agents.
+ * Scout/Observer/Advisor subsystems removed in lean audit.
+ * Handlers return empty data until Phase 2 rewrite.
  *
  * RPC methods:
- *   proactiveIntel.getInsights     — Get active insights
- *   proactiveIntel.dismissInsight  — Dismiss an insight
- *   proactiveIntel.actOnInsight    — Mark insight as acted on
- *   proactiveIntel.getDiscoveries  — Get Scout findings feed
- *   proactiveIntel.getUserPatterns — Get Observer's user model
+ *   proactiveIntel.getInsights     — Get active insights (stub: empty)
+ *   proactiveIntel.dismissInsight  — Dismiss an insight (stub: not found)
+ *   proactiveIntel.actOnInsight    — Mark insight as acted on (stub: not found)
+ *   proactiveIntel.getDiscoveries  — Get Scout findings feed (stub: empty)
+ *   proactiveIntel.getUserPatterns — Get Observer's user model (stub: null)
  *   proactiveIntel.getStatus       — Service health / last run times
- *   proactiveIntel.forceRefresh    — Trigger all scans + advisor
- *   proactiveIntel.configure       — Update cadence/source settings
+ *   proactiveIntel.forceRefresh    — Trigger refresh
+ *   proactiveIntel.configure       — Update settings
  */
 
 import type { GatewayRequestHandler } from "openclaw/plugin-sdk";
-import { readScoutState } from "../services/scout.js";
-import { readUserPatterns } from "../services/observer.js";
-import {
-  getActiveInsights,
-  dismissInsight,
-  markInsightActedOn,
-  readInsightState,
-  type InsightCategory,
-} from "../services/advisor.js";
 
 type GatewayRequestHandlers = Record<string, GatewayRequestHandler>;
 
@@ -38,21 +30,9 @@ function refreshBroadcast(context: Parameters<GatewayRequestHandler>[0]["context
 
 // ── Handlers ───────────────────────────────────────────────────────────
 
-const getInsights: GatewayRequestHandler = async ({ params, respond, context }) => {
+const getInsights: GatewayRequestHandler = async ({ respond, context }) => {
   refreshBroadcast(context);
-  const { category, limit } = params as { category?: InsightCategory; limit?: number };
-  try {
-    let insights = await getActiveInsights(category);
-    if (typeof limit === "number" && limit > 0) {
-      insights = insights.slice(0, limit);
-    }
-    respond(true, { insights, count: insights.length });
-  } catch (err) {
-    respond(false, null, {
-      code: "INTEL_ERROR",
-      message: err instanceof Error ? err.message : String(err),
-    });
-  }
+  respond(true, { insights: [], count: 0 });
 };
 
 const handleDismissInsight: GatewayRequestHandler = async ({ params, respond }) => {
@@ -61,19 +41,7 @@ const handleDismissInsight: GatewayRequestHandler = async ({ params, respond }) 
     respond(false, null, { code: "INVALID_REQUEST", message: "id is required" });
     return;
   }
-  try {
-    const success = await dismissInsight(id);
-    if (!success) {
-      respond(false, null, { code: "NOT_FOUND", message: `Insight ${id} not found` });
-      return;
-    }
-    respond(true, { dismissed: true, id });
-  } catch (err) {
-    respond(false, null, {
-      code: "INTEL_ERROR",
-      message: err instanceof Error ? err.message : String(err),
-    });
-  }
+  respond(false, null, { code: "NOT_FOUND", message: `Insight ${id} not found` });
 };
 
 const handleActOnInsight: GatewayRequestHandler = async ({ params, respond }) => {
@@ -82,68 +50,18 @@ const handleActOnInsight: GatewayRequestHandler = async ({ params, respond }) =>
     respond(false, null, { code: "INVALID_REQUEST", message: "id is required" });
     return;
   }
-  try {
-    const success = await markInsightActedOn(id);
-    if (!success) {
-      respond(false, null, { code: "NOT_FOUND", message: `Insight ${id} not found` });
-      return;
-    }
-    respond(true, { actedOn: true, id });
-  } catch (err) {
-    respond(false, null, {
-      code: "INTEL_ERROR",
-      message: err instanceof Error ? err.message : String(err),
-    });
-  }
+  respond(false, null, { code: "NOT_FOUND", message: `Insight ${id} not found` });
 };
 
-const getDiscoveries: GatewayRequestHandler = async ({ params, respond }) => {
-  const { source, limit } = params as { source?: string; limit?: number };
-  try {
-    const state = await readScoutState();
-    let findings = state.findings;
-
-    if (source && typeof source === "string") {
-      findings = findings.filter((f) => f.source === source);
-    }
-
-    // Sort by most recent first
-    findings = findings.sort((a, b) => b.discoveredAt - a.discoveredAt);
-
-    if (typeof limit === "number" && limit > 0) {
-      findings = findings.slice(0, limit);
-    }
-
-    respond(true, {
-      findings,
-      count: findings.length,
-      lastCheckAt: state.lastCheckAt,
-    });
-  } catch (err) {
-    respond(false, null, {
-      code: "INTEL_ERROR",
-      message: err instanceof Error ? err.message : String(err),
-    });
-  }
+const getDiscoveries: GatewayRequestHandler = async ({ respond }) => {
+  respond(true, { findings: [], count: 0, lastCheckAt: 0 });
 };
 
 const getUserPatterns: GatewayRequestHandler = async ({ respond }) => {
-  try {
-    const patterns = await readUserPatterns();
-    if (!patterns) {
-      respond(true, {
-        patterns: null,
-        message: "No patterns collected yet. The observer runs every 15 minutes.",
-      });
-      return;
-    }
-    respond(true, { patterns });
-  } catch (err) {
-    respond(false, null, {
-      code: "INTEL_ERROR",
-      message: err instanceof Error ? err.message : String(err),
-    });
-  }
+  respond(true, {
+    patterns: null,
+    message: "Proactive Intel subsystems pending Phase 2 rewrite.",
+  });
 };
 
 const getStatus: GatewayRequestHandler = async ({ respond, context }) => {
@@ -151,21 +69,7 @@ const getStatus: GatewayRequestHandler = async ({ respond, context }) => {
   try {
     const { getProactiveIntelService } = await import("../services/proactive-intel.js");
     const service = getProactiveIntelService();
-    const status = service.getStatus();
-
-    // Also read insight/finding counts from disk
-    const scoutState = await readScoutState();
-    const insightState = await readInsightState();
-    const activeInsights = insightState.insights.filter(
-      (i) => !i.dismissed && (!i.expiresAt || Date.now() < i.expiresAt),
-    );
-
-    respond(true, {
-      ...status,
-      totalFindings: scoutState.findings.length,
-      totalInsights: activeInsights.length,
-      lastAdvisorRun: insightState.lastAdvisorRun,
-    });
+    respond(true, service.getStatus());
   } catch (err) {
     respond(false, null, {
       code: "INTEL_ERROR",
@@ -195,12 +99,8 @@ const forceRefresh: GatewayRequestHandler = async ({ respond, context }) => {
 const configure: GatewayRequestHandler = async ({ params, respond }) => {
   const updates = params as Record<string, unknown>;
   try {
-    // Validate keys
     const allowedKeys = [
       "proactiveIntel.enabled",
-      "proactiveIntel.scout.enabled",
-      "proactiveIntel.observer.enabled",
-      "proactiveIntel.advisor.enabled",
       "proactiveIntel.cadenceMultiplier",
       "proactiveIntel.notifications.enabled",
       "proactiveIntel.briefIntegration.enabled",
@@ -230,7 +130,6 @@ const configure: GatewayRequestHandler = async ({ params, respond }) => {
     await mkdir(dirname(optionsPath), { recursive: true });
     await writeFile(optionsPath, JSON.stringify(opts, null, 2), "utf-8");
 
-    // If proactiveIntel.enabled was toggled, start/stop the service
     if ("proactiveIntel.enabled" in updates) {
       const { getProactiveIntelService } = await import("../services/proactive-intel.js");
       const service = getProactiveIntelService();

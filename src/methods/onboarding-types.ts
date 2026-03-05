@@ -7,7 +7,7 @@
  *   Phase 2: Second Brain (memory setup, Obsidian, daily brief)
  *   Phase 3: Workflow Audit (capability mapping, skill recommendations)
  *   Phase 4: Configuration (apply optimal settings)
- *   Phase 5: First Win (demo daily brief + focus pulse)
+ *   Phase 5: First Win (demo daily brief)
  *   Phase 6: Grand Reveal (summary, before/after)
  */
 
@@ -135,7 +135,7 @@ export type ConfigurationApplied = {
 // ── Phase 5: First Win ───────────────────────────────────────────
 
 export type FirstWinResult = {
-  demoType: "daily-brief" | "focus-pulse" | "morning-routine" | "other";
+  demoType: "daily-brief" | "morning-routine" | "other";
   outcome?: string;
   firstFiveCommands?: string[];
   completed: boolean;

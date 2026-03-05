@@ -4,6 +4,125 @@ This file tracks recent development changes so Atlas and other agents can quickl
 
 ---
 
+## 2026-03-04 — v1.4.0: Lean Audit + Adversarial Bug Sweep + Install Hardening
+
+### What
+Massive lean audit across the entire codebase, followed by two rounds of 3-phase adversarial bug-finding (codebase-wide + install-specific).
+
+### Lean Audit (Phase 1-6)
+- **32 files deleted**, 22 rewritten — killed developer tooling, over-engineered features, competing memory systems
+- Context injection: ~1,500 lines/turn → ~150 lines/turn (90% reduction)
+- Memory systems: 6 → 2 (Obsidian vault + awareness snapshot)
+- Safety gates: 10 → 4 (loopBreaker, promptShield, outputShield, contextPressure)
+- New `awareness-snapshot.ts` replaces CONSCIOUSNESS.md + WORKING.md dumps
+- New lean ally identity in `agent-persona.ts` (30 lines vs 66-line Persistence Protocol)
+- Identity digest + meeting prep injected into every session
+
+### Adversarial Bug Sweep (codebase)
+13 real bugs found and fixed via 3-agent adversarial process:
+- **CRITICAL**: Fathom stuck meeting recovery (infinite loop), webhook signature bypass, output shield stale comment
+- **MEDIUM**: .env parsers don't strip quotes (4 locations), captureStatus ghost fields from killed pipelines
+- **LOW**: require() in ESM, killed dashboard widget data reads
+
+### Onboarding Lean Cleanup
+- Removed focus-pulse and coding-orchestrator references from onboarding recommendations
+- Removed focusPulse/coding config from openclaw.plugin.json
+- Cleaned up dashboard widgets for killed modules (focus-pulse, coding-status, intel-highlights, streak-stats)
+- All onboarding wizard RPCs ungated (were incorrectly behind license gate — blocked new user setup)
+
+### Install Hardening (adversarial process)
+- **CRITICAL FIX**: auth-public-key.pem now included in npm package (`dist/**/*.pem` in files array)
+- **CRITICAL FIX**: auth-client.ts uses `homedir()` instead of `process.env.HOME` (Windows compat)
+- **CRITICAL FIX**: All onboarding RPCs ungated for pre-license users
+- **CRITICAL FIX**: Windows installer now removes + reinstalls (was skipping updates)
+- macOS install: .zshrc prioritized in install_node_direct() (macOS default shell)
+- Linux install: xz package name mapped per package manager (xz-utils → xz for non-Debian)
+- Install scripts synced: scripts/ ↔ site/
+
+### Files Changed (key)
+- `index.ts` — ungated onboarding RPCs, lean hooks
+- `src/lib/auth-client.ts` — homedir() fix
+- `src/lib/vault-paths.ts` — ESM import fix
+- `src/lib/awareness-snapshot.ts` — identity digest, meeting prep
+- `src/services/fathom-processor.ts` — stuck meeting recovery fix
+- `src/methods/fathom-webhook.ts` — signature enforcement + quote stripping
+- `src/methods/brief-generator.ts` — quote stripping
+- `src/services/x-client.ts` — quote stripping
+- `src/hooks/safety-gates.ts` — stale comment fix
+- `src/methods/second-brain.ts` — ghost fields cleanup
+- `src/methods/dashboards.ts` — killed widget cleanup
+- `src/methods/onboarding*.ts` — killed feature references removed
+- `src/hooks/onboarding-context.ts` — focus-pulse demo removed
+- `src/methods/options.ts` — focusPulse default removed
+- `openclaw.plugin.json` — killed config sections removed
+- `package.json` — v1.4.0, PEM included
+- `scripts/install.sh` — .zshrc + xz package fix
+- `scripts/install.ps1` — update logic fix
+- `ui/src/ui/controllers/focus-pulse.ts` — stubbed
+- `ui/src/ui/app-render.ts` — focus pulse widget removed
+- `ui/src/ui/app-gateway.ts` — focusPulse:update handler removed
+
+---
+
+## 2026-03-04 — Lean Audit (v1.2 architecture overhaul)
+
+### Why
+GodMode had grown to 27 services, 47 method files, 10 safety gates, and ~1,500 lines of context injection per turn — most serving developer use cases, not the target customer (non-technical entrepreneurs). The system prompt drowned the AI in stale context. Six competing memory systems caused confusion. Result: whack-a-mole bugs, confused AI responses, and a product that couldn't ship to clients.
+
+### What Changed
+
+**32 files deleted, 22 files rewritten.** Full archive preserved at `git tag v1.1.0-pre-lean-audit`.
+
+#### Phase 1: Dead Code Removal
+- **12 services deleted:** focus-pulse-heartbeat, rescuetime-fetcher, ide-activity-watcher, coding-orchestrator, swarm-pipeline, coding-notification, session-coordinator, claude-code-sync, session-archiver, org-sweep, cron-guard, scout + observer + advisor (consolidated into proactive-intel)
+- **13 methods deleted:** coding-tasks, session-coordination, session-archive, session-search, rescuetime, life-dashboards, lifetracks, clawhub, security-audit, subagent-runs, focus-pulse, focus-pulse-scorer, brief-notes (merged into daily-brief), corrections
+- **3 libs deleted:** session-registry, coding-task-state, injection-fingerprints
+- **1 tool deleted:** coding-task
+- **index.ts:** Removed 478 lines — all killed imports, handler registrations, service startups, and hook wiring
+
+#### Phase 2: Consolidation
+- **Safety gates 10→4:** Kept loopBreaker, promptShield, outputShield, contextPressure. Killed grepBlocker, sessionHygiene, exhaustiveSearch, selfServiceGate, persistenceGate, searchRetryGate.
+- **Proactive intel 4→1:** Killed scout, observer, advisor services. Simplified proactive-intel service as single lean module.
+
+#### Phase 3: Context Injection Redesign (~1,500→~150 lines/turn)
+- **New `src/lib/awareness-snapshot.ts`:** ~50-line ephemeral snapshot (schedule, priorities, task counts, recent decisions). Replaces raw CONSCIOUSNESS.md + WORKING.md dumps.
+- **Rewrote `src/hooks/agent-persona.ts`:** 66-line Persistence Protocol → 30-line lean ally identity.
+- **Rewrote `before_prompt_build` in index.ts:** Conditional injection — only loads what's needed per turn.
+
+#### Phase 4: Memory Consolidation (6→2 systems)
+- **Consciousness heartbeat (685→234 lines):** Replaced regenerateConsciousness + regenerateWorking + appendRosterContext with single `generateSnapshot()` call. Removed external script dependency.
+- **Vault-capture (915→282 lines):** 5→2 pipelines. Kept Sessions→Daily and Queue Outputs→Inbox. Killed Scout→Vault, Inbox→PARA, Progressive Summarization.
+- **consciousness.ts (194→88 lines):** Both flush and read use awareness snapshot.
+- **second-brain.ts:** sync handler, aiPacket handler, and vault capture status all updated to use awareness snapshot.
+- **queue-processor.ts:** Reads awareness snapshot instead of CONSCIOUSNESS.md.
+
+#### Phase 5: UI Cleanup
+- **12 UI files deleted:** Views + controllers for wheel-of-life, vision-board, lifetracks, proactive-intel, people, clawhub (originals).
+- **navigation.ts:** Removed killed tabs from type, paths, and all switch statements.
+- **app.ts:** Removed ~30 @state() properties and ~150 lines of handler methods.
+- **app-render.ts, app-settings.ts, app-view-state.ts:** Cleaned all killed feature references.
+- **clawhub stubbed:** Skills view depends on clawhub — created minimal stubs to keep skills working.
+
+#### Phase 6: Documentation
+- **MEMORY.md:** Rewrote from 160-line accumulated history to ~100-line lean routing map.
+- **CLAUDE.md:** Removed Session Coordination section (services killed), updated architecture notes with lean summary.
+
+### Results
+| Metric | Before | After | Change |
+|---|---|---|---|
+| Services | 27 | ~15 | -44% |
+| Method files | 47 | ~35 | -26% |
+| Safety gates | 10 | 4 | -60% |
+| Context per turn | ~1,500 lines | ~150 lines | -90% |
+| Memory systems | 6 | 2 | -67% |
+| Vault-capture pipelines | 5 | 2 | -60% |
+
+### Memory Architecture (after)
+- **Obsidian Vault (ClawVault)** = long-term brain. All permanent memory.
+- **Awareness Snapshot** = ephemeral ~50-line state. Cross-session awareness. Updated every 15 min.
+
+---
+
 ## 2026-03-04 — Deep Audit + Architecture Fix (post mega push)
 
 ### Why

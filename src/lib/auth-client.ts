@@ -7,10 +7,11 @@
 
 import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { homedir } from "node:os";
 import { createVerify } from "node:crypto";
 
 const AUTH_API = "https://lifeongodmode.com/api/auth";
-const AUTH_FILE = join(process.env.HOME || "~", ".openclaw", "godmode-auth.json");
+const AUTH_FILE = join(homedir(), ".openclaw", "godmode-auth.json");
 
 // Load the public key from the embedded PEM file
 const PUBLIC_KEY = readFileSync(new URL("./auth-public-key.pem", import.meta.url), "utf-8");
@@ -51,7 +52,7 @@ export function loadAuthTokens(): AuthTokens | null {
 
 /** Save auth tokens to disk */
 export function saveAuthTokens(tokens: AuthTokens): void {
-  const dir = join(process.env.HOME || "~", ".openclaw");
+  const dir = join(homedir(), ".openclaw");
   if (!existsSync(dir)) {
     mkdirSync(dir, { recursive: true, mode: 0o700 });
   }

@@ -165,14 +165,21 @@ async function processAllPending(): Promise<void> {
     const queue = await readMeetingQueue();
 
     // Recover any meetings stuck in "processing" (crash recovery)
+    let recovered = false;
     for (const m of queue.meetings) {
       if (m.status === "processing") {
         const stuckSince = m.processedAt ? Date.now() - new Date(m.processedAt).getTime() : Infinity;
         if (stuckSince > 10 * 60 * 1000) { // stuck > 10 min
           logger.warn(`[FathomProcessor] Recovering stuck meeting "${m.title}" (${m.id})`);
           m.status = "pending";
+          recovered = true;
         }
       }
+    }
+
+    // Persist recovery to disk so a crash won't re-loop
+    if (recovered) {
+      await writeMeetingQueue(queue);
     }
 
     const pending = queue.meetings.filter((m) => m.status === "pending");

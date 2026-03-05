@@ -39,7 +39,6 @@ import type { DataSource } from "./views/data";
 import type { Goal } from "./views/goals";
 import type { AllyChatMessage } from "./views/ally-chat";
 import type { AgentLogData, DailyBriefData, DecisionCardItem } from "./views/my-day";
-import type { Person } from "./views/people";
 import type { Project } from "./views/work";
 import type { TaskFilter, TaskSort, WorkspaceDetail, WorkspaceSummary, WorkspaceTask } from "./views/workspaces";
 
@@ -277,19 +276,6 @@ export type AppViewState = {
   workExpandedProjects?: Set<string>;
   workProjectFiles?: Record<string, unknown[]>;
   workDetailLoading?: Set<string>;
-  // People tab state
-  peopleList?: Person[];
-  peopleLoading?: boolean;
-  peopleError?: string | null;
-  peopleSelected?: string | null;
-  peopleSearchQuery?: string;
-  // Lifetracks state
-  lifetracksData?: import("./controllers/lifetracks").LifetrackEntry[] | null;
-  lifetracksLoading?: boolean;
-  lifetracksError?: string | null;
-  lifetracksCurrentTrack?: import("./controllers/lifetracks").LifetrackEntry | null;
-  // Life tab subtab state
-  lifeSubtab?: "vision-board" | "lifetracks" | "goals" | "wheel-of-life";
   // Goals state
   goals?: Goal[];
   goalsLoading?: boolean;
@@ -411,13 +397,6 @@ export type AppViewState = {
   handleSkipIntegration: (id: string) => void;
   handleMarkOnboardingComplete?: () => void;
   handleOpenSupportChat: () => void;
-  // Proactive Intel state
-  intelInsights: import("./controllers/proactive-intel").IntelInsight[];
-  intelDiscoveries: import("./controllers/proactive-intel").ScoutFinding[];
-  intelPatterns: import("./controllers/proactive-intel").UserPatterns | null;
-  intelStatus: import("./controllers/proactive-intel").IntelStatus | null;
-  intelLoading: boolean;
-  intelError: string | null;
   // File explorer state
   explorerOpen: boolean;
   explorerPath: string;
@@ -566,27 +545,15 @@ export type AppViewState = {
   // Work tab handlers
   handleWorkRefresh: () => Promise<void>;
   handleWorkToggleProject: (projectId: string) => void;
-  handleWorkPersonClick: (personId: string) => void;
   handleWorkFileClick: (path: string) => void;
   handleWorkSkillClick: (skill: string, projectName: string) => void;
   // People tab handlers
-  handlePeopleRefresh: () => Promise<void>;
-  handlePeopleSelect: (personId: string) => void;
-  handlePeopleBack: () => void;
-  handlePeopleSearch: (query: string) => void;
   // Workspaces handlers
   handleWorkspacesRefresh: () => Promise<void>;
   handleWorkspaceBrowse: (folderPath: string) => Promise<void>;
   handleWorkspaceBrowseSearch: (query: string) => Promise<void>;
   handleWorkspaceBrowseBack: () => void;
   handleWorkspaceCreateFolder: (folderPath: string) => Promise<void>;
-  // Lifetracks handlers
-  handleLifetracksRefresh: () => Promise<void>;
-  handleLifetracksSelectTrack: (track: import("./controllers/lifetracks").LifetrackEntry) => void;
-  // Life tab handlers
-  handleLifeSubtabChange: (
-    subtab: "vision-board" | "lifetracks" | "goals" | "wheel-of-life",
-  ) => void;
   handleGoalsRefresh: () => Promise<void>;
   handleStartChatWithPrompt: (prompt: string) => void;
   // Data tab handlers

@@ -425,9 +425,9 @@ ${firstWin?.completed ? "First win completed!" : "Not started yet."}
 
 Pick the demo most relevant to their profile. Make it real, not a simulation:
 - Run a morning brief to show them the daily brief system
-- Start a Focus Pulse morning set
 - Draft an email or message using their connected channels
 - Show memory search working with their seeded content
+- Queue a background task to demonstrate delegation
 
 ### Your First 5 Commands
 

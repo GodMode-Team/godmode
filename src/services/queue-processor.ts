@@ -10,7 +10,7 @@ import { spawn } from "node:child_process";
 import os from "node:os";
 import fs from "node:fs/promises";
 import path from "node:path";
-import { GODMODE_ROOT, MEMORY_DIR, localDateString } from "../data-paths.js";
+import { GODMODE_ROOT, MEMORY_DIR, DATA_DIR, localDateString } from "../data-paths.js";
 import { formatGuardrailsForPrompt } from "./guardrails.js";
 import { resolveClaudeBin, buildSpawnArgs, isEngineAvailable } from "../lib/resolve-claude-bin.js";
 import {
@@ -70,7 +70,7 @@ export function initQueueProcessor(logger: Logger): QueueProcessor {
 
 const INBOX_DIR = path.join(MEMORY_DIR, "inbox");
 const LEARNINGS_DIR = path.join(MEMORY_DIR, "learnings");
-const CONSCIOUSNESS_FILE = path.join(MEMORY_DIR, "CONSCIOUSNESS.md");
+const AWARENESS_SNAPSHOT_FILE = path.join(DATA_DIR, "awareness-snapshot.md");
 
 function outputPathForItem(itemId: string): string {
   return path.join(INBOX_DIR, `${itemId}.md`);
@@ -707,14 +707,13 @@ class QueueProcessor {
     body = body.replace("{description}", item.description ?? "");
     body = body.replace("{url}", item.url ?? "");
 
-    // Consciousness context (first 200 lines)
+    // Awareness snapshot (lean cross-session context)
     let consciousnessContext = "";
     try {
-      const raw = await fs.readFile(CONSCIOUSNESS_FILE, "utf-8");
-      const lines = raw.split("\n").slice(0, 200);
-      consciousnessContext = lines.join("\n");
+      const raw = await fs.readFile(AWARENESS_SNAPSHOT_FILE, "utf-8");
+      consciousnessContext = raw;
     } catch {
-      // CONSCIOUSNESS.md may not exist yet — non-fatal
+      // Awareness snapshot may not exist yet — non-fatal
     }
 
     // Guardrails context

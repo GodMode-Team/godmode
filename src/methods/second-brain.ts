@@ -15,10 +15,7 @@
  *   secondBrain.migrateToVault  — trigger migration from ~/godmode/memory/ to vault
  */
 
-import { exec as nodeExec } from "node:child_process";
 import {
-  accessSync,
-  constants as fsConstants,
   existsSync,
   lstatSync,
   readdirSync,
@@ -38,8 +35,6 @@ import {
   resolveCompaniesPath,
   resolveProjectsPath,
   resolveResearchDir,
-  resolveConsciousnessPath,
-  resolveWorkingPath,
   resolveCuratedPath,
   resolveKnowledgePath,
   resolveOpinionsPath,
@@ -339,75 +334,27 @@ const memoryBankEntry: GatewayRequestHandler = async ({ params, respond }) => {
 // ── AI Packet ────────────────────────────────────────────────────────
 
 const aiPacket: GatewayRequestHandler = async ({ respond }) => {
-  const { path: consciousnessPath } = resolveConsciousnessPath();
-  const { path: workingPath } = resolveWorkingPath();
-
-  const consciousness = safeReadFile(consciousnessPath);
-  const working = safeReadFile(workingPath);
-
-  respond(true, {
-    consciousness: consciousness
-      ? { content: consciousness, updatedAt: safeFileMtime(consciousnessPath), lineCount: consciousness.split("\n").length }
-      : null,
-    working: working
-      ? { content: working, updatedAt: safeFileMtime(workingPath), lineCount: working.split("\n").length }
-      : null,
-  });
+  try {
+    const { readSnapshot } = await import("../lib/awareness-snapshot.js");
+    const snapshot = await readSnapshot();
+    respond(true, {
+      snapshot: snapshot
+        ? { content: snapshot, lineCount: snapshot.split("\n").length }
+        : null,
+    });
+  } catch {
+    respond(true, { snapshot: null });
+  }
 };
 
 // ── Sync ─────────────────────────────────────────────────────────────
 
-const CONSCIOUSNESS_SCRIPT = join(GODMODE_ROOT, "scripts", "consciousness-sync.sh");
-const EXEC_TIMEOUT_MS = 90_000;
-
 const sync: GatewayRequestHandler = async ({ respond, context }) => {
-  if (!existsSync(CONSCIOUSNESS_SCRIPT)) {
-    respond(false, undefined, { code: "NOT_FOUND", message: "consciousness-sync.sh not found" });
-    return;
-  }
-  try {
-    accessSync(CONSCIOUSNESS_SCRIPT, fsConstants.R_OK | fsConstants.X_OK);
-  } catch {
-    respond(false, undefined, { code: "UNAVAILABLE", message: "consciousness-sync.sh is not readable/executable" });
-    return;
-  }
-
   context?.broadcast?.("secondBrain:sync-status", { status: "syncing" }, { dropIfSlow: true });
 
   try {
-    const childEnv = { ...process.env, HOME: process.env.HOME } as Record<string, string | undefined>;
-    delete childEnv.CLAUDECODE;
-
-    const { stdout } = await new Promise<{ stdout: string; stderr: string }>((resolve, reject) => {
-      nodeExec(
-        `bash "${CONSCIOUSNESS_SCRIPT}"`,
-        { timeout: EXEC_TIMEOUT_MS, env: childEnv },
-        (err, stdout, stderr) => {
-          if (err) { reject(new Error(`Script failed: ${stderr || err.message}`)); return; }
-          resolve({ stdout, stderr });
-        },
-      );
-    });
-
-    // Mirror to vault after sync (script writes to ~/godmode/memory/, we copy to vault)
-    const vault = getVaultPath();
-    const localConsciousnessPath = join(MEMORY_DIR, "CONSCIOUSNESS.md");
-    const localWorkingPath = join(MEMORY_DIR, "WORKING.md");
-    if (vault) {
-      try {
-        const { copyFile } = await import("node:fs/promises");
-        const vaultConsciousness = join(vault, VAULT_FOLDERS.system, "CONSCIOUSNESS.md");
-        const vaultWorking = join(vault, VAULT_FOLDERS.system, "WORKING.md");
-        if (existsSync(localConsciousnessPath)) await copyFile(localConsciousnessPath, vaultConsciousness);
-        if (existsSync(localWorkingPath)) await copyFile(localWorkingPath, vaultWorking);
-      } catch { /* non-fatal — vault mirror is best-effort */ }
-    }
-
-    // Read from vault-first paths for the response
-    const { path: consciousnessPath } = resolveConsciousnessPath();
-    const { path: workingPath } = resolveWorkingPath();
-    const consciousness = safeReadFile(consciousnessPath);
-    const working = safeReadFile(workingPath);
+    const { generateSnapshot } = await import("../lib/awareness-snapshot.js");
+    const snapshot = await generateSnapshot();
 
     context?.broadcast?.(
       "secondBrain:sync-status",
@@ -417,13 +364,12 @@ const sync: GatewayRequestHandler = async ({ respond, context }) => {
 
     respond(true, {
       ok: true,
-      message: stdout.trim() || "Consciousness synced",
-      consciousness: consciousness
-        ? { content: consciousness, updatedAt: safeFileMtime(consciousnessPath), lineCount: consciousness.split("\n").length }
-        : null,
-      working: working
-        ? { content: working, updatedAt: safeFileMtime(workingPath), lineCount: working.split("\n").length }
-        : null,
+      message: "Awareness snapshot regenerated",
+      snapshot: {
+        content: snapshot,
+        updatedAt: new Date().toISOString(),
+        lineCount: snapshot.split("\n").length,
+      },
     });
   } catch (err) {
     context?.broadcast?.(
@@ -513,17 +459,17 @@ const KNOWN_SOURCES: Array<{
   },
   {
     id: "consciousness",
-    name: "Consciousness",
+    name: "Awareness",
     type: "ai-context",
     icon: "\u{26A1}",
-    description: "Live AI context — CONSCIOUSNESS.md + WORKING.md",
+    description: "Live awareness snapshot — cross-session context",
     detect: () => {
-      const { path: cp } = resolveConsciousnessPath();
-      const content = safeReadFile(cp);
+      const snapshotPath = join(DATA_DIR, "awareness-snapshot.md");
+      const content = safeReadFile(snapshotPath);
       return {
         connected: content !== null,
         stats: content ? `${content.split("\n").length} lines` : undefined,
-        lastSync: safeFileMtime(cp),
+        lastSync: safeFileMtime(snapshotPath),
       };
     },
   },
@@ -1562,7 +1508,7 @@ const obsidianSyncSetMode: GatewayRequestHandler = async ({ params, respond }) =
 const vaultCaptureStatus: GatewayRequestHandler = async ({ respond }) => {
   try {
     const statePath = join(DATA_DIR, "vault-capture-state.json");
-    let state = { capturedScoutIds: [], capturedSessionPaths: [], processedInboxFiles: [], summarizedNotes: {}, lastRun: "" };
+    let state: { capturedSessionPaths?: string[]; lastRun?: string } = {};
     try {
       const raw = readFileSync(statePath, "utf-8");
       state = JSON.parse(raw);
@@ -1570,16 +1516,10 @@ const vaultCaptureStatus: GatewayRequestHandler = async ({ respond }) => {
 
     respond(true, {
       lastRun: state.lastRun || null,
-      scoutFindings: (state.capturedScoutIds as string[]).length,
-      sessionsCaptured: (state.capturedSessionPaths as string[]).length,
-      inboxProcessed: (state.processedInboxFiles as string[]).length,
-      notesSummarized: Object.keys(state.summarizedNotes as Record<string, unknown>).length,
+      sessionsCaptured: (state.capturedSessionPaths ?? []).length,
       pipelines: {
-        scoutToInbox: true,
         sessionsToDailyNotes: true,
         queueOutputsToVault: true,
-        inboxAutoProcessing: true,
-        progressiveSummarization: true,
       },
     });
   } catch (err) {
@@ -1601,12 +1541,8 @@ const vaultCaptureRunNow: GatewayRequestHandler = async ({ respond }) => {
     const result = await runAllCapturePipelines(logger);
     respond(true, {
       totalCaptured: result.totalCaptured,
-      totalProcessed: result.totalProcessed,
-      scout: result.scout,
       sessions: result.sessions,
       queueOutputs: result.queueOutputs,
-      inbox: result.inbox,
-      summarization: result.summarization,
     });
   } catch (err) {
     respond(false, undefined, {

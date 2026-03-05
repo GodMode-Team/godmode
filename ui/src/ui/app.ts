@@ -85,14 +85,6 @@ import {
   type TrustTrackerData,
 } from "./controllers/trust-tracker";
 import type { GuardrailsViewData } from "./controllers/guardrails";
-import {
-  loadLifetracks as loadLifetracksInternal,
-  selectLifetrack as selectLifetrackInternal,
-  enableLifetracks as enableLifetracksInternal,
-  generateLifetrack as generateLifetrackInternal,
-  type LifetrackEntry,
-  type LifetracksState,
-} from "./controllers/lifetracks";
 import { startMeetingNotifications, stopMeetingNotifications } from "./controllers/meeting-notify";
 // GodMode view controllers
 import {
@@ -102,14 +94,6 @@ import {
   openBriefInObsidian as openBriefInObsidianInternal,
   subscribeToAgentLogUpdates,
 } from "./controllers/my-day";
-import { loadPeople as loadPeopleInternal } from "./controllers/people";
-import { loadVisionBoard as loadVisionBoardInternal } from "./controllers/vision-board";
-import {
-  loadWheelOfLife as loadWheelOfLifeInternal,
-  updateWheelOfLife as updateWheelOfLifeInternal,
-  enterWheelEditMode as enterWheelEditModeInternal,
-  cancelWheelEditMode as cancelWheelEditModeInternal,
-} from "./controllers/wheel-of-life";
 import {
   loadWork as loadWorkInternal,
   loadProjectDetails as loadProjectDetailsInternal,
@@ -142,11 +126,9 @@ import type {
   SkillStatusReport,
   StatusSummary,
 } from "./types";
-import type { ClawHubMessage } from "./controllers/clawhub";
 import type { ToolExecutionInfo } from "./types/chat-types";
 import { type ChatAttachment, type ChatQueueItem, type CronFormState } from "./ui-types";
 import type { NostrProfileFormState } from "./views/channels.nostr-profile-form";
-import type { LifetracksConfig } from "./views/lifetracks";
 import type { TaskFilter, TaskSort, WorkspaceDetail, WorkspaceSummary, WorkspaceTask } from "./views/workspaces";
 
 declare global {
@@ -309,8 +291,6 @@ const CHAT_FILE_LINK_TAB_PREFIXES = new Set([
   "today",
   "workspaces",
   "work",
-  "people",
-  "life",
   "data",
   "overview",
   "channels",
@@ -322,9 +302,6 @@ const CHAT_FILE_LINK_TAB_PREFIXES = new Set([
   "config",
   "debug",
   "logs",
-  "wheel-of-life",
-  "vision-board",
-  "lifetracks",
   "my-day",
 ]);
 
@@ -594,8 +571,6 @@ export class GodModeApp extends LitElement {
   @state() privateSessions: Map<string, number> = new Map();
   private _privateSessionTimer: ReturnType<typeof setInterval> | null = null;
 
-  // Life subtab state
-  @state() lifeSubtab: "vision-board" | "lifetracks" | "goals" | "wheel-of-life" = "vision-board";
   @state() goals?: import("./views/goals").Goal[];
   @state() goalsLoading = false;
   @state() goalsError: string | null = null;
@@ -617,34 +592,6 @@ export class GodModeApp extends LitElement {
   @state() workProjectFiles: Record<string, unknown[]> = {};
   @state() workDetailLoading: Set<string> = new Set();
 
-  // People tab state
-  @state() peopleList?: import("./views/people").Person[];
-  @state() peopleLoading = false;
-  @state() peopleError: string | null = null;
-  @state() peopleSelected: string | null = null;
-  @state() peopleSearchQuery = "";
-
-  // Wheel of Life state
-  @state() wheelOfLifeData?: import("./views/wheel-of-life").WheelOfLifeData | null;
-  @state() wheelOfLifeLoading = false;
-  @state() wheelOfLifeError: string | null = null;
-  @state() wheelOfLifeEditMode = false;
-
-  // Vision Board state
-  @state() visionBoardData?: import("./views/vision-board").VisionBoardData | null;
-  @state() visionBoardLoading = false;
-  @state() visionBoardError: string | null = null;
-  @state() visionBoardIdentityToday?: string | null;
-
-  // Lifetracks state
-  @state() lifetracksData?: LifetrackEntry[] | null;
-  @state() lifetracksLoading = false;
-  @state() lifetracksError: string | null = null;
-  @state() lifetracksCurrentTrack?: LifetrackEntry | null;
-  @state() lifetracksConfig?: LifetracksConfig | null;
-  @state() lifetracksGenerating = false;
-  @state() lifetracksGenerationError: string | null = null;
-
   @state() skillsLoading = false;
   @state() skillsReport: SkillStatusReport | null = null;
   @state() skillsError: string | null = null;
@@ -652,17 +599,6 @@ export class GodModeApp extends LitElement {
   @state() skillEdits: Record<string, string> = {};
   @state() skillsBusyKey: string | null = null;
   @state() skillMessages: Record<string, SkillMessage> = {};
-  @state() skillsSubTab: "my-skills" | "clawhub" = "my-skills";
-  @state() clawhubQuery = "";
-  @state() clawhubResults: ClawHubSearchResult[] | null = null;
-  @state() clawhubExploreItems: ClawHubSkillItem[] | null = null;
-  @state() clawhubExploreSort = "trending";
-  @state() clawhubLoading = false;
-  @state() clawhubError: string | null = null;
-  @state() clawhubDetailSlug: string | null = null;
-  @state() clawhubDetail: ClawHubSkillDetail | null = null;
-  @state() clawhubImporting: string | null = null;
-  @state() clawhubMessage: ClawHubMessage | null = null;
 
   @state() debugLoading = false;
   @state() debugStatus: StatusSummary | null = null;
@@ -761,14 +697,6 @@ export class GodModeApp extends LitElement {
   @state() secondBrainFileTreeLoading = false;
   @state() secondBrainFileSearchQuery = "";
   @state() secondBrainFileSearchResults: import("./views/second-brain").BrainSearchResult[] | null = null;
-
-  // Proactive Intel state
-  @state() intelInsights: import("./controllers/proactive-intel").IntelInsight[] = [];
-  @state() intelDiscoveries: import("./controllers/proactive-intel").ScoutFinding[] = [];
-  @state() intelPatterns: import("./controllers/proactive-intel").UserPatterns | null = null;
-  @state() intelStatus: import("./controllers/proactive-intel").IntelStatus | null = null;
-  @state() intelLoading = false;
-  @state() intelError: string | null = null;
 
   private nodesPollInterval: number | null = null;
   private logsPollInterval: number | null = null;
@@ -1854,82 +1782,6 @@ export class GodModeApp extends LitElement {
 
   handleCommunityResourceAddFormChange(field: string, value: string) {
     this.secondBrainCommunityResourceAddForm = { ...this.secondBrainCommunityResourceAddForm, [field]: value };
-  }
-
-  // Proactive Intel handlers
-  async handleIntelLoad() {
-    const { loadInsights, loadDiscoveries, loadUserPatterns, loadStatus } = await import("./controllers/proactive-intel.js");
-    const state = {
-      client: this.client,
-      connected: this.connected,
-      insights: this.intelInsights ?? [],
-      discoveries: this.intelDiscoveries ?? [],
-      patterns: this.intelPatterns ?? null,
-      status: this.intelStatus ?? null,
-      loading: false,
-      error: null,
-    };
-    await Promise.all([loadInsights(state), loadDiscoveries(state), loadUserPatterns(state), loadStatus(state)]);
-    this.intelInsights = state.insights;
-    this.intelDiscoveries = state.discoveries;
-    this.intelPatterns = state.patterns;
-    this.intelStatus = state.status;
-    this.intelLoading = state.loading;
-    this.intelError = state.error;
-  }
-
-  async handleIntelDismiss(id: string) {
-    const { dismissInsight } = await import("./controllers/proactive-intel.js");
-    const state = {
-      client: this.client,
-      connected: this.connected,
-      insights: this.intelInsights ?? [],
-      discoveries: this.intelDiscoveries ?? [],
-      patterns: this.intelPatterns ?? null,
-      status: this.intelStatus ?? null,
-      loading: false,
-      error: null,
-    };
-    await dismissInsight(state, id);
-    this.intelInsights = state.insights;
-  }
-
-  async handleIntelAct(id: string) {
-    const { actOnInsight } = await import("./controllers/proactive-intel.js");
-    const state = {
-      client: this.client,
-      connected: this.connected,
-      insights: this.intelInsights ?? [],
-      discoveries: this.intelDiscoveries ?? [],
-      patterns: this.intelPatterns ?? null,
-      status: this.intelStatus ?? null,
-      loading: false,
-      error: null,
-    };
-    await actOnInsight(state, id);
-    this.intelInsights = state.insights;
-  }
-
-  async handleIntelRefresh() {
-    this.intelLoading = true;
-    const { forceRefresh } = await import("./controllers/proactive-intel.js");
-    const state = {
-      client: this.client,
-      connected: this.connected,
-      insights: this.intelInsights ?? [],
-      discoveries: this.intelDiscoveries ?? [],
-      patterns: this.intelPatterns ?? null,
-      status: this.intelStatus ?? null,
-      loading: true,
-      error: null,
-    };
-    await forceRefresh(state);
-    this.intelInsights = state.insights;
-    this.intelDiscoveries = state.discoveries;
-    this.intelPatterns = state.patterns;
-    this.intelStatus = state.status;
-    this.intelLoading = false;
-    this.intelError = state.error;
   }
 
   removeQueuedMessage(id: string) {
@@ -3222,11 +3074,6 @@ export class GodModeApp extends LitElement {
     this.workExpandedProjects = next;
   }
 
-  handleWorkPersonClick(personId: string) {
-    this.peopleSelected = personId;
-    this.setTab("people" as import("./navigation").Tab);
-  }
-
   async handleWorkFileClick(filePath: string) {
     if (!this.client || !this.connected) {
       this.showToast("Not connected to gateway", "error");
@@ -3263,22 +3110,6 @@ export class GodModeApp extends LitElement {
     );
   }
 
-  // People tab handlers
-  async handlePeopleRefresh() {
-    await loadPeopleInternal(this);
-  }
-
-  handlePeopleSelect(personId: string) {
-    this.peopleSelected = personId;
-  }
-
-  handlePeopleBack() {
-    this.peopleSelected = null;
-  }
-
-  handlePeopleSearch(query: string) {
-    this.peopleSearchQuery = query;
-  }
 
   handlePeopleImport(source: "apple" | "google") {
     const prompt =
@@ -3335,55 +3166,6 @@ export class GodModeApp extends LitElement {
     }
     if (ok) {
       this.showToast("Folder created", "success", 2000);
-    }
-  }
-
-  // Wheel of Life handlers
-  async handleWheelOfLifeRefresh() {
-    await loadWheelOfLifeInternal(this);
-  }
-
-  handleWheelOfLifeEdit() {
-    enterWheelEditModeInternal(this);
-  }
-
-  handleWheelOfLifeCancel() {
-    cancelWheelEditModeInternal(this);
-  }
-
-  async handleWheelOfLifeSave(updates: Record<string, { current?: number; target?: number }>) {
-    await updateWheelOfLifeInternal(this, updates);
-    cancelWheelEditModeInternal(this);
-  }
-
-  // Vision Board handlers
-  async handleVisionBoardRefresh() {
-    await loadVisionBoardInternal(this);
-  }
-
-  // Lifetracks handlers
-  async handleLifetracksRefresh() {
-    await loadLifetracksInternal(this as unknown as LifetracksState);
-  }
-
-  handleLifetracksSelectTrack(track: LifetrackEntry) {
-    selectLifetrackInternal(this as unknown as LifetracksState, track);
-  }
-
-  async handleLifetracksEnable() {
-    await enableLifetracksInternal(this as unknown as LifetracksState);
-  }
-
-  async handleLifetracksGenerate() {
-    await generateLifetrackInternal(this as unknown as LifetracksState);
-  }
-
-  // Life subtab handlers
-  handleLifeSubtabChange(subtab: "vision-board" | "lifetracks" | "goals" | "wheel-of-life") {
-    this.lifeSubtab = subtab;
-    // Load data for the selected subtab if not already loaded
-    if (subtab === "goals" && !this.goals && !this.goalsLoading) {
-      void this.handleGoalsRefresh();
     }
   }
 

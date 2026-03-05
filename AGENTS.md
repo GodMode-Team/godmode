@@ -25,11 +25,18 @@ This repository is the standalone home for the GodMode OpenClaw plugin.
 
 ## Current Architecture Notes
 
-- `agent-log`, `lifetracks`, `subagent-runs`, and `workspaces` handlers are plugin-local.
+- `agent-log` and `workspaces` handlers are plugin-local.
 - `workspaces-config` and `workspace-sync-service` are plugin-local copies.
-- `core-proxy` is removed.
 - `server-startup` in OpenClaw core should not initialize GodMode services directly.
 - Plugin `gateway_start` initializes optional agent-log writer integration.
+
+### Lean Architecture (post v1.2 audit)
+- **Context injection:** ~150 lines/turn via `before_prompt_build` (down from ~1,500).
+- **Memory:** 2 systems — Obsidian Vault (long-term) + Awareness Snapshot (ephemeral, 15-min refresh).
+- **Safety gates:** 4 active — loopBreaker, promptShield, outputShield, contextPressure.
+- **Vault-capture:** 2 pipelines — Sessions→Daily, Queue Outputs→Inbox.
+- **Awareness snapshot:** `src/lib/awareness-snapshot.ts` — ~50-line ephemeral state injected every turn. Replaces CONSCIOUSNESS.md + WORKING.md dumps.
+- **Killed modules:** coding orchestrator, swarm pipeline, session coordinator, focus pulse, lifetracks, life dashboards, clawhub, subagent-runs, security-audit, rescuetime, org-sweep, session-archiver, cron-guard. All preserved at `git tag v1.1.0-pre-lean-audit`.
 
 ## Build and Dev
 
@@ -69,36 +76,12 @@ This repository is the standalone home for the GodMode OpenClaw plugin.
 - Keep `openclaw.plugin.json` version metadata aligned with package release strategy.
 - Validate standalone build before publishing.
 
-## Session Coordination (Multi-Session Discipline)
+## Branch Discipline
 
-When multiple Claude Code sessions work on this repo simultaneously, follow these rules:
-
-### Branch Discipline
 - **NEVER work directly on `main`** — always create or switch to a feature branch.
-- **One branch per task** — each session should have its own branch (e.g., `feat/my-feature`, `fix/bug-name`).
-- **NEVER use `git stash`** — stashes are invisible to other sessions and cause lost work. Commit to your branch instead, even as WIP commits.
+- **One branch per task** (e.g., `feat/my-feature`, `fix/bug-name`).
+- **NEVER use `git stash`** — commit to your branch instead, even as WIP commits.
 - If you detect you're on `main`, create a branch immediately: `git checkout -b feat/<task-slug>`.
-
-### Gateway Restart Safety
-- Before running `openclaw gateway restart`, check if another session is active:
-  - Run: `./scripts/session-guard.sh status`
-  - Or call RPC: `session.checkConflict` with `operation: "gateway-restart"`
-- Only one session should restart the gateway at a time. The session coordinator enforces a lock.
-
-### File Conflict Awareness
-- Before making significant edits to a file, check if another session is modifying it.
-- If you find conflicts, prefer working on different files or coordinate via branch isolation.
-- Key conflict-prone files: `index.ts`, `src/services/queue-processor.ts`, `ui/src/ui/app-gateway.ts`.
-
-### Session Lifecycle
-- On start: the session coordinator tracks your branch, PID, and working directory.
-- During work: file modifications are tracked automatically via gateway RPCs.
-- On end: generate a handoff summary so the next session knows what happened.
-
-### Handoff Protocol
-- When finishing work, create a structured commit (not a stash).
-- Recent handoff summaries are stored in `~/godmode/data/session-handoffs/`.
-- The next session can read these to understand context.
 
 ## AI Session Checklist
 

@@ -17,7 +17,7 @@ const OPTIONS_FILE = join(DATA_DIR, "godmode-options.json");
 type GodModeOptions = Record<string, unknown>;
 
 const DEFAULTS: GodModeOptions = {
-  "focusPulse.enabled": true,
+  "agentPersona.enabled": true,
   "proactiveIntel.enabled": true,
   "proactiveIntel.notifications.enabled": true,
   "proactiveIntel.briefIntegration.enabled": true,

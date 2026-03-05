@@ -304,32 +304,8 @@ const widgetData: GatewayRequestHandler = async ({ params, respond }) => {
         }
 
         case "focus-pulse": {
-          const raw = safeReadJson(
-            path.join(DATA_DIR, "focus-pulse.json"),
-          ) as {
-            active?: boolean;
-            score?: number;
-            streak?: number;
-            currentFocus?: { title?: string };
-            items?: Array<{ title: string; completed?: boolean }>;
-            pulseChecks?: Array<{
-              score?: number;
-              time?: number;
-              aligned?: boolean;
-            }>;
-          } | null;
-          data[widgetId] = raw
-            ? {
-                active: raw.active ?? false,
-                score: raw.score ?? 0,
-                streak: raw.streak ?? 0,
-                currentFocus: raw.currentFocus?.title ?? null,
-                itemCount: raw.items?.length ?? 0,
-                completedCount:
-                  raw.items?.filter((i) => i.completed).length ?? 0,
-                lastPulse: raw.pulseChecks?.slice(-1)[0] ?? null,
-              }
-            : null;
+          // Focus pulse was removed in lean audit
+          data[widgetId] = null;
           break;
         }
 
@@ -407,29 +383,8 @@ const widgetData: GatewayRequestHandler = async ({ params, respond }) => {
         }
 
         case "coding-status": {
-          const raw = safeReadJson(
-            path.join(DATA_DIR, "coding-tasks.json"),
-          ) as {
-            tasks?: Array<{
-              description: string;
-              status: string;
-              branch?: string;
-            }>;
-          } | null;
-          const tasks = raw?.tasks ?? [];
-          data[widgetId] = {
-            running: tasks.filter((t) => t.status === "running").length,
-            queued: tasks.filter((t) => t.status === "queued").length,
-            done: tasks.filter((t) => t.status === "done").length,
-            failed: tasks.filter((t) => t.status === "failed").length,
-            total: tasks.length,
-            activeTasks: tasks
-              .filter((t) => t.status === "running" || t.status === "queued")
-              .map((t) => ({
-                description: t.description,
-                status: t.status,
-              })),
-          };
+          // Coding orchestrator was removed in lean audit
+          data[widgetId] = null;
           break;
         }
 
@@ -499,23 +454,8 @@ const widgetData: GatewayRequestHandler = async ({ params, respond }) => {
         }
 
         case "intel-highlights": {
-          const raw = safeReadJson(
-            path.join(DATA_DIR, "advisor-state.json"),
-          ) as {
-            insights?: Array<{
-              title: string;
-              category: string;
-              dismissed?: boolean;
-            }>;
-          } | null;
-          const active = (raw?.insights ?? []).filter((i) => !i.dismissed);
-          data[widgetId] = {
-            insights: active.slice(0, 5).map((i) => ({
-              title: i.title,
-              category: i.category,
-            })),
-            totalActive: active.length,
-          };
+          // Advisor was removed in lean audit — intel goes through proactive-intel/daily brief
+          data[widgetId] = null;
           break;
         }
 
@@ -598,9 +538,6 @@ const widgetData: GatewayRequestHandler = async ({ params, respond }) => {
         }
 
         case "streak-stats": {
-          const fpRaw = safeReadJson(
-            path.join(DATA_DIR, "focus-pulse.json"),
-          ) as { streak?: number } | null;
           const ttRaw = safeReadJson(
             path.join(DATA_DIR, "trust-tracker.json"),
           ) as { dailyRatings?: Array<{ date: string; rating: number }> } | null;
@@ -625,7 +562,6 @@ const widgetData: GatewayRequestHandler = async ({ params, respond }) => {
             }
           }
           data[widgetId] = {
-            focusStreak: fpRaw?.streak ?? 0,
             dailyRatingStreak: dailyStreak,
           };
           break;

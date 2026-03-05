@@ -2,7 +2,7 @@
  * morning-set.ts — Agent-callable tool: morning_set
  *
  * Finalizes the Morning Set conversation by updating the daily note's
- * Win The Day section, scoping today's tasks, and locking in focus.
+ * Win The Day section and scoping today's tasks.
  *
  * Called by the agent after discussing priorities with the user.
  */
@@ -11,14 +11,9 @@ import { type AnyAgentTool, jsonResult } from "openclaw/plugin-sdk";
 import {
   rewriteWinTheDay,
   scopeTasksToWinTheDay,
-  readState,
-  writeState,
   getTodayDate,
-} from "../methods/focus-pulse.js";
-import {
-  calculateDailyScore,
   type FocusItem,
-} from "../methods/focus-pulse-scorer.js";
+} from "../methods/daily-brief.js";
 
 type ToolContext = {
   sessionKey?: string;
@@ -31,12 +26,10 @@ export function createMorningSetTool(_ctx: ToolContext): AnyAgentTool {
     label: "Morning Set",
     description:
       "Finalize the Morning Set by locking in today's priorities. " +
-      "This updates the Win The Day section in the daily note, scopes today's tasks " +
-      "to only the selected priorities (other tasks get un-dated), and sets the #1 focus " +
-      "so the Focus Pulse widget appears in the topbar. " +
+      "This updates the Win The Day section in the daily note and scopes today's tasks " +
+      "to only the selected priorities (other tasks get un-dated). " +
       "Call this after discussing and refining the user's daily priorities. " +
-      "Provide the final ordered list of 3-5 priority items. The first item (or focusIndex) " +
-      "becomes the locked-in focus.",
+      "Provide the final ordered list of 3-5 priority items.",
     parameters: {
       type: "object" as const,
       properties: {
@@ -59,20 +52,13 @@ export function createMorningSetTool(_ctx: ToolContext): AnyAgentTool {
           description:
             "Ordered list of Win The Day priorities. First item is #1. Recommend 3-5 items.",
         },
-        focusIndex: {
-          type: "number",
-          description:
-            "1-based index of the item to lock in as current focus. Defaults to 1 (top priority).",
-        },
       },
       required: ["items"],
     },
     execute: async (_toolCallId: string, params: Record<string, unknown>) => {
       try {
         const rawItems = params.items as Array<{ title: string; context?: string }>;
-        const focusIdx = (params.focusIndex as number | undefined) ?? 1;
 
-        // Validate
         if (!rawItems || rawItems.length === 0) {
           return jsonResult({ error: true, message: "Provide at least one priority item." });
         }
@@ -82,7 +68,6 @@ export function createMorningSetTool(_ctx: ToolContext): AnyAgentTool {
 
         const today = getTodayDate();
 
-        // Build FocusItem[] from input
         const items: FocusItem[] = rawItems.map((item, idx) => ({
           index: idx + 1,
           title: item.title.trim(),
@@ -110,40 +95,15 @@ export function createMorningSetTool(_ctx: ToolContext): AnyAgentTool {
           // Scoping is best-effort
         }
 
-        // 4. Update focus pulse state
-        const focusItem = items.find((i) => i.index === focusIdx) ?? items[0];
-        const state = await readState();
-        state.date = today;
-        state.active = true;
-        state.morningSetDone = true;
-        state.items = items;
-        state.currentFocus = focusItem;
-        state.score = calculateDailyScore(
-          state.pulseChecks,
-          0,
-          items.length,
-          true,
-          state.streak,
-        );
-        await writeState(state);
-
-        // 5. Start heartbeat timer
-        try {
-          const { startHeartbeat } = await import("../services/focus-pulse-heartbeat.js");
-          startHeartbeat();
-        } catch {
-          // Heartbeat is best-effort
-        }
-
         return jsonResult({
           finalized: true,
-          focusTitle: focusItem.title,
+          focusTitle: items[0].title,
           itemCount: items.length,
           noteRewritten: rewriteResult.rewritten,
           tasksSynced: syncResult,
           tasksDeferred: scopeResult.deferred,
           message:
-            `Morning set locked in. Focus: "${focusItem.title}" ` +
+            `Morning set locked in. Top priority: "${items[0].title}" ` +
             `(${items.length} priorities).` +
             (scopeResult.deferred > 0
               ? ` ${scopeResult.deferred} non-priority task(s) un-dated.`
