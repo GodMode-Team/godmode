@@ -988,38 +988,37 @@ function handleGatewayEventUnsafe(host: GatewayHost, evt: GatewayEventFrame) {
           allyHost.requestUpdate?.();
         }
       } else if (payload.state === "final") {
-        // Final message: append to ally messages, clear stream
-        if (!isAllyFullScreen) {
-          const finalContent = allyHost.allyStream ?? extractTextFromMessage(payload.message) ?? "";
-          if (finalContent) {
-            allyHost.allyMessages = [
-              ...(allyHost.allyMessages ?? []),
-              { role: "assistant", content: finalContent, timestamp: Date.now() },
-            ];
-          }
-          allyHost.allyStream = null;
-          allyHost.allyWorking = false;
-          if (!allyHost.allyPanelOpen && host.tab !== "chat") {
-            allyHost.allyUnread = (allyHost.allyUnread ?? 0) + 1;
-          }
-          allyHost.requestUpdate?.();
-          // Scroll to bottom after render completes for newly arrived message
-          if (allyHost.allyPanelOpen) {
-            (host as unknown as { _scrollAllyToBottom(): void })._scrollAllyToBottom();
-          }
-        }
-      } else if (payload.state === "error" || payload.state === "aborted") {
-        if (!isAllyFullScreen) {
-          // Show error to user instead of silently swallowing it
-          const errText = extractTextFromMessage(payload.message);
-          const errorMsg = payload.state === "aborted"
-            ? "Response was stopped."
-            : (errText || "Something went wrong — try again.");
+        // Final message: append to ally messages AND sync with full screen
+        // Always update allyMessages so they stay in sync with the Chat tab
+        const finalContent = allyHost.allyStream ?? extractTextFromMessage(payload.message) ?? "";
+        if (finalContent) {
           allyHost.allyMessages = [
             ...(allyHost.allyMessages ?? []),
-            { role: "assistant", content: `*${errorMsg}*`, timestamp: Date.now() },
+            { role: "assistant", content: finalContent, timestamp: Date.now() },
           ];
         }
+        allyHost.allyStream = null;
+        allyHost.allyWorking = false;
+        if (!allyHost.allyPanelOpen && host.tab !== "chat") {
+          allyHost.allyUnread = (allyHost.allyUnread ?? 0) + 1;
+        }
+        if (!isAllyFullScreen) {
+          allyHost.requestUpdate?.();
+        }
+        // Scroll to bottom after render completes for newly arrived message
+        if (allyHost.allyPanelOpen) {
+          (host as unknown as { _scrollAllyToBottom(): void })._scrollAllyToBottom();
+        }
+      } else if (payload.state === "error" || payload.state === "aborted") {
+        // Show error to user instead of silently swallowing it
+        const errText = extractTextFromMessage(payload.message);
+        const errorMsg = payload.state === "aborted"
+          ? "Response was stopped."
+          : (errText || "Something went wrong \u2014 try again.");
+        allyHost.allyMessages = [
+          ...(allyHost.allyMessages ?? []),
+          { role: "assistant", content: `*${errorMsg}*`, timestamp: Date.now() },
+        ];
         allyHost.allyStream = null;
         allyHost.allyWorking = false;
         allyHost.requestUpdate?.();

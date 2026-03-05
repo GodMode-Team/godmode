@@ -132,6 +132,24 @@ export async function generateSnapshot(): Promise<string> {
     // Queue unavailable
   }
 
+  // Trust tracker summary (if data exists)
+  try {
+    const trustPath = join(DATA_DIR, "trust-tracker.json");
+    const trustRaw = await readFile(trustPath, "utf-8");
+    const trustData = JSON.parse(trustRaw) as {
+      workflows?: Array<{ name: string; score: number }>;
+    };
+    if (trustData.workflows && trustData.workflows.length > 0) {
+      const sorted = [...trustData.workflows].sort((a, b) => b.score - a.score);
+      const highest = sorted[0];
+      const lowest = sorted[sorted.length - 1];
+      lines.push(`## Trust`);
+      lines.push(`- ${sorted.length} workflows tracked. Highest: ${highest.name} (${highest.score.toFixed(1)}/10). Lowest: ${lowest.name} (${lowest.score.toFixed(1)}/10).`);
+    }
+  } catch {
+    // No trust data yet — skip
+  }
+
   const snapshot = lines.join("\n");
 
   // Write to disk

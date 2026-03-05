@@ -423,8 +423,9 @@ ${firstWin?.completed ? "First win completed!" : "Not started yet."}
 
 ### Live Demo
 
-Pick the demo most relevant to their profile. Make it real, not a simulation:
-- Run a morning brief to show them the daily brief system
+Generate a morning brief for the user. Even without integrations, the starter brief shows tasks, queue status, and GodMode tips. Run \`dailyBrief.generate\` now.
+
+Other demos to try:
 - Draft an email or message using their connected channels
 - Show memory search working with their seeded content
 - Queue a background task to demonstrate delegation

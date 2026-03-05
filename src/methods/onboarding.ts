@@ -785,11 +785,13 @@ export const onboardingHandlers: GatewayRequestHandlers = {
       completed: false,
     };
 
-    // Mark phase 0 and 1 as complete (quick setup skips assessment)
+    // Mark phases 0, 1, 2 as complete (quick setup skips to First Win)
     if (!state.completedPhases.includes(0)) state.completedPhases.push(0);
     if (!state.completedPhases.includes(1)) state.completedPhases.push(1);
+    if (!state.completedPhases.includes(2)) state.completedPhases.push(2);
     state.completedPhases.sort();
-    if (state.phase < 2) state.phase = 2 as OnboardingPhase;
+    // Jump straight to Phase 5 (First Win) so the user sees a brief immediately
+    if (state.phase < 5) state.phase = 5 as OnboardingPhase;
 
     if (!state.startedAt) {
       state.startedAt = new Date().toISOString();

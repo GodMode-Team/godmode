@@ -4,6 +4,43 @@ This file tracks recent development changes so Atlas and other agents can quickl
 
 ---
 
+## 2026-03-04 — v1.6.0-ux: Nav Simplification, Starter Brief, Ally Sync Fix
+
+### Nav Simplification (6-Tab Baseline)
+- Sidebar now shows 6 core tabs: Chat, Today, Work, Second Brain, Dashboards, Config
+- Power-user tabs (Skills, Trust, Guardrails, etc.) moved behind collapsible "Mission Control" section
+- Mission Control expanded state persisted in localStorage
+- All tabs still accessible via URL/programmatic navigation — only hidden from default nav
+
+### Demo Brief (Zero-Integration First Win)
+- New starter brief generated when Obsidian vault isn't configured
+- Shows: greeting with user name, today's tasks, queue status, rotating GodMode tips
+- Nudges user to connect calendar and X intelligence for richer briefs
+- `quickSetup` now jumps directly to Phase 5 (First Win) instead of Phase 2
+- Phase 5 onboarding prompt updated to reference starter brief and `dailyBrief.generate`
+
+### Ally Chat Sync Fix
+- Fixed ally panel diverging from Chat tab: `chat.final` now always updates `allyMessages` even when Chat tab is active full-screen
+- Error/abort messages now sync to `allyMessages` regardless of view state
+- Panel already reloads full history on open, scroll-to-bottom on new messages
+
+### Trust + Dashboard Prompts
+- Added dashboard-building instruction to ally persona ("How You Work" section)
+- Awareness snapshot now includes Trust section when `trust-tracker.json` exists (2 lines max)
+
+### Files Changed
+- `ui/src/ui/navigation.ts` — TAB_GROUPS + POWER_USER_GROUPS
+- `ui/src/ui/app-render.ts` — Mission Control collapsible section
+- `ui/src/ui/storage.ts` — default navGroupsCollapsed includes Mission Control
+- `src/methods/brief-generator.ts` — starter brief generator + fallback in RPC handler
+- `src/methods/onboarding.ts` — quickSetup jumps to phase 5
+- `src/hooks/onboarding-context.ts` — Phase 5 prompt references starter brief
+- `ui/src/ui/app-gateway.ts` — ally sync fix for chat.final events
+- `src/hooks/agent-persona.ts` — dashboard-building instruction
+- `src/lib/awareness-snapshot.ts` — trust tracker summary
+
+---
+
 ## 2026-03-04 — v1.4.0: Lean Audit + Adversarial Bug Sweep + Install Hardening
 
 ### What

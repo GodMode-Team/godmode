@@ -1785,6 +1785,118 @@ ${intelSection || "(none)"}`;
   };
 }
 
+// ── Starter Brief (zero-integration fallback) ────────────────────────────────
+
+const STARTER_TIPS = [
+  "Try saying 'queue a research task on [topic]' to delegate work to an agent.",
+  "You can connect your Google Calendar for a richer morning brief \u2014 ask me how.",
+  "Want me to set up a recurring skill? Just tell me what you want done and when.",
+  "Your Second Brain in Obsidian is where all your agent outputs land \u2014 check it out.",
+  "Rate your agent outputs to build trust scores \u2014 the system learns from your feedback.",
+];
+
+/**
+ * Generate a lightweight brief that works with zero integrations.
+ * Only needs name + timezone (no Calendar, no X Intel, no Obsidian).
+ */
+async function generateStarterBrief(): Promise<{
+  date: string;
+  markdown: string;
+  starterBrief: true;
+  sections: string[];
+  warnings: string[];
+}> {
+  const briefDate = todayDate();
+  const dateDisplay = formattedDate();
+
+  // Resolve user name from onboarding or USER.md
+  let userName = "friend";
+  try {
+    const onboardingPath = join(DATA_DIR, "onboarding.json");
+    const raw = await readFile(onboardingPath, "utf-8");
+    const ob = JSON.parse(raw) as { interview?: { name?: string }; identity?: { name?: string } };
+    userName = ob.interview?.name || ob.identity?.name || userName;
+  } catch { /* non-fatal */ }
+  if (userName === "friend") {
+    try {
+      const { resolveIdentityDir } = await import("../lib/vault-paths.js");
+      const identityResult = resolveIdentityDir();
+      if (identityResult) {
+        const userMd = await readFile(join(identityResult.path, "USER.md"), "utf-8");
+        const nameMatch = userMd.match(/^[-*]\s*\*\*(?:Name|Full Name)[:\s]*\*\*\s*(.+)$/mi);
+        if (nameMatch) userName = nameMatch[1].trim();
+      }
+    } catch { /* non-fatal */ }
+  }
+
+  // Tasks
+  let taskLines = "No pending tasks yet. Tell me what you're working on!";
+  try {
+    const { readTasks } = await import("./tasks.js");
+    const data = await readTasks();
+    const pending = data.tasks.filter((t: { status: string; title: string }) => t.status === "pending");
+    if (pending.length > 0) {
+      taskLines = pending.slice(0, 5).map((t: { title: string; dueDate?: string | null; priority?: string }) => {
+        const due = t.dueDate ? ` (due: ${t.dueDate})` : "";
+        const pri = t.priority && t.priority !== "medium" ? ` [${t.priority}]` : "";
+        return `- [ ] ${t.title}${due}${pri}`;
+      }).join("\n");
+      if (pending.length > 5) taskLines += `\n- ...and ${pending.length - 5} more`;
+    }
+  } catch { /* non-fatal */ }
+
+  // Queue
+  let queueLine = "Queue is empty. Delegate something!";
+  try {
+    const { readQueueState } = await import("../lib/queue-state.js");
+    const qs = await readQueueState();
+    const processing = qs.items.filter((i: { status: string }) => i.status === "processing").length;
+    const review = qs.items.filter((i: { status: string }) => i.status === "review").length;
+    const queued = qs.items.filter((i: { status: string }) => i.status === "queued").length;
+    if (processing > 0 || review > 0 || queued > 0) {
+      const parts: string[] = [];
+      if (processing > 0) parts.push(`${processing} processing`);
+      if (review > 0) parts.push(`${review} ready for review`);
+      if (queued > 0) parts.push(`${queued} queued`);
+      queueLine = parts.join(", ");
+    }
+  } catch { /* non-fatal */ }
+
+  // Tip of the day (rotate by day of year)
+  const dayOfYear = Math.floor((Date.now() - new Date(new Date().getFullYear(), 0, 0).getTime()) / 86_400_000);
+  const tip = STARTER_TIPS[dayOfYear % STARTER_TIPS.length];
+
+  const sections = [
+    `# Good morning, ${userName}`,
+    dateDisplay,
+    "",
+    "---",
+    "",
+    "## Today's Focus",
+    taskLines,
+    "",
+    "## Agent Queue",
+    queueLine,
+    "",
+    "## Tip of the Day",
+    `> ${tip}`,
+    "",
+    "---",
+    "",
+    "*Want a richer brief? Connect your calendar and X intelligence in Settings > Config.*",
+  ];
+
+  const markdown = sections.join("\n");
+
+  return {
+    date: briefDate,
+    markdown,
+    starterBrief: true,
+    sections: ["focus", "queue", "tip"],
+    warnings: [],
+  };
+}
+
 // ── RPC Handler ──────────────────────────────────────────────────────────────
 
 const generateBrief: GatewayRequestHandler = async ({ params, respond }) => {
@@ -1795,10 +1907,9 @@ const generateBrief: GatewayRequestHandler = async ({ params, respond }) => {
       // Dry run: gather data but don't write
       const vaultPath = resolveVaultPath();
       if (!vaultPath) {
-        respond(false, null, {
-          code: "INVALID_REQUEST",
-          message: "Obsidian vault path not configured",
-        });
+        // No vault — return starter brief info
+        const starter = await generateStarterBrief();
+        respond(true, { dryRun: true, starterBrief: true, markdown: starter.markdown });
         return;
       }
 
@@ -1837,6 +1948,14 @@ const generateBrief: GatewayRequestHandler = async ({ params, respond }) => {
           },
         },
       });
+      return;
+    }
+
+    // Check if vault is configured — if not, generate starter brief
+    const vaultPath = resolveVaultPath();
+    if (!vaultPath) {
+      const starter = await generateStarterBrief();
+      respond(true, starter);
       return;
     }
 

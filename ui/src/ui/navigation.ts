@@ -2,9 +2,12 @@ import type { IconName } from "./icons.js";
 
 export const TAB_GROUPS = [
   { label: "", tabs: ["chat", "today", "workspaces", "second-brain", "dashboards"] },
+  { label: "Settings", tabs: ["config"] },
+] as const;
+
+export const POWER_USER_GROUPS = [
   { label: "Toolkit", tabs: ["skills", "trust", "guardrails", "options"] },
-  { label: "Settings", tabs: ["config", "debug", "logs"] },
-  { label: "System", tabs: ["mission-control", "overview", "channels", "instances", "sessions", "cron", "nodes"] },
+  { label: "System", tabs: ["mission-control", "overview", "channels", "instances", "sessions", "cron", "nodes", "debug", "logs"] },
 ] as const;
 
 /** Tabs that can be dynamically inserted but aren't in static groups. */
