@@ -1,26 +1,21 @@
 /**
- * Setup controller — RPC helpers for the Setup tab (quick onboarding).
+ * Setup controller — RPC helpers for the Setup tab (progressive onboarding).
  */
 import type { GodModeApp } from "../app.js";
 
-type OnboardingChecklist = {
-  milestones: Array<{
-    id: string;
-    phase: number;
-    title: string;
-    description: string;
-    emoji: string;
-    status: "complete" | "in-progress" | "locked";
-    steps: Array<{
-      id: string;
-      label: string;
-      completed: boolean;
-      detail?: string;
-    }>;
-  }>;
+type CapabilityCard = {
+  id: string;
+  title: string;
+  description: string;
+  icon: string;
+  status: "active" | "available" | "coming-soon";
+  detail?: string;
+  action?: string;
+};
+
+type CapabilitiesResult = {
+  capabilities: CapabilityCard[];
   percentComplete: number;
-  currentPhase: number;
-  completedAt: string | null;
 };
 
 type OnboardingState = {
@@ -31,23 +26,23 @@ type OnboardingState = {
   [key: string]: unknown;
 };
 
-export async function loadChecklist(host: GodModeApp): Promise<void> {
+export async function loadCapabilities(host: GodModeApp): Promise<void> {
   if (!host.client || !host.connected) return;
   const app = host as unknown as {
-    setupChecklist: OnboardingChecklist | null;
-    setupChecklistLoading: boolean;
+    setupCapabilities: CapabilitiesResult | null;
+    setupCapabilitiesLoading: boolean;
   };
-  app.setupChecklistLoading = true;
+  app.setupCapabilitiesLoading = true;
   try {
-    const result = await host.client.request<OnboardingChecklist>(
-      "onboarding.checklist",
+    const result = await host.client.request<CapabilitiesResult>(
+      "onboarding.capabilities",
       {},
     );
-    app.setupChecklist = result;
+    app.setupCapabilities = result;
   } catch {
-    app.setupChecklist = null;
+    app.setupCapabilities = null;
   } finally {
-    app.setupChecklistLoading = false;
+    app.setupCapabilitiesLoading = false;
   }
 }
 
@@ -74,19 +69,12 @@ export async function loadOnboardingStatus(host: GodModeApp): Promise<void> {
 export async function quickSetup(
   host: GodModeApp,
   name: string,
-  licenseKey: string,
-  dailyIntelTopics: string,
 ): Promise<boolean> {
   if (!host.client) return false;
   try {
-    // If license key provided, activate it first
-    if (licenseKey) {
-      await host.client.request("onboarding.activateLicense", { key: licenseKey });
-    }
-    // Run quick setup
     const result = await host.client.request<{ state: OnboardingState }>(
       "onboarding.quickSetup",
-      { name, dailyIntelTopics },
+      { name },
     );
     const app = host as unknown as {
       onboardingData: OnboardingState | null;
@@ -109,6 +97,49 @@ export async function quickSetup(
     host.showToast(msg, "error");
     console.error("[Setup] quickSetup error:", err);
     return false;
+  }
+}
+
+export async function capabilityAction(host: GodModeApp, id: string): Promise<void> {
+  if (!host.client) return;
+
+  switch (id) {
+    case "identity":
+      // Open the memory wizard
+      (host as unknown as { wizardActive: boolean }).wizardActive = true;
+      break;
+    case "daily-brief":
+      // Enable daily brief and navigate to Today
+      try {
+        await host.client.request("godmode.options.set", {
+          key: "dailyBrief.enabled",
+          value: true,
+        });
+        host.setTab("today" as import("../navigation").Tab);
+        host.showToast("Daily Brief enabled!", "success", 3000);
+      } catch {
+        host.showToast("Failed to enable Daily Brief", "error");
+      }
+      break;
+    case "google-calendar":
+    case "github":
+      // Auto-install integration
+      try {
+        host.showToast("Setting up...", "success", 2000);
+        await host.client.request("integrations.autoInstall", { integrationId: id });
+        host.showToast("Connected!", "success", 3000);
+        void loadCapabilities(host);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "Setup failed";
+        host.showToast(msg, "error");
+      }
+      break;
+    case "obsidian-vault":
+      // Navigate to Second Brain tab for vault setup
+      host.setTab("second-brain" as import("../navigation").Tab);
+      break;
+    default:
+      host.showToast("Coming soon!", "success", 2000);
   }
 }
 

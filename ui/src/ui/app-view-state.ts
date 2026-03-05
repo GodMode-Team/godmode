@@ -289,8 +289,8 @@ export type AppViewState = {
   wizardState?: import("./views/onboarding-wizard").WizardState | null;
   // Setup tab state (80/20 fast onboarding)
   showSetupTab?: boolean;
-  setupChecklist?: unknown;
-  setupChecklistLoading?: boolean;
+  setupCapabilities?: { capabilities: Array<{ id: string; title: string; description: string; icon: string; status: "active" | "available" | "coming-soon"; detail?: string; action?: string }>; percentComplete: number } | null;
+  setupCapabilitiesLoading?: boolean;
   setupQuickDone?: boolean;
   // Focus Pulse state
   focusPulseData?: import("./controllers/focus-pulse").FocusPulseData | null;
@@ -567,8 +567,9 @@ export type AppViewState = {
   handleOnboardingSkipPhase?: () => void;
   handleOnboardingComplete?: () => void;
   // Setup tab handlers
-  handleQuickSetup?: (name: string, licenseKey: string, dailyIntelTopics: string) => void;
-  handleLoadSetupChecklist?: () => void;
+  handleQuickSetup?: (name: string) => void;
+  handleLoadCapabilities?: () => void;
+  handleCapabilityAction?: (id: string) => void;
   handleHideSetup?: () => void;
   handleRunAssessment?: () => void;
   // Memory wizard handlers

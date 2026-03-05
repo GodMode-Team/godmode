@@ -442,8 +442,8 @@ export function renderApp(state: AppViewState) {
                           <span class="nav-item__text">Setup</span>
                           ${state.onboardingProgress != null
                             ? html`<span class="nav-item__badge">${state.onboardingProgress}%</span>`
-                            : state.setupChecklist && (state.setupChecklist as { percentComplete?: number }).percentComplete != null
-                              ? html`<span class="nav-item__badge">${(state.setupChecklist as { percentComplete: number }).percentComplete}%</span>`
+                            : state.setupCapabilities && (state.setupCapabilities as { percentComplete?: number }).percentComplete != null
+                              ? html`<span class="nav-item__badge">${(state.setupCapabilities as { percentComplete: number }).percentComplete}%</span>`
                               : nothing}
                         </a>
                       `
@@ -1085,15 +1085,16 @@ export function renderApp(state: AppViewState) {
                 ${renderSetup({
                   connected: state.connected,
                   quickSetupDone: state.setupQuickDone ?? false,
-                  checklist: (state.setupChecklist as import("./views/setup").SetupViewProps["checklist"]) ?? null,
-                  checklistLoading: state.setupChecklistLoading ?? false,
-                  onQuickSetup: (name, licenseKey, dailyIntelTopics) =>
-                    state.handleQuickSetup?.(name, licenseKey, dailyIntelTopics),
+                  capabilities: (state.setupCapabilities as import("./views/setup").SetupViewProps["capabilities"]) ?? null,
+                  capabilitiesLoading: state.setupCapabilitiesLoading ?? false,
+                  onQuickSetup: (name) =>
+                    state.handleQuickSetup?.(name),
                   onHideSetup: () => state.handleHideSetup?.(),
                   onOpenWizard: () => state.handleWizardOpen?.(),
                   onNavigate: (tab) => state.setTab(tab),
                   onRunAssessment: () => state.handleRunAssessment?.(),
                   onOpenSupportChat: () => state.handleOpenSupportChat(),
+                  onCapabilityAction: (id) => state.handleCapabilityAction?.(id),
                 })}
                 ${state.setupQuickDone
                   ? renderOnboardingSetup({

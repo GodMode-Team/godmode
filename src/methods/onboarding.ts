@@ -29,6 +29,10 @@ import {
 } from "./onboarding-types.js";
 import { runAssessment, generateConfigRecommendations } from "./onboarding-scanner.js";
 import {
+  getIntegrationsForPlatform,
+  detectAllIntegrations,
+} from "../lib/integration-registry.js";
+import {
   generateWorkspaceFiles,
   patchOCConfig,
   checkOnboardingStatus,
@@ -458,6 +462,144 @@ export const onboardingHandlers: GatewayRequestHandlers = {
   },
 
   /**
+   * Get capability cards for the Setup tab progress tracker.
+   * Returns status for each GodMode capability: active, available, or coming-soon.
+   */
+  "onboarding.capabilities": async ({ respond }) => {
+    try {
+      const state = await readOnboarding();
+      const integrations = getIntegrationsForPlatform();
+      const integrationStatuses = await detectAllIntegrations();
+
+      type CapCard = {
+        id: string;
+        title: string;
+        description: string;
+        icon: string;
+        status: "active" | "available" | "coming-soon";
+        detail?: string;
+        action?: string;
+      };
+
+      const cards: CapCard[] = [];
+
+      // Identity
+      const hasIdentity = Boolean(state.identity?.name && state.interview?.completed);
+      cards.push({
+        id: "identity",
+        title: "Your Identity",
+        description: "Teach your ally who you are, how you work, and what matters to you.",
+        icon: "\u{1F9EC}",
+        status: hasIdentity ? "active" : "available",
+        detail: hasIdentity ? `Configured for ${state.identity!.name}` : undefined,
+        action: hasIdentity ? undefined : "Set Up Identity",
+      });
+
+      // Daily Brief
+      let briefEnabled = false;
+      try {
+        const optionsFile = join(DATA_DIR, "godmode-options.json");
+        const raw = await readFile(optionsFile, "utf-8");
+        const opts = JSON.parse(raw) as Record<string, unknown>;
+        briefEnabled = opts["dailyBrief.enabled"] !== false;
+      } catch { /* default: not configured */ }
+      cards.push({
+        id: "daily-brief",
+        title: "Daily Brief",
+        description: "Morning intelligence briefing with schedule, news, and priorities.",
+        icon: "\u{2600}\uFE0F",
+        status: briefEnabled ? "active" : "available",
+        action: briefEnabled ? undefined : "Enable",
+      });
+
+      // Google Calendar
+      const calStatus = integrationStatuses["google-calendar"];
+      const calWorking = calStatus?.working || calStatus?.configured;
+      cards.push({
+        id: "google-calendar",
+        title: "Google Calendar",
+        description: "See your schedule, get meeting prep, and manage events.",
+        icon: "\u{1F4C5}",
+        status: calWorking ? "active" : "available",
+        detail: calWorking ? "Connected" : undefined,
+        action: calWorking ? undefined : "Connect",
+      });
+
+      // GitHub
+      const ghStatus = integrationStatuses["github"];
+      const ghWorking = ghStatus?.working || ghStatus?.configured;
+      cards.push({
+        id: "github",
+        title: "GitHub",
+        description: "PR reviews, issue tracking, and repo intelligence.",
+        icon: "\u{1F4BB}",
+        status: ghWorking ? "active" : "available",
+        detail: ghWorking ? "Connected" : undefined,
+        action: ghWorking ? undefined : "Connect",
+      });
+
+      // Obsidian Vault
+      let vaultConfigured = false;
+      try {
+        const vaultPaths = [
+          join(homedir(), "Documents", "VAULT"),
+          join(homedir(), "Documents", "Obsidian"),
+        ];
+        vaultConfigured = vaultPaths.some((p) => existsSync(p));
+      } catch { /* ignore */ }
+      cards.push({
+        id: "obsidian-vault",
+        title: "Second Brain",
+        description: "Connect your Obsidian vault for persistent AI memory.",
+        icon: "\u{1F9E0}",
+        status: vaultConfigured ? "active" : "available",
+        detail: vaultConfigured ? "Vault detected" : undefined,
+        action: vaultConfigured ? undefined : "Connect",
+      });
+
+      // Agent Queue
+      cards.push({
+        id: "agent-queue",
+        title: "Agent Queue",
+        description: "Delegate tasks to background agents that work while you don't.",
+        icon: "\u{1F916}",
+        status: "available",
+        action: "Learn More",
+      });
+
+      // Safety Gates (always active)
+      cards.push({
+        id: "safety-gates",
+        title: "Safety Gates",
+        description: "Loop breaker, prompt shield, and output guardrails protecting you.",
+        icon: "\u{1F6E1}\uFE0F",
+        status: "active",
+        detail: "4 gates active",
+      });
+
+      // Smart Memory
+      cards.push({
+        id: "smart-memory",
+        title: "Smart Memory",
+        description: "Your ally remembers context across sessions and conversations.",
+        icon: "\u{1F4AD}",
+        status: state.secondBrain?.memorySeeded ? "active" : "available",
+        action: state.secondBrain?.memorySeeded ? undefined : "Set Up Identity",
+      });
+
+      const activeCount = cards.filter((c) => c.status === "active").length;
+      const percentComplete = Math.round((activeCount / cards.length) * 100);
+
+      respond(true, { capabilities: cards, percentComplete });
+    } catch (err) {
+      respond(false, undefined, {
+        code: "CAPABILITIES_ERROR",
+        message: err instanceof Error ? err.message : String(err),
+      });
+    }
+  },
+
+  /**
    * Get current onboarding status. Returns the full state.
    */
   "onboarding.status": async ({ respond }) => {
@@ -760,8 +902,8 @@ export const onboardingHandlers: GatewayRequestHandlers = {
   // ── Quick Setup (80/20 fast onboarding) ────────────────────────
 
   /**
-   * Quick setup: name + optional daily intel topics → identity saved, phase 1 done.
-   * Called from the new Setup tab for fast onboarding.
+   * Quick setup: name only → identity saved, auto-navigate to Chat.
+   * Called from the Setup tab for instant onboarding.
    * This handler is registered WITHOUT license gate so new users can use it.
    */
   "onboarding.quickSetup": async ({ params, respond, context }) => {
@@ -770,10 +912,6 @@ export const onboardingHandlers: GatewayRequestHandlers = {
       respond(false, null, { code: "INVALID_REQUEST", message: "name is required" });
       return;
     }
-
-    const dailyIntelTopics = typeof params.dailyIntelTopics === "string"
-      ? params.dailyIntelTopics.trim()
-      : "";
 
     const state = await readOnboarding();
 
@@ -818,23 +956,6 @@ export const onboardingHandlers: GatewayRequestHandlers = {
       invalidateIdentityCache();
     } catch {
       // Non-fatal — name will be picked up on next full onboarding
-    }
-
-    // Save daily intel topics to options if provided
-    if (dailyIntelTopics) {
-      try {
-        const optionsFile = join(DATA_DIR, "godmode-options.json");
-        let options: Record<string, unknown> = {};
-        try {
-          const raw = await readFile(optionsFile, "utf-8");
-          options = JSON.parse(raw) as Record<string, unknown>;
-        } catch { /* file may not exist yet */ }
-        options["dailyIntel.topics"] = dailyIntelTopics;
-        await secureMkdir(DATA_DIR);
-        await secureWriteFile(optionsFile, JSON.stringify(options, null, 2));
-      } catch {
-        // Non-fatal: intel topics are optional
-      }
     }
 
     try {

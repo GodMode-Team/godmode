@@ -496,8 +496,8 @@ export class GodModeApp extends LitElement {
 
   // Setup tab state (80/20 fast onboarding)
   @state() showSetupTab = false;
-  @state() setupChecklist: unknown = null;
-  @state() setupChecklistLoading = false;
+  @state() setupCapabilities: { capabilities: Array<{ id: string; title: string; description: string; icon: string; status: "active" | "available" | "coming-soon"; detail?: string; action?: string }>; percentComplete: number } | null = null;
+  @state() setupCapabilitiesLoading = false;
   @state() setupQuickDone = false;
 
   // Onboarding integration setup state
@@ -1150,10 +1150,15 @@ export class GodModeApp extends LitElement {
       }
 
       const idempotencyKey = `ally-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-      await this.client?.request("chat.send", {
+      // Use the `agent` RPC instead of `chat.send` so we can pass
+      // `channel: "webchat"` as turnSourceChannel. This prevents the gateway
+      // from routing the response to iMessage when the session's lastChannel
+      // is "imessage" from a prior iMessage conversation.
+      await this.client?.request("agent", {
         sessionKey: ALLY_SESSION_KEY,
         message: msg,
         deliver: false,
+        channel: "webchat",
         idempotencyKey,
         attachments: imageAttachments,
       });
@@ -3543,19 +3548,23 @@ export class GodModeApp extends LitElement {
 
   // ── Setup tab handlers ───────────────────────────────────────
 
-  async handleQuickSetup(name: string, licenseKey: string, dailyIntelTopics: string) {
+  async handleQuickSetup(name: string) {
     void import("./controllers/setup.js").then(async ({ quickSetup }) => {
-      const success = await quickSetup(this, name, licenseKey, dailyIntelTopics);
+      const success = await quickSetup(this, name);
       if (success) {
         this.setTab("chat" as import("./navigation").Tab);
-        // Reload checklist in background
-        void import("./controllers/setup.js").then(({ loadChecklist }) => loadChecklist(this));
+        // Reload capabilities in background
+        void import("./controllers/setup.js").then(({ loadCapabilities }) => loadCapabilities(this));
       }
     });
   }
 
-  handleLoadSetupChecklist() {
-    void import("./controllers/setup.js").then(({ loadChecklist }) => loadChecklist(this));
+  handleLoadCapabilities() {
+    void import("./controllers/setup.js").then(({ loadCapabilities }) => loadCapabilities(this));
+  }
+
+  handleCapabilityAction(id: string) {
+    void import("./controllers/setup.js").then(({ capabilityAction }) => capabilityAction(this, id));
   }
 
   handleHideSetup() {
@@ -3565,7 +3574,7 @@ export class GodModeApp extends LitElement {
   handleRunAssessment() {
     if (!this.client) return;
     void this.client.request("onboarding.assess", {}).then(() => {
-      this.handleLoadSetupChecklist();
+      this.handleLoadCapabilities();
     });
   }
 

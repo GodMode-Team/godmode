@@ -350,8 +350,8 @@ export async function refreshActiveTab(host: SettingsHost) {
   }
   if (host.tab === "setup") {
     const app = host as unknown as GodModeApp;
-    if (typeof app.handleLoadSetupChecklist === "function") {
-      app.handleLoadSetupChecklist();
+    if (typeof (app as any).handleLoadCapabilities === "function") {
+      (app as any).handleLoadCapabilities();
     }
   }
   if (host.tab === "dashboards") {

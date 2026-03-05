@@ -9,75 +9,46 @@ import type { Tab } from "../navigation.js";
 
 // ── Types ───────────────────────────────────────────────────────
 
-type ChecklistStep = {
+/** Capability card for the progress tracker */
+type CapabilityCard = {
   id: string;
-  label: string;
-  completed: boolean;
-  detail?: string;
-};
-
-type ChecklistMilestone = {
-  id: string;
-  phase: number;
   title: string;
   description: string;
-  emoji: string;
-  status: "complete" | "in-progress" | "locked";
-  steps: ChecklistStep[];
+  icon: string;
+  status: "active" | "available" | "coming-soon";
+  detail?: string;
+  action?: string; // button label
 };
 
-type SetupChecklist = {
-  milestones: ChecklistMilestone[];
+type CapabilitiesData = {
+  capabilities: CapabilityCard[];
   percentComplete: number;
-  currentPhase: number;
-  completedAt: string | null;
 };
 
 export type SetupViewProps = {
   connected: boolean;
   quickSetupDone: boolean;
-  checklist: SetupChecklist | null;
-  checklistLoading: boolean;
-  onQuickSetup: (name: string, licenseKey: string, dailyIntelTopics: string) => void;
+  capabilities: CapabilitiesData | null;
+  capabilitiesLoading: boolean;
+  onQuickSetup: (name: string) => void;
   onHideSetup: () => void;
   onOpenWizard: () => void;
   onNavigate: (tab: Tab) => void;
   onRunAssessment: () => void;
   onOpenSupportChat: () => void;
+  onCapabilityAction: (id: string) => void;
 };
-
-// ── Intel Chips ─────────────────────────────────────────────────
-
-const INTEL_CHIPS = [
-  "AI updates",
-  "Competitor intel",
-  "Market trends",
-  "Industry news",
-  "Tech launches",
-];
 
 // ── Quick Start Form ────────────────────────────────────────────
 
 function renderQuickStart(props: SetupViewProps) {
-  let nameValue = "";
-  let keyValue = "";
-  let intelValue = "";
   let submitting = false;
-
-  function handleChipClick(chip: string, intelInput: HTMLTextAreaElement | null) {
-    if (!intelInput) return;
-    const current = intelInput.value.trim();
-    if (current.toLowerCase().includes(chip.toLowerCase())) return;
-    intelInput.value = current ? `${current}, ${chip}` : chip;
-  }
 
   function handleSubmit(e: Event) {
     e.preventDefault();
     if (submitting) return;
     const form = e.target as HTMLFormElement;
     const name = (form.querySelector('[name="name"]') as HTMLInputElement)?.value?.trim() ?? "";
-    const key = (form.querySelector('[name="licenseKey"]') as HTMLInputElement)?.value?.trim() ?? "";
-    const intel = (form.querySelector('[name="dailyIntel"]') as HTMLTextAreaElement)?.value?.trim() ?? "";
 
     if (!name) {
       const nameInput = form.querySelector('[name="name"]') as HTMLInputElement;
@@ -86,15 +57,15 @@ function renderQuickStart(props: SetupViewProps) {
     }
 
     submitting = true;
-    props.onQuickSetup(name, key, intel);
+    props.onQuickSetup(name);
   }
 
   return html`
     <div class="setup-quick">
       <div class="setup-quick__header">
-        <span class="setup-quick__icon">⚡</span>
+        <span class="setup-quick__icon">\u26A1</span>
         <h2 class="setup-quick__title">Welcome to GodMode</h2>
-        <p class="setup-quick__subtitle">Let's get you set up in under 2 minutes.</p>
+        <p class="setup-quick__subtitle">Tell us your name and start chatting with your AI ally.</p>
       </div>
 
       <form class="setup-quick__form" @submit=${handleSubmit}>
@@ -108,143 +79,102 @@ function renderQuickStart(props: SetupViewProps) {
             placeholder="What should your AI call you?"
             required
             autocomplete="name"
-            .value=${nameValue}
           />
-        </div>
-
-        <div class="setup-field">
-          <label class="setup-label" for="setup-key">License key</label>
-          <input
-            class="setup-input"
-            type="text"
-            id="setup-key"
-            name="licenseKey"
-            placeholder="GM-DEV-... or GM-PROD-..."
-            .value=${keyValue}
-          />
-          <span class="setup-hint">Starts with GM-. Don't have one? Ask your admin.</span>
-        </div>
-
-        <div class="setup-field">
-          <label class="setup-label" for="setup-intel">
-            Daily intelligence
-            <span class="setup-label-optional">(optional)</span>
-          </label>
-          <div class="setup-chips">
-            ${INTEL_CHIPS.map(
-              (chip) => html`
-                <button
-                  type="button"
-                  class="setup-chip"
-                  @click=${(e: Event) => {
-                    const form = (e.target as HTMLElement).closest("form");
-                    const textarea = form?.querySelector('[name="dailyIntel"]') as HTMLTextAreaElement | null;
-                    handleChipClick(chip, textarea);
-                  }}
-                >
-                  ${chip}
-                </button>
-              `,
-            )}
-          </div>
-          <textarea
-            class="setup-textarea"
-            id="setup-intel"
-            name="dailyIntel"
-            rows="2"
-            placeholder="e.g., AI industry news, SaaS competitor analysis, market trends"
-            .value=${intelValue}
-          ></textarea>
-          <span class="setup-hint">
-            This powers your daily brief's intelligence section via X/Twitter search.
-          </span>
         </div>
 
         <button class="setup-submit" type="submit">
-          Get Started
+          Start Using GodMode
         </button>
       </form>
-
-      <div class="setup-help-banner">
-        <span class="setup-help-banner__text">Stuck? Our AI support agent can walk you through it.</span>
-        <button class="setup-help-banner__btn" @click=${() => props.onOpenSupportChat()}>
-          Open Support Chat
-        </button>
-      </div>
     </div>
   `;
 }
 
-// ── Checklist ───────────────────────────────────────────────────
+// ── Progress Ring ────────────────────────────────────────────────
 
-function renderMilestone(milestone: ChecklistMilestone) {
-  const completedSteps = milestone.steps.filter((s) => s.completed).length;
-  const totalSteps = milestone.steps.length;
-  const allDone = completedSteps === totalSteps;
+function progressLabel(pct: number): string {
+  if (pct >= 100) return "GodMode fully loaded";
+  if (pct >= 75) return "Your ally is learning...";
+  if (pct >= 50) return "Building momentum...";
+  if (pct >= 25) return "Getting started...";
+  return "Power up your ally";
+}
+
+function renderProgressRing(pct: number) {
+  const radius = 54;
+  const circumference = 2 * Math.PI * radius;
+  const offset = circumference - (pct / 100) * circumference;
 
   return html`
-    <details class="setup-milestone ${allDone ? "setup-milestone--done" : ""}" ?open=${milestone.status === "in-progress"}>
-      <summary class="setup-milestone__header">
-        <span class="setup-milestone__emoji">${milestone.emoji}</span>
-        <div class="setup-milestone__info">
-          <span class="setup-milestone__title">${milestone.title}</span>
-          <span class="setup-milestone__meta">${completedSteps}/${totalSteps}</span>
-        </div>
-        <span class="setup-milestone__status">
-          ${allDone ? "\u2705" : milestone.status === "in-progress" ? "\u{1F504}" : "\u{1F512}"}
-        </span>
-      </summary>
-      <div class="setup-milestone__body">
-        <p class="setup-milestone__desc">${milestone.description}</p>
-        <ul class="setup-steps">
-          ${milestone.steps.map(
-            (step) => html`
-              <li class="setup-step ${step.completed ? "setup-step--done" : ""}">
-                <span class="setup-step__check">${step.completed ? "\u2713" : "\u25CB"}</span>
-                <span class="setup-step__label">${step.label}</span>
-                ${step.detail
-                  ? html`<span class="setup-step__detail">${step.detail}</span>`
-                  : nothing}
-              </li>
-            `,
-          )}
-        </ul>
-      </div>
-    </details>
+    <div class="setup-ring">
+      <svg class="setup-ring__svg" viewBox="0 0 120 120" width="120" height="120">
+        <circle class="setup-ring__bg" cx="60" cy="60" r="${radius}" fill="none" stroke="var(--gm-border, #333)" stroke-width="8" />
+        <circle
+          class="setup-ring__fill"
+          cx="60" cy="60" r="${radius}" fill="none"
+          stroke="var(--gm-accent, #7c3aed)"
+          stroke-width="8"
+          stroke-linecap="round"
+          stroke-dasharray="${circumference}"
+          stroke-dashoffset="${offset}"
+          transform="rotate(-90 60 60)"
+        />
+        <text x="60" y="64" text-anchor="middle" fill="var(--gm-text, #fff)" font-size="22" font-weight="bold">${pct}%</text>
+      </svg>
+      <span class="setup-ring__label">${progressLabel(pct)}</span>
+    </div>
   `;
 }
 
-function renderChecklist(props: SetupViewProps) {
-  const { checklist, checklistLoading, onHideSetup, onOpenWizard } = props;
+// ── Capability Cards ────────────────────────────────────────────
 
-  if (checklistLoading && !checklist) {
-    return html`<div class="setup-loading">Loading setup progress...</div>`;
+function renderCapabilityCard(card: CapabilityCard, onAction: (id: string) => void) {
+  const statusClass = `setup-card--${card.status}`;
+  return html`
+    <div class="setup-card ${statusClass}">
+      <div class="setup-card__header">
+        <span class="setup-card__icon">${card.icon}</span>
+        <span class="setup-card__title">${card.title}</span>
+        <span class="setup-card__badge setup-card__badge--${card.status}">
+          ${card.status === "active" ? "\u2713 Active" : card.status === "available" ? "Available" : "Coming Soon"}
+        </span>
+      </div>
+      <p class="setup-card__desc">${card.description}</p>
+      ${card.detail ? html`<span class="setup-card__detail">${card.detail}</span>` : nothing}
+      ${card.status === "available" && card.action
+        ? html`<button class="setup-card__btn" @click=${() => onAction(card.id)}>${card.action}</button>`
+        : nothing}
+      ${card.status === "active"
+        ? html`<span class="setup-card__active-check">\u2705</span>`
+        : nothing}
+    </div>
+  `;
+}
+
+function renderCapabilities(props: SetupViewProps) {
+  const { capabilities, capabilitiesLoading, onHideSetup, onOpenWizard, onCapabilityAction } = props;
+
+  if (capabilitiesLoading && !capabilities) {
+    return html`<div class="setup-loading">Loading capabilities...</div>`;
   }
 
-  if (!checklist) {
-    return html`<div class="setup-loading">Couldn't load setup progress. Is the gateway running?</div>`;
+  if (!capabilities) {
+    return html`<div class="setup-loading">Couldn't load capabilities. Is the gateway running?</div>`;
   }
 
-  const { milestones, percentComplete } = checklist;
+  const { capabilities: cards, percentComplete } = capabilities;
 
   return html`
-    <div class="setup-checklist">
-      <div class="setup-checklist__header">
-        <h3 class="setup-checklist__title">Setup Progress</h3>
-        <span class="setup-checklist__pct">${percentComplete}%</span>
-      </div>
+    <div class="setup-capabilities">
+      ${renderProgressRing(percentComplete)}
 
-      <div class="setup-progress">
-        <div class="setup-progress__bar" style="width: ${percentComplete}%"></div>
-      </div>
-
-      <div class="setup-milestones">
-        ${milestones.map((m) => renderMilestone(m))}
+      <div class="setup-cards">
+        ${cards.map((card) => renderCapabilityCard(card, onCapabilityAction))}
       </div>
 
       <div class="setup-actions">
         <button class="setup-action-btn" @click=${onOpenWizard}>
-          Run Memory Wizard
+          Deep Setup Wizard
         </button>
         <button class="setup-action-btn setup-action-btn--text" @click=${onHideSetup}>
           Hide Setup
@@ -252,7 +182,7 @@ function renderChecklist(props: SetupViewProps) {
       </div>
 
       <div class="setup-help-banner">
-        <span class="setup-help-banner__text">Need help with setup? Chat with our AI support agent.</span>
+        <span class="setup-help-banner__text">Need help? Chat with our AI support agent.</span>
         <button class="setup-help-banner__btn" @click=${() => props.onOpenSupportChat()}>
           Open Support Chat
         </button>
@@ -277,7 +207,7 @@ export function renderSetup(props: SetupViewProps) {
   return html`
     <section class="tab-body setup-section">
       ${!props.quickSetupDone ? renderQuickStart(props) : nothing}
-      ${renderChecklist(props)}
+      ${renderCapabilities(props)}
     </section>
   `;
 }
