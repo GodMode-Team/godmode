@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GodMode Setup</title>
+    <meta name="robots" content="noindex, nofollow">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>&#x26A1;</text></svg>">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root {
+            --black: #000000;
+            --dark: #0a0a0a;
+            --card: #121722;
+            --card-2: #151c29;
+            --gray: #666666;
+            --muted: #a0aab8;
+            --white: #ffffff;
+            --accent: #00ff88;
+            --accent-dim: rgba(0, 255, 136, 0.1);
+            --radius: 14px;
+            --max: 720px;
+        }
+
+        html { scroll-behavior: smooth; }
+        body {
+            font-family: 'Inter', -apple-system, sans-serif;
+            background: var(--black);
+            color: var(--white);
+            line-height: 1.7;
+            overflow-x: hidden;
+        }
+
+        body::before {
+            content: "";
+            position: fixed;
+            inset: 0;
+            background:
+                radial-gradient(circle at 12% 18%, rgba(0, 255, 136, 0.1), transparent 42%),
+                radial-gradient(circle at 88% 82%, rgba(0, 200, 255, 0.06), transparent 45%);
+            pointer-events: none;
+        }
+
+        .container {
+            position: relative;
+            z-index: 2;
+            max-width: var(--max);
+            margin: 0 auto;
+            padding: 48px 24px 80px;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 6px 14px;
+            background: var(--accent-dim);
+            border: 1px solid rgba(0, 255, 136, 0.2);
+            border-radius: 999px;
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--accent);
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            margin-bottom: 20px;
+        }
+
+        h1 {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: clamp(28px, 5vw, 40px);
+            font-weight: 700;
+            line-height: 1.15;
+            margin-bottom: 12px;
+        }
+
+        .subtitle {
+            color: var(--muted);
+            font-size: 16px;
+            margin-bottom: 40px;
+        }
+
+        h2 {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 22px;
+            font-weight: 600;
+            margin: 48px 0 16px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        h2 .num {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 32px;
+            height: 32px;
+            background: var(--accent);
+            color: var(--black);
+            border-radius: 50%;
+            font-size: 14px;
+            font-weight: 700;
+            flex-shrink: 0;
+        }
+
+        p { color: var(--muted); margin-bottom: 16px; }
+
+        .card {
+            background: var(--card);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: var(--radius);
+            padding: 24px;
+            margin: 16px 0;
+        }
+
+        .card h3 {
+            font-size: 15px;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: var(--white);
+        }
+
+        .card p { font-size: 14px; margin-bottom: 8px; }
+        .card p:last-child { margin-bottom: 0; }
+
+        pre {
+            background: var(--card-2);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: 10px;
+            padding: 18px 20px;
+            margin: 12px 0 20px;
+            overflow-x: auto;
+            position: relative;
+        }
+
+        code {
+            font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+            font-size: 13.5px;
+            line-height: 1.6;
+            color: var(--accent);
+        }
+
+        pre code { display: block; white-space: pre; }
+        p code, li code {
+            background: rgba(0, 255, 136, 0.08);
+            padding: 2px 7px;
+            border-radius: 5px;
+            font-size: 13px;
+        }
+
+        .copy-btn {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(255, 255, 255, 0.06);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: var(--muted);
+            padding: 5px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .copy-btn:hover { background: rgba(255, 255, 255, 0.1); color: var(--white); }
+        .copy-btn.copied { color: var(--accent); border-color: rgba(0, 255, 136, 0.3); }
+
+        .divider {
+            border: none;
+            border-top: 1px solid rgba(255, 255, 255, 0.06);
+            margin: 40px 0;
+        }
+
+        .tag {
+            display: inline-block;
+            padding: 3px 10px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .tag.rec { background: rgba(0, 255, 136, 0.12); color: var(--accent); }
+        .tag.alt { background: rgba(255, 200, 0, 0.1); color: #ffc800; }
+
+        ul { list-style: none; padding: 0; }
+        ul li {
+            position: relative;
+            padding-left: 20px;
+            color: var(--muted);
+            font-size: 14px;
+            margin-bottom: 8px;
+        }
+        ul li::before {
+            content: ">";
+            position: absolute;
+            left: 0;
+            color: var(--accent);
+            font-weight: 700;
+        }
+
+        .checklist li::before { content: none; }
+        .checklist li {
+            padding-left: 28px;
+            margin-bottom: 12px;
+        }
+        .checklist li::after {
+            content: "";
+            position: absolute;
+            left: 0;
+            top: 4px;
+            width: 16px;
+            height: 16px;
+            border: 2px solid var(--gray);
+            border-radius: 4px;
+        }
+
+        .help {
+            background: var(--card);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: var(--radius);
+            padding: 24px;
+            margin-top: 48px;
+            text-align: center;
+        }
+        .help p { font-size: 14px; }
+        .help a { color: var(--accent); text-decoration: none; }
+        .help a:hover { text-decoration: underline; }
+
+        @media (max-width: 600px) {
+            .container { padding: 32px 16px 60px; }
+            pre { padding: 14px 12px; }
+            code { font-size: 12.5px; }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+
+    <div class="badge">Private Setup Guide</div>
+    <h1>Install GodMode on your VPS</h1>
+    <p class="subtitle">One command installs everything. Follow the steps below to get running in under 5 minutes.</p>
+
+    <!-- STEP 1 -->
+    <h2><span class="num">1</span> Run the installer</h2>
+    <p>SSH into your server and paste this:</p>
+    <pre><button class="copy-btn" onclick="copyCode(this)">Copy</button><code>curl -fsSL https://lifeongodmode.com/install.sh | sh</code></pre>
+    <p>This automatically installs Node.js, the OpenClaw runtime, and the GodMode plugin. It detects your VPS environment and configures everything for remote access.</p>
+
+    <div class="card">
+        <h3>What gets installed</h3>
+        <ul>
+            <li>Node.js 22 (if not already present)</li>
+            <li>OpenClaw CLI (the AI gateway runtime)</li>
+            <li>GodMode plugin (the AI operating system)</li>
+            <li>Security token for the gateway</li>
+        </ul>
+    </div>
+
+    <!-- STEP 2 -->
+    <h2><span class="num">2</span> Connect an AI model</h2>
+    <p>GodMode needs an AI brain to think with. Pick one:</p>
+
+    <div class="card">
+        <h3>Option A: Anthropic API Key <span class="tag rec">Recommended</span></h3>
+        <p>Best quality. Pay-per-use. Get a key at <a href="https://console.anthropic.com/settings/keys" target="_blank" style="color: var(--accent);">console.anthropic.com</a></p>
+        <pre><button class="copy-btn" onclick="copyCode(this)">Copy</button><code>echo 'export ANTHROPIC_API_KEY="sk-ant-YOUR-KEY-HERE"' >> ~/.bashrc
+source ~/.bashrc</code></pre>
+    </div>
+
+    <div class="card">
+        <h3>Option B: OpenAI / ChatGPT subscription</h3>
+        <p>Uses your existing ChatGPT Plus ($20/mo) or Pro ($200/mo) subscription.</p>
+        <pre><button class="copy-btn" onclick="copyCode(this)">Copy</button><code>openclaw models auth login</code></pre>
+        <p>Select "OpenAI" when prompted. Follow the browser link to authorize.</p>
+    </div>
+
+    <div class="card">
+        <h3>Option C: Other providers</h3>
+        <p>Any of these work — add the key to <code>~/.bashrc</code> and <code>source ~/.bashrc</code>:</p>
+        <ul>
+            <li><code>GEMINI_API_KEY</code> &mdash; Google Gemini (<a href="https://aistudio.google.com/apikey" target="_blank" style="color: var(--accent);">get key</a>)</li>
+            <li><code>OPENROUTER_API_KEY</code> &mdash; OpenRouter, 100+ models (<a href="https://openrouter.ai/keys" target="_blank" style="color: var(--accent);">get key</a>)</li>
+            <li><code>XAI_API_KEY</code> &mdash; xAI Grok (<a href="https://console.x.ai" target="_blank" style="color: var(--accent);">get key</a>)</li>
+        </ul>
+    </div>
+
+    <!-- STEP 3 -->
+    <h2><span class="num">3</span> Restart the gateway</h2>
+    <p>After adding your AI key, restart so the gateway picks it up:</p>
+    <pre><button class="copy-btn" onclick="copyCode(this)">Copy</button><code>openclaw gateway stop 2>/dev/null; nohup openclaw gateway run &</code></pre>
+
+    <hr class="divider">
+
+    <!-- STEP 4 -->
+    <h2><span class="num">4</span> Access GodMode</h2>
+    <p>Since your GodMode is running on a server, you need a way to reach it from your browser.</p>
+
+    <div class="card">
+        <h3>Option A: Tailscale <span class="tag rec">Recommended</span></h3>
+        <p>Tailscale creates a private network between your devices. Install it on your VPS and your laptop/phone.</p>
+        <pre><button class="copy-btn" onclick="copyCode(this)">Copy</button><code># On your VPS:
+curl -fsSL https://tailscale.com/install.sh | sh
+sudo tailscale up
+
+# It will print a login URL — open it to connect your VPS to your Tailscale network
+# Then get your VPS's Tailscale IP:
+tailscale ip -4</code></pre>
+        <p>Then open in your browser:</p>
+        <pre><code>http://YOUR-TAILSCALE-IP:18789/godmode</code></pre>
+        <p>Install <a href="https://tailscale.com/download" target="_blank" style="color: var(--accent);">Tailscale on your laptop/phone</a> too, using the same account.</p>
+    </div>
+
+    <div class="card">
+        <h3>Option B: SSH Tunnel <span class="tag alt">Quick</span></h3>
+        <p>From your laptop, open a tunnel to your server:</p>
+        <pre><button class="copy-btn" onclick="copyCode(this)">Copy</button><code>ssh -L 18789:localhost:18789 user@your-server-ip</code></pre>
+        <p>Then open in your browser:</p>
+        <pre><code>http://localhost:18789/godmode</code></pre>
+        <p>The tunnel stays open as long as the SSH session is active.</p>
+    </div>
+
+    <hr class="divider">
+
+    <!-- STEP 5 -->
+    <h2><span class="num">5</span> You're in</h2>
+    <p>GodMode's onboarding will walk you through the rest. It'll ask your name, set up your workspace, and introduce you to your AI ally.</p>
+
+    <div class="card">
+        <h3>Quick reference</h3>
+        <ul>
+            <li>Gateway status: <code>openclaw gateway status</code></li>
+            <li>Restart gateway: <code>openclaw gateway stop; nohup openclaw gateway run &</code></li>
+            <li>Update GodMode: <code>curl -fsSL https://lifeongodmode.com/install.sh | sh</code></li>
+            <li>Logs: <code>tail -f ~/.openclaw/logs/gateway.log</code></li>
+        </ul>
+    </div>
+
+    <div class="help">
+        <p>Stuck? Text Caleb or email <a href="mailto:support@lifeongodmode.com">support@lifeongodmode.com</a></p>
+    </div>
+
+</div>
+
+<script>
+function copyCode(btn) {
+    const code = btn.parentElement.querySelector('code').textContent;
+    navigator.clipboard.writeText(code).then(() => {
+        btn.textContent = 'Copied!';
+        btn.classList.add('copied');
+        setTimeout(() => {
+            btn.textContent = 'Copy';
+            btn.classList.remove('copied');
+        }, 2000);
+    });
+}
+</script>
+</body>
+</html>
