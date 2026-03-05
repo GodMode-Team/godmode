@@ -1166,10 +1166,10 @@ export class GodModeApp extends LitElement {
       // Gateway error/aborted events clear allyWorking if the turn fails.
       this.allyWorking = true;
 
-      // Fallback poll: if the response arrives via an external channel (iMessage,
-      // Telegram) the gateway may not stream delta/final events to the web UI.
-      // Poll the session history to detect when the response lands.
-      const msgCountAtSend = this.allyMessages.length;
+      // Fallback poll: gateway `chat` events may arrive with a canonicalized
+      // session key that doesn't match ALLY_SESSION_KEY, or the response may
+      // route through an external channel. Poll history to detect completion.
+      const lastMsgContent = this.allyMessages[this.allyMessages.length - 1]?.content;
       const pollTimer = setInterval(async () => {
         // Stop polling if working state was already cleared by a gateway event
         if (!this.allyWorking) {
@@ -1178,8 +1178,9 @@ export class GodModeApp extends LitElement {
         }
         try {
           await this._loadAllyHistory();
-          // If history now has more messages, the response arrived
-          if (this.allyMessages.length > msgCountAtSend) {
+          // Check if a NEW assistant message appeared after the user's message
+          const last = this.allyMessages[this.allyMessages.length - 1];
+          if (last && last.role === "assistant" && last.content !== lastMsgContent) {
             this.allyWorking = false;
             this.allyStream = null;
             clearInterval(pollTimer);

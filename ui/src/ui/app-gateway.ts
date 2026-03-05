@@ -414,9 +414,6 @@ async function checkOnboardingStatus(host: GatewayHost) {
     } else {
       app.onboardingActive = false;
       app.onboardingData = res ?? null;
-      // Hide setup tab for completed users
-      const setupApp = host as unknown as { showSetupTab?: boolean };
-      setupApp.showSetupTab = false;
     }
   } catch {
     // Onboarding status not available — skip (probably standalone without the method)
@@ -1004,7 +1001,10 @@ function handleGatewayEventUnsafe(host: GatewayHost, evt: GatewayEventFrame) {
     // ── Ally side-chat routing ──────────────────────────────────────
     // When the ally-main session receives chat events and is NOT the
     // active full-screen session, route messages to the ally overlay state.
-    if (payload && payload.sessionKey === ALLY_SESSION_KEY) {
+    // Match both "main" and canonicalized forms like "agent:main:main"
+    const isAllySession = payload?.sessionKey === ALLY_SESSION_KEY
+      || (payload?.sessionKey?.endsWith(`:${ALLY_SESSION_KEY}`) ?? false);
+    if (payload && isAllySession) {
       const allyHost = host as unknown as {
         allyMessages?: Array<{ role: string; content: string; timestamp?: number }>;
         allyStream?: string | null;

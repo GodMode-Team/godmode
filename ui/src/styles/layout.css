@@ -667,7 +667,7 @@
 .content-header {
   display: flex;
   align-items: flex-end;
-  justify-content: space-between;
+  justify-content: flex-start;
   gap: 16px;
   padding: 0;
   transform-origin: top center;
