@@ -696,6 +696,10 @@ openclaw config set plugins.enabled true 2>/dev/null && ok "plugins.enabled = tr
 # VPS / headless: configure network binding so remote access works
 TAILSCALE_CONFIGURED=false
 if [ "$IS_HEADLESS" = true ]; then
+  # Allow insecure auth — plain HTTP from non-localhost can't use crypto.subtle
+  # for device identity, so the gateway must accept token-only auth
+  openclaw config set gateway.controlUi.allowInsecureAuth true 2>/dev/null && ok "gateway.controlUi.allowInsecureAuth = true (plain HTTP)" || true
+
   # Detect Tailscale
   if has tailscale && tailscale status >/dev/null 2>&1; then
     TAILSCALE_IP="$(tailscale ip -4 2>/dev/null || true)"
@@ -774,6 +778,18 @@ fi
 
 GODMODE_URL="http://127.0.0.1:${GODMODE_PORT}/godmode/onboarding"
 
+# Extract gateway token for VPS access URLs
+GATEWAY_TOKEN=""
+if [ -f "$CONFIG_FILE" ]; then
+  GATEWAY_TOKEN="$(node -e "
+    try {
+      const c = JSON.parse(require('fs').readFileSync('$CONFIG_FILE', 'utf-8'));
+      const t = c.gateway?.auth?.token || c.gateway?.token || '';
+      process.stdout.write(t);
+    } catch {}
+  " 2>/dev/null || true)"
+fi
+
 printf '\n%s================================================%s\n' "$GRN$BLD" "$RST"
 printf '%s  GodMode installed successfully!%s\n' "$GRN$BLD" "$RST"
 printf '%s================================================%s\n' "$GRN$BLD" "$RST"
@@ -815,9 +831,13 @@ if [ "$IS_HEADLESS" = true ]; then
   fi
 
   if [ "$TAILSCALE_CONFIGURED" = true ]; then
-    # Tailscale already configured — show the access URL
+    # Tailscale already configured — show the access URL (with token for auth)
     printf '  %s%s.%s Access GodMode via Tailscale:\n' "$CYN" "$STEP_NUM" "$RST"
-    printf '     %s%shttp://%s:%s/godmode/onboarding%s\n\n' "  " "$CYN" "$TAILSCALE_IP" "$GODMODE_PORT" "$RST"
+    if [ -n "$GATEWAY_TOKEN" ]; then
+      printf '     %s%shttp://%s:%s/godmode/onboarding?token=%s%s\n\n' "  " "$CYN" "$TAILSCALE_IP" "$GODMODE_PORT" "$GATEWAY_TOKEN" "$RST"
+    else
+      printf '     %s%shttp://%s:%s/godmode/onboarding%s\n\n' "  " "$CYN" "$TAILSCALE_IP" "$GODMODE_PORT" "$RST"
+    fi
     STEP_NUM=$((STEP_NUM + 1))
   else
     printf '  %s%s.%s Access GodMode remotely:\n' "$CYN" "$STEP_NUM" "$RST"
@@ -832,7 +852,7 @@ if [ "$IS_HEADLESS" = true ]; then
   fi
 
   printf '  %s%s.%s Restart gateway (if you changed config above):\n' "$CYN" "$STEP_NUM" "$RST"
-  printf '     nohup openclaw gateway run &\n\n'
+  printf '     openclaw gateway restart\n\n'
 else
   # Desktop — open browser
   printf '  %sOpening GodMode...%s\n' "$WHT$BLD" "$RST"
