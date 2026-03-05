@@ -4,6 +4,28 @@ This file tracks recent development changes so Atlas and other agents can quickl
 
 ---
 
+## v1.6.0 Post-Merge Audit + Intelligence (2026-03-05)
+
+### UI Cleanup (meta-architecture alignment)
+- Removed Goals section from Today tab — goals surface through daily brief text (Chief Aim), not a separate card
+- Renamed "Command Center" tab to "Tasks" — clearer, less jargon
+- Removed dead `renderGoalsSection`, goals props/state/loading from app, controller, and view-state
+- Deleted `views/goals.ts` (dead types file)
+- Deleted orphaned CSS: `lifetracks.css` (583 lines), `vision-board.css` (405 lines)
+- Removed dead CSS imports from `styles.css`
+- Cleaned goals CSS from `my-day.css`
+
+### Harness Update
+- Added Section 6 "Building Skills" to HARNESS.md — references Anthropic's skill-creator methodology
+- Added `create-skill.md` to godmode-dev workspace template
+- Agents now have a systematic process for creating new skills with quality guardrails
+
+### Intelligence
+- `docs/INTEL-2026-03-05.md` — Anthropic skill-creator (meta-tool for building skills) + Google Workspace CLI (future integration path)
+- Both reinforce anti-fragile thesis: new tools = new files, not new code
+
+---
+
 ## v1.6.0 Product Polish — 6-Tab UX Overhaul (2026-03-05)
 
 ### Phase 1: Daily Rhythm Bulletproofing

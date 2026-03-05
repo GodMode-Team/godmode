@@ -1,6 +1,7 @@
 import { type AnyAgentTool, jsonResult } from "openclaw/plugin-sdk";
 import { updateQueueState, newQueueItemId, type QueueItemType } from "../lib/queue-state.js";
 import { resolvePersona } from "../lib/agent-roster.js";
+import { getQueueProcessor } from "../services/queue-processor.js";
 
 type ToolContext = {
   sessionKey?: string;
@@ -148,6 +149,12 @@ export function createQueueAddTool(_ctx: ToolContext): AnyAgentTool {
         return newItem;
       });
 
+      // Kick the queue processor immediately so the item starts within seconds
+      const qp = getQueueProcessor();
+      if (qp) {
+        void qp.processAllPending();
+      }
+
       return jsonResult({
         queued: true,
         item: {
@@ -157,7 +164,7 @@ export function createQueueAddTool(_ctx: ToolContext): AnyAgentTool {
           priority: item.priority,
           status: item.status,
         },
-        message: `Queued: "${item.title}" (${item.type}) — ID: ${item.id}. Will be processed by a background agent.`,
+        message: `Queued: "${item.title}" (${item.type}) — ID: ${item.id}. Processing will start shortly.`,
       });
     },
   } as AnyAgentTool;

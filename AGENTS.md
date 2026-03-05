@@ -6,6 +6,8 @@ This repository is the standalone home for the GodMode OpenClaw plugin.
 
 **Read `docs/GODMODE-META-ARCHITECTURE.md` before making any architectural decisions.** It is the definitive blueprint for how GodMode gets built.
 
+**Read `HARNESS.md` for agent workflow rules** — branching, building, merging, handing off. Follow it.
+
 ### What GodMode Is
 GodMode is a deeply contextual personal AI ally that manages a swarm of agents. The ally is 80% of the value (deep context, coworking in chat). Agent delegation is 20%. GodMode is the conductor, not the orchestra — it connects to the user's existing tools, never rebuilds them.
 

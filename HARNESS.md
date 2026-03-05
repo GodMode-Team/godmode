@@ -98,10 +98,47 @@ Hot files touched: [list any conflict magnets you modified]
 Build status: [passing/failing + what's broken]
 ```
 
+## 6. Building Skills
+
+GodMode capabilities scale through files (personas, skills), not code. When you need a new capability:
+
+### Use the Anthropic Skill Creator
+The official skill-creator (`github.com/anthropics/skills/tree/main/skills/skill-creator`) is the meta-tool for building skills. Install it in your Claude Code environment:
+
+```bash
+# Clone the skills repo and install skill-creator
+git clone https://github.com/anthropics/skills.git
+cp -r skills/skills/skill-creator ~/.claude/skills/
+```
+
+**Workflow:** Capture intent → interview & research → write SKILL.md → create test cases → evaluate → iterate. The skill-creator handles all of this.
+
+### GodMode Skill Format
+GodMode skills are markdown files with YAML frontmatter in `assets/skills/`:
+
+```yaml
+---
+name: Skill Name
+trigger: manual|cron|event
+schedule: "daily 9am" | "weekly monday 9am"
+persona: [agent-roster slug]
+taskType: [queue item type]
+priority: high|normal|low
+---
+[Instructions in markdown]
+```
+
+### When to write a skill vs. code
+- **Skill (file):** Repeatable workflow, scheduled task, agent playbook, prompt template
+- **Persona (file):** New agent role with specific expertise, voice, evidence requirements
+- **Code:** Only for engine mechanics — context injection, queue processing, trust tracking, orchestration
+
 ---
 
 ## Why This Exists
 
 OpenAI's harness engineering principle: *"Early progress was slower than expected — not because agents were incapable, but because the environment was underspecified."*
+
+Anthropic's skill-creator principle: *"Skills with objectively verifiable outputs benefit from test cases. Quality scales through prompt quality, not more code."*
 
 This file specifies the environment. Agents that follow it produce clean, mergeable work. Agents that don't create the kind of 19-conflict merge session that inspired this document.
