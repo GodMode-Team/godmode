@@ -729,6 +729,8 @@ if [ "$IS_HEADLESS" = true ]; then
       # Use tailscale serve mode — exposes gateway to tailnet securely via HTTPS
       openclaw config set gateway.tailscale.mode serve 2>/dev/null && ok "gateway.tailscale.mode = serve" || warn "Could not set tailscale mode"
       openclaw config set gateway.auth.allowTailscale true 2>/dev/null || true
+      # Tailscale IS the trust boundary — skip redundant device pairing for remote browsers
+      openclaw config set gateway.controlUi.dangerouslyDisableDeviceAuth true 2>/dev/null && ok "Device pairing skipped (Tailscale provides device auth)" || true
       # Bind to LAN so Tailscale serve can reach the gateway
       openclaw config set gateway.bind lan 2>/dev/null && ok "gateway.bind = lan (Tailscale + SSH)" || true
 
