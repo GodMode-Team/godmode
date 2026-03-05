@@ -701,17 +701,42 @@ if [ "$IS_HEADLESS" = true ]; then
   openclaw config set gateway.controlUi.allowInsecureAuth true 2>/dev/null && ok "gateway.controlUi.allowInsecureAuth = true (plain HTTP)" || true
 
   # Detect Tailscale
+  TAILSCALE_FQDN=""
   if has tailscale && tailscale status >/dev/null 2>&1; then
     TAILSCALE_IP="$(tailscale ip -4 2>/dev/null || true)"
     if [ -n "$TAILSCALE_IP" ]; then
       ok "Tailscale detected — IP: $TAILSCALE_IP"
-      # Use tailscale serve mode — exposes gateway to tailnet securely
+
+      # Get the full tailnet FQDN (e.g., metatron-3.taild13d36.ts.net)
+      TAILSCALE_FQDN="$(tailscale status --json 2>/dev/null | node -e '
+        try {
+          const d = JSON.parse(require("fs").readFileSync("/dev/stdin", "utf-8"));
+          const name = (d.Self?.DNSName || "").replace(/\.$/, "");
+          process.stdout.write(name);
+        } catch {}
+      ' 2>/dev/null || true)"
+
+      # Provision HTTPS cert early — gives CT logs time to propagate during rest of install
+      if [ -n "$TAILSCALE_FQDN" ]; then
+        tailscale cert "$TAILSCALE_FQDN" 2>/dev/null && ok "TLS certificate provisioned for $TAILSCALE_FQDN" || true
+      fi
+
+      # Use tailscale serve mode — exposes gateway to tailnet securely via HTTPS
       openclaw config set gateway.tailscale.mode serve 2>/dev/null && ok "gateway.tailscale.mode = serve" || warn "Could not set tailscale mode"
       openclaw config set gateway.auth.allowTailscale true 2>/dev/null || true
       # Bind to LAN so Tailscale serve can reach the gateway
       openclaw config set gateway.bind lan 2>/dev/null && ok "gateway.bind = lan (Tailscale + SSH)" || true
-      # Allow the Tailscale IP origin for WebSocket connections
-      openclaw config set gateway.controlUi.allowedOrigins "[\"http://${TAILSCALE_IP}:${GODMODE_PORT}\"]" 2>/dev/null && ok "gateway.controlUi.allowedOrigins includes Tailscale IP" || true
+
+      # Allow origins for WebSocket connections (both HTTP Tailscale IP and HTTPS tailnet domain)
+      if [ -n "$TAILSCALE_FQDN" ]; then
+        openclaw config set gateway.controlUi.allowedOrigins "[\"http://${TAILSCALE_IP}:${GODMODE_PORT}\", \"https://${TAILSCALE_FQDN}\"]" 2>/dev/null && ok "gateway.controlUi.allowedOrigins includes Tailscale HTTPS + IP" || true
+      else
+        openclaw config set gateway.controlUi.allowedOrigins "[\"http://${TAILSCALE_IP}:${GODMODE_PORT}\"]" 2>/dev/null && ok "gateway.controlUi.allowedOrigins includes Tailscale IP" || true
+      fi
+
+      # Set up tailscale serve — HTTPS reverse proxy on port 443 → gateway
+      tailscale serve --bg "${GODMODE_PORT}" 2>/dev/null && ok "Tailscale HTTPS serve active (port 443 → ${GODMODE_PORT})" || warn "Could not start tailscale serve — you may need to enable HTTPS in admin.tailscale.com → DNS"
+
       TAILSCALE_CONFIGURED=true
     fi
   else
@@ -833,13 +858,20 @@ if [ "$IS_HEADLESS" = true ]; then
   fi
 
   if [ "$TAILSCALE_CONFIGURED" = true ]; then
-    # Tailscale already configured — show the access URL (with token for auth)
+    # Tailscale configured — show HTTPS URL as primary, HTTP+token as fallback
     printf '  %s%s.%s Access GodMode via Tailscale:\n' "$CYN" "$STEP_NUM" "$RST"
-    if [ -n "$GATEWAY_TOKEN" ]; then
-      printf '     %s%shttp://%s:%s/godmode/onboarding?token=%s%s\n\n' "  " "$CYN" "$TAILSCALE_IP" "$GODMODE_PORT" "$GATEWAY_TOKEN" "$RST"
+    if [ -n "$TAILSCALE_FQDN" ]; then
+      printf '     %s%shttps://%s/godmode/onboarding%s  %s(recommended)%s\n' "  " "$CYN" "$TAILSCALE_FQDN" "$RST" "$GRN" "$RST"
+      printf '     %sUses HTTPS — secure, no token needed.%s\n' "     $DIM" "$RST"
+      if [ -n "$GATEWAY_TOKEN" ]; then
+        printf '     %sFallback (if HTTPS cert not ready): http://%s:%s/godmode/onboarding?token=%s%s\n' "     $DIM" "$TAILSCALE_IP" "$GODMODE_PORT" "$GATEWAY_TOKEN" "$RST"
+      fi
+    elif [ -n "$GATEWAY_TOKEN" ]; then
+      printf '     %s%shttp://%s:%s/godmode/onboarding?token=%s%s\n' "  " "$CYN" "$TAILSCALE_IP" "$GODMODE_PORT" "$GATEWAY_TOKEN" "$RST"
     else
-      printf '     %s%shttp://%s:%s/godmode/onboarding%s\n\n' "  " "$CYN" "$TAILSCALE_IP" "$GODMODE_PORT" "$RST"
+      printf '     %s%shttp://%s:%s/godmode/onboarding%s\n' "  " "$CYN" "$TAILSCALE_IP" "$GODMODE_PORT" "$RST"
     fi
+    printf '\n'
     STEP_NUM=$((STEP_NUM + 1))
   else
     printf '  %s%s.%s Access GodMode remotely:\n' "$CYN" "$STEP_NUM" "$RST"
@@ -854,7 +886,7 @@ if [ "$IS_HEADLESS" = true ]; then
   fi
 
   printf '  %s%s.%s Restart gateway (if you changed config above):\n' "$CYN" "$STEP_NUM" "$RST"
-  printf '     openclaw gateway restart\n\n'
+  printf '     pkill -f "openclaw gateway" 2>/dev/null; nohup openclaw gateway run >/dev/null 2>&1 &\n\n'
 else
   # Desktop — open browser
   printf '  %sOpening GodMode...%s\n' "$WHT$BLD" "$RST"
