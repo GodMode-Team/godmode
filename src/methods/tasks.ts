@@ -8,6 +8,7 @@ import { DATA_DIR, localDateString } from "../data-paths.js";
 import {
   findWorkspaceById,
   readWorkspaceConfig,
+  detectWorkspaceFromText,
   type WorkspaceConfigEntry,
 } from "../lib/workspaces-config.js";
 import { withFileLock } from "openclaw/plugin-sdk";
@@ -111,12 +112,14 @@ async function backfillWorkspaceLinks(): Promise<void> {
   workspaceBackfillDone = true;
 
   try {
-    const { readWorkspaceConfig, detectWorkspaceFromText } = await import("../lib/workspaces-config.js");
     const wsConfig = await readWorkspaceConfig({ initializeIfMissing: false });
-    if (!wsConfig.workspaces.length) return;
+    if (!wsConfig.workspaces.length) {
+      console.log("[tasks] backfill: no workspaces configured, skipping");
+      return;
+    }
 
-    await updateTasks((data) => {
-      let patched = 0;
+    const { result: patched } = await updateTasks((data) => {
+      let count = 0;
       for (const task of data.tasks) {
         if (task.project || task.projectId) continue;
         const detection = detectWorkspaceFromText(wsConfig, task.title);
@@ -124,12 +127,14 @@ async function backfillWorkspaceLinks(): Promise<void> {
           const ws = wsConfig.workspaces.find((w) => w.id === detection.workspaceId);
           task.project = ws?.name ?? null;
           task.projectId = detection.workspaceId;
-          patched++;
+          count++;
         }
       }
-      return patched;
+      return count;
     });
-  } catch {
+    console.log(`[tasks] backfill: linked ${patched} tasks to workspaces`);
+  } catch (err) {
+    console.error("[tasks] backfill failed:", err);
     // Non-fatal — backfill will retry next time
     workspaceBackfillDone = false;
   }
@@ -234,7 +239,8 @@ const createTask: GatewayRequestHandler = async ({ params, respond }) => {
     return;
   }
 
-  // Try to resolve projectId from workspace config
+  // Resolve project to a real workspace — never store invented names
+  let resolvedProject: string | null = null;
   let projectId: string | null = null;
   if (project) {
     try {
@@ -244,11 +250,40 @@ const createTask: GatewayRequestHandler = async ({ params, respond }) => {
         (ws) =>
           ws.id === normalizedProject ||
           ws.name.toLowerCase() === normalizedProject ||
-          ws.keywords.some((kw) => kw === normalizedProject),
+          ws.keywords.some((kw) => kw.toLowerCase() === normalizedProject),
       );
-      projectId = match?.id ?? null;
+      if (match) {
+        resolvedProject = match.name; // canonical workspace name
+        projectId = match.id;
+      }
+      // If no match, fall back to keyword detection from title
+      if (!match) {
+        const detection = detectWorkspaceFromText(config, title);
+        if (detection.workspaceId && detection.score >= 2) {
+          const ws = config.workspaces.find((w) => w.id === detection.workspaceId);
+          if (ws) {
+            resolvedProject = ws.name;
+            projectId = ws.id;
+          }
+        }
+      }
     } catch {
-      // Non-fatal — projectId stays null
+      // Non-fatal — project stays null
+    }
+  } else {
+    // No project provided — try to detect from title
+    try {
+      const config = await readWorkspaceConfig({ initializeIfMissing: false });
+      const detection = detectWorkspaceFromText(config, title);
+      if (detection.workspaceId && detection.score >= 2) {
+        const ws = config.workspaces.find((w) => w.id === detection.workspaceId);
+        if (ws) {
+          resolvedProject = ws.name;
+          projectId = ws.id;
+        }
+      }
+    } catch {
+      // Non-fatal
     }
   }
 
@@ -256,7 +291,7 @@ const createTask: GatewayRequestHandler = async ({ params, respond }) => {
     id: randomUUID(),
     title,
     status: "pending",
-    project: project ?? null,
+    project: resolvedProject,
     projectId,
     dueDate: dueDate ?? null,
     priority: priority ?? "medium",
@@ -281,6 +316,30 @@ const updateTask: GatewayRequestHandler = async ({ params, respond }) => {
   if (!id) {
     respond(false, null, { code: "INVALID_REQUEST", message: "Missing task id" });
     return;
+  }
+
+  // If project is being updated, resolve to a real workspace name
+  if ("project" in updates && updates.project) {
+    try {
+      const config = await readWorkspaceConfig({ initializeIfMissing: false });
+      const normalizedProject = updates.project.trim().toLowerCase();
+      const match = config.workspaces.find(
+        (ws) =>
+          ws.id === normalizedProject ||
+          ws.name.toLowerCase() === normalizedProject ||
+          ws.keywords.some((kw) => kw.toLowerCase() === normalizedProject),
+      );
+      if (match) {
+        updates.project = match.name;
+        (updates as Record<string, unknown>).projectId = match.id;
+      } else {
+        // Unknown project name — don't store it
+        updates.project = null;
+        (updates as Record<string, unknown>).projectId = null;
+      }
+    } catch {
+      // Non-fatal — leave as-is
+    }
   }
 
   const { result: task } = await updateTasks((data) => {
