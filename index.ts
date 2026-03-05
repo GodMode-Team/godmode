@@ -9,7 +9,7 @@
  * via a license gate wrapper.
  */
 
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, mkdirSync, copyFileSync } from "node:fs";
 import {
   request as httpRequest,
   type IncomingHttpHeaders,
@@ -83,7 +83,7 @@ import {
 } from "./src/lib/auth-client.js";
 // Static file server for UIs
 import { createStaticFileHandler } from "./src/static-server.js";
-import { DATA_DIR } from "./src/data-paths.js";
+import { DATA_DIR, MEMORY_DIR } from "./src/data-paths.js";
 // Host compatibility — self-healing layer
 import { detectHostContext, extractSessionKey, safeBroadcast } from "./src/lib/host-context.js";
 import { killZombieGateways } from "./src/lib/zombie-guard.js";
@@ -874,33 +874,33 @@ h1{color:#ff6b6b}code{background:#16213e;padding:2px 8px;border-radius:4px}a{col
 
       // Seed starter personas + skills if roster/skills dir is empty
       try {
-        const { existsSync: seedExists, readdirSync: seedReaddir, mkdirSync: seedMkdir, copyFileSync: seedCopy } = await import("node:fs");
-        const { MEMORY_DIR: seedMemDir } = await import("./src/data-paths.js");
         const seedModuleDir = dirname(fileURLToPath(import.meta.url));
         // assets/ lives alongside dist/ in the package root, or inside dist/ in dev
         const seedPluginRoot = basename(seedModuleDir) === "dist" ? dirname(seedModuleDir) : seedModuleDir;
-        const rosterTarget = join(seedMemDir, "agent-roster");
+        const rosterTarget = join(MEMORY_DIR, "agent-roster");
         const rosterSource = join(seedPluginRoot, "assets", "agent-roster");
-        if (seedExists(rosterSource)) {
-          const hasExisting = seedExists(rosterTarget) && seedReaddir(rosterTarget).filter(f => f.endsWith(".md")).length > 0;
+        if (existsSync(rosterSource)) {
+          const hasExisting = existsSync(rosterTarget) && readdirSync(rosterTarget).filter(f => f.endsWith(".md")).length > 0;
           if (!hasExisting) {
-            seedMkdir(rosterTarget, { recursive: true });
-            for (const f of seedReaddir(rosterSource).filter(f => f.endsWith(".md"))) {
-              seedCopy(join(rosterSource, f), join(rosterTarget, f));
+            mkdirSync(rosterTarget, { recursive: true });
+            const sourceFiles = readdirSync(rosterSource).filter(f => f.endsWith(".md"));
+            for (const f of sourceFiles) {
+              copyFileSync(join(rosterSource, f), join(rosterTarget, f));
             }
-            api.logger.info(`[GodMode] Seeded ${seedReaddir(rosterSource).filter(f => f.endsWith(".md")).length} starter personas`);
+            api.logger.info(`[GodMode] Seeded ${sourceFiles.length} starter personas`);
           }
         }
-        const skillsTarget = join(dirname(seedMemDir), "skills");
+        const skillsTarget = join(dirname(MEMORY_DIR), "skills");
         const skillsSource = join(seedPluginRoot, "assets", "skills");
-        if (seedExists(skillsSource)) {
-          const hasExistingSkills = seedExists(skillsTarget) && seedReaddir(skillsTarget).filter(f => f.endsWith(".md")).length > 0;
+        if (existsSync(skillsSource)) {
+          const hasExistingSkills = existsSync(skillsTarget) && readdirSync(skillsTarget).filter(f => f.endsWith(".md")).length > 0;
           if (!hasExistingSkills) {
-            seedMkdir(skillsTarget, { recursive: true });
-            for (const f of seedReaddir(skillsSource).filter(f => f.endsWith(".md"))) {
-              seedCopy(join(skillsSource, f), join(skillsTarget, f));
+            mkdirSync(skillsTarget, { recursive: true });
+            const sourceSkills = readdirSync(skillsSource).filter(f => f.endsWith(".md"));
+            for (const f of sourceSkills) {
+              copyFileSync(join(skillsSource, f), join(skillsTarget, f));
             }
-            api.logger.info(`[GodMode] Seeded ${seedReaddir(skillsSource).filter(f => f.endsWith(".md")).length} starter skills`);
+            api.logger.info(`[GodMode] Seeded ${sourceSkills.length} starter skills`);
           }
         }
       } catch (err) {
@@ -931,10 +931,8 @@ h1{color:#ff6b6b}code{background:#16213e;padding:2px 8px;border-radius:4px}a{col
 
       // Curation agent service — gated behind team workspace
       try {
-        const { existsSync: fsExistsSync } = await import("node:fs");
-        const { join: pJoin } = await import("node:path");
-        const teamWorkspacesDir = pJoin(DATA_DIR, "team-workspaces");
-        if (fsExistsSync(teamWorkspacesDir)) {
+        const clientsDir = join(dirname(DATA_DIR), "clients");
+        if (existsSync(clientsDir)) {
           const { getCurationAgentService } = await import("./src/services/curation-agent.js");
           const curation = getCurationAgentService(api.logger);
           await curation.start();

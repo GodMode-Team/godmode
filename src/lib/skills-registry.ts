@@ -66,14 +66,17 @@ export function resolveSkillsDir(): string | null {
 // ── Frontmatter Parser (minimal, no deps) ────────────────────────
 
 function parseFrontmatter(raw: string): { meta: Record<string, string>; body: string } {
-  const match = raw.match(/^---\n([\s\S]*?)\n---\n([\s\S]*)$/);
+  const match = raw.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n([\s\S]*)$/);
   if (!match) return { meta: {}, body: raw };
   const meta: Record<string, string> = {};
-  for (const line of match[1].split("\n")) {
+  for (const line of match[1].split(/\r?\n/)) {
     const idx = line.indexOf(":");
     if (idx < 0) continue;
     const key = line.slice(0, idx).trim();
-    const val = line.slice(idx + 1).trim();
+    let val = line.slice(idx + 1).trim();
+    // Strip surrounding quotes (standard YAML practice)
+    if (val.startsWith('"') && val.endsWith('"')) val = val.slice(1, -1);
+    if (val.startsWith("'") && val.endsWith("'")) val = val.slice(1, -1);
     if (key && val) meta[key] = val;
   }
   return { meta, body: match[2] };
@@ -180,9 +183,10 @@ export function parseSchedule(
   const everyMatch = s.match(/^every\s+(\d+)\s*h$/);
   if (everyMatch) {
     const hours = parseInt(everyMatch[1], 10);
+    if (hours <= 0) return null;
     const intervalMs = hours * 60 * 60 * 1000;
     return {
-      shouldRun: (_now, lastRun) => Date.now() - lastRun >= intervalMs,
+      shouldRun: (now, lastRun) => now.getTime() - lastRun >= intervalMs,
     };
   }
 

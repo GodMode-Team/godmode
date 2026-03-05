@@ -4,6 +4,44 @@ This file tracks recent development changes so Atlas and other agents can quickl
 
 ---
 
+## v1.6.0 Stabilization — Bug Hunt + Content Expansion (2026-03-05)
+
+### Bug Fixes (12 bugs found and fixed via 6-agent adversarial review)
+- **MEDIUM**: Skills registry frontmatter parser fails on CRLF (Windows) line endings — fixed regex
+- **MEDIUM**: Quoted YAML values in skill frontmatter (e.g., `schedule: "daily 9:30am"`) silently break schedule parsing — now strips quotes
+- **MEDIUM**: `every Nh` schedule uses `Date.now()` instead of `now` parameter — fixed for consistency and testability
+- **MEDIUM**: Heartbeat `lastRuns` timestamp updated even when dedup prevents queue insertion — now checks return value
+- **MEDIUM**: Queue processor doesn't block `"disabled"` autonomy level — now blocks both `"disabled"` and `"approval"`
+- **MEDIUM**: Double decrement of `activeCount` on non-zero exit codes — added `alreadyDecremented` parameter
+- **MEDIUM**: Deep work window PM/PM typo — end time always showed "PM" regardless of actual time
+- **MEDIUM**: quickSetup skips phase 4 but doesn't mark it complete — phase 4 now marked complete
+- **MEDIUM**: Mission Control toggle broken (can never collapse) — fixed boolean logic
+- **MEDIUM**: Ally unread badge not cleared when clicking pinned ally tab — now clears on switch
+- **LOW**: `every 0h` schedule not rejected — now returns null for invalid intervals
+- **LOW**: `checkEvidence` used `lower` and `content` inconsistently — standardized on `content`
+- **LOW**: Curation agent gate checks non-existent `data/team-workspaces/` instead of `clients/` — fixed path
+- **LOW**: proactiveIntel defaults still ship in options.ts despite feature removal — cleaned up
+- **LOW**: Redundant dynamic `node:fs` imports in starter persona seeding — converted to static imports
+
+### Content Layer Expansion
+- 4 new personas: finance-admin, travel-planner, executive-briefer, life-admin
+- 4 new skills: monthly-bill-review, daily-standup-prep, weekly-life-admin, quarterly-review
+- Total: 11 personas, 7 skills available out of the box
+
+### Files Changed
+- `src/lib/skills-registry.ts` — CRLF support, quote stripping, `every 0h` rejection, `now` param fix
+- `src/services/consciousness-heartbeat.ts` — dedup-aware lastRuns update
+- `src/services/queue-processor.ts` — disabled autonomy blocking, double decrement fix, evidence check consistency
+- `src/methods/brief-generator.ts` — PM/AM typo fix
+- `src/methods/onboarding.ts` — phase 4 completion in quickSetup
+- `src/methods/options.ts` — removed dead proactiveIntel defaults
+- `ui/src/ui/app-render.ts` — Mission Control toggle fix, ally unread badge fix
+- `index.ts` — curation agent path fix, static imports cleanup, MEMORY_DIR import
+- `assets/agent-roster/` — 4 new persona files
+- `assets/skills/` — 4 new skill files
+
+---
+
 ## v1.6.0 — Product Foundation (2026-03-05)
 
 ### Philosophy Lock-In

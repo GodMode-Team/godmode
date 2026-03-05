@@ -252,14 +252,14 @@ class ConsciousnessHeartbeat {
       // Create a queue item for this skill
       try {
         const { updateQueueState, newQueueItemId } = await import("../lib/queue-state.js");
-        await updateQueueState((state) => {
+        const { result: wasQueued } = await updateQueueState((state) => {
           // Dedup: don't re-queue if a pending/processing item already exists for this skill
           const existing = state.items.find(
             (i) =>
               (i.status === "pending" || i.status === "processing") &&
               i.title === `[Cron] ${skill.name}`,
           );
-          if (existing) return;
+          if (existing) return false;
 
           state.items.push({
             id: newQueueItemId(skill.name),
@@ -272,11 +272,14 @@ class ConsciousnessHeartbeat {
             personaHint: skill.persona || undefined,
             createdAt: Date.now(),
           });
+          return true;
         });
 
-        runState.lastRuns[skill.slug] = Date.now();
-        queued++;
-        this.logger.info(`[Consciousness] Cron skill fired: ${skill.name}`);
+        if (wasQueued) {
+          runState.lastRuns[skill.slug] = Date.now();
+          queued++;
+          this.logger.info(`[Consciousness] Cron skill fired: ${skill.name}`);
+        }
       } catch (err) {
         this.logger.warn(`[Consciousness] Failed to queue cron skill "${skill.slug}": ${String(err)}`);
       }

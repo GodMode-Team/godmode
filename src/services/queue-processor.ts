@@ -173,11 +173,11 @@ class QueueProcessor {
     try {
       const { getAutonomyLevel } = await import("../methods/trust-tracker.js");
       const autonomy = await getAutonomyLevel(item.personaHint ?? item.type);
-      if (autonomy === "approval") {
+      if (autonomy === "approval" || autonomy === "disabled") {
         this.logger.info(
-          `[GodMode][Queue] Skipping "${item.title}" — persona "${item.personaHint ?? item.type}" requires supervision`,
+          `[GodMode][Queue] Skipping "${item.title}" — persona "${item.personaHint ?? item.type}" requires supervision (${autonomy})`,
         );
-        return { spawned: false, error: "Requires supervision — autonomy level too low" };
+        return { spawned: false, error: `Requires supervision — autonomy level: ${autonomy}` };
       }
     } catch {
       // Trust tracker not available — proceed (default: allow)
@@ -294,7 +294,6 @@ class QueueProcessor {
     taskType: QueueItemType,
     content: string,
   ): { passed: boolean; missing: string } {
-    const lower = content.toLowerCase();
     switch (taskType) {
       case "coding":
         if (/\b(PR|pull request|merge|diff|\.ts|\.js|\.py|\.go|\.rs)\b/i.test(content) ||
@@ -318,13 +317,13 @@ class QueueProcessor {
 
       case "review":
         if (/(file|path|\.ts|\.js|\.py)\b/i.test(content) &&
-            /\b(approve|reject|pass|fail|good|issue|recommend|verdict|lgtm)\b/i.test(lower)) {
+            /\b(approve|reject|pass|fail|good|issue|recommend|verdict|lgtm)\b/i.test(content)) {
           return { passed: true, missing: "" };
         }
         return { passed: false, missing: "file paths and a verdict" };
 
       case "analysis":
-        if (/\b(data|metric|source|finding|conclusion|result|insight)\b/i.test(lower) &&
+        if (/\b(data|metric|source|finding|conclusion|result|insight)\b/i.test(content) &&
             content.length > 200) {
           return { passed: true, missing: "" };
         }
@@ -351,6 +350,7 @@ class QueueProcessor {
       await this.handleItemFailed(
         itemId,
         "Agent exited with code " + exitCode,
+        true, // activeCount already decremented above
       );
       return;
     }
@@ -467,10 +467,10 @@ class QueueProcessor {
 
   // ── Failure + retry handler ────────────────────────────────────
 
-  async handleItemFailed(itemId: string, errorMsg: string): Promise<void> {
-    // Decrement only if we haven't already (e.g. from handleItemCompleted path)
-    // We guard via max(0) so double-decrement is safe.
-    this.activeCount = Math.max(0, this.activeCount - 1);
+  async handleItemFailed(itemId: string, errorMsg: string, alreadyDecremented = false): Promise<void> {
+    if (!alreadyDecremented) {
+      this.activeCount = Math.max(0, this.activeCount - 1);
+    }
 
     const { state } = await updateQueueState((state) => {
       const qi = state.items.find((i) => i.id === itemId);

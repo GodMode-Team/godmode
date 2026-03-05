@@ -458,9 +458,7 @@ export function renderApp(state: AppViewState) {
           `;
         })}
         ${(() => {
-          const mcExpanded = state.settings.navGroupsCollapsed["__missionControl__"] === false
-            ? true
-            : state.settings.navGroupsCollapsed["__missionControl__"] ?? false;
+          const mcExpanded = !!state.settings.navGroupsCollapsed["__missionControl__"];
           const mcHasActive = POWER_USER_GROUPS.some((g) => g.tabs.some((t) => t === state.tab));
           return html`
             <div class="nav-group nav-group--mission-control">
@@ -540,6 +538,7 @@ export function renderApp(state: AppViewState) {
                        if (state.sessionKey === ALLY_SESSION_KEY) return;
                        saveDraft(state);
                        state.sessionKey = ALLY_SESSION_KEY;
+                       state.allyUnread = 0;
                        restoreDraft(state, ALLY_SESSION_KEY);
                        state.chatLoading = true;
                        state.chatStream = null;

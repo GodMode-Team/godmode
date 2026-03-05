@@ -18,10 +18,7 @@ type GodModeOptions = Record<string, unknown>;
 
 const DEFAULTS: GodModeOptions = {
   "agentPersona.enabled": true,
-  "proactiveIntel.enabled": true,
-  "proactiveIntel.notifications.enabled": true,
-  "proactiveIntel.briefIntegration.enabled": true,
-  "proactiveIntel.cadenceMultiplier": 1.0,
+  // proactiveIntel removed in v1.6.0 dead weight audit
 };
 
 async function readOptions(): Promise<GodModeOptions> {

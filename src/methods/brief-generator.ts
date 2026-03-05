@@ -413,7 +413,7 @@ function formatCalendarSection(events: CalendarEvent[], error?: string): string 
       const fromH = Math.floor(lastEnd / 60);
       const toH = Math.floor(startMin / 60);
       windows.push(
-        `${fromH > 12 ? fromH - 12 : fromH}${fromH >= 12 ? "PM" : "AM"}-${toH > 12 ? toH - 12 : toH}${toH >= 12 ? "PM" : "PM"}`,
+        `${fromH > 12 ? fromH - 12 : fromH}${fromH >= 12 ? "PM" : "AM"}-${toH > 12 ? toH - 12 : toH}${toH >= 12 ? "PM" : "AM"}`,
       );
     }
     lastEnd = Math.max(lastEnd, startMin + (evt.duration || 30));

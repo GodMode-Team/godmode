@@ -8258,7 +8258,7 @@ ${i}
               </div>
             </div>
           `})}
-        ${(()=>{const d=e.settings.navGroupsCollapsed.__missionControl__===!1?!0:e.settings.navGroupsCollapsed.__missionControl__??!1,v=Qr.some(S=>S.tabs.some(_=>_===e.tab));return r`
+        ${(()=>{const d=!!e.settings.navGroupsCollapsed.__missionControl__,v=Qr.some(S=>S.tabs.some(_=>_===e.tab));return r`
             <div class="nav-group nav-group--mission-control">
               <button
                 class="nav-label"
@@ -8312,7 +8312,7 @@ ${i}
             `:e.tab==="chat"?r`
               <div class="session-tabs">
                 <div class="session-tab session-tab--pinned ${e.sessionKey===ee?"session-tab--active":""}"
-                     @click=${()=>{e.sessionKey!==ee&&($e(e),e.sessionKey=ee,Le(e,ee),e.chatLoading=!0,e.chatStream=null,e.chatStreamStartedAt=null,e.chatRunId=null,e.resetToolStream(),e.resetChatScroll(),e.applySettings({...e.settings,sessionKey:ee,lastActiveSessionKey:ee,tabLastViewed:{...e.settings.tabLastViewed,[ee]:Date.now()}}),e.loadAssistantIdentity(),ne(e),X(e))}}
+                     @click=${()=>{e.sessionKey!==ee&&($e(e),e.sessionKey=ee,e.allyUnread=0,Le(e,ee),e.chatLoading=!0,e.chatStream=null,e.chatStreamStartedAt=null,e.chatRunId=null,e.resetToolStream(),e.resetChatScroll(),e.applySettings({...e.settings,sessionKey:ee,lastActiveSessionKey:ee,tabLastViewed:{...e.settings.tabLastViewed,[ee]:Date.now()}}),e.loadAssistantIdentity(),ne(e),X(e))}}
                      title="${e.assistantName||"Ally"}">
                   ${e.assistantAvatar?r`<img src="${e.assistantAvatar}" class="session-tab-avatar" width="16" height="16" style="border-radius:50%;vertical-align:middle;margin-right:4px;" />`:r`<span class="session-tab-icon" style="margin-right:4px;">&#x2726;</span>`}
                   ${e.assistantName||"Ally"}
