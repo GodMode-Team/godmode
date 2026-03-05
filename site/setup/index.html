@@ -297,18 +297,34 @@ source ~/.bashrc</code></pre>
     <p>Since your GodMode is running on a server, you need a way to reach it from your browser.</p>
 
     <div class="card">
-        <h3>Option A: Tailscale <span class="tag rec">Recommended</span></h3>
-        <p>Tailscale creates a private network between your devices. Install it on your VPS and your laptop/phone.</p>
+        <h3>Option A: Tailscale HTTPS <span class="tag rec">Recommended</span></h3>
+        <p>Tailscale creates a private encrypted network between your devices. Install it on your VPS and your laptop/phone.</p>
         <pre><button class="copy-btn" onclick="copyCode(this)">Copy</button><code># On your VPS:
 curl -fsSL https://tailscale.com/install.sh | sh
 sudo tailscale up
 
-# It will print a login URL — open it to connect your VPS to your Tailscale network
-# Then get your VPS's Tailscale IP:
-tailscale ip -4</code></pre>
-        <p>Then open in your browser:</p>
-        <pre><code>http://YOUR-TAILSCALE-IP:18789/godmode</code></pre>
-        <p>Install <a href="https://tailscale.com/download" target="_blank" style="color: var(--accent);">Tailscale on your laptop/phone</a> too, using the same account.</p>
+# It will print a login URL — open it to connect your VPS to your Tailscale network</code></pre>
+
+        <p><strong>Enable HTTPS certificates</strong> in the <a href="https://login.tailscale.com/admin/dns" target="_blank" style="color: var(--accent);">Tailscale admin console</a> → DNS → HTTPS Certificates.</p>
+
+        <p>Then set up HTTPS serve on your VPS:</p>
+        <pre><button class="copy-btn" onclick="copyCode(this)">Copy</button><code># Provision TLS cert and set up HTTPS reverse proxy
+FQDN=$(tailscale status --json | jq -r '.Self.DNSName' | sed 's/\.$//')
+tailscale cert "$FQDN"
+tailscale serve --bg 18789
+
+# Add the HTTPS origin to the gateway allowlist
+openclaw config set gateway.controlUi.allowedOrigins "[\"https://$FQDN\"]"
+openclaw gateway restart
+
+echo "Open: https://$FQDN/godmode/onboarding"</code></pre>
+
+        <p>Install <a href="https://tailscale.com/download" target="_blank" style="color: var(--accent);">Tailscale on your laptop/phone</a> too, then open the HTTPS URL above.</p>
+
+        <p class="muted" style="font-size: 0.85em; margin-top: 8px;">
+            <strong>Chrome certificate error?</strong> The TLS cert needs a few minutes for CT log propagation. Wait 5 minutes and refresh.
+            If it persists, the installer's re-run (<code>curl -fsSL https://lifeongodmode.com/install.sh | sh</code>) auto-configures everything.
+        </p>
     </div>
 
     <div class="card">
@@ -332,17 +348,29 @@ tailscale ip -4</code></pre>
             <li>Gateway status: <code>openclaw gateway status</code></li>
             <li>Restart gateway: <code>openclaw gateway restart</code></li>
             <li>Update GodMode: <code>curl -fsSL https://lifeongodmode.com/install.sh | sh</code></li>
-            <li>Logs: <code>tail -f ~/.openclaw/logs/gateway.log</code></li>
+            <li>Logs: <code>tail -f /tmp/openclaw/openclaw-$(date +%Y-%m-%d).log</code></li>
         </ul>
     </div>
 
     <div class="card">
         <h3>Troubleshooting</h3>
-        <p><strong>"Gateway Offline" or "Connection lost"</strong> — If you see "origin not allowed" in the browser console, allow your Tailscale IP:</p>
-        <pre><button class="copy" onclick="copyCode(this)">Copy</button><code>openclaw config set gateway.controlUi.allowedOrigins '["http://YOUR_TAILSCALE_IP:18789"]'
-openclaw config set gateway.controlUi.allowInsecureAuth true
+
+        <p><strong>"origin not allowed"</strong> — Add your access URL's origin to the allowlist:</p>
+        <pre><button class="copy-btn" onclick="copyCode(this)">Copy</button><code>FQDN=$(tailscale status --json | jq -r '.Self.DNSName' | sed 's/\.$//')
+openclaw config set gateway.controlUi.allowedOrigins "[\"https://$FQDN\"]"
 openclaw gateway restart</code></pre>
-        <p>Replace <code>YOUR_TAILSCALE_IP</code> with the output of <code>tailscale ip -4</code> on your VPS.</p>
+
+        <p><strong>"device identity required"</strong> — You're on plain HTTP. Use the HTTPS Tailscale URL instead (see Step 4). If you can't use HTTPS, use an SSH tunnel:</p>
+        <pre><button class="copy-btn" onclick="copyCode(this)">Copy</button><code># From your laptop:
+ssh -L 18789:localhost:18789 user@your-server
+# Then open: http://localhost:18789/godmode/onboarding</code></pre>
+
+        <p><strong>Chrome certificate error</strong> — Tailscale TLS certs need a few minutes for CT log propagation. Wait 5 minutes and refresh. If it persists, regenerate:</p>
+        <pre><button class="copy-btn" onclick="copyCode(this)">Copy</button><code>FQDN=$(tailscale status --json | jq -r '.Self.DNSName' | sed 's/\.$//')
+tailscale cert "$FQDN"
+# Wait 5 minutes, then refresh your browser</code></pre>
+
+        <p><strong>"pairing required"</strong> — First-time device connection needs approval. Open a terminal session on the VPS and approve it, or use the SSH tunnel (localhost connections skip pairing).</p>
     </div>
 
     <div class="help">
