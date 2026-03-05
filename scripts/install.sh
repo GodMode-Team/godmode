@@ -710,6 +710,8 @@ if [ "$IS_HEADLESS" = true ]; then
       openclaw config set gateway.auth.allowTailscale true 2>/dev/null || true
       # Bind to LAN so Tailscale serve can reach the gateway
       openclaw config set gateway.bind lan 2>/dev/null && ok "gateway.bind = lan (Tailscale + SSH)" || true
+      # Allow the Tailscale IP origin for WebSocket connections
+      openclaw config set gateway.controlUi.allowedOrigins "[\"http://${TAILSCALE_IP}:${GODMODE_PORT}\"]" 2>/dev/null && ok "gateway.controlUi.allowedOrigins includes Tailscale IP" || true
       TAILSCALE_CONFIGURED=true
     fi
   else

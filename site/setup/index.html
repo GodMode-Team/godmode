@@ -336,6 +336,15 @@ tailscale ip -4</code></pre>
         </ul>
     </div>
 
+    <div class="card">
+        <h3>Troubleshooting</h3>
+        <p><strong>"Gateway Offline" or "Connection lost"</strong> — If you see "origin not allowed" in the browser console, allow your Tailscale IP:</p>
+        <pre><button class="copy" onclick="copyCode(this)">Copy</button><code>openclaw config set gateway.controlUi.allowedOrigins '["http://YOUR_TAILSCALE_IP:18789"]'
+openclaw config set gateway.controlUi.allowInsecureAuth true
+openclaw gateway restart</code></pre>
+        <p>Replace <code>YOUR_TAILSCALE_IP</code> with the output of <code>tailscale ip -4</code> on your VPS.</p>
+    </div>
+
     <div class="help">
         <p>Stuck? Text Caleb or email <a href="mailto:support@lifeongodmode.com">support@lifeongodmode.com</a></p>
     </div>
