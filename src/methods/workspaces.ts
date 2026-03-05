@@ -1031,10 +1031,13 @@ const get: GatewayRequestHandler = async ({ params, respond }) => {
     });
   }
 
-  // Load tasks scoped to this workspace (match on workspace name)
+  // Load tasks scoped to this workspace (match on name or resolved ID)
   const tasksData = await readTasks();
   const workspaceTasks: NativeTask[] = tasksData.tasks.filter(
-    (t) => t.project === workspace.name,
+    (t) =>
+      t.project === workspace.name ||
+      t.project === workspace.id ||
+      (t as Record<string, unknown>).projectId === workspace.id,
   );
 
   // Load shared memory files (team workspaces store knowledge in memory/)

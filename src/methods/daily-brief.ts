@@ -619,8 +619,17 @@ export async function syncTasksFromBrief(date: string, opts?: { force?: boolean 
 
   // Use shared locked task updater from tasks.ts
   const { updateTasks } = await import("./tasks.js");
+  const { readWorkspaceConfig, detectWorkspaceFromText } = await import("../lib/workspaces-config.js");
 
   const { randomUUID } = await import("node:crypto");
+
+  // Pre-load workspace config for task→workspace detection
+  let wsConfig: Awaited<ReturnType<typeof readWorkspaceConfig>> | null = null;
+  try {
+    wsConfig = await readWorkspaceConfig({ initializeIfMissing: false });
+  } catch {
+    // No workspace config — tasks won't be linked to workspaces
+  }
 
   const { result: counts } = await updateTasks((tasksData) => {
     let added = 0;
@@ -653,11 +662,25 @@ export async function syncTasksFromBrief(date: string, opts?: { force?: boolean 
       } else {
         // Add new task from daily brief
         const priority = HIGH_PRIORITY_SECTIONS.test(item.section) ? "high" : "medium";
+
+        // Detect workspace from task title (e.g. "TRP: Build quiz funnel" → TRP workspace)
+        let project: string | null = null;
+        let projectId: string | null = null;
+        if (wsConfig) {
+          const detection = detectWorkspaceFromText(wsConfig, item.title);
+          if (detection.workspaceId && detection.score >= 2) {
+            const ws = wsConfig.workspaces.find((w) => w.id === detection.workspaceId);
+            project = ws?.name ?? null;
+            projectId = detection.workspaceId;
+          }
+        }
+
         tasksData.tasks.push({
           id: randomUUID(),
           title: item.title,
           status: item.completed ? "complete" : "pending",
-          project: null,
+          project,
+          projectId,
           dueDate: date,
           priority,
           createdAt: new Date().toISOString(),

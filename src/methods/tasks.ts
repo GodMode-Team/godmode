@@ -101,6 +101,40 @@ function todayDateStr(): string {
   return localDateString();
 }
 
+// ── One-time workspace backfill ──────────────────────────────────────
+// Fills in missing project/projectId on tasks that have workspace keywords
+// in their title (e.g. "TRP: Build quiz funnel" → project: "TRP", projectId: "trp").
+let workspaceBackfillDone = false;
+
+async function backfillWorkspaceLinks(): Promise<void> {
+  if (workspaceBackfillDone) return;
+  workspaceBackfillDone = true;
+
+  try {
+    const { readWorkspaceConfig, detectWorkspaceFromText } = await import("../lib/workspaces-config.js");
+    const wsConfig = await readWorkspaceConfig({ initializeIfMissing: false });
+    if (!wsConfig.workspaces.length) return;
+
+    await updateTasks((data) => {
+      let patched = 0;
+      for (const task of data.tasks) {
+        if (task.project || task.projectId) continue;
+        const detection = detectWorkspaceFromText(wsConfig, task.title);
+        if (detection.workspaceId && detection.score >= 2) {
+          const ws = wsConfig.workspaces.find((w) => w.id === detection.workspaceId);
+          task.project = ws?.name ?? null;
+          task.projectId = detection.workspaceId;
+          patched++;
+        }
+      }
+      return patched;
+    });
+  } catch {
+    // Non-fatal — backfill will retry next time
+    workspaceBackfillDone = false;
+  }
+}
+
 /**
  * Reconcile orphaned queue items — if a queue item has a sourceTaskId that
  * doesn't match any task, re-create the task so it shows up in task views.
@@ -108,6 +142,11 @@ function todayDateStr(): string {
  * that still have active (processing/review) queue work.
  */
 const listTasks: GatewayRequestHandler = async ({ params, respond }) => {
+  // Lazy one-time backfill: link unlinked tasks to workspaces
+  if (!workspaceBackfillDone) {
+    await backfillWorkspaceLinks();
+  }
+
   const { status, project, dueDate, dueBefore, dueAfter } = params as {
     status?: string;
     project?: string;
