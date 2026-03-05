@@ -326,7 +326,7 @@
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 16px;
-  align-items: start;
+  align-items: stretch;
 }
 
 @media (max-width: 720px) {
@@ -339,7 +339,7 @@
   display: flex;
   flex-direction: column;
   min-height: 0;
-  overflow: auto;
+  overflow-y: auto;
 }
 
 .command-center-tasks {
@@ -2087,7 +2087,10 @@
 /* ===== Decision Cards (Overnight Agent Results) ===== */
 
 .decision-cards {
-  margin-bottom: 24px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
 
 .decision-cards-header {
@@ -2117,12 +2120,13 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
+  flex: 1;
+  overflow-y: auto;
+  padding-right: 4px;
 }
 
 .decision-cards-list--scroll {
-  max-height: 320px;
-  overflow-y: auto;
-  padding-right: 4px;
+  /* scroll class kept for compat — list always scrolls now */
 }
 
 .decision-cards-list--scroll::-webkit-scrollbar {
