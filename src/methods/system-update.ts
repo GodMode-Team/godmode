@@ -8,10 +8,21 @@
 
 import { exec as nodeExec } from "node:child_process";
 import { existsSync, readFileSync, unlinkSync } from "node:fs";
-import { join } from "node:path";
+import { join, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 import type { GatewayRequestHandler } from "openclaw/plugin-sdk";
 import { DATA_DIR } from "../data-paths.js";
 import { secureWriteFileSync, secureMkdirSync } from "../lib/secure-fs.js";
+
+/** Detect if the plugin was installed via `openclaw plugins install` (extensions dir). */
+function isPluginInstall(): boolean {
+  try {
+    const thisDir = dirname(fileURLToPath(import.meta.url));
+    return thisDir.includes("/extensions/godmode/") || thisDir.includes("\\extensions\\godmode\\");
+  } catch {
+    return false;
+  }
+}
 
 type GatewayRequestHandlers = Record<string, GatewayRequestHandler>;
 
@@ -260,11 +271,12 @@ const pluginRun: GatewayRequestHandler = async ({ respond }) => {
   try {
     const previousVersion = _pluginVersion;
 
-    // Run npm update for the GodMode plugin
-    const { code, stdout, stderr } = await runCommand(
-      "npm update -g @godmode-team/godmode 2>&1",
-      120_000,
-    );
+    // Use the correct update command based on install method
+    const updateCmd = isPluginInstall()
+      ? "rm -rf ~/.openclaw/extensions/godmode && openclaw plugins install @godmode-team/godmode 2>&1"
+      : "npm update -g @godmode-team/godmode 2>&1";
+
+    const { code, stdout, stderr } = await runCommand(updateCmd, 120_000);
 
     if (code !== 0) {
       respond(false, undefined, {

@@ -243,15 +243,16 @@ export function findSessionByKey(
   const keyParts = key.split(":");
   const keySuffix = keyParts[keyParts.length - 1];
   if (keySuffix && keySuffix.length >= 4) {
-    const byContains = sessions.find((s) => s.key.includes(keySuffix));
-    if (byContains) {
-      return byContains;
+    // Use endsWith with delimiter to avoid false matches from substring collisions
+    const byEndsWith = sessions.find((s) => s.key === keySuffix || s.key.endsWith(`:${keySuffix}`));
+    if (byEndsWith) {
+      return byEndsWith;
     }
   }
   const withoutPrefix = key.replace(/^webchat:/, "");
   if (withoutPrefix !== key) {
     const bySuffix = sessions.find(
-      (s) => s.key.endsWith(withoutPrefix) || s.key.includes(withoutPrefix),
+      (s) => s.key.endsWith(withoutPrefix) || s.key.endsWith(`:${withoutPrefix}`),
     );
     if (bySuffix) {
       return bySuffix;

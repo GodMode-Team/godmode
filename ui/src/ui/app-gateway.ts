@@ -390,6 +390,12 @@ async function checkOnboardingStatus(host: GatewayHost) {
       // If identity already exists, quick setup is already done
       if (res.identity?.name) {
         setupApp.setupQuickDone = true;
+        // Restore display name from server if not already set in UI
+        const nameHost = host as unknown as { userName: string; settings: UiSettings; applySettings: (s: UiSettings) => void };
+        if (!nameHost.userName || !nameHost.settings.userName) {
+          nameHost.userName = res.identity.name;
+          nameHost.applySettings({ ...nameHost.settings, userName: res.identity.name });
+        }
       }
     } else {
       app.onboardingActive = false;
@@ -1286,6 +1292,14 @@ function handleGatewayEventUnsafe(host: GatewayHost, evt: GatewayEventFrame) {
       // If completed, deactivate onboarding overlay
       if (payload.completedAt) {
         app.onboardingActive = false;
+      }
+      // Sync display name from onboarding identity if not yet set
+      if (payload.identity?.name) {
+        const nameHost = host as unknown as { userName: string; settings: UiSettings; applySettings: (s: UiSettings) => void };
+        if (!nameHost.userName || !nameHost.settings.userName) {
+          nameHost.userName = payload.identity.name;
+          nameHost.applySettings({ ...nameHost.settings, userName: payload.identity.name });
+        }
       }
       app.requestUpdate?.();
     }

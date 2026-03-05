@@ -14,6 +14,7 @@ import {
   applyConfig,
   loadConfig,
   runUpdate,
+  runPluginUpdate,
   saveConfig,
   switchModel,
   updateConfigFormValue,
@@ -599,7 +600,8 @@ export function renderApp(state: AppViewState) {
                       return parts[parts.length - 1] || key;
                     };
                     const displayName = getDisplayName();
-                    const canClose = renderSessionTabKeys.length > 1;
+                    // Always allow closing — the Ally session is a valid fallback
+                    const canClose = true;
                     // Check session status for indicators
                     const isWorking = state.workingSessions.has(key);
                     const lastViewed = state.settings.tabLastViewed[key] ?? 0;
@@ -1214,6 +1216,10 @@ export function renderApp(state: AppViewState) {
                 onCheckUpdates: () => checkForUpdates(state),
                 onUpdateNow: () => {
                   void runUpdate(state);
+                },
+                pluginUpdateRunning: state.pluginUpdateRunning,
+                onUpdatePlugin: () => {
+                  void runPluginUpdate(state);
                 },
               })
             : nothing

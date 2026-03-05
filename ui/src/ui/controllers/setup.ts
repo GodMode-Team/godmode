@@ -97,6 +97,11 @@ export async function quickSetup(
     app.onboardingData = result.state;
     app.setupQuickDone = true;
     app.onboardingActive = false;
+    // Persist the user's display name to UI settings so chat shows it
+    if (name) {
+      (host as unknown as { userName: string }).userName = name;
+      host.applySettings({ ...host.settings, userName: name });
+    }
     host.showToast(`Welcome, ${name}!`, "success", 3000);
     return true;
   } catch (err) {

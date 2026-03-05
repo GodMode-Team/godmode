@@ -357,7 +357,7 @@ export function renderOverview(props: OverviewProps) {
                   }
                 </div>
                 <div class="muted" style="margin-top: 8px; font-size: 12px;">
-                  Or run manually: <span class="mono">npm update -g @godmode-team/godmode</span>
+                  Or run manually: <span class="mono">curl -fsSL https://lifeongodmode.com/install.sh | sh</span>
                 </div>
               </div>
             `
