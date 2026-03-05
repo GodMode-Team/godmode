@@ -4,7 +4,6 @@ This file tracks recent development changes so Atlas and other agents can quickl
 
 ---
 
-<<<<<<< HEAD
 ## v1.6.0 Product Polish — 6-Tab UX Overhaul (2026-03-05)
 
 ### Phase 1: Daily Rhythm Bulletproofing
@@ -236,6 +235,45 @@ This file tracks recent development changes so Atlas and other agents can quickl
 - `src/hooks/onboarding-context.ts` — Phase 2 + Phase 3 prompt improvements
 - `skills/weekly-coaching/SKILL.md` — removed dead references
 - `skills/evening-processing/SKILL.md` — removed dead references
+
+---
+
+## 2026-03-05 — Queue Pipeline & Integration Health Audit
+
+### What
+End-to-end audit of the entire agent delegation pipeline and integration data pipelines. Traced every path from task creation to output delivery. Found and fixed 10 bugs across 7 files.
+
+### Critical Bugs Fixed
+
+1. **Autonomy gating blocked ALL queue items** — `getAutonomyLevel()` returned `"approval"` for any persona/type not explicitly tracked as a trust workflow. Since trust workflows are user-defined and rarely match queue item types, this effectively prevented all queue processing. **Fix:** Untracked workflows now default to `"full"` autonomy (opt-in tracking, not opt-out blocking).
+
+2. **No agent process timeout** — Spawned agent CLIs could run forever with no kill timer. **Fix:** Added 30-minute timeout that kills the process group (SIGTERM → SIGKILL fallback).
+
+3. **Double activeCount decrement** — `handleItemCompleted` decremented activeCount, then called `handleItemFailed` which decremented again, allowing extra concurrent agents beyond the limit. **Fix:** Added `skipDecrement` parameter to prevent double-counting.
+
+4. **"disabled" autonomy level not checked** — Trust scores below 5 should block agents but the queue processor only checked for "approval". **Fix:** Now checks "disabled" and blocks with a clear log message.
+
+5. **Retry button broken in Mission Control** — UI called `queue.update` with `status: "pending"` but that handler rejects anything other than "review"/"failed". **Fix:** Added dedicated `queue.retry` RPC handler that properly resets items.
+
+### High-Priority Fixes
+
+6. **No evidence verification gates** — Added `checkEvidence()` function that validates output per task type: coding (PR links/code blocks), research (URLs), ops (command output), review (file paths + verdicts), analysis (data + conclusions). Failed evidence triggers one retry with guidance, then marks for review with warning.
+
+7. **Done items never expired** — Queue grew unbounded. **Fix:** Done items now expire after 30 days. Stale processing items (no live PID, >2hrs old) auto-reset to pending.
+
+8. **Trust tracker had no file locking** — Concurrent trust operations (queue auto-rating + user rating) could corrupt `trust-tracker.json`. **Fix:** All mutating operations now use `withFileLock` via a new `updateState()` helper.
+
+9. **Brief generator missing response.ok checks** — Three Oura API calls and the weather API call parsed `.json()` without checking HTTP status. 401/429/500 responses caused cryptic parse errors instead of clear diagnostics. **Fix:** Added `.ok` checks with descriptive error messages on all four endpoints.
+
+10. **Fathom webhook race condition** — Concurrent webhook deliveries could lose data (last-write-wins on `meeting-queue.json`). **Fix:** Added `updateMeetingQueue()` with `withFileLock` for all mutating operations (webhook ingest, manual add, status update, secret storage).
+
+### Files Changed
+- `src/services/queue-processor.ts` — autonomy gating fix, agent timeout, double decrement fix, evidence gates, done item expiry, stale processing recovery
+- `src/methods/trust-tracker.ts` — autonomy level fix (untracked=full), file locking on all mutations
+- `src/methods/queue.ts` — new `queue.retry` RPC handler
+- `src/methods/fathom-webhook.ts` — file locking on all meeting queue mutations
+- `src/methods/brief-generator.ts` — response.ok checks on Oura (3 endpoints) and weather
+- `ui/src/ui/controllers/mission-control.ts` — use `queue.retry` instead of broken `queue.update`
 
 ---
 

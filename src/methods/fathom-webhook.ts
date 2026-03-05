@@ -10,6 +10,7 @@ import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { readFileSync } from "node:fs";
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { join, dirname } from "node:path";
+import { withFileLock } from "openclaw/plugin-sdk";
 import type { GatewayRequestHandler } from "openclaw/plugin-sdk";
 import { DATA_DIR, GODMODE_ROOT } from "../data-paths.js";
 import { processMeetingById } from "../services/fathom-processor.js";
@@ -91,6 +92,11 @@ function getEnv(key: string): string {
 
 // ── Data helpers ─────────────────────────────────────────────────────
 
+const MEETING_LOCK_OPTIONS = {
+  retries: { retries: 20, factor: 1.35, minTimeout: 20, maxTimeout: 250, randomize: true },
+  stale: 15_000,
+};
+
 async function readMeetingQueue(): Promise<MeetingQueue> {
   try {
     const raw = await readFile(QUEUE_FILE, "utf-8");
@@ -109,6 +115,18 @@ async function writeMeetingQueue(queue: MeetingQueue): Promise<void> {
   await mkdir(dirname(QUEUE_FILE), { recursive: true, mode: 0o700 });
   // SECURITY: Restrictive permissions — file contains webhook signing secret
   await writeFile(QUEUE_FILE, JSON.stringify(queue, null, 2), { encoding: "utf-8", mode: 0o600 });
+}
+
+/** Atomic read-modify-write with file lock (prevents concurrent webhook data loss). */
+async function updateMeetingQueue<T>(
+  updater: (queue: MeetingQueue) => T | Promise<T>,
+): Promise<{ queue: MeetingQueue; result: T }> {
+  return withFileLock(QUEUE_FILE, MEETING_LOCK_OPTIONS, async () => {
+    const queue = await readMeetingQueue();
+    const result = await updater(queue);
+    await writeMeetingQueue(queue);
+    return { queue, result };
+  });
 }
 
 // ── Fathom API helpers ───────────────────────────────────────────────
@@ -269,14 +287,15 @@ export async function handleFathomWebhookHttp(
     return;
   }
 
-  const queue = await readMeetingQueue();
+  // Read webhook secret for signature verification (read-only, no lock needed)
+  const queueForSig = await readMeetingQueue();
 
   // SECURITY: Require webhook secret — reject unauthenticated payloads
-  if (!queue.webhookSecret) {
+  if (!queueForSig.webhookSecret) {
     console.error("[GodMode] Fathom: webhook rejected — no signing secret configured. Set up via fathom.setupWebhook.");
     return;
   }
-  const valid = verifyWebhookSignatureFromHeaders(queue.webhookSecret, headers, body);
+  const valid = verifyWebhookSignatureFromHeaders(queueForSig.webhookSecret, headers, body);
   if (!valid) {
     console.error("[GodMode] Fathom: webhook signature verification FAILED — rejecting payload");
     return;
@@ -293,14 +312,19 @@ export async function handleFathomWebhookHttp(
     return;
   }
 
-  // Deduplicate
-  if (item.id && queue.meetings.some((m) => m.id === item.id)) {
+  // Add meeting with file lock (dedup + write is atomic)
+  const { result: added } = await updateMeetingQueue((queue) => {
+    if (item.id && queue.meetings.some((m) => m.id === item.id)) {
+      return false; // duplicate
+    }
+    queue.meetings.push(item);
+    return true;
+  });
+
+  if (!added) {
     console.log(`[GodMode] Fathom: skipped duplicate recording ${item.id}`);
     return;
   }
-
-  queue.meetings.push(item);
-  await writeMeetingQueue(queue);
 
   console.log(
     `[GodMode] Fathom: queued "${item.title}" (${item.durationMin}min, ${item.attendees.length} attendees)`,
@@ -374,19 +398,20 @@ const markProcessed: GatewayRequestHandler = async ({ params, respond }) => {
       return;
     }
 
-    const queue = await readMeetingQueue();
-    const meeting = queue.meetings.find((m) => m.id === id);
+    const { result: meeting } = await updateMeetingQueue((queue) => {
+      const m = queue.meetings.find((m) => m.id === id);
+      if (!m) return null;
+      m.status = "processed";
+      m.processedAt = new Date().toISOString();
+      m.processedNotes = notes ?? null;
+      return m;
+    });
 
     if (!meeting) {
       respond(false, null, { code: "NOT_FOUND", message: `Meeting ${id} not found in queue` });
       return;
     }
 
-    meeting.status = "processed";
-    meeting.processedAt = new Date().toISOString();
-    meeting.processedNotes = notes ?? null;
-
-    await writeMeetingQueue(queue);
     respond(true, { meeting });
   } catch (err) {
     respond(false, null, {
@@ -414,10 +439,9 @@ const ingest: GatewayRequestHandler = async ({ params, respond }) => {
       return;
     }
 
-    const queue = await readMeetingQueue();
-
-    // Deduplicate
-    const existing = queue.meetings.find((m) => m.id === recordingId);
+    // Quick dedup check (read-only, no lock needed for check)
+    const queueCheck = await readMeetingQueue();
+    const existing = queueCheck.meetings.find((m) => m.id === recordingId);
     if (existing) {
       respond(false, null, {
         code: "ALREADY_EXISTS",
@@ -440,8 +464,20 @@ const ingest: GatewayRequestHandler = async ({ params, respond }) => {
     const recordingData = await recordingRes.json();
     const item = parseFathomMeeting(recordingData);
 
-    queue.meetings.push(item);
-    await writeMeetingQueue(queue);
+    // Atomic add with dedup (locks the file)
+    const { result: added } = await updateMeetingQueue((queue) => {
+      if (queue.meetings.some((m) => m.id === recordingId)) return false;
+      queue.meetings.push(item);
+      return true;
+    });
+
+    if (!added) {
+      respond(false, null, {
+        code: "ALREADY_EXISTS",
+        message: `Recording ${recordingId} was already queued by another request`,
+      });
+      return;
+    }
 
     console.log(`[GodMode] Fathom: manually ingested recording ${recordingId} — "${item.title}"`);
     respond(true, { meeting: item });
@@ -470,12 +506,13 @@ const webhookReceive: GatewayRequestHandler = async ({ params, respond }) => {
       return;
     }
 
-    const queue = await readMeetingQueue();
+    // Read-only access for signature check
+    const queueForSig = await readMeetingQueue();
 
     // Signature verification — reject on failure when secret is configured
-    if (queue.webhookSecret && headers) {
+    if (queueForSig.webhookSecret && headers) {
       const bodyStr = typeof payload === "string" ? payload : JSON.stringify(payload);
-      const valid = verifyWebhookSignatureFromHeaders(queue.webhookSecret, headers, bodyStr);
+      const valid = verifyWebhookSignatureFromHeaders(queueForSig.webhookSecret, headers, bodyStr);
       if (!valid) {
         console.error("[GodMode] Fathom: webhook signature verification FAILED — rejecting payload");
         respond(false, null, { code: "SIGNATURE_INVALID", message: "Webhook signature verification failed" });
@@ -494,15 +531,18 @@ const webhookReceive: GatewayRequestHandler = async ({ params, respond }) => {
       return;
     }
 
-    // Deduplicate
-    if (item.id && queue.meetings.some((m) => m.id === item.id)) {
+    // Atomic add with dedup (locks the file)
+    const { result: added } = await updateMeetingQueue((queue) => {
+      if (item.id && queue.meetings.some((m) => m.id === item.id)) return false;
+      queue.meetings.push(item);
+      return true;
+    });
+
+    if (!added) {
       console.log(`[GodMode] Fathom: skipped duplicate recording ${item.id}`);
       respond(true, { queued: false, recordingId: item.id });
       return;
     }
-
-    queue.meetings.push(item);
-    await writeMeetingQueue(queue);
 
     console.log(
       `[GodMode] Fathom: queued "${item.title}" (${item.durationMin}min, ${item.attendees.length} attendees)`,
@@ -563,11 +603,11 @@ const setupWebhook: GatewayRequestHandler = async ({ params, respond }) => {
     const webhookId = typeof data.id === "string" ? data.id : String(data.id ?? "");
     const secret = typeof data.secret === "string" ? data.secret : "";
 
-    // Store secret in queue file
-    const queue = await readMeetingQueue();
-    queue.webhookConfigured = true;
-    queue.webhookSecret = secret || null;
-    await writeMeetingQueue(queue);
+    // Store secret in queue file (locked)
+    await updateMeetingQueue((queue) => {
+      queue.webhookConfigured = true;
+      queue.webhookSecret = secret || null;
+    });
 
     console.log(`[GodMode] Fathom: webhook registered → ${destinationUrl}`);
     // SECURITY: Do not return the webhook secret in the RPC response

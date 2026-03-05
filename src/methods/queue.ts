@@ -448,6 +448,38 @@ const removeLessonRpc: GatewayRequestHandler = async ({ params, respond }) => {
   respond(true, { removed });
 };
 
+const retryItem: GatewayRequestHandler = async ({ params, respond }) => {
+  const { id } = params as { id?: string };
+  if (!id) {
+    respond(false, null, { code: "INVALID_REQUEST", message: "Missing id" });
+    return;
+  }
+
+  const { result } = await updateQueueState((state) => {
+    const idx = state.items.findIndex((i) => i.id === id);
+    if (idx === -1) return { item: null, error: "Queue item not found" };
+    const existing = state.items[idx];
+    if (existing.status !== "failed" && existing.status !== "review") {
+      return { item: null, error: `Cannot retry item with status "${existing.status}". Only "failed" or "review" items can be retried.` };
+    }
+    existing.status = "pending";
+    existing.error = undefined;
+    existing.lastError = undefined;
+    existing.completedAt = undefined;
+    existing.startedAt = undefined;
+    existing.pid = undefined;
+    // Don't reset retryCount — the queue processor uses it to decide retry strategy
+    state.items[idx] = existing;
+    return { item: existing, error: null };
+  });
+
+  if (result.error || !result.item) {
+    respond(false, null, { code: "INVALID_REQUEST", message: result.error ?? "Queue item not found" });
+    return;
+  }
+  respond(true, { item: result.item });
+};
+
 const bulkDismiss: GatewayRequestHandler = async ({ params, respond }) => {
   const { status } = params as { status?: string };
   if (!status) {
@@ -471,6 +503,7 @@ export const queueHandlers: Record<string, GatewayRequestHandler> = {
   "queue.update": updateItem,
   "queue.approve": approveItem,
   "queue.reject": rejectItem,
+  "queue.retry": retryItem,
   "queue.remove": removeItem,
   "queue.process": processItem,
   "queue.processAll": processAllItems,

@@ -103,9 +103,112 @@ function isPidAlive(pid: number): boolean {
   }
 }
 
+// ── Evidence Verification Gates ─────────────────────────────────────
+
+type EvidenceResult = {
+  passed: boolean;
+  reason: string;
+  hint: string;
+};
+
+/**
+ * Check that agent output contains expected evidence for the task type.
+ * This prevents agents from producing vague or empty responses.
+ */
+function checkEvidence(taskType: QueueItemType, output: string): EvidenceResult {
+  if (!output || output.trim().length < 50) {
+    return {
+      passed: false,
+      reason: "Output too short (< 50 characters)",
+      hint: "a substantive response with details, findings, or deliverables",
+    };
+  }
+
+  switch (taskType) {
+    case "coding":
+      // Expect: PR link, diff, file path, or code block
+      if (
+        /https?:\/\/github\.com\S+\/pull\/\d+/.test(output) ||
+        /```[\s\S]+```/.test(output) ||
+        /\.(ts|js|py|go|rs|java|tsx|jsx|css|html|md)\b/.test(output) ||
+        /diff --git/.test(output)
+      ) {
+        return { passed: true, reason: "", hint: "" };
+      }
+      return {
+        passed: false,
+        reason: "No code artifacts found (PR link, code block, or file paths)",
+        hint: "a PR link, code diff, or code blocks with file paths",
+      };
+
+    case "research":
+      // Expect: at least 1 URL/source
+      if (/https?:\/\/\S+/.test(output)) {
+        return { passed: true, reason: "", hint: "" };
+      }
+      return {
+        passed: false,
+        reason: "No source URLs found in research output",
+        hint: "at least one source URL (https://...) to back up findings",
+      };
+
+    case "ops":
+      // Expect: command output, status, or confirmation
+      if (
+        /\$\s+\S+/.test(output) ||
+        /```(sh|bash|shell|zsh)?[\s\S]+```/.test(output) ||
+        /\b(completed|done|success|configured|installed|deployed|running)\b/i.test(output)
+      ) {
+        return { passed: true, reason: "", hint: "" };
+      }
+      return {
+        passed: false,
+        reason: "No command output or status confirmation found",
+        hint: "command output, terminal logs, or a status confirmation",
+      };
+
+    case "review":
+      // Expect: file paths and verdict keywords
+      if (
+        /\.(ts|js|py|go|rs|md|json|yaml|yml)\b/.test(output) &&
+        /\b(issue|finding|recommend|approve|reject|concern|bug|improvement)\b/i.test(output)
+      ) {
+        return { passed: true, reason: "", hint: "" };
+      }
+      return {
+        passed: false,
+        reason: "Missing file references or review verdict",
+        hint: "specific file paths and review findings/recommendations",
+      };
+
+    case "analysis":
+      // Expect: data mention and conclusion
+      if (
+        /\b(data|metric|statistic|number|percent|trend|comparison|chart)\b/i.test(output) &&
+        /\b(conclusion|finding|insight|recommend|result|summary)\b/i.test(output)
+      ) {
+        return { passed: true, reason: "", hint: "" };
+      }
+      return {
+        passed: false,
+        reason: "Missing data references or analytical conclusions",
+        hint: "data references and analytical conclusions/recommendations",
+      };
+
+    case "creative":
+    case "task":
+    case "url":
+    case "idea":
+    default:
+      // Generic: just require substantive content (> 50 chars already checked)
+      return { passed: true, reason: "", hint: "" };
+  }
+}
+
 // ── Queue Processor Class ──────────────────────────────────────────
 
 const QUEUE_POLL_MS = 10 * 60 * 1000; // 10 minutes — faster than hourly heartbeat
+const AGENT_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes max runtime per agent
 
 class QueueProcessor {
   private logger: Logger;
@@ -173,12 +276,14 @@ class QueueProcessor {
     try {
       const { getAutonomyLevel } = await import("../methods/trust-tracker.js");
       const autonomy = await getAutonomyLevel(item.personaHint ?? item.type);
-      if (autonomy === "approval" || autonomy === "disabled") {
+      if (autonomy === "disabled") {
         this.logger.info(
-          `[GodMode][Queue] Skipping "${item.title}" — persona "${item.personaHint ?? item.type}" requires supervision (${autonomy})`,
+          `[GodMode][Queue] Blocking "${item.title}" — persona "${item.personaHint ?? item.type}" trust score too low (disabled)`,
         );
-        return { spawned: false, error: `Requires supervision — autonomy level: ${autonomy}` };
+        return { spawned: false, error: "Blocked — trust score too low (disabled)" };
       }
+      // "approval" and "full" both allow spawning; the difference is in
+      // post-completion handling (auto-approve vs manual review)
     } catch {
       // Trust tracker not available — proceed (default: allow)
     }
@@ -248,7 +353,28 @@ class QueueProcessor {
         }).catch(() => {});
       }
 
+      // Set a timeout to kill long-running agents
+      let exited = false;
+      const killTimer = setTimeout(() => {
+        if (!exited && pid) {
+          this.logger.warn(
+            `[GodMode][Queue] Agent for item ${item.id} timed out after ${AGENT_TIMEOUT_MS / 60000}min — killing pid ${pid}`,
+          );
+          try {
+            process.kill(-pid, "SIGTERM"); // Kill process group (detached)
+          } catch {
+            try {
+              process.kill(pid, "SIGKILL"); // Fallback: kill individual process
+            } catch {
+              // Process already dead
+            }
+          }
+        }
+      }, AGENT_TIMEOUT_MS);
+
       child.on("exit", (code) => {
+        exited = true;
+        clearTimeout(killTimer);
         this.logger.info(
           `[GodMode][Queue] Agent for item ${item.id} exited (code=${code})`,
         );
@@ -260,6 +386,8 @@ class QueueProcessor {
       });
 
       child.on("error", (err) => {
+        exited = true;
+        clearTimeout(killTimer);
         this.logger.error(
           `[GodMode][Queue] Agent spawn error for item ${item.id}: ${String(err)}`,
         );
@@ -288,55 +416,7 @@ class QueueProcessor {
     }
   }
 
-  // ── Evidence verification ───────────────────────────────────────
-
-  private checkEvidence(
-    taskType: QueueItemType,
-    content: string,
-  ): { passed: boolean; missing: string } {
-    switch (taskType) {
-      case "coding":
-        if (/\b(PR|pull request|merge|diff|\.ts|\.js|\.py|\.go|\.rs)\b/i.test(content) ||
-            /https?:\/\/github\.com/i.test(content) ||
-            /```[\s\S]{20,}```/.test(content)) {
-          return { passed: true, missing: "" };
-        }
-        return { passed: false, missing: "PR link, diff, code snippet, or file path" };
-
-      case "research":
-        if (/https?:\/\/\S+/.test(content)) {
-          return { passed: true, missing: "" };
-        }
-        return { passed: false, missing: "at least 1 source URL" };
-
-      case "ops":
-        if (/(\$\s|>>>|exit code|pid\s*[:=]|stdout|stderr|command|executed|running|started)/i.test(content)) {
-          return { passed: true, missing: "" };
-        }
-        return { passed: false, missing: "command output or process indicator" };
-
-      case "review":
-        if (/(file|path|\.ts|\.js|\.py)\b/i.test(content) &&
-            /\b(approve|reject|pass|fail|good|issue|recommend|verdict|lgtm)\b/i.test(content)) {
-          return { passed: true, missing: "" };
-        }
-        return { passed: false, missing: "file paths and a verdict" };
-
-      case "analysis":
-        if (/\b(data|metric|source|finding|conclusion|result|insight)\b/i.test(content) &&
-            content.length > 200) {
-          return { passed: true, missing: "" };
-        }
-        return { passed: false, missing: "data source reference and conclusion" };
-
-      default:
-        // creative, task, url, idea — any structured output >50 chars
-        if (content.trim().length > 50) {
-          return { passed: true, missing: "" };
-        }
-        return { passed: false, missing: "structured output (>50 chars)" };
-    }
-  }
+  // Evidence verification now handled by standalone checkEvidence() function above
 
   // ── Completion handler ─────────────────────────────────────────
 
@@ -347,6 +427,7 @@ class QueueProcessor {
     this.activeCount = Math.max(0, this.activeCount - 1);
 
     if (exitCode !== 0) {
+      // Pass skipDecrement=true since we already decremented above
       await this.handleItemFailed(
         itemId,
         "Agent exited with code " + exitCode,
@@ -371,38 +452,37 @@ class QueueProcessor {
       summary = "Output file not found — agent may have completed without writing results.";
     }
 
-    // Look up the item's type for evidence verification
+    // Retrieve the item's type for evidence checking
     const currentState = await readQueueState();
     const currentItem = currentState.items.find((i) => i.id === itemId);
-    const taskType = currentItem?.type ?? "task";
+    const itemType = currentItem?.type ?? "task";
 
-    // Evidence-backed verification gate
-    let evidenceWarning = "";
-    if (outputContent) {
-      const evidence = this.checkEvidence(taskType, outputContent);
-      if (!evidence.passed && (currentItem?.retryCount ?? 0) < 1) {
-        // First miss — retry with explicit evidence instruction
+    // Evidence check: verify output contains expected artifacts for this task type
+    const evidenceResult = checkEvidence(itemType, outputContent);
+    if (!evidenceResult.passed && outputContent.length > 0) {
+      const retryCount = currentItem?.retryCount ?? 0;
+      if (retryCount === 0) {
+        // First failure: re-queue with evidence instruction appended
         this.logger.info(
-          `[GodMode][Queue] Item ${itemId} missing evidence (${evidence.missing}) — retrying with instruction`,
+          `[GodMode][Queue] Item ${itemId} evidence check failed (${evidenceResult.reason}) — retrying with guidance`,
         );
         await updateQueueState((state) => {
           const qi = state.items.find((i) => i.id === itemId);
           if (qi) {
             qi.status = "pending";
-            qi.retryCount = (qi.retryCount ?? 0) + 1;
+            qi.retryCount = 1;
+            qi.lastError = `Evidence check failed: ${evidenceResult.reason}`;
             qi.description =
               (qi.description ?? "") +
-              `\n\n---\n[Evidence Gate]: Your previous output was missing: ${evidence.missing}. ` +
-              "Include this evidence in your output this time.";
+              `\n\n---\n[Evidence check failed]: ${evidenceResult.reason}\n` +
+              `Please ensure your output includes: ${evidenceResult.hint}`;
           }
         });
         this.broadcast("queue:update", { itemId, status: "pending" });
         return;
-      } else if (!evidence.passed) {
-        // Second miss — proceed to review with warning
-        evidenceWarning = ` ⚠️ Missing evidence: ${evidence.missing}`;
-        summary = `⚠️ [Evidence incomplete: ${evidence.missing}] ${summary}`;
       }
+      // Already retried — proceed to review with a warning
+      summary = `[Evidence warning: ${evidenceResult.reason}] ${summary}`;
     }
 
     // Resolve persona name for the trust rating prompt
@@ -467,8 +547,8 @@ class QueueProcessor {
 
   // ── Failure + retry handler ────────────────────────────────────
 
-  async handleItemFailed(itemId: string, errorMsg: string, alreadyDecremented = false): Promise<void> {
-    if (!alreadyDecremented) {
+  async handleItemFailed(itemId: string, errorMsg: string, skipDecrement = false): Promise<void> {
+    if (!skipDecrement) {
       this.activeCount = Math.max(0, this.activeCount - 1);
     }
 
@@ -972,17 +1052,30 @@ export async function expireStaleQueueItems(): Promise<void> {
   const { updateQueueState } = await import("../lib/queue-state.js");
   await updateQueueState((state) => {
     const now = Date.now();
+    const THIRTY_DAYS = 30 * 24 * 60 * 60 * 1000;
     const SEVEN_DAYS = 7 * 24 * 60 * 60 * 1000;
     const THREE_DAYS = 3 * 24 * 60 * 60 * 1000;
 
     state.items = state.items.filter((item) => {
-      // Review items older than 7 days → mark done and remove
+      // Done items older than 30 days → remove
+      if (item.status === "done" && item.completedAt && now - item.completedAt > THIRTY_DAYS) {
+        return false;
+      }
+      // Review items older than 7 days → remove
       if (item.status === "review" && item.completedAt && now - item.completedAt > SEVEN_DAYS) {
         return false;
       }
       // Failed items older than 3 days → remove
       if (item.status === "failed" && item.completedAt && now - item.completedAt > THREE_DAYS) {
         return false;
+      }
+      // Stale processing items (no PID, older than 2 hours) → reset to pending
+      if (item.status === "processing" && item.startedAt && now - item.startedAt > 2 * 60 * 60 * 1000) {
+        if (!item.pid || !isPidAlive(item.pid)) {
+          item.status = "pending";
+          item.pid = undefined;
+          item.startedAt = undefined;
+        }
       }
       return true;
     });

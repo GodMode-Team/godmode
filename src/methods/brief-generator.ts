@@ -537,6 +537,9 @@ async function fetchOuraData(): Promise<OuraData> {
       `https://api.ouraring.com/v2/usercollection/daily_readiness?start_date=${yesterday}`,
       { headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(10_000) },
     );
+    if (!readinessResp.ok) {
+      throw new Error(`Oura readiness API ${readinessResp.status}: ${readinessResp.statusText}`);
+    }
     const readinessData = (await readinessResp.json()) as {
       data?: Array<{ score?: number; contributors?: Record<string, number> }>;
     };
@@ -548,6 +551,9 @@ async function fetchOuraData(): Promise<OuraData> {
       `https://api.ouraring.com/v2/usercollection/daily_sleep?start_date=${yesterday}`,
       { headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(10_000) },
     );
+    if (!sleepResp.ok) {
+      throw new Error(`Oura sleep API ${sleepResp.status}: ${sleepResp.statusText}`);
+    }
     const sleepData = (await sleepResp.json()) as {
       data?: Array<{
         score?: number;
@@ -562,6 +568,9 @@ async function fetchOuraData(): Promise<OuraData> {
       `https://api.ouraring.com/v2/usercollection/sleep?start_date=${yesterday}`,
       { headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(10_000) },
     );
+    if (!sleepPeriodsResp.ok) {
+      throw new Error(`Oura sleep periods API ${sleepPeriodsResp.status}: ${sleepPeriodsResp.statusText}`);
+    }
     const sleepPeriods = (await sleepPeriodsResp.json()) as {
       data?: Array<{
         average_hrv?: number;
@@ -684,6 +693,9 @@ async function fetchWeather(): Promise<WeatherData> {
     const resp = await fetch(`https://wttr.in/${encoded}?format=j1`, {
       signal: AbortSignal.timeout(8_000),
     });
+    if (!resp.ok) {
+      throw new Error(`Weather API ${resp.status}: ${resp.statusText}`);
+    }
     const data = (await resp.json()) as {
       current_condition?: Array<{
         temp_F?: string;

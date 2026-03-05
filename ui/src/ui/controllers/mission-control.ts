@@ -496,8 +496,7 @@ export async function retryQueueItem(
 ): Promise<void> {
   if (!host.client || !host.connected) return;
   try {
-    await host.client.request("queue.update", { id: itemId, status: "pending" });
-    await host.client.request("queue.process", { id: itemId });
+    await host.client.request("queue.retry", { id: itemId });
     host.showToast("Retrying...", "success", 2000);
     await loadMissionControl(host);
   } catch (err) {
