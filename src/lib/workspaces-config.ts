@@ -555,7 +555,12 @@ export function detectWorkspaceFromText(
       if (!normalizedText.includes(keyword)) {
         continue;
       }
-      const score = keyword.length;
+      // Base score = keyword length. Boost for prefix matches (e.g. "TRP: ..." or "GodMode: ...").
+      let score = keyword.length;
+      const prefixPattern = new RegExp(`^${keyword.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "i");
+      if (prefixPattern.test(normalizedText.trim())) {
+        score += 10;
+      }
       if (score > best.score) {
         best = {
           workspaceId: workspace.id,
