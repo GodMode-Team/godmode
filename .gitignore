@@ -6,3 +6,4 @@ ui/dist/
 coverage/
 .tmp/
 .worktrees/
+.claude/worktrees/

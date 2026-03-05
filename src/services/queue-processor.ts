@@ -521,14 +521,13 @@ class QueueProcessor {
     }
 
     this.logger.info(
-      `[GodMode][Queue] Item ${itemId} completed — status set to review${evidenceWarning}`,
+      `[GodMode][Queue] Item ${itemId} completed — status set to review`,
     );
     this.broadcast("queue:update", {
       itemId,
       status: "review",
       personaHint: personaSlug,
       askTrustRating: !!personaSlug,
-      evidenceWarning: evidenceWarning || undefined,
     });
 
     // Notify Ally chat so the user sees a notification in real-time
@@ -536,7 +535,7 @@ class QueueProcessor {
       this.broadcast("ally:notification", {
         type: "queue-complete",
         title: completedItem?.title ?? itemId,
-        summary: `Agent finished "${completedItem?.title ?? itemId}" — ready for review.${evidenceWarning}`,
+        summary: `Agent finished "${completedItem?.title ?? itemId}" — ready for review.`,
         actions: [
           { label: "Review", action: "navigate", target: "today" },
           { label: "Approve", action: "rpc", method: "queue.approve", params: { id: itemId } },
