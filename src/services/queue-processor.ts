@@ -126,7 +126,6 @@ function checkEvidence(taskType: QueueItemType, output: string): EvidenceResult 
 
   switch (taskType) {
     case "coding":
-      // Expect: PR link, diff, file path, or code block
       if (
         /https?:\/\/github\.com\S+\/pull\/\d+/.test(output) ||
         /```[\s\S]+```/.test(output) ||
@@ -142,7 +141,6 @@ function checkEvidence(taskType: QueueItemType, output: string): EvidenceResult 
       };
 
     case "research":
-      // Expect: at least 1 URL/source
       if (/https?:\/\/\S+/.test(output)) {
         return { passed: true, reason: "", hint: "" };
       }
@@ -153,7 +151,6 @@ function checkEvidence(taskType: QueueItemType, output: string): EvidenceResult 
       };
 
     case "ops":
-      // Expect: command output, status, or confirmation
       if (
         /\$\s+\S+/.test(output) ||
         /```(sh|bash|shell|zsh)?[\s\S]+```/.test(output) ||
@@ -168,7 +165,6 @@ function checkEvidence(taskType: QueueItemType, output: string): EvidenceResult 
       };
 
     case "review":
-      // Expect: file paths and verdict keywords
       if (
         /\.(ts|js|py|go|rs|md|json|yaml|yml)\b/.test(output) &&
         /\b(issue|finding|recommend|approve|reject|concern|bug|improvement)\b/i.test(output)
@@ -182,7 +178,6 @@ function checkEvidence(taskType: QueueItemType, output: string): EvidenceResult 
       };
 
     case "analysis":
-      // Expect: data mention and conclusion
       if (
         /\b(data|metric|statistic|number|percent|trend|comparison|chart)\b/i.test(output) &&
         /\b(conclusion|finding|insight|recommend|result|summary)\b/i.test(output)
@@ -200,9 +195,31 @@ function checkEvidence(taskType: QueueItemType, output: string): EvidenceResult 
     case "url":
     case "idea":
     default:
-      // Generic: just require substantive content (> 50 chars already checked)
       return { passed: true, reason: "", hint: "" };
   }
+}
+
+/** Extract evidence artifacts (file paths, URLs, PR links) from agent output. */
+function extractArtifacts(content: string): string[] {
+  const artifacts: string[] = [];
+  const seen = new Set<string>();
+
+  for (const line of content.split("\n")) {
+    const prMatch = line.match(/https:\/\/github\.com\/[^\s)]+\/pull\/\d+/g);
+    if (prMatch) for (const m of prMatch) if (!seen.has(m)) { artifacts.push(m); seen.add(m); }
+
+    const urlMatch = line.match(/https?:\/\/[^\s)>]+/g);
+    if (urlMatch) for (const m of urlMatch) if (!seen.has(m)) { artifacts.push(m); seen.add(m); }
+
+    const pathMatch = line.match(/(?:^|\s)(\/[\w./-]+\.\w{1,10})\b/g);
+    if (pathMatch) for (const m of pathMatch) {
+      const cleaned = m.trim();
+      if (!seen.has(cleaned)) { artifacts.push(cleaned); seen.add(cleaned); }
+    }
+  }
+
+  return artifacts.slice(0, 20);
+
 }
 
 // ── Queue Processor Class ──────────────────────────────────────────
@@ -439,6 +456,7 @@ class QueueProcessor {
     const outPath = outputPathForItem(itemId);
     let summary = "";
     let outputContent = "";
+    let artifacts: string[] = [];
 
     try {
       outputContent = await fs.readFile(outPath, "utf-8");
@@ -448,6 +466,7 @@ class QueueProcessor {
         .filter((l) => l.trim().length > 0)
         .slice(0, 3);
       summary = lines.join(" ").slice(0, 500);
+      artifacts = extractArtifacts(outputContent);
     } catch {
       summary = "Output file not found — agent may have completed without writing results.";
     }
@@ -492,12 +511,52 @@ class QueueProcessor {
         qi.status = "review";
         qi.completedAt = Date.now();
         qi.result = { summary, outputPath: outPath };
+        qi.artifacts = artifacts;
       }
       return state;
     });
 
     const completedItem = queueState.items.find((i) => i.id === itemId);
     const personaSlug = completedItem?.personaHint;
+
+    // Verification gate for coding tasks: require artifact evidence
+    if (completedItem && completedItem.type === "coding") {
+      const hasPrLink = artifacts.some((a) => a.includes("/pull/"));
+      const hasFilePath = artifacts.some((a) => a.startsWith("/"));
+      if (!hasPrLink && !hasFilePath) {
+        await updateQueueState((state) => {
+          const qi = state.items.find((i) => i.id === itemId);
+          if (qi) {
+            qi.status = "needs-review";
+            qi.result = {
+              ...qi.result!,
+              summary: summary + "\n\n\u26A0\uFE0F No artifact provided \u2014 verify manually",
+            };
+          }
+        });
+        this.logger.info(
+          `[GodMode][Queue] Item ${itemId} (coding) has no artifacts — set to needs-review`,
+        );
+        this.broadcast("queue:update", {
+          itemId,
+          status: "needs-review",
+          personaHint: personaSlug,
+        });
+
+        // Notify Ally chat about the needs-review status
+        try {
+          this.broadcast("ally:notification", {
+            type: "queue-needs-review",
+            title: completedItem.title,
+            summary: `Agent finished "${completedItem.title}" but provided no artifact — manual verification needed.`,
+            actions: [
+              { label: "Review", action: "navigate", target: "today" },
+            ],
+          });
+        } catch { /* broadcast non-fatal */ }
+        return;
+      }
+    }
 
     // Auto-approve for full-autonomy personas (skip manual review)
     if (personaSlug) {
@@ -1061,7 +1120,7 @@ export async function expireStaleQueueItems(): Promise<void> {
         return false;
       }
       // Review items older than 7 days → remove
-      if (item.status === "review" && item.completedAt && now - item.completedAt > SEVEN_DAYS) {
+      if ((item.status === "review" || item.status === "needs-review") && item.completedAt && now - item.completedAt > SEVEN_DAYS) {
         return false;
       }
       // Failed items older than 3 days → remove

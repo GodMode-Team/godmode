@@ -17,7 +17,7 @@ export type QueueItemType =
   | "url"
   | "idea";
 
-export type QueueItemStatus = "pending" | "processing" | "review" | "done" | "failed";
+export type QueueItemStatus = "pending" | "processing" | "review" | "needs-review" | "done" | "failed";
 
 /** Human-readable agent role names shown on MC badges */
 export const AGENT_ROLE_NAMES: Record<QueueItemType, string> = {
@@ -56,6 +56,8 @@ export type QueueItem = {
     prUrl?: string;
     prDiff?: string;
   };
+  /** Evidence artifacts: file paths, URLs, PR links, command output */
+  artifacts?: string[];
   error?: string;
   createdAt: number;
   startedAt?: number;
