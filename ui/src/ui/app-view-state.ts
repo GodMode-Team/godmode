@@ -532,6 +532,7 @@ export type AppViewState = {
   // Decision card handlers
   handleDecisionApprove: (id: string) => Promise<void>;
   handleDecisionReject: (id: string) => Promise<void>;
+  handleDecisionDismiss: (id: string) => Promise<void>;
   handleDecisionViewOutput: (id: string, outputPath: string) => Promise<void>;
   handleDecisionOpenChat: (id: string) => void;
   // File open handler

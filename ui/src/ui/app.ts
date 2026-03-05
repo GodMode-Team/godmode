@@ -1259,6 +1259,17 @@ export class GodModeApp extends LitElement {
     }
   }
 
+  async handleDecisionDismiss(id: string) {
+    if (!this.client || !this.connected) return;
+    try {
+      await this.client.request("queue.remove", { id });
+      this.todayQueueResults = this.todayQueueResults.filter(r => r.id !== id);
+    } catch (e) {
+      console.error("[DecisionCard] Dismiss failed:", e);
+      this.showToast("Failed to dismiss", "error");
+    }
+  }
+
   async handleDecisionViewOutput(id: string, outputPath: string) {
     if (!this.client || !this.connected) {
       this.showToast("Not connected to gateway", "error");

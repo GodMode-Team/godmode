@@ -28,6 +28,7 @@ export type DecisionCardsProps = {
   items: DecisionCardItem[];
   onApprove: (id: string) => void;
   onReject: (id: string) => void;
+  onDismiss: (id: string) => void;
   onViewOutput: (id: string, outputPath: string) => void;
   onOpenChat: (id: string) => void;
 };
@@ -296,14 +297,32 @@ function renderTaskPanel(props: MyDayProps) {
 
 // ===== Decision Cards (Overnight Agent Results) =====
 
+function formatTimeAgo(timestamp: number): string {
+  const now = Date.now();
+  const diff = now - timestamp;
+  const minutes = Math.floor(diff / 60000);
+  if (minutes < 1) return "just now";
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days === 1) return "yesterday";
+  if (days < 7) return `${days}d ago`;
+  return new Date(timestamp).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+}
+
 function renderDecisionCard(item: DecisionCardItem, props: DecisionCardsProps) {
   const isReview = item.status === "review";
   const statusClass = isReview ? "decision-card-status--review" : "decision-card-status--done";
   const statusLabel = isReview ? "Needs Review" : "Complete";
+  const timeLabel = item.completedAt ? formatTimeAgo(item.completedAt) : "";
 
   return html`
     <div class="decision-card">
-      <span class="decision-card-status ${statusClass}">${statusLabel}</span>
+      <div class="decision-card-header">
+        <span class="decision-card-status ${statusClass}">${statusLabel}</span>
+        ${timeLabel ? html`<span class="decision-card-time">${timeLabel}</span>` : nothing}
+      </div>
       <h4 class="decision-card-title">${item.title}</h4>
       <p class="decision-card-summary">${item.summary}</p>
       <div class="decision-card-actions">
@@ -319,12 +338,16 @@ function renderDecisionCard(item: DecisionCardItem, props: DecisionCardsProps) {
                 @click=${() => props.onOpenChat(item.id)}>Open Chat</button>
               <button class="decision-card-btn decision-card-btn--reject"
                 @click=${() => props.onReject(item.id)}>Reject</button>
+              <button class="decision-card-btn decision-card-btn--dismiss"
+                @click=${() => props.onDismiss(item.id)}>Dismiss</button>
             `
           : html`
               ${item.outputPath
                 ? html`<button class="decision-card-btn decision-card-btn--view"
                     @click=${() => props.onViewOutput(item.id, item.outputPath!)}>View Output</button>`
                 : nothing}
+              <button class="decision-card-btn decision-card-btn--dismiss"
+                @click=${() => props.onDismiss(item.id)}>Dismiss</button>
             `}
         ${item.prUrl
           ? html`<a class="decision-card-btn decision-card-btn--view" href="${item.prUrl}" target="_blank" rel="noopener">View PR</a>`

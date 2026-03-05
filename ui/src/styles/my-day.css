@@ -2154,13 +2154,24 @@
   border-color: var(--mc-accent, var(--accent, #6366f1));
 }
 
+.decision-card-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
 .decision-card-status {
   font-size: 12px;
   font-weight: 600;
   padding: 2px 8px;
   border-radius: 6px;
   display: inline-block;
-  margin-bottom: 8px;
+}
+
+.decision-card-time {
+  font-size: 12px;
+  color: var(--mc-text-secondary, var(--muted, #a0a0c0));
 }
 
 .decision-card-status--review {
@@ -2248,6 +2259,17 @@
 .decision-card-btn--chat {
   background: var(--mc-accent, var(--accent, #6366f1));
   color: white;
+}
+
+.decision-card-btn--dismiss {
+  background: transparent;
+  color: var(--mc-text-secondary, var(--muted, #a0a0c0));
+  border: 1px solid var(--mc-border, var(--border, #2a2a4a));
+}
+
+:root[data-theme="light"] .decision-card-btn--dismiss {
+  color: #6b7280;
+  border-color: #d1d5db;
 }
 
 :root[data-theme="light"] .decision-card-btn--reject {
