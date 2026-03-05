@@ -222,6 +222,22 @@ export async function generateSnapshot(): Promise<string> {
     // No trust data yet — skip
   }
 
+  // Team workspaces summary — list active team workspaces with key files
+  try {
+    const { readWorkspaceConfig } = await import("./workspaces-config.js");
+    const config = await readWorkspaceConfig({ initializeIfMissing: false });
+    const teamWorkspaces = config.workspaces.filter((w: { type?: string }) => w.type === "team");
+    if (teamWorkspaces.length > 0) {
+      lines.push("## Team Workspaces");
+      for (const ws of teamWorkspaces.slice(0, 5)) {
+        const syncNote = (ws as { sync?: { remote?: string } }).sync?.remote ? "git-synced" : "local";
+        lines.push(`- ${ws.name} (${syncNote})`);
+      }
+    }
+  } catch {
+    // Workspaces unavailable
+  }
+
   const snapshot = lines.join("\n");
 
   // Write to disk

@@ -1,0 +1,14 @@
+{
+  "name": "TRP",
+  "slug": "trp",
+  "type": "project",
+  "description": "The Ready Project — team collaboration workspace",
+  "syncEnabled": true,
+  "syncInterval": 300,
+  "paths": {
+    "memory": "~/godmode/workspaces/trp/memory",
+    "skills": "~/godmode/workspaces/trp/skills",
+    "personas": "~/godmode/workspaces/trp/agent-roster",
+    "artifacts": "~/godmode/workspaces/trp/artifacts"
+  }
+}

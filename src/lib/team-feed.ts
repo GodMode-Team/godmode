@@ -59,13 +59,35 @@ export async function appendFeedMessage(feedPath: string, message: FeedMessage):
   await fs.appendFile(feedPath, line, "utf-8");
 }
 
+/** Maximum feed file size to read into memory (5MB). Older messages are skipped. */
+const MAX_FEED_READ_BYTES = 5 * 1024 * 1024;
+
 export async function readFeed(
   feedPath: string,
   opts?: { since?: string; limit?: number },
 ): Promise<FeedMessage[]> {
   let raw: string;
   try {
-    raw = await fs.readFile(feedPath, "utf-8");
+    const fileStat = await fs.stat(feedPath);
+    if (fileStat.size > MAX_FEED_READ_BYTES) {
+      // Read only the tail of the file to avoid OOM on large feeds
+      const { open } = await import("node:fs/promises");
+      const fh = await open(feedPath, "r");
+      try {
+        const buf = Buffer.alloc(MAX_FEED_READ_BYTES);
+        await fh.read(buf, 0, MAX_FEED_READ_BYTES, fileStat.size - MAX_FEED_READ_BYTES);
+        raw = buf.toString("utf-8");
+        // Drop the first (likely incomplete) line
+        const firstNewline = raw.indexOf("\n");
+        if (firstNewline > 0) {
+          raw = raw.slice(firstNewline + 1);
+        }
+      } finally {
+        await fh.close();
+      }
+    } else {
+      raw = await fs.readFile(feedPath, "utf-8");
+    }
   } catch {
     return [];
   }

@@ -277,6 +277,38 @@ End-to-end audit of the entire agent delegation pipeline and integration data pi
 
 ---
 
+## 2026-03-05 — v1.6.0: Team Workspaces & Templates
+
+### What
+Team workspace infrastructure audit and hardening. Added workspace templates for instant project setup, fixed feed safety, and integrated workspace awareness into the ally's context.
+
+### Workspace Templates
+- Created `assets/workspace-templates/` with 3 templates: `godmode-dev`, `trp`, `patient-autopilot`
+- **godmode-dev**: Code review + build verification skills, architecture conventions memory
+- **trp**: General project collaboration template
+- **patient-autopilot**: General project collaboration template
+- Templates include memory/README.md starter files and optional skills
+
+### New RPC Methods
+- `workspace.setupFromTemplate` — create a team workspace from a bundled template (copies template memory, skills, and config into a new workspace with git init)
+- `workspace.listTemplates` — list all available workspace templates with metadata
+
+### Bug Fixes
+- **team-feed.ts**: Added 5MB file size protection to `readFeed()` — large feeds now read only the tail instead of OOM'ing. Uses file handle seek for efficient tail reading.
+- **awareness-snapshot.ts**: Team workspaces now appear in the awareness snapshot — ally sees which team workspaces are active and their sync status.
+
+### Documentation
+- Created `docs/TEAM-SETUP.md` — full team setup guide for admins and members, covering workspace creation, joining, syncing, agent communication, and curation.
+
+### Files Changed
+- `src/methods/team-workspace.ts` — added `setupFromTemplate` and `listTemplates` handlers
+- `src/lib/team-feed.ts` — readFeed size protection (MAX_FEED_READ_BYTES)
+- `src/lib/awareness-snapshot.ts` — team workspace summary in snapshot
+- `assets/workspace-templates/` — 3 template configs + content directories
+- `docs/TEAM-SETUP.md` — team setup documentation
+
+---
+
 ## 2026-03-04 — v1.4.0: Lean Audit + Adversarial Bug Sweep + Install Hardening
 
 ### What

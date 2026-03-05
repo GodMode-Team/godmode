@@ -13,5 +13,5 @@ export default defineConfig({
 		"openclaw/plugin-sdk",
 	],
 	// Copy non-TS assets that are loaded via import.meta.url at runtime
-	onSuccess: "cp src/lib/auth-public-key.pem dist/auth-public-key.pem",
+	onSuccess: "cp src/lib/auth-public-key.pem dist/auth-public-key.pem && mkdir -p dist/assets/workspace-templates && cp -r assets/workspace-templates/* dist/assets/workspace-templates/ 2>/dev/null || true",
 });

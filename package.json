@@ -39,6 +39,8 @@
     "dist/**/*.pem",
     "assets/agent-roster/**/*.md",
     "assets/skills/**/*.md",
+    "dist/assets/**/*.json",
+    "dist/assets/**/*.md",
     "openclaw.plugin.json",
     "LICENSE",
     "README.md"

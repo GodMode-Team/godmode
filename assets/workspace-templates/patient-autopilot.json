@@ -1,0 +1,14 @@
+{
+  "name": "Patient Autopilot",
+  "slug": "patient-autopilot",
+  "type": "project",
+  "description": "Patient Autopilot — team collaboration workspace",
+  "syncEnabled": true,
+  "syncInterval": 300,
+  "paths": {
+    "memory": "~/godmode/workspaces/patient-autopilot/memory",
+    "skills": "~/godmode/workspaces/patient-autopilot/skills",
+    "personas": "~/godmode/workspaces/patient-autopilot/agent-roster",
+    "artifacts": "~/godmode/workspaces/patient-autopilot/artifacts"
+  }
+}
