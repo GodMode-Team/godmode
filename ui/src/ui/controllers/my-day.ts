@@ -479,37 +479,6 @@ export async function loadMyDay(state: MyDayState) {
   state.todayTasksLoading = false;
 }
 
-/**
- * Subscribe to WebSocket events for daily brief updates
- */
-export function subscribeToBriefUpdates(
-  client: GatewayBrowserClient,
-  onUpdate: (brief: DailyBriefData) => void,
-) {
-  // Listen for daily-brief:update events from the gateway
-  const handler = (data: DailyBriefData) => {
-    onUpdate(data);
-  };
-
-  client.on("daily-brief:update", handler);
-
-  // Return unsubscribe function
-  return () => {
-    client.off("daily-brief:update", handler);
-  };
-}
-
-/**
- * Subscribe to WebSocket events for agent log updates
- */
-export function subscribeToAgentLogUpdates(client: GatewayBrowserClient, onUpdate: () => void) {
-  const handler = () => {
-    onUpdate();
-  };
-
-  client.on("agent-log:update", handler);
-
-  return () => {
-    client.off("agent-log:update", handler);
-  };
-}
+// Note: daily-brief:update and agent-log:update events are handled centrally
+// in app-gateway.ts onEvent handler. No per-controller subscriptions needed.
+// GatewayBrowserClient uses onEvent callback, not .on()/.off() methods.

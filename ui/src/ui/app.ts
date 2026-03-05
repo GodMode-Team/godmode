@@ -92,7 +92,6 @@ import {
   loadBriefOnly as loadBriefOnlyInternal,
   loadAgentLogOnly as loadAgentLogOnlyInternal,
   openBriefInObsidian as openBriefInObsidianInternal,
-  subscribeToAgentLogUpdates,
 } from "./controllers/my-day";
 import {
   loadWork as loadWorkInternal,
@@ -702,7 +701,6 @@ export class GodModeApp extends LitElement {
   private logsPollInterval: number | null = null;
   private debugPollInterval: number | null = null;
   private agentLogPollInterval: number | null = null;
-  private agentLogUnsub: (() => void) | null = null;
   private logsScrollFrame: number | null = null;
   private toolStreamById = new Map<string, ToolStreamEntry>();
   private toolStreamOrder: string[] = [];
@@ -759,14 +757,8 @@ export class GodModeApp extends LitElement {
       }, 60_000);
     }
 
-    // Subscribe to agent-log:update WebSocket events for near-instant refresh.
-    if (!this.agentLogUnsub && this.client) {
-      this.agentLogUnsub = subscribeToAgentLogUpdates(this.client, () => {
-        if (this.todayViewMode === "agent-log") {
-          void loadAgentLogOnlyInternal(this);
-        }
-      });
-    }
+    // Agent log updates are handled by the 60s poll interval above.
+    // daily-brief:update events are handled centrally in app-gateway.ts.
 
     // Start meeting notifications (polls every 60s, fires toast 15 min before)
     startMeetingNotifications(this);
@@ -785,10 +777,6 @@ export class GodModeApp extends LitElement {
     if (this.agentLogPollInterval != null) {
       clearInterval(this.agentLogPollInterval);
       this.agentLogPollInterval = null;
-    }
-    if (this.agentLogUnsub) {
-      this.agentLogUnsub();
-      this.agentLogUnsub = null;
     }
     handleDisconnected(this as unknown as Parameters<typeof handleDisconnected>[0]);
     super.disconnectedCallback();
