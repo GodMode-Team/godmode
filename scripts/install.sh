@@ -832,7 +832,7 @@ if [ "$IS_HEADLESS" = true ]; then
   fi
 
   printf '  %s%s.%s Restart gateway (if you changed config above):\n' "$CYN" "$STEP_NUM" "$RST"
-  printf '     nohup openclaw gateway run &\n\n'
+  printf '     openclaw gateway restart\n\n'
 else
   # Desktop — open browser
   printf '  %sOpening GodMode...%s\n' "$WHT$BLD" "$RST"

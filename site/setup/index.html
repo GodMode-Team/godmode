@@ -288,7 +288,7 @@ source ~/.bashrc</code></pre>
     <!-- STEP 3 -->
     <h2><span class="num">3</span> Restart the gateway</h2>
     <p>After adding your AI key, restart so the gateway picks it up:</p>
-    <pre><button class="copy-btn" onclick="copyCode(this)">Copy</button><code>openclaw gateway stop 2>/dev/null; nohup openclaw gateway run &</code></pre>
+    <pre><button class="copy-btn" onclick="copyCode(this)">Copy</button><code>openclaw gateway restart</code></pre>
 
     <hr class="divider">
 
@@ -330,7 +330,7 @@ tailscale ip -4</code></pre>
         <h3>Quick reference</h3>
         <ul>
             <li>Gateway status: <code>openclaw gateway status</code></li>
-            <li>Restart gateway: <code>openclaw gateway stop; nohup openclaw gateway run &</code></li>
+            <li>Restart gateway: <code>openclaw gateway restart</code></li>
             <li>Update GodMode: <code>curl -fsSL https://lifeongodmode.com/install.sh | sh</code></li>
             <li>Logs: <code>tail -f ~/.openclaw/logs/gateway.log</code></li>
         </ul>
