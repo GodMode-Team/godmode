@@ -20,6 +20,7 @@ function createState(): ConfigState {
     configSaving: false,
     configApplying: false,
     updateRunning: false,
+    pluginUpdateRunning: false,
     configSnapshot: null,
     configSchema: null,
     configSchemaVersion: null,

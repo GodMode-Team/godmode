@@ -26,10 +26,10 @@ import { calendarHandlers } from "./src/methods/calendar.js";
 import { consciousnessHandlers } from "./src/methods/consciousness.js";
 import { dailyBriefHandlers } from "./src/methods/daily-brief.js";
 import { briefGeneratorHandlers } from "./src/methods/brief-generator.js";
-import { dataSourcesHandlers } from "./src/methods/data-sources.js";
+// data-sources removed in v1.6.0 dead weight audit
 import { goalsHandlers } from "./src/methods/goals.js";
 import { onboardingHandlers } from "./src/methods/onboarding.js";
-import { peopleDataHandlers } from "./src/methods/people-data.js";
+// people-data removed in v1.6.0 dead weight audit
 import { projectsHandlers } from "./src/methods/projects.js";
 import { tasksHandlers } from "./src/methods/tasks.js";
 import { teamCommsHandlers } from "./src/methods/team-comms.js";
@@ -48,6 +48,7 @@ import { createGuardrailTool } from "./src/tools/guardrail.js";
 import { createOnboardTool } from "./src/tools/onboard.js";
 import { createMorningSetTool } from "./src/tools/morning-set.js";
 import { createQueueAddTool } from "./src/tools/queue-add.js";
+import { createTrustRateTool } from "./src/tools/trust-rate.js";
 import { createXReadTool } from "./src/tools/x-read.js";
 import { queueHandlers } from "./src/methods/queue.js";
 import { xIntelHandlers } from "./src/methods/x-intel.js";
@@ -70,7 +71,7 @@ import { checkCustomGuardrails, logGateActivity } from "./src/services/guardrail
 import { guardrailsHandlers } from "./src/methods/guardrails.js";
 import { imageCacheHandlers } from "./src/methods/image-cache.js";
 import { secondBrainHandlers } from "./src/methods/second-brain.js";
-import { proactiveIntelHandlers } from "./src/methods/proactive-intel.js";
+// proactiveIntel removed in v1.6.0 dead weight audit
 import { supportHandlers } from "./src/methods/support.js";
 import { fathomWebhookHandlers, handleFathomWebhookHttp } from "./src/methods/fathom-webhook.js";
 import { authHandlers } from "./src/methods/auth.js";
@@ -95,7 +96,6 @@ let optionsCachedAt = 0;
 
 const OPTIONS_DEFAULTS: Record<string, unknown> = {
   "missionControl.enabled": false,
-  "proactiveIntel.enabled": true,
 };
 
 function readOptionsSync(): Record<string, unknown> {
@@ -594,8 +594,7 @@ const godmodePlugin = {
       ...dailyBriefHandlers,
       ...briefGeneratorHandlers,
       ...goalsHandlers,
-      ...peopleDataHandlers,
-      ...dataSourcesHandlers,
+      // peopleData + dataSources removed in v1.6.0
       ...agentLogHandlers,
       ...calendarHandlers,
       ...uiSlotsHandlers,
@@ -610,7 +609,7 @@ const godmodePlugin = {
       ...guardrailsHandlers,
       ...imageCacheHandlers,
       ...secondBrainHandlers,
-      ...proactiveIntelHandlers,
+      // proactiveIntel removed in v1.6.0
       ...queueHandlers,
       ...dashboardsHandlers,
       ...supportHandlers,
@@ -873,6 +872,41 @@ h1{color:#ff6b6b}code{background:#16213e;padding:2px 8px;border-radius:4px}a{col
         api.logger.warn(`[GodMode] Host compat scan failed: ${String(err)}`);
       }
 
+      // Seed starter personas + skills if roster/skills dir is empty
+      try {
+        const { existsSync: seedExists, readdirSync: seedReaddir, mkdirSync: seedMkdir, copyFileSync: seedCopy } = await import("node:fs");
+        const { MEMORY_DIR: seedMemDir } = await import("./src/data-paths.js");
+        const seedModuleDir = dirname(fileURLToPath(import.meta.url));
+        // assets/ lives alongside dist/ in the package root, or inside dist/ in dev
+        const seedPluginRoot = basename(seedModuleDir) === "dist" ? dirname(seedModuleDir) : seedModuleDir;
+        const rosterTarget = join(seedMemDir, "agent-roster");
+        const rosterSource = join(seedPluginRoot, "assets", "agent-roster");
+        if (seedExists(rosterSource)) {
+          const hasExisting = seedExists(rosterTarget) && seedReaddir(rosterTarget).filter(f => f.endsWith(".md")).length > 0;
+          if (!hasExisting) {
+            seedMkdir(rosterTarget, { recursive: true });
+            for (const f of seedReaddir(rosterSource).filter(f => f.endsWith(".md"))) {
+              seedCopy(join(rosterSource, f), join(rosterTarget, f));
+            }
+            api.logger.info(`[GodMode] Seeded ${seedReaddir(rosterSource).filter(f => f.endsWith(".md")).length} starter personas`);
+          }
+        }
+        const skillsTarget = join(dirname(seedMemDir), "skills");
+        const skillsSource = join(seedPluginRoot, "assets", "skills");
+        if (seedExists(skillsSource)) {
+          const hasExistingSkills = seedExists(skillsTarget) && seedReaddir(skillsTarget).filter(f => f.endsWith(".md")).length > 0;
+          if (!hasExistingSkills) {
+            seedMkdir(skillsTarget, { recursive: true });
+            for (const f of seedReaddir(skillsSource).filter(f => f.endsWith(".md"))) {
+              seedCopy(join(skillsSource, f), join(skillsTarget, f));
+            }
+            api.logger.info(`[GodMode] Seeded ${seedReaddir(skillsSource).filter(f => f.endsWith(".md")).length} starter skills`);
+          }
+        }
+      } catch (err) {
+        api.logger.warn(`[GodMode] Starter content seeding failed: ${String(err)}`);
+      }
+
       // Agent log writer
       try {
         const started = await initAgentLogWriter();
@@ -895,12 +929,19 @@ h1{color:#ff6b6b}code{background:#16213e;padding:2px 8px;border-radius:4px}a{col
         api.logger.warn(`[GodMode] workspace sync service failed to start: ${String(err)}`);
       }
 
-      // Curation agent service
+      // Curation agent service — gated behind team workspace
       try {
-        const { getCurationAgentService } = await import("./src/services/curation-agent.js");
-        const curation = getCurationAgentService(api.logger);
-        await curation.start();
-        serviceCleanup.push({ name: "curation-agent", fn: () => curation.stop() });
+        const { existsSync: fsExistsSync } = await import("node:fs");
+        const { join: pJoin } = await import("node:path");
+        const teamWorkspacesDir = pJoin(DATA_DIR, "team-workspaces");
+        if (fsExistsSync(teamWorkspacesDir)) {
+          const { getCurationAgentService } = await import("./src/services/curation-agent.js");
+          const curation = getCurationAgentService(api.logger);
+          await curation.start();
+          serviceCleanup.push({ name: "curation-agent", fn: () => curation.stop() });
+        } else {
+          api.logger.info("[GodMode] Curation agent skipped — no team workspaces configured");
+        }
       } catch (err) {
         api.logger.warn(`[GodMode] curation service failed to start: ${String(err)}`);
       }
@@ -941,17 +982,7 @@ h1{color:#ff6b6b}code{background:#16213e;padding:2px 8px;border-radius:4px}a{col
         api.logger.warn(`[GodMode] Consciousness heartbeat failed to start: ${String(err)}`);
       }
 
-      // Proactive Intelligence service
-      try {
-        const { getProactiveIntelService, stopProactiveIntelService } = await import("./src/services/proactive-intel.js");
-        const intel = getProactiveIntelService(api.logger);
-        // Broadcast fn wired lazily on first proactiveIntel RPC call (same pattern as focus-pulse)
-        await intel.start();
-        serviceCleanup.push({ name: "proactive-intel", fn: () => stopProactiveIntelService() });
-        api.logger.info("[GodMode] Proactive Intelligence service initialized");
-      } catch (err) {
-        api.logger.warn(`[GodMode] Proactive Intelligence failed to start: ${String(err)}`);
-      }
+      // Proactive Intelligence — removed in v1.6.0 dead weight audit
 
       // Queue processor — autonomous background task execution
       try {
@@ -1276,6 +1307,7 @@ h1{color:#ff6b6b}code{background:#16213e;padding:2px 8px;border-radius:4px}a{col
     api.registerTool((ctx) => createMorningSetTool(ctx));
     api.registerTool((ctx) => createGuardrailTool(ctx));
     api.registerTool((ctx) => createQueueAddTool(ctx));
+    api.registerTool((ctx) => createTrustRateTool(ctx));
     api.registerTool((ctx) => createXReadTool(ctx));
 
     // ── 6. Register CLI commands ──────────────────────────────────

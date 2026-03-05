@@ -288,6 +288,57 @@ class QueueProcessor {
     }
   }
 
+  // ── Evidence verification ───────────────────────────────────────
+
+  private checkEvidence(
+    taskType: QueueItemType,
+    content: string,
+  ): { passed: boolean; missing: string } {
+    const lower = content.toLowerCase();
+    switch (taskType) {
+      case "coding":
+        if (/\b(PR|pull request|merge|diff|\.ts|\.js|\.py|\.go|\.rs)\b/i.test(content) ||
+            /https?:\/\/github\.com/i.test(content) ||
+            /```[\s\S]{20,}```/.test(content)) {
+          return { passed: true, missing: "" };
+        }
+        return { passed: false, missing: "PR link, diff, code snippet, or file path" };
+
+      case "research":
+        if (/https?:\/\/\S+/.test(content)) {
+          return { passed: true, missing: "" };
+        }
+        return { passed: false, missing: "at least 1 source URL" };
+
+      case "ops":
+        if (/(\$\s|>>>|exit code|pid\s*[:=]|stdout|stderr|command|executed|running|started)/i.test(content)) {
+          return { passed: true, missing: "" };
+        }
+        return { passed: false, missing: "command output or process indicator" };
+
+      case "review":
+        if (/(file|path|\.ts|\.js|\.py)\b/i.test(content) &&
+            /\b(approve|reject|pass|fail|good|issue|recommend|verdict|lgtm)\b/i.test(lower)) {
+          return { passed: true, missing: "" };
+        }
+        return { passed: false, missing: "file paths and a verdict" };
+
+      case "analysis":
+        if (/\b(data|metric|source|finding|conclusion|result|insight)\b/i.test(lower) &&
+            content.length > 200) {
+          return { passed: true, missing: "" };
+        }
+        return { passed: false, missing: "data source reference and conclusion" };
+
+      default:
+        // creative, task, url, idea — any structured output >50 chars
+        if (content.trim().length > 50) {
+          return { passed: true, missing: "" };
+        }
+        return { passed: false, missing: "structured output (>50 chars)" };
+    }
+  }
+
   // ── Completion handler ─────────────────────────────────────────
 
   async handleItemCompleted(
@@ -306,17 +357,52 @@ class QueueProcessor {
 
     const outPath = outputPathForItem(itemId);
     let summary = "";
+    let outputContent = "";
 
     try {
-      const content = await fs.readFile(outPath, "utf-8");
+      outputContent = await fs.readFile(outPath, "utf-8");
       // Extract first 3 non-empty lines for summary
-      const lines = content
+      const lines = outputContent
         .split("\n")
         .filter((l) => l.trim().length > 0)
         .slice(0, 3);
       summary = lines.join(" ").slice(0, 500);
     } catch {
       summary = "Output file not found — agent may have completed without writing results.";
+    }
+
+    // Look up the item's type for evidence verification
+    const currentState = await readQueueState();
+    const currentItem = currentState.items.find((i) => i.id === itemId);
+    const taskType = currentItem?.type ?? "task";
+
+    // Evidence-backed verification gate
+    let evidenceWarning = "";
+    if (outputContent) {
+      const evidence = this.checkEvidence(taskType, outputContent);
+      if (!evidence.passed && (currentItem?.retryCount ?? 0) < 1) {
+        // First miss — retry with explicit evidence instruction
+        this.logger.info(
+          `[GodMode][Queue] Item ${itemId} missing evidence (${evidence.missing}) — retrying with instruction`,
+        );
+        await updateQueueState((state) => {
+          const qi = state.items.find((i) => i.id === itemId);
+          if (qi) {
+            qi.status = "pending";
+            qi.retryCount = (qi.retryCount ?? 0) + 1;
+            qi.description =
+              (qi.description ?? "") +
+              `\n\n---\n[Evidence Gate]: Your previous output was missing: ${evidence.missing}. ` +
+              "Include this evidence in your output this time.";
+          }
+        });
+        this.broadcast("queue:update", { itemId, status: "pending" });
+        return;
+      } else if (!evidence.passed) {
+        // Second miss — proceed to review with warning
+        evidenceWarning = ` ⚠️ Missing evidence: ${evidence.missing}`;
+        summary = `⚠️ [Evidence incomplete: ${evidence.missing}] ${summary}`;
+      }
     }
 
     // Resolve persona name for the trust rating prompt
@@ -355,13 +441,14 @@ class QueueProcessor {
     }
 
     this.logger.info(
-      `[GodMode][Queue] Item ${itemId} completed — status set to review`,
+      `[GodMode][Queue] Item ${itemId} completed — status set to review${evidenceWarning}`,
     );
     this.broadcast("queue:update", {
       itemId,
       status: "review",
       personaHint: personaSlug,
       askTrustRating: !!personaSlug,
+      evidenceWarning: evidenceWarning || undefined,
     });
 
     // Notify Ally chat so the user sees a notification in real-time
@@ -369,7 +456,7 @@ class QueueProcessor {
       this.broadcast("ally:notification", {
         type: "queue-complete",
         title: completedItem?.title ?? itemId,
-        summary: `Agent finished "${completedItem?.title ?? itemId}" — ready for review.`,
+        summary: `Agent finished "${completedItem?.title ?? itemId}" — ready for review.${evidenceWarning}`,
         actions: [
           { label: "Review", action: "navigate", target: "today" },
           { label: "Approve", action: "rpc", method: "queue.approve", params: { id: itemId } },

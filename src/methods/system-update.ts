@@ -253,10 +253,48 @@ export function runPostUpdateHealthCheck(
   }
 }
 
+// ── godmode.update.pluginRun ─────────────────────────────────────────────
+
+const pluginRun: GatewayRequestHandler = async ({ respond }) => {
+  try {
+    const previousVersion = _pluginVersion;
+
+    // Run npm update for the GodMode plugin
+    const { code, stdout, stderr } = await runCommand(
+      "npm update -g @godmode-team/godmode 2>&1",
+      120_000,
+    );
+
+    if (code !== 0) {
+      respond(false, undefined, {
+        code: "PLUGIN_UPDATE_FAILED",
+        message: stderr.trim() || stdout.trim() || "npm update failed",
+      });
+      return;
+    }
+
+    // Restart the gateway so it loads the new plugin version
+    void runCommand("openclaw gateway restart 2>/dev/null", 10_000);
+
+    respond(true, {
+      success: true,
+      previousVersion,
+      output: stdout.trim().slice(-500),
+      message: "Plugin updated. Gateway is restarting — the UI will reconnect automatically.",
+    });
+  } catch (err) {
+    respond(false, undefined, {
+      code: "PLUGIN_UPDATE_ERROR",
+      message: String(err),
+    });
+  }
+};
+
 // ── Export ────────────────────────────────────────────────────────────────
 
 export const systemUpdateHandlers: GatewayRequestHandlers = {
   "godmode.update.check": check,
   "godmode.update.run": run,
   "godmode.update.pluginCheck": pluginCheck,
+  "godmode.update.pluginRun": pluginRun,
 };

@@ -19,6 +19,7 @@ export type ConfigState = {
   configSaving: boolean;
   configApplying: boolean;
   updateRunning: boolean;
+  pluginUpdateRunning: boolean;
   configSnapshot: ConfigSnapshot | null;
   configSchema: unknown;
   configSchemaVersion: string | null;
@@ -167,6 +168,21 @@ export async function runUpdate(state: ConfigState) {
     state.lastError = String(err);
   } finally {
     state.updateRunning = false;
+  }
+}
+
+export async function runPluginUpdate(state: ConfigState) {
+  if (!state.client || !state.connected) {
+    return;
+  }
+  state.pluginUpdateRunning = true;
+  state.lastError = null;
+  try {
+    await state.client.request("godmode.update.pluginRun", {});
+  } catch (err) {
+    state.lastError = String(err);
+  } finally {
+    state.pluginUpdateRunning = false;
   }
 }
 

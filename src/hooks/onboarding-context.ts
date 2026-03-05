@@ -423,7 +423,7 @@ ${firstWin?.completed ? "First win completed!" : "Not started yet."}
 
 ### Live Demo
 
-Generate a morning brief for the user. Even without integrations, the starter brief shows tasks, queue status, and GodMode tips. Run \`dailyBrief.generate\` now.
+Generate a morning brief using \`briefGenerator.generate\`. Even without integrations connected, this will show the user their tasks, queue status, and GodMode tips. This is their first win — make it feel valuable.
 
 Other demos to try:
 - Draft an email or message using their connected channels
@@ -459,6 +459,13 @@ onboarding.update {
 \`\`\`
 
 **Present the 5 commands to the user** — this is their "now what?" answer. Make it feel like a gift, not homework.
+
+### Post-First-Win Nudge
+
+After completing Phase 5, include this gentle nudge:
+"Now that you've seen GodMode in action, I'd love to learn more about you to personalize your experience. Want to do a quick getting-to-know-you conversation? It takes about 5 minutes and helps me understand your goals, work style, and how I can serve you best."
+
+If they say yes, the soul interview questions from Phase 1 can be used conversationally — but this is optional deepening, not a gate.
 
 When done, advance to Phase 6 with \`onboarding.complete\`.`;
 }

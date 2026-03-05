@@ -38,7 +38,9 @@ export type OverviewProps = {
   onRefresh: () => void;
   onCheckUpdates: () => void;
   onUpdateNow?: () => void;
+  onUpdatePlugin?: () => void;
   updateRunning?: boolean;
+  pluginUpdateRunning?: boolean;
 };
 
 export function renderOverview(props: OverviewProps) {
@@ -341,8 +343,21 @@ export function renderOverview(props: OverviewProps) {
                 <div>
                   <b>GodMode ${props.updateStatus.pluginVersion} \u2192 ${props.updateStatus.pluginLatest ?? "newer"}</b>
                 </div>
+                <div class="row" style="margin-top: 10px; gap: 8px;">
+                  ${
+                    props.onUpdatePlugin
+                      ? html`<button
+                          class="btn primary"
+                          ?disabled=${props.pluginUpdateRunning || !props.connected}
+                          @click=${() => props.onUpdatePlugin?.()}
+                        >
+                          ${props.pluginUpdateRunning ? "Updating..." : "Update Now"}
+                        </button>`
+                      : nothing
+                  }
+                </div>
                 <div class="muted" style="margin-top: 8px; font-size: 12px;">
-                  Run: <span class="mono">npm update -g @godmode-team/godmode</span>
+                  Or run manually: <span class="mono">npm update -g @godmode-team/godmode</span>
                 </div>
               </div>
             `

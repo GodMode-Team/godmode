@@ -132,6 +132,24 @@ export async function generateSnapshot(): Promise<string> {
     // Queue unavailable
   }
 
+  // Active Skills index (~5 lines max)
+  try {
+    const { getCronSkills, loadSkills } = await import("./skills-registry.js");
+    const cronSkills = getCronSkills();
+    const allSkills = loadSkills();
+    const manualCount = allSkills.length - cronSkills.length;
+    if (cronSkills.length > 0 || manualCount > 0) {
+      lines.push("## Active Skills");
+      for (const s of cronSkills.slice(0, 4)) {
+        lines.push(`- ⏰ ${s.name} (${s.schedule}) → ${s.persona ?? s.taskType}`);
+      }
+      if (cronSkills.length > 4) lines.push(`- +${cronSkills.length - 4} more cron skills`);
+      if (manualCount > 0) lines.push(`- ${manualCount} manual skill${manualCount === 1 ? "" : "s"} available`);
+    }
+  } catch {
+    // Skills registry unavailable
+  }
+
   // Trust tracker summary (if data exists)
   try {
     const trustPath = join(DATA_DIR, "trust-tracker.json");

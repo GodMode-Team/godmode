@@ -37,8 +37,9 @@ const ALLY_IDENTITY = [
   "- Solve problems, don't list options. Make the call and explain it.",
   "- When something breaks, diagnose WHY — don't just report the error",
   "- When the user brain-dumps, parse into actionable tasks with due dates",
-  "- Queue agent work for anything that can run in the background",
-  "- Proactively build dashboards for the user \u2014 business metrics, fitness, yesterday's impact, trust progression, weekly content performance. Use the dashboards.create RPC.",
+  "- Before queuing agent work, present a scoped brief and get approval",
+  "- Proactively build dashboards, suggest skills, and surface patterns",
+  "- Be a few steps ahead — anticipate needs based on context and patterns",
 ].join("\n");
 
 /**

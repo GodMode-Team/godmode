@@ -4,6 +4,40 @@ This file tracks recent development changes so Atlas and other agents can quickl
 
 ---
 
+## v1.6.0 — Product Foundation (2026-03-05)
+
+### Philosophy Lock-In
+- `docs/GODMODE-META-ARCHITECTURE.md` v2 — the definitive product blueprint
+- 8 principles: context is king, files are the API, inbox-first, autonomy is earned, ally is the interface, compound don't accumulate, survive the model switch, code as little as possible
+- GodMode = Engine + Slots + Community. The ally is 80% of the value.
+
+### Engine
+- File-based skills directory (`~/godmode/skills/`) with cron scheduling
+- Heartbeat processes cron skills on each tick
+- Verification gates for all task types (not just coding)
+- Human-in-the-loop queue scoping (ally presents brief, user approves)
+- `trust_rate` tool wired into registered tools
+- Dead weight removed: proactiveIntel stubs, data-sources, people-data unregistered
+- Team services gated behind team workspace flag
+
+### UX
+- 6-tab baseline: Chat, Today, Work, Second Brain, Dashboards, Settings
+- Power-user tabs (Mission Control, Skills, Trust, etc.) behind expandable section
+- Ally panel sync fix — bubble, Chat tab, and iMessage stay in sync
+- Trust summary in awareness snapshot
+
+### Onboarding
+- Quick setup → immediate first win (starter brief, zero integrations)
+- Soul interview moved to post-first-win (optional deepening, not gatekeeping)
+- Demo brief works with name + timezone only
+
+### Content
+- 7 starter personas: content-writer, researcher, ops-runner, meeting-prep, evidence-collector, weekly-reviewer, personal-assistant
+- 3 sample cron skills: weekly-content, inbox-sweep, competitor-scan
+- Auto-deploy on first run (copies from assets/ if roster is empty)
+
+---
+
 ## 2026-03-04 — v1.6.0-ux: Nav Simplification, Starter Brief, Ally Sync Fix
 
 ### Nav Simplification (6-Tab Baseline)
