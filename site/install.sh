@@ -708,13 +708,13 @@ if [ "$IS_HEADLESS" = true ]; then
       ok "Tailscale detected — IP: $TAILSCALE_IP"
 
       # Get the full tailnet FQDN (e.g., metatron-3.taild13d36.ts.net)
-      TAILSCALE_FQDN="$(tailscale status --json 2>/dev/null | node -e "
+      TAILSCALE_FQDN="$(tailscale status --json 2>/dev/null | node -e '
         try {
-          const d = JSON.parse(require('fs').readFileSync('/dev/stdin', 'utf-8'));
-          const name = (d.Self?.DNSName || '').replace(/\.\$/, '');
+          const d = JSON.parse(require("fs").readFileSync("/dev/stdin", "utf-8"));
+          const name = (d.Self?.DNSName || "").replace(/\.$/, "");
           process.stdout.write(name);
         } catch {}
-      " 2>/dev/null || true)"
+      ' 2>/dev/null || true)"
 
       # Provision HTTPS cert early — gives CT logs time to propagate during rest of install
       if [ -n "$TAILSCALE_FQDN" ]; then
@@ -888,7 +888,7 @@ if [ "$IS_HEADLESS" = true ]; then
   fi
 
   printf '  %s%s.%s Restart gateway (if you changed config above):\n' "$CYN" "$STEP_NUM" "$RST"
-  printf '     openclaw gateway restart\n\n'
+  printf '     pkill -f "openclaw gateway" 2>/dev/null; nohup openclaw gateway run >/dev/null 2>&1 &\n\n'
 else
   # Desktop — open browser
   printf '  %sOpening GodMode...%s\n' "$WHT$BLD" "$RST"
