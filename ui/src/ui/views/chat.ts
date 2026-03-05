@@ -591,6 +591,13 @@ async function handleChatThreadLinkClick(event: MouseEvent, props: ChatProps) {
     return;
   }
 
+  // Bare domains in <code> blocks (e.g. go.example.com/page) — prefix https://
+  if (/^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+\.[a-z]{2,}(\/\S*)?$/i.test(codeText)) {
+    event.preventDefault();
+    window.open(`https://${codeText}`, "_blank", "noopener,noreferrer");
+    return;
+  }
+
   const pathCandidate = extractPathCandidateFromCode(codeText);
   if (!pathCandidate) {
     return;

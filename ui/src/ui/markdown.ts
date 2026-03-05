@@ -201,7 +201,8 @@ export function toSanitizedMarkdownHtml(markdown: string): string {
     }
     return sanitized;
   }
-  const rendered = marked.parse(`${truncated.text}${suffix}`) as string;
+  const linked = linkifyFilePaths(`${truncated.text}${suffix}`);
+  const rendered = marked.parse(linked) as string;
   const sanitized = DOMPurify.sanitize(rendered, {
     ALLOWED_TAGS: allowedTags,
     ALLOWED_ATTR: allowedAttrs,
