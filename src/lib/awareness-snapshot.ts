@@ -202,10 +202,14 @@ export async function generateSnapshot(): Promise<string> {
     };
     if (trustData.workflows && trustData.workflows.length > 0) {
       const sorted = [...trustData.workflows].sort((a, b) => b.score - a.score);
-      const highest = sorted[0];
-      const lowest = sorted[sorted.length - 1];
       lines.push(`## Trust`);
-      lines.push(`- ${sorted.length} workflows tracked. Highest: ${highest.name} (${highest.score.toFixed(1)}/10). Lowest: ${lowest.name} (${lowest.score.toFixed(1)}/10).`);
+      if (sorted.length === 1) {
+        lines.push(`- 1 workflow tracked: ${sorted[0].name} (${sorted[0].score.toFixed(1)}/10).`);
+      } else {
+        const highest = sorted[0];
+        const lowest = sorted[sorted.length - 1];
+        lines.push(`- ${sorted.length} workflows tracked. Highest: ${highest.name} (${highest.score.toFixed(1)}/10). Lowest: ${lowest.name} (${lowest.score.toFixed(1)}/10).`);
+      }
     }
   } catch {
     // No trust data yet — skip

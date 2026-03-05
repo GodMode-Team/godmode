@@ -92,6 +92,35 @@ export async function loadDashboard(
   }
 }
 
+// ── Toggle pin ──────────────────────────────────────────────────
+
+export async function toggleDashboardPin(
+  state: DashboardsState,
+  id: string,
+): Promise<void> {
+  if (!state.client || !state.connected) return;
+
+  const dash = (state.dashboardsList ?? []).find((d) => d.id === id);
+  if (!dash) return;
+
+  const newPinned = !dash.pinned;
+  try {
+    await state.client.request("dashboards.save", {
+      id: dash.id,
+      title: dash.title,
+      description: dash.description,
+      scope: dash.scope,
+      pinned: newPinned,
+    });
+    dash.pinned = newPinned;
+    // Trigger re-render by replacing the array reference
+    state.dashboardsList = [...(state.dashboardsList ?? [])];
+  } catch (err) {
+    state.dashboardsError =
+      err instanceof Error ? err.message : "Failed to toggle pin";
+  }
+}
+
 // ── Delete dashboard ─────────────────────────────────────────────────
 
 export async function deleteDashboard(

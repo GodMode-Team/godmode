@@ -351,6 +351,7 @@ export type AppViewState = {
   activeDashboardId?: string | null;
   activeDashboardHtml?: string | null;
   activeDashboardManifest?: import("./controllers/dashboards").DashboardManifest | null;
+  dashboardCategoryFilter?: string | null;
   // SecondBrain state
   secondBrainSubtab?: import("./views/second-brain").SecondBrainSubtab;
   secondBrainLoading?: boolean;
@@ -520,6 +521,7 @@ export type AppViewState = {
   handleDateToday: () => void;
   // Daily Brief handlers
   handleDailyBriefRefresh: () => Promise<void>;
+  handleDailyBriefGenerate: () => Promise<void>;
   handleDailyBriefOpenInObsidian: () => void;
   handleBriefSave: (content: string) => Promise<void>;
   handleBriefToggleCheckbox: (index: number, checked: boolean) => Promise<void>;
@@ -618,6 +620,8 @@ export type AppViewState = {
   handleDashboardSelect: (id: string) => Promise<void>;
   handleDashboardDelete: (id: string) => Promise<void>;
   handleDashboardCreateViaChat: (prompt?: string) => void;
+  handleDashboardTogglePin: (id: string) => Promise<void>;
+  handleDashboardCategoryFilter: (category: string | null) => void;
   handleDashboardBack: () => void;
   handleDashboardOpenSession: (dashboardId: string) => Promise<void>;
   // Proactive Intel handlers

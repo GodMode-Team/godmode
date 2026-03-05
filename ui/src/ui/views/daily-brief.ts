@@ -25,6 +25,7 @@ export type DailyBriefProps = {
   loading?: boolean;
   error?: string | null;
   onRefresh?: () => void;
+  onGenerate?: () => void;
   onOpenInObsidian?: () => void;
   onSaveBrief?: (content: string) => void;
   onToggleCheckbox?: (index: number, checked: boolean) => void;
@@ -133,6 +134,7 @@ export function renderDailyBrief(props: DailyBriefProps) {
     loading,
     error,
     onRefresh,
+    onGenerate,
     onOpenInObsidian,
     onSaveBrief,
     onToggleCheckbox,
@@ -196,9 +198,11 @@ export function renderDailyBrief(props: DailyBriefProps) {
             <span class="empty-icon">\uD83D\uDCDD</span>
             <span>No brief available for today</span>
             <span class="empty-hint">Your morning brief pulls together your calendar, tasks, goals, and energy data into a single scannable page.</span>
-            ${onRefresh
-              ? html`<button class="brief-generate-btn" @click=${onRefresh}>Generate Brief Now</button>`
-              : nothing}
+            ${onGenerate
+              ? html`<button class="brief-generate-btn" @click=${onGenerate}>Generate Brief Now</button>`
+              : onRefresh
+                ? html`<button class="brief-generate-btn" @click=${onRefresh}>Generate Brief Now</button>`
+                : nothing}
             <span class="empty-hint" style="margin-top: 8px; font-size: 12px;">Briefs auto-generate at 5:00 AM when configured.</span>
           </div>
         </div>

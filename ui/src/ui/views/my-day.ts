@@ -51,6 +51,7 @@ export type MyDayProps = {
   dailyBriefLoading?: boolean;
   dailyBriefError?: string | null;
   onBriefRefresh?: () => void;
+  onBriefGenerate?: () => void;
   onBriefOpenInObsidian?: () => void;
   onBriefSave?: (content: string) => void;
   onBriefToggleCheckbox?: (index: number, checked: boolean) => void;
@@ -520,6 +521,7 @@ export function renderMyDay(props: MyDayProps) {
     loading: props.dailyBriefLoading,
     error: props.dailyBriefError,
     onRefresh: props.onBriefRefresh,
+    onGenerate: props.onBriefGenerate,
     onOpenInObsidian: props.onBriefOpenInObsidian,
     onSaveBrief: props.onBriefSave,
     onToggleCheckbox: props.onBriefToggleCheckbox,

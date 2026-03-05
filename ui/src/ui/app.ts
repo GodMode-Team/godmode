@@ -672,6 +672,8 @@ export class GodModeApp extends LitElement {
   dashboardPreviousSessionKey: string | null = null;
   /** Whether the inline chat panel is expanded */
   @state() dashboardChatOpen = false;
+  /** Active category filter for dashboards gallery */
+  @state() dashboardCategoryFilter: string | null = null;
 
   // Second Brain state
   @state() secondBrainSubtab: import("./views/second-brain").SecondBrainSubtab = "identity";
@@ -1475,6 +1477,11 @@ export class GodModeApp extends LitElement {
     await deleteDashboard(this, id);
   }
 
+  async handleDashboardTogglePin(id: string) {
+    const { toggleDashboardPin } = await import("./controllers/dashboards.js");
+    await toggleDashboardPin(this, id);
+  }
+
   async handleDashboardCreateViaChat(prompt?: string) {
     this.setTab("chat" as import("./navigation").Tab);
     const { createNewSession } = await import("./app-render.helpers.js");
@@ -1482,6 +1489,10 @@ export class GodModeApp extends LitElement {
     void this.handleSendChat(
       prompt ?? "I want to create a custom dashboard. Ask me what data I want to see and design it for me. You can use any of GodMode's data — tasks, calendar, focus pulse, goals, trust scores, agent activity, queue status, coding tasks, workspace stats, and more.",
     );
+  }
+
+  handleDashboardCategoryFilter(category: string | null) {
+    this.dashboardCategoryFilter = category;
   }
 
   handleDashboardBack() {
@@ -2822,6 +2833,19 @@ export class GodModeApp extends LitElement {
   // Daily Brief handlers
   async handleDailyBriefRefresh() {
     await loadBriefOnlyInternal(this);
+  }
+
+  async handleDailyBriefGenerate() {
+    if (!this.client || !this.connected) return;
+    this.dailyBriefLoading = true;
+    try {
+      await this.client.request("dailyBrief.generate", {});
+      await loadBriefOnlyInternal(this);
+    } catch (err) {
+      this.dailyBriefError = err instanceof Error ? err.message : "Failed to generate brief";
+    } finally {
+      this.dailyBriefLoading = false;
+    }
   }
 
   handleDailyBriefOpenInObsidian() {
