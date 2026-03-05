@@ -375,6 +375,19 @@ export async function generateConfigRecommendations(): Promise<ConfigRecommendat
     });
   }
 
+  // Recommended: context pruning
+  const pruning = defaults?.contextPruning as Record<string, unknown> | undefined;
+  if (!pruning || pruning.mode === "off") {
+    recommendations.push({
+      key: "agents.defaults.contextPruning.mode",
+      label: "Context pruning",
+      currentValue: pruning?.mode ?? "off",
+      recommendedValue: "cache-ttl",
+      reason: "Auto-trims stale tool results from context to prevent overflow in long sessions.",
+      priority: "recommended",
+    });
+  }
+
   // Recommended: heartbeat
   // OC activates the heartbeat when the section exists with a schedule,
   // not just via `enabled: true`.

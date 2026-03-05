@@ -2,11 +2,10 @@ import type { IconName } from "./icons.js";
 
 export const TAB_GROUPS = [
   { label: "", tabs: ["chat", "today", "workspaces", "second-brain", "dashboards"] },
-  { label: "Settings", tabs: ["config"] },
+  { label: "Settings", tabs: ["config", "skills", "trust", "guardrails", "options"] },
 ] as const;
 
 export const POWER_USER_GROUPS = [
-  { label: "Toolkit", tabs: ["skills", "trust", "guardrails", "options"] },
   { label: "System", tabs: ["mission-control", "overview", "channels", "instances", "sessions", "cron", "nodes", "debug", "logs"] },
 ] as const;
 

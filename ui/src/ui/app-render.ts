@@ -464,51 +464,29 @@ export function renderApp(state: AppViewState) {
             </div>
           `;
         })}
-        ${(() => {
-          const mcExpanded = !!state.settings.navGroupsCollapsed["__missionControl__"];
-          const mcHasActive = POWER_USER_GROUPS.some((g) => g.tabs.some((t) => t === state.tab));
+        ${POWER_USER_GROUPS.map((group) => {
+          const isGroupCollapsed = state.settings.navGroupsCollapsed[group.label] ?? true;
+          const hasActiveTab = group.tabs.some((tab) => tab === state.tab);
           return html`
-            <div class="nav-group nav-group--mission-control">
+            <div class="nav-group ${isGroupCollapsed && !hasActiveTab ? "nav-group--collapsed" : ""}">
               <button
                 class="nav-label"
                 @click=${() => {
                   const next = { ...state.settings.navGroupsCollapsed };
-                  next["__missionControl__"] = !mcExpanded;
+                  next[group.label] = !isGroupCollapsed;
                   state.applySettings({ ...state.settings, navGroupsCollapsed: next });
                 }}
-                aria-expanded=${mcExpanded}
+                aria-expanded=${!isGroupCollapsed}
               >
-                <span class="nav-label__text">Mission Control</span>
-                <span class="nav-label__chevron">${mcExpanded ? "\u2212" : "+"}</span>
+                <span class="nav-label__text">${group.label}</span>
+                <span class="nav-label__chevron">${isGroupCollapsed ? "+" : "\u2212"}</span>
               </button>
-              ${mcExpanded || mcHasActive
-                ? POWER_USER_GROUPS.map((group) => {
-                    const isGroupCollapsed = state.settings.navGroupsCollapsed[group.label] ?? false;
-                    const hasActiveTab = group.tabs.some((tab) => tab === state.tab);
-                    return html`
-                      <div class="nav-group ${isGroupCollapsed && !hasActiveTab ? "nav-group--collapsed" : ""}">
-                        <button
-                          class="nav-label"
-                          @click=${() => {
-                            const next = { ...state.settings.navGroupsCollapsed };
-                            next[group.label] = !isGroupCollapsed;
-                            state.applySettings({ ...state.settings, navGroupsCollapsed: next });
-                          }}
-                          aria-expanded=${!isGroupCollapsed}
-                        >
-                          <span class="nav-label__text">${group.label}</span>
-                          <span class="nav-label__chevron">${isGroupCollapsed ? "+" : "\u2212"}</span>
-                        </button>
-                        <div class="nav-group__items">
-                          ${group.tabs.map((tab) => renderTab(state, tab as Tab))}
-                        </div>
-                      </div>
-                    `;
-                  })
-                : nothing}
+              <div class="nav-group__items">
+                ${group.tabs.map((tab) => renderTab(state, tab as Tab))}
+              </div>
             </div>
           `;
-        })()}
+        })}
         <div class="nav-group nav-group--links">
           <div class="nav-label nav-label--static">
             <span class="nav-label__text">Resources</span>

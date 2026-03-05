@@ -955,6 +955,21 @@ export function buildConfigPatch(answers: OnboardingAnswers): Record<string, unk
           mode: "safeguard",
           memoryFlush: { enabled: true, softThresholdTokens: 20000 },
         },
+        contextPruning: {
+          mode: "cache-ttl",
+          ttl: "5m",
+          keepLastAssistants: 3,
+          softTrimRatio: 0.3,
+          hardClearRatio: 0.5,
+          minPrunableToolChars: 4000,
+          softTrim: { maxChars: 4000, headChars: 1500, tailChars: 1500 },
+          hardClear: { enabled: true, placeholder: "[tool result expired]" },
+          tools: {
+            allow: ["exec", "shell", "bash", "read", "grep", "glob",
+                    "find", "cat", "ls", "search", "web_search", "browser"],
+            deny: ["*image*"],
+          },
+        },
         thinkingDefault: "low",
         models: {
           "anthropic/claude-sonnet-4-6": {

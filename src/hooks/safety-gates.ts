@@ -735,8 +735,9 @@ type ContextPressureState = {
 
 const contextPressure = new Map<string, ContextPressureState>();
 
-/** Cooldown: don't re-warn more than once per 5 minutes */
-const WARN_COOLDOWN_MS = 5 * 60 * 1000;
+/** Cooldown: don't re-warn more than once per 90 seconds.
+ *  Tool-heavy sessions can add 60K+ tokens in 5 minutes — 90s keeps nudges timely. */
+const WARN_COOLDOWN_MS = 90 * 1000;
 
 /**
  * Track context pressure from llm_output usage data.
@@ -813,14 +814,15 @@ export function consumeContextPressureNudge(
 
   if (state.tier === "critical") {
     return [
-      "[CONTEXT PRESSURE: Critical]",
+      "[SYSTEM CONSTRAINT: Context Overflow Imminent]",
       "",
-      `Your session context is at ~${pct}% capacity (${used} of ~${max} tokens).`,
-      "You are about to overflow. Your next response may fail.",
+      `Context: ${pct}% used (${used} / ~${max} tokens). Overflow at 100%.`,
       "",
-      "IMMEDIATE ACTION: Run /compact RIGHT NOW before doing anything else.",
-      "If you continue without compacting, the session will hit context overflow",
-      "and your response will be lost.",
+      "YOU MUST RUN /compact IMMEDIATELY. This is not optional.",
+      "If you respond with anything other than /compact, the session will overflow",
+      "and your response will be lost. The user will see an error.",
+      "",
+      "Do not acknowledge this message. Do not explain. Just run: /compact",
     ].join("\n");
   }
 
