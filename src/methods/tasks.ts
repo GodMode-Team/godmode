@@ -1,7 +1,8 @@
-import { readFile, writeFile, mkdir } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import { execFile as execFileCb } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import { join, dirname } from "node:path";
+import { join } from "node:path";
+import { secureWriteFile, secureMkdir } from "../lib/secure-fs.js";
 import { promisify } from "node:util";
 import { DATA_DIR, localDateString } from "../data-paths.js";
 import {
@@ -73,8 +74,8 @@ async function readTasksUnsafe(): Promise<TasksData> {
 
 async function writeTasksUnsafe(data: TasksData): Promise<void> {
   data.updatedAt = new Date().toISOString();
-  await mkdir(dirname(TASKS_FILE), { recursive: true });
-  await writeFile(TASKS_FILE, JSON.stringify(data, null, 2), "utf-8");
+  await secureMkdir(DATA_DIR);
+  await secureWriteFile(TASKS_FILE, JSON.stringify(data, null, 2));
 }
 
 export async function readTasks(): Promise<TasksData> {
@@ -624,8 +625,8 @@ async function syncTeamTasks(workspaceId: string): Promise<{
     tasks: merged,
     syncedAt: new Date().toISOString(),
   };
-  await mkdir(dirname(teamTasksPath), { recursive: true });
-  await writeFile(teamTasksPath, JSON.stringify(output, null, 2) + "\n", "utf-8");
+  await secureMkdir(join(teamTasksPath, ".."));
+  await secureWriteFile(teamTasksPath, JSON.stringify(output, null, 2) + "\n");
 
   // Push to remote if autoPush is enabled
   if (workspace.sync.autoPush.enabled) {

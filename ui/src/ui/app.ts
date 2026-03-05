@@ -2913,6 +2913,10 @@ export class GodModeApp extends LitElement {
       this.privateSessions = new Map(this.privateSessions).set(this.sessionKey, expiresAt);
       this._persistPrivateSessions();
       this._startPrivateSessionTimer();
+      // Notify backend so vault-capture and awareness snapshot skip this session
+      if (this.client && this.connected) {
+        this.client.request("session.setPrivate", { sessionKey: this.sessionKey, enabled: true }).catch(() => {});
+      }
       // Inject system-style notice as first message
       this.chatMessages = [
         {
@@ -2957,8 +2961,10 @@ export class GodModeApp extends LitElement {
       });
     }
 
-    // Delete from gateway (fire-and-forget, no confirmation prompt)
+    // Notify backend to clear private status before deletion
     if (this.client && this.connected) {
+      this.client.request("session.setPrivate", { sessionKey, enabled: false }).catch(() => {});
+      // Delete from gateway (fire-and-forget, no confirmation prompt)
       this.client.request("sessions.delete", { key: sessionKey, deleteTranscript: true }).catch(() => {});
     }
 

@@ -197,6 +197,15 @@ class ConsciousnessHeartbeat {
         }
       } catch { /* non-fatal */ }
 
+      // 7. Clean up expired private sessions
+      try {
+        const { cleanupExpiredPrivateSessions } = await import("../lib/private-session.js");
+        const cleaned = await cleanupExpiredPrivateSessions();
+        if (cleaned > 0) {
+          this.logger.info(`[Consciousness] Cleaned up ${cleaned} expired private session(s)`);
+        }
+      } catch { /* non-fatal */ }
+
       // 8. Vault auto-capture pipelines (Sessions→Daily, Queue→Inbox)
       try {
         const { runAllCapturePipelines } = await import("./vault-capture.js");

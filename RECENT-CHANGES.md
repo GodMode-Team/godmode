@@ -59,6 +59,40 @@ This file tracks recent development changes so Atlas and other agents can quickl
 
 ---
 
+## 2026-03-05 — Security Hardening Mega-Session
+
+### Phase 1: Comprehensive Security Audit + Fixes (12+ critical/high vulns fixed)
+- **files.ts**: Removed hardcoded GOG_KEYRING_PASSWORD; added path validation + symlink resolution to readFile, pushToDrive, batchPushToDrive, taskFiles; sanitized error messages
+- **dashboards.ts**: Sanitized dashboard ID via sanitizeSlug() in get/remove handlers; added path prefix check before rm
+- **vault-capture.ts**: Added path traversal check on destination paths in captureQueueOutputsToVault
+- **safety-gates.ts**: Expanded output shield (JWT, AWS, OpenAI, Oura, Fathom, Front, Bearer, private keys); expanded config shield (15+ sensitive paths, 20+ file-read commands); lowered min length to 20
+- **fathom-webhook.ts**: Webhook now REQUIRES signing secret; removed secret from RPC response; added restrictive file permissions
+- **markdown.ts (UI)**: Added DOMPurify hook to restrict `<input>` to checkbox only; CSS sanitization strips expression(), behavior:, -moz-binding:, @import
+
+### Phase 2: Private Session Mode
+- **Backend**: New `src/lib/private-session.ts` (server-side state, 24h auto-expiry, in-memory cache); new `src/methods/session-privacy.ts` (RPC handlers)
+- **Frontend**: Wired privateMode props to chat view; added backend RPC calls in toggle handler; lock/unlock button + banner in chat compose area
+- **Integration**: before_prompt_build blocks vault capture for private sessions; heartbeat cleans expired sessions
+
+### Phase 3: Least Privilege Hardening
+- **New `src/lib/secure-fs.ts`**: secureWriteFile (0o600), secureMkdir (0o700), sanitizeError utility
+- **12 files migrated**: trust-tracker, options, tasks, projects, data-sources, onboarding, system-update, dashboards, support, correction-log, fathom-processor, trust-rate tool
+- **Error sanitization**: User-facing error responses in support.ts now strip home directory paths
+
+### Phase 4: Security Documentation
+- **New `docs/SECURITY.md`**: Threat model, 5 security layers (safety gates, file I/O, HTML/CSS sanitization, private sessions, auth/webhooks), data storage map, user security guide
+
+### Files Changed
+- `src/methods/files.ts`, `src/methods/dashboards.ts`, `src/methods/trust-tracker.ts`, `src/methods/options.ts`, `src/methods/tasks.ts`, `src/methods/projects.ts`, `src/methods/data-sources.ts`, `src/methods/onboarding.ts`, `src/methods/system-update.ts`, `src/methods/support.ts`, `src/methods/fathom-webhook.ts`, `src/methods/session-privacy.ts` (new)
+- `src/hooks/safety-gates.ts`
+- `src/lib/private-session.ts` (new), `src/lib/secure-fs.ts` (new), `src/lib/env-writer.ts`, `src/lib/correction-log.ts`
+- `src/services/vault-capture.ts`, `src/services/consciousness-heartbeat.ts`, `src/services/fathom-processor.ts`
+- `src/tools/trust-rate.ts`
+- `ui/src/ui/views/chat.ts`, `ui/src/ui/icons.ts`, `ui/src/ui/markdown.ts`, `ui/src/ui/app.ts`, `ui/src/ui/app-render.ts`
+- `index.ts`, `docs/SECURITY.md` (new)
+
+---
+
 ## v1.6.0 Stabilization — Bug Hunt + Content Expansion (2026-03-05)
 
 ### Bug Fixes (12 bugs found and fixed via 6-agent adversarial review)

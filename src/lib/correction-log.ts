@@ -11,6 +11,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { withFileLock } from "openclaw/plugin-sdk";
 import { DATA_DIR } from "../data-paths.js";
+import { secureWriteFile, secureMkdir } from "./secure-fs.js";
 
 // ── Types ──────────────────────────────────────────────────────────
 
@@ -193,8 +194,8 @@ async function readLogUnsafe(): Promise<CorrectionLog> {
 
 async function writeLogUnsafe(log: CorrectionLog): Promise<void> {
   log.updatedAt = new Date().toISOString();
-  await fs.mkdir(path.dirname(LOG_FILE), { recursive: true });
-  await fs.writeFile(LOG_FILE, JSON.stringify(log, null, 2) + "\n", "utf-8");
+  await secureMkdir(path.dirname(LOG_FILE));
+  await secureWriteFile(LOG_FILE, JSON.stringify(log, null, 2) + "\n");
 }
 
 // ── Public API: Read/Write ──────────────────────────────────────────

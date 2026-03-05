@@ -75,6 +75,7 @@ import { secondBrainHandlers } from "./src/methods/second-brain.js";
 import { supportHandlers } from "./src/methods/support.js";
 import { fathomWebhookHandlers, handleFathomWebhookHttp } from "./src/methods/fathom-webhook.js";
 import { authHandlers } from "./src/methods/auth.js";
+import { sessionPrivacyHandlers } from "./src/methods/session-privacy.js";
 // Auth client — JWT-based authentication
 import {
   loadAuthTokens,
@@ -618,6 +619,7 @@ const godmodePlugin = {
       ...integrationsHandlers,
       ...fathomWebhookHandlers,
       ...authHandlers,
+      ...sessionPrivacyHandlers,
     };
 
     // Methods that must work before a license is configured (setup flow)
@@ -1147,8 +1149,17 @@ h1{color:#ff6b6b}code{background:#16213e;padding:2px 8px;border-radius:4px}a{col
       } catch (err) {
         api.logger.warn(`[GodMode] onboarding context hook error: ${String(err)}`);
       }
+      // ── Private Session Check ──
+      let isPrivate = false;
+      try {
+        const { isPrivateSession } = await import("./src/lib/private-session.js");
+        isPrivate = await isPrivateSession(sessionKey ?? "");
+      } catch { /* module load failure — treat as non-private */ }
+
       // ── Awareness Snapshot — lean cross-session context (~50 lines) ───
       // Replaces raw CONSCIOUSNESS.md (~300 lines) + WORKING.md (~150 lines)
+      // Private sessions still get the awareness snapshot (ally still works)
+      // but the snapshot won't include data FROM this session.
       try {
         const { readSnapshot } = await import("./src/lib/awareness-snapshot.js");
         const snapshot = await readSnapshot();
@@ -1161,6 +1172,17 @@ h1{color:#ff6b6b}code{background:#16213e;padding:2px 8px;border-radius:4px}a{col
         }
       } catch (err) {
         api.logger.warn(`[GodMode] awareness snapshot error: ${String(err)}`);
+      }
+
+      // ── Private session indicator ──
+      if (isPrivate) {
+        prependChunks.push(
+          "[Private Session Active]\n" +
+          "This conversation is in private mode. Nothing from this session will be saved " +
+          "to the vault, awareness snapshot, session archive, or daily brief. " +
+          "Tools and queue still work normally. If the user queues a task, the queue item " +
+          "is stored (necessary for processing) but this conversation context is not.",
+        );
       }
 
       // Safety nudges (conditional — only if a gate fired)

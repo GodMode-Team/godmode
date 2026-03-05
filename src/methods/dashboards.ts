@@ -18,6 +18,7 @@ import fs from "node:fs/promises";
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import path from "node:path";
+import { secureWriteFile, secureMkdir } from "../lib/secure-fs.js";
 import type { GatewayRequestHandler } from "openclaw/plugin-sdk";
 import { DATA_DIR, GODMODE_ROOT, MEMORY_DIR, localDateString } from "../data-paths.js";
 
@@ -59,8 +60,8 @@ async function readIndex(): Promise<DashboardIndex> {
 }
 
 async function writeIndex(index: DashboardIndex): Promise<void> {
-  await fs.mkdir(DASHBOARDS_DIR, { recursive: true });
-  await fs.writeFile(DASHBOARDS_INDEX, JSON.stringify(index, null, 2) + "\n", "utf-8");
+  await secureMkdir(DASHBOARDS_DIR);
+  await secureWriteFile(DASHBOARDS_INDEX, JSON.stringify(index, null, 2) + "\n");
 }
 
 function sanitizeSlug(text: string): string {
@@ -102,11 +103,13 @@ const list: GatewayRequestHandler = async ({ params, respond }) => {
 // ── Get ──────────────────────────────────────────────────────────────
 
 const get: GatewayRequestHandler = async ({ params, respond }) => {
-  const id = typeof params.id === "string" ? params.id.trim() : "";
-  if (!id) {
+  const rawId = typeof params.id === "string" ? params.id.trim() : "";
+  if (!rawId) {
     respond(false, undefined, { code: "INVALID_REQUEST", message: "id is required" });
     return;
   }
+  // SECURITY: Sanitize id to prevent path traversal (e.g., ../../etc)
+  const id = sanitizeSlug(rawId);
 
   const index = await readIndex();
   const manifest = index.dashboards.find((d) => d.id === id);
@@ -174,17 +177,16 @@ const save: GatewayRequestHandler = async ({ params, respond }) => {
 
   // Write HTML file
   const dashDir = path.join(DASHBOARDS_DIR, id);
-  await fs.mkdir(dashDir, { recursive: true });
+  await secureMkdir(dashDir);
 
   if (typeof p.html === "string") {
-    await fs.writeFile(path.join(dashDir, "index.html"), p.html, "utf-8");
+    await secureWriteFile(path.join(dashDir, "index.html"), p.html);
   }
 
   // Write individual manifest
-  await fs.writeFile(
+  await secureWriteFile(
     path.join(dashDir, "manifest.json"),
     JSON.stringify(manifest, null, 2) + "\n",
-    "utf-8",
   );
 
   await writeIndex(index);
@@ -194,11 +196,13 @@ const save: GatewayRequestHandler = async ({ params, respond }) => {
 // ── Remove ───────────────────────────────────────────────────────────
 
 const remove: GatewayRequestHandler = async ({ params, respond }) => {
-  const id = typeof params.id === "string" ? params.id.trim() : "";
-  if (!id) {
+  const rawId = typeof params.id === "string" ? params.id.trim() : "";
+  if (!rawId) {
     respond(false, undefined, { code: "INVALID_REQUEST", message: "id is required" });
     return;
   }
+  // SECURITY: Sanitize id to prevent path traversal
+  const id = sanitizeSlug(rawId);
 
   const index = await readIndex();
   const before = index.dashboards.length;
@@ -213,8 +217,12 @@ const remove: GatewayRequestHandler = async ({ params, respond }) => {
     index.activeDashboard = undefined;
   }
 
-  // Remove dashboard directory
+  // SECURITY: Verify resolved path stays within DASHBOARDS_DIR before deletion
   const dashDir = path.join(DASHBOARDS_DIR, id);
+  if (!dashDir.startsWith(DASHBOARDS_DIR + path.sep)) {
+    respond(false, undefined, { code: "ACCESS_DENIED", message: "Invalid dashboard id" });
+    return;
+  }
   try {
     await fs.rm(dashDir, { recursive: true, force: true });
   } catch {
@@ -655,10 +663,9 @@ const openSession: GatewayRequestHandler = async ({ params, respond }) => {
     // Also update the individual manifest file
     const dashDir = path.join(DASHBOARDS_DIR, dashboardId);
     try {
-      await fs.writeFile(
+      await secureWriteFile(
         path.join(dashDir, "manifest.json"),
         JSON.stringify(dashboard, null, 2) + "\n",
-        "utf-8",
       );
     } catch { /* non-critical */ }
 

@@ -342,6 +342,12 @@ export const icons = {
       <path d="M7 11V7a5 5 0 0 1 10 0v4" />
     </svg>
   `,
+  lockOpen: html`
+    <svg viewBox="0 0 24 24">
+      <rect width="18" height="11" x="3" y="11" rx="2" ry="2" />
+      <path d="M7 11V7a5 5 0 0 1 5-5 5 5 0 0 1 4.63 3.13" />
+    </svg>
+  `,
   flask: html`
     <svg viewBox="0 0 24 24">
       <path d="M10 2v7.527a2 2 0 0 1-.211.896L4.72 20.55a1 1 0 0 0 .9 1.45h12.76a1 1 0 0 0 .9-1.45l-5.069-10.127A2 2 0 0 1 14 9.527V2" />

@@ -106,8 +106,9 @@ async function readMeetingQueue(): Promise<MeetingQueue> {
 }
 
 async function writeMeetingQueue(queue: MeetingQueue): Promise<void> {
-  await mkdir(dirname(QUEUE_FILE), { recursive: true });
-  await writeFile(QUEUE_FILE, JSON.stringify(queue, null, 2), "utf-8");
+  await mkdir(dirname(QUEUE_FILE), { recursive: true, mode: 0o700 });
+  // SECURITY: Restrictive permissions — file contains webhook signing secret
+  await writeFile(QUEUE_FILE, JSON.stringify(queue, null, 2), { encoding: "utf-8", mode: 0o600 });
 }
 
 // ── Fathom API helpers ───────────────────────────────────────────────
@@ -270,13 +271,15 @@ export async function handleFathomWebhookHttp(
 
   const queue = await readMeetingQueue();
 
-  // Signature verification — reject on failure when secret is configured
-  if (queue.webhookSecret) {
-    const valid = verifyWebhookSignatureFromHeaders(queue.webhookSecret, headers, body);
-    if (!valid) {
-      console.error("[GodMode] Fathom: webhook signature verification FAILED — rejecting payload");
-      return;
-    }
+  // SECURITY: Require webhook secret — reject unauthenticated payloads
+  if (!queue.webhookSecret) {
+    console.error("[GodMode] Fathom: webhook rejected — no signing secret configured. Set up via fathom.setupWebhook.");
+    return;
+  }
+  const valid = verifyWebhookSignatureFromHeaders(queue.webhookSecret, headers, body);
+  if (!valid) {
+    console.error("[GodMode] Fathom: webhook signature verification FAILED — rejecting payload");
+    return;
   }
 
   // Parse the meeting object
@@ -567,7 +570,8 @@ const setupWebhook: GatewayRequestHandler = async ({ params, respond }) => {
     await writeMeetingQueue(queue);
 
     console.log(`[GodMode] Fathom: webhook registered → ${destinationUrl}`);
-    respond(true, { webhookId, secret });
+    // SECURITY: Do not return the webhook secret in the RPC response
+    respond(true, { webhookId, configured: true });
   } catch (err) {
     respond(false, null, {
       code: "FATHOM_API_ERROR",

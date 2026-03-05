@@ -2132,6 +2132,8 @@ export function renderApp(state: AppViewState) {
                 userAvatar: state.userAvatar,
                 currentToolName: state.currentToolName,
                 currentToolInfo: state.currentToolInfo,
+                privateMode: state.chatPrivateMode,
+                onTogglePrivateMode: () => state.handlePrivateModeToggle(),
                 isWorking: state.workingSessions.has(state.sessionKey),
                 // Scroll state
                 showScrollButton: !state.chatUserNearBottom,

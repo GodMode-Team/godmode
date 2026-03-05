@@ -12,7 +12,9 @@ const execFile = promisify(execFileCb);
 /** Environment for gog CLI calls (needs keyring password). */
 const GOG_ENV = {
   ...process.env,
-  GOG_KEYRING_PASSWORD: process.env.GOG_KEYRING_PASSWORD || "godmode2026",
+  ...(process.env.GOG_KEYRING_PASSWORD
+    ? { GOG_KEYRING_PASSWORD: process.env.GOG_KEYRING_PASSWORD }
+    : {}),
 };
 
 // ── Helpers ──────────────────────────────────────────────────────
@@ -106,6 +108,14 @@ const pushToDrive: GatewayRequestHandler = async ({ params, respond }) => {
   const resolvedPath = await resolveFilePath(filePath);
   if (!resolvedPath) {
     respond(false, null, { code: "FILE_NOT_FOUND", message: `File not found: ${filePath}` });
+    return;
+  }
+
+  // SECURITY: Validate path is within allowed roots before uploading to external service
+  const { isAllowedPath } = await import("../lib/vault-paths.js");
+  const realPath = await fs.realpath(resolvedPath).catch(() => resolvedPath);
+  if (!isAllowedPath(realPath)) {
+    respond(false, null, { code: "ACCESS_DENIED", message: "Path not allowed for Drive upload" });
     return;
   }
 
@@ -206,10 +216,19 @@ const batchPushToDrive: GatewayRequestHandler = async ({ params, respond }) => {
 
   const results: Array<{ path: string; success: boolean; driveUrl?: string; error?: string }> = [];
 
+  const { isAllowedPath } = await import("../lib/vault-paths.js");
+
   for (const fp of filePaths) {
     const resolved = await resolveFilePath(fp);
     if (!resolved) {
       results.push({ path: fp, success: false, error: `File not found: ${fp}` });
+      continue;
+    }
+
+    // SECURITY: Validate path is within allowed roots
+    const realFp = await fs.realpath(resolved).catch(() => resolved);
+    if (!isAllowedPath(realFp)) {
+      results.push({ path: fp, success: false, error: "Path not allowed for Drive upload" });
       continue;
     }
 
@@ -266,19 +285,23 @@ const taskFiles: GatewayRequestHandler = async ({ params, respond }) => {
     const item = queueState.items.find((i) => i.id === itemId);
 
     // Check the main output file
+    const { isAllowedPath: isAllowed } = await import("../lib/vault-paths.js");
     if (item?.result?.outputPath) {
       const outputPath = item.result.outputPath.startsWith("~/")
         ? path.join(process.env.HOME ?? "", item.result.outputPath.slice(2))
         : item.result.outputPath;
-      try {
-        const stat = await fs.stat(outputPath);
-        files.push({
-          path: outputPath,
-          name: path.basename(outputPath),
-          size: stat.size,
-          type: path.extname(outputPath).slice(1) || "file",
-        });
-      } catch { /* file may not exist */ }
+      // SECURITY: Validate output path is within allowed roots
+      if (isAllowed(path.resolve(outputPath))) {
+        try {
+          const stat = await fs.stat(outputPath);
+          files.push({
+            path: outputPath,
+            name: path.basename(outputPath),
+            size: stat.size,
+            type: path.extname(outputPath).slice(1) || "file",
+          });
+        } catch { /* file may not exist */ }
+      }
     }
 
     // Scan inbox for files prefixed with the item ID
@@ -320,16 +343,24 @@ const readFile: GatewayRequestHandler = async ({ params, respond }) => {
     return;
   }
 
-  // SECURITY: Validate path is within allowed roots
+  // SECURITY: Reject null bytes (path injection defense)
+  if (filePath.includes("\0")) {
+    respond(false, null, { code: "INVALID_PATH", message: "Invalid path" });
+    return;
+  }
+
+  // SECURITY: Validate path is within allowed roots, resolving symlinks
   const { isAllowedPath } = await import("../lib/vault-paths.js");
   const resolvedPath = path.resolve(filePath);
-  if (!isAllowedPath(resolvedPath)) {
-    respond(false, null, { code: "ACCESS_DENIED", message: `Path not allowed: ${filePath}` });
+  // Resolve symlinks to prevent escaping allowed roots via symlink
+  const realPath = await fs.realpath(resolvedPath).catch(() => resolvedPath);
+  if (!isAllowedPath(realPath)) {
+    respond(false, null, { code: "ACCESS_DENIED", message: "Path not allowed" });
     return;
   }
 
   try {
-    const stat = statSync(resolvedPath);
+    const stat = statSync(realPath);
     if (!stat.isFile()) {
       respond(false, null, { code: "NOT_FILE", message: "Path is not a file" });
       return;
@@ -339,10 +370,10 @@ const readFile: GatewayRequestHandler = async ({ params, respond }) => {
     const size = stat.size;
     const truncated = size > MAX_SIZE;
 
-    const content = readFileSync(resolvedPath, "utf-8").substring(0, MAX_SIZE);
+    const content = readFileSync(realPath, "utf-8").substring(0, MAX_SIZE);
 
     // Detect content type from extension
-    const ext = path.extname(resolvedPath).toLowerCase().slice(1);
+    const ext = path.extname(realPath).toLowerCase().slice(1);
     const mimeMap: Record<string, string> = {
       html: "text/html", md: "text/markdown", json: "application/json",
       js: "text/javascript", ts: "text/typescript", css: "text/css",
@@ -354,7 +385,9 @@ const readFile: GatewayRequestHandler = async ({ params, respond }) => {
 
     respond(true, { content, size, truncated, contentType });
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
+    // SECURITY: Sanitize error messages to avoid leaking full file paths
+    const rawMsg = err instanceof Error ? err.message : String(err);
+    const msg = rawMsg.replace(/\/Users\/[^/\s]+/g, "~");
     respond(false, null, { code: "READ_ERROR", message: msg });
   }
 };

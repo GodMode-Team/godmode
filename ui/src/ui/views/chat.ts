@@ -113,6 +113,9 @@ export type ChatProps = {
   showDrivePicker?: boolean;
   driveUploading?: boolean;
   onToggleDrivePicker?: () => void;
+  // Private session mode
+  privateMode?: boolean;
+  onTogglePrivateMode?: () => void;
 };
 
 const COMPACTION_TOAST_DURATION_MS = 5000;
@@ -694,6 +697,14 @@ export function renderChat(props: ChatProps) {
       @dragleave=${(e: DragEvent) => handleDragLeave(e, e.currentTarget as HTMLElement)}
       @drop=${(e: DragEvent) => handleDrop(e, props)}
     >
+      ${props.privateMode
+        ? html`<div class="callout callout--private" aria-live="polite">
+            <span style="margin-right:6px">🔒</span>
+            <strong>Private Session</strong> — Nothing from this conversation will be saved to memory or vault.
+          </div>`
+        : nothing
+      }
+
       ${props.disabledReason ? html`<div class="callout">${props.disabledReason}</div>` : nothing}
 
       ${props.error ? html`<div class="callout danger">${props.error}</div>` : nothing}
@@ -957,6 +968,23 @@ export function renderChat(props: ChatProps) {
               >
                 ${icons.paperclip}
               </button>
+
+              ${props.onTogglePrivateMode
+                ? html`
+                  <button
+                    class="chat-compose__toolbar-btn ${props.privateMode ? "private-mode--active" : ""}"
+                    type="button"
+                    @click=${props.onTogglePrivateMode}
+                    title=${props.privateMode
+                      ? "Private mode ON — this session won't be saved to memory or vault. Click to disable."
+                      : "Enable private mode — prevents this session from being saved"}
+                    aria-label=${props.privateMode ? "Disable private mode" : "Enable private mode"}
+                  >
+                    ${props.privateMode ? icons.lock : icons.lockOpen}
+                  </button>
+                `
+                : nothing
+              }
 
               ${props.onConsciousnessFlush
                 ? html`

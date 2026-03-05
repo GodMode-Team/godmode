@@ -14,10 +14,11 @@
  */
 
 import { randomBytes } from "node:crypto";
-import { readFile, writeFile, mkdir } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { homedir } from "node:os";
 import { DATA_DIR, GODMODE_ROOT } from "../data-paths.js";
+import { secureWriteFile, secureMkdir } from "../lib/secure-fs.js";
 import type { GatewayRequestHandler } from "openclaw/plugin-sdk";
 import {
   type OnboardingState,
@@ -81,8 +82,8 @@ async function readOnboarding(): Promise<OnboardingState> {
 }
 
 async function writeOnboarding(state: OnboardingState): Promise<void> {
-  await mkdir(DATA_DIR, { recursive: true });
-  await writeFile(ONBOARDING_FILE, JSON.stringify(state, null, 2) + "\n");
+  await secureMkdir(DATA_DIR);
+  await secureWriteFile(ONBOARDING_FILE, JSON.stringify(state, null, 2) + "\n");
 }
 
 /** Deep merge helper for nested objects. Arrays are replaced, not merged. */
@@ -811,8 +812,8 @@ export const onboardingHandlers: GatewayRequestHandlers = {
           options = JSON.parse(raw) as Record<string, unknown>;
         } catch { /* file may not exist yet */ }
         options["dailyIntel.topics"] = dailyIntelTopics;
-        await mkdir(DATA_DIR, { recursive: true });
-        await writeFile(optionsFile, JSON.stringify(options, null, 2), "utf-8");
+        await secureMkdir(DATA_DIR);
+        await secureWriteFile(optionsFile, JSON.stringify(options, null, 2));
       } catch {
         // Non-fatal: intel topics are optional
       }
@@ -902,8 +903,8 @@ export const onboardingHandlers: GatewayRequestHandlers = {
       }
 
       // Write back
-      await mkdir(stateDir, { recursive: true });
-      await writeFile(configPath, JSON.stringify(config, null, 2) + "\n", "utf-8");
+      await secureMkdir(stateDir);
+      await secureWriteFile(configPath, JSON.stringify(config, null, 2) + "\n");
 
       const isDevKey = key.startsWith("GM-DEV-") || key === "GM-INTERNAL";
       const tokenNote = gatewayTokenGenerated

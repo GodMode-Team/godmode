@@ -11,8 +11,9 @@
  */
 
 import { randomUUID } from "node:crypto";
-import { readFile, writeFile, mkdir } from "node:fs/promises";
-import { join, dirname } from "node:path";
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
+import { secureWriteFile, secureMkdir } from "../lib/secure-fs.js";
 import type { GatewayRequestHandler } from "openclaw/plugin-sdk";
 import { DATA_DIR } from "../data-paths.js";
 
@@ -94,8 +95,8 @@ async function readState(): Promise<TrustTrackerState> {
 
 async function writeState(state: TrustTrackerState): Promise<void> {
   state.updatedAt = new Date().toISOString();
-  await mkdir(dirname(STATE_FILE), { recursive: true });
-  await writeFile(STATE_FILE, JSON.stringify(state, null, 2), "utf-8");
+  await secureMkdir(DATA_DIR);
+  await secureWriteFile(STATE_FILE, JSON.stringify(state, null, 2));
 }
 
 function computeSummary(state: TrustTrackerState, daysBack = 30): WorkflowSummary[] {

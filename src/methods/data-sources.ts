@@ -1,6 +1,7 @@
-import { readFile, writeFile } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { DATA_DIR } from "../data-paths.js";
+import { secureWriteFile } from "../lib/secure-fs.js";
 import type { GatewayRequestHandler } from "openclaw/plugin-sdk";
 
 type GatewayRequestHandlers = Record<string, GatewayRequestHandler>;
@@ -89,7 +90,7 @@ const updateDataSource: GatewayRequestHandler = async ({ params, respond }) => {
     source.lastSync = lastSync;
   }
 
-  await writeFile(DATA_SOURCES_FILE, JSON.stringify(data, null, 2), "utf-8");
+  await secureWriteFile(DATA_SOURCES_FILE, JSON.stringify(data, null, 2));
   respond(true, source);
 };
 

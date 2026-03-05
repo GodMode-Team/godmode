@@ -12,7 +12,8 @@
  * Lifecycle: initFathomProcessor() -> startFathomProcessor() -> stopFathomProcessor()
  */
 
-import { readFile, writeFile, mkdir } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
+import { secureWriteFile, secureMkdir } from "../lib/secure-fs.js";
 import { existsSync, mkdirSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { randomUUID } from "node:crypto";
@@ -154,8 +155,8 @@ async function readMeetingQueue(): Promise<MeetingQueue> {
 }
 
 async function writeMeetingQueue(queue: MeetingQueue): Promise<void> {
-  await mkdir(dirname(QUEUE_FILE), { recursive: true });
-  await writeFile(QUEUE_FILE, JSON.stringify(queue, null, 2), "utf-8");
+  await secureMkdir(dirname(QUEUE_FILE));
+  await secureWriteFile(QUEUE_FILE, JSON.stringify(queue, null, 2));
 }
 
 // ── Core processing ──────────────────────────────────────────────────
@@ -497,7 +498,7 @@ async function fileMeetingToVault(meeting: MeetingQueueItem, meetingDate: string
       dailyContent += meetingSection;
     }
 
-    await writeFile(dailyFilePath, dailyContent, "utf-8");
+    await secureWriteFile(dailyFilePath, dailyContent);
     logger.info(`[FathomProcessor] Appended meeting to daily note: ${dailyFilePath}`);
   }
 
@@ -571,7 +572,7 @@ async function fileMeetingToVault(meeting: MeetingQueueItem, meetingDate: string
     "",
   ].join("\n");
 
-  await writeFile(meetingFilePath, meetingNote, "utf-8");
+  await secureWriteFile(meetingFilePath, meetingNote);
   logger.info(`[FathomProcessor] Created meeting note: ${meetingFilePath}`);
 }
 
@@ -710,7 +711,7 @@ async function draftFollowUpEmail(meeting: MeetingQueueItem): Promise<void> {
     .join("\n");
 
   const draftPath = join(EMAIL_DRAFTS_DIR, `${meeting.id}.md`);
-  await writeFile(draftPath, emailContent, "utf-8");
+  await secureWriteFile(draftPath, emailContent);
   logger.info(`[FathomProcessor] Email draft saved: ${draftPath}`);
 }
 
@@ -766,7 +767,7 @@ async function appendDecisionsToWorking(
     content += `${separator}${sectionHeader}\n${decisionsBlock}`;
   }
 
-  await writeFile(workingPath, content, "utf-8");
+  await secureWriteFile(workingPath, content);
   logger.info(`[FathomProcessor] Appended ${keyDecisions.length} decision(s) to WORKING.md`);
 }
 

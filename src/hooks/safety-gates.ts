@@ -451,7 +451,7 @@ const OUTPUT_LEAK_CHECKS: { name: string; check: (content: string, sessionKey?: 
   {
     name: "api_key_leak",
     check: (content) =>
-      /(?:sk-[a-zA-Z0-9]{20,}|xai-[a-zA-Z0-9]{20,}|ghp_[a-zA-Z0-9]{30,}|gho_[a-zA-Z0-9]{30,}|ANTHROPIC_API_KEY\s*[:=]\s*\S{10,}|XAI_API_KEY\s*[:=]\s*\S{10,}|Bearer\s+sk-[a-zA-Z0-9]{20,})/.test(content),
+      /(?:sk-[a-zA-Z0-9]{20,}|sk-proj-[a-zA-Z0-9]{20,}|sk-ant-[a-zA-Z0-9]{20,}|xai-[a-zA-Z0-9]{20,}|ghp_[a-zA-Z0-9]{30,}|gho_[a-zA-Z0-9]{30,}|AKIA[0-9A-Z]{16}|eyJ[a-zA-Z0-9_-]{10,}\.[a-zA-Z0-9_-]{10,}\.[a-zA-Z0-9_-]{10,}|ANTHROPIC_API_KEY\s*[:=]\s*\S{10,}|XAI_API_KEY\s*[:=]\s*\S{10,}|OURA_API_TOKEN\s*[:=]\s*\S{10,}|FATHOM_API_KEY\s*[:=]\s*\S{10,}|FRONT_API_TOKEN\s*[:=]\s*\S{10,}|RESCUETIME_API_KEY\s*[:=]\s*\S{10,}|OPENAI_API_KEY\s*[:=]\s*\S{10,}|GOG_KEYRING_PASSWORD\s*[:=]\s*\S{4,}|Bearer\s+[a-zA-Z0-9_-]{20,}|-----BEGIN\s+(?:RSA\s+)?PRIVATE\s+KEY-----)/.test(content),
   },
   {
     name: "system_prompt_recitation",
@@ -477,7 +477,7 @@ const OUTPUT_LEAK_CHECKS: { name: string; check: (content: string, sessionKey?: 
         const keys = ["apiKey", "apiSecret", "secretKey", "privateKey", "licenseKey", "authToken", "accessToken"];
         return keys.filter((k) => text.includes(`"${k}"`)).length >= 2;
       };
-      const envPattern = /(?:ANTHROPIC_API_KEY|XAI_API_KEY|OPENCLAW_|X_API_KEY|X_BEARER_TOKEN)\s*=\s*\S+/;
+      const envPattern = /(?:ANTHROPIC_API_KEY|XAI_API_KEY|OPENCLAW_|X_API_KEY|X_BEARER_TOKEN|OURA_API_TOKEN|FATHOM_API_KEY|FRONT_API_TOKEN|RESCUETIME_API_KEY|OPENAI_API_KEY|GOG_KEYRING_PASSWORD|GEMINI_API_KEY)\s*=\s*\S+/;
       return godmodeKeys.test(content) || multiSensitiveKeys(content) || envPattern.test(content);
     },
   },
@@ -534,7 +534,8 @@ export async function checkOutputLeak(
   const config = await readGuardrailsStateCached();
   if (!config.gates.outputShield?.enabled) return false;
 
-  if (content.length < 50) return false;
+  // Short messages can still contain API keys — only skip trivially short ones
+  if (content.length < 20) return false;
 
   const key = sessionKey ?? "__default__";
 
@@ -595,7 +596,10 @@ const SENSITIVE_PATH_PATTERNS = [
   ".openclaw/openclaw.json",
   ".openclaw/.env",
   ".openclaw/config.json",
+  ".openclaw/godmode-auth.json",
+  "godmode/.env",
   "godmode/data/guardrails.json",
+  "godmode/data/meeting-queue.json",
   "AGENTS.md",
   "SOUL.md",
   ".ssh/",
@@ -607,9 +611,11 @@ const SENSITIVE_PATH_PATTERNS = [
   ".netrc",
   ".npmrc",
   ".pypirc",
+  ".gnupg/",
+  ".docker/config.json",
 ];
 
-const FILE_READ_COMMANDS = /\b(cat|head|tail|less|more|strings|xxd|hexdump|od|bat)\b/;
+const FILE_READ_COMMANDS = /\b(cat|head|tail|less|more|strings|xxd|hexdump|od|bat|grep|rg|python3?|node|ruby|perl|cp|mv|curl|wget|open|pbcopy|xclip|base64|tee|sort|awk|sed)\b/;
 
 function normalizeForPathCheck(input: string): string {
   const home = process.env.HOME ?? "";
