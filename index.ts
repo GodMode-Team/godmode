@@ -48,6 +48,7 @@ import { createGuardrailTool } from "./src/tools/guardrail.js";
 import { createOnboardTool } from "./src/tools/onboard.js";
 import { createMorningSetTool } from "./src/tools/morning-set.js";
 import { createQueueAddTool } from "./src/tools/queue-add.js";
+import { createQueueCheckTool } from "./src/tools/queue-check.js";
 import { createTrustRateTool } from "./src/tools/trust-rate.js";
 import { createXReadTool } from "./src/tools/x-read.js";
 import { queueHandlers } from "./src/methods/queue.js";
@@ -636,6 +637,7 @@ const godmodePlugin = {
       "onboarding.configAudit",
       "onboarding.wizard.status",
       "onboarding.wizard.preview",
+      "onboarding.wizard.diff",
       "onboarding.wizard.generate",
       "integrations.status",
       "integrations.test",
@@ -1327,6 +1329,7 @@ h1{color:#ff6b6b}code{background:#16213e;padding:2px 8px;border-radius:4px}a{col
     api.registerTool((ctx) => createMorningSetTool(ctx));
     api.registerTool((ctx) => createGuardrailTool(ctx));
     api.registerTool((ctx) => createQueueAddTool(ctx));
+    api.registerTool(() => createQueueCheckTool());
     api.registerTool((ctx) => createTrustRateTool(ctx));
     api.registerTool((ctx) => createXReadTool(ctx));
 

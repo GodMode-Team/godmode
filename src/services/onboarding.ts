@@ -855,7 +855,82 @@ function generateDailyNoteMd(answers: OnboardingAnswers): string {
 
 // ── OC Config Patch ─────────────────────────────────────────────
 
-function buildConfigPatch(answers: OnboardingAnswers): Record<string, unknown> {
+// ── Config Diff Helpers ─────────────────────────────────────────
+
+export type ConfigDiffEntry = {
+  path: string;
+  current: unknown;
+  recommended: unknown;
+};
+
+export type ConfigDiff = {
+  additions: ConfigDiffEntry[];
+  changes: ConfigDiffEntry[];
+  matching: string[];
+};
+
+/**
+ * Flatten two nested objects into dot-path comparisons.
+ * Walks the `recommended` tree and looks up each leaf in `current`.
+ */
+export function flattenPaths(
+  current: Record<string, unknown>,
+  recommended: Record<string, unknown>,
+  prefix = "",
+): ConfigDiff {
+  const additions: ConfigDiffEntry[] = [];
+  const changes: ConfigDiffEntry[] = [];
+  const matching: string[] = [];
+
+  function walk(cur: Record<string, unknown>, rec: Record<string, unknown>, pfx: string) {
+    for (const key of Object.keys(rec)) {
+      const path = pfx ? `${pfx}.${key}` : key;
+      const rVal = rec[key];
+      const cVal = cur?.[key];
+
+      // If recommended value is a plain object and current is too, recurse
+      if (
+        rVal !== null && rVal !== undefined && typeof rVal === "object" && !Array.isArray(rVal) &&
+        cVal !== null && cVal !== undefined && typeof cVal === "object" && !Array.isArray(cVal)
+      ) {
+        walk(cVal as Record<string, unknown>, rVal as Record<string, unknown>, path);
+      } else if (cVal === undefined || cVal === null) {
+        additions.push({ path, current: cVal ?? null, recommended: rVal });
+      } else if (JSON.stringify(cVal) !== JSON.stringify(rVal)) {
+        changes.push({ path, current: cVal, recommended: rVal });
+      } else {
+        matching.push(path);
+      }
+    }
+  }
+
+  walk(current, recommended, prefix);
+  return { additions, changes, matching };
+}
+
+/**
+ * Compute a config diff between user's current OC config and GodMode's recommendations.
+ */
+export async function computeConfigDiff(
+  answers: OnboardingAnswers,
+  configPath?: string,
+): Promise<ConfigDiff> {
+  const clean = sanitizeAnswers(answers);
+  const patch = buildConfigPatch(clean);
+  const targetPath = configPath ?? OC_CONFIG_PATH;
+
+  let existing: Record<string, unknown> = {};
+  try {
+    const raw = await readFile(targetPath, "utf-8");
+    existing = JSON.parse(raw) as Record<string, unknown>;
+  } catch {
+    // Config doesn't exist — everything is an addition
+  }
+
+  return flattenPaths(existing, patch);
+}
+
+export function buildConfigPatch(answers: OnboardingAnswers): Record<string, unknown> {
   return {
     agents: {
       defaults: {
@@ -971,123 +1046,67 @@ async function safeWriteIfNew(
 export async function generateWorkspaceFiles(
   rawAnswers: OnboardingAnswers,
   workspacePath: string,
-  opts?: { force?: boolean },
+  opts?: { force?: boolean; skipFiles?: string[] },
 ): Promise<OnboardingFileResult[]> {
   const answers = sanitizeAnswers(rawAnswers);
   const force = opts?.force ?? false;
+  const skipFiles = new Set(opts?.skipFiles ?? []);
   const results: OnboardingFileResult[] = [];
 
+  /** Write a file unless its relative path is in skipFiles. */
+  async function maybeWrite(relPath: string, content: string): Promise<void> {
+    if (skipFiles.has(relPath)) {
+      results.push({ path: join(workspacePath, relPath), created: false, skipped: true, reason: "user skipped" });
+      return;
+    }
+    results.push(await safeWriteIfNew(join(workspacePath, relPath), content, force));
+  }
+
   // 1. AGENTS.md
-  results.push(
-    await safeWriteIfNew(
-      join(workspacePath, "AGENTS.md"),
-      generateAgentsMd(answers),
-      force,
-    ),
-  );
+  await maybeWrite("AGENTS.md", generateAgentsMd(answers));
 
   // 2. USER.md
-  results.push(
-    await safeWriteIfNew(
-      join(workspacePath, "USER.md"),
-      generateUserMd(answers),
-      force,
-    ),
-  );
+  await maybeWrite("USER.md", generateUserMd(answers));
 
   // 3. SOUL.md
-  results.push(
-    await safeWriteIfNew(
-      join(workspacePath, "SOUL.md"),
-      generateSoulMd(answers),
-      force,
-    ),
-  );
+  await maybeWrite("SOUL.md", generateSoulMd(answers));
 
   // 4. HEARTBEAT.md
-  results.push(
-    await safeWriteIfNew(
-      join(workspacePath, "HEARTBEAT.md"),
-      generateHeartbeatMd(answers),
-      force,
-    ),
-  );
+  await maybeWrite("HEARTBEAT.md", generateHeartbeatMd(answers));
 
   // 5. memory/WORKING.md
-  results.push(
-    await safeWriteIfNew(
-      join(workspacePath, "memory", "WORKING.md"),
-      generateWorkingMd(),
-      force,
-    ),
-  );
+  await maybeWrite("memory/WORKING.md", generateWorkingMd());
 
   // 6. memory/MISTAKES.md
-  results.push(
-    await safeWriteIfNew(
-      join(workspacePath, "memory", "MISTAKES.md"),
-      generateMistakesMd(),
-      force,
-    ),
-  );
+  await maybeWrite("memory/MISTAKES.md", generateMistakesMd());
 
   // 7. memory/tacit.md
-  results.push(
-    await safeWriteIfNew(
-      join(workspacePath, "memory", "tacit.md"),
-      generateTacitMd(answers),
-      force,
-    ),
-  );
+  await maybeWrite("memory/tacit.md", generateTacitMd(answers));
 
   // 8. memory/curated.md
-  results.push(
-    await safeWriteIfNew(
-      join(workspacePath, "memory", "curated.md"),
-      generateCuratedMd(answers),
-      force,
-    ),
-  );
+  await maybeWrite("memory/curated.md", generateCuratedMd(answers));
 
   // 9. Person stubs
   for (const person of answers.keyPeople) {
     const slug = slugify(person);
     if (!slug) continue;
-    results.push(
-      await safeWriteIfNew(
-        join(workspacePath, "memory", "bank", "people", `${slug}.md`),
-        generatePersonMd(person),
-        force,
-      ),
-    );
+    await maybeWrite(`memory/bank/people/${slug}.md`, generatePersonMd(person));
   }
 
   // 10. Project stubs
   for (const project of answers.projects) {
     const slug = slugify(project);
     if (!slug) continue;
-    results.push(
-      await safeWriteIfNew(
-        join(workspacePath, "memory", "bank", "projects", `${slug}.md`),
-        generateProjectMd(project, answers.name),
-        force,
-      ),
-    );
+    await maybeWrite(`memory/bank/projects/${slug}.md`, generateProjectMd(project, answers.name));
   }
 
   // 11. Today's daily note
-  results.push(
-    await safeWriteIfNew(
-      join(workspacePath, "memory", "daily", `${today()}.md`),
-      generateDailyNoteMd(answers),
-      force,
-    ),
-  );
+  await maybeWrite(`memory/daily/${today()}.md`, generateDailyNoteMd(answers));
 
   // 12. Desired workflows → data/workflows.json (if soul profile has them)
   if (answers.soulProfile?.desiredWorkflows && answers.soulProfile.desiredWorkflows.length > 0) {
-    const workflowsPath = join(workspacePath, "data", "workflows.json");
-    try {
+    const relPath = "data/workflows.json";
+    if (!skipFiles.has(relPath)) {
       const workflowData = {
         createdAt: new Date().toISOString(),
         source: "onboarding",
@@ -1098,17 +1117,9 @@ export async function generateWorkspaceFiles(
           createdAt: new Date().toISOString(),
         })),
       };
-      // workflows.json is always overwritten from onboarding (not idempotent)
-      await mkdir(dirname(workflowsPath), { recursive: true });
-      await writeFile(workflowsPath, JSON.stringify(workflowData, null, 2) + "\n", "utf-8");
-      results.push({ path: workflowsPath, created: true, skipped: false });
-    } catch (err) {
-      results.push({
-        path: workflowsPath,
-        created: false,
-        skipped: true,
-        reason: `write error: ${err instanceof Error ? err.message : String(err)}`,
-      });
+      results.push(await safeWriteIfNew(join(workspacePath, relPath), JSON.stringify(workflowData, null, 2) + "\n", force));
+    } else {
+      results.push({ path: join(workspacePath, relPath), created: false, skipped: true, reason: "user skipped" });
     }
   }
 
@@ -1127,14 +1138,22 @@ export async function generateWorkspaceFiles(
  *
  * @param answers - Onboarding answers (sanitized internally).
  * @param configPath - Override config path (default: ~/.openclaw/openclaw.json). Useful for testing.
+ * @param opts.skipKeys - Dot-notation paths to exclude from the merge (e.g. ["memory.backend"]).
  */
 export async function patchOCConfig(
   answers: OnboardingAnswers,
   configPath?: string,
+  opts?: { skipKeys?: string[] },
 ): Promise<{ patched: boolean; error?: string }> {
   const clean = sanitizeAnswers(answers);
-  const patch = buildConfigPatch(clean);
+  let patch = buildConfigPatch(clean);
   const targetPath = configPath ?? OC_CONFIG_PATH;
+  const skipKeys = opts?.skipKeys ?? [];
+
+  // Remove skipped keys from the patch before merging
+  if (skipKeys.length > 0) {
+    patch = removePaths(patch, skipKeys);
+  }
 
   try {
     let existing: Record<string, unknown> = {};
@@ -1157,6 +1176,28 @@ export async function patchOCConfig(
       error: err instanceof Error ? err.message : String(err),
     };
   }
+}
+
+/**
+ * Remove dot-notation paths from a nested object.
+ * Returns a shallow clone with the specified paths deleted.
+ */
+function removePaths(
+  obj: Record<string, unknown>,
+  paths: string[],
+): Record<string, unknown> {
+  const result = structuredClone(obj);
+  for (const dotPath of paths) {
+    const parts = dotPath.split(".");
+    let cur: Record<string, unknown> = result;
+    for (let i = 0; i < parts.length - 1; i++) {
+      const next = cur[parts[i]];
+      if (next === null || next === undefined || typeof next !== "object" || Array.isArray(next)) break;
+      cur = next as Record<string, unknown>;
+    }
+    delete cur[parts[parts.length - 1]];
+  }
+  return result;
 }
 
 /**

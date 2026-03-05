@@ -570,10 +570,6 @@ export class GodModeApp extends LitElement {
   @state() privateSessions: Map<string, number> = new Map();
   private _privateSessionTimer: ReturnType<typeof setInterval> | null = null;
 
-  @state() goals?: import("./views/goals").Goal[];
-  @state() goalsLoading = false;
-  @state() goalsError: string | null = null;
-
   // Data tab state
   @state() dataSources?: import("./views/data").DataSource[];
   @state() dataLoading = false;
@@ -2669,9 +2665,8 @@ export class GodModeApp extends LitElement {
       return;
     }
     await loadMyDayInternal(this);
-    // Also refresh decision cards and goals
+    // Also refresh decision cards
     this._loadDecisionCards();
-    this.handleGoalsRefresh().catch(() => {});
   }
 
   private _loadDecisionCards() {
@@ -3188,24 +3183,6 @@ export class GodModeApp extends LitElement {
     }
   }
 
-  async handleGoalsRefresh() {
-    if (!this.client || !this.connected) {
-      return;
-    }
-    this.goalsLoading = true;
-    this.goalsError = null;
-    try {
-      const result = await this.client.request<{
-        goals: import("./views/goals").Goal[];
-      }>("goals.get", {});
-      this.goals = result.goals ?? [];
-    } catch (err) {
-      this.goalsError = err instanceof Error ? err.message : "Failed to load goals";
-      console.error("[Goals] Load error:", err);
-    } finally {
-      this.goalsLoading = false;
-    }
-  }
 
   // ── Onboarding handlers ──────────────────────────────────────
 
@@ -3397,20 +3374,77 @@ export class GodModeApp extends LitElement {
   async handleWizardPreview() {
     if (!this.client || !this.wizardState) return;
     try {
-      const result = await this.client.request<{
-        files: Array<{ path: string; exists: boolean; wouldCreate: boolean }>;
-      }>("onboarding.wizard.preview", this.wizardState.answers);
-      this.wizardState = { ...this.wizardState, preview: result.files ?? [] };
+      // Fetch file preview and config diff in parallel
+      const [previewResult, diffResult] = await Promise.all([
+        this.client.request<{
+          files: Array<{ path: string; exists: boolean; wouldCreate: boolean }>;
+        }>("onboarding.wizard.preview", this.wizardState.answers),
+        this.client.request<{
+          additions: Array<{ path: string; current: unknown; recommended: unknown }>;
+          changes: Array<{ path: string; current: unknown; recommended: unknown }>;
+          matching: string[];
+        }>("onboarding.wizard.diff", this.wizardState.answers).catch(() => null),
+      ]);
+
+      // Pre-populate file selections: new files checked, existing files unchecked
+      const fileSelections: Record<string, boolean> = {};
+      for (const f of previewResult.files ?? []) {
+        fileSelections[f.path] = f.wouldCreate;
+      }
+
+      // Pre-populate config selections: additions checked, changes unchecked
+      const configSelections: Record<string, boolean> = {};
+      if (diffResult) {
+        for (const a of diffResult.additions) configSelections[a.path] = true;
+        for (const c of diffResult.changes) configSelections[c.path] = false;
+      }
+
+      this.wizardState = {
+        ...this.wizardState,
+        preview: previewResult.files ?? [],
+        diff: diffResult,
+        fileSelections,
+        configSelections,
+      };
       this.requestUpdate();
     } catch (err) {
       console.error("[Wizard] Preview failed:", err);
     }
   }
 
+  handleWizardFileToggle(path: string, checked: boolean) {
+    if (!this.wizardState) return;
+    this.wizardState = {
+      ...this.wizardState,
+      fileSelections: { ...this.wizardState.fileSelections, [path]: checked },
+    };
+    this.requestUpdate();
+  }
+
+  handleWizardConfigToggle(path: string, checked: boolean) {
+    if (!this.wizardState) return;
+    this.wizardState = {
+      ...this.wizardState,
+      configSelections: { ...this.wizardState.configSelections, [path]: checked },
+    };
+    this.requestUpdate();
+  }
+
   async handleWizardGenerate() {
     if (!this.client || !this.wizardState) return;
     this.wizardState = { ...this.wizardState, generating: true, error: null };
     this.requestUpdate();
+
+    // Derive skipFiles and skipKeys from unchecked selections
+    const skipFiles: string[] = [];
+    for (const [path, checked] of Object.entries(this.wizardState.fileSelections)) {
+      if (!checked) skipFiles.push(path);
+    }
+    const skipKeys: string[] = [];
+    for (const [path, checked] of Object.entries(this.wizardState.configSelections)) {
+      if (!checked) skipKeys.push(path);
+    }
+
     try {
       const result = await this.client.request<{
         success: boolean;
@@ -3419,7 +3453,11 @@ export class GodModeApp extends LitElement {
         configPatched: boolean;
         workspacePath: string;
         configError?: string;
-      }>("onboarding.wizard.generate", this.wizardState.answers);
+      }>("onboarding.wizard.generate", {
+        ...this.wizardState.answers,
+        skipFiles,
+        skipKeys,
+      });
 
       this.wizardState = {
         ...this.wizardState,

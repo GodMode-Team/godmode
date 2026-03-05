@@ -310,6 +310,12 @@ export function renderApp(state: AppViewState) {
       onClose: () => {
         state.handleWizardClose?.();
       },
+      onFileToggle: (path: string, checked: boolean) => {
+        state.handleWizardFileToggle?.(path, checked);
+      },
+      onConfigToggle: (path: string, checked: boolean) => {
+        state.handleWizardConfigToggle?.(path, checked);
+      },
     });
   }
 
@@ -1572,9 +1578,6 @@ export function renderApp(state: AppViewState) {
                     state.setTab("chat" as import("./navigation").Tab);
                     void state.handleSendChat("Let's do my evening capture. Ask me: What went well today? What didn't get done? What should tomorrow's brief prioritize?");
                   },
-                  // Goals
-                  goals: state.goals,
-                  goalsLoading: state.goalsLoading,
                 })
             : nothing
         }

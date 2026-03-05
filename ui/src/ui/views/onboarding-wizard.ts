@@ -30,10 +30,25 @@ export type WizardFilePreview = {
 export type WizardStep = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9;
 // 0-7 = questions, 8 = review, 9 = success
 
+export type ConfigDiffEntry = {
+  path: string;
+  current: unknown;
+  recommended: unknown;
+};
+
+export type ConfigDiff = {
+  additions: ConfigDiffEntry[];
+  changes: ConfigDiffEntry[];
+  matching: string[];
+};
+
 export type WizardState = {
   step: WizardStep;
   answers: WizardAnswers;
   preview: WizardFilePreview[] | null;
+  diff: ConfigDiff | null;
+  fileSelections: Record<string, boolean>;
+  configSelections: Record<string, boolean>;
   generating: boolean;
   result: {
     filesCreated: number;
@@ -50,6 +65,8 @@ export type WizardCallbacks = {
   onPreview: () => void;
   onGenerate: () => void;
   onClose: () => void;
+  onFileToggle: (path: string, checked: boolean) => void;
+  onConfigToggle: (path: string, checked: boolean) => void;
 };
 
 // ── Defaults ────────────────────────────────────────────────────
@@ -532,11 +549,22 @@ function renderStep7Model(
 
 // ── Review Screen ───────────────────────────────────────────────
 
+/** Format a config value for display. */
+function formatValue(val: unknown): string {
+  if (val === null || val === undefined) return "not set";
+  if (typeof val === "string") return val;
+  if (typeof val === "boolean" || typeof val === "number") return String(val);
+  if (Array.isArray(val)) return JSON.stringify(val);
+  return JSON.stringify(val);
+}
+
 function renderReview(
   state: WizardState,
   callbacks: WizardCallbacks,
 ): TemplateResult {
-  const { answers, preview, generating } = state;
+  const { answers, preview, diff, fileSelections, configSelections, generating } = state;
+  const hasExistingFiles = preview?.some((f) => f.exists) ?? false;
+  const hasConfigChanges = diff && (diff.changes.length > 0 || diff.additions.length > 0);
 
   return html`
     <div class="wizard-review">
@@ -583,22 +611,94 @@ function renderReview(
       ${preview && preview.length > 0
         ? html`
             <div class="wizard-review-section wizard-review-files">
-              <h3>Files to Generate</h3>
+              <h3>Workspace Files</h3>
+              ${hasExistingFiles
+                ? html`<p class="wizard-hint">Some files already exist. Uncheck to keep your existing version.</p>`
+                : nothing}
               <div class="wizard-file-list">
-                ${preview.map(
-                  (f) => html`
-                    <div class="wizard-file-item ${f.wouldCreate ? "wizard-file--new" : "wizard-file--exists"}">
-                      <span class="wizard-file-icon">${f.wouldCreate ? "+" : "-"}</span>
+                ${preview.map((f) => {
+                  const checked = fileSelections[f.path] ?? f.wouldCreate;
+                  return html`
+                    <label class="wizard-file-item ${f.wouldCreate ? "wizard-file--new" : "wizard-file--exists"}">
+                      <input
+                        type="checkbox"
+                        ?checked=${checked}
+                        @change=${(e: Event) => callbacks.onFileToggle(f.path, (e.target as HTMLInputElement).checked)}
+                      />
                       <span class="wizard-file-path">${f.path}</span>
-                      <span class="wizard-file-status">${f.wouldCreate ? "will create" : "exists (skip)"}</span>
-                    </div>
-                  `,
-                )}
+                      <span class="wizard-file-status">${
+                        f.exists
+                          ? checked ? "overwrite" : "keep existing"
+                          : "new"
+                      }</span>
+                    </label>
+                  `;
+                })}
               </div>
-              <p class="wizard-hint">Plus: OC config will be patched with optimal memory/agent settings.</p>
             </div>
           `
         : nothing}
+
+      ${hasConfigChanges
+        ? html`
+            <div class="wizard-review-section wizard-review-config">
+              <h3>Config Changes</h3>
+
+              ${diff.additions.length > 0
+                ? html`
+                    <div class="wizard-config-group">
+                      <h4>New settings</h4>
+                      ${diff.additions.map((entry) => {
+                        const checked = configSelections[entry.path] ?? true;
+                        return html`
+                          <label class="wizard-config-item">
+                            <input
+                              type="checkbox"
+                              ?checked=${checked}
+                              @change=${(e: Event) => callbacks.onConfigToggle(entry.path, (e.target as HTMLInputElement).checked)}
+                            />
+                            <span class="wizard-config-path">${entry.path}</span>
+                            <span class="wizard-config-value">${formatValue(entry.recommended)}</span>
+                          </label>
+                        `;
+                      })}
+                    </div>
+                  `
+                : nothing}
+
+              ${diff.changes.length > 0
+                ? html`
+                    <div class="wizard-config-group">
+                      <h4>Changed settings</h4>
+                      <p class="wizard-hint">These differ from your current config. Check to update.</p>
+                      ${diff.changes.map((entry) => {
+                        const checked = configSelections[entry.path] ?? false;
+                        return html`
+                          <label class="wizard-config-item wizard-config-item--change">
+                            <input
+                              type="checkbox"
+                              ?checked=${checked}
+                              @change=${(e: Event) => callbacks.onConfigToggle(entry.path, (e.target as HTMLInputElement).checked)}
+                            />
+                            <span class="wizard-config-path">${entry.path}</span>
+                            <span class="wizard-config-diff">
+                              <span class="wizard-config-current">${formatValue(entry.current)}</span>
+                              <span class="wizard-config-arrow">&rarr;</span>
+                              <span class="wizard-config-recommended">${formatValue(entry.recommended)}</span>
+                            </span>
+                          </label>
+                        `;
+                      })}
+                    </div>
+                  `
+                : nothing}
+
+              ${diff.matching.length > 0
+                ? html`<p class="wizard-hint">${diff.matching.length} settings already match GodMode's recommendations.</p>`
+                : nothing}
+            </div>
+          `
+        : html`<p class="wizard-hint">OC config will be patched with optimal memory/agent settings.</p>`}
 
       <div class="wizard-nav">
         <button
@@ -685,6 +785,9 @@ export function emptyWizardState(): WizardState {
     step: 0 as WizardStep,
     answers: emptyWizardAnswers(),
     preview: null,
+    diff: null,
+    fileSelections: {},
+    configSelections: {},
     generating: false,
     result: null,
     error: null,

@@ -31,6 +31,7 @@ import {
   patchOCConfig,
   checkOnboardingStatus,
   previewOnboarding,
+  computeConfigDiff,
   sanitizeAnswers,
   type OnboardingAnswers,
 } from "../services/onboarding.js";
@@ -950,13 +951,26 @@ export const onboardingHandlers: GatewayRequestHandlers = {
   },
 
   /**
+   * Compute a config diff between user's current OC config and GodMode's recommendations.
+   * Read-only — never writes anything. Used by the review screen to show what would change.
+   */
+  "onboarding.wizard.diff": async ({ params, respond }) => {
+    const answers = parseWizardAnswers(params);
+    const diff = await computeConfigDiff(answers);
+    respond(true, diff);
+  },
+
+  /**
    * Run the wizard: generate all workspace files and patch OC config.
    * Accepts the 8 onboarding answers from the UI form.
+   * Optional skipFiles/skipKeys for selective generation (existing user path).
    */
   "onboarding.wizard.generate": async ({ params, respond, context }) => {
     const answers = parseWizardAnswers(params);
     const force = Boolean(params.force);
     const shouldPatchConfig = params.patchConfig !== false;
+    const skipFiles = Array.isArray(params.skipFiles) ? (params.skipFiles as string[]) : [];
+    const skipKeys = Array.isArray(params.skipKeys) ? (params.skipKeys as string[]) : [];
 
     // If soul profile data exists in onboarding state, merge it into answers
     const state0 = await readOnboarding();
@@ -964,15 +978,15 @@ export const onboardingHandlers: GatewayRequestHandlers = {
       answers.soulProfile = state0.interview.soulProfile as OnboardingAnswers["soulProfile"];
     }
 
-    // Generate workspace files
-    const fileResults = await generateWorkspaceFiles(answers, GODMODE_ROOT, { force });
+    // Generate workspace files (skip user-deselected files)
+    const fileResults = await generateWorkspaceFiles(answers, GODMODE_ROOT, { force, skipFiles });
     const created = fileResults.filter((f) => f.created).length;
     const skipped = fileResults.filter((f) => f.skipped).length;
 
-    // Patch OC config
+    // Patch OC config (skip user-deselected config keys)
     let configResult: { patched: boolean; error?: string } = { patched: false };
     if (shouldPatchConfig) {
-      configResult = await patchOCConfig(answers);
+      configResult = await patchOCConfig(answers, undefined, { skipKeys });
     }
 
     // Update onboarding state to reflect wizard completion
