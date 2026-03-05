@@ -1,8 +1,9 @@
-import { readFile, writeFile, mkdir } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import { join, dirname } from "node:path";
 import { platform, arch } from "node:os";
 import type { GatewayRequestHandler } from "openclaw/plugin-sdk";
 import { GODMODE_ROOT, localDateString } from "../data-paths.js";
+import { secureWriteFile, secureMkdir, sanitizeError } from "../lib/secure-fs.js";
 
 type GatewayRequestHandlers = Record<string, GatewayRequestHandler>;
 
@@ -45,7 +46,7 @@ const collectDiagnostics: GatewayRequestHandler = async ({ respond }) => {
     const diagnostics = await collectDiagnosticsInternal();
     respond(true, diagnostics);
   } catch (err) {
-    respond(false, null, { code: "DIAGNOSTICS_FAILED", message: String(err) });
+    respond(false, null, { code: "DIAGNOSTICS_FAILED", message: sanitizeError(err) });
   }
 };
 
@@ -62,7 +63,7 @@ export async function logExchangeInternal(
 ): Promise<void> {
   const dateStr = localDateString();
   const logFile = join(CONVERSATIONS_DIR, `${dateStr}.md`);
-  await mkdir(CONVERSATIONS_DIR, { recursive: true });
+  await secureMkdir(CONVERSATIONS_DIR);
 
   const label = role === "user" ? "Customer" : "Atlas";
   const entry = `### ${timeStr()} — ${label}\n${content.trim()}\n\n`;
@@ -74,7 +75,7 @@ export async function logExchangeInternal(
     // New file — write header
     existing = `# Support Conversations — ${dateStr}\n\n`;
   }
-  await writeFile(logFile, existing + entry, "utf-8");
+  await secureWriteFile(logFile, existing + entry);
 }
 
 const logExchange: GatewayRequestHandler = async ({ params, respond }) => {
@@ -87,7 +88,7 @@ const logExchange: GatewayRequestHandler = async ({ params, respond }) => {
     await logExchangeInternal(role as "user" | "assistant", content);
     respond(true, { logged: true });
   } catch (err) {
-    respond(false, null, { code: "LOG_FAILED", message: String(err) });
+    respond(false, null, { code: "LOG_FAILED", message: sanitizeError(err) });
   }
 };
 
@@ -107,7 +108,7 @@ const escalate: GatewayRequestHandler = async ({ params, respond }) => {
     const now = new Date();
     const ts = now.toISOString().replace(/[:.]/g, "-").slice(0, 19);
     const ticketFile = join(ESCALATIONS_DIR, `${ts}.json`);
-    await mkdir(ESCALATIONS_DIR, { recursive: true });
+    await secureMkdir(ESCALATIONS_DIR);
     const ticket = {
       timestamp: now.toISOString(),
       summary,
@@ -115,10 +116,10 @@ const escalate: GatewayRequestHandler = async ({ params, respond }) => {
       conversationExcerpt: conversationExcerpt ?? null,
       status: "open",
     };
-    await writeFile(ticketFile, JSON.stringify(ticket, null, 2), "utf-8");
+    await secureWriteFile(ticketFile, JSON.stringify(ticket, null, 2));
     respond(true, { ticketPath: ticketFile, status: "open" });
   } catch (err) {
-    respond(false, null, { code: "ESCALATION_FAILED", message: String(err) });
+    respond(false, null, { code: "ESCALATION_FAILED", message: sanitizeError(err) });
   }
 };
 

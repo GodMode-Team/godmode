@@ -51,6 +51,7 @@ export type MyDayProps = {
   dailyBriefLoading?: boolean;
   dailyBriefError?: string | null;
   onBriefRefresh?: () => void;
+  onBriefGenerate?: () => void;
   onBriefOpenInObsidian?: () => void;
   onBriefSave?: (content: string) => void;
   onBriefToggleCheckbox?: (index: number, checked: boolean) => void;
@@ -85,6 +86,8 @@ export type MyDayProps = {
   onToggleCompletedTasks?: () => void;
   // Decision cards (overnight agent results)
   decisionCards?: DecisionCardsProps;
+  // Evening capture
+  onEveningCapture?: () => void;
 };
 
 // ===== Helper Functions =====
@@ -376,33 +379,54 @@ export function renderMyDayToolbar(props: MyDayProps) {
         <button class="today-view-tab ${viewMode === "brief" ? "active" : ""}"
           @click=${() => props.onViewModeChange?.("brief")}>Brief</button>
         <button class="today-view-tab ${viewMode === "command-center" ? "active" : ""}"
-          @click=${() => props.onViewModeChange?.("command-center")}>Command Center${props.decisionCards && props.decisionCards.items.filter(i => i.status === "review").length > 0
+          @click=${() => props.onViewModeChange?.("command-center")}>Tasks${props.decisionCards && props.decisionCards.items.filter(i => i.status === "review").length > 0
             ? html`<span class="tab-badge">${props.decisionCards.items.filter(i => i.status === "review").length}</span>`
             : nothing}</button>
         <button class="today-view-tab ${viewMode === "agent-log" ? "active" : ""}"
           @click=${() => props.onViewModeChange?.("agent-log")}>Agent Log</button>
       </div>
-      ${!props.focusPulseActive && props.onStartMorningSet
-        ? html`<button class="today-morning-set-btn" @click=${props.onStartMorningSet}
-            title="Start your morning focus ritual">\u2600\uFE0F Start Morning Set</button>`
-        : nothing}
-      ${props.onRefresh
-        ? html`<button class="my-day-refresh-btn" @click=${props.onRefresh} title="Refresh">&#x21BB;</button>`
-        : null}
+      <div class="today-quick-actions">
+        ${new Date().getHours() < 15
+          ? (!props.focusPulseActive && props.onStartMorningSet
+              ? html`<button class="today-morning-set-btn" @click=${props.onStartMorningSet}
+                  title="Start your morning focus ritual">\u2600\uFE0F Morning Set</button>`
+              : nothing)
+          : (props.onEveningCapture
+              ? html`<button class="today-evening-btn" @click=${props.onEveningCapture}
+                  title="Reflect on your day and set up tomorrow">\uD83C\uDF19 Evening Capture</button>`
+              : nothing)}
+        ${props.onRefresh
+          ? html`<button class="my-day-refresh-btn" @click=${props.onRefresh} title="Refresh / Generate Brief">&#x21BB;</button>`
+          : null}
+      </div>
     </div>
   `;
 }
 
-// ===== Command Center View =====
+// ===== Tasks View (formerly Command Center) =====
 
 function renderCommandCenter(props: MyDayProps) {
+  const hasDecisionCards = props.decisionCards && props.decisionCards.items.length > 0;
+
   return html`
-    <div class="command-center">
-      ${props.decisionCards && props.decisionCards.items.length > 0
-        ? renderDecisionCards(props.decisionCards)
-        : nothing}
-      <div class="command-center-tasks">
+    <div class="command-center command-center--grid">
+      <div class="command-center-col command-center-col--tasks">
         ${renderTaskPanel(props)}
+      </div>
+      <div class="command-center-col command-center-col--results">
+        ${hasDecisionCards
+          ? renderDecisionCards(props.decisionCards!)
+          : html`<div class="my-day-card">
+              <div class="my-day-card-header">
+                <div class="my-day-card-title">
+                  <span class="my-day-card-icon">&#x26A1;</span>
+                  <span>AGENT RESULTS</span>
+                </div>
+              </div>
+              <div class="my-day-card-content">
+                <div class="my-day-empty">No overnight results yet. Queue tasks for your agents and check back in the morning.</div>
+              </div>
+            </div>`}
       </div>
     </div>
   `;
@@ -448,6 +472,7 @@ export function renderMyDay(props: MyDayProps) {
     loading: props.dailyBriefLoading,
     error: props.dailyBriefError,
     onRefresh: props.onBriefRefresh,
+    onGenerate: props.onBriefGenerate,
     onOpenInObsidian: props.onBriefOpenInObsidian,
     onSaveBrief: props.onBriefSave,
     onToggleCheckbox: props.onBriefToggleCheckbox,
@@ -457,7 +482,9 @@ export function renderMyDay(props: MyDayProps) {
   return html`
     <div class="my-day-container">
       ${viewMode === "brief"
-        ? html`<div class="my-day-brief-full">${renderDailyBrief(briefProps)}</div>`
+        ? html`<div class="my-day-brief-full">
+            ${renderDailyBrief(briefProps)}
+          </div>`
         : viewMode === "command-center"
           ? renderCommandCenter(props)
           : html`<div class="my-day-brief-full">${renderAgentLog(props, agentLog, formatDateFromString(selectedDate))}</div>`}

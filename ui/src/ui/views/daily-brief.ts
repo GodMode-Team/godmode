@@ -25,6 +25,7 @@ export type DailyBriefProps = {
   loading?: boolean;
   error?: string | null;
   onRefresh?: () => void;
+  onGenerate?: () => void;
   onOpenInObsidian?: () => void;
   onSaveBrief?: (content: string) => void;
   onToggleCheckbox?: (index: number, checked: boolean) => void;
@@ -133,6 +134,7 @@ export function renderDailyBrief(props: DailyBriefProps) {
     loading,
     error,
     onRefresh,
+    onGenerate,
     onOpenInObsidian,
     onSaveBrief,
     onToggleCheckbox,
@@ -195,7 +197,13 @@ export function renderDailyBrief(props: DailyBriefProps) {
           <div class="brief-empty">
             <span class="empty-icon">\uD83D\uDCDD</span>
             <span>No brief available for today</span>
-            <span class="empty-hint">Brief compiles at 5:00 AM</span>
+            <span class="empty-hint">Your morning brief pulls together your calendar, tasks, goals, and energy data into a single scannable page.</span>
+            ${onGenerate
+              ? html`<button class="brief-generate-btn" @click=${onGenerate}>Generate Brief Now</button>`
+              : onRefresh
+                ? html`<button class="brief-generate-btn" @click=${onRefresh}>Generate Brief Now</button>`
+                : nothing}
+            <span class="empty-hint" style="margin-top: 8px; font-size: 12px;">Briefs auto-generate at 5:00 AM when configured.</span>
           </div>
         </div>
       </div>
@@ -328,12 +336,29 @@ export function renderDailyBrief(props: DailyBriefProps) {
 
   const editableHtml = toEditableMarkdownHtml(normalizeBriefNewlines(data.content));
 
+  // Readiness score display
+  const readinessDisplay = data.summary.readiness != null
+    ? html`<span class="brief-readiness" title="Readiness Score${data.summary.readinessMode ? ` — ${data.summary.readinessMode}` : ""}">
+        <span class="readiness-score">${data.summary.readiness}</span>
+        <span class="readiness-label">Readiness</span>
+      </span>`
+    : nothing;
+
+  // Task progress display
+  const taskProgress = data.summary.tasks.total > 0
+    ? html`<span class="brief-task-progress" title="${data.summary.tasks.completed}/${data.summary.tasks.total} tasks done">
+        ${data.summary.tasks.completed}/${data.summary.tasks.total}
+      </span>`
+    : nothing;
+
   return html`
     <div class="my-day-card brief-section brief-editor">
       <div class="my-day-card-header">
         <div class="my-day-card-title">
           <span class="my-day-card-icon">\uD83D\uDCCA</span>
           <span>DAILY BRIEF</span>
+          ${readinessDisplay}
+          ${taskProgress}
         </div>
         <div class="brief-header-actions">
           <span class="brief-updated">${formatUpdatedAt(data.updatedAt)}</span>

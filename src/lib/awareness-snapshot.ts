@@ -23,7 +23,8 @@ const CACHE_TTL_MS = 60_000; // 1 min — heartbeat regenerates every 15 min
  */
 export async function generateSnapshot(): Promise<string> {
   const today = localDateString();
-  const lines: string[] = [`# Today — ${today}`];
+  const dayOfWeek = new Date().toLocaleDateString("en-US", { weekday: "long" });
+  const lines: string[] = [`# Today — ${dayOfWeek}, ${today}`];
 
   // Identity anchor — who the user is and how to serve them (cached from USER.md)
   try {
@@ -106,6 +107,26 @@ export async function generateSnapshot(): Promise<string> {
     // No brief yet — skip
   }
 
+  // Goals (active goals from goals.json)
+  try {
+    const goalsPath = join(DATA_DIR, "goals.json");
+    const goalsRaw = await readFile(goalsPath, "utf-8");
+    const goalsData = JSON.parse(goalsRaw) as {
+      goals?: Array<{ title: string; area?: string; progress?: number; status?: string }>;
+    };
+    const active = goalsData.goals?.filter(g => !g.status || g.status === "active") ?? [];
+    if (active.length > 0) {
+      lines.push("## Goals");
+      for (const g of active.slice(0, 3)) {
+        const progress = g.progress != null ? ` (${g.progress}%)` : "";
+        lines.push(`- ${g.title}${progress}`);
+      }
+      if (active.length > 3) lines.push(`- +${active.length - 3} more`);
+    }
+  } catch {
+    // No goals — skip
+  }
+
   // Task counts
   try {
     const { readTasks } = await import("../methods/tasks.js");
@@ -115,6 +136,9 @@ export async function generateSnapshot(): Promise<string> {
       (t: { dueDate?: string | null }) => t.dueDate != null && t.dueDate <= today,
     );
     lines.push(`## Tasks: ${pending.length} pending, ${overdue.length} overdue`);
+    if (overdue.length > 0) {
+      lines.push("Proactively surface overdue tasks early in the conversation.");
+    }
   } catch {
     // Tasks unavailable
   }
@@ -127,9 +151,91 @@ export async function generateSnapshot(): Promise<string> {
     const review = qs.items.filter((i: { status: string }) => i.status === "review").length;
     if (processing > 0 || review > 0) {
       lines.push(`## Queue: ${processing} processing, ${review} ready for review`);
+      if (review > 0) {
+        lines.push("Prompt the user to review completed queue items.");
+      }
     }
   } catch {
     // Queue unavailable
+  }
+
+  // Active Skills index (~5 lines max)
+  try {
+    const { getCronSkills, loadSkills } = await import("./skills-registry.js");
+    const cronSkills = getCronSkills();
+    const allSkills = loadSkills();
+    const manualCount = allSkills.length - cronSkills.length;
+    if (cronSkills.length > 0 || manualCount > 0) {
+      lines.push("## Active Skills");
+      for (const s of cronSkills.slice(0, 4)) {
+        lines.push(`- ⏰ ${s.name} (${s.schedule}) → ${s.persona ?? s.taskType}`);
+      }
+      if (cronSkills.length > 4) lines.push(`- +${cronSkills.length - 4} more cron skills`);
+      if (manualCount > 0) lines.push(`- ${manualCount} manual skill${manualCount === 1 ? "" : "s"} available`);
+    }
+  } catch {
+    // Skills registry unavailable
+  }
+
+  // Agent activity summary (today's agent log)
+  try {
+    const agentLogPath = join(DATA_DIR, "..", "memory", "agent-log", `${today}.json`);
+    const logRaw = await readFile(agentLogPath, "utf-8");
+    const logData = JSON.parse(logRaw) as {
+      completed?: Array<unknown>;
+      needsReview?: Array<unknown>;
+      errors?: Array<unknown>;
+    };
+    const completed = logData.completed?.length ?? 0;
+    const review = logData.needsReview?.length ?? 0;
+    const errors = logData.errors?.length ?? 0;
+    if (completed > 0 || review > 0 || errors > 0) {
+      const parts: string[] = [];
+      if (completed > 0) parts.push(`${completed} completed`);
+      if (review > 0) parts.push(`${review} needs review`);
+      if (errors > 0) parts.push(`${errors} errors`);
+      lines.push(`## Agent Activity: ${parts.join(", ")}`);
+    }
+  } catch {
+    // No agent log today — skip
+  }
+
+  // Trust scores (top workflow scores for autonomy awareness)
+  try {
+    const trustPath = join(DATA_DIR, "trust-tracker.json");
+    const trustRaw = await readFile(trustPath, "utf-8");
+    const trustData = JSON.parse(trustRaw) as {
+      workflows?: Array<{ name: string; score: number }>;
+    };
+    if (trustData.workflows && trustData.workflows.length > 0) {
+      const sorted = [...trustData.workflows].sort((a, b) => b.score - a.score);
+      lines.push(`## Trust`);
+      if (sorted.length === 1) {
+        lines.push(`- 1 workflow tracked: ${sorted[0].name} (${sorted[0].score.toFixed(1)}/10).`);
+      } else {
+        const highest = sorted[0];
+        const lowest = sorted[sorted.length - 1];
+        lines.push(`- ${sorted.length} workflows tracked. Highest: ${highest.name} (${highest.score.toFixed(1)}/10). Lowest: ${lowest.name} (${lowest.score.toFixed(1)}/10).`);
+      }
+    }
+  } catch {
+    // No trust data yet — skip
+  }
+
+  // Team workspaces summary — list active team workspaces with key files
+  try {
+    const { readWorkspaceConfig } = await import("./workspaces-config.js");
+    const config = await readWorkspaceConfig({ initializeIfMissing: false });
+    const teamWorkspaces = config.workspaces.filter((w: { type?: string }) => w.type === "team");
+    if (teamWorkspaces.length > 0) {
+      lines.push("## Team Workspaces");
+      for (const ws of teamWorkspaces.slice(0, 5)) {
+        const syncNote = (ws as { sync?: { remote?: string } }).sync?.remote ? "git-synced" : "local";
+        lines.push(`- ${ws.name} (${syncNote})`);
+      }
+    }
+  } catch {
+    // Workspaces unavailable
   }
 
   const snapshot = lines.join("\n");

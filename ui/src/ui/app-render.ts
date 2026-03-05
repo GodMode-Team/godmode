@@ -14,6 +14,7 @@ import {
   applyConfig,
   loadConfig,
   runUpdate,
+  runPluginUpdate,
   saveConfig,
   switchModel,
   updateConfigFormValue,
@@ -70,7 +71,7 @@ import {
 } from "./controllers/skills";
 import { checkForUpdates } from "./controllers/updates";
 import { icons } from "./icons";
-import { TAB_GROUPS, subtitleForTab, titleForTab, type Tab } from "./navigation";
+import { TAB_GROUPS, POWER_USER_GROUPS, subtitleForTab, titleForTab, type Tab } from "./navigation";
 import { renderAllyChat } from "./views/ally-chat.js";
 import { ALLY_SESSION_KEY } from "./controllers/ally.js";
 import { renderChannels } from "./views/channels";
@@ -309,6 +310,12 @@ export function renderApp(state: AppViewState) {
       onClose: () => {
         state.handleWizardClose?.();
       },
+      onFileToggle: (path: string, checked: boolean) => {
+        state.handleWizardFileToggle?.(path, checked);
+      },
+      onConfigToggle: (path: string, checked: boolean) => {
+        state.handleWizardConfigToggle?.(path, checked);
+      },
     });
   }
 
@@ -457,6 +464,29 @@ export function renderApp(state: AppViewState) {
             </div>
           `;
         })}
+        ${POWER_USER_GROUPS.map((group) => {
+          const isGroupCollapsed = state.settings.navGroupsCollapsed[group.label] ?? true;
+          const hasActiveTab = group.tabs.some((tab) => tab === state.tab);
+          return html`
+            <div class="nav-group ${isGroupCollapsed && !hasActiveTab ? "nav-group--collapsed" : ""}">
+              <button
+                class="nav-label"
+                @click=${() => {
+                  const next = { ...state.settings.navGroupsCollapsed };
+                  next[group.label] = !isGroupCollapsed;
+                  state.applySettings({ ...state.settings, navGroupsCollapsed: next });
+                }}
+                aria-expanded=${!isGroupCollapsed}
+              >
+                <span class="nav-label__text">${group.label}</span>
+                <span class="nav-label__chevron">${isGroupCollapsed ? "+" : "\u2212"}</span>
+              </button>
+              <div class="nav-group__items">
+                ${group.tabs.map((tab) => renderTab(state, tab as Tab))}
+              </div>
+            </div>
+          `;
+        })}
         <div class="nav-group nav-group--links">
           <div class="nav-label nav-label--static">
             <span class="nav-label__text">Resources</span>
@@ -493,6 +523,7 @@ export function renderApp(state: AppViewState) {
                        if (state.sessionKey === ALLY_SESSION_KEY) return;
                        saveDraft(state);
                        state.sessionKey = ALLY_SESSION_KEY;
+                       state.allyUnread = 0;
                        restoreDraft(state, ALLY_SESSION_KEY);
                        state.chatLoading = true;
                        state.chatStream = null;
@@ -553,7 +584,8 @@ export function renderApp(state: AppViewState) {
                       return parts[parts.length - 1] || key;
                     };
                     const displayName = getDisplayName();
-                    const canClose = renderSessionTabKeys.length > 1;
+                    // Always allow closing — the Ally session is a valid fallback
+                    const canClose = true;
                     // Check session status for indicators
                     const isWorking = state.workingSessions.has(key);
                     const lastViewed = state.settings.tabLastViewed[key] ?? 0;
@@ -1032,6 +1064,10 @@ export function renderApp(state: AppViewState) {
                     onViewOutput: () => {},
                     onOpenChat: () => {},
                   } : undefined,
+                  onEveningCapture: () => {
+                    state.setTab("chat" as import("./navigation").Tab);
+                    void state.handleSendChat("Let's do my evening capture. Ask me: What went well today? What didn't get done? What should tomorrow's brief prioritize?");
+                  },
                 })
               : nothing}
           </div>
@@ -1164,6 +1200,10 @@ export function renderApp(state: AppViewState) {
                 onCheckUpdates: () => checkForUpdates(state),
                 onUpdateNow: () => {
                   void runUpdate(state);
+                },
+                pluginUpdateRunning: state.pluginUpdateRunning,
+                onUpdatePlugin: () => {
+                  void runPluginUpdate(state);
                 },
               })
             : nothing
@@ -1466,6 +1506,7 @@ export function renderApp(state: AppViewState) {
                   dailyBriefLoading: state.dailyBriefLoading ?? false,
                   dailyBriefError: state.dailyBriefError ?? null,
                   onBriefRefresh: () => state.handleDailyBriefRefresh(),
+                  onBriefGenerate: () => state.handleDailyBriefGenerate(),
                   onBriefOpenInObsidian: () => state.handleDailyBriefOpenInObsidian(),
                   onBriefSave: (content: string) => state.handleBriefSave(content),
                   onBriefToggleCheckbox: (index: number, checked: boolean) => state.handleBriefToggleCheckbox(index, checked),
@@ -1510,6 +1551,11 @@ export function renderApp(state: AppViewState) {
                     onViewOutput: (id: string, path: string) => state.handleDecisionViewOutput(id, path),
                     onOpenChat: (id: string) => state.handleDecisionOpenChat(id),
                   } : undefined,
+                  // Evening capture
+                  onEveningCapture: () => {
+                    state.setTab("chat" as import("./navigation").Tab);
+                    void state.handleSendChat("Let's do my evening capture. Ask me: What went well today? What didn't get done? What should tomorrow's brief prioritize?");
+                  },
                 })
             : nothing
         }
@@ -2073,6 +2119,8 @@ export function renderApp(state: AppViewState) {
                 userAvatar: state.userAvatar,
                 currentToolName: state.currentToolName,
                 currentToolInfo: state.currentToolInfo,
+                privateMode: state.chatPrivateMode,
+                onTogglePrivateMode: () => state.handlePrivateModeToggle(),
                 isWorking: state.workingSessions.has(state.sessionKey),
                 // Scroll state
                 showScrollButton: !state.chatUserNearBottom,
@@ -2278,7 +2326,10 @@ export function renderApp(state: AppViewState) {
                     : false,
                   onSelectDashboard: (id) => state.handleDashboardSelect(id),
                   onDeleteDashboard: (id) => state.handleDashboardDelete(id),
-                  onCreateViaChat: () => state.handleDashboardCreateViaChat(),
+                  onCreateViaChat: (prompt?: string) => state.handleDashboardCreateViaChat(prompt),
+                  onTogglePin: (id) => state.handleDashboardTogglePin(id),
+                  categoryFilter: state.dashboardCategoryFilter ?? null,
+                  onCategoryFilter: (cat) => state.handleDashboardCategoryFilter(cat),
                   onBack: () => state.handleDashboardBack(),
                   onRefresh: () => state.handleDashboardsRefresh(),
                   onOpenSession: (id) => state.handleDashboardOpenSession(id),

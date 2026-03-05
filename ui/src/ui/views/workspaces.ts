@@ -1000,12 +1000,16 @@ function renderWorkspaceDetail(props: {
             ${
               hasFolderTree
                 ? filteredFolderTree.length === 0
-                  ? html`<div class="ws-empty">No artifacts</div>`
+                  ? html`<div class="ws-empty">
+                      <span class="ws-empty-hint">No artifacts yet. Ask your ally to create a document, plan, or analysis — it'll appear here.</span>
+                    </div>`
                   : filteredFolderTree.map((node) =>
                       renderFolderNode(node, 0, folderCtx),
                     )
                 : filteredArtifacts.length === 0
-                  ? html`<div class="ws-empty">No artifacts</div>`
+                  ? html`<div class="ws-empty">
+                      <span class="ws-empty-hint">No artifacts yet. Ask your ally to create a document, plan, or analysis — it'll appear here.</span>
+                    </div>`
                   : filteredArtifacts.map((entry) =>
                       renderSectionFileRow({
                         workspaceId: workspace.id,
@@ -1031,7 +1035,9 @@ function renderWorkspaceDetail(props: {
                     ${
                       filteredSessions.length === 0
                         ? html`
-                            <div class="ws-empty">No sessions</div>
+                            <div class="ws-empty">
+                              <span class="ws-empty-hint">No sessions yet. Sessions are saved conversations with your ally — start a chat to create one.</span>
+                            </div>
                           `
                         : filteredSessions.map(
                             (session) => html`
@@ -1327,7 +1333,8 @@ export function renderWorkspaces(props: WorkspacesProps) {
                       ? html`
                           <div class="workspaces-empty">
                             <span class="workspaces-empty-icon">${connected ? "📭" : "🔌"}</span>
-                            <span>${connected ? "No workspaces found" : "Connect to gateway to see workspaces"}</span>
+                            <span>${connected ? "No workspaces yet" : "Connect to gateway to see workspaces"}</span>
+                            ${connected ? html`<span class="workspaces-empty-hint">Workspaces organize your projects. Ask your ally to create one, or start a focused session in chat.</span>` : nothing}
                           </div>
                         `
                       : filteredWorkspaces.map((workspace) =>

@@ -269,6 +269,7 @@ export async function generateConfigRecommendations(): Promise<ConfigRecommendat
   const plugins = config.plugins as Record<string, unknown> | undefined;
   const cron = config.cron as Record<string, unknown> | undefined;
   const session = config.session as Record<string, unknown> | undefined;
+  const sessions = config.sessions as Record<string, unknown> | undefined;
 
   // Critical: gateway security token (check both gateway.token and gateway.auth.token)
   const gatewayAuth = gateway?.auth as Record<string, unknown> | undefined;
@@ -280,6 +281,18 @@ export async function generateConfigRecommendations(): Promise<ConfigRecommendat
       currentValue: "not set",
       recommendedValue: "(auto-generated 256-bit token)",
       reason: "Without a token, any process on your machine can send commands to the agent via the WebSocket port.",
+      priority: "critical",
+    });
+  }
+
+  // Critical: DM session isolation
+  if (sessions?.dmScope !== "per-channel-peer") {
+    recommendations.push({
+      key: "sessions.dmScope",
+      label: "DM session isolation",
+      currentValue: sessions?.dmScope ?? "not set",
+      recommendedValue: "per-channel-peer",
+      reason: "Set dmScope to per-channel-peer to prevent DM data leaking between users.",
       priority: "critical",
     });
   }
@@ -371,6 +384,19 @@ export async function generateConfigRecommendations(): Promise<ConfigRecommendat
       currentValue: false,
       recommendedValue: true,
       reason: "Writes learned insights to permanent storage before context is compressed.",
+      priority: "recommended",
+    });
+  }
+
+  // Recommended: context pruning
+  const pruning = defaults?.contextPruning as Record<string, unknown> | undefined;
+  if (!pruning || pruning.mode === "off") {
+    recommendations.push({
+      key: "agents.defaults.contextPruning.mode",
+      label: "Context pruning",
+      currentValue: pruning?.mode ?? "off",
+      recommendedValue: "cache-ttl",
+      reason: "Auto-trims stale tool results from context to prevent overflow in long sessions.",
       priority: "recommended",
     });
   }

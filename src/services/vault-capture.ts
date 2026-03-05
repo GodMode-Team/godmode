@@ -239,7 +239,12 @@ export async function captureQueueOutputsToVault(logger: Logger): Promise<Captur
   }
 
   for (const file of files) {
+    // SECURITY: Validate filename doesn't escape the inbox directory
     const destPath = join(vaultInbox, file);
+    if (!destPath.startsWith(vaultInbox + "/")) {
+      errors.push(`${file}: path traversal blocked`);
+      continue;
+    }
     if (existsSync(destPath)) {
       skipped++;
       continue;

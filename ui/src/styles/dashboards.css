@@ -636,6 +636,164 @@
   cursor: not-allowed;
 }
 
+/* ── Category Filter Bar ──────────────────────────────────────── */
+
+.dashboards-category-bar {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.dashboards-category-btn {
+  padding: 5px 10px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  background: var(--bg-elevated, var(--bg-hover));
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm, 6px);
+  cursor: pointer;
+  color: var(--muted);
+  transition: all 0.15s;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.dashboards-category-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+.dashboards-category-btn.active {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+
+.category-count {
+  font-size: 0.6875rem;
+  background: rgba(255,255,255,0.2);
+  padding: 0 4px;
+  border-radius: 3px;
+  min-width: 16px;
+  text-align: center;
+}
+
+.dashboards-category-btn:not(.active) .category-count {
+  background: var(--bg-hover);
+}
+
+/* ── Dashboard Count ─────────────────────────────────────────── */
+
+.dashboards-count {
+  font-size: 0.8125rem;
+  color: var(--muted);
+  font-weight: 500;
+}
+
+/* ── Template Cards ──────────────────────────────────────────── */
+
+.dashboard-card--template {
+  border-style: dashed;
+  opacity: 0.85;
+}
+
+.dashboard-card--template:hover {
+  opacity: 1;
+  border-color: var(--accent);
+}
+
+.dashboard-card-template-label {
+  font-size: 0.6875rem;
+  padding: 1px 6px;
+  background: color-mix(in srgb, var(--accent) 15%, transparent);
+  color: var(--accent);
+  border-radius: 3px;
+  font-weight: 500;
+}
+
+/* ── Pinned Cards ────────────────────────────────────────────── */
+
+.dashboard-card--pinned {
+  border-color: var(--accent);
+  border-width: 1px;
+}
+
+.pin-icon {
+  margin-right: 4px;
+  font-size: 0.875rem;
+}
+
+.dashboard-card-actions {
+  display: flex;
+  flex-direction: column;
+  border-left: 1px solid var(--border);
+}
+
+.dashboard-card-pin {
+  padding: 6px 10px;
+  background: none;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 14px;
+  transition: color 0.15s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.dashboard-card-pin:hover {
+  color: var(--accent);
+  background: var(--bg-hover);
+}
+
+.dashboard-card-actions .dashboard-card-delete {
+  border-left: none;
+  flex: 1;
+}
+
+/* ── Staleness Indicator ─────────────────────────────────────── */
+
+.dashboard-card-stale {
+  font-size: 0.6875rem;
+  color: var(--warning, #f59e0b);
+}
+
+/* ── Active Dashboard Title Group ────────────────────────────── */
+
+.dashboards-active-title-group {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.dashboards-active-meta {
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+/* ── Templates Section ───────────────────────────────────────── */
+
+.dashboards-templates-section {
+  margin-top: 16px;
+}
+
+.dashboards-section-title {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin: 0 0 10px 0;
+}
+
+.dashboards-grid--templates {
+  opacity: 0.9;
+}
+
 /* ── Responsive ─────────────────────────────────────────────────── */
 
 @media (max-width: 640px) {
@@ -643,5 +801,11 @@
   .dashboards-content .grid-3,
   .dashboards-content .grid-4 {
     grid-template-columns: 1fr;
+  }
+
+  .dashboards-category-bar {
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    -webkit-overflow-scrolling: touch;
   }
 }

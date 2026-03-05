@@ -450,9 +450,90 @@
   flex: 1;
 }
 
+.wizard-file-item input[type="checkbox"] {
+  flex-shrink: 0;
+}
+
 .wizard-file-status {
   color: var(--muted, #71717a);
   font-size: 11px;
+}
+
+/* ── Config Diff ────────────────────────────────────────────── */
+
+.wizard-review-config {
+  margin-top: 12px;
+}
+
+.wizard-config-group {
+  margin-bottom: 12px;
+}
+
+.wizard-config-group h4 {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text, #e4e4e7);
+  margin: 0 0 6px;
+}
+
+.wizard-config-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+  font-size: 12px;
+  font-family: "JetBrains Mono", monospace;
+  cursor: pointer;
+}
+
+.wizard-config-item input[type="checkbox"] {
+  flex-shrink: 0;
+}
+
+.wizard-config-path {
+  color: var(--text, #e4e4e7);
+  min-width: 0;
+  word-break: break-all;
+}
+
+.wizard-config-value {
+  color: var(--ok, #22c55e);
+  font-size: 11px;
+  margin-left: auto;
+  flex-shrink: 0;
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wizard-config-diff {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+  font-size: 11px;
+  flex-shrink: 0;
+}
+
+.wizard-config-current {
+  color: var(--muted, #71717a);
+  max-width: 100px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wizard-config-arrow {
+  color: var(--muted, #71717a);
+}
+
+.wizard-config-recommended {
+  color: var(--ok, #22c55e);
+  max-width: 100px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* ── Error ───────────────────────────────────────────────────── */

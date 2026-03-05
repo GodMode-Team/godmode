@@ -390,6 +390,12 @@ async function checkOnboardingStatus(host: GatewayHost) {
       // If identity already exists, quick setup is already done
       if (res.identity?.name) {
         setupApp.setupQuickDone = true;
+        // Restore display name from server if not already set in UI
+        const nameHost = host as unknown as { userName: string; settings: UiSettings; applySettings: (s: UiSettings) => void };
+        if (!nameHost.userName || !nameHost.settings.userName) {
+          nameHost.userName = res.identity.name;
+          nameHost.applySettings({ ...nameHost.settings, userName: res.identity.name });
+        }
       }
     } else {
       app.onboardingActive = false;
@@ -988,38 +994,37 @@ function handleGatewayEventUnsafe(host: GatewayHost, evt: GatewayEventFrame) {
           allyHost.requestUpdate?.();
         }
       } else if (payload.state === "final") {
-        // Final message: append to ally messages, clear stream
-        if (!isAllyFullScreen) {
-          const finalContent = allyHost.allyStream ?? extractTextFromMessage(payload.message) ?? "";
-          if (finalContent) {
-            allyHost.allyMessages = [
-              ...(allyHost.allyMessages ?? []),
-              { role: "assistant", content: finalContent, timestamp: Date.now() },
-            ];
-          }
-          allyHost.allyStream = null;
-          allyHost.allyWorking = false;
-          if (!allyHost.allyPanelOpen && host.tab !== "chat") {
-            allyHost.allyUnread = (allyHost.allyUnread ?? 0) + 1;
-          }
-          allyHost.requestUpdate?.();
-          // Scroll to bottom after render completes for newly arrived message
-          if (allyHost.allyPanelOpen) {
-            (host as unknown as { _scrollAllyToBottom(): void })._scrollAllyToBottom();
-          }
-        }
-      } else if (payload.state === "error" || payload.state === "aborted") {
-        if (!isAllyFullScreen) {
-          // Show error to user instead of silently swallowing it
-          const errText = extractTextFromMessage(payload.message);
-          const errorMsg = payload.state === "aborted"
-            ? "Response was stopped."
-            : (errText || "Something went wrong — try again.");
+        // Final message: append to ally messages AND sync with full screen
+        // Always update allyMessages so they stay in sync with the Chat tab
+        const finalContent = allyHost.allyStream ?? extractTextFromMessage(payload.message) ?? "";
+        if (finalContent) {
           allyHost.allyMessages = [
             ...(allyHost.allyMessages ?? []),
-            { role: "assistant", content: `*${errorMsg}*`, timestamp: Date.now() },
+            { role: "assistant", content: finalContent, timestamp: Date.now() },
           ];
         }
+        allyHost.allyStream = null;
+        allyHost.allyWorking = false;
+        if (!allyHost.allyPanelOpen && host.tab !== "chat") {
+          allyHost.allyUnread = (allyHost.allyUnread ?? 0) + 1;
+        }
+        if (!isAllyFullScreen) {
+          allyHost.requestUpdate?.();
+        }
+        // Scroll to bottom after render completes for newly arrived message
+        if (allyHost.allyPanelOpen) {
+          (host as unknown as { _scrollAllyToBottom(): void })._scrollAllyToBottom();
+        }
+      } else if (payload.state === "error" || payload.state === "aborted") {
+        // Show error to user instead of silently swallowing it
+        const errText = extractTextFromMessage(payload.message);
+        const errorMsg = payload.state === "aborted"
+          ? "Response was stopped."
+          : (errText || "Something went wrong \u2014 try again.");
+        allyHost.allyMessages = [
+          ...(allyHost.allyMessages ?? []),
+          { role: "assistant", content: `*${errorMsg}*`, timestamp: Date.now() },
+        ];
         allyHost.allyStream = null;
         allyHost.allyWorking = false;
         allyHost.requestUpdate?.();
@@ -1287,6 +1292,14 @@ function handleGatewayEventUnsafe(host: GatewayHost, evt: GatewayEventFrame) {
       // If completed, deactivate onboarding overlay
       if (payload.completedAt) {
         app.onboardingActive = false;
+      }
+      // Sync display name from onboarding identity if not yet set
+      if (payload.identity?.name) {
+        const nameHost = host as unknown as { userName: string; settings: UiSettings; applySettings: (s: UiSettings) => void };
+        if (!nameHost.userName || !nameHost.settings.userName) {
+          nameHost.userName = payload.identity.name;
+          nameHost.applySettings({ ...nameHost.settings, userName: payload.identity.name });
+        }
       }
       app.requestUpdate?.();
     }

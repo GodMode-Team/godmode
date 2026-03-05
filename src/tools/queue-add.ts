@@ -1,5 +1,7 @@
 import { type AnyAgentTool, jsonResult } from "openclaw/plugin-sdk";
 import { updateQueueState, newQueueItemId, type QueueItemType } from "../lib/queue-state.js";
+import { resolvePersona } from "../lib/agent-roster.js";
+import { getQueueProcessor } from "../services/queue-processor.js";
 
 type ToolContext = {
   sessionKey?: string;
@@ -11,8 +13,10 @@ export function createQueueAddTool(_ctx: ToolContext): AnyAgentTool {
     label: "Queue",
     name: "queue_add",
     description:
-      "Drop a task, URL, research topic, or idea into the GodMode queue for background processing. " +
-      "Items will be processed by sub-agents and results placed in your inbox for review.",
+      "Queue a task for background agent processing. " +
+      "IMPORTANT: You MUST first present a scoped brief to the user and get their approval. " +
+      "Call once WITHOUT confirmed=true to preview the scoped brief. " +
+      "Call again WITH confirmed=true only after the user approves.",
     parameters: {
       type: "object" as const,
       properties: {
@@ -44,6 +48,10 @@ export function createQueueAddTool(_ctx: ToolContext): AnyAgentTool {
             "Slug of an agent-roster persona to handle this task (e.g. 'frontend-developer'). " +
             "If omitted, the best matching persona is auto-resolved from the type.",
         },
+        success_criteria: {
+          type: "string",
+          description: "What does 'done' look like? Specific deliverable the agent must produce.",
+        },
         handoff_summary: {
           type: "string",
           description: "Summary of what you did — context for the next agent picking this up",
@@ -59,6 +67,12 @@ export function createQueueAddTool(_ctx: ToolContext): AnyAgentTool {
             "Which AI engine to use. Defaults to persona's engine or 'claude'. " +
             "Use 'codex' for complex backend/multi-file work, 'claude' for speed/frontend.",
         },
+        confirmed: {
+          type: "boolean",
+          description:
+            "Set to true ONLY after the user has reviewed and approved the scoped brief. " +
+            "First call without this to get the preview, then call with confirmed=true.",
+        },
       },
       required: ["type", "title"],
     },
@@ -67,7 +81,41 @@ export function createQueueAddTool(_ctx: ToolContext): AnyAgentTool {
       const title = String(params.title || "").trim();
       if (!title) return jsonResult({ error: true, message: "title is required" });
 
-      // Build handoff context if the spawning agent provided one
+      const personaSlug = params.persona ? String(params.persona) : undefined;
+      const persona = resolvePersona(type, personaSlug);
+      const personaName = persona?.name ?? personaSlug ?? "(auto-resolved)";
+      const description = params.description ? String(params.description) : undefined;
+      const successCriteria = params.success_criteria ? String(params.success_criteria) : undefined;
+      const priority = (params.priority as "high" | "normal" | "low") || "normal";
+      const engine = params.engine ? String(params.engine) : persona?.engine ?? "claude";
+
+      // If not confirmed, return a scoped brief for the user to review
+      if (!params.confirmed) {
+        return jsonResult({
+          queued: false,
+          preview: true,
+          scopedBrief: {
+            title,
+            type,
+            persona: personaName,
+            engine,
+            priority,
+            description: description ?? "(none)",
+            successCriteria: successCriteria ?? "(not specified — consider adding one)",
+          },
+          message:
+            "Present this scoped brief to the user and ask for their approval before queuing:\n\n" +
+            `**Task:** ${title}\n` +
+            `**Type:** ${type} | **Persona:** ${personaName} | **Engine:** ${engine}\n` +
+            `**Priority:** ${priority}\n` +
+            (description ? `**Details:** ${description}\n` : "") +
+            `**Success Criteria:** ${successCriteria ?? "Not specified"}\n\n` +
+            "Ask: 'Should I queue this for background processing?' " +
+            "If approved, call queue_add again with confirmed=true.",
+        });
+      }
+
+      // Confirmed — actually queue the item
       const handoffSummary = params.handoff_summary ? String(params.handoff_summary) : undefined;
       const handoffDeliverable = params.handoff_deliverable ? String(params.handoff_deliverable) : undefined;
       const handoff =
@@ -85,19 +133,27 @@ export function createQueueAddTool(_ctx: ToolContext): AnyAgentTool {
           id: newQueueItemId(title),
           type,
           title,
-          description: params.description ? String(params.description) : undefined,
+          description: successCriteria
+            ? `${description ?? ""}\n\n**Success Criteria:** ${successCriteria}`.trim()
+            : description,
           url: params.url ? String(params.url) : undefined,
-          priority: (params.priority as "high" | "normal" | "low") || "normal",
+          priority,
           status: "pending" as const,
           source: "chat" as const,
           createdAt: Date.now(),
-          personaHint: params.persona ? String(params.persona) : undefined,
+          personaHint: personaSlug ?? persona?.slug,
           engine: params.engine ? (String(params.engine) as "claude" | "codex" | "gemini") : undefined,
           handoff,
         };
         state.items.push(newItem);
         return newItem;
       });
+
+      // Kick the queue processor immediately so the item starts within seconds
+      const qp = getQueueProcessor();
+      if (qp) {
+        void qp.processAllPending();
+      }
 
       return jsonResult({
         queued: true,
@@ -108,7 +164,7 @@ export function createQueueAddTool(_ctx: ToolContext): AnyAgentTool {
           priority: item.priority,
           status: item.status,
         },
-        message: `Queued: "${item.title}" (${item.type}) — ID: ${item.id}. Will be processed by a background agent.`,
+        message: `Queued: "${item.title}" (${item.type}) — ID: ${item.id}. Processing will start shortly.`,
       });
     },
   } as AnyAgentTool;

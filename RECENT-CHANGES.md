@@ -4,6 +4,333 @@ This file tracks recent development changes so Atlas and other agents can quickl
 
 ---
 
+## v1.6.0 Post-Merge Audit + Intelligence (2026-03-05)
+
+### UI Cleanup (meta-architecture alignment)
+- Removed Goals section from Today tab — goals surface through daily brief text (Chief Aim), not a separate card
+- Renamed "Command Center" tab to "Tasks" — clearer, less jargon
+- Removed dead `renderGoalsSection`, goals props/state/loading from app, controller, and view-state
+- Deleted `views/goals.ts` (dead types file)
+- Deleted orphaned CSS: `lifetracks.css` (583 lines), `vision-board.css` (405 lines)
+- Removed dead CSS imports from `styles.css`
+- Cleaned goals CSS from `my-day.css`
+
+### Harness Update
+- Added Section 6 "Building Skills" to HARNESS.md — references Anthropic's skill-creator methodology
+- Added `create-skill.md` to godmode-dev workspace template
+- Agents now have a systematic process for creating new skills with quality guardrails
+
+### Intelligence
+- `docs/INTEL-2026-03-05.md` — Anthropic skill-creator (meta-tool for building skills) + Google Workspace CLI (future integration path)
+- Both reinforce anti-fragile thesis: new tools = new files, not new code
+
+---
+
+## v1.6.0 Product Polish — 6-Tab UX Overhaul (2026-03-05)
+
+### Phase 1: Daily Rhythm Bulletproofing
+- Fixed goals schema mismatch in brief-generator (`goal.text` → `goal.title`)
+- Added active goals to awareness snapshot (top 3 + overflow count)
+- Added agent activity summary to awareness snapshot
+- Fixed AI Packet display (backend returns `snapshot`, UI expected `consciousness/working`)
+- Expanded starter tips from 5 to 15 (was cycling every 5 days)
+- Added goals section to starter brief
+- Added readiness score display in daily brief header
+- Improved empty state with "Generate Brief Now" CTA
+
+### Phase 2: Dashboards 10x (175 → 370 lines)
+- Added 6 dashboard template cards with starter prompts
+- Added category filter bar (6 categories: overview, personal, productivity, finance, system, content)
+- Added pin/unpin support with pinned-first sorting
+- Added staleness indicators (>24h since last refresh)
+- Added dashboard count display
+- Auto-categorization from title/description keywords
+- Created `assets/dashboard-templates/` with 6 template files
+
+### Phase 3: Goals in Today Tab
+- Added goals section to Today tab with progress bars
+- Added evening capture button to toolbar
+- Wired goals loading into my-day refresh cycle
+
+### Phase 4: Second Brain Polish
+- Replaced dead Insights placeholder with readiness checklist
+- Added context health score (0-100% across 5 criteria)
+- Added "Update via Chat" button to Identity panel
+- Fixed Research Quick Add button (was unreachable)
+
+### Phase 5: UX Polish
+- Improved Work tab empty states (workspaces, artifacts, sessions) with helpful hints and CTAs
+
+### Files Changed
+- `src/lib/awareness-snapshot.ts` — goals section, agent activity summary
+- `src/methods/brief-generator.ts` — goals schema fix, 15 starter tips, goals in prompt
+- `ui/src/ui/views/dashboards.ts` — complete rewrite with templates, categories, pinning
+- `ui/src/ui/views/my-day.ts` — goals section, evening capture, empty state
+- `ui/src/ui/views/daily-brief.ts` — readiness score, generate button, task progress
+- `ui/src/ui/views/second-brain.ts` — insights panel, health score, identity chat button
+- `ui/src/ui/views/workspaces.ts` — improved empty states
+- `ui/src/ui/controllers/second-brain.ts` — sync data shape fix
+- `ui/src/ui/app.ts` — dashboard prompt passthrough, goals refresh
+- `ui/src/ui/app-render.ts` — evening capture, goals props, dashboard prompt
+- `ui/src/ui/app-view-state.ts` — dashboard create type update
+- `ui/src/styles/dashboards.css` — categories, templates, pinning, staleness
+- `ui/src/styles/my-day.css` — readiness, goals, generate button, evening capture
+- `ui/src/styles/second-brain.css` — health score, chat button
+- `ui/src/styles/workspaces.css` — empty state hints
+- `assets/dashboard-templates/*.md` — 6 new template files
+
+---
+
+## 2026-03-05 — Security Hardening Mega-Session
+
+### Phase 1: Comprehensive Security Audit + Fixes (12+ critical/high vulns fixed)
+- **files.ts**: Removed hardcoded GOG_KEYRING_PASSWORD; added path validation + symlink resolution to readFile, pushToDrive, batchPushToDrive, taskFiles; sanitized error messages
+- **dashboards.ts**: Sanitized dashboard ID via sanitizeSlug() in get/remove handlers; added path prefix check before rm
+- **vault-capture.ts**: Added path traversal check on destination paths in captureQueueOutputsToVault
+- **safety-gates.ts**: Expanded output shield (JWT, AWS, OpenAI, Oura, Fathom, Front, Bearer, private keys); expanded config shield (15+ sensitive paths, 20+ file-read commands); lowered min length to 20
+- **fathom-webhook.ts**: Webhook now REQUIRES signing secret; removed secret from RPC response; added restrictive file permissions
+- **markdown.ts (UI)**: Added DOMPurify hook to restrict `<input>` to checkbox only; CSS sanitization strips expression(), behavior:, -moz-binding:, @import
+
+### Phase 2: Private Session Mode
+- **Backend**: New `src/lib/private-session.ts` (server-side state, 24h auto-expiry, in-memory cache); new `src/methods/session-privacy.ts` (RPC handlers)
+- **Frontend**: Wired privateMode props to chat view; added backend RPC calls in toggle handler; lock/unlock button + banner in chat compose area
+- **Integration**: before_prompt_build blocks vault capture for private sessions; heartbeat cleans expired sessions
+
+### Phase 3: Least Privilege Hardening
+- **New `src/lib/secure-fs.ts`**: secureWriteFile (0o600), secureMkdir (0o700), sanitizeError utility
+- **12 files migrated**: trust-tracker, options, tasks, projects, data-sources, onboarding, system-update, dashboards, support, correction-log, fathom-processor, trust-rate tool
+- **Error sanitization**: User-facing error responses in support.ts now strip home directory paths
+
+### Phase 4: Security Documentation
+- **New `docs/SECURITY.md`**: Threat model, 5 security layers (safety gates, file I/O, HTML/CSS sanitization, private sessions, auth/webhooks), data storage map, user security guide
+
+### Files Changed
+- `src/methods/files.ts`, `src/methods/dashboards.ts`, `src/methods/trust-tracker.ts`, `src/methods/options.ts`, `src/methods/tasks.ts`, `src/methods/projects.ts`, `src/methods/data-sources.ts`, `src/methods/onboarding.ts`, `src/methods/system-update.ts`, `src/methods/support.ts`, `src/methods/fathom-webhook.ts`, `src/methods/session-privacy.ts` (new)
+- `src/hooks/safety-gates.ts`
+- `src/lib/private-session.ts` (new), `src/lib/secure-fs.ts` (new), `src/lib/env-writer.ts`, `src/lib/correction-log.ts`
+- `src/services/vault-capture.ts`, `src/services/consciousness-heartbeat.ts`, `src/services/fathom-processor.ts`
+- `src/tools/trust-rate.ts`
+- `ui/src/ui/views/chat.ts`, `ui/src/ui/icons.ts`, `ui/src/ui/markdown.ts`, `ui/src/ui/app.ts`, `ui/src/ui/app-render.ts`
+- `index.ts`, `docs/SECURITY.md` (new)
+
+---
+
+## v1.6.0 Stabilization — Bug Hunt + Content Expansion (2026-03-05)
+
+### Bug Fixes (12 bugs found and fixed via 6-agent adversarial review)
+- **MEDIUM**: Skills registry frontmatter parser fails on CRLF (Windows) line endings — fixed regex
+- **MEDIUM**: Quoted YAML values in skill frontmatter (e.g., `schedule: "daily 9:30am"`) silently break schedule parsing — now strips quotes
+- **MEDIUM**: `every Nh` schedule uses `Date.now()` instead of `now` parameter — fixed for consistency and testability
+- **MEDIUM**: Heartbeat `lastRuns` timestamp updated even when dedup prevents queue insertion — now checks return value
+- **MEDIUM**: Queue processor doesn't block `"disabled"` autonomy level — now blocks both `"disabled"` and `"approval"`
+- **MEDIUM**: Double decrement of `activeCount` on non-zero exit codes — added `alreadyDecremented` parameter
+- **MEDIUM**: Deep work window PM/PM typo — end time always showed "PM" regardless of actual time
+- **MEDIUM**: quickSetup skips phase 4 but doesn't mark it complete — phase 4 now marked complete
+- **MEDIUM**: Mission Control toggle broken (can never collapse) — fixed boolean logic
+- **MEDIUM**: Ally unread badge not cleared when clicking pinned ally tab — now clears on switch
+- **LOW**: `every 0h` schedule not rejected — now returns null for invalid intervals
+- **LOW**: `checkEvidence` used `lower` and `content` inconsistently — standardized on `content`
+- **LOW**: Curation agent gate checks non-existent `data/team-workspaces/` instead of `clients/` — fixed path
+- **LOW**: proactiveIntel defaults still ship in options.ts despite feature removal — cleaned up
+- **LOW**: Redundant dynamic `node:fs` imports in starter persona seeding — converted to static imports
+
+### Content Layer Expansion
+- 4 new personas: finance-admin, travel-planner, executive-briefer, life-admin
+- 4 new skills: monthly-bill-review, daily-standup-prep, weekly-life-admin, quarterly-review
+- Total: 11 personas, 7 skills available out of the box
+
+### Files Changed
+- `src/lib/skills-registry.ts` — CRLF support, quote stripping, `every 0h` rejection, `now` param fix
+- `src/services/consciousness-heartbeat.ts` — dedup-aware lastRuns update
+- `src/services/queue-processor.ts` — disabled autonomy blocking, double decrement fix, evidence check consistency
+- `src/methods/brief-generator.ts` — PM/AM typo fix
+- `src/methods/onboarding.ts` — phase 4 completion in quickSetup
+- `src/methods/options.ts` — removed dead proactiveIntel defaults
+- `ui/src/ui/app-render.ts` — Mission Control toggle fix, ally unread badge fix
+- `index.ts` — curation agent path fix, static imports cleanup, MEMORY_DIR import
+- `assets/agent-roster/` — 4 new persona files
+- `assets/skills/` — 4 new skill files
+
+---
+
+## v1.6.0 — Product Foundation (2026-03-05)
+
+### Philosophy Lock-In
+- `docs/GODMODE-META-ARCHITECTURE.md` v2 — the definitive product blueprint
+- 8 principles: context is king, files are the API, inbox-first, autonomy is earned, ally is the interface, compound don't accumulate, survive the model switch, code as little as possible
+- GodMode = Engine + Slots + Community. The ally is 80% of the value.
+
+### Engine
+- File-based skills directory (`~/godmode/skills/`) with cron scheduling
+- Heartbeat processes cron skills on each tick
+- Verification gates for all task types (not just coding)
+- Human-in-the-loop queue scoping (ally presents brief, user approves)
+- `trust_rate` tool wired into registered tools
+- Dead weight removed: proactiveIntel stubs, data-sources, people-data unregistered
+- Team services gated behind team workspace flag
+
+### UX
+- 6-tab baseline: Chat, Today, Work, Second Brain, Dashboards, Settings
+- Power-user tabs (Mission Control, Skills, Trust, etc.) behind expandable section
+- Ally panel sync fix — bubble, Chat tab, and iMessage stay in sync
+- Trust summary in awareness snapshot
+
+### Onboarding
+- Quick setup → immediate first win (starter brief, zero integrations)
+- Soul interview moved to post-first-win (optional deepening, not gatekeeping)
+- Demo brief works with name + timezone only
+
+### Content
+- 7 starter personas: content-writer, researcher, ops-runner, meeting-prep, evidence-collector, weekly-reviewer, personal-assistant
+- 3 sample cron skills: weekly-content, inbox-sweep, competitor-scan
+- Auto-deploy on first run (copies from assets/ if roster is empty)
+
+---
+
+## 2026-03-04 — v1.6.0-ux: Nav Simplification, Starter Brief, Ally Sync Fix
+
+### Nav Simplification (6-Tab Baseline)
+- Sidebar now shows 6 core tabs: Chat, Today, Work, Second Brain, Dashboards, Config
+- Power-user tabs (Skills, Trust, Guardrails, etc.) moved behind collapsible "Mission Control" section
+- Mission Control expanded state persisted in localStorage
+- All tabs still accessible via URL/programmatic navigation — only hidden from default nav
+
+### Demo Brief (Zero-Integration First Win)
+- New starter brief generated when Obsidian vault isn't configured
+- Shows: greeting with user name, today's tasks, queue status, rotating GodMode tips
+- Nudges user to connect calendar and X intelligence for richer briefs
+- `quickSetup` now jumps directly to Phase 5 (First Win) instead of Phase 2
+- Phase 5 onboarding prompt updated to reference starter brief and `dailyBrief.generate`
+
+### Ally Chat Sync Fix
+- Fixed ally panel diverging from Chat tab: `chat.final` now always updates `allyMessages` even when Chat tab is active full-screen
+- Error/abort messages now sync to `allyMessages` regardless of view state
+- Panel already reloads full history on open, scroll-to-bottom on new messages
+
+### Trust + Dashboard Prompts
+- Added dashboard-building instruction to ally persona ("How You Work" section)
+- Awareness snapshot now includes Trust section when `trust-tracker.json` exists (2 lines max)
+
+### Files Changed
+- `ui/src/ui/navigation.ts` — TAB_GROUPS + POWER_USER_GROUPS
+- `ui/src/ui/app-render.ts` — Mission Control collapsible section
+- `ui/src/ui/storage.ts` — default navGroupsCollapsed includes Mission Control
+- `src/methods/brief-generator.ts` — starter brief generator + fallback in RPC handler
+- `src/methods/onboarding.ts` — quickSetup jumps to phase 5
+- `src/hooks/onboarding-context.ts` — Phase 5 prompt references starter brief
+- `ui/src/ui/app-gateway.ts` — ally sync fix for chat.final events
+- `src/hooks/agent-persona.ts` — dashboard-building instruction
+- `src/lib/awareness-snapshot.ts` — trust tracker summary
+
+---
+
+## 2026-03-05 — v1.6.0: Core Identity & Memory Audit
+
+### What
+9-phase audit of every file that defines WHO the ally is, HOW it remembers, and WHAT it proactively does. Quality improvements only — zero new services, zero new dependencies.
+
+### Changes
+
+**Ally Identity (`src/hooks/agent-persona.ts`):**
+- Rewrote 27-line identity from scratch (23 lines, within budget)
+- Changed "executive assistant, chief of staff" → "deeply contextual coworker, proactive partner"
+- Added 8 specific behavior directives: investigate before asking, solve don't list, parse brain-dumps, scope before delegating, be proactive, remember everything, be honest and direct, treat time as sacred
+- Added capabilities summary: tasks, goals, queue, trust tracking, skills, dashboards, vault
+
+**Awareness Snapshot (`src/lib/awareness-snapshot.ts`):**
+- Added day of week to header (enables weekly rhythm awareness — Monday planning, Friday review)
+- Added active goals with progress percentages
+- Added trust scores summary (workflow scores from trust-tracker.json)
+- Added proactive nudge lines: "Surface overdue tasks early" when overdue > 0, "Prompt user to review queue items" when review > 0
+
+**Onboarding Prompts (`src/hooks/onboarding-context.ts`):**
+- Phase 2 (Second Brain): Rewrote from dry "help set up memory system" to warm copy that communicates the value — "nothing gets lost", "never repeat yourself", "wow moment"
+- Phase 3 (Workflow Audit): Removed killed "ClawHub" reference, updated to "GodMode capabilities"
+
+**Skills:**
+- `weekly-coaching`: Removed killed wheel-of-life.json and snapshots/ references, replaced with goals + trust scores + daily briefs as data sources
+- `evening-processing`: Removed killed snapshots/ reference, aligned with actual vault-capture pipeline, changed delivery to "none" (silent background)
+
+### Files Changed
+- `src/hooks/agent-persona.ts` — identity rewrite
+- `src/lib/awareness-snapshot.ts` — goals, trust, day-of-week, proactive nudges
+- `src/hooks/onboarding-context.ts` — Phase 2 + Phase 3 prompt improvements
+- `skills/weekly-coaching/SKILL.md` — removed dead references
+- `skills/evening-processing/SKILL.md` — removed dead references
+
+---
+
+## 2026-03-05 — Queue Pipeline & Integration Health Audit
+
+### What
+End-to-end audit of the entire agent delegation pipeline and integration data pipelines. Traced every path from task creation to output delivery. Found and fixed 10 bugs across 7 files.
+
+### Critical Bugs Fixed
+
+1. **Autonomy gating blocked ALL queue items** — `getAutonomyLevel()` returned `"approval"` for any persona/type not explicitly tracked as a trust workflow. Since trust workflows are user-defined and rarely match queue item types, this effectively prevented all queue processing. **Fix:** Untracked workflows now default to `"full"` autonomy (opt-in tracking, not opt-out blocking).
+
+2. **No agent process timeout** — Spawned agent CLIs could run forever with no kill timer. **Fix:** Added 30-minute timeout that kills the process group (SIGTERM → SIGKILL fallback).
+
+3. **Double activeCount decrement** — `handleItemCompleted` decremented activeCount, then called `handleItemFailed` which decremented again, allowing extra concurrent agents beyond the limit. **Fix:** Added `skipDecrement` parameter to prevent double-counting.
+
+4. **"disabled" autonomy level not checked** — Trust scores below 5 should block agents but the queue processor only checked for "approval". **Fix:** Now checks "disabled" and blocks with a clear log message.
+
+5. **Retry button broken in Mission Control** — UI called `queue.update` with `status: "pending"` but that handler rejects anything other than "review"/"failed". **Fix:** Added dedicated `queue.retry` RPC handler that properly resets items.
+
+### High-Priority Fixes
+
+6. **No evidence verification gates** — Added `checkEvidence()` function that validates output per task type: coding (PR links/code blocks), research (URLs), ops (command output), review (file paths + verdicts), analysis (data + conclusions). Failed evidence triggers one retry with guidance, then marks for review with warning.
+
+7. **Done items never expired** — Queue grew unbounded. **Fix:** Done items now expire after 30 days. Stale processing items (no live PID, >2hrs old) auto-reset to pending.
+
+8. **Trust tracker had no file locking** — Concurrent trust operations (queue auto-rating + user rating) could corrupt `trust-tracker.json`. **Fix:** All mutating operations now use `withFileLock` via a new `updateState()` helper.
+
+9. **Brief generator missing response.ok checks** — Three Oura API calls and the weather API call parsed `.json()` without checking HTTP status. 401/429/500 responses caused cryptic parse errors instead of clear diagnostics. **Fix:** Added `.ok` checks with descriptive error messages on all four endpoints.
+
+10. **Fathom webhook race condition** — Concurrent webhook deliveries could lose data (last-write-wins on `meeting-queue.json`). **Fix:** Added `updateMeetingQueue()` with `withFileLock` for all mutating operations (webhook ingest, manual add, status update, secret storage).
+
+### Files Changed
+- `src/services/queue-processor.ts` — autonomy gating fix, agent timeout, double decrement fix, evidence gates, done item expiry, stale processing recovery
+- `src/methods/trust-tracker.ts` — autonomy level fix (untracked=full), file locking on all mutations
+- `src/methods/queue.ts` — new `queue.retry` RPC handler
+- `src/methods/fathom-webhook.ts` — file locking on all meeting queue mutations
+- `src/methods/brief-generator.ts` — response.ok checks on Oura (3 endpoints) and weather
+- `ui/src/ui/controllers/mission-control.ts` — use `queue.retry` instead of broken `queue.update`
+
+---
+
+## 2026-03-05 — v1.6.0: Team Workspaces & Templates
+
+### What
+Team workspace infrastructure audit and hardening. Added workspace templates for instant project setup, fixed feed safety, and integrated workspace awareness into the ally's context.
+
+### Workspace Templates
+- Created `assets/workspace-templates/` with 3 templates: `godmode-dev`, `trp`, `patient-autopilot`
+- **godmode-dev**: Code review + build verification skills, architecture conventions memory
+- **trp**: General project collaboration template
+- **patient-autopilot**: General project collaboration template
+- Templates include memory/README.md starter files and optional skills
+
+### New RPC Methods
+- `workspace.setupFromTemplate` — create a team workspace from a bundled template (copies template memory, skills, and config into a new workspace with git init)
+- `workspace.listTemplates` — list all available workspace templates with metadata
+
+### Bug Fixes
+- **team-feed.ts**: Added 5MB file size protection to `readFeed()` — large feeds now read only the tail instead of OOM'ing. Uses file handle seek for efficient tail reading.
+- **awareness-snapshot.ts**: Team workspaces now appear in the awareness snapshot — ally sees which team workspaces are active and their sync status.
+
+### Documentation
+- Created `docs/TEAM-SETUP.md` — full team setup guide for admins and members, covering workspace creation, joining, syncing, agent communication, and curation.
+
+### Files Changed
+- `src/methods/team-workspace.ts` — added `setupFromTemplate` and `listTemplates` handlers
+- `src/lib/team-feed.ts` — readFeed size protection (MAX_FEED_READ_BYTES)
+- `src/lib/awareness-snapshot.ts` — team workspace summary in snapshot
+- `assets/workspace-templates/` — 3 template configs + content directories
+- `docs/TEAM-SETUP.md` — team setup documentation
+
+---
+
 ## 2026-03-04 — v1.4.0: Lean Audit + Adversarial Bug Sweep + Install Hardening
 
 ### What

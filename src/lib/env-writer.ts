@@ -52,8 +52,8 @@ export function readEnvFile(filePath?: string): Record<string, string> {
 export function writeEnvVar(key: string, value: string, filePath?: string): void {
   const target = filePath ?? primaryEnvPath();
 
-  // Ensure directory exists
-  mkdirSync(dirname(target), { recursive: true });
+  // SECURITY: Ensure directory exists with restrictive permissions (owner-only)
+  mkdirSync(dirname(target), { recursive: true, mode: 0o700 });
 
   // Read existing content
   let lines: string[] = [];
@@ -85,9 +85,9 @@ export function writeEnvVar(key: string, value: string, filePath?: string): void
     updated.push(`${key}=${value}`);
   }
 
-  // Atomic write
+  // SECURITY: Atomic write with restrictive permissions (owner read/write only)
   const tmpPath = `${target}.${randomBytes(4).toString("hex")}.tmp`;
-  writeFileSync(tmpPath, updated.join("\n"), "utf-8");
+  writeFileSync(tmpPath, updated.join("\n"), { encoding: "utf-8", mode: 0o600 });
   renameSync(tmpPath, target);
 }
 
@@ -109,7 +109,7 @@ export function removeEnvVar(key: string, filePath?: string): void {
   });
 
   const tmpPath = `${target}.${randomBytes(4).toString("hex")}.tmp`;
-  writeFileSync(tmpPath, filtered.join("\n"), "utf-8");
+  writeFileSync(tmpPath, filtered.join("\n"), { encoding: "utf-8", mode: 0o600 });
   renameSync(tmpPath, target);
 }
 

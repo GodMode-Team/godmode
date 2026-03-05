@@ -7,10 +7,22 @@
  */
 
 import { exec as nodeExec } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { existsSync, readFileSync, unlinkSync } from "node:fs";
+import { join, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 import type { GatewayRequestHandler } from "openclaw/plugin-sdk";
 import { DATA_DIR } from "../data-paths.js";
+import { secureWriteFileSync, secureMkdirSync } from "../lib/secure-fs.js";
+
+/** Detect if the plugin was installed via `openclaw plugins install` (extensions dir). */
+function isPluginInstall(): boolean {
+  try {
+    const thisDir = dirname(fileURLToPath(import.meta.url));
+    return thisDir.includes("/extensions/godmode/") || thisDir.includes("\\extensions\\godmode\\");
+  } catch {
+    return false;
+  }
+}
 
 type GatewayRequestHandlers = Record<string, GatewayRequestHandler>;
 
@@ -152,7 +164,7 @@ const run: GatewayRequestHandler = async ({ respond }) => {
 
     // Write pre-update checkpoint
     if (!existsSync(DATA_DIR)) {
-      mkdirSync(DATA_DIR, { recursive: true });
+      secureMkdirSync(DATA_DIR);
     }
     const checkpoint = {
       openclawVersion,
@@ -160,7 +172,7 @@ const run: GatewayRequestHandler = async ({ respond }) => {
       timestamp: Date.now(),
       initiatedAt: new Date().toISOString(),
     };
-    writeFileSync(CHECKPOINT_FILE, JSON.stringify(checkpoint, null, 2));
+    secureWriteFileSync(CHECKPOINT_FILE, JSON.stringify(checkpoint, null, 2));
 
     // Run openclaw update --yes
     // The gateway will restart as part of the update process.
@@ -240,9 +252,9 @@ export function runPostUpdateHealthCheck(
     };
 
     if (!existsSync(DATA_DIR)) {
-      mkdirSync(DATA_DIR, { recursive: true });
+      secureMkdirSync(DATA_DIR);
     }
-    writeFileSync(POST_UPDATE_STATUS_FILE, JSON.stringify(status, null, 2));
+    secureWriteFileSync(POST_UPDATE_STATUS_FILE, JSON.stringify(status, null, 2));
     unlinkSync(CHECKPOINT_FILE);
 
     logger.info(
@@ -253,10 +265,49 @@ export function runPostUpdateHealthCheck(
   }
 }
 
+// ── godmode.update.pluginRun ─────────────────────────────────────────────
+
+const pluginRun: GatewayRequestHandler = async ({ respond }) => {
+  try {
+    const previousVersion = _pluginVersion;
+
+    // Use the correct update command based on install method
+    const updateCmd = isPluginInstall()
+      ? "rm -rf ~/.openclaw/extensions/godmode && openclaw plugins install @godmode-team/godmode 2>&1"
+      : "npm update -g @godmode-team/godmode 2>&1";
+
+    const { code, stdout, stderr } = await runCommand(updateCmd, 120_000);
+
+    if (code !== 0) {
+      respond(false, undefined, {
+        code: "PLUGIN_UPDATE_FAILED",
+        message: stderr.trim() || stdout.trim() || "npm update failed",
+      });
+      return;
+    }
+
+    // Restart the gateway so it loads the new plugin version
+    void runCommand("openclaw gateway restart 2>/dev/null", 10_000);
+
+    respond(true, {
+      success: true,
+      previousVersion,
+      output: stdout.trim().slice(-500),
+      message: "Plugin updated. Gateway is restarting — the UI will reconnect automatically.",
+    });
+  } catch (err) {
+    respond(false, undefined, {
+      code: "PLUGIN_UPDATE_ERROR",
+      message: String(err),
+    });
+  }
+};
+
 // ── Export ────────────────────────────────────────────────────────────────
 
 export const systemUpdateHandlers: GatewayRequestHandlers = {
   "godmode.update.check": check,
   "godmode.update.run": run,
   "godmode.update.pluginCheck": pluginCheck,
+  "godmode.update.pluginRun": pluginRun,
 };

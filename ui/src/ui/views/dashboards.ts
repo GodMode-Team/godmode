@@ -2,9 +2,10 @@
  * Dashboards view — gallery of custom data views + active dashboard renderer.
  *
  * Two modes:
- *   1. Gallery: grid of dashboard cards with create/delete actions.
+ *   1. Gallery: grid of dashboard cards with create/delete/pin actions,
+ *      category filter, template suggestions, and staleness indicators.
  *   2. Active: renders a single dashboard's HTML with back/refresh controls
- *      and an "Open in Chat" button. Chat is handled by the side-panel Ally.
+ *      and an "Open in Chat" button.
  */
 
 import { html, nothing } from "lit";
@@ -14,6 +15,14 @@ import { formatAgo } from "../format.js";
 import type { DashboardManifest } from "../controllers/dashboards.js";
 
 // ── Types ────────────────────────────────────────────────────────────
+
+export type DashboardTemplate = {
+  id: string;
+  name: string;
+  category: string;
+  description: string;
+  prompt: string;
+};
 
 export type DashboardsProps = {
   connected: boolean;
@@ -26,11 +35,74 @@ export type DashboardsProps = {
   isWorking?: boolean;
   onSelectDashboard: (id: string) => void;
   onDeleteDashboard: (id: string) => void;
-  onCreateViaChat: () => void;
+  onCreateViaChat: (prompt?: string) => void;
   onBack: () => void;
   onRefresh: () => void;
   onOpenSession: (dashboardId: string) => void;
+  onTogglePin?: (id: string) => void;
+  // Category filter
+  categoryFilter?: string;
+  onCategoryFilter?: (category: string) => void;
+  // Templates
+  templates?: DashboardTemplate[];
 };
+
+// ── Constants ────────────────────────────────────────────────────────
+
+const CATEGORIES: Record<string, { icon: string; label: string }> = {
+  all: { icon: "\uD83D\uDCCA", label: "All" },
+  productivity: { icon: "\u{1F4CB}", label: "Productivity" },
+  personal: { icon: "\u{1F9D1}", label: "Personal" },
+  business: { icon: "\u{1F4BC}", label: "Business" },
+  system: { icon: "\u{2699}\uFE0F", label: "System" },
+  custom: { icon: "\u{2728}", label: "Custom" },
+};
+
+// Built-in template suggestions when no templates are loaded from assets
+const DEFAULT_TEMPLATE_IDEAS: DashboardTemplate[] = [
+  {
+    id: "morning-overview",
+    name: "Morning Overview",
+    category: "productivity",
+    description: "Tasks, calendar, priorities, and focus score",
+    prompt: "Create a morning overview dashboard that shows my top priorities, today's calendar events, active queue items, and readiness score. Use clean CSS grid layout.",
+  },
+  {
+    id: "weekly-impact",
+    name: "Weekly Impact",
+    category: "productivity",
+    description: "What you accomplished this week",
+    prompt: "Create a weekly impact dashboard showing tasks completed vs created this week, agent task outcomes, trust score changes, and top 3 wins. Use CSS bar charts.",
+  },
+  {
+    id: "agent-activity",
+    name: "Agent Activity",
+    category: "system",
+    description: "Queue throughput, personas, and trust scores",
+    prompt: "Create an agent activity dashboard showing queue stats (pending, processing, completed, failed), most active personas, cron skill execution log, and trust scores by workflow.",
+  },
+  {
+    id: "health-energy",
+    name: "Health & Energy",
+    category: "personal",
+    description: "Sleep, readiness, and activity from Oura",
+    prompt: "Create a health and energy dashboard showing last night's sleep score, 7-day sleep trend, today's readiness score, activity level, and HRV trend. Pull from Oura integration.",
+  },
+  {
+    id: "goals-tracker",
+    name: "Goals Tracker",
+    category: "personal",
+    description: "Active goals with progress bars",
+    prompt: "Create a goals tracker dashboard showing my active goals as cards with progress bars, grouped by area (health, career, finance, personal), with overall completion percentage.",
+  },
+  {
+    id: "content-performance",
+    name: "Content Performance",
+    category: "business",
+    description: "Social posts and content pipeline",
+    prompt: "Create a content performance dashboard showing recent content pieces, content pipeline status, engagement metrics from X intelligence, and a content calendar for the next 7 days.",
+  },
+];
 
 // ── Helpers ──────────────────────────────────────────────────────────
 
@@ -41,38 +113,92 @@ function renderScopeBadge(scope: string) {
   return html`<span class="dashboard-card-scope">${scope}</span>`;
 }
 
+function isStale(updatedAt: string): boolean {
+  const elapsed = Date.now() - new Date(updatedAt).getTime();
+  return elapsed > 24 * 60 * 60 * 1000; // 24 hours
+}
+
+function inferCategory(dashboard: DashboardManifest): string {
+  const title = (dashboard.title + " " + (dashboard.description ?? "")).toLowerCase();
+  if (title.includes("health") || title.includes("sleep") || title.includes("oura") || title.includes("energy") || title.includes("goal")) return "personal";
+  if (title.includes("agent") || title.includes("queue") || title.includes("trust") || title.includes("skill")) return "system";
+  if (title.includes("revenue") || title.includes("business") || title.includes("content") || title.includes("metric")) return "business";
+  if (title.includes("task") || title.includes("calendar") || title.includes("morning") || title.includes("impact") || title.includes("weekly")) return "productivity";
+  return "custom";
+}
+
+// ── Template Card ────────────────────────────────────────────────────
+
+function renderTemplateCard(
+  template: DashboardTemplate,
+  onCreateViaChat: (prompt?: string) => void,
+) {
+  const catInfo = CATEGORIES[template.category] ?? CATEGORIES.custom;
+  return html`
+    <div class="dashboard-card dashboard-card--template">
+      <button
+        class="dashboard-card-main"
+        @click=${() => onCreateViaChat(template.prompt)}
+      >
+        <div class="dashboard-card-title">${template.name}</div>
+        <div class="dashboard-card-desc">${template.description}</div>
+        <div class="dashboard-card-meta">
+          <span class="dashboard-card-scope">${catInfo.icon} ${catInfo.label}</span>
+          <span class="dashboard-card-template-label">Template</span>
+        </div>
+      </button>
+    </div>
+  `;
+}
+
 // ── Dashboard Card ───────────────────────────────────────────────────
 
 function renderDashboardCard(
   dashboard: DashboardManifest,
   onSelect: (id: string) => void,
   onDelete: (id: string) => void,
+  onTogglePin?: (id: string) => void,
 ) {
+  const stale = isStale(dashboard.updatedAt);
+
   return html`
-    <div class="dashboard-card">
+    <div class="dashboard-card ${dashboard.pinned ? "dashboard-card--pinned" : ""}">
       <button
         class="dashboard-card-main"
         @click=${() => onSelect(dashboard.id)}
       >
-        <div class="dashboard-card-title">${dashboard.title}</div>
+        <div class="dashboard-card-title">
+          ${dashboard.pinned ? html`<span class="pin-icon" title="Pinned">\u{1F4CC}</span>` : nothing}
+          ${dashboard.title}
+        </div>
         ${dashboard.description
           ? html`<div class="dashboard-card-desc">${dashboard.description}</div>`
           : nothing}
         <div class="dashboard-card-meta">
           ${renderScopeBadge(dashboard.scope)}
           <span>${formatAgo(new Date(dashboard.updatedAt).getTime())}</span>
+          ${stale ? html`<span class="dashboard-card-stale" title="Last updated over 24 hours ago">\u{1F7E1} Stale</span>` : nothing}
         </div>
       </button>
-      <button
-        class="dashboard-card-delete"
-        title="Delete dashboard"
-        @click=${(e: Event) => {
-          e.stopPropagation();
-          if (confirm(`Delete "${dashboard.title}"?`)) {
-            onDelete(dashboard.id);
-          }
-        }}
-      >&times;</button>
+      <div class="dashboard-card-actions">
+        ${onTogglePin
+          ? html`<button
+              class="dashboard-card-pin"
+              title="${dashboard.pinned ? "Unpin" : "Pin"}"
+              @click=${(e: Event) => { e.stopPropagation(); onTogglePin(dashboard.id); }}
+            >${dashboard.pinned ? "\u{1F4CC}" : "\u{1F4C5}"}</button>`
+          : nothing}
+        <button
+          class="dashboard-card-delete"
+          title="Delete dashboard"
+          @click=${(e: Event) => {
+            e.stopPropagation();
+            if (confirm(`Delete "${dashboard.title}"?`)) {
+              onDelete(dashboard.id);
+            }
+          }}
+        >&times;</button>
+      </div>
     </div>
   `;
 }
@@ -83,6 +209,8 @@ function renderActiveDashboard(props: DashboardsProps) {
   const { activeDashboardHtml, activeDashboardManifest, isWorking } = props;
   if (!activeDashboardHtml || !activeDashboardManifest) return nothing;
 
+  const stale = isStale(activeDashboardManifest.updatedAt);
+
   return html`
     <section class="dashboards-container">
       <div class="dashboards-active-header">
@@ -90,11 +218,17 @@ function renderActiveDashboard(props: DashboardsProps) {
           class="dashboards-back-btn"
           @click=${() => props.onBack()}
         >&larr; All Dashboards</button>
-        <span class="dashboards-active-title">${activeDashboardManifest.title}</span>
+        <div class="dashboards-active-title-group">
+          <span class="dashboards-active-title">${activeDashboardManifest.title}</span>
+          <span class="dashboards-active-meta">
+            ${formatAgo(new Date(activeDashboardManifest.updatedAt).getTime())}
+            ${stale ? html` &middot; <span class="dashboard-card-stale">\u{1F7E1} Stale</span>` : nothing}
+          </span>
+        </div>
         <button
           class="dashboards-session-btn"
           @click=${() => props.onOpenSession(activeDashboardManifest.id)}
-        >${isWorking ? "Working..." : "Open in Chat"}</button>
+        >${isWorking ? "Working..." : "Edit in Chat"}</button>
         <button
           class="dashboards-refresh-btn"
           @click=${() => props.onRefresh()}
@@ -109,43 +243,113 @@ function renderActiveDashboard(props: DashboardsProps) {
   `;
 }
 
+// ── Category Filter Bar ──────────────────────────────────────────────
+
+function renderCategoryFilter(
+  activeCategory: string,
+  dashboards: DashboardManifest[],
+  onCategoryFilter: (category: string) => void,
+) {
+  // Count dashboards per category
+  const counts: Record<string, number> = { all: dashboards.length };
+  for (const d of dashboards) {
+    const cat = inferCategory(d);
+    counts[cat] = (counts[cat] ?? 0) + 1;
+  }
+
+  return html`
+    <div class="dashboards-category-bar">
+      ${Object.entries(CATEGORIES).map(([key, info]) => html`
+        <button
+          class="dashboards-category-btn ${activeCategory === key ? "active" : ""}"
+          @click=${() => onCategoryFilter(key)}
+        >
+          ${info.icon} ${info.label}
+          ${counts[key] ? html`<span class="category-count">${counts[key]}</span>` : nothing}
+        </button>
+      `)}
+    </div>
+  `;
+}
+
 // ── Gallery View ─────────────────────────────────────────────────────
 
 function renderGallery(props: DashboardsProps) {
   const { loading, dashboards } = props;
+  const categoryFilter = props.categoryFilter ?? "all";
+  const templates = props.templates ?? DEFAULT_TEMPLATE_IDEAS;
+
+  // Filter dashboards by category
+  const filteredDashboards = categoryFilter === "all"
+    ? (dashboards ?? [])
+    : (dashboards ?? []).filter(d => inferCategory(d) === categoryFilter);
+
+  // Sort: pinned first, then by updatedAt desc
+  const sortedDashboards = [...filteredDashboards].sort((a, b) => {
+    if (a.pinned && !b.pinned) return -1;
+    if (!a.pinned && b.pinned) return 1;
+    return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+  });
+
+  // Filter templates by category
+  const filteredTemplates = categoryFilter === "all"
+    ? templates
+    : templates.filter(t => t.category === categoryFilter);
+
+  const hasDashboards = (dashboards ?? []).length > 0;
 
   return html`
     <section class="dashboards-container">
       <div class="dashboards-toolbar">
+        <span class="dashboards-count">${(dashboards ?? []).length} dashboard${(dashboards ?? []).length === 1 ? "" : "s"}</span>
         <button
           class="dashboards-create-btn"
           @click=${() => props.onCreateViaChat()}
         >+ Create via Chat</button>
       </div>
 
+      ${hasDashboards && props.onCategoryFilter
+        ? renderCategoryFilter(categoryFilter, dashboards ?? [], props.onCategoryFilter)
+        : nothing}
+
       ${loading
-        ? html`<div class="dashboards-loading">Loading...</div>`
-        : !dashboards || dashboards.length === 0
+        ? html`<div class="dashboards-loading"><div class="spinner"></div> Loading dashboards...</div>`
+        : sortedDashboards.length === 0 && !hasDashboards
           ? html`
               <div class="dashboards-empty">
                 <div class="dashboards-empty-icon">&#128202;</div>
                 <div class="dashboards-empty-title">No dashboards yet</div>
                 <div class="dashboards-empty-hint">
-                  Tell your ally what you want to see and they'll build it for you.<br>
-                  <em>"Create a morning overview dashboard with my tasks, calendar, and focus score."</em>
+                  Dashboards are AI-generated views your ally builds for you.
+                  Pick a template below or describe what you want to see.
+                </div>
+              </div>
+              <div class="dashboards-templates-section">
+                <h3 class="dashboards-section-title">Start from a template</h3>
+                <div class="dashboards-grid">
+                  ${templates.map(t => renderTemplateCard(t, props.onCreateViaChat))}
                 </div>
               </div>
             `
           : html`
               <div class="dashboards-grid">
-                ${dashboards.map((d) =>
+                ${sortedDashboards.map((d) =>
                   renderDashboardCard(
                     d,
                     props.onSelectDashboard,
                     props.onDeleteDashboard,
+                    props.onTogglePin,
                   ),
                 )}
               </div>
+              ${filteredTemplates.length > 0 ? html`
+                <div class="dashboards-templates-section">
+                  <h3 class="dashboards-section-title">Create from template</h3>
+                  <div class="dashboards-grid dashboards-grid--templates">
+                    ${filteredTemplates.map(t => renderTemplateCard(t, props.onCreateViaChat))}
+                  </div>
+                </div>
+              ` : nothing}
             `}
     </section>
   `;
@@ -158,8 +362,9 @@ export function renderDashboards(props: DashboardsProps) {
     return html`
       <section class="dashboards-container">
         <div class="dashboards-error">
+          <span class="error-icon">\u26A0</span>
           <p>${props.error}</p>
-          <button @click=${() => props.onRefresh()}>Retry</button>
+          <button class="retry-button" @click=${() => props.onRefresh()}>Retry</button>
         </div>
       </section>
     `;

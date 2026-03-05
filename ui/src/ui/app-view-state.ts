@@ -36,7 +36,6 @@ import type { ToolExecutionInfo } from "./types/chat-types";
 import type { ChatAttachment, ChatQueueItem, CronFormState, FileTreeNode } from "./ui-types";
 import type { NostrProfileFormState } from "./views/channels.nostr-profile-form";
 import type { DataSource } from "./views/data";
-import type { Goal } from "./views/goals";
 import type { AllyChatMessage } from "./views/ally-chat";
 import type { AgentLogData, DailyBriefData, DecisionCardItem } from "./views/my-day";
 import type { Project } from "./views/work";
@@ -276,10 +275,6 @@ export type AppViewState = {
   workExpandedProjects?: Set<string>;
   workProjectFiles?: Record<string, unknown[]>;
   workDetailLoading?: Set<string>;
-  // Goals state
-  goals?: Goal[];
-  goalsLoading?: boolean;
-  goalsError?: string | null;
   // Data tab state
   dataSources?: DataSource[];
   dataLoading?: boolean;
@@ -351,6 +346,7 @@ export type AppViewState = {
   activeDashboardId?: string | null;
   activeDashboardHtml?: string | null;
   activeDashboardManifest?: import("./controllers/dashboards").DashboardManifest | null;
+  dashboardCategoryFilter?: string | null;
   // SecondBrain state
   secondBrainSubtab?: import("./views/second-brain").SecondBrainSubtab;
   secondBrainLoading?: boolean;
@@ -520,6 +516,7 @@ export type AppViewState = {
   handleDateToday: () => void;
   // Daily Brief handlers
   handleDailyBriefRefresh: () => Promise<void>;
+  handleDailyBriefGenerate: () => Promise<void>;
   handleDailyBriefOpenInObsidian: () => void;
   handleBriefSave: (content: string) => Promise<void>;
   handleBriefToggleCheckbox: (index: number, checked: boolean) => Promise<void>;
@@ -554,7 +551,6 @@ export type AppViewState = {
   handleWorkspaceBrowseSearch: (query: string) => Promise<void>;
   handleWorkspaceBrowseBack: () => void;
   handleWorkspaceCreateFolder: (folderPath: string) => Promise<void>;
-  handleGoalsRefresh: () => Promise<void>;
   handleStartChatWithPrompt: (prompt: string) => void;
   // Data tab handlers
   handleDataRefresh: () => Promise<void>;
@@ -580,6 +576,8 @@ export type AppViewState = {
   handleWizardAnswerChange?: (key: string, value: unknown) => void;
   handleWizardPreview?: () => Promise<void>;
   handleWizardGenerate?: () => Promise<void>;
+  handleWizardFileToggle?: (path: string, checked: boolean) => void;
+  handleWizardConfigToggle?: (path: string, checked: boolean) => void;
   // Focus Pulse handlers
   loadFocusPulse: () => Promise<void>;
   handleFocusPulseStartMorning: () => Promise<void>;
@@ -617,7 +615,9 @@ export type AppViewState = {
   handleDashboardsRefresh: () => Promise<void>;
   handleDashboardSelect: (id: string) => Promise<void>;
   handleDashboardDelete: (id: string) => Promise<void>;
-  handleDashboardCreateViaChat: () => void;
+  handleDashboardCreateViaChat: (prompt?: string) => void;
+  handleDashboardTogglePin: (id: string) => Promise<void>;
+  handleDashboardCategoryFilter: (category: string | null) => void;
   handleDashboardBack: () => void;
   handleDashboardOpenSession: (dashboardId: string) => Promise<void>;
   // Proactive Intel handlers

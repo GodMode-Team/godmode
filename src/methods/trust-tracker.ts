@@ -11,8 +11,10 @@
  */
 
 import { randomUUID } from "node:crypto";
-import { readFile, writeFile, mkdir } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import { join, dirname } from "node:path";
+import { withFileLock } from "openclaw/plugin-sdk";
+import { secureWriteFile, secureMkdir } from "../lib/secure-fs.js";
 import type { GatewayRequestHandler } from "openclaw/plugin-sdk";
 import { DATA_DIR } from "../data-paths.js";
 
@@ -72,6 +74,11 @@ export type WorkflowSummary = {
 
 // --- Helpers ---
 
+const LOCK_OPTIONS = {
+  retries: { retries: 20, factor: 1.35, minTimeout: 20, maxTimeout: 250, randomize: true },
+  stale: 15_000,
+};
+
 function emptyState(): TrustTrackerState {
   const now = new Date().toISOString();
   return {
@@ -83,7 +90,7 @@ function emptyState(): TrustTrackerState {
   };
 }
 
-async function readState(): Promise<TrustTrackerState> {
+async function readStateUnsafe(): Promise<TrustTrackerState> {
   try {
     const raw = await readFile(STATE_FILE, "utf-8");
     return JSON.parse(raw) as TrustTrackerState;
@@ -92,10 +99,27 @@ async function readState(): Promise<TrustTrackerState> {
   }
 }
 
-async function writeState(state: TrustTrackerState): Promise<void> {
+async function writeStateUnsafe(state: TrustTrackerState): Promise<void> {
   state.updatedAt = new Date().toISOString();
-  await mkdir(dirname(STATE_FILE), { recursive: true });
-  await writeFile(STATE_FILE, JSON.stringify(state, null, 2), "utf-8");
+  await secureMkdir(DATA_DIR);
+  await secureWriteFile(STATE_FILE, JSON.stringify(state, null, 2));
+}
+
+/** Read state with file lock (for read-only access). */
+async function readState(): Promise<TrustTrackerState> {
+  return withFileLock(STATE_FILE, LOCK_OPTIONS, async () => readStateUnsafe());
+}
+
+/** Read-modify-write with file lock (for mutations). */
+async function updateState<T>(
+  updater: (state: TrustTrackerState) => T | Promise<T>,
+): Promise<{ state: TrustTrackerState; result: T }> {
+  return withFileLock(STATE_FILE, LOCK_OPTIONS, async () => {
+    const state = await readStateUnsafe();
+    const result = await updater(state);
+    await writeStateUnsafe(state);
+    return { state, result };
+  });
 }
 
 function computeSummary(state: TrustTrackerState, daysBack = 30): WorkflowSummary[] {
@@ -179,9 +203,9 @@ export const trustTrackerHandlers: GatewayRequestHandlers = {
       .map((w) => w.trim())
       .slice(0, MAX_WORKFLOWS);
 
-    const state = await readState();
-    state.workflows = cleaned;
-    await writeState(state);
+    const { state } = await updateState((s) => {
+      s.workflows = cleaned;
+    });
     context?.broadcast?.("trust:update", { workflows: state.workflows });
     respond(true, { workflows: state.workflows });
   },
@@ -192,32 +216,31 @@ export const trustTrackerHandlers: GatewayRequestHandlers = {
       respond(false, undefined, { code: "INVALID_PARAMS", message: "workflow name is required" });
       return;
     }
-    const state = await readState();
     const normalized = workflow.trim();
 
-    // Check if already tracked (case-insensitive)
-    if (state.workflows.some((w) => w.toLowerCase() === normalized.toLowerCase())) {
+    const { state, result } = await updateState((s) => {
+      if (s.workflows.some((w) => w.toLowerCase() === normalized.toLowerCase())) {
+        return { added: false, reason: "already_tracked" as const };
+      }
+      if (s.workflows.length >= MAX_WORKFLOWS) {
+        return { added: false, reason: "limit_reached" as const };
+      }
+      s.workflows.push(normalized);
+      return { added: true, reason: null };
+    });
+
+    if (!result.added) {
       respond(true, {
         added: false,
-        reason: "already_tracked",
-        message: `"${normalized}" is already being tracked.`,
+        reason: result.reason,
+        message: result.reason === "already_tracked"
+          ? `"${normalized}" is already being tracked.`
+          : `You're tracking ${MAX_WORKFLOWS} workflows already. Remove one first to add "${normalized}".`,
         workflows: state.workflows,
       });
       return;
     }
 
-    if (state.workflows.length >= MAX_WORKFLOWS) {
-      respond(true, {
-        added: false,
-        reason: "limit_reached",
-        message: `You're tracking ${MAX_WORKFLOWS} workflows already. Remove one first to add "${normalized}".`,
-        workflows: state.workflows,
-      });
-      return;
-    }
-
-    state.workflows.push(normalized);
-    await writeState(state);
     context?.broadcast?.("trust:update", { workflows: state.workflows });
     respond(true, {
       added: true,
@@ -232,9 +255,14 @@ export const trustTrackerHandlers: GatewayRequestHandlers = {
       respond(false, undefined, { code: "INVALID_PARAMS", message: "workflow name is required" });
       return;
     }
-    const state = await readState();
-    const idx = state.workflows.findIndex((w) => w.toLowerCase() === workflow.trim().toLowerCase());
-    if (idx === -1) {
+    const { state, result } = await updateState((s) => {
+      const idx = s.workflows.findIndex((w) => w.toLowerCase() === workflow.trim().toLowerCase());
+      if (idx === -1) return { removed: false, name: "" };
+      const name = s.workflows.splice(idx, 1)[0];
+      return { removed: true, name };
+    });
+
+    if (!result.removed) {
       respond(true, {
         removed: false,
         message: `"${workflow}" is not being tracked.`,
@@ -242,12 +270,10 @@ export const trustTrackerHandlers: GatewayRequestHandlers = {
       });
       return;
     }
-    const removed = state.workflows.splice(idx, 1)[0];
-    await writeState(state);
     context?.broadcast?.("trust:update", { workflows: state.workflows });
     respond(true, {
       removed: true,
-      message: `Stopped tracking "${removed}".`,
+      message: `Stopped tracking "${result.name}".`,
       workflows: state.workflows,
     });
   },
@@ -269,14 +295,7 @@ export const trustTrackerHandlers: GatewayRequestHandlers = {
       return;
     }
 
-    const state = await readState();
-
-    // Auto-add workflow if not tracked and under limit
     const normalizedWorkflow = workflow.trim();
-    if (!state.workflows.includes(normalizedWorkflow) && state.workflows.length < MAX_WORKFLOWS) {
-      state.workflows.push(normalizedWorkflow);
-    }
-
     const entry: TrustRating = {
       id: randomUUID(),
       workflow: normalizedWorkflow,
@@ -286,14 +305,17 @@ export const trustTrackerHandlers: GatewayRequestHandlers = {
       timestamp: new Date().toISOString(),
     };
 
-    state.ratings.push(entry);
-
-    // Cap at MAX_RATINGS (FIFO trim)
-    if (state.ratings.length > MAX_RATINGS) {
-      state.ratings = state.ratings.slice(-MAX_RATINGS);
-    }
-
-    await writeState(state);
+    const { state } = await updateState((s) => {
+      // Auto-add workflow if not tracked and under limit
+      if (!s.workflows.includes(normalizedWorkflow) && s.workflows.length < MAX_WORKFLOWS) {
+        s.workflows.push(normalizedWorkflow);
+      }
+      s.ratings.push(entry);
+      // Cap at MAX_RATINGS (FIFO trim)
+      if (s.ratings.length > MAX_RATINGS) {
+        s.ratings = s.ratings.slice(-MAX_RATINGS);
+      }
+    });
 
     // Compute trust score for this workflow
     const workflowRatings = state.ratings.filter((r) => r.workflow === normalizedWorkflow);
@@ -328,23 +350,22 @@ export const trustTrackerHandlers: GatewayRequestHandlers = {
       return;
     }
 
-    const state = await readState();
     const normalized = workflow.trim();
-    if (!state.workflowFeedback) state.workflowFeedback = {};
-    if (!state.workflowFeedback[normalized]) state.workflowFeedback[normalized] = [];
-    state.workflowFeedback[normalized].push(feedback.trim());
 
-    // Keep at most 20 feedback entries per workflow
-    if (state.workflowFeedback[normalized].length > 20) {
-      state.workflowFeedback[normalized] = state.workflowFeedback[normalized].slice(-20);
-    }
+    const { state } = await updateState((s) => {
+      if (!s.workflowFeedback) s.workflowFeedback = {};
+      if (!s.workflowFeedback[normalized]) s.workflowFeedback[normalized] = [];
+      s.workflowFeedback[normalized].push(feedback.trim());
+      if (s.workflowFeedback[normalized].length > 20) {
+        s.workflowFeedback[normalized] = s.workflowFeedback[normalized].slice(-20);
+      }
+    });
 
-    await writeState(state);
     context?.broadcast?.("trust:feedback", { workflow: normalized, feedback: feedback.trim() });
     respond(true, {
       stored: true,
       message: `Feedback noted for "${normalized}". I'll apply this next time.`,
-      feedbackCount: state.workflowFeedback[normalized].length,
+      feedbackCount: (state.workflowFeedback[normalized] ?? []).length,
     });
   },
 
@@ -452,33 +473,33 @@ export const trustTrackerHandlers: GatewayRequestHandlers = {
       return;
     }
 
-    const state = await readState();
-    if (!state.dailyRatings) state.dailyRatings = [];
-
     const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
 
-    // Overwrite if already rated today
-    const existingIdx = state.dailyRatings.findIndex((r) => r.date === today);
-    const entry: DailyRating = {
-      id: existingIdx >= 0 ? state.dailyRatings[existingIdx].id : randomUUID(),
-      date: today,
-      rating,
-      ...(note ? { note: note.trim() } : {}),
-      timestamp: new Date().toISOString(),
-    };
+    let entry!: DailyRating;
+    await updateState((s) => {
+      if (!s.dailyRatings) s.dailyRatings = [];
 
-    if (existingIdx >= 0) {
-      state.dailyRatings[existingIdx] = entry;
-    } else {
-      state.dailyRatings.push(entry);
-    }
+      // Overwrite if already rated today
+      const existingIdx = s.dailyRatings.findIndex((r) => r.date === today);
+      entry = {
+        id: existingIdx >= 0 ? s.dailyRatings[existingIdx].id : randomUUID(),
+        date: today,
+        rating,
+        ...(note ? { note: note.trim() } : {}),
+        timestamp: new Date().toISOString(),
+      };
 
-    // Cap at MAX_DAILY_RATINGS (keep most recent)
-    if (state.dailyRatings.length > MAX_DAILY_RATINGS) {
-      state.dailyRatings = state.dailyRatings.slice(-MAX_DAILY_RATINGS);
-    }
+      if (existingIdx >= 0) {
+        s.dailyRatings[existingIdx] = entry;
+      } else {
+        s.dailyRatings.push(entry);
+      }
 
-    await writeState(state);
+      // Cap at MAX_DAILY_RATINGS (keep most recent)
+      if (s.dailyRatings.length > MAX_DAILY_RATINGS) {
+        s.dailyRatings = s.dailyRatings.slice(-MAX_DAILY_RATINGS);
+      }
+    });
 
     const needsFeedback = rating < FEEDBACK_THRESHOLD;
     context?.broadcast?.("trust:dailyUpdate", { entry });
@@ -559,27 +580,26 @@ export async function submitTrustRating(
   rating: number,
   note?: string,
 ): Promise<{ trustScore: number | null; count: number }> {
-  const state = await readState();
   const normalized = workflow.trim();
 
-  // Auto-add workflow if not tracked and under limit
-  if (!state.workflows.includes(normalized) && state.workflows.length < MAX_WORKFLOWS) {
-    state.workflows.push(normalized);
-  }
+  const { state } = await updateState((s) => {
+    // Auto-add workflow if not tracked and under limit
+    if (!s.workflows.includes(normalized) && s.workflows.length < MAX_WORKFLOWS) {
+      s.workflows.push(normalized);
+    }
 
-  state.ratings.push({
-    id: randomUUID(),
-    workflow: normalized,
-    rating: Math.max(1, Math.min(10, Math.round(rating))),
-    ...(note ? { note } : {}),
-    timestamp: new Date().toISOString(),
+    s.ratings.push({
+      id: randomUUID(),
+      workflow: normalized,
+      rating: Math.max(1, Math.min(10, Math.round(rating))),
+      ...(note ? { note } : {}),
+      timestamp: new Date().toISOString(),
+    });
+
+    if (s.ratings.length > MAX_RATINGS) {
+      s.ratings = s.ratings.slice(-MAX_RATINGS);
+    }
   });
-
-  if (state.ratings.length > MAX_RATINGS) {
-    state.ratings = state.ratings.slice(-MAX_RATINGS);
-  }
-
-  await writeState(state);
 
   const workflowRatings = state.ratings.filter((r) => r.workflow === normalized);
   const count = workflowRatings.length;
@@ -607,14 +627,28 @@ export type AutonomyLevel = "full" | "approval" | "disabled";
 
 /**
  * Determine the autonomy level for a persona based on trust score.
- * - full (score >= 8): auto-approve results
- * - approval (score 5-7.9): queue for human review
- * - disabled (score < 5): block from running
- * Returns "approval" if not enough ratings yet (safe default).
+ * - full (score >= 8): auto-approve results, skip manual review
+ * - approval (score 5-7.9): queue for human review after completion
+ * - disabled (score < 5): block from running entirely
+ *
+ * Returns "full" if the persona/workflow isn't tracked in the trust system
+ * (untracked workflows default to allowed so new users aren't blocked).
+ * Returns "approval" if tracked but not enough ratings yet (safe default
+ * once user has opted into tracking).
  */
 export async function getAutonomyLevel(persona: string): Promise<AutonomyLevel> {
+  const state = await readState();
+  const normalized = persona.trim();
+
+  // If this persona/workflow isn't being tracked, allow full autonomy.
+  // The trust system is opt-in: users must explicitly add workflows to track.
+  const isTracked = state.workflows.some(
+    (w) => w.toLowerCase() === normalized.toLowerCase(),
+  );
+  if (!isTracked) return "full";
+
   const score = await getTrustScore(persona);
-  if (score === null) return "approval";
+  if (score === null) return "approval"; // tracked but not enough data yet
   if (score >= 8) return "full";
   if (score >= 5) return "approval";
   return "disabled";

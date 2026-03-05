@@ -103,9 +103,129 @@ function isPidAlive(pid: number): boolean {
   }
 }
 
+// ── Evidence Verification Gates ─────────────────────────────────────
+
+type EvidenceResult = {
+  passed: boolean;
+  reason: string;
+  hint: string;
+};
+
+/**
+ * Check that agent output contains expected evidence for the task type.
+ * This prevents agents from producing vague or empty responses.
+ */
+function checkEvidence(taskType: QueueItemType, output: string): EvidenceResult {
+  if (!output || output.trim().length < 50) {
+    return {
+      passed: false,
+      reason: "Output too short (< 50 characters)",
+      hint: "a substantive response with details, findings, or deliverables",
+    };
+  }
+
+  switch (taskType) {
+    case "coding":
+      if (
+        /https?:\/\/github\.com\S+\/pull\/\d+/.test(output) ||
+        /```[\s\S]+```/.test(output) ||
+        /\.(ts|js|py|go|rs|java|tsx|jsx|css|html|md)\b/.test(output) ||
+        /diff --git/.test(output)
+      ) {
+        return { passed: true, reason: "", hint: "" };
+      }
+      return {
+        passed: false,
+        reason: "No code artifacts found (PR link, code block, or file paths)",
+        hint: "a PR link, code diff, or code blocks with file paths",
+      };
+
+    case "research":
+      if (/https?:\/\/\S+/.test(output)) {
+        return { passed: true, reason: "", hint: "" };
+      }
+      return {
+        passed: false,
+        reason: "No source URLs found in research output",
+        hint: "at least one source URL (https://...) to back up findings",
+      };
+
+    case "ops":
+      if (
+        /\$\s+\S+/.test(output) ||
+        /```(sh|bash|shell|zsh)?[\s\S]+```/.test(output) ||
+        /\b(completed|done|success|configured|installed|deployed|running)\b/i.test(output)
+      ) {
+        return { passed: true, reason: "", hint: "" };
+      }
+      return {
+        passed: false,
+        reason: "No command output or status confirmation found",
+        hint: "command output, terminal logs, or a status confirmation",
+      };
+
+    case "review":
+      if (
+        /\.(ts|js|py|go|rs|md|json|yaml|yml)\b/.test(output) &&
+        /\b(issue|finding|recommend|approve|reject|concern|bug|improvement)\b/i.test(output)
+      ) {
+        return { passed: true, reason: "", hint: "" };
+      }
+      return {
+        passed: false,
+        reason: "Missing file references or review verdict",
+        hint: "specific file paths and review findings/recommendations",
+      };
+
+    case "analysis":
+      if (
+        /\b(data|metric|statistic|number|percent|trend|comparison|chart)\b/i.test(output) &&
+        /\b(conclusion|finding|insight|recommend|result|summary)\b/i.test(output)
+      ) {
+        return { passed: true, reason: "", hint: "" };
+      }
+      return {
+        passed: false,
+        reason: "Missing data references or analytical conclusions",
+        hint: "data references and analytical conclusions/recommendations",
+      };
+
+    case "creative":
+    case "task":
+    case "url":
+    case "idea":
+    default:
+      return { passed: true, reason: "", hint: "" };
+  }
+}
+
+/** Extract evidence artifacts (file paths, URLs, PR links) from agent output. */
+function extractArtifacts(content: string): string[] {
+  const artifacts: string[] = [];
+  const seen = new Set<string>();
+
+  for (const line of content.split("\n")) {
+    const prMatch = line.match(/https:\/\/github\.com\/[^\s)]+\/pull\/\d+/g);
+    if (prMatch) for (const m of prMatch) if (!seen.has(m)) { artifacts.push(m); seen.add(m); }
+
+    const urlMatch = line.match(/https?:\/\/[^\s)>]+/g);
+    if (urlMatch) for (const m of urlMatch) if (!seen.has(m)) { artifacts.push(m); seen.add(m); }
+
+    const pathMatch = line.match(/(?:^|\s)(\/[\w./-]+\.\w{1,10})\b/g);
+    if (pathMatch) for (const m of pathMatch) {
+      const cleaned = m.trim();
+      if (!seen.has(cleaned)) { artifacts.push(cleaned); seen.add(cleaned); }
+    }
+  }
+
+  return artifacts.slice(0, 20);
+
+}
+
 // ── Queue Processor Class ──────────────────────────────────────────
 
 const QUEUE_POLL_MS = 10 * 60 * 1000; // 10 minutes — faster than hourly heartbeat
+const AGENT_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes max runtime per agent
 
 class QueueProcessor {
   private logger: Logger;
@@ -173,12 +293,14 @@ class QueueProcessor {
     try {
       const { getAutonomyLevel } = await import("../methods/trust-tracker.js");
       const autonomy = await getAutonomyLevel(item.personaHint ?? item.type);
-      if (autonomy === "approval") {
+      if (autonomy === "disabled") {
         this.logger.info(
-          `[GodMode][Queue] Skipping "${item.title}" — persona "${item.personaHint ?? item.type}" requires supervision`,
+          `[GodMode][Queue] Blocking "${item.title}" — persona "${item.personaHint ?? item.type}" trust score too low (disabled)`,
         );
-        return { spawned: false, error: "Requires supervision — autonomy level too low" };
+        return { spawned: false, error: "Blocked — trust score too low (disabled)" };
       }
+      // "approval" and "full" both allow spawning; the difference is in
+      // post-completion handling (auto-approve vs manual review)
     } catch {
       // Trust tracker not available — proceed (default: allow)
     }
@@ -248,7 +370,28 @@ class QueueProcessor {
         }).catch(() => {});
       }
 
+      // Set a timeout to kill long-running agents
+      let exited = false;
+      const killTimer = setTimeout(() => {
+        if (!exited && pid) {
+          this.logger.warn(
+            `[GodMode][Queue] Agent for item ${item.id} timed out after ${AGENT_TIMEOUT_MS / 60000}min — killing pid ${pid}`,
+          );
+          try {
+            process.kill(-pid, "SIGTERM"); // Kill process group (detached)
+          } catch {
+            try {
+              process.kill(pid, "SIGKILL"); // Fallback: kill individual process
+            } catch {
+              // Process already dead
+            }
+          }
+        }
+      }, AGENT_TIMEOUT_MS);
+
       child.on("exit", (code) => {
+        exited = true;
+        clearTimeout(killTimer);
         this.logger.info(
           `[GodMode][Queue] Agent for item ${item.id} exited (code=${code})`,
         );
@@ -260,6 +403,8 @@ class QueueProcessor {
       });
 
       child.on("error", (err) => {
+        exited = true;
+        clearTimeout(killTimer);
         this.logger.error(
           `[GodMode][Queue] Agent spawn error for item ${item.id}: ${String(err)}`,
         );
@@ -288,6 +433,8 @@ class QueueProcessor {
     }
   }
 
+  // Evidence verification now handled by standalone checkEvidence() function above
+
   // ── Completion handler ─────────────────────────────────────────
 
   async handleItemCompleted(
@@ -297,26 +444,64 @@ class QueueProcessor {
     this.activeCount = Math.max(0, this.activeCount - 1);
 
     if (exitCode !== 0) {
+      // Pass skipDecrement=true since we already decremented above
       await this.handleItemFailed(
         itemId,
         "Agent exited with code " + exitCode,
+        true, // activeCount already decremented above
       );
       return;
     }
 
     const outPath = outputPathForItem(itemId);
     let summary = "";
+    let outputContent = "";
+    let artifacts: string[] = [];
 
     try {
-      const content = await fs.readFile(outPath, "utf-8");
+      outputContent = await fs.readFile(outPath, "utf-8");
       // Extract first 3 non-empty lines for summary
-      const lines = content
+      const lines = outputContent
         .split("\n")
         .filter((l) => l.trim().length > 0)
         .slice(0, 3);
       summary = lines.join(" ").slice(0, 500);
+      artifacts = extractArtifacts(outputContent);
     } catch {
       summary = "Output file not found — agent may have completed without writing results.";
+    }
+
+    // Retrieve the item's type for evidence checking
+    const currentState = await readQueueState();
+    const currentItem = currentState.items.find((i) => i.id === itemId);
+    const itemType = currentItem?.type ?? "task";
+
+    // Evidence check: verify output contains expected artifacts for this task type
+    const evidenceResult = checkEvidence(itemType, outputContent);
+    if (!evidenceResult.passed && outputContent.length > 0) {
+      const retryCount = currentItem?.retryCount ?? 0;
+      if (retryCount === 0) {
+        // First failure: re-queue with evidence instruction appended
+        this.logger.info(
+          `[GodMode][Queue] Item ${itemId} evidence check failed (${evidenceResult.reason}) — retrying with guidance`,
+        );
+        await updateQueueState((state) => {
+          const qi = state.items.find((i) => i.id === itemId);
+          if (qi) {
+            qi.status = "pending";
+            qi.retryCount = 1;
+            qi.lastError = `Evidence check failed: ${evidenceResult.reason}`;
+            qi.description =
+              (qi.description ?? "") +
+              `\n\n---\n[Evidence check failed]: ${evidenceResult.reason}\n` +
+              `Please ensure your output includes: ${evidenceResult.hint}`;
+          }
+        });
+        this.broadcast("queue:update", { itemId, status: "pending" });
+        return;
+      }
+      // Already retried — proceed to review with a warning
+      summary = `[Evidence warning: ${evidenceResult.reason}] ${summary}`;
     }
 
     // Resolve persona name for the trust rating prompt
@@ -326,12 +511,52 @@ class QueueProcessor {
         qi.status = "review";
         qi.completedAt = Date.now();
         qi.result = { summary, outputPath: outPath };
+        qi.artifacts = artifacts;
       }
       return state;
     });
 
     const completedItem = queueState.items.find((i) => i.id === itemId);
     const personaSlug = completedItem?.personaHint;
+
+    // Verification gate for coding tasks: require artifact evidence
+    if (completedItem && completedItem.type === "coding") {
+      const hasPrLink = artifacts.some((a) => a.includes("/pull/"));
+      const hasFilePath = artifacts.some((a) => a.startsWith("/"));
+      if (!hasPrLink && !hasFilePath) {
+        await updateQueueState((state) => {
+          const qi = state.items.find((i) => i.id === itemId);
+          if (qi) {
+            qi.status = "needs-review";
+            qi.result = {
+              ...qi.result!,
+              summary: summary + "\n\n\u26A0\uFE0F No artifact provided \u2014 verify manually",
+            };
+          }
+        });
+        this.logger.info(
+          `[GodMode][Queue] Item ${itemId} (coding) has no artifacts — set to needs-review`,
+        );
+        this.broadcast("queue:update", {
+          itemId,
+          status: "needs-review",
+          personaHint: personaSlug,
+        });
+
+        // Notify Ally chat about the needs-review status
+        try {
+          this.broadcast("ally:notification", {
+            type: "queue-needs-review",
+            title: completedItem.title,
+            summary: `Agent finished "${completedItem.title}" but provided no artifact — manual verification needed.`,
+            actions: [
+              { label: "Review", action: "navigate", target: "today" },
+            ],
+          });
+        } catch { /* broadcast non-fatal */ }
+        return;
+      }
+    }
 
     // Auto-approve for full-autonomy personas (skip manual review)
     if (personaSlug) {
@@ -380,10 +605,10 @@ class QueueProcessor {
 
   // ── Failure + retry handler ────────────────────────────────────
 
-  async handleItemFailed(itemId: string, errorMsg: string): Promise<void> {
-    // Decrement only if we haven't already (e.g. from handleItemCompleted path)
-    // We guard via max(0) so double-decrement is safe.
-    this.activeCount = Math.max(0, this.activeCount - 1);
+  async handleItemFailed(itemId: string, errorMsg: string, skipDecrement = false): Promise<void> {
+    if (!skipDecrement) {
+      this.activeCount = Math.max(0, this.activeCount - 1);
+    }
 
     const { state } = await updateQueueState((state) => {
       const qi = state.items.find((i) => i.id === itemId);
@@ -885,17 +1110,30 @@ export async function expireStaleQueueItems(): Promise<void> {
   const { updateQueueState } = await import("../lib/queue-state.js");
   await updateQueueState((state) => {
     const now = Date.now();
+    const THIRTY_DAYS = 30 * 24 * 60 * 60 * 1000;
     const SEVEN_DAYS = 7 * 24 * 60 * 60 * 1000;
     const THREE_DAYS = 3 * 24 * 60 * 60 * 1000;
 
     state.items = state.items.filter((item) => {
-      // Review items older than 7 days → mark done and remove
-      if (item.status === "review" && item.completedAt && now - item.completedAt > SEVEN_DAYS) {
+      // Done items older than 30 days → remove
+      if (item.status === "done" && item.completedAt && now - item.completedAt > THIRTY_DAYS) {
+        return false;
+      }
+      // Review items older than 7 days → remove
+      if ((item.status === "review" || item.status === "needs-review") && item.completedAt && now - item.completedAt > SEVEN_DAYS) {
         return false;
       }
       // Failed items older than 3 days → remove
       if (item.status === "failed" && item.completedAt && now - item.completedAt > THREE_DAYS) {
         return false;
+      }
+      // Stale processing items (no PID, older than 2 hours) → reset to pending
+      if (item.status === "processing" && item.startedAt && now - item.startedAt > 2 * 60 * 60 * 1000) {
+        if (!item.pid || !isPidAlive(item.pid)) {
+          item.status = "pending";
+          item.pid = undefined;
+          item.startedAt = undefined;
+        }
       }
       return true;
     });

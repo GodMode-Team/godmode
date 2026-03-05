@@ -1,0 +1,16 @@
+{
+  "name": "GodMode",
+  "slug": "godmode",
+  "type": "development",
+  "description": "GodMode plugin development — shared architecture, conventions, and dev tools",
+  "gitRemote": "git@github.com:godmode-team/godmode.git",
+  "syncEnabled": true,
+  "syncInterval": 300,
+  "paths": {
+    "root": "~/Projects/godmode-plugin",
+    "memory": "~/godmode/workspaces/godmode/memory",
+    "skills": "~/godmode/workspaces/godmode/skills",
+    "personas": "~/godmode/workspaces/godmode/agent-roster",
+    "artifacts": "~/godmode/workspaces/godmode/artifacts"
+  }
+}

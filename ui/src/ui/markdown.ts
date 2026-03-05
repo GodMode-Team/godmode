@@ -149,6 +149,16 @@ function installHooks() {
   }
   hooksInstalled = true;
 
+  // SECURITY: Restrict <input> to checkbox only (prevent fake form fields)
+  DOMPurify.addHook("uponSanitizeElement", (node) => {
+    if (
+      node instanceof HTMLInputElement &&
+      node.getAttribute("type") !== "checkbox"
+    ) {
+      node.remove();
+    }
+  });
+
   DOMPurify.addHook("afterSanitizeAttributes", (node) => {
     if (!(node instanceof HTMLAnchorElement)) {
       return;
@@ -398,8 +408,15 @@ function findBlockEnd(text: string, start: number): number {
 }
 
 function scopeCss(css: string, scope: string): string {
-  // Strip @import (security: no external resource loading)
-  const text = css.replace(/@import\b[^;]*;/gi, "");
+  // SECURITY: Strip dangerous CSS constructs
+  // Strip @import (no external resource loading)
+  let text = css.replace(/@import\b[^;]*;/gi, "");
+  // Strip IE CSS expressions (execute JS)
+  text = text.replace(/expression\s*\(/gi, "/* blocked */(");
+  // Strip IE HTC behaviors
+  text = text.replace(/behavior\s*:/gi, "/* blocked */:");
+  // Strip Firefox XBL bindings
+  text = text.replace(/-moz-binding\s*:/gi, "/* blocked */:");
 
   const output: string[] = [];
   let i = 0;

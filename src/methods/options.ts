@@ -5,10 +5,11 @@
  * The UI reads/writes this file via RPC to toggle features on/off.
  */
 
-import { readFile, writeFile, mkdir } from "node:fs/promises";
-import { join, dirname } from "node:path";
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
 import type { GatewayRequestHandler } from "openclaw/plugin-sdk";
 import { DATA_DIR } from "../data-paths.js";
+import { secureWriteFile, secureMkdir } from "../lib/secure-fs.js";
 
 type GatewayRequestHandlers = Record<string, GatewayRequestHandler>;
 
@@ -18,10 +19,7 @@ type GodModeOptions = Record<string, unknown>;
 
 const DEFAULTS: GodModeOptions = {
   "agentPersona.enabled": true,
-  "proactiveIntel.enabled": true,
-  "proactiveIntel.notifications.enabled": true,
-  "proactiveIntel.briefIntegration.enabled": true,
-  "proactiveIntel.cadenceMultiplier": 1.0,
+  // proactiveIntel removed in v1.6.0 dead weight audit
 };
 
 async function readOptions(): Promise<GodModeOptions> {
@@ -35,8 +33,8 @@ async function readOptions(): Promise<GodModeOptions> {
 }
 
 async function writeOptions(options: GodModeOptions): Promise<void> {
-  await mkdir(dirname(OPTIONS_FILE), { recursive: true });
-  await writeFile(OPTIONS_FILE, JSON.stringify(options, null, 2), "utf-8");
+  await secureMkdir(DATA_DIR);
+  await secureWriteFile(OPTIONS_FILE, JSON.stringify(options, null, 2));
 }
 
 const getOptions: GatewayRequestHandler = async ({ respond }) => {

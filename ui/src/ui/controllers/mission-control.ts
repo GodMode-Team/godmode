@@ -327,18 +327,26 @@ export async function loadMissionControl(
       // queue not available yet — ignore
     }
 
-    const [subagentsResult, codingListResult] = await Promise.all([
-      host.client.request<{ runs: SerializedRun[]; activeCount: number; totalCount: number }>(
+    // subagents.list and coding.list were removed in the lean audit — gracefully degrade
+    let subagentRuns: SerializedRun[] = [];
+    let codingTasks: CodingTaskRpc[] = [];
+    try {
+      const subagentsResult = await host.client.request<{ runs: SerializedRun[]; activeCount: number; totalCount: number }>(
         "subagents.list",
         { limit: 200 },
-      ),
-      host.client.request<{ tasks: CodingTaskRpc[] }>("coding.list", {}),
-    ]);
+      );
+      subagentRuns = subagentsResult.runs ?? [];
+    } catch {
+      // method not registered — expected post-lean-audit
+    }
+    try {
+      const codingListResult = await host.client.request<{ tasks: CodingTaskRpc[] }>("coding.list", {});
+      codingTasks = codingListResult.tasks ?? [];
+    } catch {
+      // method not registered — expected post-lean-audit
+    }
 
-    const agents = mergeAgents(
-      subagentsResult.runs ?? [],
-      codingListResult.tasks ?? [],
-    );
+    const agents = mergeAgents(subagentRuns, codingTasks);
 
     // Merge queue items into agents list
     const queueItems = queueResult?.items ?? [];
@@ -496,8 +504,7 @@ export async function retryQueueItem(
 ): Promise<void> {
   if (!host.client || !host.connected) return;
   try {
-    await host.client.request("queue.update", { id: itemId, status: "pending" });
-    await host.client.request("queue.process", { id: itemId });
+    await host.client.request("queue.retry", { id: itemId });
     host.showToast("Retrying...", "success", 2000);
     await loadMissionControl(host);
   } catch (err) {

@@ -489,6 +489,251 @@ const provisionTeam: GatewayRequestHandler = async ({ params, respond }) => {
   } as unknown as Parameters<GatewayRequestHandler>[0]);
 };
 
+/**
+ * workspace.setupFromTemplate — create a team workspace from a bundled template.
+ *
+ * Templates live in assets/workspace-templates/{slug}.json with optional
+ * content directories at assets/workspace-templates/{slug}/.
+ *
+ * Params:
+ * - template (string, required) — template slug (godmode-dev, trp, patient-autopilot)
+ * - github (string, optional) — override git remote
+ * - branch (string, optional, default "main")
+ * - path (string, optional) — override workspace path
+ */
+const setupFromTemplate: GatewayRequestHandler = async ({ params, respond }) => {
+  const template = typeof params.template === "string" ? String(params.template).trim() : "";
+  const githubOverride = typeof params.github === "string" ? String(params.github).trim() : "";
+  const branch = typeof params.branch === "string" ? String(params.branch).trim() : "main";
+  const explicitPath = typeof params.path === "string" ? String(params.path).trim() : "";
+
+  if (!template) {
+    respond(false, undefined, errorShape(ErrorCodes.INVALID_REQUEST, "template is required"));
+    return;
+  }
+
+  // Resolve template path relative to the plugin's assets directory
+  const { dirname: dirnameFn, join: joinFn, resolve: resolveFn, basename: basenameFn } = await import("node:path");
+  const { fileURLToPath } = await import("node:url");
+  const { existsSync, readFileSync } = await import("node:fs");
+  const { cp, readdir, stat } = await import("node:fs/promises");
+
+  const moduleDir = dirnameFn(fileURLToPath(import.meta.url));
+  // tsup bundles to dist/index.js so moduleDir = dist/
+  // dev mode: dist/src/methods/ or src/methods/
+  // Check multiple candidate roots (same strategy as index.ts UI asset resolution)
+  const pluginRootFromDist = basenameFn(moduleDir) === "dist" ? resolveFn(moduleDir, "..") : moduleDir;
+  const pluginRootUp1 = resolveFn(moduleDir, "..");
+  const pluginRootUp3 = dirnameFn(dirnameFn(dirnameFn(moduleDir)));
+  const templateJsonCandidates = [
+    // Bundled: dist/assets/workspace-templates/ (tsup onSuccess copies these)
+    joinFn(moduleDir, "assets", "workspace-templates", `${template}.json`),
+    // Dev/unbundled: assets/ at plugin root
+    joinFn(pluginRootFromDist, "assets", "workspace-templates", `${template}.json`),
+    joinFn(pluginRootUp1, "assets", "workspace-templates", `${template}.json`),
+    joinFn(pluginRootUp3, "assets", "workspace-templates", `${template}.json`),
+  ];
+
+  let templateJsonPath: string | undefined;
+  for (const candidate of templateJsonCandidates) {
+    if (existsSync(candidate)) {
+      templateJsonPath = candidate;
+      break;
+    }
+  }
+
+  if (!templateJsonPath) {
+    respond(
+      false,
+      undefined,
+      errorShape(ErrorCodes.NOT_FOUND, `Template not found: ${template}. Available: godmode-dev, trp, patient-autopilot`),
+    );
+    return;
+  }
+
+  let templateConfig: {
+    name: string;
+    slug: string;
+    type?: string;
+    description?: string;
+    gitRemote?: string;
+    syncEnabled?: boolean;
+    syncInterval?: number;
+    paths?: Record<string, string>;
+  };
+
+  try {
+    templateConfig = JSON.parse(readFileSync(templateJsonPath, "utf-8"));
+  } catch (err) {
+    respond(
+      false,
+      undefined,
+      errorShape(ErrorCodes.INVALID_REQUEST, `Invalid template JSON: ${err instanceof Error ? err.message : String(err)}`),
+    );
+    return;
+  }
+
+  const name = templateConfig.name;
+  const github = githubOverride || templateConfig.gitRemote || "";
+
+  const config = await readWorkspaceConfig();
+  const existingIds = new Set(config.workspaces.map((w) => w.id));
+  const id = createWorkspaceId(templateConfig.slug || name, existingIds);
+
+  const root = resolveGodModeRoot();
+  const workspacePath = explicitPath
+    ? path.resolve(explicitPath)
+    : path.join(root, "clients", id);
+
+  try {
+    if (github) {
+      await gitClone(resolveGithubUrl(github), workspacePath, branch);
+    } else {
+      await ensureWorkspaceFolders(workspacePath, "team");
+      await gitInit(workspacePath);
+    }
+  } catch (err) {
+    respond(
+      false,
+      undefined,
+      errorShape(ErrorCodes.GIT_ERROR, `Git setup failed: ${err instanceof Error ? err.message : String(err)}`),
+    );
+    return;
+  }
+
+  // Scaffold team workspace metadata
+  const creatorId = await resolveGitMemberId(workspacePath);
+  const metadata = await scaffoldTeamWorkspace({
+    workspacePath,
+    name,
+    id,
+    github: github || undefined,
+    creatorName: creatorId,
+    creatorId,
+  });
+
+  // Copy template content files (memory/, skills/, etc.) into the workspace
+  const templateContentDir = path.dirname(templateJsonPath);
+  const templateSlugDir = path.join(templateContentDir, template);
+  try {
+    const templateStat = await stat(templateSlugDir);
+    if (templateStat.isDirectory()) {
+      const subdirs = await readdir(templateSlugDir, { withFileTypes: true });
+      for (const entry of subdirs) {
+        const srcPath = path.join(templateSlugDir, entry.name);
+        const dstPath = path.join(workspacePath, entry.name);
+        if (entry.isDirectory()) {
+          await cp(srcPath, dstPath, { recursive: true, force: false });
+        } else if (entry.isFile()) {
+          // Copy individual files (e.g., template-level configs)
+          const { copyFile } = await import("node:fs/promises");
+          await copyFile(srcPath, dstPath);
+        }
+      }
+    }
+  } catch {
+    // Template content dir may not exist — scaffold already created defaults
+  }
+
+  // Initial commit + push
+  try {
+    const remote = github ? "origin" : undefined;
+    await gitAddCommitPush(workspacePath, `Initialize ${name} workspace from template`, remote, branch);
+  } catch {
+    // Push may fail if repo is empty or no remote — non-fatal
+  }
+
+  const workspace: WorkspaceConfigEntry = {
+    id,
+    name,
+    emoji: "👥",
+    type: "team",
+    path: workspacePath,
+    keywords: [id, name.toLowerCase(), templateConfig.slug],
+    pinned: [],
+    pinnedSessions: [],
+    artifactDirs: ["outputs", "artifacts"],
+    sync: {
+      type: "git",
+      remote: github ? "origin" : undefined,
+      branch,
+      autoPull: { enabled: templateConfig.syncEnabled !== false, interval: "30s" },
+      autoPush: { enabled: templateConfig.syncEnabled !== false, debounceMs: 5000 },
+    },
+    team: {
+      github: github || undefined,
+      role: "admin",
+      memberId: creatorId,
+    },
+    curation: { enabled: true },
+  };
+
+  config.workspaces.push(workspace);
+  await writeWorkspaceConfig(config);
+
+  const syncService = getWorkspaceSyncService();
+  await syncService.refreshFromConfig(config);
+
+  respond(true, {
+    workspace: { ...workspace, path: toDisplayPath(workspace.path) },
+    metadata,
+    template,
+  });
+};
+
+/**
+ * workspace.listTemplates — list available workspace templates.
+ */
+const listTemplates: GatewayRequestHandler = async ({ respond }) => {
+  const { dirname: dirnameFn, join: joinFn, resolve: resolveFn, basename: basenameFn } = await import("node:path");
+  const { fileURLToPath } = await import("node:url");
+  const { readdir, readFile: readFileFn } = await import("node:fs/promises");
+
+  const moduleDir = dirnameFn(fileURLToPath(import.meta.url));
+  const pluginRootFromDist = basenameFn(moduleDir) === "dist" ? resolveFn(moduleDir, "..") : moduleDir;
+  const pluginRootUp1 = resolveFn(moduleDir, "..");
+  const pluginRootUp3 = dirnameFn(dirnameFn(dirnameFn(moduleDir)));
+
+  const templateDirs = [
+    joinFn(moduleDir, "assets", "workspace-templates"),
+    joinFn(pluginRootFromDist, "assets", "workspace-templates"),
+    joinFn(pluginRootUp1, "assets", "workspace-templates"),
+    joinFn(pluginRootUp3, "assets", "workspace-templates"),
+  ];
+
+  const templates: Array<{ slug: string; name: string; type?: string; description?: string }> = [];
+  const seen = new Set<string>();
+
+  for (const dir of templateDirs) {
+    try {
+      const entries = await readdir(dir, { withFileTypes: true });
+      for (const entry of entries) {
+        if (!entry.isFile() || !entry.name.endsWith(".json")) continue;
+        const slug = entry.name.replace(/\.json$/, "");
+        if (seen.has(slug)) continue;
+        seen.add(slug);
+
+        try {
+          const raw = await readFileFn(joinFn(dir, entry.name), "utf-8");
+          const config = JSON.parse(raw);
+          templates.push({
+            slug,
+            name: config.name ?? slug,
+            type: config.type,
+            description: config.description,
+          });
+        } catch {
+          templates.push({ slug, name: slug });
+        }
+      }
+    } catch {
+      // Directory may not exist
+    }
+  }
+
+  respond(true, { templates });
+};
+
 export const teamWorkspaceHandlers: GatewayRequestHandlers = {
   "workspace.createTeam": createTeam,
   "workspace.provisionTeam": provisionTeam,
@@ -496,4 +741,6 @@ export const teamWorkspaceHandlers: GatewayRequestHandlers = {
   "workspace.leaveTeam": leaveTeam,
   "workspace.syncNow": syncNow,
   "workspace.syncStatus": syncStatus,
+  "workspace.setupFromTemplate": setupFromTemplate,
+  "workspace.listTemplates": listTemplates,
 };

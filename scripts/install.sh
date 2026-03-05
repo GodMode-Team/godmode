@@ -692,6 +692,7 @@ step 8 "Configuring gateway"
 openclaw config set gateway.mode local 2>/dev/null && ok "gateway.mode = local" || warn "Could not set gateway.mode"
 openclaw config set gateway.controlUi.enabled true 2>/dev/null && ok "gateway.controlUi.enabled = true" || warn "Could not set controlUi"
 openclaw config set plugins.enabled true 2>/dev/null && ok "plugins.enabled = true" || warn "Could not set plugins.enabled"
+openclaw config set sessions.dmScope per-channel-peer 2>/dev/null && ok "sessions.dmScope = per-channel-peer" || warn "Could not set sessions.dmScope"
 
 # VPS / headless: configure network binding so remote access works
 TAILSCALE_CONFIGURED=false
@@ -872,6 +873,8 @@ if [ "$IS_HEADLESS" = true ]; then
       printf '     %s%shttp://%s:%s/godmode/onboarding%s\n' "  " "$CYN" "$TAILSCALE_IP" "$GODMODE_PORT" "$RST"
     fi
     printf '\n'
+    printf '     %sChrome cert error? Wait 5 min and refresh — the TLS cert needs time to propagate.%s\n' "$DIM" "$RST"
+    printf '     %sStill broken? SSH fallback: ssh -L %s:localhost:%s user@this-server%s\n\n' "$DIM" "$GODMODE_PORT" "$GODMODE_PORT" "$RST"
     STEP_NUM=$((STEP_NUM + 1))
   else
     printf '  %s%s.%s Access GodMode remotely:\n' "$CYN" "$STEP_NUM" "$RST"

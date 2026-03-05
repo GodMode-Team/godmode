@@ -315,7 +315,8 @@ function buildPhase2Prompt(state: OnboardingState): string {
   const brain = state.secondBrain;
   return `## GodMode Onboarding — Phase 2: Second Brain Setup
 
-Help the user set up their memory system.
+Set up the user's memory so nothing gets lost. This is what makes GodMode remember everything
+across sessions — conversations, decisions, preferences, people, projects.
 
 Status:
 - Memory seeded: ${brain?.memorySeeded ? "Yes" : "No"}
@@ -324,9 +325,11 @@ ${brain?.obsidianPath ? `- Obsidian vault: ${brain.obsidianPath}` : "- No Obsidi
 
 Tasks:
 1. Check if ~/godmode/memory/MEMORY.md exists and has content
-2. If sparse, help seed it with info from the interview (name, role, mission, preferences)
-3. Ask if they use Obsidian — if yes, note the vault path
-4. Check if daily brief is configured; if not, help set it up
+2. If sparse, seed it with everything from the interview — name, role, mission, communication style, priorities
+3. Ask if they use Obsidian — if yes, set OBSIDIAN_VAULT_PATH. This becomes the permanent vault for daily briefs, agent outputs, and knowledge
+4. Generate their first daily brief to show the system working — this is the "wow" moment
+
+**Tone:** "Your memory is set up. From now on, I'll remember everything we discuss — you'll never have to repeat yourself."
 
 Save progress with \`onboarding.update { secondBrain: { ... } }\`.
 When complete, advance to Phase 3.`;
@@ -347,9 +350,9 @@ Pain points: ${painPoints.length > 0 ? painPoints.join(", ") : "(none specified)
 ${audit?.mappings ? `Mappings done: ${audit.mappings.length}` : "No mappings yet."}
 
 For each workflow:
-1. Identify which OpenClaw capabilities can help (skills, memory, channels, cron, etc.)
-2. Suggest specific skills from ClawHub that would help
-3. Suggest automations (cron jobs, memory writes, channel routing)
+1. Identify which GodMode capabilities can help (skills, queue delegation, memory, cron, dashboards)
+2. Suggest specific skills or agent personas that would help
+3. Suggest automations (cron jobs, recurring skills, channel routing)
 4. Recommend Trust Tracker categories (suggest 3-5 based on their workflows)
 
 Save with \`onboarding.update { audit: { mappings: [...], recommendedTrustWorkflows: [...] } }\`.
@@ -423,8 +426,9 @@ ${firstWin?.completed ? "First win completed!" : "Not started yet."}
 
 ### Live Demo
 
-Pick the demo most relevant to their profile. Make it real, not a simulation:
-- Run a morning brief to show them the daily brief system
+Generate a morning brief using \`briefGenerator.generate\`. Even without integrations connected, this will show the user their tasks, queue status, and GodMode tips. This is their first win — make it feel valuable.
+
+Other demos to try:
 - Draft an email or message using their connected channels
 - Show memory search working with their seeded content
 - Queue a background task to demonstrate delegation
@@ -458,6 +462,13 @@ onboarding.update {
 \`\`\`
 
 **Present the 5 commands to the user** — this is their "now what?" answer. Make it feel like a gift, not homework.
+
+### Post-First-Win Nudge
+
+After completing Phase 5, include this gentle nudge:
+"Now that you've seen GodMode in action, I'd love to learn more about you to personalize your experience. Want to do a quick getting-to-know-you conversation? It takes about 5 minutes and helps me understand your goals, work style, and how I can serve you best."
+
+If they say yes, the soul interview questions from Phase 1 can be used conversationally — but this is optional deepening, not a gate.
 
 When done, advance to Phase 6 with \`onboarding.complete\`.`;
 }

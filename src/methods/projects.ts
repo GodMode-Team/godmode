@@ -1,7 +1,8 @@
 import { randomUUID } from "node:crypto";
-import { readFile, writeFile, mkdir } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import { join, extname } from "node:path";
 import { DATA_DIR } from "../data-paths.js";
+import { secureWriteFile, secureMkdir } from "../lib/secure-fs.js";
 import type { GatewayRequestHandler } from "openclaw/plugin-sdk";
 
 type GatewayRequestHandlers = Record<string, GatewayRequestHandler>;
@@ -152,7 +153,7 @@ const createProject: GatewayRequestHandler = async ({ params, respond }) => {
     try {
       const { expandPath } = await import("./workspaces.js");
       const expandedFolder = expandPath(project.folder);
-      await mkdir(expandedFolder, { recursive: true });
+      await secureMkdir(expandedFolder);
     } catch (err) {
       console.warn("[Projects] mkdir warning:", err);
     }
@@ -160,7 +161,7 @@ const createProject: GatewayRequestHandler = async ({ params, respond }) => {
 
   const data = await readProjects();
   data.projects.push(project);
-  await writeFile(PROJECTS_FILE, JSON.stringify(data, null, 2), "utf-8");
+  await secureWriteFile(PROJECTS_FILE, JSON.stringify(data, null, 2));
   respond(true, project);
 };
 
@@ -171,7 +172,7 @@ const updateProjects: GatewayRequestHandler = async ({ params, respond }) => {
     return;
   }
   const data: ProjectsData = { projects };
-  await writeFile(PROJECTS_FILE, JSON.stringify(data, null, 2), "utf-8");
+  await secureWriteFile(PROJECTS_FILE, JSON.stringify(data, null, 2));
   respond(true, data);
 };
 

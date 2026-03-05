@@ -9,7 +9,7 @@
  * via a license gate wrapper.
  */
 
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, mkdirSync, copyFileSync } from "node:fs";
 import {
   request as httpRequest,
   type IncomingHttpHeaders,
@@ -26,10 +26,10 @@ import { calendarHandlers } from "./src/methods/calendar.js";
 import { consciousnessHandlers } from "./src/methods/consciousness.js";
 import { dailyBriefHandlers } from "./src/methods/daily-brief.js";
 import { briefGeneratorHandlers } from "./src/methods/brief-generator.js";
-import { dataSourcesHandlers } from "./src/methods/data-sources.js";
+// data-sources removed in v1.6.0 dead weight audit
 import { goalsHandlers } from "./src/methods/goals.js";
 import { onboardingHandlers } from "./src/methods/onboarding.js";
-import { peopleDataHandlers } from "./src/methods/people-data.js";
+// people-data removed in v1.6.0 dead weight audit
 import { projectsHandlers } from "./src/methods/projects.js";
 import { tasksHandlers } from "./src/methods/tasks.js";
 import { teamCommsHandlers } from "./src/methods/team-comms.js";
@@ -48,6 +48,8 @@ import { createGuardrailTool } from "./src/tools/guardrail.js";
 import { createOnboardTool } from "./src/tools/onboard.js";
 import { createMorningSetTool } from "./src/tools/morning-set.js";
 import { createQueueAddTool } from "./src/tools/queue-add.js";
+import { createQueueCheckTool } from "./src/tools/queue-check.js";
+import { createTrustRateTool } from "./src/tools/trust-rate.js";
 import { createXReadTool } from "./src/tools/x-read.js";
 import { queueHandlers } from "./src/methods/queue.js";
 import { xIntelHandlers } from "./src/methods/x-intel.js";
@@ -70,10 +72,11 @@ import { checkCustomGuardrails, logGateActivity } from "./src/services/guardrail
 import { guardrailsHandlers } from "./src/methods/guardrails.js";
 import { imageCacheHandlers } from "./src/methods/image-cache.js";
 import { secondBrainHandlers } from "./src/methods/second-brain.js";
-import { proactiveIntelHandlers } from "./src/methods/proactive-intel.js";
+// proactiveIntel removed in v1.6.0 dead weight audit
 import { supportHandlers } from "./src/methods/support.js";
 import { fathomWebhookHandlers, handleFathomWebhookHttp } from "./src/methods/fathom-webhook.js";
 import { authHandlers } from "./src/methods/auth.js";
+import { sessionPrivacyHandlers } from "./src/methods/session-privacy.js";
 // Auth client — JWT-based authentication
 import {
   loadAuthTokens,
@@ -82,7 +85,7 @@ import {
 } from "./src/lib/auth-client.js";
 // Static file server for UIs
 import { createStaticFileHandler } from "./src/static-server.js";
-import { DATA_DIR } from "./src/data-paths.js";
+import { DATA_DIR, MEMORY_DIR } from "./src/data-paths.js";
 // Host compatibility — self-healing layer
 import { detectHostContext, extractSessionKey, safeBroadcast } from "./src/lib/host-context.js";
 import { killZombieGateways } from "./src/lib/zombie-guard.js";
@@ -95,7 +98,6 @@ let optionsCachedAt = 0;
 
 const OPTIONS_DEFAULTS: Record<string, unknown> = {
   "missionControl.enabled": false,
-  "proactiveIntel.enabled": true,
 };
 
 function readOptionsSync(): Record<string, unknown> {
@@ -594,8 +596,7 @@ const godmodePlugin = {
       ...dailyBriefHandlers,
       ...briefGeneratorHandlers,
       ...goalsHandlers,
-      ...peopleDataHandlers,
-      ...dataSourcesHandlers,
+      // peopleData + dataSources removed in v1.6.0
       ...agentLogHandlers,
       ...calendarHandlers,
       ...uiSlotsHandlers,
@@ -610,7 +611,7 @@ const godmodePlugin = {
       ...guardrailsHandlers,
       ...imageCacheHandlers,
       ...secondBrainHandlers,
-      ...proactiveIntelHandlers,
+      // proactiveIntel removed in v1.6.0
       ...queueHandlers,
       ...dashboardsHandlers,
       ...supportHandlers,
@@ -619,6 +620,7 @@ const godmodePlugin = {
       ...integrationsHandlers,
       ...fathomWebhookHandlers,
       ...authHandlers,
+      ...sessionPrivacyHandlers,
     };
 
     // Methods that must work before a license is configured (setup flow)
@@ -635,6 +637,7 @@ const godmodePlugin = {
       "onboarding.configAudit",
       "onboarding.wizard.status",
       "onboarding.wizard.preview",
+      "onboarding.wizard.diff",
       "onboarding.wizard.generate",
       "integrations.status",
       "integrations.test",
@@ -873,6 +876,41 @@ h1{color:#ff6b6b}code{background:#16213e;padding:2px 8px;border-radius:4px}a{col
         api.logger.warn(`[GodMode] Host compat scan failed: ${String(err)}`);
       }
 
+      // Seed starter personas + skills if roster/skills dir is empty
+      try {
+        const seedModuleDir = dirname(fileURLToPath(import.meta.url));
+        // assets/ lives alongside dist/ in the package root, or inside dist/ in dev
+        const seedPluginRoot = basename(seedModuleDir) === "dist" ? dirname(seedModuleDir) : seedModuleDir;
+        const rosterTarget = join(MEMORY_DIR, "agent-roster");
+        const rosterSource = join(seedPluginRoot, "assets", "agent-roster");
+        if (existsSync(rosterSource)) {
+          const hasExisting = existsSync(rosterTarget) && readdirSync(rosterTarget).filter(f => f.endsWith(".md")).length > 0;
+          if (!hasExisting) {
+            mkdirSync(rosterTarget, { recursive: true });
+            const sourceFiles = readdirSync(rosterSource).filter(f => f.endsWith(".md"));
+            for (const f of sourceFiles) {
+              copyFileSync(join(rosterSource, f), join(rosterTarget, f));
+            }
+            api.logger.info(`[GodMode] Seeded ${sourceFiles.length} starter personas`);
+          }
+        }
+        const skillsTarget = join(dirname(MEMORY_DIR), "skills");
+        const skillsSource = join(seedPluginRoot, "assets", "skills");
+        if (existsSync(skillsSource)) {
+          const hasExistingSkills = existsSync(skillsTarget) && readdirSync(skillsTarget).filter(f => f.endsWith(".md")).length > 0;
+          if (!hasExistingSkills) {
+            mkdirSync(skillsTarget, { recursive: true });
+            const sourceSkills = readdirSync(skillsSource).filter(f => f.endsWith(".md"));
+            for (const f of sourceSkills) {
+              copyFileSync(join(skillsSource, f), join(skillsTarget, f));
+            }
+            api.logger.info(`[GodMode] Seeded ${sourceSkills.length} starter skills`);
+          }
+        }
+      } catch (err) {
+        api.logger.warn(`[GodMode] Starter content seeding failed: ${String(err)}`);
+      }
+
       // Agent log writer
       try {
         const started = await initAgentLogWriter();
@@ -895,12 +933,17 @@ h1{color:#ff6b6b}code{background:#16213e;padding:2px 8px;border-radius:4px}a{col
         api.logger.warn(`[GodMode] workspace sync service failed to start: ${String(err)}`);
       }
 
-      // Curation agent service
+      // Curation agent service — gated behind team workspace
       try {
-        const { getCurationAgentService } = await import("./src/services/curation-agent.js");
-        const curation = getCurationAgentService(api.logger);
-        await curation.start();
-        serviceCleanup.push({ name: "curation-agent", fn: () => curation.stop() });
+        const clientsDir = join(dirname(DATA_DIR), "clients");
+        if (existsSync(clientsDir)) {
+          const { getCurationAgentService } = await import("./src/services/curation-agent.js");
+          const curation = getCurationAgentService(api.logger);
+          await curation.start();
+          serviceCleanup.push({ name: "curation-agent", fn: () => curation.stop() });
+        } else {
+          api.logger.info("[GodMode] Curation agent skipped — no team workspaces configured");
+        }
       } catch (err) {
         api.logger.warn(`[GodMode] curation service failed to start: ${String(err)}`);
       }
@@ -941,17 +984,7 @@ h1{color:#ff6b6b}code{background:#16213e;padding:2px 8px;border-radius:4px}a{col
         api.logger.warn(`[GodMode] Consciousness heartbeat failed to start: ${String(err)}`);
       }
 
-      // Proactive Intelligence service
-      try {
-        const { getProactiveIntelService, stopProactiveIntelService } = await import("./src/services/proactive-intel.js");
-        const intel = getProactiveIntelService(api.logger);
-        // Broadcast fn wired lazily on first proactiveIntel RPC call (same pattern as focus-pulse)
-        await intel.start();
-        serviceCleanup.push({ name: "proactive-intel", fn: () => stopProactiveIntelService() });
-        api.logger.info("[GodMode] Proactive Intelligence service initialized");
-      } catch (err) {
-        api.logger.warn(`[GodMode] Proactive Intelligence failed to start: ${String(err)}`);
-      }
+      // Proactive Intelligence — removed in v1.6.0 dead weight audit
 
       // Queue processor — autonomous background task execution
       try {
@@ -1118,8 +1151,17 @@ h1{color:#ff6b6b}code{background:#16213e;padding:2px 8px;border-radius:4px}a{col
       } catch (err) {
         api.logger.warn(`[GodMode] onboarding context hook error: ${String(err)}`);
       }
+      // ── Private Session Check ──
+      let isPrivate = false;
+      try {
+        const { isPrivateSession } = await import("./src/lib/private-session.js");
+        isPrivate = await isPrivateSession(sessionKey ?? "");
+      } catch { /* module load failure — treat as non-private */ }
+
       // ── Awareness Snapshot — lean cross-session context (~50 lines) ───
       // Replaces raw CONSCIOUSNESS.md (~300 lines) + WORKING.md (~150 lines)
+      // Private sessions still get the awareness snapshot (ally still works)
+      // but the snapshot won't include data FROM this session.
       try {
         const { readSnapshot } = await import("./src/lib/awareness-snapshot.js");
         const snapshot = await readSnapshot();
@@ -1132,6 +1174,17 @@ h1{color:#ff6b6b}code{background:#16213e;padding:2px 8px;border-radius:4px}a{col
         }
       } catch (err) {
         api.logger.warn(`[GodMode] awareness snapshot error: ${String(err)}`);
+      }
+
+      // ── Private session indicator ──
+      if (isPrivate) {
+        prependChunks.push(
+          "[Private Session Active]\n" +
+          "This conversation is in private mode. Nothing from this session will be saved " +
+          "to the vault, awareness snapshot, session archive, or daily brief. " +
+          "Tools and queue still work normally. If the user queues a task, the queue item " +
+          "is stored (necessary for processing) but this conversation context is not.",
+        );
       }
 
       // Safety nudges (conditional — only if a gate fired)
@@ -1276,6 +1329,8 @@ h1{color:#ff6b6b}code{background:#16213e;padding:2px 8px;border-radius:4px}a{col
     api.registerTool((ctx) => createMorningSetTool(ctx));
     api.registerTool((ctx) => createGuardrailTool(ctx));
     api.registerTool((ctx) => createQueueAddTool(ctx));
+    api.registerTool(() => createQueueCheckTool());
+    api.registerTool((ctx) => createTrustRateTool(ctx));
     api.registerTool((ctx) => createXReadTool(ctx));
 
     // ── 6. Register CLI commands ──────────────────────────────────

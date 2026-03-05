@@ -2,6 +2,39 @@
 
 This repository is the standalone home for the GodMode OpenClaw plugin.
 
+## Product Architecture — READ FIRST
+
+**Read `docs/GODMODE-META-ARCHITECTURE.md` before making any architectural decisions.** It is the definitive blueprint for how GodMode gets built.
+
+**Read `HARNESS.md` for agent workflow rules** — branching, building, merging, handing off. Follow it.
+
+### What GodMode Is
+GodMode is a deeply contextual personal AI ally that manages a swarm of agents. The ally is 80% of the value (deep context, coworking in chat). Agent delegation is 20%. GodMode is the conductor, not the orchestra — it connects to the user's existing tools, never rebuilds them.
+
+### The Three Golden Rules
+1. **Code as little as possible.** Can this be a file (persona, skill, recipe)? If yes, don't write TypeScript. Only write engine code for: ally identity, context stack, orchestration, queue processing, trust tracking.
+2. **Conduct, don't rebuild.** NEVER build a CRM, file explorer, project management tool, email client, calendar app, note editor, code editor, social media manager, analytics platform, or chat platform. The ally connects to the user's existing tools via API/MCP.
+3. **Meta-agent pattern.** The ally crafts precise prompts for sub-agents. Quality scales through prompt quality, not more code.
+
+### Scope Boundaries — NEVER Build These
+- CRM / contacts manager → plug into Apple Contacts, HubSpot, Google
+- File explorer / storage → ally reads/writes files via tools
+- Project management (boards, sprints, dependencies) → ally reads/writes ClickUp, Linear, Asana via API
+- Email client → ally reads email via integration
+- Calendar app → Today tab shows schedule, don't rebuild calendar
+- Note-taking app → Obsidian IS the note-taking app
+- Code editor → VS Code, Cursor exist
+- Social media manager → content-writer persona creates content, user posts via their tool
+
+### Task System Scope
+GodMode tasks = flat operational notepad (title, due date, status, workspace). No hierarchy, no subtasks, no boards. Big projects = markdown artifacts the ally creates. Ally bridges to external PM tools, never mirrors them.
+
+### The 6-Tab UI Baseline
+Chat → Today → Work → Second Brain → Dashboards → Settings. Everything else hides behind Settings. Work tab shows GodMode artifacts ONLY: sessions, agent outputs, tasks, artifacts, skills, workspace memory.
+
+### Anti-Bloat Rule
+Nothing gets permanent context injection. New capabilities are files (personas, skills) or conditional context (state-checked, injected only when relevant). The only always-on injection: ally identity (~30 lines) + awareness snapshot (~50 lines).
+
 ## Mission
 
 - Keep GodMode fully self-contained.

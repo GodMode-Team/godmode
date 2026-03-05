@@ -14,10 +14,11 @@
  */
 
 import { randomBytes } from "node:crypto";
-import { readFile, writeFile, mkdir } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { homedir } from "node:os";
 import { DATA_DIR, GODMODE_ROOT } from "../data-paths.js";
+import { secureWriteFile, secureMkdir } from "../lib/secure-fs.js";
 import type { GatewayRequestHandler } from "openclaw/plugin-sdk";
 import {
   type OnboardingState,
@@ -30,6 +31,7 @@ import {
   patchOCConfig,
   checkOnboardingStatus,
   previewOnboarding,
+  computeConfigDiff,
   sanitizeAnswers,
   type OnboardingAnswers,
 } from "../services/onboarding.js";
@@ -81,8 +83,8 @@ async function readOnboarding(): Promise<OnboardingState> {
 }
 
 async function writeOnboarding(state: OnboardingState): Promise<void> {
-  await mkdir(DATA_DIR, { recursive: true });
-  await writeFile(ONBOARDING_FILE, JSON.stringify(state, null, 2) + "\n");
+  await secureMkdir(DATA_DIR);
+  await secureWriteFile(ONBOARDING_FILE, JSON.stringify(state, null, 2) + "\n");
 }
 
 /** Deep merge helper for nested objects. Arrays are replaced, not merged. */
@@ -785,11 +787,15 @@ export const onboardingHandlers: GatewayRequestHandlers = {
       completed: false,
     };
 
-    // Mark phase 0 and 1 as complete (quick setup skips assessment)
+    // Mark phases 0-4 as complete (quick setup skips to First Win)
     if (!state.completedPhases.includes(0)) state.completedPhases.push(0);
     if (!state.completedPhases.includes(1)) state.completedPhases.push(1);
+    if (!state.completedPhases.includes(2)) state.completedPhases.push(2);
+    if (!state.completedPhases.includes(3)) state.completedPhases.push(3);
+    if (!state.completedPhases.includes(4)) state.completedPhases.push(4);
     state.completedPhases.sort();
-    if (state.phase < 2) state.phase = 2 as OnboardingPhase;
+    // Jump straight to Phase 5 (First Win) so the user sees a brief immediately
+    if (state.phase < 5) state.phase = 5 as OnboardingPhase;
 
     if (!state.startedAt) {
       state.startedAt = new Date().toISOString();
@@ -807,8 +813,8 @@ export const onboardingHandlers: GatewayRequestHandlers = {
           options = JSON.parse(raw) as Record<string, unknown>;
         } catch { /* file may not exist yet */ }
         options["dailyIntel.topics"] = dailyIntelTopics;
-        await mkdir(DATA_DIR, { recursive: true });
-        await writeFile(optionsFile, JSON.stringify(options, null, 2), "utf-8");
+        await secureMkdir(DATA_DIR);
+        await secureWriteFile(optionsFile, JSON.stringify(options, null, 2));
       } catch {
         // Non-fatal: intel topics are optional
       }
@@ -898,8 +904,8 @@ export const onboardingHandlers: GatewayRequestHandlers = {
       }
 
       // Write back
-      await mkdir(stateDir, { recursive: true });
-      await writeFile(configPath, JSON.stringify(config, null, 2) + "\n", "utf-8");
+      await secureMkdir(stateDir);
+      await secureWriteFile(configPath, JSON.stringify(config, null, 2) + "\n");
 
       const isDevKey = key.startsWith("GM-DEV-") || key === "GM-INTERNAL";
       const tokenNote = gatewayTokenGenerated
@@ -945,13 +951,26 @@ export const onboardingHandlers: GatewayRequestHandlers = {
   },
 
   /**
+   * Compute a config diff between user's current OC config and GodMode's recommendations.
+   * Read-only — never writes anything. Used by the review screen to show what would change.
+   */
+  "onboarding.wizard.diff": async ({ params, respond }) => {
+    const answers = parseWizardAnswers(params);
+    const diff = await computeConfigDiff(answers);
+    respond(true, diff);
+  },
+
+  /**
    * Run the wizard: generate all workspace files and patch OC config.
    * Accepts the 8 onboarding answers from the UI form.
+   * Optional skipFiles/skipKeys for selective generation (existing user path).
    */
   "onboarding.wizard.generate": async ({ params, respond, context }) => {
     const answers = parseWizardAnswers(params);
     const force = Boolean(params.force);
     const shouldPatchConfig = params.patchConfig !== false;
+    const skipFiles = Array.isArray(params.skipFiles) ? (params.skipFiles as string[]) : [];
+    const skipKeys = Array.isArray(params.skipKeys) ? (params.skipKeys as string[]) : [];
 
     // If soul profile data exists in onboarding state, merge it into answers
     const state0 = await readOnboarding();
@@ -959,15 +978,15 @@ export const onboardingHandlers: GatewayRequestHandlers = {
       answers.soulProfile = state0.interview.soulProfile as OnboardingAnswers["soulProfile"];
     }
 
-    // Generate workspace files
-    const fileResults = await generateWorkspaceFiles(answers, GODMODE_ROOT, { force });
+    // Generate workspace files (skip user-deselected files)
+    const fileResults = await generateWorkspaceFiles(answers, GODMODE_ROOT, { force, skipFiles });
     const created = fileResults.filter((f) => f.created).length;
     const skipped = fileResults.filter((f) => f.skipped).length;
 
-    // Patch OC config
+    // Patch OC config (skip user-deselected config keys)
     let configResult: { patched: boolean; error?: string } = { patched: false };
     if (shouldPatchConfig) {
-      configResult = await patchOCConfig(answers);
+      configResult = await patchOCConfig(answers, undefined, { skipKeys });
     }
 
     // Update onboarding state to reflect wizard completion

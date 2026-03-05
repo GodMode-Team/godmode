@@ -320,7 +320,8 @@ Write-Step 7 "Configuring gateway"
 $configItems = @(
     @{ Key = "gateway.mode";              Value = "local";  Label = "gateway.mode = local" },
     @{ Key = "gateway.controlUi.enabled"; Value = "true";   Label = "gateway.controlUi.enabled = true" },
-    @{ Key = "plugins.enabled";           Value = "true";   Label = "plugins.enabled = true" }
+    @{ Key = "plugins.enabled";           Value = "true";   Label = "plugins.enabled = true" },
+    @{ Key = "sessions.dmScope";          Value = "per-channel-peer"; Label = "sessions.dmScope = per-channel-peer" }
 )
 
 foreach ($item in $configItems) {

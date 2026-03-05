@@ -62,12 +62,18 @@ export type SecondBrainMemoryBankData = {
 };
 
 export type SecondBrainAiPacketData = {
-  consciousness: {
+  snapshot: {
+    content: string;
+    updatedAt?: string | null;
+    lineCount: number;
+  } | null;
+  // Legacy fields kept for backward compat
+  consciousness?: {
     content: string;
     updatedAt: string | null;
     lineCount: number;
   } | null;
-  working: {
+  working?: {
     content: string;
     updatedAt: string | null;
     lineCount: number;
@@ -262,14 +268,27 @@ function renderMd(content: string) {
 function renderIdentityPanel(props: SecondBrainProps) {
   const { identity } = props;
   if (!identity || identity.files.length === 0) {
-    return renderEmpty(
-      "No identity files found",
-      "Start building your Second Brain by creating USER.md in ~/godmode/.",
-    );
+    return html`
+      <div class="second-brain-panel">
+        <div class="second-brain-empty-block">
+          <div class="second-brain-empty-icon">\u{1F464}</div>
+          <div class="second-brain-empty-title">No identity files found</div>
+          <div class="second-brain-empty-hint">Tell your ally about yourself to start building your profile. Your identity helps the ally personalize everything.</div>
+          <button class="sb-chat-btn" @click=${() => props.onSaveViaChat()} style="margin-top: 12px;">
+            Tell your ally about you
+          </button>
+        </div>
+      </div>
+    `;
   }
 
   return html`
     <div class="second-brain-panel">
+      <div class="sb-identity-actions" style="display: flex; gap: 8px; margin-bottom: 12px;">
+        <button class="sb-chat-btn" @click=${() => props.onSaveViaChat()}>
+          \u{1F4AC} Update via Chat
+        </button>
+      </div>
       ${identity.identityOs ? html`
         <div
           class="second-brain-hero"
@@ -465,6 +484,9 @@ function renderEntryRow(entry: SecondBrainMemoryEntry, props: SecondBrainProps) 
 
 function renderAiPacketPanel(props: SecondBrainProps) {
   const { aiPacket, syncing } = props;
+  // Support both new shape (snapshot) and legacy shape (consciousness/working)
+  const snapshotData = aiPacket?.snapshot ?? aiPacket?.consciousness ?? null;
+  const snapshotLabel = aiPacket?.snapshot ? "Awareness Snapshot" : "CONSCIOUSNESS.md";
 
   return html`
     <div class="second-brain-panel">
@@ -472,10 +494,10 @@ function renderAiPacketPanel(props: SecondBrainProps) {
         <div class="second-brain-sync-info">
           <span class="second-brain-sync-label">Live Context Injection</span>
           <span class="second-brain-sync-time">
-            ${aiPacket?.consciousness?.updatedAt
-              ? `Last synced ${fmtUpdated(aiPacket.consciousness.updatedAt)}`
+            ${snapshotData?.updatedAt
+              ? `Last synced ${fmtUpdated(snapshotData.updatedAt)}`
               : "Not yet synced"}
-            ${aiPacket?.consciousness ? ` \u{2022} ${aiPacket.consciousness.lineCount} lines` : ""}
+            ${snapshotData ? ` \u{2022} ${snapshotData.lineCount} lines` : ""}
           </span>
         </div>
         <button
@@ -487,19 +509,23 @@ function renderAiPacketPanel(props: SecondBrainProps) {
         </button>
       </div>
 
-      ${aiPacket?.consciousness ? html`
+      <div class="second-brain-ai-packet-explainer" style="padding: 12px 16px; margin-bottom: 12px; font-size: 13px; color: var(--text-secondary); background: var(--bg-secondary); border-radius: 8px;">
+        This is what your ally knows right now. It refreshes every 15 minutes automatically.
+      </div>
+
+      ${snapshotData ? html`
         <div class="second-brain-card">
           <div class="second-brain-card-header">
-            <span class="second-brain-card-label">CONSCIOUSNESS.md</span>
-            <span class="second-brain-card-updated">${aiPacket.consciousness.lineCount} lines</span>
+            <span class="second-brain-card-label">${snapshotLabel}</span>
+            <span class="second-brain-card-updated">${snapshotData.lineCount} lines</span>
           </div>
-          <div class="second-brain-card-content">${renderMd(aiPacket.consciousness.content)}</div>
+          <div class="second-brain-card-content">${renderMd(snapshotData.content)}</div>
         </div>
       ` : html`
         <div class="second-brain-empty-block">
           <div class="second-brain-empty-icon">\u{1F9E0}</div>
-          <div class="second-brain-empty-title">No consciousness file yet</div>
-          <div class="second-brain-empty-hint">Hit "Sync Now" to generate your first consciousness snapshot.</div>
+          <div class="second-brain-empty-title">No awareness snapshot yet</div>
+          <div class="second-brain-empty-hint">Hit "Sync Now" to generate your first awareness snapshot. It includes your schedule, tasks, goals, and agent activity.</div>
         </div>
       `}
 
@@ -783,6 +809,9 @@ function renderResearchPanel(props: SecondBrainProps) {
           />
           <span class="second-brain-search-count">${researchData.totalEntries} entries</span>
         </div>
+        <button class="second-brain-sync-btn" @click=${() => props.onResearchAddFormToggle()}>
+          + Quick Add
+        </button>
         <button class="second-brain-sync-btn" @click=${() => props.onSaveViaChat()}>
           + Save via Chat
         </button>
@@ -966,12 +995,65 @@ function renderVaultHealthBar(vaultHealth?: VaultHealthData | null) {
   `;
 }
 
+function computeContextHealth(props: SecondBrainProps): { score: number; tips: string[] } {
+  let score = 0;
+  const tips: string[] = [];
+
+  // USER.md exists? (20%)
+  if (props.identity && props.identity.files.length > 0) {
+    score += 20;
+  } else {
+    tips.push("Create USER.md to help your ally know you");
+  }
+
+  // Goals set? (20%)
+  // We can't directly check goals here, but vault health tells us enough
+  const hasVault = props.vaultHealth?.available ?? false;
+  if (hasVault) score += 20;
+  else tips.push("Connect your Obsidian vault for long-term memory");
+
+  // Memory bank has entries? (20%)
+  if (props.memoryBank && props.memoryBank.totalEntries > 0) {
+    score += 20;
+  } else {
+    tips.push("Teach your ally — chat naturally and it remembers");
+  }
+
+  // At least 1 source connected? (20%)
+  if (props.sourcesData && props.sourcesData.connectedCount > 0) {
+    score += 20;
+  } else {
+    tips.push("Connect a data source (calendar, Oura, etc.)");
+  }
+
+  // 7+ daily briefs? (20%)
+  if (props.vaultHealth?.stats && props.vaultHealth.stats.dailyCount >= 7) {
+    score += 20;
+  } else {
+    tips.push("Keep using the morning brief — it compounds");
+  }
+
+  return { score, tips };
+}
+
 export function renderSecondBrain(props: SecondBrainProps) {
   const { subtab, loading, vaultHealth } = props;
+  const health = computeContextHealth(props);
 
   return html`
     <section class="second-brain-container">
       ${renderVaultHealthBar(vaultHealth)}
+      ${health.score < 100 ? html`
+        <div class="sb-health-score">
+          <div class="sb-health-score-bar">
+            <div class="sb-health-score-fill" style="width: ${health.score}%"></div>
+          </div>
+          <div class="sb-health-score-info">
+            <span class="sb-health-score-label">Context Health: ${health.score}%</span>
+            ${health.tips.length > 0 ? html`<span class="sb-health-score-tip">${health.tips[0]}</span>` : nothing}
+          </div>
+        </div>
+      ` : nothing}
       <div class="second-brain-tabs">
         <button
           class="second-brain-tab ${subtab === "identity" ? "active" : ""}"
@@ -1024,7 +1106,7 @@ export function renderSecondBrain(props: SecondBrainProps) {
       </div>
 
       ${subtab === "intel"
-        ? html`<div class="muted" style="padding: 16px;">Intel has been folded into the daily brief.</div>`
+        ? renderInsightsPanel(props)
         : loading
           ? html`<div class="second-brain-loading"><div class="second-brain-loading-spinner"></div>Loading...</div>`
           : subtab === "identity"
@@ -1041,6 +1123,48 @@ export function renderSecondBrain(props: SecondBrainProps) {
                       ? renderFilesTab(props)
                       : renderResearchPanel(props)}
     </section>
+  `;
+}
+
+// ── Insights Panel ────────────────────────────────────────────────────
+
+function renderInsightsPanel(props: SecondBrainProps) {
+  const hasVault = props.vaultHealth?.available ?? false;
+  const hasBriefs = (props.vaultHealth?.stats?.dailyCount ?? 0) >= 3;
+  const hasSources = (props.sourcesData?.connectedCount ?? 0) > 0;
+
+  return html`
+    <div class="second-brain-panel">
+      <div class="second-brain-card">
+        <div class="second-brain-card-header">
+          <span class="second-brain-card-label">How Insights Work</span>
+        </div>
+        <div class="second-brain-card-content" style="padding: 16px;">
+          <p style="margin: 0 0 12px; font-size: 13px; color: var(--text-secondary); line-height: 1.6;">
+            Your ally builds insights over time as you work together. The more daily briefs, agent tasks, and interactions you accumulate, the smarter your ally gets at spotting patterns, blind spots, and opportunities.
+          </p>
+          <div style="display: flex; flex-direction: column; gap: 8px;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="font-size: 14px;">${hasVault ? "\u2705" : "\u{1F7E1}"}</span>
+              <span style="font-size: 13px; color: var(--text);">Obsidian Vault ${hasVault ? "connected" : "not connected — connect for richer insights"}</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="font-size: 14px;">${hasBriefs ? "\u2705" : "\u{1F7E1}"}</span>
+              <span style="font-size: 13px; color: var(--text);">${hasBriefs ? `${props.vaultHealth?.stats?.dailyCount} daily briefs accumulated` : "Less than 3 daily briefs — keep using the morning brief"}</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="font-size: 14px;">${hasSources ? "\u2705" : "\u{1F7E1}"}</span>
+              <span style="font-size: 13px; color: var(--text);">${hasSources ? "Data sources connected" : "No data sources yet — connect integrations for cross-domain insights"}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div style="padding: 0 16px;">
+        <p style="font-size: 12px; color: var(--text-muted); margin: 8px 0;">
+          Proactive insights surface in your daily brief and awareness snapshot. Check your Dashboards tab for deeper analysis views.
+        </p>
+      </div>
+    </div>
   `;
 }
 

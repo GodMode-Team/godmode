@@ -413,7 +413,7 @@ function formatCalendarSection(events: CalendarEvent[], error?: string): string 
       const fromH = Math.floor(lastEnd / 60);
       const toH = Math.floor(startMin / 60);
       windows.push(
-        `${fromH > 12 ? fromH - 12 : fromH}${fromH >= 12 ? "PM" : "AM"}-${toH > 12 ? toH - 12 : toH}${toH >= 12 ? "PM" : "PM"}`,
+        `${fromH > 12 ? fromH - 12 : fromH}${fromH >= 12 ? "PM" : "AM"}-${toH > 12 ? toH - 12 : toH}${toH >= 12 ? "PM" : "AM"}`,
       );
     }
     lastEnd = Math.max(lastEnd, startMin + (evt.duration || 30));
@@ -537,6 +537,9 @@ async function fetchOuraData(): Promise<OuraData> {
       `https://api.ouraring.com/v2/usercollection/daily_readiness?start_date=${yesterday}`,
       { headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(10_000) },
     );
+    if (!readinessResp.ok) {
+      throw new Error(`Oura readiness API ${readinessResp.status}: ${readinessResp.statusText}`);
+    }
     const readinessData = (await readinessResp.json()) as {
       data?: Array<{ score?: number; contributors?: Record<string, number> }>;
     };
@@ -548,6 +551,9 @@ async function fetchOuraData(): Promise<OuraData> {
       `https://api.ouraring.com/v2/usercollection/daily_sleep?start_date=${yesterday}`,
       { headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(10_000) },
     );
+    if (!sleepResp.ok) {
+      throw new Error(`Oura sleep API ${sleepResp.status}: ${sleepResp.statusText}`);
+    }
     const sleepData = (await sleepResp.json()) as {
       data?: Array<{
         score?: number;
@@ -562,6 +568,9 @@ async function fetchOuraData(): Promise<OuraData> {
       `https://api.ouraring.com/v2/usercollection/sleep?start_date=${yesterday}`,
       { headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(10_000) },
     );
+    if (!sleepPeriodsResp.ok) {
+      throw new Error(`Oura sleep periods API ${sleepPeriodsResp.status}: ${sleepPeriodsResp.statusText}`);
+    }
     const sleepPeriods = (await sleepPeriodsResp.json()) as {
       data?: Array<{
         average_hrv?: number;
@@ -684,6 +693,9 @@ async function fetchWeather(): Promise<WeatherData> {
     const resp = await fetch(`https://wttr.in/${encoded}?format=j1`, {
       signal: AbortSignal.timeout(8_000),
     });
+    if (!resp.ok) {
+      throw new Error(`Weather API ${resp.status}: ${resp.statusText}`);
+    }
     const data = (await resp.json()) as {
       current_condition?: Array<{
         temp_F?: string;
@@ -1314,6 +1326,7 @@ function isActionItem(text: string): boolean {
 
 type ContextData = {
   chiefAim: string;
+  activeGoals: Array<{ title: string; area?: string; progress?: number }>;
   streakDay: number | null;
   streakLabel: string;
   streakStart: string | null;
@@ -1347,13 +1360,25 @@ async function readContextData(): Promise<ContextData> {
 
   // Read chief aim: goals.json first, then THESIS.md heading/label fallback
   let chiefAim = "";
+  let activeGoals: Array<{ title: string; area?: string; progress?: number }> = [];
   try {
     const goalsRaw = await readFile(join(DATA_DIR, "goals.json"), "utf-8");
-    const goals = JSON.parse(goalsRaw) as { chiefAim?: string; goals?: Array<{ text?: string }> };
-    if (goals.chiefAim) {
-      chiefAim = goals.chiefAim;
-    } else if (goals.goals && goals.goals.length > 0 && goals.goals[0].text) {
-      chiefAim = goals.goals[0].text;
+    const goalsData = JSON.parse(goalsRaw) as {
+      chiefAim?: string;
+      goals?: Array<{ title?: string; text?: string; area?: string; progress?: number; status?: string }>;
+    };
+    if (goalsData.chiefAim) {
+      chiefAim = goalsData.chiefAim;
+    } else if (goalsData.goals && goalsData.goals.length > 0) {
+      const firstGoal = goalsData.goals[0];
+      chiefAim = firstGoal.title || firstGoal.text || "";
+    }
+    // Collect active goals for the brief
+    if (goalsData.goals) {
+      activeGoals = goalsData.goals
+        .filter(g => !g.status || g.status === "active")
+        .map(g => ({ title: g.title || g.text || "", area: g.area, progress: g.progress }))
+        .filter(g => g.title);
     }
   } catch { /* goals.json not found or invalid */ }
 
@@ -1373,6 +1398,7 @@ async function readContextData(): Promise<ContextData> {
 
   return {
     chiefAim,
+    activeGoals,
     streakDay: streakStart ? daysSince(streakStart) : null,
     streakLabel,
     streakStart,
@@ -1684,6 +1710,11 @@ ${xIntelRaw}
 ### Carryover (incomplete from yesterday)
 ${carryoverRaw}
 
+### Active Goals
+${context.activeGoals.length > 0
+  ? context.activeGoals.map(g => `- ${g.title}${g.area ? ` [${g.area}]` : ""}${g.progress != null ? ` (${g.progress}%)` : ""}`).join("\n")
+  : "(no goals set)"}
+
 ### Oura Biometrics
 ${ouraRaw}
 
@@ -1785,6 +1816,152 @@ ${intelSection || "(none)"}`;
   };
 }
 
+// ── Starter Brief (zero-integration fallback) ────────────────────────────────
+
+const STARTER_TIPS = [
+  "Try saying 'queue a research task on [topic]' to delegate work to an agent.",
+  "You can connect your Google Calendar for a richer morning brief — ask me how.",
+  "Want me to set up a recurring skill? Just tell me what you want done and when.",
+  "Your Second Brain in Obsidian is where all your agent outputs land — check it out.",
+  "Rate your agent outputs to build trust scores — the system learns from your feedback.",
+  "Tell me your top 3 goals and I'll weave them into every morning brief.",
+  "Ask me to create a dashboard — I'll build a live view of anything you want to track.",
+  "You can say 'evening capture' at the end of the day to reflect and set up tomorrow.",
+  "Try 'what should I focus on?' and I'll analyze your tasks, calendar, and energy.",
+  "Ask me to write a persona for a specific role — content writer, researcher, admin.",
+  "Your daily brief gets smarter over time as I learn your patterns and preferences.",
+  "Say 'review my queue' to see what your agents have been working on overnight.",
+  "Connect your Oura ring for biometric-aware energy prescriptions in your brief.",
+  "You can teach me about yourself — just chat naturally and I'll remember what matters.",
+  "Try 'help me plan my week' and I'll pull from your goals, tasks, and calendar.",
+];
+
+/**
+ * Generate a lightweight brief that works with zero integrations.
+ * Only needs name + timezone (no Calendar, no X Intel, no Obsidian).
+ */
+async function generateStarterBrief(): Promise<{
+  date: string;
+  markdown: string;
+  starterBrief: true;
+  sections: string[];
+  warnings: string[];
+}> {
+  const briefDate = todayDate();
+  const dateDisplay = formattedDate();
+
+  // Resolve user name from onboarding or USER.md
+  let userName = "friend";
+  try {
+    const onboardingPath = join(DATA_DIR, "onboarding.json");
+    const raw = await readFile(onboardingPath, "utf-8");
+    const ob = JSON.parse(raw) as { interview?: { name?: string }; identity?: { name?: string } };
+    userName = ob.interview?.name || ob.identity?.name || userName;
+  } catch { /* non-fatal */ }
+  if (userName === "friend") {
+    try {
+      const { resolveIdentityDir } = await import("../lib/vault-paths.js");
+      const identityResult = resolveIdentityDir();
+      if (identityResult) {
+        const userMd = await readFile(join(identityResult.path, "USER.md"), "utf-8");
+        const nameMatch = userMd.match(/^[-*]\s*\*\*(?:Name|Full Name)[:\s]*\*\*\s*(.+)$/mi);
+        if (nameMatch) userName = nameMatch[1].trim();
+      }
+    } catch { /* non-fatal */ }
+  }
+
+  // Tasks
+  let taskLines = "No pending tasks yet. Tell me what you're working on!";
+  try {
+    const { readTasks } = await import("./tasks.js");
+    const data = await readTasks();
+    const pending = data.tasks.filter((t: { status: string; title: string }) => t.status === "pending");
+    if (pending.length > 0) {
+      taskLines = pending.slice(0, 5).map((t: { title: string; dueDate?: string | null; priority?: string }) => {
+        const due = t.dueDate ? ` (due: ${t.dueDate})` : "";
+        const pri = t.priority && t.priority !== "medium" ? ` [${t.priority}]` : "";
+        return `- [ ] ${t.title}${due}${pri}`;
+      }).join("\n");
+      if (pending.length > 5) taskLines += `\n- ...and ${pending.length - 5} more`;
+    }
+  } catch { /* non-fatal */ }
+
+  // Queue
+  let queueLine = "Queue is empty. Delegate something!";
+  try {
+    const { readQueueState } = await import("../lib/queue-state.js");
+    const qs = await readQueueState();
+    const processing = qs.items.filter((i: { status: string }) => i.status === "processing").length;
+    const review = qs.items.filter((i: { status: string }) => i.status === "review").length;
+    const queued = qs.items.filter((i: { status: string }) => i.status === "queued").length;
+    if (processing > 0 || review > 0 || queued > 0) {
+      const parts: string[] = [];
+      if (processing > 0) parts.push(`${processing} processing`);
+      if (review > 0) parts.push(`${review} ready for review`);
+      if (queued > 0) parts.push(`${queued} queued`);
+      queueLine = parts.join(", ");
+    }
+  } catch { /* non-fatal */ }
+
+  // Goals
+  let goalsLines = "";
+  try {
+    const goalsRaw = await readFile(join(DATA_DIR, "goals.json"), "utf-8");
+    const goalsData = JSON.parse(goalsRaw) as {
+      goals?: Array<{ title?: string; text?: string; area?: string; progress?: number; status?: string }>;
+    };
+    const active = (goalsData.goals ?? [])
+      .filter(g => !g.status || g.status === "active")
+      .filter(g => g.title || g.text);
+    if (active.length > 0) {
+      goalsLines = active.slice(0, 4).map(g => {
+        const title = g.title || g.text || "";
+        const progress = g.progress != null ? ` — ${g.progress}%` : "";
+        return `- ${title}${progress}`;
+      }).join("\n");
+    }
+  } catch { /* non-fatal */ }
+
+  // Tip of the day (rotate by day of year)
+  const dayOfYear = Math.floor((Date.now() - new Date(new Date().getFullYear(), 0, 0).getTime()) / 86_400_000);
+  const tip = STARTER_TIPS[dayOfYear % STARTER_TIPS.length];
+
+  const sections = [
+    `# Good morning, ${userName}`,
+    dateDisplay,
+    "",
+    "---",
+    "",
+    ...(goalsLines ? [
+      "## Goals",
+      goalsLines,
+      "",
+    ] : []),
+    "## Today's Focus",
+    taskLines,
+    "",
+    "## Agent Queue",
+    queueLine,
+    "",
+    "## Tip of the Day",
+    `> ${tip}`,
+    "",
+    "---",
+    "",
+    "*Want a richer brief? Connect your calendar and X intelligence in Settings > Config.*",
+  ];
+
+  const markdown = sections.join("\n");
+
+  return {
+    date: briefDate,
+    markdown,
+    starterBrief: true,
+    sections: ["focus", "queue", "tip"],
+    warnings: [],
+  };
+}
+
 // ── RPC Handler ──────────────────────────────────────────────────────────────
 
 const generateBrief: GatewayRequestHandler = async ({ params, respond }) => {
@@ -1795,10 +1972,9 @@ const generateBrief: GatewayRequestHandler = async ({ params, respond }) => {
       // Dry run: gather data but don't write
       const vaultPath = resolveVaultPath();
       if (!vaultPath) {
-        respond(false, null, {
-          code: "INVALID_REQUEST",
-          message: "Obsidian vault path not configured",
-        });
+        // No vault — return starter brief info
+        const starter = await generateStarterBrief();
+        respond(true, { dryRun: true, starterBrief: true, markdown: starter.markdown });
         return;
       }
 
@@ -1837,6 +2013,14 @@ const generateBrief: GatewayRequestHandler = async ({ params, respond }) => {
           },
         },
       });
+      return;
+    }
+
+    // Check if vault is configured — if not, generate starter brief
+    const vaultPath = resolveVaultPath();
+    if (!vaultPath) {
+      const starter = await generateStarterBrief();
+      respond(true, starter);
       return;
     }
 

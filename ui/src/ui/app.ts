@@ -570,10 +570,6 @@ export class GodModeApp extends LitElement {
   @state() privateSessions: Map<string, number> = new Map();
   private _privateSessionTimer: ReturnType<typeof setInterval> | null = null;
 
-  @state() goals?: import("./views/goals").Goal[];
-  @state() goalsLoading = false;
-  @state() goalsError: string | null = null;
-
   // Data tab state
   @state() dataSources?: import("./views/data").DataSource[];
   @state() dataLoading = false;
@@ -672,6 +668,8 @@ export class GodModeApp extends LitElement {
   dashboardPreviousSessionKey: string | null = null;
   /** Whether the inline chat panel is expanded */
   @state() dashboardChatOpen = false;
+  /** Active category filter for dashboards gallery */
+  @state() dashboardCategoryFilter: string | null = null;
 
   // Second Brain state
   @state() secondBrainSubtab: import("./views/second-brain").SecondBrainSubtab = "identity";
@@ -1475,13 +1473,22 @@ export class GodModeApp extends LitElement {
     await deleteDashboard(this, id);
   }
 
-  async handleDashboardCreateViaChat() {
+  async handleDashboardTogglePin(id: string) {
+    const { toggleDashboardPin } = await import("./controllers/dashboards.js");
+    await toggleDashboardPin(this, id);
+  }
+
+  async handleDashboardCreateViaChat(prompt?: string) {
     this.setTab("chat" as import("./navigation").Tab);
     const { createNewSession } = await import("./app-render.helpers.js");
     createNewSession(this);
     void this.handleSendChat(
-      "I want to create a custom dashboard. Ask me what data I want to see and design it for me. You can use any of GodMode's data — tasks, calendar, focus pulse, goals, trust scores, agent activity, queue status, coding tasks, workspace stats, and more.",
+      prompt ?? "I want to create a custom dashboard. Ask me what data I want to see and design it for me. You can use any of GodMode's data — tasks, calendar, focus pulse, goals, trust scores, agent activity, queue status, coding tasks, workspace stats, and more.",
     );
+  }
+
+  handleDashboardCategoryFilter(category: string | null) {
+    this.dashboardCategoryFilter = category;
   }
 
   handleDashboardBack() {
@@ -2823,6 +2830,19 @@ export class GodModeApp extends LitElement {
     await loadBriefOnlyInternal(this);
   }
 
+  async handleDailyBriefGenerate() {
+    if (!this.client || !this.connected) return;
+    this.dailyBriefLoading = true;
+    try {
+      await this.client.request("dailyBrief.generate", {});
+      await loadBriefOnlyInternal(this);
+    } catch (err) {
+      this.dailyBriefError = err instanceof Error ? err.message : "Failed to generate brief";
+    } finally {
+      this.dailyBriefLoading = false;
+    }
+  }
+
   handleDailyBriefOpenInObsidian() {
     const date = this.dailyBrief?.date;
     openBriefInObsidianInternal(date);
@@ -2888,6 +2908,10 @@ export class GodModeApp extends LitElement {
       this.privateSessions = new Map(this.privateSessions).set(this.sessionKey, expiresAt);
       this._persistPrivateSessions();
       this._startPrivateSessionTimer();
+      // Notify backend so vault-capture and awareness snapshot skip this session
+      if (this.client && this.connected) {
+        this.client.request("session.setPrivate", { sessionKey: this.sessionKey, enabled: true }).catch(() => {});
+      }
       // Inject system-style notice as first message
       this.chatMessages = [
         {
@@ -2932,8 +2956,10 @@ export class GodModeApp extends LitElement {
       });
     }
 
-    // Delete from gateway (fire-and-forget, no confirmation prompt)
+    // Notify backend to clear private status before deletion
     if (this.client && this.connected) {
+      this.client.request("session.setPrivate", { sessionKey, enabled: false }).catch(() => {});
+      // Delete from gateway (fire-and-forget, no confirmation prompt)
       this.client.request("sessions.delete", { key: sessionKey, deleteTranscript: true }).catch(() => {});
     }
 
@@ -3157,24 +3183,6 @@ export class GodModeApp extends LitElement {
     }
   }
 
-  async handleGoalsRefresh() {
-    if (!this.client || !this.connected) {
-      return;
-    }
-    this.goalsLoading = true;
-    this.goalsError = null;
-    try {
-      const result = await this.client.request<{
-        goals: import("./views/goals").Goal[];
-      }>("goals.get", {});
-      this.goals = result.goals ?? [];
-    } catch (err) {
-      this.goalsError = err instanceof Error ? err.message : "Failed to load goals";
-      console.error("[Goals] Load error:", err);
-    } finally {
-      this.goalsLoading = false;
-    }
-  }
 
   // ── Onboarding handlers ──────────────────────────────────────
 
@@ -3366,20 +3374,77 @@ export class GodModeApp extends LitElement {
   async handleWizardPreview() {
     if (!this.client || !this.wizardState) return;
     try {
-      const result = await this.client.request<{
-        files: Array<{ path: string; exists: boolean; wouldCreate: boolean }>;
-      }>("onboarding.wizard.preview", this.wizardState.answers);
-      this.wizardState = { ...this.wizardState, preview: result.files ?? [] };
+      // Fetch file preview and config diff in parallel
+      const [previewResult, diffResult] = await Promise.all([
+        this.client.request<{
+          files: Array<{ path: string; exists: boolean; wouldCreate: boolean }>;
+        }>("onboarding.wizard.preview", this.wizardState.answers),
+        this.client.request<{
+          additions: Array<{ path: string; current: unknown; recommended: unknown }>;
+          changes: Array<{ path: string; current: unknown; recommended: unknown }>;
+          matching: string[];
+        }>("onboarding.wizard.diff", this.wizardState.answers).catch(() => null),
+      ]);
+
+      // Pre-populate file selections: new files checked, existing files unchecked
+      const fileSelections: Record<string, boolean> = {};
+      for (const f of previewResult.files ?? []) {
+        fileSelections[f.path] = f.wouldCreate;
+      }
+
+      // Pre-populate config selections: additions checked, changes unchecked
+      const configSelections: Record<string, boolean> = {};
+      if (diffResult) {
+        for (const a of diffResult.additions) configSelections[a.path] = true;
+        for (const c of diffResult.changes) configSelections[c.path] = false;
+      }
+
+      this.wizardState = {
+        ...this.wizardState,
+        preview: previewResult.files ?? [],
+        diff: diffResult,
+        fileSelections,
+        configSelections,
+      };
       this.requestUpdate();
     } catch (err) {
       console.error("[Wizard] Preview failed:", err);
     }
   }
 
+  handleWizardFileToggle(path: string, checked: boolean) {
+    if (!this.wizardState) return;
+    this.wizardState = {
+      ...this.wizardState,
+      fileSelections: { ...this.wizardState.fileSelections, [path]: checked },
+    };
+    this.requestUpdate();
+  }
+
+  handleWizardConfigToggle(path: string, checked: boolean) {
+    if (!this.wizardState) return;
+    this.wizardState = {
+      ...this.wizardState,
+      configSelections: { ...this.wizardState.configSelections, [path]: checked },
+    };
+    this.requestUpdate();
+  }
+
   async handleWizardGenerate() {
     if (!this.client || !this.wizardState) return;
     this.wizardState = { ...this.wizardState, generating: true, error: null };
     this.requestUpdate();
+
+    // Derive skipFiles and skipKeys from unchecked selections
+    const skipFiles: string[] = [];
+    for (const [path, checked] of Object.entries(this.wizardState.fileSelections)) {
+      if (!checked) skipFiles.push(path);
+    }
+    const skipKeys: string[] = [];
+    for (const [path, checked] of Object.entries(this.wizardState.configSelections)) {
+      if (!checked) skipKeys.push(path);
+    }
+
     try {
       const result = await this.client.request<{
         success: boolean;
@@ -3388,7 +3453,11 @@ export class GodModeApp extends LitElement {
         configPatched: boolean;
         workspacePath: string;
         configError?: string;
-      }>("onboarding.wizard.generate", this.wizardState.answers);
+      }>("onboarding.wizard.generate", {
+        ...this.wizardState.answers,
+        skipFiles,
+        skipKeys,
+      });
 
       this.wizardState = {
         ...this.wizardState,

@@ -151,7 +151,14 @@ class ConsciousnessHeartbeat {
         this.logger.error(`[Consciousness] Brief auto-gen failed: ${String(briefErr)}`);
       }
 
-      // 3. Auto-queue overdue tasks from tasks.json
+      // 3. Process cron skills
+      try {
+        await this.processCronSkills();
+      } catch (err) {
+        this.logger.warn(`[Consciousness] Cron skills processing failed: ${String(err)}`);
+      }
+
+      // 4. Auto-queue overdue tasks from tasks.json
       try {
         const { autoQueueOverdueTasks } = await import("./queue-processor.js");
         const queueResult = await autoQueueOverdueTasks();
@@ -166,19 +173,19 @@ class ConsciousnessHeartbeat {
         }
       } catch { /* non-fatal */ }
 
-      // 4. Task maintenance (dedup + archival)
+      // 5. Task maintenance (dedup + archival)
       try {
         const { runTaskMaintenance } = await import("../methods/tasks.js");
         runTaskMaintenance().catch(() => {});
       } catch { /* non-fatal */ }
 
-      // 5. Expire stale queue items
+      // 6. Expire stale queue items
       try {
         const { expireStaleQueueItems } = await import("./queue-processor.js");
         await expireStaleQueueItems();
       } catch { /* Queue expiration non-fatal */ }
 
-      // 6. Process pending queue items
+      // 7. Process pending queue items
       try {
         const { getQueueProcessor } = await import("./queue-processor.js");
         const processor = getQueueProcessor();
@@ -190,7 +197,16 @@ class ConsciousnessHeartbeat {
         }
       } catch { /* non-fatal */ }
 
-      // 7. Vault auto-capture pipelines (Sessions→Daily, Queue→Inbox)
+      // 7. Clean up expired private sessions
+      try {
+        const { cleanupExpiredPrivateSessions } = await import("../lib/private-session.js");
+        const cleaned = await cleanupExpiredPrivateSessions();
+        if (cleaned > 0) {
+          this.logger.info(`[Consciousness] Cleaned up ${cleaned} expired private session(s)`);
+        }
+      } catch { /* non-fatal */ }
+
+      // 8. Vault auto-capture pipelines (Sessions→Daily, Queue→Inbox)
       try {
         const { runAllCapturePipelines } = await import("./vault-capture.js");
         const captureResult = await runAllCapturePipelines(this.logger);
@@ -218,6 +234,74 @@ class ConsciousnessHeartbeat {
   }
 
   // ── Helpers ──────────────────────────────────────────────────────
+
+  /** Process cron-triggered skills — create queue items for skills whose schedule fires. */
+  private async processCronSkills(): Promise<void> {
+    const { getCronSkills, parseSchedule, readSkillRuns, saveSkillRuns } = await import(
+      "../lib/skills-registry.js"
+    );
+    const cronSkills = getCronSkills();
+    if (cronSkills.length === 0) return;
+
+    const runState = await readSkillRuns();
+    const now = new Date();
+    let queued = 0;
+
+    for (const skill of cronSkills) {
+      if (!skill.schedule) continue;
+      const parsed = parseSchedule(skill.schedule);
+      if (!parsed) {
+        this.logger.warn(`[Consciousness] Invalid schedule for skill "${skill.slug}": ${skill.schedule}`);
+        continue;
+      }
+
+      const lastRun = runState.lastRuns[skill.slug] ?? 0;
+      if (!parsed.shouldRun(now, lastRun)) continue;
+
+      // Create a queue item for this skill
+      try {
+        const { updateQueueState, newQueueItemId } = await import("../lib/queue-state.js");
+        const { result: wasQueued } = await updateQueueState((state) => {
+          // Dedup: don't re-queue if a pending/processing item already exists for this skill
+          const existing = state.items.find(
+            (i) =>
+              (i.status === "pending" || i.status === "processing") &&
+              i.title === `[Cron] ${skill.name}`,
+          );
+          if (existing) return false;
+
+          state.items.push({
+            id: newQueueItemId(skill.name),
+            type: skill.taskType,
+            title: `[Cron] ${skill.name}`,
+            description: skill.body || undefined,
+            priority: skill.priority,
+            status: "pending",
+            source: "cron",
+            personaHint: skill.persona || undefined,
+            createdAt: Date.now(),
+          });
+          return true;
+        });
+
+        if (wasQueued) {
+          runState.lastRuns[skill.slug] = Date.now();
+          queued++;
+          this.logger.info(`[Consciousness] Cron skill fired: ${skill.name}`);
+        }
+      } catch (err) {
+        this.logger.warn(`[Consciousness] Failed to queue cron skill "${skill.slug}": ${String(err)}`);
+      }
+    }
+
+    if (queued > 0) {
+      await saveSkillRuns(runState);
+      this.broadcast("ally:notification", {
+        type: "cron-result",
+        summary: `${queued} cron skill${queued === 1 ? "" : "s"} fired and queued for processing.`,
+      });
+    }
+  }
 
   /** Copy awareness snapshot into the vault's 99-System/ folder. */
   private async mirrorToVault(): Promise<void> {
