@@ -709,13 +709,17 @@ if [ "$IS_HEADLESS" = true ]; then
       ok "Tailscale detected — IP: $TAILSCALE_IP"
 
       # Get the full tailnet FQDN (e.g., metatron-3.taild13d36.ts.net)
-      TAILSCALE_FQDN="$(tailscale status --json 2>/dev/null | node -e '
-        try {
-          const d = JSON.parse(require("fs").readFileSync("/dev/stdin", "utf-8"));
-          const name = (d.Self?.DNSName || "").replace(/\.$/, "");
-          process.stdout.write(name);
-        } catch {}
-      ' 2>/dev/null || true)"
+      # Use sed to parse JSON — no node dependency, works everywhere
+      TAILSCALE_FQDN="$(tailscale status --json 2>/dev/null \
+        | sed -n 's/.*"DNSName"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' \
+        | head -1 \
+        | sed 's/\.$//')"
+
+      if [ -z "$TAILSCALE_FQDN" ]; then
+        warn "Could not detect Tailscale FQDN — will use IP-based URL as fallback"
+      else
+        ok "Tailscale FQDN: $TAILSCALE_FQDN"
+      fi
 
       # Provision HTTPS cert early — gives CT logs time to propagate during rest of install
       if [ -n "$TAILSCALE_FQDN" ]; then
