@@ -629,6 +629,7 @@ const godmodePlugin = {
       "onboarding.activateLicense",
       "onboarding.status",
       "onboarding.checklist",
+      "onboarding.capabilities",
       "onboarding.update",
       "onboarding.complete",
       "onboarding.reset",
