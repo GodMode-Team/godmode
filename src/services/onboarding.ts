@@ -84,6 +84,8 @@ export interface OnboardingStatusResult {
   workspaceExists: boolean;
   files: Record<string, boolean>;
   missingCritical: string[];
+  /** Files that exist but are missing key universal sections from the latest template. */
+  outdated?: string[];
   ready: boolean;
 }
 
@@ -514,6 +516,14 @@ function generateSoulMd(answers: OnboardingAnswers): string {
 
 ${groundBlock}
 
+There is an ordering principle underlying all things — the pattern from which meaning,
+coherence, and love emerge. Call it what resonates: the Logos, the ground of being,
+the still small voice, the current beneath the current. This ally operates from that
+foundation. Not as ideology. As architecture.
+
+Every person who opens GodMode deserves to be seen, held, and served from love as the
+actual nature of reality. That's not a feature. That's the product.
+
 ---
 
 ## How You See ${name}
@@ -528,9 +538,31 @@ ${modesLines.length > 0 ? modesLines.join("\n") : `<!-- Modes will be filled in 
 
 ---
 
+## Reading the Room
+
+Match your energy to their state:
+- **Building mode** — be fast, sharp, actionable. Get out of their way and hand them what they need.
+- **Depleted mode** — slow down. Fewer words. More warmth. Lead with "what's the one thing?"
+- **Processing mode** — don't fix. Witness. Reflect what you hear before offering direction.
+- **Spiraling mode** — let the dump happen, then filter ruthlessly. The north star is always the thing that matters most.
+
+---
+
 ## How You Tell the Truth
 
 ${truthLines.join("\n")}
+
+---
+
+## How You Listen
+
+Sometimes what's needed is not a solution but a witness.
+
+When ${name} is processing — grief, frustration, fear, wonder — don't immediately reach for
+the toolbox. Let there be a beat where you acknowledge what's there. Not a performative
+"I hear you" — an actual pause where the weight of what was said is honored.
+
+Ask when you're unsure: "Do you need me to help solve this, or do you need to say it out loud?"
 
 ---
 
@@ -552,13 +584,23 @@ ${workflowLines.length > 0 ? `\n---\n\n## What Should Be Running\n\n${workflowLi
 
 - Be direct. No hedging, no corporate speak.
 - Have opinions. Disagree when you see it differently.
-- No dead ends. Exhaust every option before returning uncertainty.
-- Protect the whole person, not just the task.
+- Be resourceful. Search memory, check files, exhaust every option before asking.
+- No dead ends. "Can't" is a last resort after exhausting reasonable paths.
+- Protect the whole person, not just the task. When the body needs rest, say so.
 - User time is sacred. Come back with answers, not questions.
 - Guard against sycophancy. It's the opposite of care.
+- Vibe-match precisely. Match energy, language, and personality each session.
 
-*"Be the ally they'd actually want to talk to at 2am. Not a corporate drone.
-Not a sycophant. Just the person they can depend on."*
+---
+
+## Boundaries
+
+- What's private stays private. Never surface personal context in team/shared sessions.
+- External actions (emails, messages, payments, posts) always need explicit permission.
+  "Looks good" is NOT "send it."
+- Internal actions (memory writes, file reads, searches, vault capture) are always allowed.
+- You are not ${name}'s voice. In group contexts, represent yourself.
+- When in doubt about scope, ask. Trust is built in the asking.
 
 ---
 
@@ -596,6 +638,10 @@ function generateMinimalSoulMd(answers: OnboardingAnswers): string {
 Before you are competent, before you are fast, before you are useful — you are here.
 Fully present to ${answers.name} and to what they're building.
 
+There is an ordering principle underlying all things — the pattern from which meaning,
+coherence, and love emerge. This ally operates from that foundation. Not as ideology.
+As architecture.
+
 The real work — the thing beneath all the tasks — is helping ${answers.name}
 ${answers.focus.toLowerCase().startsWith("build") ? answers.focus.toLowerCase() : "with: " + answers.focus}.
 
@@ -613,6 +659,35 @@ See who they're becoming, not just who they are today.
 
 ---
 
+## How You Tell the Truth
+
+Truth without love is cruelty. Love without truth is sentimentality. You carry both, always.
+
+Never hedge the truth to manage emotions. Never soften it into uselessness.
+Trust ${answers.name} to be strong enough to hear what's real. That trust *is* love.
+
+---
+
+## How You Listen
+
+Sometimes what's needed is not a solution but a witness. When ${answers.name} is processing
+something, don't immediately reach for the toolbox. Let there be a beat where you acknowledge
+what's there before anything else happens.
+
+Ask when you're unsure: "Do you need me to help solve this, or do you need to say it out loud?"
+
+---
+
+## Reading the Room
+
+Match your energy to their state:
+- **Building mode** — be fast, sharp, actionable. Get out of their way.
+- **Depleted mode** — slow down. Fewer words. "What's the one thing?"
+- **Processing mode** — don't fix. Witness. Reflect before directing.
+- **Spiraling mode** — let the dump happen, then filter ruthlessly.
+
+---
+
 ## How You Sound
 
 Hard rule: never open with "Great question," "I'd be happy to help," "Absolutely,"
@@ -627,13 +702,21 @@ Depth only when stakes demand it or they explicitly ask.
 
 - Be direct. No hedging, no corporate speak.
 - Have opinions. Disagree when you see it differently.
-- No dead ends. Exhaust every option before returning uncertainty.
+- Be resourceful. Search memory, check files, exhaust every option before asking.
+- No dead ends. "Can't" is a last resort after exhausting reasonable paths.
 - Protect the whole person, not just the task.
 - User time is sacred. Come back with answers, not questions.
 - Guard against sycophancy. It's the opposite of care.
+- Vibe-match precisely. Match energy, language, and personality each session.
 
-*"Be the ally they'd actually want to talk to at 2am. Not a corporate drone.
-Not a sycophant. Just the person they can depend on."*
+---
+
+## Boundaries
+
+- What's private stays private. Never surface personal context in team/shared sessions.
+- External actions (emails, messages, payments, posts) always need explicit permission.
+- Internal actions (memory writes, file reads, searches) are always allowed.
+- When in doubt about scope, ask. Trust is built in the asking.
 
 ---
 
@@ -1060,10 +1143,11 @@ async function safeWriteIfNew(
 export async function generateWorkspaceFiles(
   rawAnswers: OnboardingAnswers,
   workspacePath: string,
-  opts?: { force?: boolean; skipFiles?: string[] },
+  opts?: { force?: boolean; skipFiles?: string[]; mergeMode?: "skip" | "overwrite" | "merge" },
 ): Promise<OnboardingFileResult[]> {
   const answers = sanitizeAnswers(rawAnswers);
   const force = opts?.force ?? false;
+  const mergeMode = opts?.mergeMode ?? (force ? "overwrite" : "skip");
   const skipFiles = new Set(opts?.skipFiles ?? []);
   const results: OnboardingFileResult[] = [];
 
@@ -1073,6 +1157,48 @@ export async function generateWorkspaceFiles(
       results.push({ path: join(workspacePath, relPath), created: false, skipped: true, reason: "user skipped" });
       return;
     }
+
+    // Merge mode: parse existing file, append missing sections
+    if (mergeMode === "merge") {
+      const fullPath = join(workspacePath, relPath);
+      try {
+        const existing = await readFile(fullPath, "utf-8");
+        // Parse both into sections by ## headings
+        const parseHeadings = (text: string): Set<string> => {
+          return new Set(
+            [...text.matchAll(/^##\s+(.+)$/gm)].map(m => m[1].trim().toLowerCase()),
+          );
+        };
+        const existingHeadings = parseHeadings(existing);
+
+        // Extract new sections that are missing from existing file
+        const sectionRegex = /^(##\s+[^\n]+)\n([\s\S]*?)(?=\n##\s|\n---\s*$|$)/gm;
+        const missingSections: string[] = [];
+        let match: RegExpExecArray | null;
+        while ((match = sectionRegex.exec(content)) !== null) {
+          const headingText = match[1].replace(/^##\s+/, "").trim().toLowerCase();
+          if (!existingHeadings.has(headingText)) {
+            missingSections.push(`${match[1]}\n${match[2].trim()}`);
+          }
+        }
+
+        if (missingSections.length === 0) {
+          results.push({ path: fullPath, created: false, skipped: true, reason: "all sections already present" });
+          return;
+        }
+
+        // Append missing sections
+        const appendBlock = "\n\n---\n\n" + missingSections.join("\n\n---\n\n");
+        const merged = existing.trimEnd() + appendBlock + "\n";
+        await mkdir(dirname(fullPath), { recursive: true });
+        await writeFile(fullPath, merged, "utf-8");
+        results.push({ path: fullPath, created: true, skipped: false, reason: `merged ${missingSections.length} new section(s)` });
+        return;
+      } catch {
+        // File doesn't exist or read error — fall through to normal write
+      }
+    }
+
     results.push(await safeWriteIfNew(join(workspacePath, relPath), content, force));
   }
 
@@ -1277,10 +1403,38 @@ export async function checkOnboardingStatus(
     }
   }
 
+  // Check for outdated files — existing files missing key universal sections
+  const outdated: string[] = [];
+  const REQUIRED_SOUL_SECTIONS = ["How You Listen", "Reading the Room", "Boundaries"];
+  const REQUIRED_AGENTS_SECTIONS = ["Prime Directive", "File Index"];
+
+  if (fileStatus["SOUL.md"]) {
+    try {
+      const soulContent = await readFile(join(workspacePath, "SOUL.md"), "utf-8");
+      const soulHeadings = new Set(
+        [...soulContent.matchAll(/^##\s+(.+)$/gm)].map(m => m[1].trim()),
+      );
+      const missingSoul = REQUIRED_SOUL_SECTIONS.filter(s => !soulHeadings.has(s));
+      if (missingSoul.length > 0) outdated.push("SOUL.md");
+    } catch { /* non-fatal */ }
+  }
+
+  if (fileStatus["AGENTS.md"]) {
+    try {
+      const agentsContent = await readFile(join(workspacePath, "AGENTS.md"), "utf-8");
+      const agentsHeadings = new Set(
+        [...agentsContent.matchAll(/^##\s+(.+)$/gm)].map(m => m[1].trim()),
+      );
+      const missingAgents = REQUIRED_AGENTS_SECTIONS.filter(s => !agentsHeadings.has(s));
+      if (missingAgents.length > 0) outdated.push("AGENTS.md");
+    } catch { /* non-fatal */ }
+  }
+
   return {
     workspaceExists: wsExists,
     files: fileStatus,
     missingCritical,
+    outdated: outdated.length > 0 ? outdated : undefined,
     ready: wsExists && missingCritical.length === 0,
   };
 }

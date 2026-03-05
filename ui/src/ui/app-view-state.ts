@@ -529,6 +529,7 @@ export type AppViewState = {
   handleAllySend: () => Promise<void>;
   handleAllyOpenFull: () => void;
   handleAllyAttachmentsChange: (attachments: import("./ui-types").ChatAttachment[]) => void;
+  handleAllyAction: (action: string, target?: string, method?: string, params?: Record<string, unknown>) => Promise<void>;
   // Decision card handlers
   handleDecisionApprove: (id: string) => Promise<void>;
   handleDecisionReject: (id: string) => Promise<void>;

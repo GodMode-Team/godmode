@@ -1,4 +1,5 @@
 import type { GodModeApp } from "./app";
+import { ALLY_SESSION_KEY } from "./controllers/ally";
 import { refreshChat } from "./app-chat";
 import { getEventLogSnapshot } from "./app-gateway";
 import {
@@ -191,6 +192,13 @@ export function setTab(host: SettingsHost, next: Tab) {
   const prev = host.tab;
   if (prev !== next) {
     host.tab = next;
+  }
+
+  // When leaving Chat tab while the ally session was the active full-screen
+  // session, reload ally history so the side-chat overlay stays in sync.
+  if (prev === "chat" && next !== "chat" && host.sessionKey === ALLY_SESSION_KEY) {
+    const app = host as unknown as { _loadAllyHistory?: () => Promise<void> };
+    void app._loadAllyHistory?.();
   }
 
   // Restore stashed session when leaving dashboards tab with an active dashboard
