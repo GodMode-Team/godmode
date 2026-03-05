@@ -28,6 +28,7 @@ export type PersonaProfile = {
   taskTypes: QueueItemType[];
   swarmStages?: string[];
   engine?: AgentEngine;
+  mission?: string;
   body: string;
 };
 
@@ -102,6 +103,7 @@ function parsePersonaFile(filePath: string, category: string): PersonaProfile | 
     )
       ? (meta.engine.toLowerCase() as AgentEngine)
       : undefined;
+    const mission = meta.mission || undefined;
     return {
       slug,
       category,
@@ -109,6 +111,7 @@ function parsePersonaFile(filePath: string, category: string): PersonaProfile | 
       taskTypes,
       swarmStages,
       engine,
+      mission,
       body: body.trim(),
     };
   } catch {
@@ -213,6 +216,7 @@ export function listRoster(): Array<{
   name: string;
   taskTypes: string[];
   engine?: AgentEngine;
+  mission?: string;
 }> {
   return loadRoster().map((p) => ({
     slug: p.slug,
@@ -220,5 +224,6 @@ export function listRoster(): Array<{
     name: p.name,
     taskTypes: p.taskTypes,
     engine: p.engine,
+    mission: p.mission,
   }));
 }
