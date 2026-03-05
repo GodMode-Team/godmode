@@ -4,6 +4,52 @@ This file tracks recent development changes so Atlas and other agents can quickl
 
 ---
 
+## Soul + Router + Enforcer Architecture (2026-03-05)
+
+### Soul Digest (`src/lib/awareness-snapshot.ts`)
+- `loadSoulDigest()` — extracts behavioral essence from SOUL.md (~20 lines, 30-min cache)
+- Sections: How You See, Truth, Listen, Serve, Modes, Boundaries
+- `loadRouterDigest()` — extracts Prime Directive, File Index, search rules from AGENTS.md (~25 lines, 30-min cache)
+- Expanded `loadIdentityDigest()` — now includes Family, Key Entities, Critical Constraints (~15 lines, up from ~4)
+- Total always-on context: ~130 lines/turn (within 150-line budget)
+
+### Enforcer Gates (`src/hooks/safety-gates.ts`)
+- 4 new gates on `message_sending` — zero context cost, nudge only when fired:
+  - `exhaustiveSearch` — blocks "I don't know" when 0 search tools used
+  - `selfServiceGate` — blocks asking user for searchable info when 0 tools used
+  - `persistenceGate` — blocks "I can't" when < 3 investigation tools tried
+  - `searchRetryGate` — blocks "not found" when < 3 search attempts
+- Per-turn tool usage tracking (reset on `message_received`, record on `before_tool_call`)
+- Nudge system: gate fires → flag stored → `before_prompt_build` injects nudge → ally retries
+- All gates configurable via Guardrails settings panel
+
+### Persistence Protocol (`src/hooks/agent-persona.ts`)
+- Replaced generic 30-line persona with focused Persistence Protocol + Core Behaviors
+- Proactive behavioral complement to reactive enforcer gates
+- "Try AT LEAST 5 meaningfully different approaches before telling user something can't be done"
+
+### Universal SOUL.md Template (`src/services/onboarding.ts`)
+- Universal sections for ALL users: The Ground (Logos principle), How You Listen, Reading the Room, Boundaries
+- `mergeMode: "merge"` — appends missing sections to existing files without overwriting
+- `checkOnboardingStatus()` now returns `outdated` field for files missing key sections
+
+### Hook Wiring (`index.ts`)
+- `message_received` → `resetTurnToolUsage()`
+- `before_tool_call` → `recordToolUsage()` (after existing gates)
+- `message_sending` → `checkEnforcerGates()` (before output shield)
+- `before_prompt_build` → `consumeEnforcerNudge()`
+- `before_reset` → cleanup
+
+### Other Changes in This Merge
+- Setup banner fix: only shows for users who haven't completed quickSetup
+- Auto-install integrations: `integrations.autoInstall` RPC for CLI deps (gog, gh)
+- Name persistence: quickSetup writes USER.md for awareness snapshot
+- Chat tab merge fix: no longer deduplicates tabs by display name
+- Auto-title retry: failed auto-title attempts now retry on next response
+- Auth subscription plan: `docs/PLAN-auth-subscription.md`
+
+---
+
 ## v1.6.0 Post-Merge Audit + Intelligence (2026-03-05)
 
 ### UI Cleanup (meta-architecture alignment)
