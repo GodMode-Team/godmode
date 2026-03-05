@@ -198,9 +198,9 @@ const tailscale: IntegrationProvider = {
     }
   },
   setupSteps: {
-    darwin: "1. Install: `brew install tailscale` or download from [tailscale.com](https://tailscale.com/download)\n2. Start: `sudo tailscale up`\n3. Authenticate in your browser\n4. Enter your hostname below",
-    linux: "1. Install: `curl -fsSL https://tailscale.com/install.sh | sh`\n2. Start: `sudo tailscale up`\n3. Authenticate in your browser\n4. Enter your hostname below",
-    win32: "1. Download from [tailscale.com/download](https://tailscale.com/download)\n2. Install and sign in\n3. Enter your hostname below",
+    darwin: "1. Download [Tailscale](https://tailscale.com/download) and sign in\n2. Once connected, enter your device hostname below\n3. GodMode will configure secure remote access automatically",
+    linux: "1. Tailscale is typically installed during GodMode setup\n2. If not installed, visit [tailscale.com](https://tailscale.com/download)\n3. Enter your device hostname below",
+    win32: "1. Download [Tailscale](https://tailscale.com/download) and sign in\n2. Once connected, enter your device hostname below",
   },
 };
 
@@ -252,26 +252,9 @@ const googleCalendar: IntegrationProvider = {
     return { success: false, message: "Could not fetch calendar events — check gog auth" };
   },
   setupSteps: {
-    darwin: [
-      "1. Install gog CLI: `npm install -g @nicepkg/gog`",
-      "2. Set up file-based keyring (required):",
-      "   ```",
-      "   mkdir -p ~/Library/Application\\ Support/gogcli",
-      `   echo '{"keyring_backend": "file"}' > ~/Library/Application\\ Support/gogcli/config.json`,
-      "   ```",
-      "3. Authenticate: `GOG_KEYRING_PASSWORD=godmode2026 gog auth add YOUR_EMAIL --services calendar --client godmode`",
-      "4. Enter your Google account email below",
-    ].join("\n"),
-    linux: [
-      "1. Install gog CLI: `npm install -g @nicepkg/gog`",
-      "2. Authenticate: `gog auth add YOUR_EMAIL --services calendar --client godmode`",
-      "3. Enter your Google account email below",
-    ].join("\n"),
-    win32: [
-      "1. Install gog CLI: `npm install -g @nicepkg/gog`",
-      "2. Authenticate: `gog auth add YOUR_EMAIL --services calendar --client godmode`",
-      "3. Enter your Google account email below",
-    ].join("\n"),
+    darwin: "1. Enter your Google account email below\n2. Click **Save & Test** — GodMode will install and configure everything automatically\n3. You'll get a link to authorize Google Calendar access in your browser",
+    linux: "1. Enter your Google account email below\n2. Click **Save & Test** — GodMode will install and configure everything automatically\n3. You'll get a link to authorize Google Calendar access in your browser",
+    win32: "1. Enter your Google account email below\n2. Click **Save & Test** — GodMode will install and configure everything automatically\n3. You'll get a link to authorize Google Calendar access in your browser",
   },
 };
 
@@ -354,9 +337,9 @@ const githubCli: IntegrationProvider = {
     return { success: false, message: "GitHub CLI not authenticated — run `gh auth login`" };
   },
   setupSteps: {
-    darwin: "1. Install: `brew install gh`\n2. Authenticate: `gh auth login`\n3. Follow the browser prompts",
-    linux: "1. Install: follow [cli.github.com](https://cli.github.com)\n2. Authenticate: `gh auth login`\n3. Follow the browser prompts",
-    win32: "1. Install: `winget install GitHub.cli`\n2. Authenticate: `gh auth login`\n3. Follow the browser prompts",
+    darwin: "1. Click **Save & Test** — GodMode will install GitHub CLI automatically\n2. You'll be prompted to authenticate via your browser\n3. Once connected, GodMode can create PRs and manage repos for you",
+    linux: "1. Click **Save & Test** — GodMode will install GitHub CLI automatically\n2. You'll be prompted to authenticate via your browser\n3. Once connected, GodMode can create PRs and manage repos for you",
+    win32: "1. Click **Save & Test** — GodMode will install GitHub CLI automatically\n2. You'll be prompted to authenticate via your browser\n3. Once connected, GodMode can create PRs and manage repos for you",
   },
 };
 

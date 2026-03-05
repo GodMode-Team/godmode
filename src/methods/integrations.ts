@@ -16,7 +16,10 @@ import {
 import { detectPlatform, resetPlatformCache } from "../lib/platform-detect.js";
 import { ensureVaultStructure, resetVaultCache } from "../lib/vault-paths.js";
 import { resolveVaultPath } from "../data-paths.js";
-import { existsSync, mkdirSync } from "node:fs";
+import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { exec } from "node:child_process";
+import { join } from "node:path";
+import { homedir } from "node:os";
 
 type GatewayRequestHandlers = Record<string, GatewayRequestHandler>;
 
@@ -118,6 +121,32 @@ const configure: GatewayRequestHandler = async ({ params, respond }) => {
       return;
     }
 
+    // Special handling: Google Calendar auto-install
+    if (integrationId === "google-calendar" && values.GOG_CALENDAR_ACCOUNT) {
+      try {
+        // Auto-install gog if not present
+        const { code: gogCheck } = await new Promise<{ code: number }>((resolve) => {
+          exec("command -v gog", { timeout: 5_000 }, (err) => resolve({ code: err ? 1 : 0 }));
+        });
+        if (gogCheck !== 0) {
+          await new Promise<void>((resolve) => {
+            exec("npm install -g @nicepkg/gog", { timeout: 120_000 }, () => resolve());
+          });
+        }
+        // macOS: ensure file-based keyring
+        if (process.platform === "darwin") {
+          const configDir = join(homedir(), "Library", "Application Support", "gogcli");
+          const configFile = join(configDir, "config.json");
+          if (!existsSync(configFile)) {
+            mkdirSync(configDir, { recursive: true });
+            writeFileSync(configFile, '{"keyring_backend": "file"}\n');
+          }
+        }
+      } catch {
+        // Non-fatal — user can still set up manually
+      }
+    }
+
     // Special handling: vault auto-setup
     if (integrationId === "obsidian-vault" && values.OBSIDIAN_VAULT_PATH) {
       const vaultPath = values.OBSIDIAN_VAULT_PATH.replace(/^~/, process.env.HOME ?? "");
@@ -192,6 +221,137 @@ const platformInfo: GatewayRequestHandler = async ({ respond }) => {
   respond(true, detectPlatform());
 };
 
+// ── integrations.autoInstall ───────────────────────────────────────────
+
+/** Run a shell command and return the output. */
+function runShell(cmd: string, timeoutMs = 60_000): Promise<{ code: number; stdout: string; stderr: string }> {
+  return new Promise((resolve) => {
+    exec(cmd, { timeout: timeoutMs, env: { ...process.env, HOME: homedir() }, maxBuffer: 1024 * 1024 }, (err, stdout, stderr) => {
+      const code = err && "code" in err ? (err.code as number) ?? 1 : err ? 1 : 0;
+      resolve({ code, stdout: String(stdout), stderr: String(stderr) });
+    });
+  });
+}
+
+/**
+ * Auto-install CLI dependencies for an integration.
+ * Handles gog (Google Calendar), gh (GitHub CLI), tailscale, etc.
+ * Returns step-by-step progress so the UI can show a progress indicator.
+ */
+const autoInstall: GatewayRequestHandler = async ({ params, respond }) => {
+  const { integrationId, email } = params as { integrationId: string; email?: string };
+  if (!integrationId) {
+    respond(false, undefined, { code: "MISSING_PARAM", message: "integrationId is required" });
+    return;
+  }
+
+  const steps: Array<{ step: string; status: "ok" | "error" | "skipped"; detail?: string }> = [];
+
+  try {
+    if (integrationId === "google-calendar") {
+      // Step 1: Install gog CLI
+      const { code: gogCheck } = await runShell("command -v gog", 5_000);
+      if (gogCheck !== 0) {
+        steps.push({ step: "Installing gog CLI", status: "ok" });
+        const { code, stderr } = await runShell("npm install -g @nicepkg/gog 2>&1", 120_000);
+        if (code !== 0) {
+          steps.push({ step: "Install gog", status: "error", detail: stderr.slice(-200) });
+          respond(true, { success: false, steps });
+          return;
+        }
+        steps[steps.length - 1] = { step: "gog CLI installed", status: "ok" };
+      } else {
+        steps.push({ step: "gog CLI already installed", status: "skipped" });
+      }
+
+      // Step 2: Set up file-based keyring (macOS)
+      if (process.platform === "darwin") {
+        const configDir = join(homedir(), "Library", "Application Support", "gogcli");
+        const configFile = join(configDir, "config.json");
+        if (!existsSync(configFile)) {
+          mkdirSync(configDir, { recursive: true });
+          writeFileSync(configFile, '{"keyring_backend": "file"}\n');
+          steps.push({ step: "File-based keyring configured", status: "ok" });
+        } else {
+          steps.push({ step: "Keyring already configured", status: "skipped" });
+        }
+      }
+
+      // Step 3: Authenticate with Google (needs email)
+      if (email) {
+        const client = "godmode";
+        const envPrefix = process.platform === "darwin" ? "GOG_KEYRING_PASSWORD=godmode2026 " : "";
+        const { code, stdout, stderr } = await runShell(
+          `${envPrefix}gog auth add ${email} --services calendar --client ${client} 2>&1`,
+          30_000,
+        );
+        if (code === 0) {
+          // gog auth outputs an OAuth URL — extract it
+          const urlMatch = (stdout + stderr).match(/(https:\/\/accounts\.google\.com\S+)/);
+          if (urlMatch) {
+            steps.push({
+              step: "Open this URL to authorize Google Calendar",
+              status: "ok",
+              detail: urlMatch[1],
+            });
+          } else {
+            steps.push({ step: "Google auth started", status: "ok", detail: stdout.slice(-200) });
+          }
+        } else {
+          steps.push({ step: "Google auth", status: "error", detail: (stderr || stdout).slice(-200) });
+        }
+      } else {
+        steps.push({ step: "Enter your Google email to connect Calendar", status: "skipped" });
+      }
+
+      respond(true, { success: true, steps });
+      return;
+    }
+
+    if (integrationId === "github-cli") {
+      const { code: ghCheck } = await runShell("command -v gh", 5_000);
+      if (ghCheck !== 0) {
+        // Try to install via package manager
+        if (process.platform === "darwin") {
+          const { code } = await runShell("brew install gh 2>&1", 120_000);
+          steps.push(code === 0
+            ? { step: "GitHub CLI installed via Homebrew", status: "ok" }
+            : { step: "Could not install gh — install Homebrew first", status: "error" });
+        } else {
+          // Linux: try apt, then dnf
+          const { code } = await runShell(
+            "(apt-get install -y gh 2>/dev/null || dnf install -y gh 2>/dev/null || snap install gh 2>/dev/null) 2>&1",
+            120_000,
+          );
+          steps.push(code === 0
+            ? { step: "GitHub CLI installed", status: "ok" }
+            : { step: "Could not auto-install gh — see cli.github.com", status: "error" });
+        }
+      } else {
+        steps.push({ step: "GitHub CLI already installed", status: "skipped" });
+      }
+
+      // Check if already authenticated
+      const { code: authCheck } = await runShell("gh auth status 2>/dev/null", 5_000);
+      if (authCheck === 0) {
+        steps.push({ step: "Already authenticated with GitHub", status: "skipped" });
+      } else {
+        steps.push({ step: "Run `gh auth login` to authenticate (opens browser)", status: "ok" });
+      }
+
+      respond(true, { success: true, steps });
+      return;
+    }
+
+    respond(false, undefined, { code: "UNSUPPORTED", message: `Auto-install not supported for ${integrationId}` });
+  } catch (err) {
+    respond(false, undefined, {
+      code: "INSTALL_ERROR",
+      message: err instanceof Error ? err.message : String(err),
+    });
+  }
+};
+
 // ── Export ──────────────────────────────────────────────────────────────
 
 export const integrationsHandlers: GatewayRequestHandlers = {
@@ -200,4 +360,5 @@ export const integrationsHandlers: GatewayRequestHandlers = {
   "integrations.configure": configure,
   "integrations.setupGuide": setupGuide,
   "integrations.platformInfo": platformInfo,
+  "integrations.autoInstall": autoInstall,
 };

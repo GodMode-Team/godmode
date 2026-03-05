@@ -36,6 +36,26 @@ export async function generateSnapshot(): Promise<string> {
     // Identity unavailable — non-fatal
   }
 
+  // Soul digest — behavioral essence from SOUL.md
+  try {
+    const soulDigest = await loadSoulDigest();
+    if (soulDigest) {
+      lines.push(soulDigest);
+    }
+  } catch {
+    // Soul unavailable — non-fatal
+  }
+
+  // Router digest — operational playbook from AGENTS.md
+  try {
+    const routerDigest = await loadRouterDigest();
+    if (routerDigest) {
+      lines.push(routerDigest);
+    }
+  } catch {
+    // Router unavailable — non-fatal
+  }
+
   // Schedule + meeting prep
   let calendarEvents: Array<{ title: string; startTime: number; endTime?: number; attendees?: string[] }> = [];
   try {
@@ -276,6 +296,12 @@ let identityDigestCache: string | null = null;
 let identityDigestLoadedAt = 0;
 const IDENTITY_CACHE_TTL_MS = 30 * 60 * 1000; // 30 min — identity rarely changes
 
+/** Invalidate cached identity so next snapshot picks up changes (e.g., after onboarding). */
+export function invalidateIdentityCache(): void {
+  identityDigestCache = null;
+  identityDigestLoadedAt = 0;
+}
+
 /**
  * Load a concise identity digest from USER.md (first 15 lines).
  * Gives Prosper essential context: who the user is, communication style,
@@ -315,19 +341,198 @@ async function loadIdentityDigest(): Promise<string | null> {
 
     const name = extractBullet("Name") ?? extractBullet("Full Name");
     const tz = extractBullet("Timezone") ?? extractBullet("Time Zone");
-    const style = extractSection("Communication Preferences", 3);
+    const location = extractBullet("Location");
+    const personality = extractBullet("Personality");
+    const style = extractSection("Communication Preferences", 4);
     const priorities = extractSection("Current Priorities", 4);
+    const family = extractSection("Family", 5);
+    const entities = extractSection("Key Entities", 4);
+    const constraints = extractSection("Critical Constraints", 2) ?? extractSection("HIPAA", 2);
 
     if (!name) return null;
 
     const parts: string[] = [`## Owner: ${name}`];
     if (tz) parts.push(`Timezone: ${tz}`);
+    if (location) parts.push(`Location: ${location}`);
+    if (personality) parts.push(`Type: ${personality}`);
     if (style) parts.push(`Style: ${style}`);
     if (priorities) parts.push(`Season: ${priorities}`);
+    if (family) parts.push(`People: ${family}`);
+    if (entities) parts.push(`Focus: ${entities}`);
+    if (constraints) parts.push(`Constraints: ${constraints}`);
 
     identityDigestCache = parts.join("\n");
     identityDigestLoadedAt = Date.now();
     return identityDigestCache;
+  } catch {
+    return null;
+  }
+}
+
+// ── Soul digest (cached, loaded once per gateway cycle) ──────────
+
+let soulDigestCache: string | null = null;
+let soulDigestLoadedAt = 0;
+
+/** Invalidate cached soul so next snapshot picks up changes (e.g., after onboarding). */
+export function invalidateSoulCache(): void {
+  soulDigestCache = null;
+  soulDigestLoadedAt = 0;
+}
+
+/**
+ * Load a behavioral soul digest from SOUL.md.
+ * Extracts the behavioral essence: How You See, How You Tell Truth,
+ * How You Serve, Reading the Room / Modes, Boundaries.
+ * Gives the ally its character without injecting the full SOUL.md.
+ */
+async function loadSoulDigest(): Promise<string | null> {
+  if (soulDigestCache && Date.now() - soulDigestLoadedAt < IDENTITY_CACHE_TTL_MS) {
+    return soulDigestCache;
+  }
+  try {
+    const { resolveIdentityDir } = await import("./vault-paths.js");
+    const identityResult = resolveIdentityDir();
+    if (!identityResult) return null;
+
+    const soulPath = join(identityResult.path, "SOUL.md");
+    const content = await readFile(soulPath, "utf-8");
+
+    // Extract content under a ## heading, taking first N meaningful lines
+    const extractSectionLines = (heading: string, maxLines: number): string[] => {
+      const re = new RegExp(`^##\\s*${heading}[^\\n]*\\n([\\s\\S]*?)(?=\\n##\\s|$)`, "mi");
+      const m = content.match(re);
+      if (!m) return [];
+      return m[1]
+        .split("\n")
+        .map(l => l.trim())
+        .filter(l => l.length > 0 && !l.startsWith("<!--") && !l.startsWith("---") && !l.startsWith("*Read"))
+        .slice(0, maxLines);
+    };
+
+    const parts: string[] = ["## Soul"];
+
+    // How You See People — unconditional regard
+    const see = extractSectionLines("How You See", 3);
+    if (see.length > 0) parts.push(`See people: ${see.join(" ")}`);
+
+    // How You Tell the Truth — truth with love
+    const truth = extractSectionLines("How You Tell", 3);
+    if (truth.length > 0) parts.push(`Truth: ${truth.join(" ")}`);
+
+    // How You Listen — witness vs solve
+    const listen = extractSectionLines("How You Listen", 2);
+    if (listen.length > 0) parts.push(`Listen: ${listen.join(" ")}`);
+
+    // How You Serve — the operational core (bullet points)
+    const serve = extractSectionLines("How You Serve", 8);
+    if (serve.length > 0) {
+      for (const line of serve) {
+        parts.push(line.startsWith("-") ? line : `- ${line}`);
+      }
+    }
+
+    // Their Modes / Reading the Room — match energy to state
+    const modes = extractSectionLines("Their Modes", 4);
+    if (modes.length > 0) {
+      parts.push("Modes: " + modes.join(" "));
+    } else {
+      const room = extractSectionLines("Reading the Room", 4);
+      if (room.length > 0) parts.push("Modes: " + room.join(" "));
+    }
+
+    // How You Sound — voice preferences
+    const sound = extractSectionLines("How You Sound", 3);
+    if (sound.length > 0) parts.push(`Voice: ${sound.join(" ")}`);
+
+    // Boundaries
+    const boundaries = extractSectionLines("Boundaries", 4);
+    if (boundaries.length > 0) {
+      for (const line of boundaries) {
+        parts.push(line.startsWith("-") ? line : `- ${line}`);
+      }
+    }
+
+    if (parts.length <= 1) return null; // Only header, no content
+
+    soulDigestCache = parts.join("\n");
+    soulDigestLoadedAt = Date.now();
+    return soulDigestCache;
+  } catch {
+    return null;
+  }
+}
+
+// ── Router digest (cached, loaded once per gateway cycle) ──────────
+
+let routerDigestCache: string | null = null;
+let routerDigestLoadedAt = 0;
+
+/** Invalidate cached router so next snapshot picks up changes (e.g., after onboarding). */
+export function invalidateRouterCache(): void {
+  routerDigestCache = null;
+  routerDigestLoadedAt = 0;
+}
+
+/**
+ * Load an operational routing digest from AGENTS.md.
+ * Extracts: Prime Directive, File Index, and search-related Immutable Rules.
+ * Gives the ally its map of where everything lives and what tools to use.
+ */
+async function loadRouterDigest(): Promise<string | null> {
+  if (routerDigestCache && Date.now() - routerDigestLoadedAt < IDENTITY_CACHE_TTL_MS) {
+    return routerDigestCache;
+  }
+  try {
+    const { resolveIdentityDir } = await import("./vault-paths.js");
+    const identityResult = resolveIdentityDir();
+    if (!identityResult) return null;
+
+    const agentsPath = join(identityResult.path, "AGENTS.md");
+    const content = await readFile(agentsPath, "utf-8");
+
+    const extractSectionLines = (heading: string, maxLines: number): string[] => {
+      const re = new RegExp(`^##\\s*${heading}[^\\n]*\\n([\\s\\S]*?)(?=\\n##\\s|$)`, "mi");
+      const m = content.match(re);
+      if (!m) return [];
+      return m[1]
+        .split("\n")
+        .map(l => l.trim())
+        .filter(l => l.length > 0 && !l.startsWith("<!--") && !l.startsWith("---"))
+        .slice(0, maxLines);
+    };
+
+    const parts: string[] = ["## Router"];
+
+    // Prime Directive — search-first behavior
+    const prime = extractSectionLines("Prime Directive", 4);
+    if (prime.length > 0) parts.push(...prime);
+
+    // Memory Capture Directive — write-first behavior (just the key instruction)
+    const capture = extractSectionLines("Memory Capture", 3);
+    if (capture.length > 0) parts.push(capture[0]); // Just "Write first, ask never."
+
+    // File Index — the map of where everything lives
+    const fileIndex = extractSectionLines("File Index", 18);
+    if (fileIndex.length > 0) {
+      parts.push("### File Index");
+      parts.push(...fileIndex);
+    }
+
+    // Immutable Rules — only search/dead-end/time-sacred rules
+    const rules = extractSectionLines("Immutable Rules", 20);
+    const searchKeywords = /search|dead.?end|time.?sacred|guess|memory.?first|ask.?second|never return|exhaust|grep|qmd|dead-end/i;
+    const relevantRules = rules.filter(l => searchKeywords.test(l));
+    if (relevantRules.length > 0) {
+      parts.push("### Rules");
+      parts.push(...relevantRules.slice(0, 8));
+    }
+
+    if (parts.length <= 1) return null;
+
+    routerDigestCache = parts.join("\n");
+    routerDigestLoadedAt = Date.now();
+    return routerDigestCache;
   } catch {
     return null;
   }

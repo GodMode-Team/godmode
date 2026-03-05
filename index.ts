@@ -1054,10 +1054,16 @@ h1{color:#ff6b6b}code{background:#16213e;padding:2px 8px;border-radius:4px}a{col
       api.logger.info(`[GodMode] Gateway stopped — ${cleaned} service(s) cleaned up`);
     });
 
-    // ── Safety Gates: message_received — Prompt Shield ──
+    // ── Safety Gates: message_received — Prompt Shield + Turn Tracker Reset ──
     api.on("message_received", async (event, ctx) => {
       const sessionKey = extractSessionKey(ctx);
       const content = event.content ?? "";
+
+      // Reset per-turn tool usage tracker — fresh for each new user message
+      try {
+        const { resetTurnToolUsage } = await import("./src/hooks/safety-gates.js");
+        resetTurnToolUsage(sessionKey);
+      } catch { /* non-fatal */ }
 
       if (content) {
         const result = await scanForInjection(sessionKey, content);
@@ -1193,6 +1199,13 @@ h1{color:#ff6b6b}code{background:#16213e;padding:2px 8px;border-radius:4px}a{col
       const contextNudge = consumeContextPressureNudge(sessionKey);
       if (contextNudge) prependChunks.push(contextNudge);
 
+      // Enforcer gate nudge (if a search-enforcement gate fired last turn)
+      try {
+        const { consumeEnforcerNudge } = await import("./src/hooks/safety-gates.js");
+        const enforcerNudge = consumeEnforcerNudge(sessionKey);
+        if (enforcerNudge) prependChunks.push(enforcerNudge);
+      } catch { /* non-fatal */ }
+
       // Queue review count (lean — just a count, not full output injection)
       try {
         const { readQueueState } = await import("./src/lib/queue-state.js");
@@ -1234,6 +1247,13 @@ h1{color:#ff6b6b}code{background:#16213e;padding:2px 8px;border-radius:4px}a{col
 
       // Reset context pressure tracking for this session
       resetContextPressure(sessionKey);
+
+      // Reset enforcer gate flags and tool usage for this session
+      try {
+        const { resetEnforcerFlags, resetSessionToolUsage } = await import("./src/hooks/safety-gates.js");
+        resetEnforcerFlags(sessionKey);
+        resetSessionToolUsage(sessionKey);
+      } catch { /* non-fatal */ }
 
       // Team memory routing — write session memory to team workspace on reset
       try {
@@ -1284,12 +1304,31 @@ h1{color:#ff6b6b}code{background:#16213e;padding:2px 8px;border-radius:4px}a{col
         return { block: true, blockReason: configBlock };
       }
 
+      // Record tool usage for enforcer gates (only tools that pass all gates)
+      try {
+        const { recordToolUsage } = await import("./src/hooks/safety-gates.js");
+        recordToolUsage(sessionKey, name);
+      } catch { /* non-fatal */ }
+
     });
 
-    // ── Safety Gates: message_sending — output shield ───
+    // ── Safety Gates: message_sending — enforcer gates + output shield ───
     api.on("message_sending", async (event, ctx) => {
       const sessionKey = extractSessionKey(ctx);
       const content = event.content ?? "";
+
+      // Enforcer gates — verify tool usage before allowing lazy/surrender responses
+      try {
+        const { checkEnforcerGates } = await import("./src/hooks/safety-gates.js");
+        const enforcerResult = await checkEnforcerGates(sessionKey, content);
+        if (enforcerResult?.cancel) {
+          api.logger.warn(`[GodMode][SafetyGate] enforcer gate fired: ${enforcerResult.gate}`);
+          return { cancel: true };
+        }
+      } catch (err) {
+        api.logger.warn(`[GodMode] enforcer gate error: ${String(err)}`);
+      }
+
       // Output Shield — block messages that leak system prompts, keys, or config
       if (await checkOutputLeak(sessionKey, content)) {
         api.logger.warn(`[GodMode][SafetyGate] output shield fired — leak blocked`);
@@ -1301,7 +1340,13 @@ h1{color:#ff6b6b}code{background:#16213e;padding:2px 8px;border-radius:4px}a{col
     api.on("llm_output", async (event, ctx) => {
       const sessionKey = extractSessionKey(ctx);
       try {
-        await trackContextPressure(sessionKey, event.usage);
+        const tier = await trackContextPressure(sessionKey, event.usage);
+        // Auto-compact: when critical, tell the UI to trigger compaction
+        // instead of hoping the LLM obeys the text nudge
+        if (tier === "critical" && sessionKey) {
+          safeBroadcast(api, "session:auto-compact", { sessionKey });
+          api.logger.info(`[GodMode] auto-compact broadcast for session: ${sessionKey}`);
+        }
       } catch (err) {
         api.logger.warn(`[GodMode] context pressure tracking error: ${String(err)}`);
       }

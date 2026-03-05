@@ -59,6 +59,8 @@ export type AllyChatProps = {
   onOpenFullChat: () => void;
   /** Update attachments */
   onAttachmentsChange: (attachments: ChatAttachment[]) => void;
+  /** Handle notification action button clicks */
+  onAction?: (action: string, target?: string, method?: string, params?: Record<string, unknown>) => void;
 };
 
 // ── Helpers ────────────────────────────────────────────────────────
@@ -149,7 +151,7 @@ function renderMessageContent(msg: AllyChatMessage) {
   return html`<span class="ally-msg__content">${msg.content}</span>`;
 }
 
-function renderActions(msg: AllyChatMessage) {
+function renderActions(msg: AllyChatMessage, onAction?: AllyChatProps["onAction"]) {
   if (!msg.actions || msg.actions.length === 0) return nothing;
   return html`
     <div class="ally-msg__actions">
@@ -158,9 +160,7 @@ function renderActions(msg: AllyChatMessage) {
           <button
             type="button"
             class="ally-msg__action-btn"
-            data-action=${a.action}
-            data-target=${a.target ?? ""}
-            data-method=${a.method ?? ""}
+            @click=${() => onAction?.(a.action, a.target, a.method, a.params)}
           >
             ${a.label}
           </button>
@@ -170,12 +170,12 @@ function renderActions(msg: AllyChatMessage) {
   `;
 }
 
-function renderMessage(msg: AllyChatMessage, index: number) {
+function renderMessage(msg: AllyChatMessage, index: number, onAction?: AllyChatProps["onAction"]) {
   if (msg.isNotification) {
     return html`
       <div class="ally-msg ally-msg--notification" data-idx=${index}>
         ${renderMessageContent(msg)}
-        ${renderActions(msg)}
+        ${renderActions(msg, onAction)}
         ${msg.timestamp ? html`<div class="ally-msg__time">${formatTimestamp(msg.timestamp)}</div>` : nothing}
       </div>
     `;
@@ -204,11 +204,17 @@ function renderStatus(props: AllyChatProps) {
   if (!props.connected) {
     return html`<div class="ally-panel__status ally-panel__status--disconnected">Disconnected</div>`;
   }
-  // Don't show "Working..." when stream content is actively rendering
-  if ((props.isWorking || props.sending) && !props.stream) {
-    return html`<div class="ally-panel__status ally-panel__status--working">Working...</div>`;
-  }
   return nothing;
+}
+
+function renderReadingIndicator() {
+  return html`
+    <div class="ally-msg ally-msg--assistant ally-msg--reading-indicator">
+      <span class="chat-reading-indicator__dots">
+        <span></span><span></span><span></span>
+      </span>
+    </div>
+  `;
 }
 
 function handlePaste(e: ClipboardEvent, props: AllyChatProps) {
@@ -364,8 +370,9 @@ function renderPanelContent(props: AllyChatProps): TemplateResult {
             Start a conversation with ${props.allyName}
           </div>`
         : nothing}
-      ${props.messages.map((msg, i) => renderMessage(msg, i))}
+      ${props.messages.map((msg, i) => renderMessage(msg, i, props.onAction))}
       ${props.stream ? renderStream(props.stream) : nothing}
+      ${(props.isWorking || props.sending) && !props.stream ? renderReadingIndicator() : nothing}
       <button
         type="button"
         class="ally-jump-bottom"

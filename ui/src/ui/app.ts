@@ -1073,11 +1073,29 @@ export class GodModeApp extends LitElement {
 
   // ── Ally Side-Chat Handlers ──────────────────────────────────────────
 
+  async handleAllyAction(action: string, target?: string, method?: string, params?: Record<string, unknown>) {
+    if (action === "navigate" && target) {
+      this.setTab(target as import("./navigation.js").Tab);
+    } else if (action === "rpc" && method && this.client) {
+      try {
+        await this.client.request(method, params ?? {});
+        this.showToast("Done", "success", 2000);
+      } catch (e) {
+        console.error("[Ally] Action RPC failed:", e);
+        this.showToast("Action failed", "error");
+      }
+    }
+  }
+
   handleAllyToggle() {
     this.allyPanelOpen = !this.allyPanelOpen;
     if (this.allyPanelOpen) {
       this.allyUnread = 0;
-      this._loadAllyHistory().then(() => this._scrollAllyToBottom());
+      this._loadAllyHistory().then(() => {
+        // Double-RAF ensures the panel DOM is fully rendered before scrolling
+        this._scrollAllyToBottom();
+        requestAnimationFrame(() => this._scrollAllyToBottom());
+      });
     }
   }
 
@@ -1139,18 +1157,35 @@ export class GodModeApp extends LitElement {
         idempotencyKey,
         attachments: imageAttachments,
       });
-      // Show "Working..." between RPC success and first streaming delta
+      // Show reading indicator between RPC success and first streaming delta.
+      // Gateway error/aborted events clear allyWorking if the turn fails.
       this.allyWorking = true;
-      // Timeout: if no stream after 45s, show hint that the session may be busy
-      setTimeout(() => {
-        if (this.allyWorking && !this.allyStream) {
-          this.allyMessages = [
-            ...this.allyMessages,
-            { role: "assistant" as const, content: "*Session is busy — your message is queued and will be answered shortly.*", timestamp: Date.now() },
-          ];
-          this.allyWorking = false;
+
+      // Fallback poll: if the response arrives via an external channel (iMessage,
+      // Telegram) the gateway may not stream delta/final events to the web UI.
+      // Poll the session history to detect when the response lands.
+      const msgCountAtSend = this.allyMessages.length;
+      const pollTimer = setInterval(async () => {
+        // Stop polling if working state was already cleared by a gateway event
+        if (!this.allyWorking) {
+          clearInterval(pollTimer);
+          return;
         }
-      }, 45_000);
+        try {
+          await this._loadAllyHistory();
+          // If history now has more messages, the response arrived
+          if (this.allyMessages.length > msgCountAtSend) {
+            this.allyWorking = false;
+            this.allyStream = null;
+            clearInterval(pollTimer);
+            this._scrollAllyToBottom();
+          }
+        } catch {
+          // Ignore — will retry on next tick
+        }
+      }, 5_000);
+      // Safety cap: stop polling after 2 minutes regardless
+      setTimeout(() => clearInterval(pollTimer), 120_000);
     } catch (e) {
       const errStr = e instanceof Error ? e.message : String(e);
       console.error("[Ally] Failed to send ally message:", errStr);
@@ -1201,7 +1236,7 @@ export class GodModeApp extends LitElement {
     });
   }
 
-  private async _loadAllyHistory() {
+  async _loadAllyHistory() {
     try {
       const res = await this.client?.request<{
         messages: Array<{ role: string; content: unknown; timestamp?: number }>;
@@ -1229,6 +1264,17 @@ export class GodModeApp extends LitElement {
             };
           })
           .filter((m): m is NonNullable<typeof m> => m !== null);
+
+        // Deduplicate consecutive messages with identical role + content.
+        // Server history can contain duplicates when the response is delivered
+        // to both the web UI and an external channel (iMessage, Telegram).
+        const deduped: typeof this.allyMessages = [];
+        for (const m of this.allyMessages) {
+          const prev = deduped[deduped.length - 1];
+          if (prev && prev.role === m.role && prev.content === m.content) continue;
+          deduped.push(m);
+        }
+        this.allyMessages = deduped;
       }
     } catch {
       // History load failed — start fresh

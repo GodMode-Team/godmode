@@ -279,12 +279,7 @@
   font-size: 10px;
   color: var(--muted, #71717a);
   margin-top: 2px;
-  opacity: 0;
-  transition: opacity 150ms;
-}
-
-.ally-msg:hover .ally-msg__time {
-  opacity: 0.7;
+  opacity: 0.6;
 }
 
 .ally-msg--user .ally-msg__time {
@@ -408,10 +403,10 @@
   flex-shrink: 0;
 }
 
-.ally-panel__status--working {
-  color: var(--accent, #ff6b6b);
-  background: var(--accent-subtle, rgba(255, 107, 107, 0.18));
-  animation: pulse-subtle 1.5s var(--ease-in-out) infinite;
+/* ── Reading Indicator (reuses .chat-reading-indicator__dots from components.css) ── */
+.ally-msg--reading-indicator {
+  padding: 8px 12px;
+  width: fit-content;
 }
 
 .ally-panel__status--disconnected {

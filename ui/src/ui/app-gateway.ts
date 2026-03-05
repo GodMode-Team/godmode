@@ -338,9 +338,23 @@ async function checkWorkspaceSetup(host: GatewayHost) {
   if (!host.client) {
     return;
   }
+  const app = host as unknown as { workspaceNeedsSetup?: boolean; setupQuickDone?: boolean };
   try {
+    // If the user already completed quick setup, never show the banner
+    if (app.setupQuickDone) {
+      app.workspaceNeedsSetup = false;
+      return;
+    }
+    // Also check onboarding state directly — setupQuickDone may not be set yet
+    try {
+      const ob = await host.client.request<{ identity?: { name?: string } }>("onboarding.status", {});
+      if (ob?.identity?.name) {
+        app.workspaceNeedsSetup = false;
+        return;
+      }
+    } catch { /* onboarding methods may not exist */ }
+
     const res = await host.client.request("projects.list", {});
-    const app = host as unknown as { workspaceNeedsSetup?: boolean };
     app.workspaceNeedsSetup = !res?.projects || res.projects.length === 0;
   } catch {
     // Not critical — don't block on this
@@ -428,8 +442,14 @@ function updateSessionTimestamp(host: GatewayHost, sessionKey: string) {
   };
 }
 
-// Track sessions that already had auto-title attempted to avoid repeated calls
-const autoTitleAttempted = new Set<string>();
+// Track sessions that already had auto-title SUCCESSFULLY applied to avoid repeated calls.
+// Failed attempts are NOT tracked — they can retry on the next response.
+const autoTitleApplied = new Set<string>();
+
+/** Clear auto-title state on reconnect so untitled sessions get another chance. */
+export function resetAutoTitleState() {
+  autoTitleApplied.clear();
+}
 
 /**
  * Derive a short, meaningful title from the first user message in a session.
@@ -539,18 +559,21 @@ function scoreTitleFromText(text: string): string | null {
 
   if (sentences.length === 0) return null;
 
-  // Score each sentence for "topic quality" — higher = better title candidate
-  const GREETING_RE = /^(hi|hey|hello|thanks|thank\s+you|thx|ok|okay|sure|alright|great)\b/i;
-  const IMPERATIVE_RE = /^(fix|add|create|update|change|build|implement|remove|delete|refactor|make|set\s+up|configure|enable|disable|show|hide|move|rename|convert|replace|write|edit|debug|test|deploy|install|run|check|review|optimize|improve|clean|reset|open|close|connect|disconnect|sync|upload|download|merge|split|sort|filter|search|format|generate|export|import|migrate|monitor|schedule|cancel|approve|reject|assign|unassign)\b/i;
-  const TECH_RE = /\b(function|component|file|page|button|API|error|bug|feature|config|style|layout|route|test|database|server|client|UI|CSS|HTML|TypeScript|view|sidebar|modal|tab|form|input|output|session|message|chat|title|drive|upload|deploy|build)\b/i;
+  // Score each sentence for "topic quality" — higher = better title candidate.
+  // Balanced for both technical and personal/life topics.
+  const GREETING_RE = /^(hi|hey|hello|thanks|thank\s+you|thx|ok|okay|sure|alright|great|good\s+(morning|afternoon|evening))\b/i;
+  const IMPERATIVE_RE = /^(fix|add|create|update|change|build|implement|remove|delete|refactor|make|set\s+up|configure|enable|disable|show|hide|move|rename|convert|replace|write|edit|debug|test|deploy|install|run|check|review|optimize|improve|clean|reset|open|close|connect|disconnect|sync|upload|download|merge|split|sort|filter|search|format|generate|export|import|migrate|monitor|schedule|cancel|approve|reject|assign|unassign|plan|draft|prep|book|find|send|call|email|reach\s+out|follow\s+up|look\s+into|figure\s+out|research|compare|analyze|summarize)\b/i;
+  const TOPIC_RE = /\b(function|component|file|page|button|API|error|bug|feature|config|style|layout|route|test|database|server|client|UI|CSS|HTML|TypeScript|view|sidebar|modal|tab|form|input|output|session|message|chat|title|drive|upload|deploy|build|meeting|email|invoice|proposal|contract|lead|customer|prospect|client|website|landing|content|strategy|schedule|flight|trip|travel|appointment|haircut|doctor|dentist|gym|workout|diet|recipe|budget|expense|report|presentation|pitch|pricing|competitor|marketing|sales|hiring|onboarding|feedback|review|goal|milestone|deadline|launch|release)\b/i;
 
   function scoreSentence(s: string): number {
     let score = 0;
     if (s.includes("?")) score += 3;
     if (IMPERATIVE_RE.test(s)) score += 5;
-    if (TECH_RE.test(s)) score += 2;
-    if (/^(I |you |we |my |it'?s |this is |that |there )/i.test(s)) score -= 1;
+    if (TOPIC_RE.test(s)) score += 2;
     if (GREETING_RE.test(s)) score -= 5;
+    // Mild penalty for personal pronoun starts — but don't nuke them,
+    // they often carry the actual topic ("I need to prep for my flight")
+    if (/^(it'?s |this is |that |there )/i.test(s)) score -= 1;
     if (s.length < 15) score -= 1;
     if (s.length >= 15 && s.length <= 60) score += 1;
     return score;
@@ -561,9 +584,9 @@ function scoreTitleFromText(text: string): string | null {
 
   let title = scored[0].text;
 
-  // Strip common filler prefixes to get to the actual request
+  // Strip common filler prefixes to get to the actual topic
   title = title
-    .replace(/^(can you|could you|would you|will you|I need you to|I want you to|I'd like you to|help me to?|go ahead and)\s+/i, "")
+    .replace(/^(can you|could you|would you|will you|I need you to|I want you to|I'd like you to|I need to|I want to|I'd like to|help me to?|go ahead and|let'?s|so |okay so )\s+/i, "")
     .replace(/^(please|pls)\s+/i, "")
     .trim();
 
@@ -573,7 +596,7 @@ function scoreTitleFromText(text: string): string | null {
   }
 
   // Strip trailing punctuation for cleaner title
-  title = title.replace(/[.!]+$/, "").trim();
+  title = title.replace(/[.!?]+$/, "").trim();
 
   // Truncate to 50 chars at word boundary
   if (title.length > 50) {
@@ -600,21 +623,27 @@ async function maybeAutoTitleSession(host: GatewayHost, sessionKey: string) {
     return;
   }
 
-  // Don't retry if we already attempted for this session
-  if (autoTitleAttempted.has(sessionKey)) {
+  // Skip if already successfully titled
+  if (autoTitleApplied.has(sessionKey)) {
     return;
   }
 
-  // Check if session already has a label or displayName
+  // Check if session already has a label or displayName (manually set or previously titled)
   const session = host.sessionsResult?.sessions?.find((s) => s.key === sessionKey);
   if (session?.label?.trim() || session?.displayName?.trim()) {
+    // Mark as applied so we don't re-check every turn
+    autoTitleApplied.add(sessionKey);
     return;
   }
 
-  autoTitleAttempted.add(sessionKey);
+  // Also check the auto-title cache (title may exist but not yet in sessionsResult)
+  if (autoTitleCache.has(sessionKey)) {
+    autoTitleApplied.add(sessionKey);
+    return;
+  }
 
   if (!host.client || !host.connected) {
-    console.warn("[auto-title] skipped: not connected");
+    // Don't mark as applied — will retry on next response
     return;
   }
 
@@ -624,7 +653,7 @@ async function maybeAutoTitleSession(host: GatewayHost, sessionKey: string) {
     const title = deriveSessionTitle(app.chatMessages ?? []);
 
     if (!title) {
-      console.warn("[auto-title] no user message found to derive title");
+      // Don't mark as applied — will retry on next response when more messages exist
       return;
     }
 
@@ -634,8 +663,12 @@ async function maybeAutoTitleSession(host: GatewayHost, sessionKey: string) {
 
     if (!result.ok) {
       console.error("[auto-title] patch failed:", result.error);
+      // Don't mark as applied — will retry on next response
       return;
     }
+
+    // SUCCESS — mark as applied so we don't retry
+    autoTitleApplied.add(sessionKey);
 
     // Store in persistent cache so it survives sessionsResult overwrites
     autoTitleCache.set(sessionKey, title);
@@ -652,6 +685,7 @@ async function maybeAutoTitleSession(host: GatewayHost, sessionKey: string) {
     (host as unknown as { requestUpdate?: () => void }).requestUpdate?.();
   } catch (e) {
     console.error("[auto-title] RPC call failed:", e);
+    // Don't mark as applied — will retry on next response
   }
 }
 
@@ -661,6 +695,9 @@ export function connectGateway(host: GatewayHost) {
   host.connected = false;
   host.execApprovalQueue = [];
   host.execApprovalError = null;
+
+  // Reset auto-title state so untitled sessions get another chance after reconnect
+  resetAutoTitleState();
 
   // Reset all loading states to ensure fresh start on new connection
   // This prevents stuck loading spinners after reconnects
@@ -994,27 +1031,24 @@ function handleGatewayEventUnsafe(host: GatewayHost, evt: GatewayEventFrame) {
           allyHost.requestUpdate?.();
         }
       } else if (payload.state === "final") {
-        // Final message: append to ally messages AND sync with full screen
-        // Always update allyMessages so they stay in sync with the Chat tab
-        const finalContent = allyHost.allyStream ?? extractTextFromMessage(payload.message) ?? "";
-        if (finalContent) {
-          allyHost.allyMessages = [
-            ...(allyHost.allyMessages ?? []),
-            { role: "assistant", content: finalContent, timestamp: Date.now() },
-          ];
-        }
+        // Reload full history from the server so the overlay stays in sync.
+        // This captures user messages from external channels (iMessage, Telegram)
+        // that don't arrive as individual gateway events.
         allyHost.allyStream = null;
         allyHost.allyWorking = false;
         if (!allyHost.allyPanelOpen && host.tab !== "chat") {
           allyHost.allyUnread = (allyHost.allyUnread ?? 0) + 1;
         }
-        if (!isAllyFullScreen) {
+        const app = host as unknown as {
+          _loadAllyHistory: () => Promise<void>;
+          _scrollAllyToBottom: () => void;
+        };
+        void app._loadAllyHistory().then(() => {
+          if (allyHost.allyPanelOpen) {
+            app._scrollAllyToBottom();
+          }
           allyHost.requestUpdate?.();
-        }
-        // Scroll to bottom after render completes for newly arrived message
-        if (allyHost.allyPanelOpen) {
-          (host as unknown as { _scrollAllyToBottom(): void })._scrollAllyToBottom();
-        }
+        });
       } else if (payload.state === "error" || payload.state === "aborted") {
         // Show error to user instead of silently swallowing it
         const errText = extractTextFromMessage(payload.message);
@@ -1346,6 +1380,32 @@ function handleGatewayEventUnsafe(host: GatewayHost, evt: GatewayEventFrame) {
         allyHost.allyUnread = (allyHost.allyUnread ?? 0) + 1;
       }
       allyHost.requestUpdate?.();
+    }
+    return;
+  }
+
+  // Auto-compact: server detected critical context pressure on a session
+  if (evt.event === "session:auto-compact") {
+    const payload = evt.payload as { sessionKey?: string } | undefined;
+    if (payload?.sessionKey) {
+      const app = host as unknown as {
+        sessionKey?: string;
+        compactionStatus?: { active: boolean } | null;
+        connected?: boolean;
+        handleCompactChat?: () => Promise<void>;
+        showToast?: (msg: string, type: string, duration?: number) => void;
+        client?: { request: (method: string, params: Record<string, unknown>) => Promise<unknown> };
+      };
+      // Only auto-compact if the session matches the current active session
+      // and compaction isn't already in progress
+      if (
+        payload.sessionKey === app.sessionKey &&
+        !app.compactionStatus?.active &&
+        app.connected
+      ) {
+        app.showToast?.("Context near limit — auto-compacting...", "info", 3000);
+        void app.handleCompactChat?.();
+      }
     }
     return;
   }

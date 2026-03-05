@@ -450,11 +450,13 @@ a:hover { color: #ef4444; }
 
 <script>
 var userCode = '';
+var redirectTo = '';
 
-// Check URL for ?code= param
+// Check URL for ?code= and ?redirect= params
 (function init() {
   var params = new URLSearchParams(window.location.search);
   var code = params.get('code');
+  redirectTo = params.get('redirect') || '';
 
   if (code) {
     userCode = code.trim();
@@ -463,10 +465,10 @@ var userCode = '';
     document.getElementById('codeDisplayValue').textContent = userCode;
   }
 
-  // If already logged in and no device code, redirect to account
+  // If already logged in and no device code, redirect
   var token = localStorage.getItem('godmode_access_token');
   if (token && !userCode) {
-    window.location.href = '/account';
+    window.location.href = redirectTo || '/account';
   }
 })();
 
@@ -534,8 +536,8 @@ function handleSuccess(data) {
     document.getElementById('successMessage').textContent =
       'Your device has been linked. You can close this window and return to your terminal.';
   } else {
-    // Direct browser login: redirect to account
-    window.location.href = '/account';
+    // Direct browser login: redirect to account or original destination
+    window.location.href = redirectTo || '/account';
   }
 }
 

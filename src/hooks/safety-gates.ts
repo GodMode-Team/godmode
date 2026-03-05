@@ -746,11 +746,11 @@ const WARN_COOLDOWN_MS = 90 * 1000;
 export async function trackContextPressure(
   sessionKey: string | undefined,
   usage: { input?: number; output?: number; total?: number } | undefined,
-): Promise<void> {
-  if (!usage?.input) return;
+): Promise<"ok" | "warning" | "critical"> {
+  if (!usage?.input) return "ok";
 
   const config = await readGuardrailsStateCached();
-  if (!config.gates.contextPressure?.enabled) return;
+  if (!config.gates.contextPressure?.enabled) return "ok";
 
   const warningPct =
     config.gates.contextPressure?.thresholds?.warningPercent ??
@@ -793,6 +793,8 @@ export async function trackContextPressure(
     nudgeQueued: shouldNudge || (existing?.nudgeQueued ?? false),
     lastWarnedAt: shouldNudge ? now : (existing?.lastWarnedAt ?? 0),
   });
+
+  return tier;
 }
 
 /**
@@ -844,4 +846,277 @@ export function consumeContextPressureNudge(
 export function resetContextPressure(sessionKey: string | undefined): void {
   const key = sessionKey ?? "__default__";
   contextPressure.delete(key);
+}
+
+// ── Per-Turn Tool Usage Tracker ─────────────────────────────────
+//
+// Tracks which tools the agent used during the current turn.
+// Used by enforcer gates to verify the agent searched/investigated
+// before giving up or asking the user.
+//
+// Flow: message_received resets tracker → before_tool_call records usage
+//       → message_sending checks usage against gates → blocks if lazy.
+
+const SEARCH_TOOLS = new Set([
+  "memory_search", "qmd_search", "qmd_vsearch",
+  "secondbrain.search", "search", "web_search",
+]);
+
+const INVESTIGATION_TOOLS = new Set([
+  "read", "read_file", "glob", "grep",
+  ...SEARCH_TOOLS,
+]);
+
+function isSearchTool(toolName: string): boolean {
+  const lower = toolName.toLowerCase();
+  if (SEARCH_TOOLS.has(lower)) return true;
+  return lower.includes("search") || lower.includes("memory");
+}
+
+function isInvestigationTool(toolName: string): boolean {
+  const lower = toolName.toLowerCase();
+  if (INVESTIGATION_TOOLS.has(lower)) return true;
+  return isSearchTool(lower);
+}
+
+type TurnToolUsage = {
+  searchCount: number;
+  investigationCount: number;
+  tools: Set<string>;
+};
+
+const turnToolUsage = new Map<string, TurnToolUsage>();
+
+/**
+ * Record a tool call for the current turn.
+ * Called from before_tool_call in index.ts (after existing gates, so blocked tools don't count).
+ */
+export function recordToolUsage(sessionKey: string | undefined, toolName: string): void {
+  const key = sessionKey ?? "__default__";
+  let usage = turnToolUsage.get(key);
+  if (!usage) {
+    usage = { searchCount: 0, investigationCount: 0, tools: new Set() };
+    turnToolUsage.set(key, usage);
+  }
+  usage.tools.add(toolName.toLowerCase());
+  if (isSearchTool(toolName)) usage.searchCount++;
+  if (isInvestigationTool(toolName)) usage.investigationCount++;
+}
+
+/**
+ * Reset tool usage at the start of each turn.
+ * Called from message_received in index.ts.
+ */
+export function resetTurnToolUsage(sessionKey: string | undefined): void {
+  const key = sessionKey ?? "__default__";
+  turnToolUsage.set(key, { searchCount: 0, investigationCount: 0, tools: new Set() });
+}
+
+/**
+ * Get current turn's tool usage stats.
+ */
+function getTurnToolUsage(sessionKey: string | undefined): TurnToolUsage {
+  const key = sessionKey ?? "__default__";
+  return turnToolUsage.get(key) ?? { searchCount: 0, investigationCount: 0, tools: new Set() };
+}
+
+/**
+ * Full session reset — called from before_reset.
+ */
+export function resetSessionToolUsage(sessionKey: string | undefined): void {
+  const key = sessionKey ?? "__default__";
+  turnToolUsage.delete(key);
+}
+
+// ── Enforcer Gates (message_sending) ────────────────────────────
+//
+// Four gates that verify the agent used its tools before giving up,
+// asking the user, surrendering, or declaring "not found."
+//
+// Originally in v1.0, removed during lean audit, re-added with
+// per-turn tool tracking. Zero context cost per turn — only inject
+// a nudge when a gate fires.
+//
+// Pattern: message_sending → detect bad pattern + check tool usage
+//          → cancel + set flag in Map
+//          before_prompt_build → consume flag → inject nudge
+//          before_reset → clear all flags
+
+type EnforcerNudge = {
+  gate: string;
+  message: string;
+};
+
+const enforcerNudgeFlags = new Map<string, EnforcerNudge>();
+
+/**
+ * Consume an enforcer nudge (if any) for injection via before_prompt_build.
+ * Clears the flag after consumption.
+ */
+export function consumeEnforcerNudge(sessionKey: string | undefined): string | undefined {
+  const key = sessionKey ?? "__default__";
+  const nudge = enforcerNudgeFlags.get(key);
+  if (!nudge) return undefined;
+  enforcerNudgeFlags.delete(key);
+  return `[ENFORCEMENT: ${nudge.gate}]\n\n${nudge.message}`;
+}
+
+/** Reset all enforcer flags for a session. */
+export function resetEnforcerFlags(sessionKey: string | undefined): void {
+  const key = sessionKey ?? "__default__";
+  enforcerNudgeFlags.delete(key);
+}
+
+// ── Gate patterns ────────────────────────────────────────────────
+
+// Gate 1: Exhaustive Search — blocks "I don't know" when no search tools used
+const DONT_KNOW_PATTERNS: RegExp[] = [
+  /i don'?t (?:know|have (?:access|information|data|context|details|that))/i,
+  /i couldn'?t (?:find|locate|determine|access)/i,
+  /i'?m not sure (?:about|what|where|how|if|of)/i,
+  /i don'?t have (?:access|information|that info|enough|details|data|specifics)/i,
+  /i (?:wasn't|was not) able to (?:find|locate|determine|access)/i,
+  /(?:no|without) (?:information|data|context|details) (?:about|on|regarding|for)/i,
+];
+
+// Gate 2: Self-Service — blocks "can you tell me" when agent has tools
+const DELEGATION_PATTERNS: RegExp[] = [
+  /(?:can|could|would) you (?:tell|share|provide|give|send|show|check|confirm|clarify|remind)/i,
+  /(?:do|did) you (?:know|have|remember) (?:your|the|what|when|where)/i,
+  /(?:could you|would you) (?:check|verify|confirm|look up|pull up)/i,
+  /(?:let me know|fill me in|bring me up to speed) (?:about|on|what|regarding)/i,
+  /what (?:is|are|was|were) your (?:flight|travel|schedule|meeting|appointment|address|booking)/i,
+];
+
+// Gate 3: Persistence — blocks "I can't" when agent hasn't tried enough
+const SURRENDER_PATTERNS: RegExp[] = [
+  /i (?:can'?t|cannot|am unable to|am not able to) (?:do|find|access|determine|help with)/i,
+  /(?:unfortunately|regrettably),? i (?:can'?t|cannot|don'?t|am unable)/i,
+  /this (?:isn'?t|is not) (?:possible|something i|within my)/i,
+  /i don'?t have the (?:ability|capability|capacity|tools)/i,
+  /(?:beyond|outside) (?:my|the) (?:capabilities|scope|ability)/i,
+];
+
+// Gate 4: Search Retry — blocks "not found" when too few searches were attempted
+const NOT_FOUND_PATTERNS: RegExp[] = [
+  /i searched (?:but|and) (?:couldn'?t|could not|didn'?t|did not) (?:find|locate)/i,
+  /no results (?:found|returned|came|for)/i,
+  /(?:nothing|no matches) (?:came up|found|returned|available)/i,
+  /my search (?:didn'?t|did not|returned no)/i,
+  /(?:couldn'?t|could not) (?:locate|find) (?:any|the|that)/i,
+];
+
+function matchesAny(content: string, patterns: RegExp[]): boolean {
+  return patterns.some(p => p.test(content));
+}
+
+/**
+ * Run all four enforcer gates on an outbound message.
+ * Returns { cancel: true, gate } if a gate fires, undefined otherwise.
+ * Called from message_sending in index.ts.
+ */
+export async function checkEnforcerGates(
+  sessionKey: string | undefined,
+  content: string,
+): Promise<{ cancel: boolean; gate?: string } | undefined> {
+  // Skip very short messages (greetings, confirmations)
+  if (content.length < 30) return undefined;
+
+  const config = await readGuardrailsStateCached();
+  const key = sessionKey ?? "__default__";
+  const usage = getTurnToolUsage(sessionKey);
+
+  // Gate 1: Exhaustive Search — claimed ignorance with zero searches
+  if (config.gates.exhaustiveSearch?.enabled) {
+    if (matchesAny(content, DONT_KNOW_PATTERNS) && usage.searchCount === 0) {
+      enforcerNudgeFlags.set(key, {
+        gate: "Exhaustive Search",
+        message: [
+          "Your response was blocked because you claimed ignorance without searching memory.",
+          "",
+          "You have access to: memory_search, qmd search, qmd vsearch, secondBrain.search.",
+          "Your memory bank has files on people, companies, projects, travel, preferences, and more.",
+          "Check your File Index for where things live. Search FIRST, then respond.",
+          "If truly not found after 3+ different searches, say what you tried.",
+        ].join("\n"),
+      });
+      void logGateActivity("exhaustiveSearch", "fired", "Blocked: claimed ignorance with 0 searches", sessionKey);
+      return { cancel: true, gate: "exhaustiveSearch" };
+    }
+  }
+
+  // Gate 2: Self-Service — asking the user for searchable facts
+  if (config.gates.selfServiceGate?.enabled) {
+    if (matchesAny(content, DELEGATION_PATTERNS) && usage.searchCount === 0 && usage.investigationCount === 0) {
+      // Only fire if the message contains a question mark (actual delegation, not a statement)
+      if (content.includes("?")) {
+        enforcerNudgeFlags.set(key, {
+          gate: "Self-Service Gate",
+          message: [
+            "Your response was blocked because you're asking the user for information you can look up.",
+            "",
+            "You have search tools (memory_search, qmd search) and file tools (read, glob).",
+            "Search memory, check vault files, read the File Index. Never ask for what you can find.",
+            "Only ask the user when you've genuinely exhausted your search tools.",
+          ].join("\n"),
+        });
+        void logGateActivity("selfServiceGate", "fired", "Blocked: delegating to user with 0 tools used", sessionKey);
+        return { cancel: true, gate: "selfServiceGate" };
+      }
+    }
+  }
+
+  // Gate 3: Persistence — gave up without trying enough approaches
+  if (config.gates.persistenceGate?.enabled) {
+    const minTools = config.gates.persistenceGate?.thresholds?.minInvestigationTools
+      ?? GATE_DEFAULTS.persistenceGate.thresholds!.minInvestigationTools;
+    if (matchesAny(content, SURRENDER_PATTERNS) && usage.investigationCount < minTools) {
+      enforcerNudgeFlags.set(key, {
+        gate: "Persistence Gate",
+        message: [
+          `Your response was blocked because you gave up too early.`,
+          `You've only used ${usage.investigationCount} investigation tool(s). Minimum: ${minTools}.`,
+          "",
+          "Try at least 3 different approaches before declaring something impossible:",
+          "- Search memory with different terms",
+          "- Read relevant files directly (check the File Index)",
+          "- Use glob to find files by pattern",
+          "- Try different search tools (qmd search, memory_search, secondBrain.search)",
+          "When you truly exhaust all options, explain everything you tried.",
+        ].join("\n"),
+      });
+      void logGateActivity(
+        "persistenceGate", "fired",
+        `Blocked: surrendered with only ${usage.investigationCount}/${minTools} tools used`,
+        sessionKey,
+      );
+      return { cancel: true, gate: "persistenceGate" };
+    }
+  }
+
+  // Gate 4: Search Retry — declared "not found" without enough search variation
+  if (config.gates.searchRetryGate?.enabled) {
+    const minSearches = config.gates.searchRetryGate?.thresholds?.minSearchAttempts
+      ?? GATE_DEFAULTS.searchRetryGate.thresholds!.minSearchAttempts;
+    if (matchesAny(content, NOT_FOUND_PATTERNS) && usage.searchCount < minSearches) {
+      enforcerNudgeFlags.set(key, {
+        gate: "Search Retry Gate",
+        message: [
+          `You searched ${usage.searchCount} time(s) but haven't exhausted your options. Minimum: ${minSearches}.`,
+          "",
+          "Try different search terms, different tools, check the File Index.",
+          "Tools: memory_search, qmd search, qmd vsearch, secondBrain.search, glob, read.",
+          "When you truly exhaust all options, explain everything you tried.",
+        ].join("\n"),
+      });
+      void logGateActivity(
+        "searchRetryGate", "fired",
+        `Blocked: "not found" after only ${usage.searchCount}/${minSearches} searches`,
+        sessionKey,
+      );
+      return { cancel: true, gate: "searchRetryGate" };
+    }
+  }
+
+  return undefined;
 }

@@ -19,6 +19,8 @@ import { join } from "node:path";
 import { homedir } from "node:os";
 import { DATA_DIR, GODMODE_ROOT } from "../data-paths.js";
 import { secureWriteFile, secureMkdir } from "../lib/secure-fs.js";
+import { existsSync } from "node:fs";
+import { invalidateIdentityCache } from "../lib/awareness-snapshot.js";
 import type { GatewayRequestHandler } from "openclaw/plugin-sdk";
 import {
   type OnboardingState,
@@ -802,6 +804,21 @@ export const onboardingHandlers: GatewayRequestHandlers = {
     }
 
     await writeOnboarding(state);
+
+    // Write a minimal USER.md so the awareness snapshot knows the user's name
+    try {
+      const userMdPath = join(GODMODE_ROOT, "USER.md");
+      if (!existsSync(userMdPath)) {
+        await secureMkdir(GODMODE_ROOT);
+        await secureWriteFile(
+          userMdPath,
+          `# USER.md - About Your Human\n\n- **Name:** ${name}\n`,
+        );
+      }
+      invalidateIdentityCache();
+    } catch {
+      // Non-fatal — name will be picked up on next full onboarding
+    }
 
     // Save daily intel topics to options if provided
     if (dailyIntelTopics) {
