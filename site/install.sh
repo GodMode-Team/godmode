@@ -692,6 +692,7 @@ step 8 "Configuring gateway"
 openclaw config set gateway.mode local 2>/dev/null && ok "gateway.mode = local" || warn "Could not set gateway.mode"
 openclaw config set gateway.controlUi.enabled true 2>/dev/null && ok "gateway.controlUi.enabled = true" || warn "Could not set controlUi"
 openclaw config set plugins.enabled true 2>/dev/null && ok "plugins.enabled = true" || warn "Could not set plugins.enabled"
+openclaw config set sessions.dmScope per-channel-peer 2>/dev/null && ok "sessions.dmScope = per-channel-peer" || warn "Could not set sessions.dmScope"
 
 # VPS / headless: configure network binding so remote access works
 TAILSCALE_CONFIGURED=false

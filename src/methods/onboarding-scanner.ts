@@ -269,6 +269,7 @@ export async function generateConfigRecommendations(): Promise<ConfigRecommendat
   const plugins = config.plugins as Record<string, unknown> | undefined;
   const cron = config.cron as Record<string, unknown> | undefined;
   const session = config.session as Record<string, unknown> | undefined;
+  const sessions = config.sessions as Record<string, unknown> | undefined;
 
   // Critical: gateway security token (check both gateway.token and gateway.auth.token)
   const gatewayAuth = gateway?.auth as Record<string, unknown> | undefined;
@@ -280,6 +281,18 @@ export async function generateConfigRecommendations(): Promise<ConfigRecommendat
       currentValue: "not set",
       recommendedValue: "(auto-generated 256-bit token)",
       reason: "Without a token, any process on your machine can send commands to the agent via the WebSocket port.",
+      priority: "critical",
+    });
+  }
+
+  // Critical: DM session isolation
+  if (sessions?.dmScope !== "per-channel-peer") {
+    recommendations.push({
+      key: "sessions.dmScope",
+      label: "DM session isolation",
+      currentValue: sessions?.dmScope ?? "not set",
+      recommendedValue: "per-channel-peer",
+      reason: "Set dmScope to per-channel-peer to prevent DM data leaking between users.",
       priority: "critical",
     });
   }
