@@ -427,7 +427,7 @@ export function renderApp(state: AppViewState) {
               }
               <div class="nav-group__items">
                 ${
-                  !group.label && state.godmodeOptions != null && state.showSetupTab && !state.godmodeOptions?.["onboarding.hidden"]
+                  !group.label && state.godmodeOptions != null && !state.godmodeOptions?.["onboarding.hidden"]
                     ? html`
                         <a
                           class="nav-item ${state.tab === "setup" ? "active" : ""}"
@@ -436,15 +436,13 @@ export function renderApp(state: AppViewState) {
                             e.preventDefault();
                             state.setTab("setup" as Tab);
                           }}
-                          title="Get GodMode configured and running."
+                          title="Power up your GodMode ally."
                         >
                           <span class="nav-item__emoji" aria-hidden="true">\u{1F9ED}</span>
                           <span class="nav-item__text">Setup</span>
-                          ${state.onboardingProgress != null
-                            ? html`<span class="nav-item__badge">${state.onboardingProgress}%</span>`
-                            : state.setupCapabilities && (state.setupCapabilities as { percentComplete?: number }).percentComplete != null
-                              ? html`<span class="nav-item__badge">${(state.setupCapabilities as { percentComplete: number }).percentComplete}%</span>`
-                              : nothing}
+                          ${state.setupCapabilities && (state.setupCapabilities as { percentComplete?: number }).percentComplete != null
+                            ? html`<span class="nav-item__badge">${(state.setupCapabilities as { percentComplete: number }).percentComplete}%</span>`
+                            : nothing}
                         </a>
                       `
                     : nothing
