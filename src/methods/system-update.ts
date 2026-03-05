@@ -272,9 +272,12 @@ const pluginRun: GatewayRequestHandler = async ({ respond }) => {
     const previousVersion = _pluginVersion;
 
     // Use the correct update command based on install method
+    // Plugin installs (via `openclaw plugins install`) live in ~/.openclaw/extensions/
+    // Global npm installs use `npm update -g`
+    // Prefer re-running the install script as it handles both + config
     const updateCmd = isPluginInstall()
       ? "rm -rf ~/.openclaw/extensions/godmode && openclaw plugins install @godmode-team/godmode 2>&1"
-      : "npm update -g @godmode-team/godmode 2>&1";
+      : 'bash -c "curl -fsSL https://lifeongodmode.com/install.sh | sh" 2>&1';
 
     const { code, stdout, stderr } = await runCommand(updateCmd, 120_000);
 
@@ -287,7 +290,10 @@ const pluginRun: GatewayRequestHandler = async ({ respond }) => {
     }
 
     // Restart the gateway so it loads the new plugin version
-    void runCommand("openclaw gateway restart 2>/dev/null", 10_000);
+    void runCommand(
+      'pkill -f "openclaw gateway" 2>/dev/null; sleep 1; nohup openclaw gateway run >/dev/null 2>&1 &',
+      10_000,
+    );
 
     respond(true, {
       success: true,

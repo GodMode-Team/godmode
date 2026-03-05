@@ -347,13 +347,12 @@ ${hardRulesBlock}
 }
 
 function generateUserMd(answers: OnboardingAnswers): string {
-  return `# USER.md -- Owner Profile
+  return `# USER.md - About Your Human
 
-## ${answers.name}
-
-**Timezone:** ${answers.timezone}
-**Focus:** ${answers.focus}
-**Communication style:** ${answers.commStyle}
+- **Name:** ${answers.name}
+- **Timezone:** ${answers.timezone}
+- **Focus:** ${answers.focus}
+- **Communication style:** ${answers.commStyle}
 
 ---
 

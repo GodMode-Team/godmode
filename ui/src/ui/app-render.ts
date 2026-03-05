@@ -194,25 +194,15 @@ function collapseRepeatedLabel(value: string): string {
 }
 
 function getSessionTabIdentity(key: string, session: ReturnType<typeof findSessionByKey>): string {
+  // If the session has a real sessionId, use it — this deduplicates multiple
+  // tab entries that point to the exact same session.
   const sessionId = session?.sessionId?.trim();
   if (sessionId) {
     return `session:${sessionId}`;
   }
-  const displayName =
-    session?.label ??
-    session?.displayName ??
-    autoTitleCache.get(session?.key ?? key) ??
-    autoTitleCache.get(key) ??
-    "";
-  const normalizedName = normalizeTabIdentityText(collapseRepeatedLabel(displayName));
-  if (normalizedName) {
-    const surface = String(session?.surface ?? "")
-      .trim()
-      .toLowerCase();
-    const subject = normalizeTabIdentityText(String(session?.subject ?? "")).slice(0, 20);
-    const tokenPrefix = normalizedName.split(" ").filter(Boolean).slice(0, 3).join(" ");
-    return `name:${surface}|${subject}|${tokenPrefix || normalizedName.slice(0, 24)}`;
-  }
+  // No sessionId — treat each tab key as unique. Without a sessionId we can't
+  // know if two tabs refer to the same session, and collapsing by display name
+  // causes distinct sessions to merge (the "first tab can't be closed" bug).
   return `key:${key.trim().toLowerCase()}`;
 }
 
@@ -2155,6 +2145,7 @@ export function renderApp(state: AppViewState) {
                   onSend: () => state.handleAllySend(),
                   onOpenFullChat: () => state.handleAllyOpenFull(),
                   onAttachmentsChange: (attachments) => state.handleAllyAttachmentsChange(attachments),
+                  onAction: (action, target, method, params) => state.handleAllyAction(action, target, method, params),
                 } : null,
               })
             : nothing
@@ -2445,6 +2436,7 @@ export function renderApp(state: AppViewState) {
         onSend: () => state.handleAllySend(),
         onOpenFullChat: () => state.handleAllyOpenFull(),
         onAttachmentsChange: (attachments) => state.handleAllyAttachmentsChange(attachments),
+        onAction: (action, target, method, params) => state.handleAllyAction(action, target, method, params),
       }) : nothing}
       ${renderExecApprovalPrompt(state)}
       ${renderGatewayUrlConfirmation(state)}
