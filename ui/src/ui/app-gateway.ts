@@ -338,9 +338,23 @@ async function checkWorkspaceSetup(host: GatewayHost) {
   if (!host.client) {
     return;
   }
+  const app = host as unknown as { workspaceNeedsSetup?: boolean; setupQuickDone?: boolean };
   try {
+    // If the user already completed quick setup, never show the banner
+    if (app.setupQuickDone) {
+      app.workspaceNeedsSetup = false;
+      return;
+    }
+    // Also check onboarding state directly — setupQuickDone may not be set yet
+    try {
+      const ob = await host.client.request<{ identity?: { name?: string } }>("onboarding.status", {});
+      if (ob?.identity?.name) {
+        app.workspaceNeedsSetup = false;
+        return;
+      }
+    } catch { /* onboarding methods may not exist */ }
+
     const res = await host.client.request("projects.list", {});
-    const app = host as unknown as { workspaceNeedsSetup?: boolean };
     app.workspaceNeedsSetup = !res?.projects || res.projects.length === 0;
   } catch {
     // Not critical — don't block on this
