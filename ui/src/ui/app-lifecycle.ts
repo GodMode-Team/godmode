@@ -367,9 +367,17 @@ function normalizeOpenTabs(host: LifecycleHost, sessions: SessionsListResult["se
       identityToTabKey.get(currentSessionIdentity) ??
       currentSession?.key ??
       (host.sessionKey.trim() || dedupedTabs[0] || "main");
-    const resolvedSessionKey = dedupedTabs.includes(canonicalSessionKey)
-      ? canonicalSessionKey
-      : (dedupedTabs[0] || "main");
+    // The pinned Prosper tab (ALLY_SESSION_KEY = "main") is never in openTabs,
+    // so don't fall back to the first open tab when the user is on Prosper.
+    const isMainAlias =
+      canonicalSessionKey === "main" ||
+      canonicalSessionKey.endsWith(":main");
+    const resolvedSessionKey =
+      isMainAlias
+        ? canonicalSessionKey
+        : dedupedTabs.includes(canonicalSessionKey)
+          ? canonicalSessionKey
+          : (dedupedTabs[0] || "main");
 
     host.applySettings({
       ...host.settings,

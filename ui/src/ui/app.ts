@@ -1150,10 +1150,18 @@ export class GodModeApp extends LitElement {
       }
 
       const idempotencyKey = `ally-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-      // Use the `agent` RPC instead of `chat.send` so we can pass
-      // `channel: "webchat"` as turnSourceChannel. This prevents the gateway
-      // from routing the response to iMessage when the session's lastChannel
-      // is "imessage" from a prior iMessage conversation.
+      // Force the session's lastChannel to "webchat" so the gateway routes
+      // the response here instead of to iMessage. The `channel` param on the
+      // agent RPC alone isn't sufficient — the gateway still checks
+      // session.lastChannel for delivery routing.
+      try {
+        await this.client?.request("sessions.patch", {
+          key: ALLY_SESSION_KEY,
+          lastChannel: "webchat",
+        });
+      } catch {
+        // Non-blocking — best-effort channel override
+      }
       await this.client?.request("agent", {
         sessionKey: ALLY_SESSION_KEY,
         message: msg,

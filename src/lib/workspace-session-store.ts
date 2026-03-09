@@ -171,8 +171,15 @@ export function deriveSessionTitle(entry: SessionStoreEntry | undefined, firstUs
     return entry.subject.trim();
   }
   if (firstUserMessage?.trim()) {
-    const normalized = firstUserMessage.replace(/\s+/g, " ").trim();
-    return truncateTitle(normalized, DERIVED_TITLE_MAX_LEN);
+    const normalized = firstUserMessage
+      // Strip leading timestamp prefixes (e.g. "Mon 2026-03-09 13:15 CDT", "2026-03-09T13:15:00Z")
+      .replace(/^(?:(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)\w*\s+)?\d{4}-\d{2}-\d{2}[\sT]\d{1,2}:\d{2}(?::\d{2})?(?:\s*[A-Z]{2,5})?\s*/g, "")
+      .replace(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}[^\s]*\s*/g, "")
+      .replace(/\s+/g, " ")
+      .trim();
+    if (normalized) {
+      return truncateTitle(normalized, DERIVED_TITLE_MAX_LEN);
+    }
   }
   if (typeof entry.sessionId === "string" && entry.sessionId) {
     return entry.sessionId.slice(0, 8);

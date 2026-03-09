@@ -449,26 +449,50 @@ export function resetAutoTitleState() {
 }
 
 /**
- * Derive a short, meaningful title from the first user message in a session.
- * Scans all sentences for the most "topical" one instead of blindly using the first line.
+ * Extract raw text content from a message (string or content blocks).
+ */
+function extractMessageText(msg: { content: unknown }): string {
+  if (typeof msg.content === "string") return msg.content;
+  if (Array.isArray(msg.content)) {
+    const textBlock = msg.content.find(
+      (b: unknown) => (b as { type?: string }).type === "text",
+    );
+    return (textBlock as { text?: string })?.text ?? "";
+  }
+  return "";
+}
+
+/**
+ * Derive a short, meaningful title from conversation messages.
+ *
+ * Strategy (in priority order):
+ * 1. Extract a topic summary from the assistant's first response
+ * 2. Extract key terms from the first user message
+ * 3. Fall back to scored sentence picking from user messages
  */
 function deriveSessionTitle(chatMessages: Array<{ role: string; content: unknown }>): string | null {
-  // Try each user message in order — skip ones that are entirely system-injected content
   const userMessages = chatMessages.filter((m) => m.role === "user");
   if (userMessages.length === 0) return null;
 
-  for (const userMsg of userMessages) {
-    let raw = "";
-    if (typeof userMsg.content === "string") {
-      raw = userMsg.content;
-    } else if (Array.isArray(userMsg.content)) {
-      const textBlock = userMsg.content.find(
-        (b: unknown) => (b as { type?: string }).type === "text",
-      );
-      raw = (textBlock as { text?: string })?.text ?? "";
-    }
+  // Strategy 1: Use the assistant's first response — it often summarizes the topic
+  const firstAssistant = chatMessages.find((m) => m.role === "assistant");
+  if (firstAssistant) {
+    const assistantTitle = extractTitleFromAssistant(extractMessageText(firstAssistant));
+    if (assistantTitle) return assistantTitle;
+  }
 
-    const text = stripSystemContent(raw);
+  // Strategy 2: Extract topic from user messages
+  for (const userMsg of userMessages) {
+    const text = stripSystemContent(extractMessageText(userMsg));
+    if (!text.trim()) continue;
+
+    const title = extractTopicTitle(text);
+    if (title) return title;
+  }
+
+  // Strategy 3: Fall back to sentence scoring
+  for (const userMsg of userMessages) {
+    const text = stripSystemContent(extractMessageText(userMsg));
     if (!text.trim()) continue;
 
     const title = scoreTitleFromText(text);
@@ -476,6 +500,131 @@ function deriveSessionTitle(chatMessages: Array<{ role: string; content: unknown
   }
 
   return null;
+}
+
+/**
+ * Extract a topic-based title from the assistant's first response.
+ * Assistants typically open with "I'll help you X", "Let me X", "Here's X" — the X is the topic.
+ */
+function extractTitleFromAssistant(text: string): string | null {
+  if (!text || text.length < 10) return null;
+
+  // Strip markdown formatting
+  let cleaned = text
+    .replace(/```[\s\S]*?```/g, "")
+    .replace(/`[^`]+`/g, (m) => m.slice(1, -1))
+    .replace(/https?:\/\/\S+/g, "")
+    .replace(/[*_~[\]]/g, "")
+    .replace(/^#+\s*/gm, "");
+
+  // Get first meaningful sentence
+  const lines = cleaned.split(/\n+/).filter((l) => l.trim().length > 5);
+  if (lines.length === 0) return null;
+  let first = lines[0].trim();
+
+  // Strip conversational openers to get to the topic
+  first = first
+    .replace(/^(sure[!,.]?\s*|of course[!,.]?\s*|absolutely[!,.]?\s*|great[!,.]?\s*|certainly[!,.]?\s*|happy to help[!,.]?\s*|no problem[!,.]?\s*)/i, "")
+    .replace(/^(I'll|I will|let me|I can|I'm going to|here's|here is|here are)\s+/i, "")
+    .replace(/^(help you\s+(with\s+)?|take a look at\s+|check\s+(on\s+)?|look into\s+|review\s+)/i, (_, match) => {
+      // Keep the verb for context: "review X" → "X Review"
+      return "";
+    })
+    .trim();
+
+  if (first.length < 5) return null;
+
+  // Take first sentence only
+  const sentenceEnd = first.search(/[.!?:]\s/);
+  if (sentenceEnd > 10) first = first.substring(0, sentenceEnd);
+
+  // Strip trailing punctuation
+  first = first.replace(/[.!?:,]+$/, "").trim();
+
+  // Capitalize and truncate
+  if (first.length > 0) {
+    first = first[0].toUpperCase() + first.slice(1);
+  }
+
+  if (first.length > 40) {
+    first = first.slice(0, 37).replace(/\s+\S*$/, "").trim() + "...";
+  }
+
+  // Reject if still too generic or too short
+  if (first.length < 5) return null;
+  if (/^(the|a|an|some|this|that|your|my|our)\s*$/i.test(first)) return null;
+
+  return first;
+}
+
+/**
+ * Extract a concise topic from user message text.
+ * Strips question structure and conversational wrappers to find the core topic.
+ */
+function extractTopicTitle(text: string): string | null {
+  // Strip code blocks, inline code, URLs, images, markdown
+  const cleaned = text
+    .replace(/```[\s\S]*?```/g, "")
+    .replace(/`[^`]+`/g, (m) => m.slice(1, -1))
+    .replace(/https?:\/\/\S+/g, "")
+    .replace(/!\[.*?\]\(.*?\)/g, "")
+    .replace(/[*_~[\]]/g, "")
+    .replace(/^#+\s*/gm, "");
+
+  // Get first meaningful line
+  const lines = cleaned
+    .split(/\n+/)
+    .map((l) => l.trim())
+    .filter((l) => l.length > 3);
+  if (lines.length === 0) return null;
+
+  let title = lines[0];
+
+  // Strip question structure: "What/How/Can you X?" → "X"
+  title = title
+    .replace(/^(what|how|where|when|why|which|who)\s+(is|are|was|were|do|does|did|can|could|would|should|will|about)\s+/i, "")
+    .replace(/^(can|could|would|will|should)\s+(you|we|I)\s+/i, "")
+    .replace(/^(do|does)\s+(this|that|it)\s+/i, "")
+    .replace(/^(is|are)\s+(there|this|that|it)\s+/i, "");
+
+  // Strip conversational filler
+  title = title
+    .replace(/^(I need you to|I want you to|I'd like you to|I need to|I want to|I'd like to)\s+/i, "")
+    .replace(/^(help me\s+(to\s+)?|go ahead and|let'?s|so\s+|okay so\s+|also\s+)/i, "")
+    .replace(/^(please|pls)\s+/i, "")
+    .replace(/^(can you|could you|would you|will you)\s+/i, "")
+    .replace(/^(tell me about|explain|describe|show me)\s+/i, "")
+    .replace(/\?+$/, "")
+    .trim();
+
+  if (title.length < 4) return null;
+
+  // Strip trailing conditions/clauses for cleaner titles
+  // "Read HEARTBEAT.md if it exists" → "Read HEARTBEAT.md"
+  title = title
+    .replace(/\s+(if|when|before|after|so that|because|since|unless|and then)\s+.*/i, "")
+    .replace(/\s+[-—]\s+.*/, "")
+    .trim();
+
+  // Capitalize first letter
+  if (title.length > 0) {
+    title = title[0].toUpperCase() + title.slice(1);
+  }
+
+  // Strip trailing punctuation
+  title = title.replace(/[.!?:,]+$/, "").trim();
+
+  // Truncate to 40 chars at word boundary
+  if (title.length > 40) {
+    title = title.slice(0, 37).replace(/\s+\S*$/, "").trim() + "...";
+  }
+
+  // Reject too-short or generic results
+  if (title.length < 4) return null;
+  const GREETING_RE = /^(hi|hey|hello|thanks|thank\s+you|thx|ok|okay|sure|alright|great|good\s+(morning|afternoon|evening))\b/i;
+  if (GREETING_RE.test(title)) return null;
+
+  return title;
 }
 
 /** Fingerprints that indicate leaked system context (tagless echoes). */
@@ -514,7 +663,11 @@ function stripSystemContent(text: string): string {
     // Remove <ide_opened_file>...</ide_opened_file> blocks
     .replace(/<ide_opened_file>[\s\S]*?<\/ide_opened_file>/g, "")
     // Remove any remaining XML-style system tags (catch-all for <foo_bar>...</foo_bar>)
-    .replace(/<[a-z][a-z_-]*>[\s\S]*?<\/[a-z][a-z_-]*>/g, "");
+    .replace(/<[a-z][a-z_-]*>[\s\S]*?<\/[a-z][a-z_-]*>/g, "")
+    // Strip leading timestamp prefixes (e.g. "Mon 2026-03-09 13:15 CDT", "2026-03-09T13:15:00Z")
+    .replace(/^(?:(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)\w*\s+)?\d{4}-\d{2}-\d{2}[\sT]\d{1,2}:\d{2}(?::\d{2})?(?:\s*[A-Z]{2,5})?\s*/gm, "")
+    // Strip ISO timestamps at line starts
+    .replace(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}[^\s]*\s*/gm, "");
 
   // Fingerprint-based detection for tagless echoes of system content.
   // Count how many fingerprints match — if 2+, the whole message is a system dump.
@@ -544,7 +697,7 @@ function scoreTitleFromText(text: string): string | null {
   // Strip code blocks, inline code, URLs, and image links
   const cleaned = text
     .replace(/```[\s\S]*?```/g, "")
-    .replace(/`[^`]+`/g, "")
+    .replace(/`[^`]+`/g, (m) => m.slice(1, -1))
     .replace(/https?:\/\/\S+/g, "")
     .replace(/!\[.*?\]\(.*?\)/g, "");
 
@@ -556,8 +709,6 @@ function scoreTitleFromText(text: string): string | null {
 
   if (sentences.length === 0) return null;
 
-  // Score each sentence for "topic quality" — higher = better title candidate.
-  // Balanced for both technical and personal/life topics.
   const GREETING_RE = /^(hi|hey|hello|thanks|thank\s+you|thx|ok|okay|sure|alright|great|good\s+(morning|afternoon|evening))\b/i;
   const IMPERATIVE_RE = /^(fix|add|create|update|change|build|implement|remove|delete|refactor|make|set\s+up|configure|enable|disable|show|hide|move|rename|convert|replace|write|edit|debug|test|deploy|install|run|check|review|optimize|improve|clean|reset|open|close|connect|disconnect|sync|upload|download|merge|split|sort|filter|search|format|generate|export|import|migrate|monitor|schedule|cancel|approve|reject|assign|unassign|plan|draft|prep|book|find|send|call|email|reach\s+out|follow\s+up|look\s+into|figure\s+out|research|compare|analyze|summarize)\b/i;
   const TOPIC_RE = /\b(function|component|file|page|button|API|error|bug|feature|config|style|layout|route|test|database|server|client|UI|CSS|HTML|TypeScript|view|sidebar|modal|tab|form|input|output|session|message|chat|title|drive|upload|deploy|build|meeting|email|invoice|proposal|contract|lead|customer|prospect|client|website|landing|content|strategy|schedule|flight|trip|travel|appointment|haircut|doctor|dentist|gym|workout|diet|recipe|budget|expense|report|presentation|pitch|pricing|competitor|marketing|sales|hiring|onboarding|feedback|review|goal|milestone|deadline|launch|release)\b/i;
@@ -568,8 +719,6 @@ function scoreTitleFromText(text: string): string | null {
     if (IMPERATIVE_RE.test(s)) score += 5;
     if (TOPIC_RE.test(s)) score += 2;
     if (GREETING_RE.test(s)) score -= 5;
-    // Mild penalty for personal pronoun starts — but don't nuke them,
-    // they often carry the actual topic ("I need to prep for my flight")
     if (/^(it'?s |this is |that |there )/i.test(s)) score -= 1;
     if (s.length < 15) score -= 1;
     if (s.length >= 15 && s.length <= 60) score += 1;
@@ -581,10 +730,17 @@ function scoreTitleFromText(text: string): string | null {
 
   let title = scored[0].text;
 
-  // Strip common filler prefixes to get to the actual topic
+  // Strip conversational filler to get to the topic
   title = title
     .replace(/^(can you|could you|would you|will you|I need you to|I want you to|I'd like you to|I need to|I want to|I'd like to|help me to?|go ahead and|let'?s|so |okay so )\s+/i, "")
     .replace(/^(please|pls)\s+/i, "")
+    .replace(/^(what|how|where|when|why|which|who)\s+(is|are|was|were|do|does|did|can|could|would|should|will|about)\s+/i, "")
+    .replace(/\?+$/, "")
+    .trim();
+
+  // Strip trailing conditions
+  title = title
+    .replace(/\s+(if|when|before|after|so that|because|since|unless|and then)\s+.*/i, "")
     .trim();
 
   // Capitalize first letter
@@ -592,12 +748,12 @@ function scoreTitleFromText(text: string): string | null {
     title = title[0].toUpperCase() + title.slice(1);
   }
 
-  // Strip trailing punctuation for cleaner title
-  title = title.replace(/[.!?]+$/, "").trim();
+  // Strip trailing punctuation
+  title = title.replace(/[.!?:,]+$/, "").trim();
 
-  // Truncate to 50 chars at word boundary
-  if (title.length > 50) {
-    title = title.slice(0, 47).replace(/\s+\S*$/, "").trim() + "...";
+  // Truncate to 40 chars at word boundary
+  if (title.length > 40) {
+    title = title.slice(0, 37).replace(/\s+\S*$/, "").trim() + "...";
   }
 
   return title || null;
@@ -626,7 +782,9 @@ async function maybeAutoTitleSession(host: GatewayHost, sessionKey: string) {
   }
 
   // Check if session already has a label or displayName (manually set or previously titled)
-  const session = host.sessionsResult?.sessions?.find((s) => s.key === sessionKey);
+  // Use fuzzy matching — gateway keys (agent:main:webchat-X) may differ from server keys.
+  const { findSessionByKey } = await import("./app-lifecycle.js");
+  const session = findSessionByKey(host.sessionsResult?.sessions, sessionKey);
   if (session?.label?.trim() || session?.displayName?.trim()) {
     // Mark as applied so we don't re-check every turn
     autoTitleApplied.add(sessionKey);
@@ -645,18 +803,43 @@ async function maybeAutoTitleSession(host: GatewayHost, sessionKey: string) {
   }
 
   try {
-    // Derive title client-side from the first user message
+    // Derive title from conversation messages.
+    // Only use app.chatMessages if this IS the active session — otherwise
+    // we'd derive the wrong title from a different session's messages.
     const app = host as unknown as GodModeApp;
-    const title = deriveSessionTitle(app.chatMessages ?? []);
+    const isActiveSession = app.sessionKey === sessionKey
+      || (session?.key && app.sessionKey === session.key);
+    let messages = isActiveSession ? (app.chatMessages ?? []) : [];
+
+    // If no local messages (non-active session or race condition),
+    // fetch this session's history directly.
+    if (messages.length === 0 && host.client) {
+      try {
+        const res = await host.client.request("chat.history", {
+          sessionKey,
+          limit: 10,
+        });
+        if (Array.isArray(res?.messages)) {
+          messages = res.messages;
+        }
+      } catch {
+        // Fetch failed — try again on next response
+        return;
+      }
+    }
+
+    const title = deriveSessionTitle(messages);
 
     if (!title) {
       // Don't mark as applied — will retry on next response when more messages exist
       return;
     }
 
-    // Persist the title via self-healing session patch (handles field name changes)
+    // Persist the title via self-healing session patch (handles field name changes).
+    // Use the server's canonical key if available (avoids key format mismatches).
+    const patchKey = session?.key ?? sessionKey;
     const { hostPatchSession } = await import("../lib/host-compat.js");
-    const result = await hostPatchSession(host.client, sessionKey, title);
+    const result = await hostPatchSession(host.client, patchKey, title);
 
     if (!result.ok) {
       console.error("[auto-title] patch failed:", result.error);
@@ -667,15 +850,22 @@ async function maybeAutoTitleSession(host: GatewayHost, sessionKey: string) {
     // SUCCESS — mark as applied so we don't retry
     autoTitleApplied.add(sessionKey);
 
-    // Store in persistent cache so it survives sessionsResult overwrites
+    // Store in persistent cache under BOTH the gateway key and server key
+    // so loadSessions can find it regardless of key format.
     autoTitleCache.set(sessionKey, title);
+    if (session?.key && session.key !== sessionKey) {
+      autoTitleCache.set(session.key, title);
+    }
 
-    // Update local session data immediately so the tab re-renders
+    // Update local session data immediately so the tab re-renders.
+    // Match by both gateway key and server key to handle format differences.
     if (host.sessionsResult?.sessions) {
       host.sessionsResult = {
         ...host.sessionsResult,
         sessions: host.sessionsResult.sessions.map((s) =>
-          s.key === sessionKey ? { ...s, label: title, displayName: title } : s,
+          (s.key === sessionKey || s.key === patchKey)
+            ? { ...s, label: title, displayName: title }
+            : s,
         ),
       };
     }
@@ -970,6 +1160,21 @@ function handleGatewayEventUnsafe(host: GatewayHost, evt: GatewayEventFrame) {
           host.workingSessions.add(payload.sessionKey);
           (host as unknown as { requestUpdate?: () => void }).requestUpdate?.();
         }
+        // Safety timeout: clear working indicator if no final event arrives
+        // within 90 seconds (e.g., response delivered via iMessage only).
+        const safetyKey = `safety:${payload.sessionKey}`;
+        const existingSafety = workingSessionClearTimers.get(safetyKey);
+        if (existingSafety) clearTimeout(existingSafety);
+        workingSessionClearTimers.set(
+          safetyKey,
+          setTimeout(() => {
+            workingSessionClearTimers.delete(safetyKey);
+            if (host.workingSessions.has(payload.sessionKey)) {
+              host.workingSessions.delete(payload.sessionKey);
+              (host as unknown as { requestUpdate?: () => void }).requestUpdate?.();
+            }
+          }, 90_000),
+        );
       } else if (
         payload.state === "final" ||
         payload.state === "error" ||
@@ -984,6 +1189,13 @@ function handleGatewayEventUnsafe(host: GatewayHost, evt: GatewayEventFrame) {
           if (existing) {
             clearTimeout(existing);
             workingSessionClearTimers.delete(payload.sessionKey);
+          }
+          // Cancel the safety timeout too
+          const safetyKey = `safety:${payload.sessionKey}`;
+          const existingSafety = workingSessionClearTimers.get(safetyKey);
+          if (existingSafety) {
+            clearTimeout(existingSafety);
+            workingSessionClearTimers.delete(safetyKey);
           }
           host.workingSessions.delete(payload.sessionKey);
           (host as unknown as { requestUpdate?: () => void }).requestUpdate?.();
@@ -1069,16 +1281,16 @@ function handleGatewayEventUnsafe(host: GatewayHost, evt: GatewayEventFrame) {
     // handleChatEvent returns null for non-active sessions, so we check payload.state
     // directly to avoid missing auto-title when the user switches tabs mid-response.
     if (payload.state === "final") {
-      // Load sessions first (for token counts), then auto-title.
-      // Sequential to prevent race: loadSessions could overwrite auto-title's
-      // local displayName update if they run concurrently.
+      // Run auto-title FIRST (before loadSessions can overwrite local state).
+      // Then refresh sessions. Auto-title is self-contained — it fetches its
+      // own messages if needed and caches the result defensively.
       void (async () => {
+        await maybeAutoTitleSession(host, payload.sessionKey);
         try {
           await loadSessions(host as unknown as GodModeApp, { activeMinutes: 0 });
-        } catch (e) {
-          console.error("[auto-title] loadSessions failed, proceeding anyway:", e);
+        } catch {
+          // Non-critical
         }
-        void maybeAutoTitleSession(host, payload.sessionKey);
       })();
     }
 
@@ -1380,6 +1592,35 @@ function handleGatewayEventUnsafe(host: GatewayHost, evt: GatewayEventFrame) {
         allyHost.allyUnread = (allyHost.allyUnread ?? 0) + 1;
       }
       allyHost.requestUpdate?.();
+    }
+    return;
+  }
+
+  // Server-side auto-title: session was titled by the server after first LLM response.
+  // Update the local session list with the new title without a full re-fetch.
+  if (evt.event === "sessions:updated") {
+    const payload = evt.payload as { sessionKey?: string; title?: string } | undefined;
+    if (payload?.sessionKey && payload?.title) {
+      // Update local session data immediately
+      if (host.sessionsResult?.sessions) {
+        host.sessionsResult = {
+          ...host.sessionsResult,
+          sessions: host.sessionsResult.sessions.map((s) => {
+            const keyMatch =
+              s.key === payload.sessionKey ||
+              s.key?.endsWith(`:${payload.sessionKey?.split(":").pop()}`) ||
+              payload.sessionKey?.endsWith(`:${s.key?.split(":").pop()}`);
+            if (keyMatch) {
+              return { ...s, displayName: payload.title, label: payload.title };
+            }
+            return s;
+          }),
+        };
+      }
+      // Also update the autoTitleCache so loadSessions doesn't overwrite
+      autoTitleCache.set(payload.sessionKey, payload.title);
+      autoTitleApplied.add(payload.sessionKey);
+      (host as unknown as { requestUpdate?: () => void }).requestUpdate?.();
     }
     return;
   }

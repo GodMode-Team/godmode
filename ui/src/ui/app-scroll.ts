@@ -46,21 +46,16 @@ export function scheduleChatScroll(host: ScrollHost, force = false) {
       if (!target) {
         return;
       }
-      const distanceFromBottom = target.scrollHeight - target.scrollTop - target.clientHeight;
-
-      // force=true only overrides when we haven't auto-scrolled yet (initial load).
-      // After initial load, respect the user's scroll position.
-      const effectiveForce = force && !host.chatHasAutoScrolled;
-      // Only auto-scroll if user hasn't scrolled away, or on initial forced load.
-      // Do NOT use a distance fallback — that fights the user during fast streaming.
-      const shouldStick = effectiveForce || host.chatUserNearBottom;
+      // When force=true (tab switch, load complete, user message), always scroll.
+      // Otherwise respect the user's current scroll position.
+      const shouldStick = force || host.chatUserNearBottom;
 
       if (!shouldStick) {
         // User is scrolled up — flag that new content arrived below.
         host.chatNewMessagesBelow = true;
         return;
       }
-      if (effectiveForce) {
+      if (force) {
         host.chatHasAutoScrolled = true;
       }
       host.chatIsAutoScrolling = true;
@@ -70,14 +65,14 @@ export function scheduleChatScroll(host: ScrollHost, force = false) {
       requestAnimationFrame(() => {
         host.chatIsAutoScrolling = false;
       });
-      const retryDelay = effectiveForce ? 150 : 120;
+      const retryDelay = force ? 150 : 120;
       host.chatScrollTimeout = window.setTimeout(() => {
         host.chatScrollTimeout = null;
         const latest = pickScrollTarget();
         if (!latest) {
           return;
         }
-        const shouldStickRetry = effectiveForce || host.chatUserNearBottom;
+        const shouldStickRetry = force || host.chatUserNearBottom;
         if (!shouldStickRetry) {
           return;
         }

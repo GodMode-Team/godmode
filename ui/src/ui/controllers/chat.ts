@@ -165,9 +165,11 @@ export async function loadChatHistory(state: ChatState): Promise<void> {
  *
  * When the gateway exits before flushing the session JSONL, the server
  * returns empty/partial history. This wrapper preserves the locally-held
- * messages (including the temporary assistant message from the stream) if
- * the server response would erase them, then retries once after a short
- * delay in case the file was still being flushed.
+ * messages if the server response would erase them, then retries once
+ * after a short delay in case the file was still being flushed.
+ *
+ * Also clears chatStream — the stream bubble stays visible until real
+ * history replaces it (prevents the flash-then-duplicate pattern).
  */
 export async function loadChatHistoryAfterFinal(
   state: ChatState,
@@ -178,6 +180,9 @@ export async function loadChatHistoryAfterFinal(
 
   await loadChatHistory(state);
 
+  // Clear the stream now that server history is loaded.
+  state.chatStream = null;
+
   if (
     !opts?.allowShrink &&
     snapshotLen > 0 &&
@@ -186,7 +191,10 @@ export async function loadChatHistoryAfterFinal(
     state.chatMessages = snapshot;
     // Retry once after a short delay — the file may still be flushing
     setTimeout(() => {
-      void loadChatHistory(state);
+      void loadChatHistory(state).then(() => {
+        // Ensure stream is cleared even on retry
+        state.chatStream = null;
+      });
     }, 2000);
   }
 }
@@ -459,20 +467,12 @@ export function handleChatEvent(state: ChatState, payload?: ChatEventPayload) {
       }
     }
   } else if (payload.state === "final") {
-    // Preserve stream content as a temporary assistant message.
-    // Without this, the response vanishes between chatStream=null
-    // and loadChatHistory() completing (async HTTP fetch).
-    if (state.chatStream && state.chatStream.trim()) {
-      state.chatMessages = [
-        ...state.chatMessages,
-        {
-          role: "assistant",
-          content: [{ type: "text", text: state.chatStream }],
-          timestamp: Date.now(),
-        },
-      ];
-    }
-    state.chatStream = null;
+    // Keep chatStream visible until loadChatHistoryAfterFinal() completes.
+    // Previously we added a temp assistant message here to bridge the gap,
+    // but that caused duplicate messages when the server returned the same
+    // content. Keeping the stream avoids duplication — the stream bubble
+    // stays visible until real history replaces it.
+    // chatStream is cleared by loadChatHistoryAfterFinal() after loading.
     state.chatRunId = null;
     state.chatStreamStartedAt = null;
     pendingSendMessage = null; // Clear on successful completion

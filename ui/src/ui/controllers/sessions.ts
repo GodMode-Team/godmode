@@ -72,12 +72,25 @@ export async function loadSessions(
         }
 
         res.sessions = res.sessions.map((s) => {
-          // If API returned a displayName, use it
-          if (s.displayName) {
+          // If API returned a label or displayName, use it
+          if (s.label || s.displayName) {
             return s;
           }
-          // Check auto-title cache first (most reliable source)
-          const cachedTitle = autoTitleCache.get(s.key);
+          // Check auto-title cache first (most reliable source).
+          // Try exact match, then fuzzy suffix match (gateway keys may differ
+          // from server keys, e.g. "agent:main:webchat-X" vs "webchat-X").
+          let cachedTitle = autoTitleCache.get(s.key);
+          if (!cachedTitle) {
+            const suffix = s.key.split(":").pop();
+            if (suffix && suffix.length >= 4) {
+              for (const [k, v] of autoTitleCache) {
+                if (k === s.key || k.endsWith(`:${suffix}`) || s.key.endsWith(`:${k.split(":").pop()}`)) {
+                  cachedTitle = v;
+                  break;
+                }
+              }
+            }
+          }
           if (cachedTitle) {
             return { ...s, displayName: cachedTitle };
           }

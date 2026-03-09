@@ -258,6 +258,25 @@ export async function generateSnapshot(): Promise<string> {
     // Workspaces unavailable
   }
 
+  // Cron failure detection — surface broken jobs so the ally tells the user
+  try {
+    const { scanForFailures, formatFailuresForSnapshot } = await import("../services/failure-notify.js");
+    const failures = await scanForFailures();
+    const failureBlock = formatFailuresForSnapshot(failures);
+    if (failureBlock) {
+      lines.push(failureBlock);
+    }
+  } catch {
+    // Failure detection non-fatal
+  }
+
+  // Operational rules
+  lines.push("## Operational Rules");
+  lines.push("- ARTIFACTS: When sharing files from ~/godmode/memory/inbox/, link to /godmode/artifacts/{filename}. NEVER invent /reports/ URLs.");
+  lines.push("- PRE-FLIGHT: Before launching ANY background script, verify: 1) dependencies installed (npm/bun install), 2) env vars available, 3) run a quick smoke test. NEVER say 'running' without confirming exit code 0.");
+  lines.push("- MONITORING: After spawning background processes, check exit codes within 30s. If a process fails, tell the user immediately — do NOT wait until morning.");
+  lines.push("- PROMISES: Never promise overnight deliverables without pre-flight validation. If a script might fail, say so upfront.");
+
   const snapshot = lines.join("\n");
 
   // Write to disk
