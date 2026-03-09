@@ -93,6 +93,11 @@
   "engines": {
     "node": ">=22"
   },
+  "pnpm": {
+    "onlyBuiltDependencies": ["sqlite3", "better-sqlite3"],
+    "allowedDeprecatedVersions": {},
+    "neverBuiltDependencies": []
+  },
   "openclaw": {
     "extensions": [
       "./dist/index.js"
