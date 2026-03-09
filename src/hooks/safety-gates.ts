@@ -840,6 +840,18 @@ export function consumeContextPressureNudge(
 }
 
 /**
+ * Get the current context pressure as a 0-1 float.
+ * Used by context-budget.ts for progressive context trimming.
+ * Returns 0 if no pressure data exists yet.
+ */
+export function getContextPressureLevel(sessionKey: string | undefined): number {
+  const key = sessionKey ?? "__default__";
+  const state = contextPressure.get(key);
+  if (!state || !state.contextTokens) return 0;
+  return Math.min(1, state.lastInputTokens / state.contextTokens);
+}
+
+/**
  * Reset context pressure tracking for a session.
  * Call on before_reset and after_compaction.
  */

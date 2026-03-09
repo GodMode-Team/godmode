@@ -26,6 +26,7 @@ export type LessonCategory =
   | "scope"
   | "style"
   | "process"
+  | "routing"
   | "other";
 
 export type Lesson = {
@@ -161,6 +162,57 @@ export function formatLessonsForPrompt(lessons: Lesson[]): string {
 
   for (const l of lessons) {
     lines.push(`- **[${l.category}]** ${l.rule}`);
+  }
+
+  return lines.join("\n");
+}
+
+// ── Routing Lessons (ally-specific) ──────────────────────────────
+
+const ROUTING_PERSONA = "__ally_routing__";
+
+/**
+ * Get routing lessons for the ally itself (not queue agents).
+ * These accumulate when the ally makes routing mistakes
+ * (asks user for info it could have looked up, uses wrong tool, etc.)
+ */
+export async function getRoutingLessons(): Promise<Lesson[]> {
+  const state = await readLessonsState();
+  const routing = state.perPersona[ROUTING_PERSONA] ?? [];
+  // Also include global routing-category lessons
+  const globalRouting = state.global.filter((l) => l.category === "routing");
+  return [...globalRouting, ...routing];
+}
+
+/**
+ * Add a routing lesson for the ally.
+ */
+export async function addRoutingLesson(rule: string, sourceContext: string): Promise<Lesson> {
+  return addLesson(
+    {
+      rule,
+      category: "routing",
+      sourceTaskId: "ally-correction",
+      sourceTaskTitle: sourceContext,
+    },
+    ROUTING_PERSONA,
+  );
+}
+
+/**
+ * Format routing lessons for context injection.
+ * Returns empty string if no lessons.
+ */
+export function formatRoutingLessons(lessons: Lesson[]): string {
+  if (lessons.length === 0) return "";
+
+  const lines: string[] = [
+    "## Routing Corrections",
+    "You have been corrected on these in the past. Do NOT repeat these mistakes:",
+  ];
+
+  for (const l of lessons.slice(0, 10)) {
+    lines.push(`- ${l.rule}`);
   }
 
   return lines.join("\n");

@@ -99,6 +99,15 @@ class ConsciousnessHeartbeat {
       // Mirror awareness snapshot to vault 99-System/
       this.mirrorToVault().catch(() => {});
 
+      // Process Mem0 memory retry queue (failed ingestions from conversation turns)
+      try {
+        const { processRetryQueue } = await import("../lib/memory.js");
+        const retried = await processRetryQueue();
+        if (retried > 0) {
+          this.logger.info(`[Consciousness] Mem0 retry queue: processed ${retried} item(s)`);
+        }
+      } catch { /* Memory retry non-fatal */ }
+
       this.lastSyncAt = Date.now();
       this.broadcast("consciousness:status", {
         status: "ok",
@@ -149,6 +158,25 @@ class ConsciousnessHeartbeat {
         }
       } catch (briefErr) {
         this.logger.error(`[Consciousness] Brief auto-gen failed: ${String(briefErr)}`);
+      }
+
+      // 2b. Check for cron/exec failures and broadcast notifications
+      try {
+        const { scanForFailures, formatFailureNotification } = await import("./failure-notify.js");
+        const failures = await scanForFailures();
+        if (failures.hasNewFailures) {
+          const notification = formatFailureNotification(failures);
+          if (notification) {
+            this.logger.warn(`[Consciousness] ${notification}`);
+            this.broadcast("ally:notification", {
+              type: "failure-alert",
+              summary: notification,
+              cronErrors: failures.cronErrors,
+            });
+          }
+        }
+      } catch (err) {
+        this.logger.warn(`[Consciousness] Failure detection failed: ${String(err)}`);
       }
 
       // 3. Process cron skills

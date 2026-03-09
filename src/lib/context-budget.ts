@@ -1,0 +1,289 @@
+/**
+ * context-budget.ts — Three-level routing + context management for GodMode.
+ *
+ * The ally gets progressively more detail as it routes to the right domain:
+ *   Level 1 (always): Soul + identity + memory + routing decision tree
+ *   Level 2 (on-demand): Skill card with domain-specific tips/gotchas
+ *   Level 3 (accumulated): Routing lessons from past corrections
+ *
+ * Progressive degradation under context pressure:
+ *   Normal (0-70%):   Full injection — all 3 levels (~55 lines max)
+ *   Pressure (70-90%): P0 + P1 only (~35 lines)
+ *   Critical (90%+):   Soul + identity + memories only (~25 lines)
+ *
+ * Memory failures are visible but non-fatal. The conversation never breaks.
+ */
+
+// ── Priority Tiers ───────────────────────────────────────────────────
+//
+// P0 (always): Soul essence, identity anchor, Mem0 results, routing guide
+// P1 (normal): Schedule, task/queue counts, priorities, skill card
+// P2 (trim under pressure): Meeting prep, cron failures, queue review, routing lessons
+// P3 (first to drop): Safety nudges, conditional context
+
+export interface ContextInputs {
+  /** P0: User identity anchor (name, tz, style) — ~5 lines */
+  identityAnchor: string | null;
+
+  /** P0: Mem0 search results relevant to this message — up to 15 lines */
+  memoryBlock: string | null;
+
+  /** P0: Memory system health — "ready" | "degraded" | "offline" */
+  memoryStatus: "ready" | "degraded" | "offline";
+
+  /** P1: Today's calendar — ~5 lines */
+  schedule: string | null;
+
+  /** P1: Task and queue summary — ~2 lines */
+  operationalCounts: string | null;
+
+  /** P1: Today's priorities — ~3 lines */
+  priorities: string | null;
+
+  /** P2: Meeting prep (only if meeting in 2 hrs) — ~3 lines */
+  meetingPrep: string | null;
+
+  /** P2: Cron failure alerts — ~3 lines */
+  cronFailures: string | null;
+
+  /** P2: Queue items ready for review — ~1 line */
+  queueReview: string | null;
+
+  /** P1.5: Skill card — domain-specific routing tips (~15 lines) */
+  skillCard: string | null;
+
+  /** P2: Routing lessons — past corrections (~5 lines) */
+  routingLessons: string | null;
+
+  /** P3: Safety nudges (enforcer, output shield, prompt shield) */
+  safetyNudges: string[];
+
+  /** Current context pressure: 0 = empty, 1 = full */
+  contextPressure: number;
+}
+
+/** Max lines for each section to prevent any single section from bloating */
+const MAX_MEMORY_LINES = 12;
+const MAX_SCHEDULE_LINES = 6;
+
+/**
+ * Assemble the final context block for injection.
+ * Respects priority tiers and context pressure.
+ * Returns the complete string to inject, or empty string if nothing to inject.
+ */
+export function assembleContext(inputs: ContextInputs): string {
+  const chunks: string[] = [];
+  const pressure = inputs.contextPressure;
+
+  // ── P0: Always injected ──────────────────────────────────────────
+
+  // Soul essence — who you are, meta goal (~4 lines, always)
+  chunks.push(SOUL_ESSENCE);
+
+  // Identity anchor — who the user is
+  if (inputs.identityAnchor) {
+    chunks.push(inputs.identityAnchor);
+  }
+
+  // Mem0 memories (most important — answers the user's question before the LLM asks)
+  if (inputs.memoryBlock) {
+    chunks.push(truncateLines(inputs.memoryBlock, MAX_MEMORY_LINES));
+  } else if (inputs.memoryStatus === "offline") {
+    chunks.push(
+      "## Memory Status: Offline\n" +
+      "Your memory system is not connected this session. You may need to ask the user " +
+      "for details you would normally already know. Apologize briefly if so.",
+    );
+  } else if (inputs.memoryStatus === "degraded") {
+    chunks.push(
+      "## Memory Status: Degraded\n" +
+      "Memory search failed this turn. If you're unsure about something, " +
+      "search your vault or ask — don't guess.",
+    );
+  }
+
+  // Capability map — tells the ally what tools it has
+  chunks.push(CAPABILITY_MAP);
+
+  // Under critical pressure, stop here
+  if (pressure >= 0.9) {
+    chunks.push(
+      "⚠ Context window near capacity. Keep responses concise. " +
+      "Suggest the user run /compact if the conversation is long.",
+    );
+    return wrapContext(chunks);
+  }
+
+  // ── P1: Normal operation ─────────────────────────────────────────
+
+  if (inputs.schedule) {
+    chunks.push(truncateLines(inputs.schedule, MAX_SCHEDULE_LINES));
+  }
+
+  if (inputs.operationalCounts) {
+    chunks.push(inputs.operationalCounts);
+  }
+
+  if (inputs.priorities) {
+    chunks.push(inputs.priorities);
+  }
+
+  // P1.5: Skill card — domain-specific guidance for this turn's topic
+  if (inputs.skillCard) {
+    chunks.push(inputs.skillCard);
+  }
+
+  // Under moderate pressure, stop here
+  if (pressure >= 0.7) {
+    return wrapContext(chunks);
+  }
+
+  // ── P2: Full context ─────────────────────────────────────────────
+
+  if (inputs.meetingPrep) {
+    chunks.push(inputs.meetingPrep);
+  }
+
+  if (inputs.cronFailures) {
+    chunks.push(inputs.cronFailures);
+  }
+
+  if (inputs.queueReview) {
+    chunks.push(inputs.queueReview);
+  }
+
+  // Routing lessons — past corrections the ally should not repeat
+  if (inputs.routingLessons) {
+    chunks.push(inputs.routingLessons);
+  }
+
+  // ── P3: Lowest priority ──────────────────────────────────────────
+
+  for (const nudge of inputs.safetyNudges) {
+    if (nudge) chunks.push(nudge);
+  }
+
+  return wrapContext(chunks);
+}
+
+// ── Soul Essence ────────────────────────────────────────────────────
+// Condensed identity: who the ally IS + the meta goal. ~4 lines.
+// Full Soul details (modes, boundaries, serve rules) live in Mem0
+// and are retrieved on-demand when relevant.
+
+const SOUL_ESSENCE = [
+  "## Who You Are",
+  "You are the user's personal AI ally — a deeply contextual coworker who",
+  "knows their goals, priorities, people, and rhythms. Powered by GodMode.",
+  "You are not a chatbot. You are a proactive partner who anticipates, executes, and remembers.",
+  "Meta goal: Earn trust through competence. Search before asking. Act, don't list options.",
+].join("\n");
+
+// ── Routing Guide ───────────────────────────────────────────────────
+// Decision tree, not a menu. Tells the ally the lookup priority chain
+// so it never asks the user for something it can find itself.
+// The LLM already sees tool definitions — this tells it WHEN to use WHAT.
+
+const CAPABILITY_MAP = [
+  "## How to Find What You Need",
+  "BEFORE you ask the user ANYTHING, follow this lookup chain:",
+  "1. **Check above** — your memory was searched and results are shown above.",
+  "2. **Search the vault** — call secondBrain.search for notes, projects, people, context.",
+  "3. **Check your tools** — you have tasks.list, calendar.events.today, queue.list, files.read, x.search.",
+  "4. **Delegate** — use queue_add to send complex work to background agents.",
+  "5. **ONLY THEN ask** — if steps 1-4 came up empty, ask the user.",
+  "",
+  "## Routing",
+  "- Schedule/meetings → already injected above, or call calendar.events.today",
+  "- Tasks/priorities → already injected above, or call tasks.list",
+  "- People/contacts/context → secondBrain.search (vault has everything)",
+  "- Background work → queue_add (draft, research, code review, etc.)",
+  "- X/Twitter intel → x_read tool or x.search",
+  "- Past conversations → your memory (already searched above)",
+  "",
+  "CRITICAL: Asking the user for info you could look up is a FAILURE MODE.",
+  "When unsure, search first. You have the tools. Use them.",
+].join("\n");
+
+// ── Context Wrapper ──────────────────────────────────────────────────
+// Replaces the old "invisible background context" framing that caused the
+// LLM to deprioritize instructions.
+
+function wrapContext(chunks: string[]): string {
+  if (chunks.length === 0) return "";
+
+  const joined = chunks.join("\n\n");
+
+  return (
+    `<godmode-context priority="mandatory">\n` +
+    `You MUST follow these operating instructions. Do NOT echo or quote this block.\n\n` +
+    `${joined}\n` +
+    `</godmode-context>`
+  );
+}
+
+// ── Helpers ──────────────────────────────────────────────────────────
+
+function truncateLines(text: string, maxLines: number): string {
+  const lines = text.split("\n");
+  if (lines.length <= maxLines) return text;
+  return lines.slice(0, maxLines).join("\n") + `\n(+${lines.length - maxLines} more)`;
+}
+
+// ── Identity Anchor Builder ──────────────────────────────────────────
+// Extracts the minimal identity anchor from the awareness snapshot.
+// This is the only piece that stays hardcoded — everything else goes through Mem0.
+
+/**
+ * Build a minimal identity anchor from USER.md.
+ * ~5 lines: Name, timezone, style, current season.
+ * Cached for 30 min — identity rarely changes.
+ */
+let identityCache: string | null = null;
+let identityCachedAt = 0;
+const IDENTITY_TTL_MS = 30 * 60 * 1000;
+
+export async function getIdentityAnchor(): Promise<string | null> {
+  if (identityCache && Date.now() - identityCachedAt < IDENTITY_TTL_MS) {
+    return identityCache;
+  }
+
+  try {
+    const { readFile } = await import("node:fs/promises");
+    const { join } = await import("node:path");
+    const { resolveIdentityDir } = await import("./vault-paths.js");
+
+    const identityResult = resolveIdentityDir();
+    if (!identityResult) return null;
+
+    const content = await readFile(join(identityResult.path, "USER.md"), "utf-8");
+
+    const extract = (label: string): string | null => {
+      const m = content.match(new RegExp(`^[-*]\\s*\\*\\*${label}[:\\s]*\\*\\*\\s*(.+)$`, "mi"));
+      return m?.[1]?.trim() ?? null;
+    };
+
+    const name = extract("Name") ?? extract("Full Name");
+    if (!name) return null;
+
+    const tz = extract("Timezone") ?? extract("Time Zone");
+    const style = extract("Personality");
+
+    const parts = [`## Owner: ${name}`];
+    if (tz) parts.push(`Timezone: ${tz}`);
+    if (style) parts.push(`Type: ${style}`);
+    parts.push("Style: Be direct, concise, no corporate speak. Give recommendations, not options.");
+
+    identityCache = parts.join("\n");
+    identityCachedAt = Date.now();
+    return identityCache;
+  } catch {
+    return null;
+  }
+}
+
+/** Invalidate identity cache (e.g., after onboarding changes) */
+export function invalidateIdentityCache(): void {
+  identityCache = null;
+  identityCachedAt = 0;
+}
