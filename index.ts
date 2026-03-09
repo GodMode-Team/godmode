@@ -1505,6 +1505,7 @@ h1{color:#ff6b6b}code{background:#16213e;padding:2px 8px;border-radius:4px}a{col
 
       // P1: Task + queue counts
       let operationalCounts: string | null = null;
+      let overdueCount = 0;
       try {
         const { localDateString: lds } = await import("./src/data-paths.js");
         const today = lds();
@@ -1514,6 +1515,7 @@ h1{color:#ff6b6b}code{background:#16213e;padding:2px 8px;border-radius:4px}a{col
         const overdue = pending.filter(
           (t: { dueDate?: string | null }) => t.dueDate != null && t.dueDate <= today,
         );
+        overdueCount = overdue.length;
         const parts = [`Tasks: ${pending.length} pending, ${overdue.length} overdue`];
         if (overdue.length > 0) parts.push("Surface overdue tasks early.");
         // Queue review count is handled by the dedicated P2 queueReview block — don't duplicate here
@@ -1569,10 +1571,14 @@ h1{color:#ff6b6b}code{background:#16213e;padding:2px 8px;border-radius:4px}a{col
 
       // Extract user message once for skill card + routing lesson matching
       let currentUserMessage = "";
+      let isFirstTurn = false;
       try {
         const msgs = (event as any).messages ?? [];
         const lastMsg = [...msgs].reverse().find((m: any) => m.role === "user");
         currentUserMessage = typeof lastMsg?.content === "string" ? lastMsg.content : "";
+        // First turn = only one user message in the conversation
+        const userMsgCount = msgs.filter((m: any) => m.role === "user").length;
+        isFirstTurn = userMsgCount <= 1;
       } catch { /* non-fatal */ }
 
       // P1.5: Skill card — domain-specific routing tips
@@ -1656,6 +1662,9 @@ h1{color:#ff6b6b}code{background:#16213e;padding:2px 8px;border-radius:4px}a{col
         safetyNudges,
         contextPressure,
         provenance,
+        userMessage: currentUserMessage,
+        isFirstTurn,
+        overdueCount,
       });
 
       if (!assembled) return;

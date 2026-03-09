@@ -74,6 +74,15 @@ export interface ContextInputs {
 
   /** ACP provenance — who sent this message (3.8+). Null if unknown/local UI. */
   provenance?: InputProvenance | null;
+
+  /** Current user message — for relevance filtering */
+  userMessage?: string;
+
+  /** Whether this is the first message in the session */
+  isFirstTurn?: boolean;
+
+  /** Number of overdue tasks — always surface if > 0 */
+  overdueCount?: number;
 }
 
 /** Max lines for each section to prevent any single section from bloating */
@@ -129,8 +138,18 @@ export function assembleContext(inputs: ContextInputs): string {
     }
   }
 
-  // Capability map — tells the ally what tools it has
-  chunks.push(CAPABILITY_MAP);
+  // Relevance signals — determines what operational context to inject
+  const msg = (inputs.userMessage ?? "").toLowerCase();
+  const isFirst = inputs.isFirstTurn ?? false;
+  const hasOverdue = (inputs.overdueCount ?? 0) > 0;
+  const wantsSchedule = isFirst || isTimeRelevant(msg);
+  const wantsOps = isFirst || isOpsRelevant(msg) || hasOverdue;
+
+  // Capability map — only on first turn or when routing lessons fire
+  // (routing lessons = ally made a mistake = needs the map refreshed)
+  if (isFirst || inputs.routingLessons) {
+    chunks.push(CAPABILITY_MAP);
+  }
 
   // Under critical pressure, stop here
   if (pressure >= 0.9) {
@@ -146,21 +165,21 @@ export function assembleContext(inputs: ContextInputs): string {
     return wrapContext(chunks);
   }
 
-  // ── P1: Normal operation ─────────────────────────────────────────
+  // ── P1: Normal operation (relevance-gated) ─────────────────────
 
-  if (inputs.schedule) {
+  if (inputs.schedule && wantsSchedule) {
     chunks.push(truncateLines(inputs.schedule, MAX_SCHEDULE_LINES));
   }
 
-  if (inputs.operationalCounts) {
+  if (inputs.operationalCounts && wantsOps) {
     chunks.push(inputs.operationalCounts);
   }
 
-  if (inputs.priorities) {
+  if (inputs.priorities && wantsOps) {
     chunks.push(inputs.priorities);
   }
 
-  // P1.5: Skill card — domain-specific guidance for this turn's topic
+  // P1.5: Skill card — already relevance-gated by keyword match
   if (inputs.skillCard) {
     chunks.push(inputs.skillCard);
   }
@@ -184,7 +203,7 @@ export function assembleContext(inputs: ContextInputs): string {
     chunks.push(inputs.queueReview);
   }
 
-  // Routing lessons — past corrections the ally should not repeat
+  // Routing lessons — already relevance-gated by keyword match
   if (inputs.routingLessons) {
     chunks.push(inputs.routingLessons);
   }
@@ -266,6 +285,32 @@ function truncateLines(text: string, maxLines: number): string {
   const lines = text.split("\n");
   if (lines.length <= maxLines) return text;
   return lines.slice(0, maxLines).join("\n") + `\n(+${lines.length - maxLines} more)`;
+}
+
+// ── Relevance Detectors ─────────────────────────────────────────────
+// Lightweight keyword checks to decide if operational context is worth injecting.
+
+const TIME_WORDS = [
+  "schedule", "calendar", "meeting", "call", "today", "tomorrow", "morning",
+  "afternoon", "evening", "tonight", "this week", "next week", "what time",
+  "when", "agenda", "day look", "plans", "free time", "busy", "available",
+  "slot", "book", "reschedule", "cancel",
+];
+
+const OPS_WORDS = [
+  "task", "todo", "to-do", "overdue", "priority", "priorities", "focus",
+  "plan", "planning", "work", "project", "deadline", "due", "queue",
+  "status", "progress", "update", "brief", "brief me", "catch me up",
+  "what's going on", "what am i", "what should", "what do i", "remind",
+  "morning", "start the day", "good morning", "hey prosper",
+];
+
+function isTimeRelevant(msg: string): boolean {
+  return TIME_WORDS.some((w) => msg.includes(w));
+}
+
+function isOpsRelevant(msg: string): boolean {
+  return OPS_WORDS.some((w) => msg.includes(w));
 }
 
 /**
