@@ -828,7 +828,26 @@ async function maybeAutoTitleSession(host: GatewayHost, sessionKey: string) {
       }
     }
 
-    const title = deriveSessionTitle(messages);
+    // Try LLM-generated title via server RPC, fall back to local string derivation
+    let title: string | null = null;
+    const firstUser = messages.find((m: { role: string }) => m.role === "user");
+    const firstAssistant = messages.find((m: { role: string }) => m.role === "assistant");
+    if (firstUser && host.client) {
+      try {
+        const res = await host.client.request("sessions.generateTitle", {
+          userMessage: extractMessageText(firstUser as { content: unknown }),
+          assistantMessage: firstAssistant ? extractMessageText(firstAssistant as { content: unknown }) : "",
+        });
+        if (res?.title) {
+          title = res.title;
+        }
+      } catch {
+        // RPC failed — fall through to local derivation
+      }
+    }
+    if (!title) {
+      title = deriveSessionTitle(messages);
+    }
 
     if (!title) {
       // Don't mark as applied — will retry on next response when more messages exist

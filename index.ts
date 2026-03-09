@@ -959,6 +959,22 @@ h1{color:#ff6b6b}code{background:#16213e;padding:2px 8px;border-radius:4px}a{col
 
     // ── 4. Plugin status RPC (not license-gated — for diagnostics) ─
     const methodCount = Object.keys(allHandlers).length;
+    // ── sessions.generateTitle — LLM-powered title generation ──
+    api.registerGatewayMethod("sessions.generateTitle", (async ({ params, respond }: { params: Record<string, unknown>; respond: Function }) => {
+      const userMessage = typeof params.userMessage === "string" ? params.userMessage : "";
+      const assistantMessage = typeof params.assistantMessage === "string" ? params.assistantMessage : "";
+      if (!userMessage) {
+        respond(false, null, { code: "MISSING_PARAM", message: "userMessage is required" });
+        return;
+      }
+      try {
+        const title = await generateSessionTitle(userMessage, assistantMessage);
+        respond(true, { title: title ?? null });
+      } catch (err) {
+        respond(true, { title: null, error: String(err) });
+      }
+    }) as Parameters<typeof api.registerGatewayMethod>[1]);
+
     api.registerGatewayMethod("godmode.status", (async ({ respond }: { respond: Function }) => {
       respond(true, {
         plugin: true,
@@ -1317,6 +1333,7 @@ h1{color:#ff6b6b}code{background:#16213e;padding:2px 8px;border-radius:4px}a{col
           !isCronSessionKey(sessionKey)
         ) {
           pendingAutoTitles.set(sessionKey, content);
+          api.logger.info(`[GodMode][AutoTitle] Captured first message for "${sessionKey}" (${content.slice(0, 60)}...)`);
         }
       }
     });
@@ -1786,9 +1803,14 @@ h1{color:#ff6b6b}code{background:#16213e;padding:2px 8px;border-radius:4px}a{col
       const sessionKey = extractSessionKey(ctx);
       if (!sessionKey) return;
 
+      api.logger.info(`[GodMode][AutoTitle] llm_output fired for "${sessionKey}", pending keys: [${[...pendingAutoTitles.keys()].join(", ")}]`);
+
       // Check if we have a pending first message for this session
       const firstMessage = pendingAutoTitles.get(sessionKey);
-      if (!firstMessage) return;
+      if (!firstMessage) {
+        api.logger.info(`[GodMode][AutoTitle] No pending message for "${sessionKey}" — skipping`);
+        return;
+      }
 
       // Remove from pending — we'll either title it or skip it
       pendingAutoTitles.delete(sessionKey);
@@ -1816,8 +1838,10 @@ h1{color:#ff6b6b}code{background:#16213e;padding:2px 8px;border-radius:4px}a{col
 
         // Try LLM-based title generation first, fall back to string derivation
         let title = await generateSessionTitle(firstMessage, assistantText);
+        api.logger.info(`[GodMode][AutoTitle] LLM title result: ${title ? `"${title}"` : "null (falling back to string derivation)"}`);
         if (!title) {
           title = deriveSessionTitle(entry ?? {}, firstMessage) ?? null;
+          api.logger.info(`[GodMode][AutoTitle] String fallback result: ${title ? `"${title}"` : "null"}`);
         }
         if (!title) return;
 
