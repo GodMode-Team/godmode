@@ -80,8 +80,26 @@ async function _doInit(): Promise<void> {
       return;
     }
 
-    if (!process.env.ANTHROPIC_API_KEY) {
-      console.warn("[GodMode Memory] No ANTHROPIC_API_KEY found. Memory disabled.");
+    // Resolve Anthropic API key — check process.env first, then OpenClaw OAuth
+    let anthropicKey = process.env.ANTHROPIC_API_KEY;
+    if (!anthropicKey) {
+      try {
+        const { resolveApiKeyForProvider, loadAuthProfileStore } = await import("openclaw/plugin-sdk");
+        const store = await loadAuthProfileStore();
+        const resolved = await resolveApiKeyForProvider({
+          provider: "anthropic",
+          store,
+        });
+        if (resolved?.apiKey) {
+          anthropicKey = resolved.apiKey;
+          console.log(`[GodMode Memory] Resolved Anthropic key via ${resolved.source}`);
+        }
+      } catch (err) {
+        console.warn(`[GodMode Memory] Could not resolve Anthropic key from OpenClaw auth: ${String(err)}`);
+      }
+    }
+    if (!anthropicKey) {
+      console.warn("[GodMode Memory] No Anthropic API key available (env or OAuth). Memory disabled.");
       initFailed = true;
       return;
     }
@@ -94,7 +112,7 @@ async function _doInit(): Promise<void> {
       llm: {
         provider: "anthropic",
         config: {
-          apiKey: process.env.ANTHROPIC_API_KEY,
+          apiKey: anthropicKey,
           model: "claude-sonnet-4-20250514",
         },
       },
