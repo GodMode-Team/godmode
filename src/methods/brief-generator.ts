@@ -96,21 +96,14 @@ function resolveAnthropicAuth(): string | null {
   return null;
 }
 
-/** Call Claude via direct API (API key) or `claude` CLI (OAuth/Claude Max). */
+/** Call Claude via `claude` CLI (OAuth/Claude Max). Always uses Max subscription. */
 async function callClaude(
   systemPrompt: string,
   userPrompt: string,
   opts?: { model?: string; maxTokens?: number },
 ): Promise<string | null> {
-  const apiKey = resolveAnthropicAuth();
-  const isOAuth = apiKey?.startsWith("sk-ant-oat01-");
-
-  // If we have a direct API key (not OAuth), use the Messages API
-  if (apiKey && !isOAuth) {
-    return callClaudeDirectAPI(apiKey, systemPrompt, userPrompt, opts);
-  }
-
-  // Otherwise use the `claude` CLI which handles OAuth/Max auth natively
+  // Always use the CLI which routes through OAuth/Max subscription.
+  // Never call the direct API — that bills to the API account.
   return callClaudeCLI(systemPrompt, userPrompt, opts);
 }
 
@@ -1491,6 +1484,7 @@ async function generateDailyBrief(date?: string): Promise<GenerateResult> {
   const [
     calendar, oura, weather, context, xIntel, carryForward,
     frontInbox, eveningReview, overnightWork, intelSection,
+    cronFailures,
   ] = await Promise.all([
     fetchCalendarEvents().catch((e) => ({ events: [] as CalendarEvent[], error: String(e) })),
     fetchOuraData().catch(() => ({
@@ -1508,6 +1502,12 @@ async function generateDailyBrief(date?: string): Promise<GenerateResult> {
     extractEveningReview(vaultPath).catch(() => ({ tomorrowHandoff: "", reflection: "" })),
     formatOvernightWorkSection().catch(() => null),
     formatIntelligenceSection().catch(() => null),
+    (async () => {
+      try {
+        const { scanForFailures } = await import("../services/failure-notify.js");
+        return await scanForFailures();
+      } catch { return null; }
+    })(),
   ]);
 
   if (calendar.error) warnings.push(`Calendar: ${calendar.error}`);
@@ -1722,7 +1722,13 @@ ${ouraRaw}
 ${overnightWork || "(none)"}
 
 ### GodMode Intelligence
-${intelSection || "(none)"}`;
+${intelSection || "(none)"}
+
+### Overnight Failures
+${cronFailures && cronFailures.cronErrors.length > 0
+  ? cronFailures.cronErrors.map(e => `- ${e.name}: ${e.consecutiveErrors} consecutive errors (last run: ${e.lastRunAt ?? "unknown"})`).join("\n")
+  : "(all clear — no failures)"}
+${cronFailures && cronFailures.cronErrors.length > 0 ? "\nIMPORTANT: Surface these failures prominently in the brief. The user needs to know what broke overnight." : ""}`;
 
   // ── Call Claude to render the brief ─────────────────────────────
   console.log("[BriefGenerator] Calling Claude Sonnet 4.6 to render brief...");

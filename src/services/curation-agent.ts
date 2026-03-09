@@ -307,53 +307,9 @@ async function runCurationLLM(params: {
 }): Promise<CurationLLMResult> {
   const { workspace, memoryFiles, currentMemory, currentSops, log } = params;
 
-  // Try LLM-based curation first
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (apiKey) {
-    try {
-      const prompt = buildCurationPrompt({ memoryFiles, currentMemory, currentSops });
-      const response = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-api-key": apiKey,
-          "anthropic-version": "2023-06-01",
-        },
-        body: JSON.stringify({
-          model: CURATION_MODEL,
-          max_tokens: CURATION_MAX_TOKENS,
-          messages: [{ role: "user", content: prompt }],
-        }),
-        signal: AbortSignal.timeout(30_000),
-      });
-
-      if (response.ok) {
-        const body = (await response.json()) as {
-          content: Array<{ type: string; text?: string }>;
-        };
-        const text = body.content
-          ?.filter((b) => b.type === "text")
-          .map((b) => b.text)
-          .join("");
-
-        if (text) {
-          const result = parseCurationResponse(text);
-          if (result.updatedMemory) {
-            log.info(`[Curation] LLM curation completed for ${workspace.id}`);
-            return result;
-          }
-        }
-      } else {
-        log.warn(`[Curation] LLM API returned ${response.status} — falling back to merge`);
-      }
-    } catch (err) {
-      log.warn(`[Curation] LLM call failed: ${err instanceof Error ? err.message : String(err)} — falling back to merge`);
-    }
-  } else {
-    log.info("[Curation] No ANTHROPIC_API_KEY — using merge-based curation");
-  }
-
-  // Fallback: simple merge-based curation
+  // Direct API calls bill to the API account — always use merge-based curation.
+  // LLM curation disabled to prevent unexpected API charges.
+  log.info("[Curation] Using merge-based curation (direct API disabled, use OAuth/Max via CLI)");
   return runMergeCuration(params);
 }
 

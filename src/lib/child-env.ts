@@ -48,9 +48,10 @@ export function buildChildEnv(
     TERM: process.env.TERM ?? "xterm-256color",
   };
 
-  // Forward API keys when present
+  // Forward non-Anthropic API keys when present.
+  // ANTHROPIC_API_KEY is intentionally NOT forwarded — child processes
+  // should use OAuth/Max subscription via the CLI, not the direct API.
   for (const key of [
-    "ANTHROPIC_API_KEY",
     "OPENAI_API_KEY",
     "GEMINI_API_KEY",
   ]) {
