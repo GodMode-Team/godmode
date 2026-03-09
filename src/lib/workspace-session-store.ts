@@ -172,6 +172,13 @@ export function deriveSessionTitle(entry: SessionStoreEntry | undefined, firstUs
   }
   if (firstUserMessage?.trim()) {
     const normalized = firstUserMessage
+      // Strip XML system-context / system-reminder blocks injected by GodMode
+      .replace(/<system-context>[\s\S]*?<\/system-context>/g, "")
+      .replace(/<system-reminder>[\s\S]*?<\/system-reminder>/g, "")
+      .replace(/<system>[\s\S]*?<\/system>/g, "")
+      .replace(/<context>[\s\S]*?<\/context>/g, "")
+      // Strip any remaining XML-style system tags (catch-all)
+      .replace(/<[a-z][a-z_-]*>[\s\S]*?<\/[a-z][a-z_-]*>/g, "")
       // Strip leading timestamp prefixes (e.g. "Mon 2026-03-09 13:15 CDT", "2026-03-09T13:15:00Z")
       .replace(/^(?:(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)\w*\s+)?\d{4}-\d{2}-\d{2}[\sT]\d{1,2}:\d{2}(?::\d{2})?(?:\s*[A-Z]{2,5})?\s*/g, "")
       .replace(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}[^\s]*\s*/g, "")

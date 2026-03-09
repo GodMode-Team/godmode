@@ -17,6 +17,7 @@ import { secureWriteFile, secureMkdir } from "../lib/secure-fs.js";
 import { existsSync, mkdirSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { randomUUID } from "node:crypto";
+import { withFileLock } from "openclaw/plugin-sdk";
 import { DATA_DIR, localDateString } from "../data-paths.js";
 import {
   getVaultPath,
@@ -159,6 +160,23 @@ async function writeMeetingQueue(queue: MeetingQueue): Promise<void> {
   await secureWriteFile(QUEUE_FILE, JSON.stringify(queue, null, 2));
 }
 
+const MEETING_LOCK_OPTIONS = {
+  retries: { retries: 20, factor: 1.35, minTimeout: 20, maxTimeout: 250, randomize: true },
+  stale: 15_000,
+};
+
+/** Atomic read-modify-write with file lock (coordinates with webhook handler). */
+async function updateMeetingQueueLocked<T>(
+  updater: (queue: MeetingQueue) => T | Promise<T>,
+): Promise<T> {
+  return withFileLock(QUEUE_FILE, MEETING_LOCK_OPTIONS, async () => {
+    const queue = await readMeetingQueue();
+    const result = await updater(queue);
+    await writeMeetingQueue(queue);
+    return result;
+  });
+}
+
 // ── Core processing ──────────────────────────────────────────────────
 
 async function processAllPending(): Promise<void> {
@@ -169,7 +187,8 @@ async function processAllPending(): Promise<void> {
     let recovered = false;
     for (const m of queue.meetings) {
       if (m.status === "processing") {
-        const stuckSince = m.processedAt ? Date.now() - new Date(m.processedAt).getTime() : Infinity;
+        // Use receivedAt as proxy for when processing started (processedAt is null during processing)
+        const stuckSince = m.receivedAt ? Date.now() - new Date(m.receivedAt).getTime() : Infinity;
         if (stuckSince > 10 * 60 * 1000) { // stuck > 10 min
           logger.warn(`[FathomProcessor] Recovering stuck meeting "${m.title}" (${m.id})`);
           m.status = "pending";
@@ -195,14 +214,14 @@ async function processAllPending(): Promise<void> {
         logger.warn(
           `[FathomProcessor] Failed to process meeting "${meeting.title}" (${meeting.id}): ${String(err)}`,
         );
-        // Re-read queue to avoid clobbering concurrent writes, then mark as failed
-        const freshQueue = await readMeetingQueue();
-        const target = freshQueue.meetings.find((m) => m.id === meeting.id);
-        if (target) {
-          target.status = "failed";
-          target.error = err instanceof Error ? err.message : String(err);
-          await writeMeetingQueue(freshQueue);
-        }
+        // Mark as failed (file-locked to coordinate with webhook handler)
+        await updateMeetingQueueLocked((queue) => {
+          const target = queue.meetings.find((m) => m.id === meeting.id);
+          if (target) {
+            target.status = "failed";
+            target.error = err instanceof Error ? err.message : String(err);
+          }
+        });
       }
     }
   });
@@ -211,13 +230,11 @@ async function processAllPending(): Promise<void> {
 async function processMeeting(meeting: MeetingQueueItem): Promise<void> {
   logger.info(`[FathomProcessor] Processing: "${meeting.title}" (${meeting.id})`);
 
-  // Mark as processing
-  const queue = await readMeetingQueue();
-  const queueMeeting = queue.meetings.find((m) => m.id === meeting.id);
-  if (queueMeeting) {
-    queueMeeting.status = "processing";
-    await writeMeetingQueue(queue);
-  }
+  // Mark as processing (file-locked to coordinate with webhook handler)
+  await updateMeetingQueueLocked((queue) => {
+    const m = queue.meetings.find((m) => m.id === meeting.id);
+    if (m) m.status = "processing";
+  });
 
   const processingNotes: string[] = [];
   const meetingDate = meeting.date ? meeting.date.split("T")[0] : localDateString();
@@ -267,15 +284,15 @@ async function processMeeting(meeting: MeetingQueueItem): Promise<void> {
     processingNotes.push(`Notification failed: ${String(err)}`);
   }
 
-  // ── Step 6: Mark as processed ──────────────────────────────────
-  const finalQueue = await readMeetingQueue();
-  const finalMeeting = finalQueue.meetings.find((m) => m.id === meeting.id);
-  if (finalMeeting) {
-    finalMeeting.status = "processed";
-    finalMeeting.processedAt = new Date().toISOString();
-    finalMeeting.processedNotes = processingNotes.join("; ");
-    await writeMeetingQueue(finalQueue);
-  }
+  // ── Step 6: Mark as processed (file-locked to coordinate with webhook handler)
+  await updateMeetingQueueLocked((queue) => {
+    const m = queue.meetings.find((m) => m.id === meeting.id);
+    if (m) {
+      m.status = "processed";
+      m.processedAt = new Date().toISOString();
+      m.processedNotes = processingNotes.join("; ");
+    }
+  });
 
   logger.info(
     `[FathomProcessor] Completed: "${meeting.title}" — ${processingNotes.join("; ")}`,

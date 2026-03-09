@@ -509,8 +509,12 @@ const webhookReceive: GatewayRequestHandler = async ({ params, respond }) => {
     // Read-only access for signature check
     const queueForSig = await readMeetingQueue();
 
-    // Signature verification — reject on failure when secret is configured
-    if (queueForSig.webhookSecret && headers) {
+    // Signature verification — reject when secret is configured but headers missing or invalid
+    if (queueForSig.webhookSecret) {
+      if (!headers) {
+        respond(false, null, { code: "SIGNATURE_REQUIRED", message: "Webhook signing is configured — headers with signature are required" });
+        return;
+      }
       const bodyStr = typeof payload === "string" ? payload : JSON.stringify(payload);
       const valid = verifyWebhookSignatureFromHeaders(queueForSig.webhookSecret, headers, bodyStr);
       if (!valid) {

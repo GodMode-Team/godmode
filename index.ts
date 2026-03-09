@@ -1125,7 +1125,11 @@ h1{color:#ff6b6b}code{background:#16213e;padding:2px 8px;border-radius:4px}a{col
       try {
         const { initMemory, isMemoryReady, seedFromVault } = await import("./src/lib/memory.js");
         await initMemory();
-        api.logger.info("[GodMode] Mem0 memory initialized");
+        if (isMemoryReady()) {
+          api.logger.info("[GodMode] Mem0 memory initialized");
+        } else {
+          api.logger.warn("[GodMode] Mem0 memory not available (missing API keys or init failed)");
+        }
 
         // Seed vault knowledge + skill cards into Mem0 on first boot
         if (isMemoryReady()) {
