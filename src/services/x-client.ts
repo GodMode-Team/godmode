@@ -3,23 +3,23 @@
  *
  * Routes requests to the best backend:
  *   - XAI x_search: semantic search, topic monitoring
- *   - Brave CDP: bookmarks, specific tweets, timelines, articles
+ *   - twitter-cli: bookmarks, specific tweets, timelines
  *
- * Graceful degradation: if Brave is down, search still works via XAI.
- * If XAI key is missing, browser operations still work.
+ * Graceful degradation: if twitter-cli is down, search still works via XAI.
+ * If XAI key is missing, twitter-cli operations still work.
  */
 
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
-  checkHealth as checkBrowserHealth,
-  getBookmarks as browserGetBookmarks,
-  getTweet as browserGetTweet,
-  getThread as browserGetThread,
-  getUserTimeline as browserGetTimeline,
-  readArticle as browserReadArticle,
-  setupLogin as browserSetup,
-  launchBrave,
+  checkHealth as checkCliHealth,
+  getBookmarks as cliGetBookmarks,
+  getTweet as cliGetTweet,
+  getThread as cliGetThread,
+  getUserTimeline as cliGetTimeline,
+  readArticle as cliReadArticle,
+  setupLogin as cliSetup,
+  initTwitterCli,
   findReachableCdp,
   type XBrowserHealth,
   type ExtractedTweet,
@@ -65,7 +65,7 @@ export function getXaiApiKey(): string {
 
 export type XSearchResult = {
   items: Array<{ author: string; text: string; url?: string }>;
-  source: "xai" | "browser";
+  source: "xai" | "cli";
   error?: string;
 };
 
@@ -88,21 +88,9 @@ export async function searchX(
 ): Promise<XSearchResult> {
   const apiKey = getXaiApiKey();
   if (!apiKey) {
-    // Fall back to browser search if no XAI key
-    const cdp = await findReachableCdp();
-    if (cdp) {
-      const result = await browserGetTimeline(query.split(" ")[0] ?? "news", opts?.limit ?? 10);
-      return {
-        items: result.tweets.map((t) => ({
-          author: t.handle,
-          text: t.text,
-          url: t.url,
-        })),
-        source: "browser",
-        error: result.error,
-      };
-    }
-    return { items: [], source: "xai", error: "XAI_API_KEY not configured and no browser available" };
+    // Fall back to twitter-cli search
+    // twitter-cli doesn't have a search command that maps cleanly, but we can try
+    return { items: [], source: "xai", error: "XAI_API_KEY not configured. Search requires the XAI API key in ~/.openclaw/.env" };
   }
 
   try {
@@ -200,27 +188,27 @@ export async function searchX(
   }
 }
 
-// ── Passthrough to browser operations ──────────────────────────────────
+// ── Passthrough to twitter-cli operations ──────────────────────────────
 
-export { browserGetBookmarks as getBookmarks };
-export { browserGetTweet as getTweet };
-export { browserGetThread as getThread };
-export { browserGetTimeline as getUserTimeline };
-export { browserReadArticle as readArticle };
-export { browserSetup as setup };
+export { cliGetBookmarks as getBookmarks };
+export { cliGetTweet as getTweet };
+export { cliGetThread as getThread };
+export { cliGetTimeline as getUserTimeline };
+export { cliReadArticle as readArticle };
+export { cliSetup as setup };
 
 // ── Health ──────────────────────────────────────────────────────────────
 
 export async function health(): Promise<XHealthStatus> {
   const apiKey = getXaiApiKey();
-  const browserHealth = await checkBrowserHealth();
+  const cliHealth = await checkCliHealth();
 
   return {
     xai: {
       available: !!apiKey,
       error: apiKey ? undefined : "XAI_API_KEY not set in ~/.openclaw/.env",
     },
-    browser: browserHealth,
+    browser: cliHealth,
   };
 }
 
@@ -234,21 +222,9 @@ export async function initXClient(logger?: { info: (msg: string) => void; warn: 
   if (apiKey) {
     log.info("[GodMode] X client: XAI x_search available");
   } else {
-    log.warn("[GodMode] X client: XAI_API_KEY not configured — search will use browser fallback");
+    log.warn("[GodMode] X client: XAI_API_KEY not configured — search unavailable");
   }
 
-  // Check browser
-  const cdpUrl = await findReachableCdp();
-  if (cdpUrl) {
-    log.info(`[GodMode] X client: browser connected on ${cdpUrl}`);
-  } else {
-    // Try to launch our own headless Brave
-    log.info("[GodMode] X client: no browser detected, launching headless Brave...");
-    const result = await launchBrave();
-    if ("cdpUrl" in result) {
-      log.info(`[GodMode] X client: Brave launched on ${result.cdpUrl}`);
-    } else {
-      log.warn(`[GodMode] X client: ${result.error}`);
-    }
-  }
+  // Check twitter-cli
+  await initTwitterCli(log);
 }

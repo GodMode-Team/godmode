@@ -827,7 +827,10 @@ const godmodePlugin = {
           res.end(JSON.stringify({ ok: true }));
           // Process async in background
           const body = Buffer.concat(chunks).toString("utf8");
-          const hdrs = req.headers as Record<string, string>;
+          const hdrs: Record<string, string> = {};
+          for (const [k, v] of Object.entries(req.headers)) {
+            hdrs[k] = Array.isArray(v) ? v[0] : v ?? "";
+          }
           handleFathomWebhookHttp(body, hdrs).catch((err) => {
             console.error("[GodMode] Fathom webhook processing error:", err);
           });
@@ -1224,11 +1227,10 @@ h1{color:#ff6b6b}code{background:#16213e;padding:2px 8px;border-radius:4px}a{col
         api.logger.warn(`[GodMode] Fathom processor failed to start: ${String(err)}`);
       }
 
-      // X/Twitter client — connect to browser + validate XAI key
+      // X/Twitter client — validate twitter-cli + XAI key
       try {
         const { initXClient } = await import("./src/services/x-client.js");
         await initXClient(api.logger);
-        serviceCleanup.push({ name: "x-browser", fn: async () => { const { stopBrave } = await import("./src/services/x-browser.js"); stopBrave(); } });
       } catch (err) {
         api.logger.warn(`[GodMode] X client init failed: ${String(err)}`);
       }

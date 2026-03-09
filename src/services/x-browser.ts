@@ -1,33 +1,31 @@
 /**
- * x-browser.ts — Headless Brave lifecycle manager for X/Twitter access.
+ * x-browser.ts — X/Twitter access via twitter-cli.
  *
- * Manages a headless Brave browser instance with a dedicated profile
- * logged into X. Uses native CDP (Chrome DevTools Protocol) over
- * HTTP + WebSocket — zero external dependencies.
+ * Replaces the old headless Brave CDP approach with the `twitter` CLI tool.
+ * Authentication uses cookies extracted from Brave's profile or env vars.
+ * No running browser process needed — survives reboots cleanly.
+ *
+ * Install: `uv tool install twitter-cli`
+ * Auth:    Set TWITTER_AUTH_TOKEN + TWITTER_CT0 in ~/godmode/.env
+ *          or let twitter-cli auto-extract from Brave/Chrome.
  */
 
-import { spawn, type ChildProcess } from "node:child_process";
+import { execFile } from "node:child_process";
 import { join } from "node:path";
+import { readFileSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
-import { existsSync } from "node:fs";
 
 // ── Constants ──────────────────────────────────────────────────────────
 
-const CDP_PORT = 18850;
-const CDP_BASE = `http://127.0.0.1:${CDP_PORT}`;
-
-/** Well-known Brave path on macOS. */
-const BRAVE_MAC = "/Applications/Brave Browser.app/Contents/MacOS/Brave Browser";
-
-/** How long to wait for a page to load before extracting content. */
-const PAGE_LOAD_WAIT_MS = 4_000;
-
-/** Auto-restart backoff schedule (ms). */
-const RESTART_BACKOFF = [1_000, 5_000, 30_000];
+/** Max time to wait for a twitter-cli command. */
+const CMD_TIMEOUT_MS = 30_000;
 
 // ── Types ──────────────────────────────────────────────────────────────
 
 export type XBrowserHealth = {
+  cliAvailable: boolean;
+  authenticated: boolean;
+  /** @deprecated kept for backward compat with x-client.ts */
   browserRunning: boolean;
   cdpReachable: boolean;
   xSessionValid: boolean | null;
@@ -43,235 +41,186 @@ export type ExtractedTweet = {
   timestamp?: string;
 };
 
-type CdpTarget = {
-  id: string;
-  webSocketDebuggerUrl: string;
-  url: string;
-  title: string;
-  type: string;
-};
-
 // ── State ──────────────────────────────────────────────────────────────
 
-let _proc: ChildProcess | null = null;
-let _restartCount = 0;
-let _lastSessionCheck: { valid: boolean; ts: number } | null = null;
+let _lastHealthCheck: { valid: boolean; ts: number } | null = null;
+let _twitterBin: string | null = null;
 
-function profileDir(): string {
-  const root = process.env.GODMODE_ROOT || join(process.env.HOME || "", "godmode");
-  return join(root, "data", "x-browser-profile");
+function godmodeRoot(): string {
+  return process.env.GODMODE_ROOT || join(process.env.HOME || "", "godmode");
 }
 
-// ── CDP helpers (native fetch + WebSocket) ─────────────────────────────
+// ── Cookie / env helpers ───────────────────────────────────────────────
 
-/** Check if a CDP endpoint is reachable. */
-async function cdpReachable(base: string, timeoutMs = 2_000): Promise<boolean> {
+/**
+ * Load TWITTER_AUTH_TOKEN and TWITTER_CT0 from ~/godmode/.env if not
+ * already in the process environment.
+ */
+function loadTwitterEnv(): Record<string, string> {
+  const env: Record<string, string> = { ...process.env } as Record<string, string>;
+
+  // Already set — nothing to do
+  if (env.TWITTER_AUTH_TOKEN && env.TWITTER_CT0) return env;
+
+  // Try ~/godmode/.env
   try {
-    const resp = await fetch(`${base}/json/version`, {
-      signal: AbortSignal.timeout(timeoutMs),
-    });
-    return resp.ok;
-  } catch {
-    return false;
-  }
-}
-
-/** Create a new browser tab and return its target info. */
-async function cdpNewTab(base: string, url: string): Promise<CdpTarget | null> {
-  try {
-    const resp = await fetch(`${base}/json/new?${encodeURIComponent(url)}`, {
-      method: "PUT",
-      signal: AbortSignal.timeout(5_000),
-    });
-    if (!resp.ok) return null;
-    return (await resp.json()) as CdpTarget;
-  } catch {
-    return null;
-  }
-}
-
-/** Close a browser tab by target ID. */
-async function cdpCloseTab(base: string, targetId: string): Promise<void> {
-  try {
-    await fetch(`${base}/json/close/${targetId}`, { signal: AbortSignal.timeout(3_000) });
-  } catch {
-    // Best effort
-  }
-}
-
-/** Execute JavaScript in a tab via CDP WebSocket. Returns the stringified result. */
-async function cdpEvaluate(wsUrl: string, expression: string, timeoutMs = 10_000): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const ws = new WebSocket(wsUrl);
-    const timer = setTimeout(() => {
-      ws.close();
-      reject(new Error("CDP evaluate timed out"));
-    }, timeoutMs);
-
-    ws.addEventListener("open", () => {
-      ws.send(
-        JSON.stringify({
-          id: 1,
-          method: "Runtime.evaluate",
-          params: { expression, returnByValue: true, awaitPromise: true },
-        }),
-      );
-    });
-
-    ws.addEventListener("message", (event) => {
-      try {
-        const msg = JSON.parse(String(event.data)) as {
-          id?: number;
-          result?: { result?: { value?: unknown } };
-        };
-        if (msg.id === 1) {
-          clearTimeout(timer);
-          ws.close();
-          resolve(String(msg.result?.result?.value ?? ""));
-        }
-      } catch {
-        // ignore non-JSON messages
+    const envPath = join(godmodeRoot(), ".env");
+    const raw = readFileSync(envPath, "utf-8");
+    for (const line of raw.split("\n")) {
+      const m = line.match(/^(TWITTER_AUTH_TOKEN|TWITTER_CT0)\s*=\s*(.+)/);
+      if (m?.[1] && m[2]) {
+        const v = m[2].trim();
+        env[m[1]] = (v.startsWith('"') && v.endsWith('"')) || (v.startsWith("'") && v.endsWith("'"))
+          ? v.slice(1, -1)
+          : v;
       }
-    });
+    }
+  } catch {
+    // no .env — twitter-cli will try browser extraction
+  }
 
-    ws.addEventListener("error", () => {
-      clearTimeout(timer);
-      reject(new Error(`CDP WebSocket error connecting to ${wsUrl}`));
+  // Also try ~/.openclaw/.env as secondary
+  try {
+    const envPath = join(process.env.HOME || "", ".openclaw", ".env");
+    const raw = readFileSync(envPath, "utf-8");
+    for (const line of raw.split("\n")) {
+      const m = line.match(/^(TWITTER_AUTH_TOKEN|TWITTER_CT0)\s*=\s*(.+)/);
+      if (m?.[1] && m[2] && !env[m[1]]) {
+        const v = m[2].trim();
+        env[m[1]] = (v.startsWith('"') && v.endsWith('"')) || (v.startsWith("'") && v.endsWith("'"))
+          ? v.slice(1, -1)
+          : v;
+      }
+    }
+  } catch {
+    // ignore
+  }
+
+  return env;
+}
+
+// ── CLI runner ─────────────────────────────────────────────────────────
+
+/** Find the twitter binary path. */
+async function findTwitterBin(): Promise<string | null> {
+  if (_twitterBin) return _twitterBin;
+
+  // Check common paths
+  const candidates = [
+    "twitter",
+    join(process.env.HOME || "", ".local", "bin", "twitter"),
+    "/usr/local/bin/twitter",
+    "/opt/homebrew/bin/twitter",
+  ];
+
+  for (const bin of candidates) {
+    try {
+      await new Promise<void>((resolve, reject) => {
+        execFile(bin, ["--help"], { timeout: 5_000 }, (err) => {
+          if (err) reject(err);
+          else resolve();
+        });
+      });
+      _twitterBin = bin;
+      return bin;
+    } catch {
+      // try next
+    }
+  }
+  return null;
+}
+
+/** Run a twitter-cli command and return parsed JSON output. */
+async function runTwitter(
+  args: string[],
+  timeoutMs = CMD_TIMEOUT_MS,
+): Promise<{ data: unknown; error?: string }> {
+  const bin = await findTwitterBin();
+  if (!bin) {
+    return { data: null, error: "twitter-cli not installed. Run: uv tool install twitter-cli" };
+  }
+
+  const env = loadTwitterEnv();
+
+  return new Promise((resolve) => {
+    execFile(bin, [...args, "--json"], { timeout: timeoutMs, env, maxBuffer: 5 * 1024 * 1024 }, (err, stdout, stderr) => {
+      if (err) {
+        const msg = stderr?.trim() || err.message;
+        // Check for auth errors — twitter-cli prints "Cookie expired or invalid (HTTP 401)"
+        const combined = `${msg} ${stdout ?? ""}`.toLowerCase();
+        if (combined.includes("cookie expired") || combined.includes("401") || combined.includes("re-login") || combined.includes("auth")) {
+          resolve({ data: null, error: "X session expired or cookies invalid. Run x.setup to configure authentication." });
+          return;
+        }
+        resolve({ data: null, error: `twitter-cli error: ${msg.slice(0, 300)}` });
+        return;
+      }
+
+      try {
+        const parsed = JSON.parse(stdout);
+        resolve({ data: parsed });
+      } catch {
+        // Non-JSON output — return as text
+        resolve({ data: { text: stdout.trim() } });
+      }
     });
   });
 }
 
-// ── Browser lifecycle ──────────────────────────────────────────────────
+// ── CDP stubs (backward compat — no longer used) ─────────────────────
 
-/**
- * Find a reachable CDP endpoint:
- * 1. GodMode-managed port (18850)
- * 2. OpenClaw brave profile port (9222)
- */
+/** @deprecated No longer uses CDP. Kept for import compat. */
 export async function findReachableCdp(): Promise<string | null> {
-  if (await cdpReachable(CDP_BASE)) return CDP_BASE;
-  if (await cdpReachable("http://127.0.0.1:9222")) return "http://127.0.0.1:9222";
   return null;
 }
 
-/**
- * Launch headless Brave with the GodMode X browser profile.
- * No-op if a browser is already reachable.
- */
+/** @deprecated No longer launches Brave. */
 export async function launchBrave(): Promise<{ cdpUrl: string } | { error: string }> {
-  const existing = await findReachableCdp();
-  if (existing) {
-    _restartCount = 0;
-    return { cdpUrl: existing };
-  }
-
-  const bravePath = existsSync(BRAVE_MAC) ? BRAVE_MAC : null;
-  if (!bravePath) {
-    return { error: "Brave Browser not found at /Applications/Brave Browser.app" };
-  }
-
-  const dir = profileDir();
-  await mkdir(dir, { recursive: true });
-
-  try {
-    _proc = spawn(bravePath, [
-      `--remote-debugging-port=${CDP_PORT}`,
-      `--user-data-dir=${dir}`,
-      "--headless=new",
-      "--disable-gpu",
-      "--no-first-run",
-      "--no-default-browser-check",
-      "--disable-background-networking",
-    ], {
-      stdio: "ignore",
-      detached: false,
-    });
-
-    _proc.on("exit", (code) => {
-      console.log(`[x-browser] Brave exited with code ${code}`);
-      _proc = null;
-      scheduleRestart();
-    });
-
-    _proc.on("error", (err) => {
-      console.error(`[x-browser] Brave spawn error: ${err.message}`);
-      _proc = null;
-    });
-
-    // Wait for CDP to become reachable
-    for (let i = 0; i < 10; i++) {
-      await sleep(500);
-      if (await cdpReachable(CDP_BASE)) {
-        _restartCount = 0;
-        console.log(`[x-browser] Brave launched on CDP port ${CDP_PORT}`);
-        return { cdpUrl: CDP_BASE };
-      }
-    }
-
-    return { error: `Brave launched but CDP not reachable on port ${CDP_PORT} after 5s` };
-  } catch (err) {
-    return { error: `Failed to launch Brave: ${err instanceof Error ? err.message : String(err)}` };
-  }
+  const bin = await findTwitterBin();
+  if (bin) return { cdpUrl: "twitter-cli" };
+  return { error: "twitter-cli not installed. Run: uv tool install twitter-cli" };
 }
 
-function scheduleRestart(): void {
-  if (_restartCount >= RESTART_BACKOFF.length) {
-    console.error("[x-browser] Gave up restarting Brave after 3 attempts");
-    return;
-  }
-  const delay = RESTART_BACKOFF[_restartCount] ?? 30_000;
-  _restartCount++;
-  console.log(`[x-browser] Scheduling restart in ${delay}ms (attempt ${_restartCount})`);
-  setTimeout(() => {
-    launchBrave().catch((err) => {
-      console.error(`[x-browser] Restart failed: ${err}`);
-    });
-  }, delay);
-}
-
-/** Stop the GodMode-managed Brave process. */
+/** @deprecated No longer manages a browser process. */
 export function stopBrave(): void {
-  if (_proc) {
-    _proc.removeAllListeners("exit");
-    _proc.kill("SIGTERM");
-    _proc = null;
-  }
+  // no-op — no browser to stop
 }
 
 // ── Health check ───────────────────────────────────────────────────────
 
 export async function checkHealth(): Promise<XBrowserHealth> {
-  const cdpUrl = await findReachableCdp();
-  const browserRunning = cdpUrl !== null;
+  const bin = await findTwitterBin();
+  const cliAvailable = bin !== null;
+  let authenticated = false;
 
-  let xSessionValid: boolean | null = null;
-
-  if (browserRunning && cdpUrl) {
-    if (_lastSessionCheck && Date.now() - _lastSessionCheck.ts < 30 * 60_000) {
-      xSessionValid = _lastSessionCheck.valid;
+  if (cliAvailable) {
+    // Use cache for 30 min
+    if (_lastHealthCheck && Date.now() - _lastHealthCheck.ts < 30 * 60_000) {
+      authenticated = _lastHealthCheck.valid;
     } else {
-      try {
-        xSessionValid = await validateXSession(cdpUrl);
-        _lastSessionCheck = { valid: xSessionValid, ts: Date.now() };
-      } catch {
-        xSessionValid = null;
-      }
+      // Quick test: try fetching 1 bookmark
+      const result = await runTwitter(["favorites", "--max", "1"], 15_000);
+      authenticated = !result.error;
+      _lastHealthCheck = { valid: authenticated, ts: Date.now() };
     }
   }
 
   const health: XBrowserHealth = {
-    browserRunning,
-    cdpReachable: browserRunning,
-    xSessionValid,
-    cdpUrl: cdpUrl || CDP_BASE,
+    cliAvailable,
+    authenticated,
+    // backward compat fields
+    browserRunning: cliAvailable,
+    cdpReachable: cliAvailable,
+    xSessionValid: authenticated,
+    cdpUrl: "twitter-cli",
   };
 
   // Persist health
   try {
-    const root = process.env.GODMODE_ROOT || join(process.env.HOME || "", "godmode");
-    await mkdir(join(root, "data"), { recursive: true });
+    const dataDir = join(godmodeRoot(), "data");
+    await mkdir(dataDir, { recursive: true });
     await writeFile(
-      join(root, "data", "x-browser-health.json"),
+      join(dataDir, "x-browser-health.json"),
       JSON.stringify(health, null, 2),
       "utf-8",
     );
@@ -282,55 +231,11 @@ export async function checkHealth(): Promise<XBrowserHealth> {
   return health;
 }
 
-async function validateXSession(base: string): Promise<boolean> {
-  const tab = await cdpNewTab(base, "https://x.com/home");
-  if (!tab) return false;
-
-  try {
-    await sleep(3_000);
-    const finalUrl = await cdpEvaluate(tab.webSocketDebuggerUrl, "window.location.href");
-    return !finalUrl.includes("/login") && !finalUrl.includes("/i/flow/login");
-  } catch {
-    return false;
-  } finally {
-    await cdpCloseTab(base, tab.id);
-  }
-}
-
-// ── Page operations ────────────────────────────────────────────────────
-
-async function navigateAndExtract(
-  url: string,
-  opts?: { waitMs?: number },
-): Promise<{ text: string; finalUrl: string } | { error: string }> {
-  const base = await findReachableCdp();
-  if (!base) return { error: "No browser available. Run x.setup to configure." };
-
-  const tab = await cdpNewTab(base, url);
-  if (!tab) return { error: "Failed to open new browser tab" };
-
-  try {
-    await sleep(opts?.waitMs ?? PAGE_LOAD_WAIT_MS);
-
-    const finalUrl = await cdpEvaluate(tab.webSocketDebuggerUrl, "window.location.href");
-    const text = await cdpEvaluate(
-      tab.webSocketDebuggerUrl,
-      "document.body?.innerText || ''",
-    );
-
-    return { text, finalUrl };
-  } catch (err) {
-    return { error: `Navigation failed: ${err instanceof Error ? err.message : String(err)}` };
-  } finally {
-    await cdpCloseTab(base, tab.id);
-  }
-}
-
-// ── X-specific operations ──────────────────────────────────────────────
+// ── X operations ──────────────────────────────────────────────────────
 
 function parseTweetId(urlOrId: string): string {
   const match = urlOrId.match(/(?:x\.com|twitter\.com)\/\w+\/status\/(\d+)/);
-  return match ? match[1] : urlOrId;
+  return match?.[1] ?? urlOrId;
 }
 
 function parseHandle(urlOrHandle: string): string {
@@ -339,28 +244,47 @@ function parseHandle(urlOrHandle: string): string {
   return raw.replace(/^@/, "");
 }
 
+/** Normalize twitter-cli JSON output into ExtractedTweet[]. */
+function normalizeTweets(data: unknown, maxCount: number): ExtractedTweet[] {
+  if (!data || !Array.isArray(data)) {
+    // Single tweet object?
+    if (data && typeof data === "object" && "text" in data) {
+      const t = data as Record<string, unknown>;
+      return [{
+        author: String(t.name ?? t.username ?? t.user ?? ""),
+        handle: `@${String(t.username ?? t.screen_name ?? t.user ?? "")}`,
+        text: String(t.text ?? t.full_text ?? ""),
+        url: t.url ? String(t.url) : undefined,
+        timestamp: t.created_at ? String(t.created_at) : undefined,
+      }];
+    }
+    return [];
+  }
+
+  return (data as Array<Record<string, unknown>>).slice(0, maxCount).map((t) => ({
+    author: String(t.name ?? t.username ?? t.user ?? ""),
+    handle: `@${String(t.username ?? t.screen_name ?? t.user ?? "")}`,
+    text: String(t.text ?? t.full_text ?? ""),
+    url: t.url ? String(t.url) : undefined,
+    timestamp: t.created_at ? String(t.created_at) : undefined,
+  }));
+}
+
 export async function getBookmarks(
   count = 20,
 ): Promise<{ tweets: ExtractedTweet[]; error?: string }> {
-  const result = await navigateAndExtract("https://x.com/i/bookmarks", { waitMs: 5_000 });
-  if ("error" in result) return { tweets: [], error: result.error };
-  if (result.finalUrl.includes("/login")) {
-    return { tweets: [], error: "X session expired. Run x.setup to re-login." };
-  }
-  return { tweets: extractTweetsFromText(result.text, count) };
+  const result = await runTwitter(["favorites", "--max", String(count)]);
+  if (result.error) return { tweets: [], error: result.error };
+  return { tweets: normalizeTweets(result.data, count) };
 }
 
 export async function getTweet(
   urlOrId: string,
 ): Promise<{ tweet: ExtractedTweet | null; error?: string }> {
   const id = parseTweetId(urlOrId);
-  const handle = urlOrId.match(/(?:x\.com|twitter\.com)\/(\w+)\/status/)?.[1] ?? "unknown";
-  const url = `https://x.com/${handle}/status/${id}`;
-
-  const result = await navigateAndExtract(url);
-  if ("error" in result) return { tweet: null, error: result.error };
-
-  const tweets = extractTweetsFromText(result.text, 1);
+  const result = await runTwitter(["tweet", id]);
+  if (result.error) return { tweet: null, error: result.error };
+  const tweets = normalizeTweets(result.data, 1);
   return { tweet: tweets[0] ?? null };
 }
 
@@ -368,12 +292,18 @@ export async function getThread(
   urlOrId: string,
 ): Promise<{ tweets: ExtractedTweet[]; error?: string }> {
   const id = parseTweetId(urlOrId);
-  const handle = urlOrId.match(/(?:x\.com|twitter\.com)\/(\w+)\/status/)?.[1] ?? "unknown";
-  const url = `https://x.com/${handle}/status/${id}`;
+  const result = await runTwitter(["tweet", id]);
+  if (result.error) return { tweets: [], error: result.error };
 
-  const result = await navigateAndExtract(url, { waitMs: 5_000 });
-  if ("error" in result) return { tweets: [], error: result.error };
-  return { tweets: extractTweetsFromText(result.text, 50) };
+  // twitter-cli returns the tweet + replies in the same call
+  const data = result.data;
+  if (data && typeof data === "object" && "replies" in data) {
+    const obj = data as Record<string, unknown>;
+    const mainTweets = normalizeTweets([obj], 1);
+    const replyTweets = normalizeTweets(obj.replies, 50);
+    return { tweets: [...mainTweets, ...replyTweets] };
+  }
+  return { tweets: normalizeTweets(data, 50) };
 }
 
 export async function getUserTimeline(
@@ -381,105 +311,103 @@ export async function getUserTimeline(
   count = 10,
 ): Promise<{ tweets: ExtractedTweet[]; error?: string }> {
   const handle = parseHandle(handleOrUrl);
-  const result = await navigateAndExtract(`https://x.com/${handle}`, { waitMs: 5_000 });
-  if ("error" in result) return { tweets: [], error: result.error };
-  return { tweets: extractTweetsFromText(result.text, count) };
+  const result = await runTwitter(["user-posts", handle, "--max", String(count)]);
+  if (result.error) return { tweets: [], error: result.error };
+  return { tweets: normalizeTweets(result.data, count) };
 }
 
 export async function readArticle(
   urlOrTweetUrl: string,
 ): Promise<{ title: string; text: string; url: string } | { error: string }> {
+  // For articles, we still need the tweet text first, then the linked URL
   const isTweetUrl = /(?:x\.com|twitter\.com)\/\w+\/status\/\d+/.test(urlOrTweetUrl);
-  const result = await navigateAndExtract(urlOrTweetUrl, { waitMs: isTweetUrl ? 4_000 : 5_000 });
-  if ("error" in result) return { error: result.error };
-
-  const lines = result.text.split("\n").filter((l) => l.trim());
-  const title = lines[0]?.slice(0, 200) ?? "Article";
-
-  return { title, text: result.text.slice(0, 10_000), url: result.finalUrl };
+  if (isTweetUrl) {
+    const id = parseTweetId(urlOrTweetUrl);
+    const result = await runTwitter(["tweet", id]);
+    if (result.error) return { error: result.error };
+    const tweets = normalizeTweets(result.data, 1);
+    const tweet = tweets[0];
+    if (!tweet) return { error: "Tweet not found" };
+    return {
+      title: `Tweet by ${tweet.author}`,
+      text: tweet.text,
+      url: urlOrTweetUrl,
+    };
+  }
+  // Non-tweet URL — we can't fetch arbitrary articles without a browser
+  return { error: "Article reading requires a tweet URL. Non-tweet URLs are not supported without a browser." };
 }
 
 // ── Setup ──────────────────────────────────────────────────────────────
 
 export async function setupLogin(): Promise<{ message: string } | { error: string }> {
-  const bravePath = existsSync(BRAVE_MAC) ? BRAVE_MAC : null;
-  if (!bravePath) return { error: "Brave Browser not found" };
+  const bin = await findTwitterBin();
+  if (!bin) {
+    return {
+      error:
+        "twitter-cli is not installed. Install it with:\n\n" +
+        "  uv tool install twitter-cli\n\n" +
+        "Then set your X cookies in ~/godmode/.env:\n\n" +
+        "  TWITTER_AUTH_TOKEN=your_auth_token_cookie\n" +
+        "  TWITTER_CT0=your_ct0_cookie\n\n" +
+        "To get these cookies: open X in your browser → DevTools → Application → Cookies → x.com → copy auth_token and ct0 values.",
+    };
+  }
 
-  const dir = profileDir();
-  await mkdir(dir, { recursive: true });
+  // Check if env vars are already set
+  const env = loadTwitterEnv();
+  if (env.TWITTER_AUTH_TOKEN && env.TWITTER_CT0) {
+    // Validate
+    const result = await runTwitter(["favorites", "--max", "1"], 15_000);
+    if (!result.error) {
+      _lastHealthCheck = { valid: true, ts: Date.now() };
+      return { message: "X authentication is working! Cookies are valid." };
+    }
+    return {
+      message:
+        "Cookies are set but appear invalid/expired. Update them in ~/godmode/.env:\n\n" +
+        "  TWITTER_AUTH_TOKEN=<new value>\n" +
+        "  TWITTER_CT0=<new value>\n\n" +
+        "To get fresh cookies: open X in your browser → DevTools (F12) → Application tab → Cookies → x.com → copy auth_token and ct0 values.",
+    };
+  }
 
-  stopBrave();
-
-  const proc = spawn(bravePath, [
-    `--remote-debugging-port=${CDP_PORT}`,
-    `--user-data-dir=${dir}`,
-    "--no-first-run",
-    "--no-default-browser-check",
-  ], { stdio: "ignore", detached: true });
-
-  proc.on("error", (err) => {
-    console.error(`[x-browser] Login spawn error: ${err.message}`);
-  });
-
-  proc.unref();
+  // twitter-cli will try browser extraction automatically
+  const result = await runTwitter(["favorites", "--max", "1"], 15_000);
+  if (!result.error) {
+    _lastHealthCheck = { valid: true, ts: Date.now() };
+    return { message: "X authentication working! twitter-cli extracted cookies from your browser." };
+  }
 
   return {
     message:
-      "Brave has opened. Log into X (twitter.com) in the browser window, " +
-      "then close it. GodMode will switch to headless mode automatically.",
+      "Set your X cookies in ~/godmode/.env:\n\n" +
+      "  TWITTER_AUTH_TOKEN=<your auth_token cookie>\n" +
+      "  TWITTER_CT0=<your ct0 cookie>\n\n" +
+      "To get these: open x.com in any browser → DevTools (F12) → Application tab → Cookies → x.com → copy the values for 'auth_token' and 'ct0'.\n\n" +
+      "This works from any machine — no browser needed on the server.",
   };
 }
 
-// ── Text extraction helpers ────────────────────────────────────────────
+// ── Init (called from x-client.ts) ────────────────────────────────────
 
-function extractTweetsFromText(text: string, maxCount: number): ExtractedTweet[] {
-  const tweets: ExtractedTweet[] = [];
-  const lines = text.split("\n").map((l) => l.trim()).filter(Boolean);
+export async function initTwitterCli(
+  logger?: { info: (msg: string) => void; warn: (msg: string) => void },
+): Promise<void> {
+  const log = logger ?? console;
 
-  let currentAuthor = "";
-  let currentHandle = "";
-  let currentText = "";
-
-  for (const line of lines) {
-    const handleMatch = line.match(/^@(\w{1,15})$/);
-    if (handleMatch) {
-      if (currentText && currentHandle) {
-        tweets.push({
-          author: currentAuthor || currentHandle,
-          handle: currentHandle,
-          text: currentText.trim(),
-        });
-        if (tweets.length >= maxCount) break;
-      }
-      currentHandle = `@${handleMatch[1]}`;
-      currentAuthor = "";
-      currentText = "";
-      continue;
-    }
-
-    if (!currentHandle && /^[A-Z]/.test(line) && line.length < 50) {
-      currentAuthor = line;
-      continue;
-    }
-
-    if (currentHandle && line.length > 10) {
-      currentText += (currentText ? " " : "") + line;
-    }
+  const bin = await findTwitterBin();
+  if (!bin) {
+    log.warn("[GodMode] X client: twitter-cli not found. Install with: uv tool install twitter-cli");
+    return;
   }
+  log.info(`[GodMode] X client: twitter-cli found at ${bin}`);
 
-  if (currentText && currentHandle && tweets.length < maxCount) {
-    tweets.push({
-      author: currentAuthor || currentHandle,
-      handle: currentHandle,
-      text: currentText.trim(),
-    });
+  // Quick auth check
+  const env = loadTwitterEnv();
+  if (env.TWITTER_AUTH_TOKEN && env.TWITTER_CT0) {
+    log.info("[GodMode] X client: auth cookies configured via env");
+  } else {
+    log.info("[GodMode] X client: no env cookies — twitter-cli will try browser extraction");
   }
-
-  return tweets;
-}
-
-// ── Utility ────────────────────────────────────────────────────────────
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
 }
