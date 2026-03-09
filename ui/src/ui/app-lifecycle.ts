@@ -510,9 +510,11 @@ export function handleUpdated(host: LifecycleHost, changed: Map<PropertyKey, unk
       changed.has("chatToolMessages") ||
       changed.has("chatStream") ||
       changed.has("chatLoading") ||
+      changed.has("sessionKey") ||
       changed.has("tab"))
   ) {
     const forcedByTab = changed.has("tab");
+    const forcedBySession = changed.has("sessionKey");
     const forcedByLoad =
       changed.has("chatLoading") && changed.get("chatLoading") === true && !host.chatLoading;
     // Force scroll when new user message is added (user sent something)
@@ -530,12 +532,12 @@ export function handleUpdated(host: LifecycleHost, changed: Map<PropertyKey, unk
       // Don't force, but ensure scheduleChatScroll runs so it can decide based on userNearBottom
       forceScroll = false;
     }
-    if (forcedByTab || forcedByLoad) {
+    if (forcedByTab || forcedBySession || forcedByLoad) {
       resetChatScroll(host as unknown as Parameters<typeof resetChatScroll>[0]);
     }
     scheduleChatScroll(
       host as unknown as Parameters<typeof scheduleChatScroll>[0],
-      forcedByTab || forcedByLoad || forceScroll || !host.chatHasAutoScrolled,
+      forcedByTab || forcedBySession || forcedByLoad || forceScroll || !host.chatHasAutoScrolled,
     );
   }
   if (

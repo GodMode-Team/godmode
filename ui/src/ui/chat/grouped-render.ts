@@ -747,7 +747,7 @@ function renderGroupedMessageUnsafe(
   }
   // Strip <system-context> blocks that may leak from prependContext injection
   if (cleanedText) {
-    cleanedText = cleanedText.replace(/<system-context\b[^>]*>[\s\S]*?<\/system-context>/gi, "").trim() || null;
+    cleanedText = cleanedText.replace(/<(?:system|godmode)-context\b[^>]*>[\s\S]*?<\/(?:system|godmode)-context>/gi, "").trim() || null;
   }
   // Convert raw API error JSON to friendly message
   if (cleanedText) {

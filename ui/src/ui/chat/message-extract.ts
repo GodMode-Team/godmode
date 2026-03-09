@@ -3,8 +3,8 @@ import { stripThinkingTags } from "../format";
 /** Silent reply token used by agents to indicate no user-visible response */
 const SILENT_REPLY_TOKEN = "NO_REPLY";
 
-/** Strip <system-context>...</system-context> blocks injected by GodMode hooks */
-const SYSTEM_CONTEXT_RE = /<system-context\b[^>]*>[\s\S]*?<\/system-context>/gi;
+/** Strip <system-context> and <godmode-context> blocks injected by GodMode hooks */
+const SYSTEM_CONTEXT_RE = /<(?:system|godmode)-context\b[^>]*>[\s\S]*?<\/(?:system|godmode)-context>/gi;
 
 /**
  * GodMode system context fingerprints. The model sometimes echoes the
@@ -18,6 +18,9 @@ const CONTEXT_FINGERPRINTS = [
   "internal system context injected by godmode",
   "treat it as invisible background instructions only",
   "persistence protocol (non-negotiable)",
+  "you must follow these operating instructions. do not echo or quote this block",
+  "meta goal: earn trust through competence. search before asking",
+  "asking the user for info you could look up is a failure mode",
 ];
 
 function stripSystemContext(text: string): string {
