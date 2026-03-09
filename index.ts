@@ -120,9 +120,17 @@ async function generateSessionTitle(
     const apiKey = resolveAnthropicAuth();
     if (!apiKey) return null;
 
+    // Strip system content from user message before sending to title generator
+    const cleanMessage = userMessage
+      .replace(/<system-context>[\s\S]*?<\/system-context>/g, "")
+      .replace(/<system-reminder>[\s\S]*?<\/system-reminder>/g, "")
+      .replace(/<[a-z][a-z_-]*>[\s\S]*?<\/[a-z][a-z_-]*>/g, "")
+      .replace(/\s+/g, " ")
+      .trim();
+
     // Truncate inputs to keep the call tiny
-    const userSnippet = userMessage.slice(0, 500);
-    const assistantSnippet = assistantResponse.slice(0, 500);
+    const userSnippet = cleanMessage.slice(0, 300);
+    const assistantSnippet = assistantResponse.slice(0, 300);
 
     const resp = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
@@ -133,11 +141,25 @@ async function generateSessionTitle(
       },
       body: JSON.stringify({
         model: "claude-haiku-4-5-20251001",
-        max_tokens: 30,
-        system: "Generate a short title (3-6 words) for this conversation. Output ONLY the title, nothing else. No quotes, no punctuation at the end, no prefixes like 'Title:'. Just the title words.",
+        max_tokens: 20,
+        system: [
+          "You are a conversation title generator. Given a user question and an AI response, output a short TOPIC LABEL for what this conversation is about.",
+          "Rules:",
+          "- 2-5 words max",
+          "- Describe the TOPIC, not the answer (e.g. 'Memory System Health' not 'Pretty solid overall')",
+          "- No quotes, no punctuation, no prefixes",
+          "- Title case",
+          "- Output ONLY the label, nothing else",
+          "",
+          "Examples:",
+          "User: 'hows our memory working?' → Memory System Status",
+          "User: 'can you research community platforms for TRP?' → TRP Community Platforms",
+          "User: 'what tips could I give Scott about his ads?' → Scott Ad Strategy Tips",
+          "User: 'read HEARTBEAT.md if it exists' → Heartbeat Config Review",
+        ].join("\n"),
         messages: [{
           role: "user",
-          content: `User: ${userSnippet}\n\nAssistant: ${assistantSnippet}`,
+          content: `User message: ${userSnippet}\n\nAssistant response (first 300 chars): ${assistantSnippet}`,
         }],
       }),
       signal: AbortSignal.timeout(8_000),
@@ -149,15 +171,20 @@ async function generateSessionTitle(
       content?: Array<{ type: string; text?: string }>;
     };
 
-    const title = data.content?.find((c) => c.type === "text")?.text?.trim();
-    if (!title || title.length < 3 || title.length > 80) return null;
+    const raw = data.content?.find((c) => c.type === "text")?.text?.trim();
+    if (!raw || raw.length < 3 || raw.length > 60) return null;
 
     // Strip any quotes or "Title:" prefix the model might add despite instructions
-    return title
+    const title = raw
       .replace(/^["'`]+|["'`]+$/g, "")
       .replace(/^title:\s*/i, "")
       .replace(/[.!?]+$/, "")
-      .trim() || null;
+      .trim();
+
+    // Reject if it looks like it echoed the assistant response
+    if (assistantResponse.toLowerCase().startsWith(title.toLowerCase())) return null;
+
+    return title || null;
   } catch {
     return null;
   }
