@@ -106,6 +106,63 @@ const pendingAutoTitles = new Map<string, string>();
 /** Sessions that already have titles — skip future auto-title attempts */
 const titledSessions = new Set<string>();
 
+/**
+ * Generate a short session title using a fast LLM call.
+ * Uses Haiku for speed and cost (~0.001¢ per title).
+ * Returns null on any failure (caller falls back to string derivation).
+ */
+async function generateSessionTitle(
+  userMessage: string,
+  assistantResponse: string,
+): Promise<string | null> {
+  try {
+    const { resolveAnthropicAuth } = await import("./src/methods/brief-generator.js");
+    const apiKey = resolveAnthropicAuth();
+    if (!apiKey) return null;
+
+    // Truncate inputs to keep the call tiny
+    const userSnippet = userMessage.slice(0, 500);
+    const assistantSnippet = assistantResponse.slice(0, 500);
+
+    const resp = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01",
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "claude-haiku-4-5-20251001",
+        max_tokens: 30,
+        system: "Generate a short title (3-6 words) for this conversation. Output ONLY the title, nothing else. No quotes, no punctuation at the end, no prefixes like 'Title:'. Just the title words.",
+        messages: [{
+          role: "user",
+          content: `User: ${userSnippet}\n\nAssistant: ${assistantSnippet}`,
+        }],
+      }),
+      signal: AbortSignal.timeout(8_000),
+    });
+
+    if (!resp.ok) return null;
+
+    const data = (await resp.json()) as {
+      content?: Array<{ type: string; text?: string }>;
+    };
+
+    const title = data.content?.find((c) => c.type === "text")?.text?.trim();
+    if (!title || title.length < 3 || title.length > 80) return null;
+
+    // Strip any quotes or "Title:" prefix the model might add despite instructions
+    return title
+      .replace(/^["'`]+|["'`]+$/g, "")
+      .replace(/^title:\s*/i, "")
+      .replace(/[.!?]+$/, "")
+      .trim() || null;
+  } catch {
+    return null;
+  }
+}
+
 // ── Options file reader (for feature flags in HTTP handler) ─────────
 const OPTIONS_FILE_PATH = join(DATA_DIR, "godmode-options.json");
 const OPTIONS_CACHE_TTL_MS = 5_000; // re-read every 5 seconds max
@@ -1289,6 +1346,26 @@ h1{color:#ff6b6b}code{background:#16213e;padding:2px 8px;border-radius:4px}a{col
 
       // Import context budget system
       const { assembleContext, getIdentityAnchor } = await import("./src/lib/context-budget.js");
+      type InputProvenance = import("./src/lib/context-budget.js").InputProvenance;
+
+      // ACP Provenance — extract origin metadata from the last user message (3.8+)
+      let provenance: InputProvenance | null = null;
+      try {
+        const allMessages = (event as any).messages ?? [];
+        const lastMsg = [...allMessages].reverse().find((m: any) => m.role === "user");
+        if (lastMsg?.provenance && typeof lastMsg.provenance === "object") {
+          const p = lastMsg.provenance as Record<string, unknown>;
+          const kind = p.kind as string;
+          if (kind === "external_user" || kind === "inter_session" || kind === "internal_system") {
+            provenance = {
+              kind,
+              sourceSessionKey: typeof p.sourceSessionKey === "string" ? p.sourceSessionKey : undefined,
+              sourceChannel: typeof p.sourceChannel === "string" ? p.sourceChannel : undefined,
+              sourceTool: typeof p.sourceTool === "string" ? p.sourceTool : undefined,
+            };
+          }
+        }
+      } catch { /* provenance extraction is non-fatal */ }
 
       // P0: Identity anchor (~5 lines from USER.md)
       // Soul essence is now hardcoded in context-budget.ts SOUL_ESSENCE.
@@ -1309,27 +1386,30 @@ h1{color:#ff6b6b}code{background:#16213e;padding:2px 8px;border-radius:4px}a{col
       }
 
       // P0: Mem0 proactive memory search + status
+      // Skip for inter-session (agent-to-agent) — personal memory isn't relevant
       let memoryBlock: string | null = null;
       let memoryStatus: "ready" | "degraded" | "offline" = "offline";
-      try {
-        const { isMemoryReady, searchMemories, formatMemoriesForContext, getMemoryStatus } = await import("./src/lib/memory.js");
-        memoryStatus = getMemoryStatus();
-        if (isMemoryReady()) {
-          // Extract user's latest message for search
-          const messages = (event as any).messages ?? [];
-          const lastUserMsg = [...messages].reverse().find((m: any) => m.role === "user");
-          const query = typeof lastUserMsg?.content === "string" ? lastUserMsg.content : "";
-          if (query.length >= 5) {
-            const memories = await searchMemories(query, "caleb", 8);
-            const formatted = formatMemoriesForContext(memories);
-            if (formatted) memoryBlock = formatted;
-            // Refresh status after search attempt
-            memoryStatus = getMemoryStatus();
+      if (provenance?.kind !== "inter_session") {
+        try {
+          const { isMemoryReady, searchMemories, formatMemoriesForContext, getMemoryStatus } = await import("./src/lib/memory.js");
+          memoryStatus = getMemoryStatus();
+          if (isMemoryReady()) {
+            // Extract user's latest message for search
+            const messages = (event as any).messages ?? [];
+            const lastUserMsg = [...messages].reverse().find((m: any) => m.role === "user");
+            const query = typeof lastUserMsg?.content === "string" ? lastUserMsg.content : "";
+            if (query.length >= 5) {
+              const memories = await searchMemories(query, "caleb", 8);
+              const formatted = formatMemoriesForContext(memories);
+              if (formatted) memoryBlock = formatted;
+              // Refresh status after search attempt
+              memoryStatus = getMemoryStatus();
+            }
           }
+        } catch (err) {
+          api.logger.warn(`[GodMode] Mem0 search error (non-fatal): ${String(err)}`);
+          memoryStatus = "degraded";
         }
-      } catch (err) {
-        api.logger.warn(`[GodMode] Mem0 search error (non-fatal): ${String(err)}`);
-        memoryStatus = "degraded";
       }
 
       // P1: Schedule + meeting prep
@@ -1520,6 +1600,7 @@ h1{color:#ff6b6b}code{background:#16213e;padding:2px 8px;border-radius:4px}a{col
         routingLessons,
         safetyNudges,
         contextPressure,
+        provenance,
       });
 
       if (!assembled) return;
@@ -1659,11 +1740,11 @@ h1{color:#ff6b6b}code{background:#16213e;padding:2px 8px;border-radius:4px}a{col
       }
     });
 
-    // ── Server-side auto-title: derive + persist title after first LLM response ──
-    // Runs after the LLM responds. If the session has no title yet and we
-    // captured a first user message, derive a title and write it directly
-    // to the session store. This eliminates all client-side race conditions.
-    api.on("llm_output", async (_event, ctx) => {
+    // ── Server-side auto-title: LLM-generated title after first response ──
+    // After the LLM responds, if the session has no title, ask a fast/cheap
+    // model to generate a short descriptive title from the conversation.
+    // Falls back to string-based derivation if the LLM call fails.
+    api.on("llm_output", async (event, ctx) => {
       const sessionKey = extractSessionKey(ctx);
       if (!sessionKey) return;
 
@@ -1692,8 +1773,14 @@ h1{color:#ff6b6b}code{background:#16213e;padding:2px 8px;border-radius:4px}a{col
           }
         }
 
-        // Derive title from the first user message
-        const title = deriveSessionTitle(entry ?? {}, firstMessage);
+        // Get assistant response text for context
+        const assistantText = (event as { assistantTexts?: string[] }).assistantTexts?.join("") ?? "";
+
+        // Try LLM-based title generation first, fall back to string derivation
+        let title = await generateSessionTitle(firstMessage, assistantText);
+        if (!title) {
+          title = deriveSessionTitle(entry ?? {}, firstMessage) ?? null;
+        }
         if (!title) return;
 
         // Write to session store
@@ -1702,7 +1789,7 @@ h1{color:#ff6b6b}code{background:#16213e;padding:2px 8px;border-radius:4px}a{col
           const existing = storeData[normalizedKey] ?? {};
           storeData[normalizedKey] = {
             ...existing,
-            displayName: title,
+            displayName: title!,
             updatedAt: Date.now(),
           };
         });
