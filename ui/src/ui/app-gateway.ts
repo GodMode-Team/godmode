@@ -1511,6 +1511,46 @@ function handleGatewayEventUnsafe(host: GatewayHost, evt: GatewayEventFrame) {
     return;
   }
 
+  // Fathom meeting processed — notify via toast + ally chat + main chat
+  if (evt.event === "fathom:meeting-processed") {
+    const payload = evt.payload as
+      | { meetingId?: number; title?: string; tasksCreated?: number; message?: string }
+      | undefined;
+    if (payload?.title) {
+      const app = host as unknown as {
+        showToast?: (msg: string, type: string, dur: number) => void;
+        allyMessages?: Array<{ role: string; content: string; timestamp?: number }>;
+        allyUnread?: number;
+        allyPanelOpen?: boolean;
+        tab?: string;
+        sessionKey?: string;
+        chatMessages?: Array<{ role: string; content: unknown; timestamp?: number }>;
+        requestUpdate?: () => void;
+      };
+      if (typeof app.showToast === "function") {
+        app.showToast(`Meeting processed: ${payload.title}`, "success", 6000);
+      }
+      const summary = payload.message ?? `Meeting "${payload.title}" has been processed.`;
+      // Inject into ally overlay
+      app.allyMessages = [
+        ...(app.allyMessages ?? []),
+        { role: "assistant", content: summary, timestamp: Date.now() },
+      ];
+      if (!app.allyPanelOpen && app.tab !== "chat") {
+        app.allyUnread = (app.allyUnread ?? 0) + 1;
+      }
+      // Also inject into main chat session if user is viewing it
+      if (app.sessionKey === ALLY_SESSION_KEY && app.chatMessages) {
+        app.chatMessages = [
+          ...app.chatMessages,
+          { role: "assistant", content: summary, timestamp: Date.now() },
+        ];
+      }
+      app.requestUpdate?.();
+    }
+    return;
+  }
+
   // Onboarding state updates (real-time phase transitions from agent)
   if (evt.event === "onboarding:update") {
     const payload = evt.payload as

@@ -278,7 +278,7 @@ async function processMeeting(meeting: MeetingQueueItem): Promise<void> {
 
   // ── Step 5: Broadcast notification ─────────────────────────────
   try {
-    broadcastMeetingNotification(meeting, tasksCreated);
+    broadcastMeetingNotification(meeting, tasksCreated, processingNotes);
     processingNotes.push("Notification sent");
   } catch (err) {
     processingNotes.push(`Notification failed: ${String(err)}`);
@@ -790,14 +790,12 @@ async function appendDecisionsToWorking(
 
 // ── Step 5: Broadcast notification ───────────────────────────────────
 
-function broadcastMeetingNotification(meeting: MeetingQueueItem, tasksCreated: number): void {
+function broadcastMeetingNotification(meeting: MeetingQueueItem, tasksCreated: number, processingNotes: string[]): void {
   if (!broadcastFn) return;
 
   const message = [
     `Meeting processed: ${meeting.title}`,
-    `- ${tasksCreated} action item(s) created as tasks`,
-    `- Meeting notes filed to vault`,
-    `- Follow-up email drafted -> ~/godmode/data/email-drafts/${meeting.id}.md`,
+    ...processingNotes.map((n) => `- ${n}`),
   ].join("\n");
 
   broadcastFn("fathom:meeting-processed", {
