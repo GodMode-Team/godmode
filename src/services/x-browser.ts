@@ -244,30 +244,46 @@ function parseHandle(urlOrHandle: string): string {
   return raw.replace(/^@/, "");
 }
 
+/** Extract author/handle from twitter-cli's nested author object or flat fields. */
+function extractAuthor(t: Record<string, unknown>): { author: string; handle: string } {
+  const a = t.author as Record<string, unknown> | undefined;
+  if (a && typeof a === "object") {
+    return {
+      author: String(a.name ?? a.screenName ?? ""),
+      handle: `@${String(a.screenName ?? a.name ?? "")}`,
+    };
+  }
+  return {
+    author: String(t.name ?? t.username ?? t.user ?? ""),
+    handle: `@${String(t.username ?? t.screen_name ?? t.user ?? "")}`,
+  };
+}
+
 /** Normalize twitter-cli JSON output into ExtractedTweet[]. */
 function normalizeTweets(data: unknown, maxCount: number): ExtractedTweet[] {
+  const normalize = (t: Record<string, unknown>): ExtractedTweet => {
+    const { author, handle } = extractAuthor(t);
+    const id = t.id ? String(t.id) : undefined;
+    const screenName = (t.author as Record<string, unknown> | undefined)?.screenName;
+    const url = id && screenName ? `https://x.com/${screenName}/status/${id}` : undefined;
+    return {
+      author,
+      handle,
+      text: String(t.text ?? t.full_text ?? ""),
+      url,
+      timestamp: t.createdAt ? String(t.createdAt) : (t.created_at ? String(t.created_at) : undefined),
+    };
+  };
+
   if (!data || !Array.isArray(data)) {
     // Single tweet object?
     if (data && typeof data === "object" && "text" in data) {
-      const t = data as Record<string, unknown>;
-      return [{
-        author: String(t.name ?? t.username ?? t.user ?? ""),
-        handle: `@${String(t.username ?? t.screen_name ?? t.user ?? "")}`,
-        text: String(t.text ?? t.full_text ?? ""),
-        url: t.url ? String(t.url) : undefined,
-        timestamp: t.created_at ? String(t.created_at) : undefined,
-      }];
+      return [normalize(data as Record<string, unknown>)];
     }
     return [];
   }
 
-  return (data as Array<Record<string, unknown>>).slice(0, maxCount).map((t) => ({
-    author: String(t.name ?? t.username ?? t.user ?? ""),
-    handle: `@${String(t.username ?? t.screen_name ?? t.user ?? "")}`,
-    text: String(t.text ?? t.full_text ?? ""),
-    url: t.url ? String(t.url) : undefined,
-    timestamp: t.created_at ? String(t.created_at) : undefined,
-  }));
+  return (data as Array<Record<string, unknown>>).slice(0, maxCount).map(normalize);
 }
 
 export async function getBookmarks(
