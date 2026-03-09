@@ -201,19 +201,51 @@ export async function addRoutingLesson(rule: string, sourceContext: string): Pro
 
 /**
  * Format routing lessons for context injection.
- * Returns empty string if no lessons.
+ * Only includes lessons RELEVANT to the current message (keyword match).
+ * Returns empty string if no relevant lessons.
  */
-export function formatRoutingLessons(lessons: Lesson[]): string {
+export function formatRoutingLessons(lessons: Lesson[], userMessage?: string): string {
   if (lessons.length === 0) return "";
+
+  // If no user message, skip injection entirely (don't waste tokens)
+  if (!userMessage || userMessage.length < 3) return "";
+
+  const query = userMessage.toLowerCase();
+
+  // Only inject lessons whose rules or source context match the current topic
+  const relevant = lessons.filter((l) => {
+    const ruleWords = extractKeywords(l.rule);
+    const contextWords = extractKeywords(l.sourceTaskTitle);
+    return ruleWords.some((w) => query.includes(w)) || contextWords.some((w) => query.includes(w));
+  });
+
+  if (relevant.length === 0) return "";
 
   const lines: string[] = [
     "## Routing Corrections",
     "You have been corrected on these in the past. Do NOT repeat these mistakes:",
   ];
 
-  for (const l of lessons.slice(0, 10)) {
+  for (const l of relevant.slice(0, 5)) {
     lines.push(`- ${l.rule}`);
   }
 
   return lines.join("\n");
+}
+
+/** Extract meaningful keywords from a lesson rule for relevance matching */
+function extractKeywords(text: string): string[] {
+  const stopWords = new Set(["the", "a", "an", "is", "are", "was", "were", "be", "been",
+    "have", "has", "had", "do", "does", "did", "will", "would", "could", "should",
+    "may", "might", "shall", "can", "to", "of", "in", "for", "on", "with", "at",
+    "by", "from", "as", "into", "about", "not", "no", "or", "and", "but", "if",
+    "then", "than", "that", "this", "it", "its", "you", "your", "i", "my", "me",
+    "we", "our", "they", "them", "their", "what", "when", "where", "who", "how",
+    "all", "any", "each", "every", "before", "after", "up", "down", "out",
+    "don't", "always", "never", "use", "using", "first", "without"]);
+  return text.toLowerCase()
+    .replace(/[^a-z0-9\s]/g, " ")
+    .split(/\s+/)
+    .filter((w) => w.length >= 3 && !stopWords.has(w))
+    .slice(0, 15);
 }

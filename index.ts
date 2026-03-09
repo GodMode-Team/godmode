@@ -1550,27 +1550,32 @@ h1{color:#ff6b6b}code{background:#16213e;padding:2px 8px;border-radius:4px}a{col
         }
       } catch { /* non-fatal */ }
 
+      // Extract user message once for skill card + routing lesson matching
+      let currentUserMessage = "";
+      try {
+        const msgs = (event as any).messages ?? [];
+        const lastMsg = [...msgs].reverse().find((m: any) => m.role === "user");
+        currentUserMessage = typeof lastMsg?.content === "string" ? lastMsg.content : "";
+      } catch { /* non-fatal */ }
+
       // P1.5: Skill card — domain-specific routing tips
       let skillCard: string | null = null;
       try {
-        const messages = (event as any).messages ?? [];
-        const lastUserMsg = [...messages].reverse().find((m: any) => m.role === "user");
-        const userQuery = typeof lastUserMsg?.content === "string" ? lastUserMsg.content : "";
-        if (userQuery.length >= 3) {
+        if (currentUserMessage.length >= 3) {
           const { matchSkillCard, formatSkillCard } = await import("./src/lib/skill-cards.js");
-          const matched = matchSkillCard(userQuery);
+          const matched = matchSkillCard(currentUserMessage);
           if (matched) {
             skillCard = formatSkillCard(matched);
           }
         }
       } catch { /* non-fatal */ }
 
-      // P2: Routing lessons — past corrections
+      // P2: Routing lessons — only inject lessons RELEVANT to current message
       let routingLessons: string | null = null;
       try {
         const { getRoutingLessons, formatRoutingLessons } = await import("./src/lib/agent-lessons.js");
         const lessons = await getRoutingLessons();
-        const formatted = formatRoutingLessons(lessons);
+        const formatted = formatRoutingLessons(lessons, currentUserMessage);
         if (formatted) routingLessons = formatted;
       } catch { /* non-fatal */ }
 
