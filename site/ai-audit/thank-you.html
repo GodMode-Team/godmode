@@ -474,6 +474,10 @@
         <p>Got it. Now book your 45-minute interview below and we'll come fully prepared.</p>
       </div>
 
+      <div id="formError" style="display:none;background:#2a1215;border:1px solid #7f1d1d;border-radius:10px;padding:14px 18px;margin-bottom:16px;color:#fca5a5;font-size:0.9rem;">
+        Something went wrong submitting your form. Please try again — or email <a href="mailto:caleb@lifeongodmode.com" style="color:#fca5a5;text-decoration:underline">caleb@lifeongodmode.com</a> directly and we'll get you sorted.
+      </div>
+
       <form class="intake-form" id="intakeForm">
         <!-- ── Contact Info ── -->
         <div class="form-row">
@@ -649,7 +653,7 @@
 
       <div class="calendar-section">
         <div class="calendar-embed" id="calendarEmbed">
-          <iframe src="https://api.leadconnectorhq.com/widget/booking/caleb-hodges-personal-calendar-pcmpwm4da" scrolling="no" style="width: 100%; min-height: 700px; border: none; border-radius: 10px;"></iframe>
+          <iframe src="https://api.yourlocaldoc.com/widget/booking/cS0maOhNCjZfg6tqq5by" scrolling="no" style="width: 100%; min-height: 700px; border: none; border-radius: 10px;"></iframe>
         </div>
       </div>
     </section>
@@ -727,15 +731,28 @@
         });
 
         if (!res.ok) {
-          console.warn('[intake] API returned', res.status);
+          const errData = await res.json().catch(() => ({}));
+          console.error('[intake] API returned', res.status, errData);
+          submitBtn.disabled = false;
+          submitBtn.textContent = 'Submit Intake Form & Continue to Booking';
+          const errMsg = document.getElementById('formError');
+          if (errMsg) errMsg.style.display = 'block';
+          return;
         }
       } catch (err) {
-        console.warn('[intake] Submission failed, data saved locally:', err);
+        console.error('[intake] Submission failed:', err);
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Submit Intake Form & Continue to Booking';
+        const errMsg = document.getElementById('formError');
+        if (errMsg) errMsg.style.display = 'block';
+        return;
       }
 
-      // Always show success
+      // Show success only on confirmed submission
       form.style.display = 'none';
       successMsg.style.display = 'block';
+      const errMsg = document.getElementById('formError');
+      if (errMsg) errMsg.style.display = 'none';
 
       // Update progress
       step2.classList.remove('active');
