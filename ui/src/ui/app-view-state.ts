@@ -35,7 +35,6 @@ import type { LightboxImage, LightboxState } from "./chat/lightbox";
 import type { ToolExecutionInfo } from "./types/chat-types";
 import type { ChatAttachment, ChatQueueItem, CronFormState, FileTreeNode } from "./ui-types";
 import type { NostrProfileFormState } from "./views/channels.nostr-profile-form";
-import type { DataSource } from "./views/data";
 import type { AllyChatMessage } from "./views/ally-chat";
 import type { AgentLogData, DailyBriefData, DecisionCardItem } from "./views/my-day";
 import type { Project } from "./views/work";
@@ -275,11 +274,6 @@ export type AppViewState = {
   workExpandedProjects?: Set<string>;
   workProjectFiles?: Record<string, unknown[]>;
   workDetailLoading?: Set<string>;
-  // Data tab state
-  dataSources?: DataSource[];
-  dataLoading?: boolean;
-  dataError?: string | null;
-  dataSubtab?: "dashboard" | "sources";
   // Onboarding experience state (6-phase flow)
   onboardingActive?: boolean;
   onboardingPhase?: import("./views/onboarding").OnboardingPhase;
@@ -554,11 +548,6 @@ export type AppViewState = {
   handleWorkspaceBrowseBack: () => void;
   handleWorkspaceCreateFolder: (folderPath: string) => Promise<void>;
   handleStartChatWithPrompt: (prompt: string) => void;
-  // Data tab handlers
-  handleDataRefresh: () => Promise<void>;
-  handleDataSubtabChange: (subtab: "dashboard" | "sources") => void;
-  handleDataConnectSource: (sourceId: string) => void;
-  handleDataQuerySubmit: (query: string) => void;
   // User profile handlers
   handleUpdateUserProfile: (name: string, avatar: string) => void;
   // Onboarding handlers

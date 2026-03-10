@@ -216,9 +216,11 @@ const identity: GatewayRequestHandler = async ({ respond }) => {
     }
   }
 
-  // Check for Identity OS dashboard
-  const identityOsDashboard = join(MEMORY_DIR, "projects", "identity-os", "final", "dashboard", "index.html");
-  const identityOsExists = existsSync(identityOsDashboard);
+  // Check for Identity OS dashboard — served via artifact file server
+  const identityOsDashboardFile = join(MEMORY_DIR, "projects", "identity-os", "final", "dashboard", "index.html");
+  const identityOsExists = existsSync(identityOsDashboardFile);
+  // Return the served URL so the UI can open it directly (preserving relative links)
+  const identityOsDashboard = "/godmode/artifacts/index.html";
 
   // Identity OS final artifacts
   const identityOsFinalPath = join(MEMORY_DIR, "projects", "identity-os", "final");

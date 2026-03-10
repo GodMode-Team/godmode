@@ -706,6 +706,63 @@ export async function checkConfigAccess(
   return undefined;
 }
 
+// ── Ephemeral Path Shield ──────────────────────────────────────────
+//
+// Problem: Ally built a website in /tmp, served it locally, macOS cleaned
+// /tmp, work vanished. Massive token waste.
+// Rule: Warn (not block) when exec writes to /tmp or /var/tmp.
+// We warn instead of block because some legitimate commands need /tmp
+// (e.g., package installs, build tools). The warning injects context
+// that nudges the LLM to persist the output somewhere permanent.
+
+const EPHEMERAL_WRITE_PATTERNS = [
+  /\b(>|>>|tee|cp|mv|mkdir|touch|cat\s*>)\s+\/tmp\b/,
+  /\b(>|>>|tee|cp|mv|mkdir|touch|cat\s*>)\s+\/var\/tmp\b/,
+  /\bcd\s+\/tmp\b/,
+  /\bmkdir\s+(-p\s+)?\/tmp\//,
+  /\bwrite_file.*\/tmp\//i,
+  /\bsave.*\/tmp\//i,
+];
+
+/**
+ * Check if an exec command writes to ephemeral directories (/tmp, /var/tmp).
+ * Returns a warning string to inject (does NOT block), or undefined.
+ */
+export function checkEphemeralWrite(
+  toolName: string,
+  params: Record<string, unknown>,
+  sessionKey?: string,
+): string | undefined {
+  const name = toolName.trim().toLowerCase();
+  if (name !== "exec" && name !== "bash" && name !== "shell") return undefined;
+
+  const command =
+    typeof params.command === "string"
+      ? params.command
+      : typeof params.cmd === "string"
+        ? params.cmd
+        : "";
+  if (!command) return undefined;
+
+  const isEphemeral = EPHEMERAL_WRITE_PATTERNS.some((p) => p.test(command));
+  if (!isEphemeral) return undefined;
+
+  void logGateActivity(
+    "ephemeralPathShield",
+    "fired",
+    `Ephemeral write detected: ${command.slice(0, 120)}`,
+    sessionKey,
+  );
+
+  return [
+    "⚠ EPHEMERAL PATH WARNING: This command writes to /tmp which is cleaned by the OS.",
+    "Files in /tmp WILL be lost. After this command completes, you MUST:",
+    "1. Move/copy the output to a permanent location (~/godmode/artifacts/, GitHub repo, or vault).",
+    "2. If this is a website or code project, create a GitHub repo and push it.",
+    "3. Confirm the permanent location before telling the user the task is done.",
+  ].join("\n");
+}
+
 /**
  * Reset prompt shield and output shield tracking for a session.
  */

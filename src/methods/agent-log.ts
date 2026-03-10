@@ -192,8 +192,4 @@ export const agentLogHandlers: GatewayRequestHandlers = {
     respond(true, { ok: true, resolved: false, reason: "item not found" }, undefined);
   },
 
-  "agentLog.syncClaudeCode": async ({ respond }) => {
-    // Claude Code sync removed in lean audit
-    respond(true, { ok: true, synced: 0, message: "Claude Code sync removed" }, undefined);
-  },
 };

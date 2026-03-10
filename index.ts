@@ -1304,10 +1304,14 @@ h1{color:#ff6b6b}code{background:#16213e;padding:2px 8px;border-radius:4px}a{col
 
       // Identity graph initialization — entity/relationship tracking (SQLite, sync)
       try {
-        const { initIdentityGraph, isGraphReady } = await import("./src/lib/identity-graph.js");
+        const { initIdentityGraph, isGraphReady, seedFromVault: seedGraphFromVault } = await import("./src/lib/identity-graph.js");
         initIdentityGraph();
         if (isGraphReady()) {
           api.logger.info("[GodMode] Identity graph initialized");
+          // Seed from vault on first boot (async, fire-and-forget)
+          void seedGraphFromVault().catch((err) =>
+            api.logger.warn(`[GodMode] Identity graph seeding failed (non-fatal): ${String(err)}`),
+          );
         }
       } catch (err) {
         api.logger.warn(`[GodMode] Identity graph init failed (non-fatal): ${String(err)}`);
@@ -1585,13 +1589,21 @@ h1{color:#ff6b6b}code{background:#16213e;padding:2px 8px;border-radius:4px}a{col
       }
 
       // P0: Identity graph — entity/relationship context
+      // Combines user message keywords + entity names found in Mem0 results
+      // so "prep for that meeting with the sales VP" finds Sarah via Mem0's semantic match
       let graphBlock: string | null = null;
       if (provenance?.kind !== "inter_session") {
         try {
           const { isGraphReady, queryGraph, formatGraphContext } = await import("./src/lib/identity-graph.js");
-          if (isGraphReady() && userQuery.length >= 5) {
-            const graphResults = queryGraph(userQuery);
-            graphBlock = formatGraphContext(graphResults);
+          if (isGraphReady()) {
+            // Feed both user query AND Mem0 memory hits into graph search
+            const graphInput = memoryBlock
+              ? `${userQuery}\n${memoryBlock}`
+              : userQuery;
+            if (graphInput.length >= 5) {
+              const graphResults = queryGraph(graphInput);
+              graphBlock = formatGraphContext(graphResults);
+            }
           }
         } catch {
           // Graph query failure is invisible
@@ -1889,6 +1901,17 @@ h1{color:#ff6b6b}code{background:#16213e;padding:2px 8px;border-radius:4px}a{col
         api.logger.warn(`[GodMode][SafetyGate] config shield fired: ${name}`);
         return { block: true, blockReason: configBlock };
       }
+
+      // Gate 1d: Ephemeral Path Shield — warn when writing to /tmp
+      try {
+        const { checkEphemeralWrite } = await import("./src/hooks/safety-gates.js");
+        const ephemeralWarn = checkEphemeralWrite(name, (event.params ?? {}) as Record<string, unknown>, sessionKey);
+        if (ephemeralWarn) {
+          api.logger.warn(`[GodMode][SafetyGate] ephemeral path shield fired: ${name}`);
+          // Warn, don't block — inject the warning as prependContext so the LLM sees it
+          return { prependContext: ephemeralWarn };
+        }
+      } catch { /* non-fatal */ }
 
       // Record tool usage for enforcer gates (only tools that pass all gates)
       try {

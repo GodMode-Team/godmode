@@ -7,11 +7,11 @@
  * Singleton pattern.
  */
 
-import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { readFile, writeFile, mkdir, copyFile } from "node:fs/promises";
 import { join } from "node:path";
 import { DATA_DIR, localDateString, DAILY_FOLDER, resolveVaultPath } from "../data-paths.js";
-import { getVaultPath, VAULT_FOLDERS, ensureVaultStructure } from "../lib/vault-paths.js";
+import { getVaultPath, VAULT_FOLDERS, ensureVaultStructure, resolveConsciousnessPath } from "../lib/vault-paths.js";
 
 type BroadcastFn = (
   event: string,
@@ -107,6 +107,17 @@ class ConsciousnessHeartbeat {
           this.logger.info(`[Consciousness] Mem0 retry queue: processed ${retried} item(s)`);
         }
       } catch { /* Memory retry non-fatal */ }
+
+      // Identity graph maintenance — prune stale orphan entities
+      try {
+        const { isGraphReady, pruneStaleEntities } = await import("../lib/identity-graph.js");
+        if (isGraphReady()) {
+          const pruned = pruneStaleEntities();
+          if (pruned > 0) {
+            this.logger.info(`[Consciousness] Identity graph: pruned ${pruned} stale entities`);
+          }
+        }
+      } catch { /* non-fatal */ }
 
       this.lastSyncAt = Date.now();
       this.broadcast("consciousness:status", {
@@ -339,7 +350,8 @@ class ConsciousnessHeartbeat {
    * task counts and top-priority items. Replaces any existing section.
    */
   private async appendTaskDashboard(): Promise<void> {
-    if (!existsSync(CONSCIOUSNESS_FILE)) return;
+    const consciousnessFile = resolveConsciousnessPath().path;
+    if (!existsSync(consciousnessFile)) return;
 
     const { readTasks } = await import("../methods/tasks.js");
     const { localDateString } = await import("../data-paths.js");
@@ -407,11 +419,11 @@ class ConsciousnessHeartbeat {
     const dashboardBlock = lines.join("\n");
 
     try {
-      let content = readFileSync(CONSCIOUSNESS_FILE, "utf-8");
+      let content = readFileSync(consciousnessFile, "utf-8");
       // Remove existing Task Pulse section
       content = content.replace(/\n## Task Pulse\n[\s\S]*?(?=\n## |\n$|$)/, "");
       content = content.trimEnd() + "\n" + dashboardBlock;
-      writeFileSync(CONSCIOUSNESS_FILE, content, "utf-8");
+      writeFileSync(consciousnessFile, content, "utf-8");
     } catch {
       // Non-fatal
     }

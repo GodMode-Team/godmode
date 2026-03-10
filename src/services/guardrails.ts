@@ -27,6 +27,7 @@ export type GuardrailGateId =
   | "promptShield"
   | "outputShield"
   | "configShield"
+  | "ephemeralPathShield"
   | "contextPressure";
 
 export type GateConfig = {
@@ -89,6 +90,7 @@ export const GATE_DEFAULTS: Record<GuardrailGateId, GateConfig> = {
   promptShield: { enabled: true },
   outputShield: { enabled: true },
   configShield: { enabled: true },
+  ephemeralPathShield: { enabled: true },
   contextPressure: { enabled: true, thresholds: { warningPercent: 70, criticalPercent: 90, maxContextTokens: 200000 } },
 };
 
@@ -185,6 +187,13 @@ export const GATE_DESCRIPTORS: Record<GuardrailGateId, GateDescriptor> = {
     description:
       "Blocks tool calls (bash, read) that would access sensitive config files like openclaw.json, .env, AGENTS.md, SOUL.md, or SSH keys.",
     icon: "\u{1F5C4}",
+    hook: "before_tool_call",
+  },
+  ephemeralPathShield: {
+    name: "Ephemeral Path Shield",
+    description:
+      "Warns when exec commands write to /tmp or /var/tmp. Injects persistence reminder so generated artifacts are saved permanently (GitHub, vault, ~/godmode/artifacts/).",
+    icon: "\u{1F4BE}",
     hook: "before_tool_call",
   },
   contextPressure: {

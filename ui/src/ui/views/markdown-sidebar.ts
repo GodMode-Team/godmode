@@ -202,7 +202,7 @@ function renderBody(props: MarkdownSidebarProps) {
     return html`<iframe
       class="sidebar-html-frame"
       src=${blobUrl}
-      sandbox="allow-same-origin"
+      sandbox="allow-same-origin allow-top-navigation-by-user-activation allow-popups"
       @load=${(e: Event) => {
         // Clean up blob URL after load
         URL.revokeObjectURL(blobUrl);

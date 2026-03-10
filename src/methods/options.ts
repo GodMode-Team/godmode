@@ -19,7 +19,6 @@ type GodModeOptions = Record<string, unknown>;
 
 const DEFAULTS: GodModeOptions = {
   "agentPersona.enabled": true,
-  // proactiveIntel removed in v1.6.0 dead weight audit
 };
 
 async function readOptions(): Promise<GodModeOptions> {
