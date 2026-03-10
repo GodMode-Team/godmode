@@ -127,6 +127,9 @@ run_campaign "soul-essence"    "$CAMPAIGNS_DIR/soul-essence.mjs"    15
 run_campaign "queue-prompts"   "$CAMPAIGNS_DIR/queue-prompts.mjs"   15
 run_campaign "ally-experience" "$CAMPAIGNS_DIR/ally-experience.mjs" 15
 
+# Phase 4: Vault optimization (LLM-as-judge + structural fixes)
+run_campaign "second-brain"   "$CAMPAIGNS_DIR/second-brain.mjs"   10
+
 # ── Final eval ───────────────────────────────────────────────────────
 
 echo ""
