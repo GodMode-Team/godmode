@@ -121,7 +121,7 @@ let _LLM_KEY, _LLM_URL, _LLM_MODEL, _IS_ANTHROPIC;
 if (_ANTHROPIC_KEY) {
   _LLM_KEY = _ANTHROPIC_KEY;
   _LLM_URL = "https://api.anthropic.com/v1/messages";
-  _LLM_MODEL = "claude-sonnet-4-20250514";
+  _LLM_MODEL = "claude-sonnet-4-6";
   _IS_ANTHROPIC = true;
   console.log(`[queue-prompts] Using LLM judge: Sonnet 4.6 via Anthropic`);
 } else {

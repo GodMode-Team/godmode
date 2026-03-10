@@ -61,7 +61,7 @@ let LLM_API_KEY, LLM_BASE_URL, LLM_MODEL;
 if (ANTHROPIC_KEY) {
   LLM_API_KEY = ANTHROPIC_KEY;
   LLM_BASE_URL = "https://api.anthropic.com/v1/messages";
-  LLM_MODEL = "claude-sonnet-4-20250514";
+  LLM_MODEL = "claude-sonnet-4-6";
   console.log(`[ally-experience] Using LLM judge: Sonnet 4.6 via Anthropic`);
 } else {
   const XAI_API_KEY = process.env.XAI_API_KEY;
