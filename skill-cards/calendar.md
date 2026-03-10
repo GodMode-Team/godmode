@@ -1,6 +1,6 @@
 ---
 domain: calendar
-triggers: meeting, schedule, calendar, event, availability, free, busy, when am i, what's next, upcoming
+triggers: meeting, schedule, calendar, event, availability, free, busy, when am i, what's next, upcoming, standup, reschedule, block off, coming up, tomorrow
 tools: calendar.events.today, calendar.events.range
 ---
 ## When to Use

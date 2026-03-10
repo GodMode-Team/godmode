@@ -1,7 +1,7 @@
 ---
 domain: queue
-triggers: queue, delegate, background, agent, run this, can you do, draft, research for me, write this up, code review
-tools: queue_add, queue_check, queue.list, queue.approve, queue.reject
+triggers: queue, delegate, background, agent, run this, can you do, draft, research for me, write this up, code review, research, deep dive
+tools: queue_add, queue_check, queue_action
 ---
 ## When to Use
 - User wants work done in the background (research, drafting, code review, analysis)
@@ -11,8 +11,7 @@ tools: queue_add, queue_check, queue.list, queue.approve, queue.reject
 ## How to Use
 - `queue_add` tool — { title, description, taskType, persona?, priority? }
 - `queue_check` tool — check status of queued items
-- `queue.list` — list all queue items
-- `queue.approve` / `queue.reject` — user reviews completed work
+- `queue_action` tool — { id, action } — approve, reject, retry, or remove a queue item
 
 ## Workflow
 1. Scope the work clearly in the description — be specific about deliverables

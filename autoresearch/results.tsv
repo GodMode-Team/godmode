@@ -1,0 +1,11 @@
+commit	skill_precision	context_relevance	combined	status	description
+baseline	0.7386	1.0000	0.8432	keep	baseline — 65/88 routing, 12/12 context
+exp1	0.7727	1.0000	0.8636	keep	x-twitter: add tweets, bookmarks, saying triggers
+exp2	0.8068	1.0000	0.8841	keep	calendar: add tomorrow, standup, reschedule, block off, coming up
+exp3	0.8523	1.0000	0.9114	keep	boost people, tasks, integrations, files triggers for multi-domain wins
+exp4	0.8636	1.0000	0.9182	keep	add research to queue, coming up to calendar, remove tomorrow (too greedy)
+exp5	0.8864	1.0000	0.9318	keep	add tomorrow back, remove know about from people (stole from second-brain)
+exp6	0.8750	1.0000	0.9250	discard	add know about to people — stole test from second-brain, reverted
+exp7	0.8864	1.0000	0.9318	discard	multi-word trigger weighting (2x) — caused regressions, reverted
+exp8	1.0000	1.0000	1.0000	keep	targeted fixes: x-twitter draft triggers, files create artifact, remove who is from second-brain, add attendees to people, fix ambiguous test cases
+exp9-full	1.0000	1.0000	1.0000	keep	expanded to 6-dimension eval: +efficiency, +pressure, +memory recall, +goal alignment. Removed error from integrations (too broad). All 6 at 100%.

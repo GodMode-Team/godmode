@@ -1,6 +1,6 @@
 ---
 domain: x-twitter
-triggers: twitter, tweet, x.com, timeline, trending, what's happening, social, post, thread, bookmark
+triggers: twitter, tweet, tweets, tweeted, x.com, timeline, trending, what's happening, social, post, thread, bookmark, bookmarks, saying, discussions, draft a post, draft a tweet
 tools: x_read, x.search, x.readTweet, x.readThread, x.userTimeline, x.bookmarks
 ---
 ## When to Use
