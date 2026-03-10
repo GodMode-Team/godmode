@@ -349,12 +349,14 @@ const readFile: GatewayRequestHandler = async ({ params, respond }) => {
     return;
   }
 
-  // SECURITY: Validate path is within allowed roots, resolving symlinks
-  const { isAllowedPath } = await import("../lib/vault-paths.js");
+  // SECURITY: Validate path is within user's home directory, resolving symlinks.
+  // files.read is local-only (sidebar display) so HOME is the safe boundary.
+  // Drive uploads use the stricter isAllowedPath (godmode root + vault + workspaces).
   const resolvedPath = path.resolve(filePath);
-  // Resolve symlinks to prevent escaping allowed roots via symlink
   const realPath = await fs.realpath(resolvedPath).catch(() => resolvedPath);
-  if (!isAllowedPath(realPath)) {
+  const homeDir = process.env.HOME || process.env.USERPROFILE || "";
+  const homePrefix = homeDir.endsWith(path.sep) ? homeDir : homeDir + path.sep;
+  if (!homeDir || (!realPath.startsWith(homePrefix) && realPath !== homeDir)) {
     respond(false, null, { code: "ACCESS_DENIED", message: "Path not allowed" });
     return;
   }
