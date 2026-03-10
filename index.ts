@@ -988,6 +988,103 @@ h1{color:#ff6b6b}code{background:#16213e;padding:2px 8px;border-radius:4px}a{col
       }
     }) as Parameters<typeof api.registerGatewayMethod>[1]);
 
+    // ── sessions.searchContent — full-text search across session messages ──
+    api.registerGatewayMethod("sessions.searchContent", (async ({ params, respond }: { params: Record<string, unknown>; respond: Function }) => {
+      const query = typeof params.query === "string" ? params.query.trim().toLowerCase() : "";
+      const limit = typeof params.limit === "number" ? Math.min(params.limit, 50) : 20;
+      if (!query) {
+        respond(true, { ts: Date.now(), results: [] });
+        return;
+      }
+      try {
+        // Get session list from host
+        const sessionsRes = await api.request("sessions.list", { limit: 200 }) as {
+          sessions?: Array<{ key: string; label?: string; displayName?: string }>;
+        } | null;
+        const sessions = sessionsRes?.sessions ?? [];
+        if (sessions.length === 0) {
+          respond(true, { ts: Date.now(), results: [] });
+          return;
+        }
+
+        // Search sessions in parallel (cap concurrency to avoid overload)
+        const CONCURRENCY = 10;
+        const results: Array<{
+          key: string;
+          label?: string;
+          displayName?: string;
+          matches: Array<{ role: string; text: string; timestamp?: number }>;
+        }> = [];
+
+        for (let i = 0; i < sessions.length && results.length < limit; i += CONCURRENCY) {
+          const batch = sessions.slice(i, i + CONCURRENCY);
+          const batchResults = await Promise.allSettled(
+            batch.map(async (s) => {
+              // Check if session name matches
+              const nameMatch = [s.label, s.displayName, s.key]
+                .filter(Boolean)
+                .some((f) => f!.toLowerCase().includes(query));
+
+              // Fetch recent messages for content search
+              const histRes = await api.request("chat.history", {
+                sessionKey: s.key,
+                limit: 50,
+              }) as { messages?: Array<{ role: string; content: string; timestamp?: number }> } | null;
+              const messages = histRes?.messages ?? [];
+
+              // Find content matches
+              const contentMatches: Array<{ role: string; text: string; timestamp?: number }> = [];
+              for (const msg of messages) {
+                const text = typeof msg.content === "string" ? msg.content : "";
+                // Strip system tags for cleaner search
+                const clean = text
+                  .replace(/<system-context>[\s\S]*?<\/system-context>/g, "")
+                  .replace(/<system-reminder>[\s\S]*?<\/system-reminder>/g, "")
+                  .replace(/<[a-z][a-z_-]*>[\s\S]*?<\/[a-z][a-z_-]*>/g, "");
+                if (clean.toLowerCase().includes(query)) {
+                  // Extract snippet around the match
+                  const idx = clean.toLowerCase().indexOf(query);
+                  const start = Math.max(0, idx - 40);
+                  const end = Math.min(clean.length, idx + query.length + 60);
+                  const snippet = (start > 0 ? "..." : "") +
+                    clean.slice(start, end).replace(/\n/g, " ").trim() +
+                    (end < clean.length ? "..." : "");
+                  contentMatches.push({
+                    role: msg.role,
+                    text: snippet,
+                    timestamp: msg.timestamp,
+                  });
+                }
+                if (contentMatches.length >= 3) break;
+              }
+
+              if (nameMatch || contentMatches.length > 0) {
+                return {
+                  key: s.key,
+                  label: s.label,
+                  displayName: s.displayName,
+                  matches: contentMatches,
+                };
+              }
+              return null;
+            }),
+          );
+
+          for (const r of batchResults) {
+            if (r.status === "fulfilled" && r.value) {
+              results.push(r.value);
+              if (results.length >= limit) break;
+            }
+          }
+        }
+
+        respond(true, { ts: Date.now(), results });
+      } catch (err) {
+        api.logger.warn(`[GodMode] sessions.searchContent error: ${String(err)}`);
+        respond(false, null, { code: "SEARCH_ERROR", message: String(err) });
+      }
+    }) as Parameters<typeof api.registerGatewayMethod>[1]);
+
     api.registerGatewayMethod("godmode.status", (async ({ respond }: { respond: Function }) => {
       respond(true, {
         plugin: true,
