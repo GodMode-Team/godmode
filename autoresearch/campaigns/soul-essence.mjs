@@ -43,16 +43,38 @@ function loadEnv(path) {
 
 loadEnv(ENV_PATH);
 
-const XAI_API_KEY = process.env.XAI_API_KEY;
-const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
-const LLM_API_KEY = XAI_API_KEY || OPENAI_API_KEY;
-const LLM_BASE_URL = XAI_API_KEY ? "https://api.x.ai/v1/chat/completions" : "https://api.openai.com/v1/chat/completions";
-const LLM_MODEL = XAI_API_KEY ? "grok-3-mini-fast" : "gpt-4o-mini";
+// ── Resolve Anthropic API key (preferred judge: Sonnet 4.6) ──────────
+let ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY;
+if (!ANTHROPIC_KEY) {
+  try {
+    const { readFileSync: rfs } = await import("node:fs");
+    const { join: pj } = await import("node:path");
+    const { homedir: hd } = await import("node:os");
+    const profiles = JSON.parse(rfs(pj(hd(), ".openclaw", "auth-profiles.json"), "utf-8"));
+    const entry = profiles?.profiles?.["anthropic:oauth"]
+      ?? Object.values(profiles?.profiles ?? {}).find(p => p?.provider === "anthropic" && p?.token);
+    if (entry?.token) ANTHROPIC_KEY = entry.token;
+  } catch {}
+}
+
+let LLM_API_KEY, LLM_BASE_URL, LLM_MODEL;
+if (ANTHROPIC_KEY) {
+  LLM_API_KEY = ANTHROPIC_KEY;
+  LLM_BASE_URL = "https://api.anthropic.com/v1/messages";
+  LLM_MODEL = "claude-sonnet-4-20250514";
+  console.log(`[soul-essence] Using LLM judge: Sonnet 4.6 via Anthropic`);
+} else {
+  const XAI_API_KEY = process.env.XAI_API_KEY;
+  const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
+  LLM_API_KEY = XAI_API_KEY || OPENAI_API_KEY;
+  LLM_BASE_URL = XAI_API_KEY ? "https://api.x.ai/v1/chat/completions" : "https://api.openai.com/v1/chat/completions";
+  LLM_MODEL = XAI_API_KEY ? "grok-3-mini-fast" : "gpt-4o-mini";
+  console.log(`[soul-essence] Using LLM judge: ${LLM_MODEL} (Anthropic key not found, falling back)`);
+}
 if (!LLM_API_KEY) {
-  console.error("XAI_API_KEY or OPENAI_API_KEY not found in environment or ~/.openclaw/.env");
+  console.error("No API key found (Anthropic, XAI, or OpenAI). Cannot run LLM judge.");
   process.exit(1);
 }
-console.log(`[soul-essence] Using LLM judge: ${LLM_MODEL} via ${XAI_API_KEY ? "XAI" : "OpenAI"}`);
 
 // ── CLI args ────────────────────────────────────────────────────────
 
@@ -263,7 +285,9 @@ function applyMutation(source, mutation) {
   return null;
 }
 
-// ── OpenAI Judge ────────────────────────────────────────────────────
+// ── LLM Judge (Anthropic Sonnet 4.6 preferred, OpenAI/XAI fallback) ──
+
+const IS_ANTHROPIC = LLM_BASE_URL.includes("anthropic.com");
 
 async function callJudge(promptText, scenario) {
   const systemMsg = `You are evaluating an AI system prompt for a personal AI ally called GodMode/Prosper.
@@ -279,39 +303,73 @@ ${promptText}
 How would an AI with this prompt handle: "${scenario.user}"
 The ideal behavior is: "${scenario.ideal}"`;
 
-  const body = {
-    model: LLM_MODEL,
-    messages: [
-      { role: "system", content: systemMsg },
-      { role: "user", content: userMsg },
-    ],
-    temperature: 0.3,
-    max_tokens: 120,
-  };
-
   for (let attempt = 0; attempt < 3; attempt++) {
     try {
-      const res = await fetch(LLM_BASE_URL, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${LLM_API_KEY}`,
-        },
-        body: JSON.stringify(body),
-      });
+      let res, content;
 
-      if (!res.ok) {
-        const errText = await res.text();
-        console.error(`  LLM API error (${res.status}): ${errText}`);
-        if (res.status === 429) {
-          await sleep(2000 * (attempt + 1));
-          continue;
+      if (IS_ANTHROPIC) {
+        // Anthropic Messages API
+        res = await fetch(LLM_BASE_URL, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-api-key": LLM_API_KEY,
+            "anthropic-version": "2023-06-01",
+          },
+          body: JSON.stringify({
+            model: LLM_MODEL,
+            system: systemMsg,
+            messages: [{ role: "user", content: userMsg }],
+            temperature: 0.3,
+            max_tokens: 200,
+          }),
+        });
+
+        if (!res.ok) {
+          const errText = await res.text();
+          console.error(`  Anthropic API error (${res.status}): ${errText}`);
+          if (res.status === 429 || res.status === 529) {
+            await sleep(3000 * (attempt + 1));
+            continue;
+          }
+          throw new Error(`Anthropic ${res.status}`);
         }
-        throw new Error(`LLM API ${res.status}`);
+
+        const data = await res.json();
+        content = data.content?.[0]?.text?.trim();
+      } else {
+        // OpenAI-compatible API (XAI, OpenAI)
+        res = await fetch(LLM_BASE_URL, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${LLM_API_KEY}`,
+          },
+          body: JSON.stringify({
+            model: LLM_MODEL,
+            messages: [
+              { role: "system", content: systemMsg },
+              { role: "user", content: userMsg },
+            ],
+            temperature: 0.3,
+            max_tokens: 200,
+          }),
+        });
+
+        if (!res.ok) {
+          const errText = await res.text();
+          console.error(`  LLM API error (${res.status}): ${errText}`);
+          if (res.status === 429) {
+            await sleep(2000 * (attempt + 1));
+            continue;
+          }
+          throw new Error(`LLM API ${res.status}`);
+        }
+
+        const data = await res.json();
+        content = data.choices?.[0]?.message?.content?.trim();
       }
 
-      const data = await res.json();
-      const content = data.choices?.[0]?.message?.content?.trim();
       if (!content) throw new Error("Empty response");
 
       // Extract JSON from response (may be wrapped in markdown code block)

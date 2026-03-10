@@ -121,13 +121,11 @@ run_campaign "skill-triggers"  "$CAMPAIGNS_DIR/skill-triggers.mjs"  20
 # Phase 2: Memory threshold tuning (may use API, moderate cost)
 run_campaign "memory-thresholds" "$CAMPAIGNS_DIR/memory-thresholds.mjs" 25
 
-# Phase 3: LLM-as-judge campaigns (API calls, higher cost)
-if [ -n "${OPENAI_API_KEY:-}" ]; then
-  run_campaign "soul-essence"  "$CAMPAIGNS_DIR/soul-essence.mjs"   15
-  run_campaign "queue-prompts" "$CAMPAIGNS_DIR/queue-prompts.mjs"  15
-else
-  echo "[overnight] SKIPPING LLM-as-judge campaigns (no OPENAI_API_KEY)"
-fi
+# Phase 3: LLM-as-judge campaigns (Anthropic Sonnet 4 preferred, XAI/OpenAI fallback)
+# These campaigns auto-detect the best available API key
+run_campaign "soul-essence"    "$CAMPAIGNS_DIR/soul-essence.mjs"    15
+run_campaign "queue-prompts"   "$CAMPAIGNS_DIR/queue-prompts.mjs"   15
+run_campaign "ally-experience" "$CAMPAIGNS_DIR/ally-experience.mjs" 15
 
 # ── Final eval ───────────────────────────────────────────────────────
 

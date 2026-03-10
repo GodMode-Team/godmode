@@ -103,11 +103,36 @@ const MUTATIONS = [
   'Start with a one-sentence executive summary.',
 ];
 
-// ── LLM judge (XAI Grok or OpenAI fallback) ─────────────────────────
-const _LLM_KEY = process.env.XAI_API_KEY || process.env.OPENAI_API_KEY;
-const _LLM_URL = process.env.XAI_API_KEY ? "https://api.x.ai/v1/chat/completions" : "https://api.openai.com/v1/chat/completions";
-const _LLM_MODEL = process.env.XAI_API_KEY ? "grok-3-mini-fast" : "gpt-4o-mini";
-console.log(`[queue-prompts] Using LLM judge: ${_LLM_MODEL}`);
+// ── Resolve Anthropic key (Sonnet 4.6 preferred judge) ───────────────
+let _ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY;
+if (!_ANTHROPIC_KEY) {
+  try {
+    const { readFileSync: rfs } = await import("node:fs");
+    const { join: pj } = await import("node:path");
+    const { homedir: hd } = await import("node:os");
+    const profiles = JSON.parse(rfs(pj(hd(), ".openclaw", "auth-profiles.json"), "utf-8"));
+    const entry = profiles?.profiles?.["anthropic:oauth"]
+      ?? Object.values(profiles?.profiles ?? {}).find(p => p?.provider === "anthropic" && p?.token);
+    if (entry?.token) _ANTHROPIC_KEY = entry.token;
+  } catch {}
+}
+
+let _LLM_KEY, _LLM_URL, _LLM_MODEL, _IS_ANTHROPIC;
+if (_ANTHROPIC_KEY) {
+  _LLM_KEY = _ANTHROPIC_KEY;
+  _LLM_URL = "https://api.anthropic.com/v1/messages";
+  _LLM_MODEL = "claude-sonnet-4-20250514";
+  _IS_ANTHROPIC = true;
+  console.log(`[queue-prompts] Using LLM judge: Sonnet 4.6 via Anthropic`);
+} else {
+  const xai = process.env.XAI_API_KEY;
+  const oai = process.env.OPENAI_API_KEY;
+  _LLM_KEY = xai || oai;
+  _LLM_URL = xai ? "https://api.x.ai/v1/chat/completions" : "https://api.openai.com/v1/chat/completions";
+  _LLM_MODEL = xai ? "grok-3-mini-fast" : "gpt-4o-mini";
+  _IS_ANTHROPIC = false;
+  console.log(`[queue-prompts] Using LLM judge: ${_LLM_MODEL} (Anthropic key not found, falling back)`);
+}
 
 const JUDGE_SYSTEM = `You are evaluating a prompt template for an AI agent task system. The template will be filled with {title} and {description} to create instructions for a background AI agent.
 
@@ -125,36 +150,73 @@ async function sleep(ms) {
 }
 
 async function judgePrompt(filledTemplate, taskType, title, description) {
-  if (!_LLM_KEY) throw new Error("XAI_API_KEY or OPENAI_API_KEY not set in ~/.openclaw/.env");
+  if (!_LLM_KEY) throw new Error("No API key found for LLM judge");
 
   const userMsg = `Template being evaluated:\n---\n${filledTemplate}\n---\n\nThis is a "${taskType}" task. The title is "${title}" and description is "${description}".`;
 
-  const res = await fetch(_LLM_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${_LLM_KEY}`,
-    },
-    body: JSON.stringify({
-      model: _LLM_MODEL,
-      temperature: 0.2,
-      messages: [
-        { role: "system", content: JUDGE_SYSTEM },
-        { role: "user", content: userMsg },
-      ],
-    }),
-  });
+  let res, content;
 
-  if (!res.ok) {
-    const body = await res.text();
-    throw new Error(`LLM API error ${res.status}: ${body}`);
+  if (_IS_ANTHROPIC) {
+    res = await fetch(_LLM_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": _LLM_KEY,
+        "anthropic-version": "2023-06-01",
+      },
+      body: JSON.stringify({
+        model: _LLM_MODEL,
+        system: JUDGE_SYSTEM,
+        messages: [{ role: "user", content: userMsg }],
+        temperature: 0.2,
+        max_tokens: 200,
+      }),
+    });
+
+    if (!res.ok) {
+      const body = await res.text();
+      if (res.status === 429 || res.status === 529) {
+        await sleep(3000);
+        return judgePrompt(filledTemplate, taskType, title, description); // retry
+      }
+      throw new Error(`Anthropic API error ${res.status}: ${body}`);
+    }
+
+    const data = await res.json();
+    content = data.content?.[0]?.text;
+  } else {
+    res = await fetch(_LLM_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${_LLM_KEY}`,
+      },
+      body: JSON.stringify({
+        model: _LLM_MODEL,
+        temperature: 0.2,
+        messages: [
+          { role: "system", content: JUDGE_SYSTEM },
+          { role: "user", content: userMsg },
+        ],
+      }),
+    });
+
+    if (!res.ok) {
+      const body = await res.text();
+      throw new Error(`LLM API error ${res.status}: ${body}`);
+    }
+
+    const data = await res.json();
+    content = data.choices?.[0]?.message?.content;
   }
 
-  const data = await res.json();
-  const content = data.choices?.[0]?.message?.content;
   if (!content) throw new Error("Empty response from judge");
 
-  const scores = JSON.parse(content);
+  // Extract JSON (may be wrapped in markdown code blocks)
+  const jsonMatch = content.match(/\{[^}]+\}/);
+  if (!jsonMatch) throw new Error(`No JSON in response: ${content}`);
+
+  const scores = JSON.parse(jsonMatch[0]);
   return scores;
 }
 
