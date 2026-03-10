@@ -27,23 +27,23 @@ import { resolveIdentityDir, getVaultPath, VAULT_FOLDERS } from "../lib/vault-pa
 
 const PROMPT_TEMPLATES: Record<QueueItemType, string> = {
   coding:
-    "Implement this: {title}\n{description}\n\nCreate a branch, write the code, ensure it builds.",
+    "Implement this: {title}\n{description}\n\nCreate a branch, write the code, ensure it builds.\n\nEnd with: ## Next Steps — what the user should do with this.",
   research:
-    "Research this topic: {title}\n{description}\n\nWrite a structured report: Summary, Key Findings, Sources, Recommendations.",
+    "Research this topic: {title}\n{description}\n\nWrite a structured report: Summary, Key Findings, Sources, Recommendations.\n\nBe thorough but concise. Quality over quantity.\n\nThink step by step before acting.\n\nStart with a one-sentence executive summary.\n\nIf you can't fully complete this, document what's blocking you and what you tried.",
   analysis:
     "Analyze this: {title}\n{description}\n\nProvide: Data Summary, Key Insights, Comparisons, Actionable Conclusions.",
   creative:
     "Create this content: {title}\n{description}\n\nWrite polished, publication-ready output. Include variations if appropriate.",
   review:
-    "Review this: {title}\n{description}\n\nProvide: Summary, Issues Found, Recommendations, Severity Ratings.",
+    "Review this: {title}\n{description}\n\nProvide: Summary, Issues Found, Recommendations, Severity Ratings.\n\nFormat output in markdown with clear headers.\n\nStart with a one-sentence executive summary.",
   ops:
     "Handle this operational task: {title}\n{description}\n\nExecute the task, document what was done and any follow-ups needed.",
   task:
-    "Complete this task: {title}\n{description}\n\nDo whatever it takes to get this done. Show your work.",
+    "Complete this task: {title}\n{description}\n\nDo whatever it takes to get this done. Show your work.\n\nInclude confidence levels for each finding.",
   url:
     "Analyze this URL: {url}\n{title}\n{description}\n\nFetch the content, analyze it. Write: Source, Key Points, Relevance, Action Items.",
   idea:
-    "Explore this idea: {title}\n{description}\n\nAnalyze feasibility, implementation approach, potential issues.",
+    "Explore this idea: {title}\n{description}\n\nAnalyze feasibility, implementation approach, potential issues.\n\nIMPORTANT: Show your sources. Link to evidence.",
 };
 
 // ── Singleton ──────────────────────────────────────────────────────

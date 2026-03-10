@@ -1,0 +1,25 @@
+iteration	task_type	score_before	score_after	mutation	status
+0	coding	21.67	21.67	(baseline)	baseline
+0	research	28.67	28.67	(baseline)	baseline
+0	analysis	24.33	24.33	(baseline)	baseline
+0	creative	25.00	25.00	(baseline)	baseline
+0	review	28.67	28.67	(baseline)	baseline
+0	ops	21.67	21.67	(baseline)	baseline
+0	task	17.67	17.67	(baseline)	baseline
+0	url	26.67	26.67	(baseline)	baseline
+0	idea	24.33	24.33	(baseline)	baseline
+1	idea	24.33	24.00	Prioritize actionable insights over comprehensive coverage.	reverted
+2	research	28.67	30.33	Be thorough but concise. Quality over quantity.	kept
+3	review	28.67	31.00	Format output in markdown with clear headers.	kept
+4	review	31.00	30.67	Format output in markdown with clear headers.	reverted
+5	ops	21.67	21.67	End with: ## Next Steps — what the user should do with this.	reverted
+6	review	31.00	31.67	Start with a one-sentence executive summary.	kept
+7	review	31.67	28.33	Format output in markdown with clear headers.	reverted
+8	research	30.33	31.67	Think step by step before acting.	kept
+9	task	17.67	19.33	Include confidence levels for each finding.	kept
+10	research	31.67	32.00	Start with a one-sentence executive summary.	kept
+11	url	26.67	26.67	Format output in markdown with clear headers.	reverted
+12	research	32.00	30.00	Be thorough but concise. Quality over quantity.	reverted
+13	coding	21.67	23.00	End with: ## Next Steps — what the user should do with this.	kept
+14	idea	24.33	27.33	IMPORTANT: Show your sources. Link to evidence.	kept
+15	research	32.00	33.00	If you can't fully complete this, document what's blocking you and what you tried.	kept

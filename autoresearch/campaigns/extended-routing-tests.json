@@ -1,6 +1,6 @@
 {
   "description": "Extended routing tests — hard cases for skill card trigger optimization",
-  "generated": "2026-03-10T03:42:57.153Z",
+  "generated": "2026-03-10T03:50:27.650Z",
   "categories": {
     "multi_domain_ambiguity": "Messages that reference multiple domains — tests which signal wins",
     "colloquial_slang": "Informal language that should still route correctly",

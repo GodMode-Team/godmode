@@ -114,6 +114,13 @@ echo "║           $(date)                            ║"
 echo "╚═══════════════════════════════════════════════════════════════╝"
 echo ""
 
+# Phase 0: One-time seeding (gated by sentinel, runs once then skips)
+if [ -f "$CAMPAIGNS_DIR/seed-apple-notes.mjs" ]; then
+  echo "── Apple Notes Seeding (sentinel-gated) ──"
+  node "$CAMPAIGNS_DIR/seed-apple-notes.mjs" 2>&1 || true
+  echo ""
+fi
+
 # Phase 1: Deterministic campaigns (no API calls, fast)
 run_campaign "context-words"   "$CAMPAIGNS_DIR/context-words.mjs"   30
 run_campaign "skill-triggers"  "$CAMPAIGNS_DIR/skill-triggers.mjs"  20
@@ -127,8 +134,16 @@ run_campaign "soul-essence"    "$CAMPAIGNS_DIR/soul-essence.mjs"    15
 run_campaign "queue-prompts"   "$CAMPAIGNS_DIR/queue-prompts.mjs"   15
 run_campaign "ally-experience" "$CAMPAIGNS_DIR/ally-experience.mjs" 15
 
+# Phase 3.5: Onboarding hardening (LLM-as-judge, Sonnet 4.6 required, OAuth re-auth)
+# Simulates 5 user personas across 10 onboarding scenarios, optimizes phase prompts
+run_campaign "onboarding-hardening" "$CAMPAIGNS_DIR/onboarding-hardening.mjs" 12
+
 # Phase 4: Vault optimization (LLM-as-judge + structural fixes)
 run_campaign "second-brain"   "$CAMPAIGNS_DIR/second-brain.mjs"   10
+
+# Phase 5: Full product audit (structural + LLM-as-judge, Sonnet 4.6)
+# Simulates customer personas, audits safety gates, hunts bugs
+run_campaign "product-audit"  "$CAMPAIGNS_DIR/product-audit.mjs"  10
 
 # ── Final eval ───────────────────────────────────────────────────────
 

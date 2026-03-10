@@ -80,23 +80,38 @@ async function _doInit(): Promise<void> {
       return;
     }
 
-    // Resolve Anthropic API key — check process.env first, then OpenClaw OAuth profile
+    // Resolve Anthropic API key — check env, Claude Code OAuth, then OpenClaw profiles
     let anthropicKey = process.env.ANTHROPIC_API_KEY;
     if (!anthropicKey) {
+      // Claude Code OAuth credentials (fresh tokens with refresh support)
+      try {
+        const { readFile: rf } = await import("node:fs/promises");
+        const { join: pjoin } = await import("node:path");
+        const { homedir } = await import("node:os");
+        const credsPath = pjoin(homedir(), ".claude", ".credentials.json");
+        const creds = JSON.parse(await rf(credsPath, "utf-8"));
+        const oauth = creds?.claudeAiOauth;
+        if (oauth?.accessToken) {
+          anthropicKey = oauth.accessToken;
+          console.log("[GodMode Memory] Resolved Anthropic key from Claude Code OAuth");
+        }
+      } catch { /* not found */ }
+    }
+    if (!anthropicKey) {
+      // Fallback: OpenClaw auth-profiles (may be stale)
       try {
         const { readFile: rf } = await import("node:fs/promises");
         const { join: pjoin } = await import("node:path");
         const { homedir } = await import("node:os");
         const profilesPath = pjoin(homedir(), ".openclaw", "auth-profiles.json");
         const profiles = JSON.parse(await rf(profilesPath, "utf-8"));
-        // Look for anthropic:oauth or any anthropic profile with a token
         const entry = profiles?.profiles?.["anthropic:oauth"]
           ?? Object.values(profiles?.profiles ?? {}).find(
             (p: any) => p?.provider === "anthropic" && p?.token,
           );
         if (entry && typeof (entry as any).token === "string") {
           anthropicKey = (entry as any).token;
-          console.log("[GodMode Memory] Resolved Anthropic key from OAuth profile");
+          console.log("[GodMode Memory] Resolved Anthropic key from OpenClaw auth profile");
         }
       } catch {
         // Auth profiles not readable — non-fatal
@@ -117,7 +132,7 @@ async function _doInit(): Promise<void> {
         provider: "anthropic",
         config: {
           apiKey: anthropicKey,
-          model: "claude-sonnet-4-20250514",
+          model: "claude-sonnet-4-6",
         },
       },
       embedder,
@@ -185,7 +200,7 @@ export interface MemoryResult {
 export async function searchMemories(
   query: string,
   userId: string,
-  limit = 8,
+  limit = 5,
 ): Promise<MemoryResult[]> {
   if (!memoryInstance || !query || query.length < 5) return [];
 
@@ -319,6 +334,8 @@ export async function seedFromVault(userId: string): Promise<void> {
   const sentinelPath = join(DATA_DIR, ".mem0-seeded");
   if (existsSync(sentinelPath)) return;
 
+  let seedSuccesses = 0;
+
   // Seed identity files
   const filesToSeed = [
     join(DATA_DIR, "..", "USER.md"),
@@ -330,9 +347,10 @@ export async function seedFromVault(userId: string): Promise<void> {
       const content = await readFile(filePath, "utf-8");
       if (content.length > 50) {
         await memoryInstance.add(content, { userId, agentId: "prosper" });
+        seedSuccesses++;
       }
-    } catch {
-      // File doesn't exist — skip
+    } catch (err) {
+      console.warn(`[GodMode Memory] Seed failed for ${filePath}: ${String(err).slice(0, 100)}`);
     }
   }
 
@@ -350,6 +368,7 @@ export async function seedFromVault(userId: string): Promise<void> {
               `[Skill Card: ${f.replace(".md", "")}] ${content}`,
               { userId, agentId: "prosper" },
             );
+            seedSuccesses++;
           }
         } catch {
           // Skip individual card files
@@ -360,8 +379,13 @@ export async function seedFromVault(userId: string): Promise<void> {
     // Skill cards not available — non-fatal
   }
 
-  // Mark as seeded so we don't re-run on next restart
-  await wf(sentinelPath, new Date().toISOString()).catch(() => {});
+  // Only mark as seeded if at least one fact was actually stored
+  if (seedSuccesses > 0) {
+    await wf(sentinelPath, new Date().toISOString()).catch(() => {});
+    console.log(`[GodMode Memory] Vault seeding complete: ${seedSuccesses} items ingested`);
+  } else {
+    console.warn("[GodMode Memory] Vault seeding failed — 0 items ingested. Will retry next restart.");
+  }
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────

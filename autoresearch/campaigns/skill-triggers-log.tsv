@@ -1,0 +1,18 @@
+iteration	message	expected	got	trigger_added	card_modified	status
+1	Remind me to check twitter tomorrow	tasks	calendar	remind	tasks.md	kept
+2	Add a note about the meeting with Sarah	second-brain	calendar	-	second-brain.md	skip_no_safe_trigger
+3	Find what Jake tweeted about our integration	x-twitter	integrations	-	x-twitter.md	skip_no_safe_trigger
+4	Look up the file I saved about the team contact list	files	people	-	files.md	skip_no_safe_trigger
+5	bruh who even is this guy	people	null	-	people.md	skip_no_safe_trigger
+6	aight throw that on my list	tasks	null	-	tasks.md	skip_no_safe_trigger
+7	can you just bang out that report real quick	queue	null	-	queue.md	skip_no_safe_trigger
+8	Don't add this to my calendar, just note it	second-brain	calendar	-	second-brain.md	skip_no_safe_trigger
+9	I don't need a reminder, just look it up	second-brain	tasks	-	second-brain.md	skip_no_safe_trigger
+10	Check twitter and add a task about what you find	x-twitter	second-brain	-	x-twitter.md	skip_no_safe_trigger
+11	Find my notes on the topic and queue a research deep dive	second-brain	queue	-	second-brain.md	skip_no_safe_trigger
+12	Who was at the meeting and what did we discuss?	people	calendar	-	people.md	skip_no_safe_trigger
+13	what's the word on the street	x-twitter	null	-	x-twitter.md	skip_no_safe_trigger
+14	jot this down for me	second-brain	null	-	second-brain.md	skip_no_safe_trigger
+15	ping Jake about the deliverable	people	null	-	people.md	skip_no_safe_trigger
+16	offload this to someone	queue	null	-	queue.md	skip_no_safe_trigger
+17	is everything hooked up properly	integrations	null	-	integrations.md	skip_no_safe_trigger

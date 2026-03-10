@@ -140,7 +140,7 @@ export async function extractAndStore(text: string): Promise<void> {
 
   try {
     const body = JSON.stringify({
-      model: "claude-haiku-4-5-20251001",
+      model: "claude-sonnet-4-6",
       max_tokens: 1024,
       messages: [
         {
@@ -423,8 +423,12 @@ export async function seedFromVault(): Promise<void> {
     } catch { /* skip dirs */ }
   }
 
-  console.log(`[Identity Graph] Seeded from ${seeded} vault files`);
-  await writeFile(SEED_SENTINEL, new Date().toISOString()).catch(() => {});
+  if (seeded > 0) {
+    console.log(`[Identity Graph] Seeded from ${seeded} vault files`);
+    await writeFile(SEED_SENTINEL, new Date().toISOString()).catch(() => {});
+  } else {
+    console.warn("[Identity Graph] Vault seeding failed — 0 files processed. Will retry next restart.");
+  }
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────
@@ -432,6 +436,14 @@ export async function seedFromVault(): Promise<void> {
 function resolveAnthropicKey(): string | null {
   const envKey = process.env.ANTHROPIC_API_KEY;
   if (envKey) return envKey;
+
+  // Check Claude Code OAuth credentials (fresh tokens with refresh support)
+  try {
+    const credsPath = join(homedir(), ".claude", ".credentials.json");
+    const creds = JSON.parse(readFileSync(credsPath, "utf-8"));
+    const oauth = creds?.claudeAiOauth;
+    if (oauth?.accessToken) return oauth.accessToken;
+  } catch { /* not found */ }
 
   // Check OpenClaw .env
   try {
@@ -445,7 +457,7 @@ function resolveAnthropicKey(): string | null {
     }
   } catch { /* not found */ }
 
-  // Check OAuth profile
+  // Check OpenClaw OAuth profile (may be stale)
   try {
     const profilesPath = join(homedir(), ".openclaw", "auth-profiles.json");
     const raw = JSON.parse(readFileSync(profilesPath, "utf-8")) as {
