@@ -28,7 +28,8 @@ export type GuardrailGateId =
   | "outputShield"
   | "configShield"
   | "ephemeralPathShield"
-  | "contextPressure";
+  | "contextPressure"
+  | "unverifiedClaimGate";
 
 export type GateConfig = {
   enabled: boolean;
@@ -92,6 +93,7 @@ export const GATE_DEFAULTS: Record<GuardrailGateId, GateConfig> = {
   configShield: { enabled: true },
   ephemeralPathShield: { enabled: true },
   contextPressure: { enabled: true, thresholds: { warningPercent: 70, criticalPercent: 90, maxContextTokens: 200000 } },
+  unverifiedClaimGate: { enabled: true },
 };
 
 export const GATE_DESCRIPTORS: Record<GuardrailGateId, GateDescriptor> = {
@@ -207,6 +209,13 @@ export const GATE_DESCRIPTORS: Record<GuardrailGateId, GateDescriptor> = {
       criticalPercent: "Critical threshold (%)",
       maxContextTokens: "Max context tokens",
     },
+  },
+  unverifiedClaimGate: {
+    name: "Unverified Claim Gate",
+    description:
+      "Blocks confident factual claims about external systems (deployments, APIs, configs, live URLs) when no investigation tools were used this turn. Forces verification before assertion.",
+    icon: "\u{26A0}\u{FE0F}",
+    hook: "message_sending",
   },
 };
 

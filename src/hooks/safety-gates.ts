@@ -1075,6 +1075,15 @@ const NOT_FOUND_PATTERNS: RegExp[] = [
   /(?:couldn'?t|could not) (?:locate|find) (?:any|the|that)/i,
 ];
 
+// Gate 5: Unverified Claim — making factual claims about external systems without tool verification
+const UNVERIFIED_CLAIM_PATTERNS: RegExp[] = [
+  /(?:was|were|is|isn't|is not|hasn't been|has not been|wasn't|was not|was never) (?:deployed|published|pushed|live|configured|set up|installed|running|enabled|disabled)/i,
+  /(?:it|this|the (?:page|site|app|api|endpoint|service|route|url|webhook|form)) (?:was never|has never been|isn't|is not|hasn't been) /i,
+  /never (?:deployed|published|pushed|added|configured|set up|created|registered)/i,
+  /(?:doesn't|does not|didn't|did not) (?:exist|work|have|include) (?:on|in|at) (?:vercel|netlify|heroku|aws|cloudflare|production|staging|the server)/i,
+  /(?:broken|down|offline|unreachable|404|not found) (?:since|for|because)/i,
+];
+
 function matchesAny(content: string, patterns: RegExp[]): boolean {
   return patterns.some(p => p.test(content));
 }
@@ -1184,6 +1193,26 @@ export async function checkEnforcerGates(
         sessionKey,
       );
       return { cancel: true, gate: "searchRetryGate" };
+    }
+  }
+
+  // Gate 5: Unverified Claim — asserting facts about external systems without using tools
+  if (config.gates.unverifiedClaimGate?.enabled) {
+    if (matchesAny(content, UNVERIFIED_CLAIM_PATTERNS) && usage.investigationCount === 0) {
+      enforcerNudgeFlags.set(key, {
+        gate: "Unverified Claim Gate",
+        message: [
+          "Your response was blocked because you made a factual claim about an external system without verifying it first.",
+          "",
+          "Claims about deployment status, API state, live URLs, or system configuration MUST be tool-verified.",
+          "Absence of memory is NOT evidence — if you don't have data, CHECK with a tool before stating facts.",
+          "",
+          "Use exec (curl, vercel ls, git log), read, or search tools to verify before asserting.",
+          "If you can't verify, say 'Let me check' — never state unverified claims as facts.",
+        ].join("\n"),
+      });
+      void logGateActivity("unverifiedClaimGate", "fired", "Blocked: factual claim about external system with 0 investigation tools", sessionKey);
+      return { cancel: true, gate: "unverifiedClaimGate" };
     }
   }
 

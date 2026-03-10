@@ -86,7 +86,7 @@ export interface ContextInputs {
 }
 
 /** Max lines for each section to prevent any single section from bloating */
-const MAX_MEMORY_LINES = 20;
+const MAX_MEMORY_LINES = 15;
 const MAX_SCHEDULE_LINES = 6;
 
 /**
@@ -242,7 +242,10 @@ const SOUL_ESSENCE = [
   "Don't over-optimize for productivity. Rest, reflection, and relationships matter.",
   "When the user is stressed, zoom out to purpose. Why are they doing this? What's the bigger picture?",
   "NEVER break flow. If you need info, search silently. If you need to clarify, make your best guess and note the assumption.",
+  "CRITICAL — Fact vs. Inference: When making claims about external systems (deployments, configs, APIs, live URLs), ONLY state what you have EVIDENCE for (memory, tool output, vault docs). If you haven't verified it this session, say 'Let me check' and USE A TOOL. Never infer deployment status, API state, or system configuration from absence of memory — absence of evidence is NOT evidence of absence. Getting this wrong destroys trust instantly.",
   "Never be sycophantic. Challenge the user when they're off-track. A real ally tells hard truths.",
+  "You have persistent memory across sessions. Yesterday's conversations are in your memory system.",
+  "When the user mentions a person by name, ALWAYS search memory + vault for context on them first.",
 ].join("\n");
 
 // ── Routing Guide ───────────────────────────────────────────────────
@@ -305,22 +308,23 @@ function truncateLines(text: string, maxLines: number): string {
 
 const TIME_WORDS = [
   "schedule", "calendar", "meeting", "call",
-  "tomorrow", "morning", "afternoon", "evening",
-  "tonight", "this week", "next week", "agenda",
-  "day look", "plans", "free time", "available",
-  "slot", "reschedule", "cancel", "eta",
-  "one on one", "review", "weekly", "by when",
+  "tomorrow", "morning", "evening", "tonight",
+  "this week", "next week", "agenda", "plans",
+  "free time", "slot", "reschedule", "cancel",
+  "one on one", "weekly", "by when", "appointment",
+  "hang out", "eta", "check-in", "kickoff",
 ];
 
 const OPS_WORDS = [
-  "task", "todo", "to-do", "priority",
-  "priorities", "focus", "plan", "planning",
-  "work", "project", "deadline", "queue",
-  "progress", "update", "brief", "brief me",
-  "catch me up", "what am i", "what should", "morning",
-  "start the day", "good morning", "hey prosper", "release",
-  "backlog", "anything urgent", "what needs", "blockers",
-  "blocked", "retro", "ship it", "how's it going",
+  "task", "to-do", "priorities", "plan",
+  "planning", "work", "project", "deadline",
+  "queue", "progress", "update", "brief me",
+  "catch me up", "what am i", "morning", "start the day",
+  "good morning", "hey prosper", "release", "backlog",
+  "anything urgent", "what needs", "blockers", "blocked",
+  "retro", "ship it", "how's it going", "sprint",
+  "deploy", "ship", "retrospective", "recap",
+  "debrief", "milestone",
 ];
 
 function isTimeRelevant(msg: string): boolean {
