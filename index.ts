@@ -49,6 +49,7 @@ import { createOnboardTool } from "./src/tools/onboard.js";
 import { createMorningSetTool } from "./src/tools/morning-set.js";
 import { createQueueAddTool } from "./src/tools/queue-add.js";
 import { createQueueCheckTool } from "./src/tools/queue-check.js";
+import { createQueueActionTool } from "./src/tools/queue-action.js";
 import { createTrustRateTool } from "./src/tools/trust-rate.js";
 import { createXReadTool } from "./src/tools/x-read.js";
 import { queueHandlers } from "./src/methods/queue.js";
@@ -105,6 +106,18 @@ import { killZombieGateways } from "./src/lib/zombie-guard.js";
 const pendingAutoTitles = new Map<string, string>();
 /** Sessions that already have titles — skip future auto-title attempts */
 const titledSessions = new Set<string>();
+const TITLED_SESSIONS_MAX = 5_000;
+/** Evict oldest entries when titledSessions grows too large */
+function evictTitledSessions(): void {
+  if (titledSessions.size <= TITLED_SESSIONS_MAX) return;
+  const excess = titledSessions.size - TITLED_SESSIONS_MAX;
+  let removed = 0;
+  for (const key of titledSessions) {
+    if (removed >= excess) break;
+    titledSessions.delete(key);
+    removed++;
+  }
+}
 
 /**
  * Generate a short session title using a fast LLM call.
@@ -1192,6 +1205,17 @@ h1{color:#ff6b6b}code{background:#16213e;padding:2px 8px;border-radius:4px}a{col
         api.logger.warn(`[GodMode] Mem0 memory init failed (non-fatal): ${String(err)}`);
       }
 
+      // Identity graph initialization — entity/relationship tracking (SQLite, sync)
+      try {
+        const { initIdentityGraph, isGraphReady } = await import("./src/lib/identity-graph.js");
+        initIdentityGraph();
+        if (isGraphReady()) {
+          api.logger.info("[GodMode] Identity graph initialized");
+        }
+      } catch (err) {
+        api.logger.warn(`[GodMode] Identity graph init failed (non-fatal): ${String(err)}`);
+      }
+
       // Image cache cleanup
       try {
         const { cleanupCache } = await import("./src/services/image-cache.js");
@@ -1435,6 +1459,11 @@ h1{color:#ff6b6b}code{background:#16213e;padding:2px 8px;border-radius:4px}a{col
         api.logger.warn(`[GodMode] identity anchor error: ${String(err)}`);
       }
 
+      // Extract user's latest message for memory search + graph query
+      const _messages = (event as any).messages ?? [];
+      const _lastUserMsg = [..._messages].reverse().find((m: any) => m.role === "user");
+      const userQuery = typeof _lastUserMsg?.content === "string" ? _lastUserMsg.content : "";
+
       // P0: Mem0 proactive memory search + status
       // Skip for inter-session (agent-to-agent) — personal memory isn't relevant
       let memoryBlock: string | null = null;
@@ -1444,12 +1473,8 @@ h1{color:#ff6b6b}code{background:#16213e;padding:2px 8px;border-radius:4px}a{col
           const { isMemoryReady, searchMemories, formatMemoriesForContext, getMemoryStatus } = await import("./src/lib/memory.js");
           memoryStatus = getMemoryStatus();
           if (isMemoryReady()) {
-            // Extract user's latest message for search
-            const messages = (event as any).messages ?? [];
-            const lastUserMsg = [...messages].reverse().find((m: any) => m.role === "user");
-            const query = typeof lastUserMsg?.content === "string" ? lastUserMsg.content : "";
-            if (query.length >= 5) {
-              const memories = await searchMemories(query, "caleb", 8);
+            if (userQuery.length >= 5) {
+              const memories = await searchMemories(userQuery, "caleb", 8);
               const formatted = formatMemoriesForContext(memories);
               if (formatted) memoryBlock = formatted;
               // Refresh status after search attempt
@@ -1459,6 +1484,20 @@ h1{color:#ff6b6b}code{background:#16213e;padding:2px 8px;border-radius:4px}a{col
         } catch (err) {
           api.logger.warn(`[GodMode] Mem0 search error (non-fatal): ${String(err)}`);
           memoryStatus = "degraded";
+        }
+      }
+
+      // P0: Identity graph — entity/relationship context
+      let graphBlock: string | null = null;
+      if (provenance?.kind !== "inter_session") {
+        try {
+          const { isGraphReady, queryGraph, formatGraphContext } = await import("./src/lib/identity-graph.js");
+          if (isGraphReady() && userQuery.length >= 5) {
+            const graphResults = queryGraph(userQuery);
+            graphBlock = formatGraphContext(graphResults);
+          }
+        } catch {
+          // Graph query failure is invisible
         }
       }
 
@@ -1581,6 +1620,22 @@ h1{color:#ff6b6b}code{background:#16213e;padding:2px 8px;border-radius:4px}a{col
         isFirstTurn = userMsgCount <= 1;
       } catch { /* non-fatal */ }
 
+      // ── Auto-title: capture user message for untitled sessions ──
+      // message_received doesn't fire for webchat (only external channels),
+      // so we capture here in before_prompt_build as a universal fallback.
+      // Works for both new sessions (first turn) and existing untitled sessions
+      // (e.g. after gateway restart when in-memory state is lost).
+      if (
+        sessionKey &&
+        currentUserMessage &&
+        !titledSessions.has(sessionKey) &&
+        !pendingAutoTitles.has(sessionKey) &&
+        !isCronSessionKey(sessionKey)
+      ) {
+        pendingAutoTitles.set(sessionKey, currentUserMessage);
+        api.logger.info(`[GodMode][AutoTitle] Captured message via before_prompt_build for "${sessionKey}" (${currentUserMessage.slice(0, 60)}...)`);
+      }
+
       // P1.5: Skill card — domain-specific routing tips
       let skillCard: string | null = null;
       try {
@@ -1651,6 +1706,7 @@ h1{color:#ff6b6b}code{background:#16213e;padding:2px 8px;border-radius:4px}a{col
         identityAnchor,
         memoryBlock,
         memoryStatus,
+        graphBlock,
         schedule,
         operationalCounts,
         priorities,
@@ -1778,6 +1834,16 @@ h1{color:#ff6b6b}code{background:#16213e;padding:2px 8px;border-radius:4px}a{col
       } catch {
         // Memory ingestion failure is invisible to the user
       }
+
+      // Identity graph — extract entities/relationships (async, never blocks)
+      try {
+        const { isGraphReady, extractAndStore } = await import("./src/lib/identity-graph.js");
+        if (isGraphReady() && content.length > 30) {
+          void extractAndStore(content);
+        }
+      } catch {
+        // Entity extraction failure is invisible
+      }
     });
 
     // ── Context Pressure: llm_output — track token usage ──────────
@@ -1866,6 +1932,7 @@ h1{color:#ff6b6b}code{background:#16213e;padding:2px 8px;border-radius:4px}a{col
         });
 
         titledSessions.add(sessionKey);
+        evictTitledSessions();
         api.logger.info(`[GodMode] Auto-titled session "${sessionKey}" → "${title}"`);
 
         // Broadcast so the UI refreshes session list with the new title
@@ -1917,6 +1984,7 @@ h1{color:#ff6b6b}code{background:#16213e;padding:2px 8px;border-radius:4px}a{col
     api.registerTool((ctx) => createGuardrailTool(ctx));
     api.registerTool((ctx) => createQueueAddTool(ctx));
     api.registerTool(() => createQueueCheckTool());
+    api.registerTool(() => createQueueActionTool());
     api.registerTool((ctx) => createTrustRateTool(ctx));
     api.registerTool((ctx) => createXReadTool(ctx));
 
