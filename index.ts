@@ -1104,6 +1104,12 @@ h1{color:#ff6b6b}code{background:#16213e;padding:2px 8px;border-radius:4px}a{col
     api.on("gateway_start", async () => {
       api.logger.info("[GodMode] Gateway started — plugin active");
 
+      // Warm the allowed-paths cache so files.read works for workspace files
+      try {
+        const { initAllowedPaths } = await import("./src/lib/vault-paths.js");
+        initAllowedPaths();
+      } catch { /* non-fatal */ }
+
       // Load workspace .env into process.env so exec child processes inherit
       // API keys (Keap, etc.) without needing to read .env directly (which the
       // exec sandbox blocks). Only sets vars that aren't already in the environment.

@@ -356,19 +356,59 @@ export async function writeVaultManifest(manifest: VaultManifest): Promise<void>
 // ── Security ────────────────────────────────────────────────────────
 
 /**
- * Check if a resolved path is within the vault OR within GODMODE_ROOT.
+ * Check if a resolved path is within an allowed root: GODMODE_ROOT, Obsidian vault,
+ * or any registered workspace directory.
  * Resolves the path first to collapse `..` traversals, then verifies
  * the result falls within an allowed root using a directory-boundary check
  * (trailing separator) to prevent prefix collisions like `/home/god` matching `/home/godmode`.
  */
+
+// Cache workspace paths — refreshed lazily when isAllowedPath is called
+let _workspacePaths: string[] = [];
+let _workspacePathsTs = 0;
+const WORKSPACE_CACHE_TTL = 30_000; // 30s
+
+function isWithinRoot(resolved: string, root: string): boolean {
+  const prefix = root.endsWith(sep) ? root : root + sep;
+  return resolved === root || resolved.startsWith(prefix);
+}
+
 export function isAllowedPath(filePath: string): boolean {
   const resolved = resolve(filePath);
-  const godmodePrefix = GODMODE_ROOT.endsWith(sep) ? GODMODE_ROOT : GODMODE_ROOT + sep;
-  if (resolved === GODMODE_ROOT || resolved.startsWith(godmodePrefix)) return true;
+
+  // GODMODE_ROOT
+  if (isWithinRoot(resolved, GODMODE_ROOT)) return true;
+
+  // Obsidian vault
   const vault = getVaultPath();
-  if (vault) {
-    const vaultPrefix = vault.endsWith(sep) ? vault : vault + sep;
-    if (resolved === vault || resolved.startsWith(vaultPrefix)) return true;
+  if (vault && isWithinRoot(resolved, vault)) return true;
+
+  // Registered workspace directories (cached, async refresh)
+  for (const wsPath of _workspacePaths) {
+    if (isWithinRoot(resolved, wsPath)) return true;
   }
+
+  // Trigger async refresh if cache is stale (result applies on next call)
+  if (Date.now() - _workspacePathsTs > WORKSPACE_CACHE_TTL) {
+    void refreshWorkspacePaths();
+  }
+
   return false;
+}
+
+/** Refresh workspace paths cache from config. */
+async function refreshWorkspacePaths(): Promise<void> {
+  try {
+    const { readWorkspaceConfig } = await import("./workspaces-config.js");
+    const config = await readWorkspaceConfig({ initializeIfMissing: false });
+    _workspacePaths = config.workspaces.map((ws) => resolve(ws.path));
+    _workspacePathsTs = Date.now();
+  } catch {
+    // Non-fatal — keep existing cache
+  }
+}
+
+/** Eagerly load workspace paths (call at startup). */
+export function initAllowedPaths(): void {
+  void refreshWorkspacePaths();
 }
