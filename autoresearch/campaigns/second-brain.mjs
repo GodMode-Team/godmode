@@ -192,12 +192,19 @@ function scoreCaptureCompleteness(vault) {
   total += scores.session_capture;
   count++;
 
-  // 2b. Queue output flow — local inbox → vault inbox
+  // 2b. Queue output flow — local inbox → vault (inbox + routed folders)
   const localInbox = join(GODMODE_MEMORY, "inbox");
-  const vaultInbox = join(vault, "00-Inbox");
   const localCount = countMdFiles(localInbox);
-  const vaultCount = countMdFiles(vaultInbox);
-  // Score: what fraction of local items made it to vault?
+  // Count vault items across inbox + known routing destinations
+  let vaultCount = countMdFiles(join(vault, "00-Inbox"));
+  for (const sub of ["agent-outputs", "clawhub-discoveries", "x-intel", "godmode-updates", "workspace-notes", "research"]) {
+    vaultCount += countMdFiles(join(vault, "04-Resources", sub));
+  }
+  for (const sub of ["antifragile", "trp", "audiencelab"]) {
+    vaultCount += countMdFiles(join(vault, "02-Projects", sub));
+  }
+  vaultCount += countMdFiles(join(vault, "05-Archive", "inbox"));
+  // Score: what fraction of local items made it to vault (any location)?
   scores.queue_capture = localCount > 0 ? Math.min(1, vaultCount / localCount) : 1;
   total += scores.queue_capture;
   count++;
@@ -400,6 +407,133 @@ function cleanAgentLogMirrors(vault, keepDays = 30) {
   return removed;
 }
 
+// ── Smart Fixes (structural) ────────────────────────────────────────
+
+function deduplicatePeopleFacts(vault) {
+  const peopleDir = join(vault, "06-Brain", "People");
+  if (!existsSync(peopleDir)) return 0;
+
+  let totalDeduped = 0;
+  for (const f of readdirSync(peopleDir).filter(f => f.endsWith(".md") && f !== "INDEX.md")) {
+    try {
+      const filePath = join(peopleDir, f);
+      const content = readFileSync(filePath, "utf-8");
+      const lines = content.split("\n");
+      const seen = new Set();
+      const deduped = [];
+      let removed = 0;
+
+      for (const line of lines) {
+        const normalized = line.trim().replace(/^\d{4}-\d{2}-\d{2}\s*/, "").replace(/\s+/g, " ");
+        if (normalized.length > 20 && seen.has(normalized)) {
+          removed++;
+          continue;
+        }
+        if (normalized.length > 20) seen.add(normalized);
+        deduped.push(line);
+      }
+
+      if (removed > 0) {
+        writeFileSync(filePath, deduped.join("\n"));
+        totalDeduped += removed;
+      }
+    } catch { /* skip */ }
+  }
+  return totalDeduped;
+}
+
+function triageInboxByType(vault) {
+  const inboxDir = join(vault, "00-Inbox");
+  if (!existsSync(inboxDir)) return { routed: 0, details: {} };
+
+  const routeMap = {
+    "clawhub": join(vault, "04-Resources", "clawhub-discoveries"),
+    "x-": join(vault, "04-Resources", "x-intel"),
+    "antifragile": join(vault, "02-Projects", "antifragile"),
+    "auto-": join(vault, "04-Resources", "agent-outputs"),
+    "godmode": join(vault, "04-Resources", "godmode-updates"),
+    "trp": join(vault, "02-Projects", "trp"),
+    "workspace": join(vault, "04-Resources", "workspace-notes"),
+    "audiencelab": join(vault, "02-Projects", "audiencelab"),
+    "research": join(vault, "04-Resources", "research"),
+  };
+
+  let routed = 0;
+  const details = {};
+
+  for (const f of readdirSync(inboxDir).filter(f => f.endsWith(".md"))) {
+    const nameWithoutDate = f.replace(/^\d{4}-\d{2}-\d{2}-/, "");
+    for (const [prefix, destDir] of Object.entries(routeMap)) {
+      if (nameWithoutDate.startsWith(prefix)) {
+        mkdirSync(destDir, { recursive: true });
+        try {
+          renameSync(join(inboxDir, f), join(destDir, f));
+          routed++;
+          details[prefix] = (details[prefix] || 0) + 1;
+        } catch { /* skip */ }
+        break;
+      }
+    }
+  }
+
+  return { routed, details };
+}
+
+function addCrossLinks(vault) {
+  const peopleDir = join(vault, "06-Brain", "People");
+  const companiesDir = join(vault, "06-Brain", "Companies");
+  if (!existsSync(peopleDir)) return 0;
+
+  const entities = new Map();
+  for (const dir of [peopleDir, companiesDir]) {
+    if (!existsSync(dir)) continue;
+    for (const f of readdirSync(dir).filter(f => f.endsWith(".md") && f !== "INDEX.md")) {
+      const slug = basename(f, ".md");
+      const displayName = slug.replace(/-/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+      entities.set(slug, { displayName, dir: basename(dir) });
+    }
+  }
+
+  let linksAdded = 0;
+
+  for (const dir of [peopleDir, companiesDir]) {
+    if (!existsSync(dir)) continue;
+    for (const f of readdirSync(dir).filter(f => f.endsWith(".md") && f !== "INDEX.md")) {
+      try {
+        const filePath = join(dir, f);
+        const mySlug = basename(f, ".md");
+        let content = readFileSync(filePath, "utf-8");
+        let modified = false;
+
+        const addedSlugs = new Set();
+        // Extract already-linked slugs from existing Related section
+        const existingLinks = content.match(/\[\[([^\]|]+)/g) || [];
+        for (const l of existingLinks) addedSlugs.add(l.replace("[[", ""));
+
+        for (const [slug, info] of entities) {
+          if (slug === mySlug || addedSlugs.has(slug)) continue;
+          const namePattern = new RegExp(`(?<!\\[\\[)\\b${info.displayName}\\b(?!\\]\\])`, "gi");
+          if (namePattern.test(content)) {
+            if (!content.includes("## Related")) {
+              content = content.trimEnd() + "\n\n## Related\n";
+            }
+            content += `- [[${slug}|${info.displayName}]]\n`;
+            addedSlugs.add(slug);
+            modified = true;
+            linksAdded++;
+          }
+        }
+
+        if (modified) {
+          writeFileSync(filePath, content);
+        }
+      } catch { /* skip */ }
+    }
+  }
+
+  return linksAdded;
+}
+
 // ═════════════════════════════════════════════════════════════════════
 // LLM-AS-JUDGE
 // ═════════════════════════════════════════════════════════════════════
@@ -470,7 +604,7 @@ Return ONLY a JSON object:
         "anthropic-version": "2023-06-01",
       },
       body: JSON.stringify({
-        model: "claude-sonnet-4-6-20250514",
+        model: "claude-sonnet-4-6",
         max_tokens: 256,
         messages: [{ role: "user", content: prompt }],
       }),
@@ -612,7 +746,19 @@ async function main() {
       const logsArchived = cleanAgentLogMirrors(vault, 30);
       console.log(`  Archived ${logsArchived} old agent-log mirrors (>30 days)`);
 
-      action = `fix: inbox=${inboxArchived} daily=${dailyArchived} logs=${logsArchived}`;
+      const deduped = deduplicatePeopleFacts(vault);
+      console.log(`  Deduplicated ${deduped} duplicate facts in People entries`);
+
+      const triage = triageInboxByType(vault);
+      console.log(`  Triaged ${triage.routed} inbox items by type`);
+      for (const [prefix, count] of Object.entries(triage.details)) {
+        console.log(`    → ${prefix}: ${count}`);
+      }
+
+      const crossLinks = addCrossLinks(vault);
+      console.log(`  Added ${crossLinks} cross-links between Brain entries`);
+
+      action = `fix: inbox=${inboxArchived} daily=${dailyArchived} logs=${logsArchived} dedup=${deduped} triage=${triage.routed} links=${crossLinks}`;
 
       // Re-score after fixes
       console.log("\n=== Post-Fix Scores ===\n");

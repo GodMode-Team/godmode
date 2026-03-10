@@ -1,2 +1,12 @@
 iteration	vault_health	capture	integration	noise	llm_quality	combined	action
 1	0.6056	0.4444	0.9185	0.5613	0.0000	0.5541	audit-only
+1	0.6056	0.4444	0.9185	0.5613	0.4600	0.6231	audit-only
+1	0.6056	0.4444	0.9185	0.5613	0.4600	0.6231	fix: inbox=23 daily=1 logs=0
+2	0.6311	0.4444	0.9185	0.6591	0.4600	0.6442	fix: inbox=0 daily=0 logs=0
+3	0.6311	0.4444	0.9185	0.6591	0.4600	0.6442	fix: inbox=0 daily=0 logs=0
+1	0.6311	0.4444	0.9185	0.6591	0.4600	0.6442	fix: inbox=0 daily=0 logs=0 dedup=18 triage=34 links=64
+2	0.6689	0.4222	0.9185	0.8571	0.5400	0.6909	fix: inbox=0 daily=0 logs=0 dedup=0 triage=0 links=64
+1	0.6689	0.4222	0.9185	0.8571	0.5400	0.6909	fix: inbox=0 daily=0 logs=0 dedup=26 triage=90 links=64
+2	0.7689	0.1365	0.9185	0.8750	0.5400	0.6614	fix: inbox=0 daily=0 logs=0 dedup=26 triage=0 links=64
+1	0.7689	0.4444	0.9185	0.8750	0.5200	0.7200	audit-only
+1	0.7689	0.4444	0.9185	0.8750	0.5200	0.7200	audit-only
