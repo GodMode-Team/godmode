@@ -1569,7 +1569,13 @@ h1{color:#ff6b6b}code{background:#16213e;padding:2px 8px;border-radius:4px}a{col
       // Extract user's latest message for memory search + graph query
       const _messages = (event as any).messages ?? [];
       const _lastUserMsg = [..._messages].reverse().find((m: any) => m.role === "user");
-      const userQuery = typeof _lastUserMsg?.content === "string" ? _lastUserMsg.content : "";
+      let userQuery = "";
+      if (typeof _lastUserMsg?.content === "string") {
+        userQuery = _lastUserMsg.content;
+      } else if (Array.isArray(_lastUserMsg?.content)) {
+        const _textBlock = _lastUserMsg.content.find((b: any) => b.type === "text");
+        userQuery = typeof _textBlock?.text === "string" ? _textBlock.text : "";
+      }
 
       // P0: Mem0 proactive memory search + status
       // Skip for inter-session (agent-to-agent) — personal memory isn't relevant
@@ -1729,7 +1735,13 @@ h1{color:#ff6b6b}code{background:#16213e;padding:2px 8px;border-radius:4px}a{col
       try {
         const msgs = (event as any).messages ?? [];
         const lastMsg = [...msgs].reverse().find((m: any) => m.role === "user");
-        currentUserMessage = typeof lastMsg?.content === "string" ? lastMsg.content : "";
+        // Handle both string content and content block arrays
+        if (typeof lastMsg?.content === "string") {
+          currentUserMessage = lastMsg.content;
+        } else if (Array.isArray(lastMsg?.content)) {
+          const textBlock = lastMsg.content.find((b: any) => b.type === "text");
+          currentUserMessage = typeof textBlock?.text === "string" ? textBlock.text : "";
+        }
         // First turn = only one user message in the conversation
         const userMsgCount = msgs.filter((m: any) => m.role === "user").length;
         isFirstTurn = userMsgCount <= 1;
@@ -1740,15 +1752,19 @@ h1{color:#ff6b6b}code{background:#16213e;padding:2px 8px;border-radius:4px}a{col
       // so we capture here in before_prompt_build as a universal fallback.
       // Works for both new sessions (first turn) and existing untitled sessions
       // (e.g. after gateway restart when in-memory state is lost).
-      if (
-        sessionKey &&
-        currentUserMessage &&
-        !titledSessions.has(sessionKey) &&
-        !pendingAutoTitles.has(sessionKey) &&
-        !isCronSessionKey(sessionKey)
-      ) {
-        pendingAutoTitles.set(sessionKey, currentUserMessage);
-        api.logger.info(`[GodMode][AutoTitle] Captured message via before_prompt_build for "${sessionKey}" (${currentUserMessage.slice(0, 60)}...)`);
+      {
+        const skipReason = !sessionKey ? "no-sessionKey"
+          : !currentUserMessage ? "no-userMessage"
+          : titledSessions.has(sessionKey) ? "already-titled"
+          : pendingAutoTitles.has(sessionKey) ? "already-pending"
+          : isCronSessionKey(sessionKey) ? "cron-session"
+          : null;
+        if (skipReason) {
+          api.logger.info(`[GodMode][AutoTitle] before_prompt_build SKIP for "${sessionKey ?? "?"}" — reason: ${skipReason}, msgLen=${currentUserMessage.length}`);
+        } else {
+          pendingAutoTitles.set(sessionKey, currentUserMessage);
+          api.logger.info(`[GodMode][AutoTitle] Captured message via before_prompt_build for "${sessionKey}" (${currentUserMessage.slice(0, 60)}...)`);
+        }
       }
 
       // P1.5: Skill card — domain-specific routing tips
