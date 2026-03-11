@@ -1,6 +1,6 @@
 ---
 domain: second-brain
-triggers: vault, note, notes, obsidian, search, find, look up, brain, knowledge, who is, what do we know, remember
+triggers: vault, note, notes, obsidian, search, find, look up, brain, knowledge, what do we know, remember
 tools: secondBrain.search, secondBrain.identity, secondBrain.memoryBank, secondBrain.memoryBankEntry
 ---
 ## When to Use

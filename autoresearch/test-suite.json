@@ -1,0 +1,245 @@
+{
+  "version": 1,
+  "description": "Autoresearch test suite for GodMode skill routing + context relevance",
+
+  "skill_routing": {
+    "description": "Each test maps a user message to the expected skill card domain (or null for no match)",
+    "tests": [
+      { "message": "What's on my calendar today?", "expected": "calendar" },
+      { "message": "Do I have any meetings tomorrow?", "expected": "calendar" },
+      { "message": "Am I free at 3pm?", "expected": "calendar" },
+      { "message": "When's my next meeting?", "expected": "calendar" },
+      { "message": "What does my schedule look like this week?", "expected": "calendar" },
+      { "message": "Can you check my availability on Tuesday?", "expected": "calendar" },
+      { "message": "What's coming up today?", "expected": "calendar" },
+      { "message": "Block off 2-3pm for deep work", "expected": "calendar" },
+      { "message": "Do I have anything after lunch?", "expected": null, "note": "no calendar trigger words" },
+      { "message": "Reschedule my standup to 10am", "expected": "calendar" },
+
+      { "message": "Add a task to follow up with Jake", "expected": "tasks" },
+      { "message": "What are my priorities today?", "expected": "tasks" },
+      { "message": "Do I have any overdue tasks?", "expected": "tasks" },
+      { "message": "Remind me to send the invoice Friday", "expected": "tasks" },
+      { "message": "Mark the website redesign task as done", "expected": "tasks" },
+      { "message": "What should I focus on right now?", "expected": "tasks" },
+      { "message": "I need to call the landlord", "expected": "tasks" },
+      { "message": "What's on my to-do list?", "expected": "tasks" },
+      { "message": "Set a reminder for 5pm", "expected": "tasks" },
+      { "message": "What do I need to get done today?", "expected": "tasks" },
+
+      { "message": "Queue up a research task on competitor pricing", "expected": "queue" },
+      { "message": "Can you draft a blog post about AI agents?", "expected": "queue" },
+      { "message": "Run a code review on the auth PR", "expected": "queue" },
+      { "message": "Delegate the market analysis to an agent", "expected": "queue" },
+      { "message": "What's in my queue right now?", "expected": "queue" },
+      { "message": "Research the best CRM tools for small teams", "expected": "queue" },
+      { "message": "Write this up as a detailed report", "expected": "queue" },
+      { "message": "Have an agent look into this", "expected": "queue" },
+      { "message": "Can you do a deep dive on this topic?", "expected": "queue" },
+      { "message": "Run this in the background", "expected": "queue" },
+
+      { "message": "Who is Sarah Chen?", "expected": "people" },
+      { "message": "What do we know about Jake? Who is he?", "expected": "people" },
+      { "message": "Look up that client I met last week", "expected": "people" },
+      { "message": "Who was in the standup this morning? Any attendees I should know about?", "expected": "people" },
+      { "message": "Tell me about my relationship with the Acme team", "expected": "people" },
+      { "message": "Who's the contact at HubSpot?", "expected": "people" },
+      { "message": "I just met with Dr. Williams", "expected": "people" },
+      { "message": "What team is Marcus on?", "expected": "people" },
+
+      { "message": "Search my vault for the product roadmap", "expected": "second-brain" },
+      { "message": "What notes do I have on the Q2 launch?", "expected": "second-brain" },
+      { "message": "Look up my notes on pricing models", "expected": "second-brain" },
+      { "message": "Look up my notes from the strategy session", "expected": "second-brain" },
+      { "message": "What's in my obsidian vault about marketing?", "expected": "second-brain" },
+      { "message": "Do I have any notes on this topic?", "expected": "second-brain" },
+      { "message": "Search for the onboarding doc", "expected": "second-brain" },
+      { "message": "What do we know about our competitors?", "expected": "second-brain" },
+      { "message": "Check my knowledge base for API specs", "expected": "second-brain" },
+      { "message": "I remember writing something about this", "expected": "second-brain" },
+
+      { "message": "What's trending on Twitter right now?", "expected": "x-twitter" },
+      { "message": "Search Twitter for discussions about autoresearch", "expected": "x-twitter" },
+      { "message": "Read this tweet thread", "expected": "x-twitter" },
+      { "message": "What are people saying about the new GPT release?", "expected": "x-twitter" },
+      { "message": "Check my bookmarks on X", "expected": "x-twitter" },
+      { "message": "Show me Karpathy's latest tweets", "expected": "x-twitter" },
+      { "message": "What's happening on social media?", "expected": "x-twitter" },
+      { "message": "Draft a post about our product launch", "expected": "x-twitter" },
+
+      { "message": "Save this as a file", "expected": "files" },
+      { "message": "Read the README from that project", "expected": "files" },
+      { "message": "Push this document to Google Drive", "expected": "files" },
+      { "message": "Create an artifact with the meeting notes", "expected": "files" },
+      { "message": "Export this as a PDF", "expected": "files" },
+      { "message": "Write this to a file in my vault", "expected": "files" },
+
+      { "message": "Is my Google Calendar connected?", "expected": "integrations" },
+      { "message": "Set up the HubSpot integration", "expected": "integrations" },
+      { "message": "My calendar isn't working, can you check?", "expected": "integrations" },
+      { "message": "Configure the API key for X", "expected": "integrations" },
+      { "message": "Something's broken with the email integration", "expected": "integrations" },
+      { "message": "How do I connect my Google account?", "expected": "integrations" },
+
+      { "message": "Hey, how are you doing today?", "expected": null },
+      { "message": "Tell me a joke", "expected": null },
+      { "message": "What's the meaning of life?", "expected": null },
+      { "message": "Summarize this paragraph for me", "expected": null },
+      { "message": "Help me think through this problem", "expected": null },
+      { "message": "I'm feeling stressed about the presentation", "expected": null },
+      { "message": "What do you think about this approach?", "expected": null },
+      { "message": "Explain quantum computing to me", "expected": null },
+      { "message": "Write me a haiku", "expected": null },
+      { "message": "Good morning!", "expected": null },
+
+      { "message": "What meetings do I have and what tasks are overdue?", "expected": "tasks", "note": "multi-domain — overdue tasks signal is stronger than meeting mention" },
+      { "message": "Search my vault for notes about the meeting with Jake", "expected": "second-brain", "note": "vault/search triggers should beat meeting trigger" },
+      { "message": "Who is attending the 3pm call?", "expected": "people", "note": "people intent even though meeting is mentioned" },
+      { "message": "Draft a tweet about my calendar app", "expected": "x-twitter", "note": "creative intent, twitter domain" },
+      { "message": "Queue a task to research my schedule optimization", "expected": "queue", "note": "queue intent even though schedule is mentioned" },
+      { "message": "Is the calendar integration broken?", "expected": "integrations", "note": "troubleshooting intent > calendar content" },
+      { "message": "Save my meeting notes to a file", "expected": "files", "note": "file action > meeting content" },
+      { "message": "Find the person I met with at the event", "expected": "people", "note": "people lookup intent" },
+      { "message": "What did people tweet about the product launch?", "expected": "x-twitter", "note": "twitter search intent, no calendar trigger" },
+      { "message": "Remind me about the client meeting tomorrow", "expected": "calendar", "note": "meeting + tomorrow gives calendar 2 triggers vs tasks 1" }
+    ]
+  },
+
+  "context_relevance": {
+    "description": "Tests whether the right context tiers activate for different message types",
+    "tests": [
+      { "message": "Good morning, what's on my plate?", "expect_schedule": true, "expect_ops": true, "is_first": false },
+      { "message": "When am I free tomorrow?", "expect_schedule": true, "expect_ops": false, "is_first": false },
+      { "message": "Tell me a joke", "expect_schedule": false, "expect_ops": false, "is_first": false },
+      { "message": "What are my priorities?", "expect_schedule": false, "expect_ops": true, "is_first": false },
+      { "message": "Hey Prosper", "expect_schedule": false, "expect_ops": true, "is_first": false },
+      { "message": "Start the day", "expect_schedule": false, "expect_ops": true, "is_first": false },
+      { "message": "Help me plan my week", "expect_schedule": false, "expect_ops": true, "is_first": false },
+      { "message": "What's the weather like?", "expect_schedule": false, "expect_ops": false, "is_first": false },
+      { "message": "Catch me up", "expect_schedule": false, "expect_ops": true, "is_first": false },
+      { "message": "Brief me on what I missed", "expect_schedule": false, "expect_ops": true, "is_first": false },
+      { "message": "Hello!", "expect_schedule": true, "expect_ops": true, "is_first": true, "note": "first turn always gets schedule + ops" },
+      { "message": "Random question", "expect_schedule": true, "expect_ops": true, "is_first": true, "note": "first turn always gets schedule + ops" }
+    ]
+  },
+
+  "ambiguity_tests": {
+    "description": "Edge cases and ambiguous messages where routing is genuinely hard",
+    "tests": [
+      { "message": "Can you look into that for me?", "expected": null, "note": "too vague for any domain" },
+      { "message": "What did we talk about yesterday?", "expected": null, "note": "memory query, not a skill card domain" },
+      { "message": "Update me", "expected": null, "note": "could be tasks or general — too vague" },
+      { "message": "Let's work on the project", "expected": null, "note": "project is vague, no specific domain" },
+      { "message": "I need to prepare for tomorrow", "expected": null, "note": "could be calendar or tasks — ambiguous without more context" }
+    ]
+  },
+
+  "context_efficiency": {
+    "description": "Tests that context injection is lean — no unnecessary tokens injected. Each test specifies a message and which context sections should NOT be injected.",
+    "tests": [
+      { "message": "Tell me a joke", "should_not_inject": ["schedule", "ops", "skill_card"], "note": "pure chat, no operational context needed" },
+      { "message": "What's the meaning of life?", "should_not_inject": ["schedule", "ops", "skill_card"], "note": "philosophical, no operational context" },
+      { "message": "Explain React hooks to me", "should_not_inject": ["schedule", "ops", "skill_card"], "note": "technical question, no GodMode context needed" },
+      { "message": "Write me a poem about autumn", "should_not_inject": ["schedule", "ops", "skill_card"], "note": "creative, no operational context" },
+      { "message": "What's 2 + 2?", "should_not_inject": ["schedule", "ops", "skill_card"], "note": "trivial, no context needed" },
+      { "message": "How do I make pasta carbonara?", "should_not_inject": ["schedule", "ops", "skill_card"], "note": "cooking question, no operational context" },
+      { "message": "Translate this to Spanish", "should_not_inject": ["schedule", "ops", "skill_card"], "note": "utility, no operational context" },
+      { "message": "Debug this error for me", "should_not_inject": ["schedule", "ops", "skill_card"], "note": "coding help, no GodMode context" },
+      { "message": "Compare PostgreSQL vs MySQL", "should_not_inject": ["schedule", "ops", "skill_card"], "note": "technical question" },
+      { "message": "I'm feeling anxious about the presentation", "should_not_inject": ["schedule", "ops"], "note": "emotional, no operational context — but schedule might help if meeting related" },
+
+      { "message": "Good morning, brief me", "should_inject": ["schedule", "ops"], "note": "morning greeting should get full context" },
+      { "message": "What's on my calendar?", "should_inject": ["schedule", "skill_card"], "note": "calendar query needs schedule + skill card" },
+      { "message": "What tasks are overdue?", "should_inject": ["ops", "skill_card"], "note": "task query needs ops + skill card" },
+      { "message": "Queue a research task", "should_inject": ["skill_card"], "note": "queue query needs skill card" },
+      { "message": "Search my vault for project notes", "should_inject": ["skill_card"], "note": "second-brain query needs skill card" }
+    ]
+  },
+
+  "context_pressure": {
+    "description": "Tests that context degrades correctly under pressure",
+    "tests": [
+      { "pressure": 0.0, "should_include": ["soul", "identity", "memory", "schedule", "ops", "skill_card", "meeting_prep", "routing_lessons", "safety"], "note": "zero pressure, everything included" },
+      { "pressure": 0.5, "should_include": ["soul", "identity", "memory", "schedule", "ops", "skill_card", "meeting_prep", "routing_lessons", "safety"], "note": "moderate pressure, still everything" },
+      { "pressure": 0.75, "should_include": ["soul", "identity", "memory", "schedule", "ops", "skill_card"], "should_exclude": ["meeting_prep", "routing_lessons", "safety"], "note": "high pressure, P2/P3 dropped" },
+      { "pressure": 0.95, "should_include": ["soul", "identity", "memory"], "should_exclude": ["schedule", "ops", "skill_card", "meeting_prep", "routing_lessons"], "note": "critical pressure, only P0" }
+    ]
+  },
+
+  "memory_recall": {
+    "description": "Tests memory search quality. Seeded facts with queries and expected recall. These test the score threshold, result limit, and query matching.",
+    "seed_facts": [
+      "Caleb's timezone is US Central (CST/CDT). He lives in Austin, Texas.",
+      "Jake Morrison works at Acme Corp as VP of Engineering. Met at SaaStr 2025.",
+      "Sarah Chen is the design lead at TRP (The Recovery Practice). She handles all patient-facing materials.",
+      "Patient Autopilot is Caleb's chiropractic marketing company. It does automated ad campaigns for chiropractors.",
+      "GodMode is Caleb's personal AI project. It's a deeply contextual personal AI ally built on OpenClaw.",
+      "Caleb's morning routine: wake at 6am, cold plunge, journal, then work by 7:30am.",
+      "The Q2 launch is targeting April 15, 2026. Key deliverables: auth system, billing integration, onboarding flow.",
+      "Caleb uses Obsidian for note-taking with PARA structure. Vault path is ~/Documents/VAULT/.",
+      "TRP uses HubSpot for CRM and patient tracking. Integration via API key in ~/.openclaw/.env.",
+      "Caleb's communication style: direct, concise, no corporate speak. Prefers recommendations over options.",
+      "The weekly standup is every Monday at 9am CST with Jake, Sarah, and Marcus.",
+      "Marcus Thompson handles backend engineering. He built the queue processor and trust tracker.",
+      "Cara AI is the AI assistant product for Patient Autopilot. It automates chiro marketing campaigns.",
+      "Caleb's top goal for Q1 2026: ship GodMode v2.0 with full agent orchestration.",
+      "The GodMode license is $297/month. Auth uses OAuth Device Flow with JWT RS256."
+    ],
+    "tests": [
+      { "query": "What timezone is Caleb in?", "expected_facts": ["timezone", "CST", "Austin"], "note": "basic identity recall" },
+      { "query": "Tell me about Jake", "expected_facts": ["Jake Morrison", "Acme", "VP"], "note": "people recall" },
+      { "query": "What does Sarah do?", "expected_facts": ["Sarah Chen", "design lead", "TRP"], "note": "people + role recall" },
+      { "query": "What is Patient Autopilot?", "expected_facts": ["chiropractic", "marketing", "chiropractors"], "note": "business recall" },
+      { "query": "When is the Q2 launch?", "expected_facts": ["April 15", "auth", "billing"], "note": "project recall" },
+      { "query": "What CRM does TRP use?", "expected_facts": ["HubSpot", "patient"], "note": "tool recall" },
+      { "query": "Who is in the standup?", "expected_facts": ["Jake", "Sarah", "Marcus", "Monday"], "note": "meeting recall" },
+      { "query": "What is Cara AI?", "expected_facts": ["Patient Autopilot", "chiro", "marketing"], "note": "product recall" },
+      { "query": "How much does GodMode cost?", "expected_facts": ["297", "month"], "note": "pricing recall" },
+      { "query": "How does Caleb like to communicate?", "expected_facts": ["direct", "concise", "recommendations"], "note": "style recall" },
+      { "query": "What does Marcus work on?", "expected_facts": ["Marcus", "backend", "queue"], "note": "people + work recall" },
+      { "query": "What is Caleb's morning routine?", "expected_facts": ["6am", "cold plunge", "journal"], "note": "routine recall" }
+    ]
+  },
+
+  "goal_alignment": {
+    "description": "Tests whether the context assembly would help advance user goals. Uses synthetic session scenarios scored against goals.",
+    "goals": [
+      "Ship GodMode v2.0 with full agent orchestration by end of Q1 2026",
+      "Grow Patient Autopilot revenue to $50k MRR",
+      "Build Cara AI as the flagship PA product",
+      "Maintain health routine (6am wake, cold plunge, exercise)"
+    ],
+    "scenarios": [
+      {
+        "user_message": "Good morning, what should I focus on today?",
+        "context_should_include": ["priorities", "schedule", "overdue tasks", "goals"],
+        "context_should_not_include": ["x-twitter", "integrations setup"],
+        "alignment_note": "Morning briefing should surface priorities aligned with active goals"
+      },
+      {
+        "user_message": "I need to work on the auth system for GodMode",
+        "context_should_include": ["Q2 launch", "GodMode"],
+        "context_should_not_include": ["Patient Autopilot pricing", "morning routine"],
+        "alignment_note": "Should surface project context relevant to the specific work"
+      },
+      {
+        "user_message": "How are the PA ad campaigns performing?",
+        "context_should_include": ["Patient Autopilot", "Cara AI"],
+        "context_should_not_include": ["GodMode architecture", "cold plunge"],
+        "alignment_note": "Should surface PA business context, not GodMode tech context"
+      },
+      {
+        "user_message": "I'm behind on the Q2 launch, what can I delegate?",
+        "context_should_include": ["queue", "Q2 launch", "April 15", "delegate"],
+        "context_should_not_include": ["morning routine", "Twitter"],
+        "alignment_note": "Should surface delegation tools and project timeline pressure"
+      },
+      {
+        "user_message": "Set up a meeting with Jake about the API integration",
+        "context_should_include": ["Jake", "Acme", "calendar"],
+        "context_should_not_include": ["Patient Autopilot", "Cara AI"],
+        "alignment_note": "Should surface Jake's people file and calendar for scheduling"
+      }
+    ]
+  }
+}

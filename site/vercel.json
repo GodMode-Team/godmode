@@ -1,5 +1,6 @@
 {
   "rewrites": [
+    { "source": "/audit-intake", "destination": "/ai-audit/thank-you.html" },
     { "source": "/install.sh", "destination": "/install.sh" },
     { "source": "/setup", "destination": "/setup/index.html" },
     { "source": "/support", "destination": "/support/index.html" },

@@ -7,11 +7,11 @@
  * Singleton pattern.
  */
 
-import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { readFile, writeFile, mkdir, copyFile } from "node:fs/promises";
 import { join } from "node:path";
 import { DATA_DIR, localDateString, DAILY_FOLDER, resolveVaultPath } from "../data-paths.js";
-import { getVaultPath, VAULT_FOLDERS, ensureVaultStructure } from "../lib/vault-paths.js";
+import { getVaultPath, VAULT_FOLDERS, ensureVaultStructure, resolveConsciousnessPath } from "../lib/vault-paths.js";
 
 type BroadcastFn = (
   event: string,
@@ -107,6 +107,17 @@ class ConsciousnessHeartbeat {
           this.logger.info(`[Consciousness] Mem0 retry queue: processed ${retried} item(s)`);
         }
       } catch { /* Memory retry non-fatal */ }
+
+      // Identity graph maintenance — prune stale orphan entities
+      try {
+        const { isGraphReady, pruneStaleEntities } = await import("../lib/identity-graph.js");
+        if (isGraphReady()) {
+          const pruned = pruneStaleEntities();
+          if (pruned > 0) {
+            this.logger.info(`[Consciousness] Identity graph: pruned ${pruned} stale entities`);
+          }
+        }
+      } catch { /* non-fatal */ }
 
       this.lastSyncAt = Date.now();
       this.broadcast("consciousness:status", {
@@ -204,10 +215,19 @@ class ConsciousnessHeartbeat {
         }
       } catch { /* non-fatal */ }
 
-      // 5. Task maintenance (dedup + archival)
+      // 5. Task maintenance (dedup + archival + orphan detection)
       try {
         const { runTaskMaintenance } = await import("../methods/tasks.js");
-        runTaskMaintenance().catch(() => {});
+        const maintResult = await runTaskMaintenance();
+        if (maintResult.warnings.length > 0) {
+          this.logger.warn(`[GodMode][Tasks] Maintenance warnings:\n${maintResult.warnings.join("\n")}`);
+        }
+      } catch { /* non-fatal */ }
+
+      // 5b. Prune action item buffers
+      try {
+        const { actionItemBuffer } = await import("../lib/action-items.js");
+        actionItemBuffer.prune();
       } catch { /* non-fatal */ }
 
       // 6. Expire stale queue items
@@ -228,7 +248,23 @@ class ConsciousnessHeartbeat {
         }
       } catch { /* non-fatal */ }
 
-      // 7. Clean up expired private sessions
+      // 7b. Self-heal — check all subsystems, auto-repair what's broken
+      try {
+        const { runSelfHeal, cleanOrphanedAgents } = await import("./self-heal.js");
+        const healResult = await runSelfHeal(this.logger, (event, payload) => this.broadcast(event, payload));
+        if (healResult.repaired > 0) {
+          this.logger.info(`[Consciousness] Self-heal: ${healResult.repaired} repair(s), ${healResult.failures.length} persistent failure(s)`);
+        }
+        // Also clean orphaned agent processes
+        const orphansCleaned = await cleanOrphanedAgents(this.logger);
+        if (orphansCleaned > 0) {
+          this.logger.info(`[Consciousness] Cleaned ${orphansCleaned} orphaned agent process(es)`);
+        }
+      } catch (err) {
+        this.logger.warn(`[Consciousness] Self-heal failed: ${String(err)}`);
+      }
+
+      // 8. Clean up expired private sessions
       try {
         const { cleanupExpiredPrivateSessions } = await import("../lib/private-session.js");
         const cleaned = await cleanupExpiredPrivateSessions();
@@ -339,7 +375,8 @@ class ConsciousnessHeartbeat {
    * task counts and top-priority items. Replaces any existing section.
    */
   private async appendTaskDashboard(): Promise<void> {
-    if (!existsSync(CONSCIOUSNESS_FILE)) return;
+    const consciousnessFile = resolveConsciousnessPath().path;
+    if (!existsSync(consciousnessFile)) return;
 
     const { readTasks } = await import("../methods/tasks.js");
     const { localDateString } = await import("../data-paths.js");
@@ -407,11 +444,11 @@ class ConsciousnessHeartbeat {
     const dashboardBlock = lines.join("\n");
 
     try {
-      let content = readFileSync(CONSCIOUSNESS_FILE, "utf-8");
+      let content = readFileSync(consciousnessFile, "utf-8");
       // Remove existing Task Pulse section
       content = content.replace(/\n## Task Pulse\n[\s\S]*?(?=\n## |\n$|$)/, "");
       content = content.trimEnd() + "\n" + dashboardBlock;
-      writeFileSync(CONSCIOUSNESS_FILE, content, "utf-8");
+      writeFileSync(consciousnessFile, content, "utf-8");
     } catch {
       // Non-fatal
     }

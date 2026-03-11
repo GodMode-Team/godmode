@@ -1504,32 +1504,6 @@ function handleGatewayEventUnsafe(host: GatewayHost, evt: GatewayEventFrame) {
     return;
   }
 
-  // Proactive Intel live updates
-  if (evt.event === "proactiveIntel:insight") {
-    const app = host as unknown as GodModeApp;
-    if (typeof app.handleIntelLoad === "function") {
-      void app.handleIntelLoad();
-    }
-    // Show toast for new insights
-    const payload = evt.payload as { newInsights?: number; totalActive?: number } | undefined;
-    if (payload?.newInsights && typeof app.showToast === "function") {
-      app.showToast(
-        `${payload.newInsights} new intelligence insight${payload.newInsights > 1 ? "s" : ""} available`,
-        "info",
-        6000,
-      );
-    }
-    return;
-  }
-  if (evt.event === "proactiveIntel:update") {
-    const app = host as unknown as GodModeApp;
-    const subtab = (app as unknown as { secondBrainSubtab?: string }).secondBrainSubtab;
-    if (typeof app.handleIntelLoad === "function" && host.tab === "second-brain" && subtab === "intel") {
-      void app.handleIntelLoad();
-    }
-    return;
-  }
-
   // Fathom meeting processed — notify via toast + ally chat + main chat
   if (evt.event === "fathom:meeting-processed") {
     const payload = evt.payload as

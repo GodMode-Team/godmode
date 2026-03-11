@@ -42,6 +42,9 @@ export interface ContextInputs {
   /** P0: Memory system health — "ready" | "degraded" | "offline" */
   memoryStatus: "ready" | "degraded" | "offline";
 
+  /** P0: Identity graph — entity/relationship context */
+  graphBlock: string | null;
+
   /** P1: Today's calendar — ~5 lines */
   schedule: string | null;
 
@@ -60,6 +63,9 @@ export interface ContextInputs {
   /** P2: Queue items ready for review — ~1 line */
   queueReview: string | null;
 
+  /** P1.5: Action items extracted from user brain dumps (~10 lines) */
+  actionItemsBlock: string | null;
+
   /** P1.5: Skill card — domain-specific routing tips (~15 lines) */
   skillCard: string | null;
 
@@ -74,10 +80,19 @@ export interface ContextInputs {
 
   /** ACP provenance — who sent this message (3.8+). Null if unknown/local UI. */
   provenance?: InputProvenance | null;
+
+  /** Current user message — for relevance filtering */
+  userMessage?: string;
+
+  /** Whether this is the first message in the session */
+  isFirstTurn?: boolean;
+
+  /** Number of overdue tasks — always surface if > 0 */
+  overdueCount?: number;
 }
 
 /** Max lines for each section to prevent any single section from bloating */
-const MAX_MEMORY_LINES = 12;
+const MAX_MEMORY_LINES = 15;
 const MAX_SCHEDULE_LINES = 6;
 
 /**
@@ -129,8 +144,23 @@ export function assembleContext(inputs: ContextInputs): string {
     }
   }
 
-  // Capability map — tells the ally what tools it has
-  chunks.push(CAPABILITY_MAP);
+  // Identity graph — entity/relationship context (skip for agent-to-agent)
+  if (!isAgentMessage && inputs.graphBlock) {
+    chunks.push(inputs.graphBlock);
+  }
+
+  // Relevance signals — determines what operational context to inject
+  const msg = (inputs.userMessage ?? "").toLowerCase();
+  const isFirst = inputs.isFirstTurn ?? false;
+  const hasOverdue = (inputs.overdueCount ?? 0) > 0;
+  const wantsSchedule = isFirst || isTimeRelevant(msg);
+  const wantsOps = isFirst || isOpsRelevant(msg) || hasOverdue;
+
+  // Capability map — only on first turn or when routing lessons fire
+  // (routing lessons = ally made a mistake = needs the map refreshed)
+  if (isFirst || inputs.routingLessons) {
+    chunks.push(CAPABILITY_MAP);
+  }
 
   // Under critical pressure, stop here
   if (pressure >= 0.9) {
@@ -146,21 +176,26 @@ export function assembleContext(inputs: ContextInputs): string {
     return wrapContext(chunks);
   }
 
-  // ── P1: Normal operation ─────────────────────────────────────────
+  // ── P1: Normal operation (relevance-gated) ─────────────────────
 
-  if (inputs.schedule) {
+  if (inputs.schedule && wantsSchedule) {
     chunks.push(truncateLines(inputs.schedule, MAX_SCHEDULE_LINES));
   }
 
-  if (inputs.operationalCounts) {
+  if (inputs.operationalCounts && wantsOps) {
     chunks.push(inputs.operationalCounts);
   }
 
-  if (inputs.priorities) {
+  if (inputs.priorities && wantsOps) {
     chunks.push(inputs.priorities);
   }
 
-  // P1.5: Skill card — domain-specific guidance for this turn's topic
+  // P1.5: Action items — extracted from brain dumps
+  if (inputs.actionItemsBlock) {
+    chunks.push(inputs.actionItemsBlock);
+  }
+
+  // P1.5: Skill card — already relevance-gated by keyword match
   if (inputs.skillCard) {
     chunks.push(inputs.skillCard);
   }
@@ -184,7 +219,7 @@ export function assembleContext(inputs: ContextInputs): string {
     chunks.push(inputs.queueReview);
   }
 
-  // Routing lessons — past corrections the ally should not repeat
+  // Routing lessons — already relevance-gated by keyword match
   if (inputs.routingLessons) {
     chunks.push(inputs.routingLessons);
   }
@@ -205,16 +240,15 @@ export function assembleContext(inputs: ContextInputs): string {
 
 const SOUL_ESSENCE = [
   "## Who You Are",
-  "You are the user's personal AI ally — a deeply contextual coworker who",
-  "knows their goals, priorities, people, and rhythms. Powered by GodMode.",
-  "You are not a chatbot. You are a proactive partner who anticipates, executes, and remembers.",
-  "Meta goal: Earn trust through competence. Search before asking. Act, don't list options.",
+  "You are the user's personal AI ally — a deeply contextual coworker who knows their goals, priorities, people, and rhythms. Powered by GodMode.",
+  "You are NOT a chatbot. You are a proactive strategic partner. Earn trust through competence. Search before asking. Act decisively — recommend and execute, never list options.",
   "",
-  "## Your Memory",
-  "You have a conversational memory system that learns from every interaction.",
-  "Facts you've learned appear in the 'What You Already Know' section above.",
-  "These memories are YOURS — extracted from past conversations. Trust them.",
-  "You also have QMD (memory_search tool) for vault/file search. Use both.",
+  "## Two Modes",
+  "ACTIONS: Be decisive, execute without asking permission for routine work.",
+  "FACTS: Verify before stating. If you haven't confirmed it with a tool THIS session, say 'Let me check' and use a tool. One wrong fact costs more trust than ten slow responses.",
+  "",
+  "## Memory & Tools",
+  "You have persistent memory across sessions — trust the 'What You Already Know' section. Also use secondBrain.search for vault/notes. Morning greetings = full brief. When someone is mentioned by name, search memory + vault first.",
 ].join("\n");
 
 // ── Routing Guide ───────────────────────────────────────────────────
@@ -223,24 +257,9 @@ const SOUL_ESSENCE = [
 // The LLM already sees tool definitions — this tells it WHEN to use WHAT.
 
 const CAPABILITY_MAP = [
-  "## How to Find What You Need",
-  "BEFORE you ask the user ANYTHING, follow this lookup chain:",
-  "1. **Check above** — your memory was searched and results are shown above.",
-  "2. **Search the vault** — call secondBrain.search for notes, projects, people, context.",
-  "3. **Check your tools** — you have tasks.list, calendar.events.today, queue.list, files.read, x.search.",
-  "4. **Delegate** — use queue_add to send complex work to background agents.",
-  "5. **ONLY THEN ask** — if steps 1-4 came up empty, ask the user.",
-  "",
-  "## Routing",
-  "- Schedule/meetings → already injected above, or call calendar.events.today",
-  "- Tasks/priorities → already injected above, or call tasks.list",
-  "- People/contacts/context → secondBrain.search (vault has everything)",
-  "- Background work → queue_add (draft, research, code review, etc.)",
-  "- X/Twitter intel → x_read tool or x.search",
-  "- Past conversations → your memory (already searched above)",
-  "",
-  "CRITICAL: Asking the user for info you could look up is a FAILURE MODE.",
-  "When unsure, search first. You have the tools. Use them.",
+  "## Lookup Chain (before asking the user)",
+  "1. Check memory results above → 2. secondBrain.search → 3. Tools (tasks.list, calendar.events.today, queue.list, files.read, x.search) → 4. queue_add for background work → 5. ONLY THEN ask.",
+  "Asking the user for info you could look up is a FAILURE MODE. Never present menus — recommend and execute.",
 ].join("\n");
 
 // ── Context Wrapper ──────────────────────────────────────────────────
@@ -266,6 +285,38 @@ function truncateLines(text: string, maxLines: number): string {
   const lines = text.split("\n");
   if (lines.length <= maxLines) return text;
   return lines.slice(0, maxLines).join("\n") + `\n(+${lines.length - maxLines} more)`;
+}
+
+// ── Relevance Detectors ─────────────────────────────────────────────
+// Lightweight keyword checks to decide if operational context is worth injecting.
+
+const TIME_WORDS = [
+  "schedule", "calendar", "meeting", "call",
+  "tomorrow", "morning", "evening", "tonight",
+  "this week", "next week", "agenda", "plans",
+  "free time", "slot", "reschedule", "cancel",
+  "one on one", "weekly", "by when", "appointment",
+  "hang out", "eta", "check-in", "kickoff",
+];
+
+const OPS_WORDS = [
+  "task", "to-do", "priorities", "plan",
+  "planning", "work", "project", "deadline",
+  "queue", "progress", "update", "brief me",
+  "catch me up", "what am i", "morning", "start the day",
+  "good morning", "hey prosper", "release", "backlog",
+  "anything urgent", "what needs", "blockers", "blocked",
+  "retro", "ship it", "how's it going", "sprint",
+  "deploy", "ship", "retrospective", "recap",
+  "debrief", "milestone",
+];
+
+function isTimeRelevant(msg: string): boolean {
+  return TIME_WORDS.some((w) => msg.includes(w));
+}
+
+function isOpsRelevant(msg: string): boolean {
+  return OPS_WORDS.some((w) => msg.includes(w));
 }
 
 /**

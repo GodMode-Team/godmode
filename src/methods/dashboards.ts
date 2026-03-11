@@ -311,11 +311,6 @@ const widgetData: GatewayRequestHandler = async ({ params, respond }) => {
           break;
         }
 
-        case "focus-pulse": {
-          // Focus pulse was removed in lean audit
-          data[widgetId] = null;
-          break;
-        }
 
         case "goals-progress": {
           const raw = safeReadJson(path.join(DATA_DIR, "goals.json")) as {
@@ -390,11 +385,6 @@ const widgetData: GatewayRequestHandler = async ({ params, respond }) => {
           break;
         }
 
-        case "coding-status": {
-          // Coding orchestrator was removed in lean audit
-          data[widgetId] = null;
-          break;
-        }
 
         case "trust-scores": {
           const raw = safeReadJson(
@@ -461,11 +451,6 @@ const widgetData: GatewayRequestHandler = async ({ params, respond }) => {
           break;
         }
 
-        case "intel-highlights": {
-          // Advisor was removed in lean audit — intel goes through proactive-intel/daily brief
-          data[widgetId] = null;
-          break;
-        }
 
         case "recent-files": {
           // List most recently modified files across ~/godmode/memory/

@@ -1,6 +1,6 @@
 ---
 domain: tasks
-triggers: task, todo, to-do, remind, reminder, overdue, priority, priorities, what should i, what do i need
+triggers: task, todo, to-do, remind, reminder, overdue, priority, priorities, what should i, what do i need, i need to, need to get done, focus on, save
 tools: tasks.list, tasks.add, tasks.update
 ---
 ## When to Use

@@ -179,6 +179,51 @@ export async function generateSnapshot(): Promise<string> {
     // Queue unavailable
   }
 
+  // Proactive suggestions — delegatable work the ally can volunteer for
+  try {
+    const { readTasks } = await import("../methods/tasks.js");
+    const { readQueueState } = await import("./queue-state.js");
+    const taskData = await readTasks();
+    const queueState = await readQueueState();
+
+    const activeAgents = queueState.items.filter(
+      (i: { status: string }) => i.status === "processing",
+    ).length;
+    const hasCapacity = activeAgents < 5;
+
+    // Find tasks that could be delegated to agents
+    const delegatable = taskData.tasks.filter((t: { status: string; title: string; dueDate?: string | null }) => {
+      if (t.status !== "pending") return false;
+      const title = t.title.toLowerCase();
+      // Tasks with research/analysis/review/creative keywords are delegatable
+      return /\b(research|analyze|review|audit|write|draft|compare|investigate|report|summarize|explore)\b/.test(title);
+    });
+
+    // Find overdue tasks with no queue work attached
+    const queuedTaskIds = new Set(
+      queueState.items
+        .filter((qi: { sourceTaskId?: string }) => qi.sourceTaskId)
+        .map((qi: { sourceTaskId?: string }) => qi.sourceTaskId),
+    );
+    const unqueued = delegatable.filter(
+      (t: { id: string }) => !queuedTaskIds.has(t.id),
+    );
+
+    if (hasCapacity && unqueued.length > 0) {
+      lines.push("## Delegatable Work");
+      lines.push("These pending tasks could be handled by background agents.");
+      lines.push("Offer to queue them: \"I can work on these in the background. Want me to?\"");
+      lines.push("Always ask — never auto-queue without the user's approval.");
+      for (const t of unqueued.slice(0, 4)) {
+        const due = (t as { dueDate?: string | null }).dueDate ? ` (due ${(t as { dueDate?: string | null }).dueDate})` : "";
+        lines.push(`- ${(t as { title: string }).title}${due}`);
+      }
+      if (unqueued.length > 4) lines.push(`- +${unqueued.length - 4} more`);
+    }
+  } catch {
+    // Proactive suggestions non-fatal
+  }
+
   // Active Skills index (~5 lines max)
   try {
     const { getCronSkills, loadSkills } = await import("./skills-registry.js");

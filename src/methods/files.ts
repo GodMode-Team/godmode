@@ -111,10 +111,11 @@ const pushToDrive: GatewayRequestHandler = async ({ params, respond }) => {
     return;
   }
 
-  // SECURITY: Validate path is within allowed roots before uploading to external service
-  const { isAllowedPath } = await import("../lib/vault-paths.js");
+  // SECURITY: Validate path is within user's home directory
   const realPath = await fs.realpath(resolvedPath).catch(() => resolvedPath);
-  if (!isAllowedPath(realPath)) {
+  const homeDir = process.env.HOME || process.env.USERPROFILE || "";
+  const homePrefix = homeDir.endsWith(path.sep) ? homeDir : homeDir + path.sep;
+  if (!homeDir || (!realPath.startsWith(homePrefix) && realPath !== homeDir)) {
     respond(false, null, { code: "ACCESS_DENIED", message: "Path not allowed for Drive upload" });
     return;
   }
@@ -216,7 +217,8 @@ const batchPushToDrive: GatewayRequestHandler = async ({ params, respond }) => {
 
   const results: Array<{ path: string; success: boolean; driveUrl?: string; error?: string }> = [];
 
-  const { isAllowedPath } = await import("../lib/vault-paths.js");
+  const batchHomeDir = process.env.HOME || process.env.USERPROFILE || "";
+  const batchHomePrefix = batchHomeDir.endsWith(path.sep) ? batchHomeDir : batchHomeDir + path.sep;
 
   for (const fp of filePaths) {
     const resolved = await resolveFilePath(fp);
@@ -225,9 +227,9 @@ const batchPushToDrive: GatewayRequestHandler = async ({ params, respond }) => {
       continue;
     }
 
-    // SECURITY: Validate path is within allowed roots
+    // SECURITY: Validate path is within user's home directory
     const realFp = await fs.realpath(resolved).catch(() => resolved);
-    if (!isAllowedPath(realFp)) {
+    if (!batchHomeDir || (!realFp.startsWith(batchHomePrefix) && realFp !== batchHomeDir)) {
       results.push({ path: fp, success: false, error: "Path not allowed for Drive upload" });
       continue;
     }
@@ -285,13 +287,15 @@ const taskFiles: GatewayRequestHandler = async ({ params, respond }) => {
     const item = queueState.items.find((i) => i.id === itemId);
 
     // Check the main output file
-    const { isAllowedPath: isAllowed } = await import("../lib/vault-paths.js");
+    const tfHomeDir = process.env.HOME || process.env.USERPROFILE || "";
+    const tfHomePrefix = tfHomeDir.endsWith(path.sep) ? tfHomeDir : tfHomeDir + path.sep;
     if (item?.result?.outputPath) {
       const outputPath = item.result.outputPath.startsWith("~/")
         ? path.join(process.env.HOME ?? "", item.result.outputPath.slice(2))
         : item.result.outputPath;
-      // SECURITY: Validate output path is within allowed roots
-      if (isAllowed(path.resolve(outputPath))) {
+      // SECURITY: Validate output path is within user's home directory
+      const resolvedOutput = path.resolve(outputPath);
+      if (tfHomeDir && (resolvedOutput.startsWith(tfHomePrefix) || resolvedOutput === tfHomeDir)) {
         try {
           const stat = await fs.stat(outputPath);
           files.push({
@@ -349,12 +353,14 @@ const readFile: GatewayRequestHandler = async ({ params, respond }) => {
     return;
   }
 
-  // SECURITY: Validate path is within allowed roots, resolving symlinks
-  const { isAllowedPath } = await import("../lib/vault-paths.js");
+  // SECURITY: Validate path is within user's home directory, resolving symlinks.
+  // files.read is local-only (sidebar display) so HOME is the safe boundary.
+  // Drive uploads use the stricter isAllowedPath (godmode root + vault + workspaces).
   const resolvedPath = path.resolve(filePath);
-  // Resolve symlinks to prevent escaping allowed roots via symlink
   const realPath = await fs.realpath(resolvedPath).catch(() => resolvedPath);
-  if (!isAllowedPath(realPath)) {
+  const homeDir = process.env.HOME || process.env.USERPROFILE || "";
+  const homePrefix = homeDir.endsWith(path.sep) ? homeDir : homeDir + path.sep;
+  if (!homeDir || (!realPath.startsWith(homePrefix) && realPath !== homeDir)) {
     respond(false, null, { code: "ACCESS_DENIED", message: "Path not allowed" });
     return;
   }

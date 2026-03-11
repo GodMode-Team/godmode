@@ -4,6 +4,24 @@ This file tracks recent development changes so Atlas and other agents can quickl
 
 ---
 
+## Artifact Persistence Guardrails (2026-03-09)
+
+### Problem
+Ally built a website in /tmp, served it locally, macOS cleaned /tmp, work vanished. Tokens wasted.
+
+### Three-Layer Protection
+1. **P0 Context Injection** (`src/lib/context-budget.ts`) — `ARTIFACT_PERSISTENCE` block injected into EVERY conversation. Rules: never use /tmp, websites → GitHub, code → GitHub or ~/godmode/artifacts/, documents → vault.
+2. **Queue Agent Prompt** (`src/services/queue-processor.ts`) — Artifact Persistence section in safety rules for background agents. Same rules as ally.
+3. **Ephemeral Path Shield** (`src/hooks/safety-gates.ts`) — Deterministic `before_tool_call` gate that detects exec commands writing to /tmp or /var/tmp. Fires a warning (doesn't block) that injects persistence instructions into the LLM's context.
+
+### New Infrastructure
+- `ARTIFACTS_DIR` export in `src/data-paths.ts` → `~/godmode/artifacts/`
+- `ephemeralPathShield` gate registered in `src/services/guardrails.ts` (enabled by default, visible in Settings > Guardrails)
+- `checkEphemeralWrite()` function in safety-gates.ts
+- Wired into `before_tool_call` hook in index.ts (Gate 1d)
+
+---
+
 ## Soul + Router + Enforcer Architecture (2026-03-05)
 
 ### Soul Digest (`src/lib/awareness-snapshot.ts`)

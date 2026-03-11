@@ -1,6 +1,6 @@
 ---
 domain: files
-triggers: file, read file, write file, save, artifact, document, export, drive, google drive
+triggers: file, read file, write file, save, artifact, document, export, drive, google drive, readme, push to, save to, create an artifact
 tools: files.read, files.listDriveAccounts, files.pushToDrive
 ---
 ## When to Use

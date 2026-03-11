@@ -890,28 +890,6 @@ function formatXIntelligence(items: XIntelItem[], error?: string): string {
   return lines.join("\n");
 }
 
-// ── Data source: Proactive Intelligence insights ──────────────────────────────
-
-async function formatIntelligenceSection(): Promise<string | null> {
-  // Check if brief integration is enabled
-  try {
-    const optionsPath = join(
-      process.env.GODMODE_ROOT || join((await import("node:os")).homedir(), "godmode"),
-      "data",
-      "godmode-options.json",
-    );
-    const raw = JSON.parse(await readFile(optionsPath, "utf-8")) as Record<string, unknown>;
-    if (raw["proactiveIntel.briefIntegration.enabled"] === false) return null;
-    if (raw["proactiveIntel.enabled"] === false) return null;
-  } catch {
-    // Options not available — proceed with defaults (enabled)
-  }
-
-  // Scout/Observer/Advisor subsystems removed in lean audit.
-  // Proactive intel section will be rebuilt in Phase 2.
-  return null;
-}
-
 // ── Data source: Overnight Agent Work (queue processor) ──────────────────────
 
 async function formatOvernightWorkSection(): Promise<string | null> {
@@ -1483,7 +1461,7 @@ async function generateDailyBrief(date?: string): Promise<GenerateResult> {
   // ── Gather all data sources in parallel ──────────────────────────
   const [
     calendar, oura, weather, context, xIntel, carryForward,
-    frontInbox, eveningReview, overnightWork, intelSection,
+    frontInbox, eveningReview, overnightWork,
     cronFailures,
   ] = await Promise.all([
     fetchCalendarEvents().catch((e) => ({ events: [] as CalendarEvent[], error: String(e) })),
@@ -1501,7 +1479,6 @@ async function generateDailyBrief(date?: string): Promise<GenerateResult> {
     fetchFrontInbox().catch(() => ({ conversations: [] as FrontConversation[], error: "Front fetch failed" })),
     extractEveningReview(vaultPath).catch(() => ({ tomorrowHandoff: "", reflection: "" })),
     formatOvernightWorkSection().catch(() => null),
-    formatIntelligenceSection().catch(() => null),
     (async () => {
       try {
         const { scanForFailures } = await import("../services/failure-notify.js");
@@ -1720,9 +1697,6 @@ ${ouraRaw}
 
 ### Agent Work Overnight
 ${overnightWork || "(none)"}
-
-### GodMode Intelligence
-${intelSection || "(none)"}
 
 ### Overnight Failures
 ${cronFailures && cronFailures.cronErrors.length > 0

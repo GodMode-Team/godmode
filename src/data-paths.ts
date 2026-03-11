@@ -16,6 +16,9 @@ export const DATA_DIR = join(GODMODE_ROOT, "data");
 /** Root memory directory: ~/godmode/memory */
 export const MEMORY_DIR = join(GODMODE_ROOT, "memory");
 
+/** Artifacts directory: ~/godmode/artifacts — permanent storage for generated files */
+export const ARTIFACTS_DIR = join(GODMODE_ROOT, "artifacts");
+
 /** Obsidian vault path: OBSIDIAN_VAULT_PATH env var or ~/Documents/VAULT */
 export const VAULT_PATH: string | null =
   process.env.OBSIDIAN_VAULT_PATH || null;

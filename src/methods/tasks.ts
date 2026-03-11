@@ -400,24 +400,33 @@ const deleteTask: GatewayRequestHandler = async ({ params, respond }) => {
     respond(false, null, { code: "INVALID_REQUEST", message: "Missing task id" });
     return;
   }
-  // Guard: don't delete tasks with active queue work unless force=true
-  if (!force) {
-    try {
-      const { readQueueState } = await import("../lib/queue-state.js");
-      const queueState = await readQueueState();
-      const activeQueueItem = queueState.items.find(
-        (qi) => qi.sourceTaskId === id && qi.status !== "done",
-      );
-      if (activeQueueItem) {
+  // Guard: don't delete tasks with active or reviewable queue work
+  try {
+    const { readQueueState } = await import("../lib/queue-state.js");
+    const queueState = await readQueueState();
+    const activeQueueItem = queueState.items.find(
+      (qi) => qi.sourceTaskId === id && qi.status !== "done" && qi.status !== "failed",
+    );
+    if (activeQueueItem) {
+      // Review items always block — user needs to approve/reject first
+      if (activeQueueItem.status === "review") {
+        respond(false, null, {
+          code: "HAS_REVIEW_QUEUE_ITEM",
+          message: `Cannot delete — task has a queue result waiting for your review. Approve or reject it first, then delete the task.`,
+        });
+        return;
+      }
+      // Other active items (pending, processing) block unless force=true
+      if (!force) {
         respond(false, null, {
           code: "HAS_ACTIVE_QUEUE_ITEM",
           message: `Cannot delete — task has active queue work (status: ${activeQueueItem.status}). Use force=true to override.`,
         });
         return;
       }
-    } catch {
-      // Queue state unavailable — allow deletion
     }
+  } catch {
+    // Queue state unavailable — allow deletion
   }
 
   const { result: removed } = await updateTasks((data) => {
@@ -884,11 +893,62 @@ function countNonNull(task: NativeTask): number {
   return count;
 }
 
-export async function runTaskMaintenance(): Promise<void> {
+export async function runTaskMaintenance(): Promise<{ cleaned: number; warnings: string[] }> {
+  const warnings: string[] = [];
+  let cleaned = 0;
+
   await updateTasks((data) => {
     deduplicateTasks(data);
     archiveCompletedTasks(data);
+
+    // ── Orphan cleanup: pending tasks with stale projectIds ──
+    const today = localDateString();
+    const staleThreshold = 30; // 30 days old with no update = stale
+    const now = Date.now();
+
+    for (const task of data.tasks) {
+      // Warn about very old pending tasks (likely forgotten)
+      const createdMs = task.createdAt ? new Date(task.createdAt).getTime() : 0;
+      if (
+        task.status === "pending" &&
+        createdMs > 0 &&
+        now - createdMs > staleThreshold * 24 * 60 * 60 * 1000 &&
+        !task.dueDate // No due date = probably forgotten
+      ) {
+        warnings.push(`Stale task (${Math.round((now - createdMs) / 86400000)}d old, no due date): "${task.title}"`);
+      }
+
+      // Warn about overdue tasks older than 14 days
+      if (
+        task.status === "pending" &&
+        task.dueDate &&
+        task.dueDate < today
+      ) {
+        const daysOverdue = Math.round(
+          (new Date(today).getTime() - new Date(task.dueDate).getTime()) / 86400000,
+        );
+        if (daysOverdue > 14) {
+          warnings.push(`Task overdue ${daysOverdue}d: "${task.title}" (due ${task.dueDate})`);
+        }
+      }
+    }
   });
+
+  // ── Check for orphaned queue items (tasks deleted but queue items linger) ──
+  try {
+    const { readQueueState } = await import("../lib/queue-state.js");
+    const taskData = await readTasks();
+    const queueState = await readQueueState();
+    const taskIds = new Set(taskData.tasks.map((t) => t.id));
+
+    for (const qi of queueState.items) {
+      if (qi.sourceTaskId && !taskIds.has(qi.sourceTaskId) && qi.status !== "done" && qi.status !== "failed") {
+        warnings.push(`Orphaned queue item "${qi.title}" (source task deleted, status: ${qi.status})`);
+      }
+    }
+  } catch { /* queue state unavailable */ }
+
+  return { cleaned, warnings };
 }
 
 const archiveHandler: GatewayRequestHandler = async ({ params, respond }) => {

@@ -1,0 +1,16 @@
+iteration	combined_before	combined_after	leverage	flow	awakening	purpose	mutation	status
+1	7.166	7.116	7.76	8.64	5.68	6.04	Add: chief of staff mental model	discard
+2	7.166	7.100	7.56	8.52	5.88	6.16	Add: default to action	discard
+3	7.166	7.266	7.72	8.64	6.04	6.40	Add: periodic goal alignment check	keep
+4	7.266	7.294	7.80	8.60	6.16	6.32	Add: proactively surface project context	keep
+5	7.294	7.162	7.64	8.48	5.88	6.40	Add: health goal check-in	discard
+6	7.294	7.370	7.76	8.64	6.44	6.36	Add: daily reflection offer	keep
+7	7.370	7.374	7.76	8.64	6.52	6.28	Add: think 3 steps ahead	keep
+8	7.374	7.416	7.72	8.68	6.60	6.40	Add: rest and reflection matter	keep
+9	7.416	7.550	7.76	8.68	6.80	6.76	Add: zoom out under stress	keep
+10	7.550	7.554	7.80	8.80	6.68	6.72	Add: never break flow	keep
+11	7.554	7.524	7.88	8.68	6.68	6.60	Add: chief of staff mental model	discard
+12	7.554	7.528	7.80	8.80	6.64	6.64	Add: health goal check-in	discard
+13	7.554	7.574	7.80	8.76	6.80	6.72	Add: health goal check-in	keep
+14	7.574	7.674	7.92	8.84	6.88	6.84	Add: no sycophancy, hard truths	keep
+15	7.674	7.598	7.88	8.72	6.84	6.72	Add: default to action	discard

@@ -167,25 +167,6 @@ async function runTwitter(
   });
 }
 
-// ── CDP stubs (backward compat — no longer used) ─────────────────────
-
-/** @deprecated No longer uses CDP. Kept for import compat. */
-export async function findReachableCdp(): Promise<string | null> {
-  return null;
-}
-
-/** @deprecated No longer launches Brave. */
-export async function launchBrave(): Promise<{ cdpUrl: string } | { error: string }> {
-  const bin = await findTwitterBin();
-  if (bin) return { cdpUrl: "twitter-cli" };
-  return { error: "twitter-cli not installed. Run: uv tool install twitter-cli" };
-}
-
-/** @deprecated No longer manages a browser process. */
-export function stopBrave(): void {
-  // no-op — no browser to stop
-}
-
 // ── Health check ───────────────────────────────────────────────────────
 
 export async function checkHealth(): Promise<XBrowserHealth> {

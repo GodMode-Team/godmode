@@ -16,6 +16,7 @@
 
 import { join } from "node:path";
 import { DATA_DIR } from "../data-paths.js";
+import { health, turnErrors } from "./health-ledger.js";
 
 // Disable Mem0 telemetry before any import
 process.env.MEM0_TELEMETRY = "false";
@@ -48,22 +49,18 @@ async function _doInit(): Promise<void> {
     const { Memory } = await import("mem0ai/oss");
 
     // Determine embedding provider based on available API keys
-    const hasOpenAI = !!process.env.OPENAI_API_KEY;
+    // Prefer Gemini (free tier, reliable) over OpenAI (paid, may hit quota)
     const hasGemini = !!process.env.GEMINI_API_KEY || !!process.env.GOOGLE_API_KEY;
+    const hasOpenAI = !!process.env.OPENAI_API_KEY;
 
     let embedder: { provider: string; config: Record<string, unknown> };
     let dimension: number;
 
-    if (hasOpenAI) {
-      embedder = {
-        provider: "openai",
-        config: {
-          apiKey: process.env.OPENAI_API_KEY,
-          model: "text-embedding-3-small",
-        },
-      };
-      dimension = 1536;
-    } else if (hasGemini) {
+    if (hasGemini) {
+      // Mem0's GoogleEmbedder also checks process.env.GOOGLE_API_KEY internally
+      if (process.env.GEMINI_API_KEY && !process.env.GOOGLE_API_KEY) {
+        process.env.GOOGLE_API_KEY = process.env.GEMINI_API_KEY;
+      }
       embedder = {
         provider: "google",
         config: {
@@ -73,6 +70,16 @@ async function _doInit(): Promise<void> {
         },
       };
       dimension = 768;
+      console.log("[GodMode Memory] Using Gemini embeddings (gemini-embedding-001)");
+    } else if (hasOpenAI) {
+      embedder = {
+        provider: "openai",
+        config: {
+          apiKey: process.env.OPENAI_API_KEY,
+          model: "text-embedding-3-small",
+        },
+      };
+      dimension = 1536;
     } else {
       // No embedding key available — skip memory initialization
       console.warn("[GodMode Memory] No OPENAI_API_KEY or GEMINI_API_KEY found. Memory disabled.");
@@ -80,23 +87,38 @@ async function _doInit(): Promise<void> {
       return;
     }
 
-    // Resolve Anthropic API key — check process.env first, then OpenClaw OAuth profile
+    // Resolve Anthropic API key — check env, Claude Code OAuth, then OpenClaw profiles
     let anthropicKey = process.env.ANTHROPIC_API_KEY;
     if (!anthropicKey) {
+      // Claude Code OAuth credentials (fresh tokens with refresh support)
+      try {
+        const { readFile: rf } = await import("node:fs/promises");
+        const { join: pjoin } = await import("node:path");
+        const { homedir } = await import("node:os");
+        const credsPath = pjoin(homedir(), ".claude", ".credentials.json");
+        const creds = JSON.parse(await rf(credsPath, "utf-8"));
+        const oauth = creds?.claudeAiOauth;
+        if (oauth?.accessToken) {
+          anthropicKey = oauth.accessToken;
+          console.log("[GodMode Memory] Resolved Anthropic key from Claude Code OAuth");
+        }
+      } catch { /* not found */ }
+    }
+    if (!anthropicKey) {
+      // Fallback: OpenClaw auth-profiles (may be stale)
       try {
         const { readFile: rf } = await import("node:fs/promises");
         const { join: pjoin } = await import("node:path");
         const { homedir } = await import("node:os");
         const profilesPath = pjoin(homedir(), ".openclaw", "auth-profiles.json");
         const profiles = JSON.parse(await rf(profilesPath, "utf-8"));
-        // Look for anthropic:oauth or any anthropic profile with a token
         const entry = profiles?.profiles?.["anthropic:oauth"]
           ?? Object.values(profiles?.profiles ?? {}).find(
             (p: any) => p?.provider === "anthropic" && p?.token,
           );
         if (entry && typeof (entry as any).token === "string") {
           anthropicKey = (entry as any).token;
-          console.log("[GodMode Memory] Resolved Anthropic key from OAuth profile");
+          console.log("[GodMode Memory] Resolved Anthropic key from OpenClaw auth profile");
         }
       } catch {
         // Auth profiles not readable — non-fatal
@@ -117,7 +139,7 @@ async function _doInit(): Promise<void> {
         provider: "anthropic",
         config: {
           apiKey: anthropicKey,
-          model: "claude-sonnet-4-20250514",
+          model: "claude-haiku-4-5-20251001",
         },
       },
       embedder,
@@ -136,7 +158,14 @@ async function _doInit(): Promise<void> {
       enableGraph: false,
     });
 
-    console.log("[GodMode Memory] Mem0 initialized (Anthropic + SQLite)");
+    // Patch Mem0's Anthropic LLM to force JSON output via assistant prefill.
+    // Mem0 ignores the responseFormat param for Anthropic — it never sets
+    // response_format or uses a prefill. Without this, the model often returns
+    // conversational text instead of JSON, causing "Failed to parse facts" errors
+    // that silently break all memory ingestion.
+    patchMem0AnthropicLlm(memoryInstance);
+
+    console.log("[GodMode Memory] Mem0 initialized (Anthropic + SQLite, JSON-patched)");
   } catch (err) {
     console.warn(`[GodMode Memory] Init failed (non-fatal): ${String(err)}`);
     initFailed = true;
@@ -185,10 +214,11 @@ export interface MemoryResult {
 export async function searchMemories(
   query: string,
   userId: string,
-  limit = 8,
+  limit = 10,
 ): Promise<MemoryResult[]> {
   if (!memoryInstance || !query || query.length < 5) return [];
 
+  const start = Date.now();
   try {
     const result: any = await withTimeout(
       memoryInstance.search(query, { userId, limit }),
@@ -196,16 +226,23 @@ export async function searchMemories(
     );
     if (!result?.results) {
       lastSearchFailed = true;
+      health.signal("memory.search", false, { error: "no results object", elapsed: Date.now() - start });
       return [];
     }
 
     lastSearchFailed = false;
-    return (result.results as any[])
-      .filter((r) => r.memory && (r.score == null || r.score > 0.5))
+    const filtered = (result.results as any[])
+      .filter((r) => r.memory && (r.score == null || r.score > 0.55))
       .map((r) => ({ memory: r.memory as string, score: r.score as number | undefined }));
+
+    health.signal("memory.search", true, { results: filtered.length, elapsed: Date.now() - start });
+    return filtered;
   } catch (err) {
     lastSearchFailed = true;
-    console.warn(`[GodMode Memory] Search failed (non-fatal): ${String(err)}`);
+    const errMsg = String(err).slice(0, 100);
+    health.signal("memory.search", false, { error: errMsg, elapsed: Date.now() - start });
+    turnErrors.capture("memory.search", errMsg);
+    console.warn(`[GodMode Memory] Search failed (non-fatal): ${errMsg}`);
     return [];
   }
 }
@@ -241,13 +278,18 @@ export async function ingestConversation(
 ): Promise<void> {
   if (!memoryInstance || !content || content.length < 10) return;
 
+  const start = Date.now();
   try {
     await withTimeout(
       memoryInstance.add(content, { userId, agentId: "prosper" }),
       INGEST_TIMEOUT_MS,
     );
+    health.signal("memory.ingest", true, { elapsed: Date.now() - start, contentLen: content.length });
   } catch (err) {
-    console.warn(`[GodMode Memory] Ingestion failed, queued for retry: ${String(err)}`);
+    const errMsg = String(err).slice(0, 100);
+    health.signal("memory.ingest", false, { error: errMsg, elapsed: Date.now() - start });
+    turnErrors.capture("memory.ingest", errMsg);
+    console.warn(`[GodMode Memory] Ingestion failed, queued for retry: ${errMsg}`);
     retryQueue.push({ messages: content, userId, attempts: 1 });
     // Trim retry queue to prevent unbounded growth
     while (retryQueue.length > 50) retryQueue.shift();
@@ -319,7 +361,11 @@ export async function seedFromVault(userId: string): Promise<void> {
   const sentinelPath = join(DATA_DIR, ".mem0-seeded");
   if (existsSync(sentinelPath)) return;
 
-  // Seed identity files
+  let seedSuccesses = 0;
+
+  // Seed identity files — convert markdown to conversational facts for Mem0.
+  // Mem0's fact extraction works best with short, declarative sentences,
+  // not raw markdown with headers and formatting.
   const filesToSeed = [
     join(DATA_DIR, "..", "USER.md"),
     join(DATA_DIR, "..", "SOUL.md"),
@@ -328,15 +374,29 @@ export async function seedFromVault(userId: string): Promise<void> {
   for (const filePath of filesToSeed) {
     try {
       const content = await readFile(filePath, "utf-8");
-      if (content.length > 50) {
-        await memoryInstance.add(content, { userId, agentId: "prosper" });
+      if (content.length < 50) continue;
+      // Extract meaningful lines: skip headers, blank lines, and formatting-only lines
+      const lines = content.split("\n")
+        .map((l: string) => l.replace(/^#+\s*/, "").replace(/^\*+\s*|\*+$/g, "").replace(/^-\s*/, "").trim())
+        .filter((l: string) => l.length > 20 && !l.startsWith("---") && !l.startsWith("```"));
+      // Batch lines into chunks of ~3 for better fact extraction
+      for (let i = 0; i < lines.length; i += 3) {
+        const batch = lines.slice(i, i + 3).join(". ");
+        if (batch.length > 30) {
+          try {
+            await memoryInstance.add(batch, { userId, agentId: "prosper" });
+            seedSuccesses++;
+          } catch {
+            // Individual batch failure — non-fatal
+          }
+        }
       }
-    } catch {
-      // File doesn't exist — skip
+    } catch (err) {
+      console.warn(`[GodMode Memory] Seed failed for ${filePath}: ${String(err).slice(0, 100)}`);
     }
   }
 
-  // Seed skill cards so Mem0 can semantically surface routing tips
+  // Seed skill cards as short summaries (not raw markdown)
   try {
     const { resolveSkillCardsDir } = await import("./skill-cards.js");
     const cardsDir = resolveSkillCardsDir();
@@ -345,11 +405,18 @@ export async function seedFromVault(userId: string): Promise<void> {
       for (const f of files) {
         try {
           const content = await readFile(join(cardsDir, f), "utf-8");
-          if (content.length > 50) {
+          if (content.length < 50) continue;
+          // Extract just the first meaningful paragraph as a summary
+          const lines = content.split("\n")
+            .map((l: string) => l.replace(/^#+\s*/, "").replace(/^-\s*/, "").trim())
+            .filter((l: string) => l.length > 15 && !l.startsWith("---") && !l.startsWith("```") && !l.startsWith("trigger"));
+          const summary = lines.slice(0, 2).join(". ");
+          if (summary.length > 30) {
             await memoryInstance.add(
-              `[Skill Card: ${f.replace(".md", "")}] ${content}`,
+              `Skill: ${f.replace(".md", "")}. ${summary}`,
               { userId, agentId: "prosper" },
             );
+            seedSuccesses++;
           }
         } catch {
           // Skip individual card files
@@ -360,8 +427,86 @@ export async function seedFromVault(userId: string): Promise<void> {
     // Skill cards not available — non-fatal
   }
 
-  // Mark as seeded so we don't re-run on next restart
-  await wf(sentinelPath, new Date().toISOString()).catch(() => {});
+  // Only mark as seeded if at least one fact was actually stored
+  if (seedSuccesses > 0) {
+    await wf(sentinelPath, new Date().toISOString()).catch(() => {});
+    console.log(`[GodMode Memory] Vault seeding complete: ${seedSuccesses} items ingested`);
+  } else {
+    console.warn("[GodMode Memory] Vault seeding failed — 0 items ingested. Will retry next restart.");
+  }
+}
+
+// ── Mem0 Anthropic JSON Patch ────────────────────────────────────────
+
+/**
+ * Monkey-patch Mem0's internal Anthropic LLM to force JSON responses.
+ *
+ * Problem: Mem0's AnthropicLLM.generateResponse ignores the responseFormat
+ * parameter. It calls messages.create without any JSON constraint.
+ * The model frequently returns conversational text instead of JSON,
+ * silently breaking fact extraction and memory updates.
+ *
+ * Fix: Wrap the LLM's generateResponse to add an assistant prefill of "{"
+ * when JSON is requested. This is Anthropic's documented technique for
+ * forcing JSON output without response_format support.
+ */
+function patchMem0AnthropicLlm(mem: InstanceType<any>): void {
+  try {
+    // Mem0 stores the LLM instance at mem.llm
+    const llm = mem.llm;
+    if (!llm || typeof llm.generateResponse !== "function") {
+      console.warn("[GodMode Memory] Cannot patch LLM — no generateResponse method found");
+      return;
+    }
+
+    // Access the underlying Anthropic client
+    const client = llm.client;
+    if (!client || typeof client.messages?.create !== "function") {
+      console.warn("[GodMode Memory] Cannot patch LLM — no Anthropic client found");
+      return;
+    }
+
+    const originalCreate = client.messages.create.bind(client.messages);
+    const model = llm.model || "claude-haiku-4-5-20251001";
+
+    // Replace the Anthropic client's messages.create to inject prefill
+    client.messages.create = async (params: any) => {
+      const messages = params.messages || [];
+
+      // Detect if this is a JSON-expecting call by checking the system prompt
+      const systemContent = typeof params.system === "string" ? params.system : "";
+      const expectsJson = systemContent.includes('"facts"') ||
+        systemContent.includes("JSON") ||
+        systemContent.includes("json") ||
+        messages.some((m: any) => typeof m.content === "string" &&
+          (m.content.includes('"memory"') || m.content.includes("JSON format")));
+
+      if (expectsJson) {
+        // Add assistant prefill to force JSON output
+        const patchedMessages = [
+          ...messages,
+          { role: "assistant", content: "{" },
+        ];
+        const result = await originalCreate({
+          ...params,
+          messages: patchedMessages,
+        });
+
+        // Prepend the "{" back to the response since the model continues from it
+        if (result.content?.[0]?.type === "text") {
+          result.content[0].text = "{" + result.content[0].text;
+        }
+        return result;
+      }
+
+      // Non-JSON calls pass through unmodified
+      return originalCreate(params);
+    };
+
+    console.log("[GodMode Memory] Patched Anthropic LLM for reliable JSON output");
+  } catch (err) {
+    console.warn(`[GodMode Memory] LLM patch failed (non-fatal): ${String(err)}`);
+  }
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────

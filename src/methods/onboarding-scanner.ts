@@ -77,8 +77,20 @@ type AuthProfile = {
 };
 
 async function detectAuthMethod(): Promise<AssessmentResult["authMethod"]> {
-  const profiles = await safeReadJson<AuthProfile[]>(AUTH_PROFILES);
-  if (!profiles || !Array.isArray(profiles) || profiles.length === 0) {
+  const raw = await safeReadJson<
+    | AuthProfile[]
+    | { profiles?: Record<string, AuthProfile>; version?: number }
+  >(AUTH_PROFILES);
+
+  // Normalize: handle both array format and { profiles: { ... } } object format
+  let profiles: AuthProfile[] = [];
+  if (Array.isArray(raw)) {
+    profiles = raw;
+  } else if (raw && typeof raw === "object" && "profiles" in raw && raw.profiles) {
+    profiles = Object.values(raw.profiles);
+  }
+
+  if (profiles.length === 0) {
     // Check for env var fallback
     if (process.env.ANTHROPIC_API_KEY) return "api-key";
     return "none";

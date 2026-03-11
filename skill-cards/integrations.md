@@ -1,6 +1,6 @@
 ---
 domain: integrations
-triggers: integration, connect, setup, configure, hubspot, google, apple, api key, not working, broken, error
+triggers: integration, connect, setup, configure, hubspot, google, apple, api key, not working, broken, connected, working, isn't working
 tools: integrations.status, integrations.test, integrations.configure, integrations.setupGuide
 ---
 ## When to Use

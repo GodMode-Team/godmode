@@ -20,7 +20,6 @@ import {
   readArticle as cliReadArticle,
   setupLogin as cliSetup,
   initTwitterCli,
-  findReachableCdp,
   type XBrowserHealth,
   type ExtractedTweet,
 } from "./x-browser.js";

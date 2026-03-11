@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Your AI Audit — Rich Hodge</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0f1117; color: #e1e4e8; min-height: 100vh; padding: 40px 20px; }
+  .container { max-width: 860px; margin: 0 auto; }
+  .header { background: linear-gradient(135deg, #1a1f2e 0%, #0f1117 100%); border: 1px solid #30363d; border-radius: 16px; padding: 40px; margin-bottom: 32px; }
+  .logo { font-size: 13px; color: #6e7681; letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 12px; }
+  .name { font-size: 32px; font-weight: 700; color: #fff; margin-bottom: 6px; }
+  .subtitle { font-size: 15px; color: #8b949e; }
+  .meta { display: flex; gap: 24px; margin-top: 20px; flex-wrap: wrap; }
+  .meta-item { font-size: 13px; color: #6e7681; }
+  .meta-item strong { color: #c9d1d9; }
+  .section { background: #161b22; border: 1px solid #30363d; border-radius: 12px; padding: 28px; margin-bottom: 20px; }
+  .section-title { font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: #6e7681; margin-bottom: 16px; }
+  h3 { font-size: 17px; font-weight: 600; color: #e6edf3; margin-bottom: 14px; }
+  p { font-size: 14px; line-height: 1.7; color: #8b949e; margin-bottom: 12px; }
+  p:last-child { margin-bottom: 0; }
+  .score-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; }
+  .score-card { background: #0d1117; border: 1px solid #30363d; border-radius: 10px; padding: 20px; text-align: center; }
+  .score-num { font-size: 36px; font-weight: 800; margin-bottom: 4px; }
+  .score-label { font-size: 12px; color: #6e7681; text-transform: uppercase; letter-spacing: 0.08em; }
+  .green { color: #3fb950; }
+  .yellow { color: #d29922; }
+  .red { color: #f85149; }
+  .blue { color: #58a6ff; }
+  .purple { color: #bc8cff; }
+  .tag { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 12px; font-weight: 500; margin: 3px 3px 3px 0; }
+  .tag-green { background: #0d4429; color: #3fb950; border: 1px solid #196c2e; }
+  .tag-yellow { background: #2d2002; color: #d29922; border: 1px solid #6e4c00; }
+  .tag-blue { background: #0c2d6b; color: #58a6ff; border: 1px solid #1f4e9e; }
+  .tag-red { background: #3d0c0c; color: #f85149; border: 1px solid #8e1c1c; }
+  ul { list-style: none; padding: 0; }
+  ul li { font-size: 14px; color: #8b949e; line-height: 1.6; padding: 8px 0; border-bottom: 1px solid #21262d; display: flex; gap: 10px; }
+  ul li:last-child { border-bottom: none; }
+  ul li::before { content: "→"; color: #58a6ff; flex-shrink: 0; margin-top: 1px; }
+  .priority-item { background: #0d1117; border: 1px solid #30363d; border-radius: 8px; padding: 16px; margin-bottom: 12px; }
+  .priority-item:last-child { margin-bottom: 0; }
+  .priority-num { font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: #6e7681; margin-bottom: 6px; }
+  .priority-title { font-size: 15px; font-weight: 600; color: #e6edf3; margin-bottom: 6px; }
+  .priority-desc { font-size: 13px; color: #8b949e; line-height: 1.6; }
+  .quote { background: #0d1117; border-left: 3px solid #58a6ff; border-radius: 0 8px 8px 0; padding: 16px 20px; margin: 16px 0; font-size: 14px; color: #c9d1d9; font-style: italic; line-height: 1.7; }
+  .quote cite { display: block; font-size: 12px; color: #6e7681; font-style: normal; margin-top: 8px; }
+  .terminal-block { background: #010409; border: 1px solid #30363d; border-radius: 10px; overflow: hidden; margin: 14px 0; }
+  .terminal-header { background: #161b22; padding: 10px 16px; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid #30363d; }
+  .terminal-dot { width: 12px; height: 12px; border-radius: 50%; }
+  .terminal-dot.red { background: #f85149; }
+  .terminal-dot.yellow { background: #d29922; }
+  .terminal-dot.green { background: #3fb950; }
+  .terminal-label { font-size: 12px; color: #6e7681; margin-left: 6px; }
+  .terminal-body { padding: 16px; font-family: 'SF Mono', 'Fira Code', 'Monaco', monospace; font-size: 13px; line-height: 1.7; }
+  .cmd { color: #3fb950; }
+  .comment { color: #6e7681; }
+  .output { color: #8b949e; }
+  .highlight-line { background: #1f2d1f; border-radius: 4px; padding: 2px 6px; display: block; margin: 2px 0; }
+  .prompt-box { background: #0d1117; border: 1px solid #1f4e9e; border-radius: 10px; overflow: hidden; margin: 14px 0; }
+  .prompt-header { background: #0c2d6b; padding: 10px 16px; display: flex; justify-content: space-between; align-items: center; }
+  .prompt-title { font-size: 12px; font-weight: 600; color: #58a6ff; text-transform: uppercase; letter-spacing: 0.08em; }
+  .prompt-tag { font-size: 11px; color: #8b949e; background: #0d1117; padding: 2px 8px; border-radius: 12px; }
+  .prompt-body { padding: 16px; font-size: 13px; color: #c9d1d9; line-height: 1.8; white-space: pre-wrap; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+  .step { display: flex; gap: 16px; margin-bottom: 20px; align-items: flex-start; }
+  .step-num { width: 32px; height: 32px; border-radius: 50%; background: #1f6feb; color: #fff; font-size: 14px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 2px; }
+  .step-content { flex: 1; }
+  .step-title { font-size: 15px; font-weight: 600; color: #e6edf3; margin-bottom: 6px; }
+  .step-desc { font-size: 13px; color: #8b949e; line-height: 1.6; margin-bottom: 8px; }
+  .step-note { font-size: 12px; color: #d29922; background: #2d2002; border: 1px solid #6e4c00; border-radius: 6px; padding: 8px 12px; margin-top: 8px; }
+  .checklist { list-style: none; padding: 0; }
+  .checklist li { font-size: 14px; color: #8b949e; padding: 10px 0; border-bottom: 1px solid #21262d; display: flex; gap: 10px; align-items: flex-start; }
+  .checklist li:last-child { border-bottom: none; }
+  .checklist li::before { content: "☐"; color: #3fb950; font-size: 16px; flex-shrink: 0; margin-top: -1px; }
+  .checklist li strong { color: #c9d1d9; }
+  .callout { background: #0d2818; border: 1px solid #196c2e; border-radius: 8px; padding: 14px 16px; margin: 14px 0; font-size: 13px; color: #3fb950; line-height: 1.6; }
+  .callout-warn { background: #2d1e00; border: 1px solid #6e4c00; color: #d29922; }
+  .callout-blue { background: #071d3a; border: 1px solid #1f4e9e; color: #58a6ff; }
+  .godmode-teaser { background: linear-gradient(135deg, #12071f 0%, #0d1117 100%); border: 1px solid #4a2e8a; border-radius: 12px; padding: 24px; margin-top: 14px; }
+  .godmode-title { font-size: 18px; font-weight: 700; color: #bc8cff; margin-bottom: 8px; }
+  .godmode-desc { font-size: 14px; color: #8b949e; line-height: 1.7; }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <div class="header">
+    <div class="logo">GodMode AI Audit</div>
+    <div class="name">Rich Hodge</div>
+    <div class="subtitle">Home Services CEO · AI Early Adopter · Sovereign-First Mindset</div>
+    <div class="meta">
+      <div class="meta-item"><strong>Call Date:</strong> March 10, 2026</div>
+      <div class="meta-item"><strong>Attendees:</strong> Rich Hodge, Michelle Caulder, Caleb Hodges</div>
+      <div class="meta-item"><strong>Duration:</strong> ~50 minutes</div>
+      <div class="meta-item"><strong>Investment:</strong> $497</div>
+    </div>
+  </div>
+
+  <!-- Scores -->
+  <div class="section">
+    <div class="section-title">Your AI Readiness Snapshot</div>
+    <div class="score-grid">
+      <div class="score-card">
+        <div class="score-num green">8/10</div>
+        <div class="score-label">Your AI Depth</div>
+      </div>
+      <div class="score-card">
+        <div class="score-num yellow">4/10</div>
+        <div class="score-label">Team AI Adoption</div>
+      </div>
+      <div class="score-card">
+        <div class="score-num green">9/10</div>
+        <div class="score-label">Sovereign Mindset</div>
+      </div>
+      <div class="score-card">
+        <div class="score-num yellow">5/10</div>
+        <div class="score-label">Workflow Automation</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Where You Are -->
+  <div class="section">
+    <div class="section-title">Where You Are</div>
+    <h3>You're Not a Beginner — You're in the Proof-of-Work Phase</h3>
+    <p>You went deep on AI three weeks ago and haven't come up for air. You're running two OpenClaw instances (Mac Mini + iMac), connected to Telegram, iMessage, Slack, and Asana. You're experimenting with multi-model adversarial setups — running 7-8 agents with competing viewpoints to stress-test decisions. You bought a Mac Studio with 512GB RAM specifically to run local LLMs like Llama.</p>
+    <p>Your framing is exactly right: you compared this to Bitcoin in 2019 — the proof-of-work phase before the payoff arrives. You're not in it for quick wins. You're building infrastructure. That's the right bet.</p>
+    <p>Michelle has been alongside you the whole time — handling everything from prescriptions to business ops — but hasn't been pulled into your AI exploration until now. That changes with this report.</p>
+    <div class="quote">
+      "I want to show up and build and not worry about status, what's this, and spend all this time reconciling the red tape."
+      <cite>— You, on the call</cite>
+    </div>
+  </div>
+
+  <!-- Current Stack -->
+  <div class="section">
+    <div class="section-title">What You're Running</div>
+    <h3>Your Current AI Stack</h3>
+    <ul>
+      <li>OpenClaw on Mac Mini + iMac (two active instances)</li>
+      <li>Telegram as primary interface · iMessage also connected (mobile)</li>
+      <li>Anthropic (Sonnet, Opus) + Codex API keys active</li>
+      <li>$20/mo Anthropic subscription — throttling you at this level</li>
+      <li>Slack + Asana + Microsoft 365 + Azure + Fabric environment</li>
+      <li>Exchange Server on-site</li>
+      <li>Mac Studio 512GB ordered — arrives end of month (target: run Llama locally)</li>
+      <li>Multi-agent adversarial setups (7-8 agents arguing it out)</li>
+      <li>ChatGPT subscriptions for full team</li>
+    </ul>
+  </div>
+
+  <!-- Pain Points -->
+  <div class="section">
+    <div class="section-title">What's Slowing You Down</div>
+    <h3>The Friction Points We Identified</h3>
+    <ul>
+      <li><strong>Signal extraction:</strong> You have massive data in Slack, email, Asana — but no system to harvest the signal and close loops. The information is there. The harvesting isn't.</li>
+      <li><strong>Michelle as single point of failure:</strong> She handles everything, but that's not scalable. The goal isn't to delegate more to Michelle — it's to give her AI leverage so she can do 3x the work with the same effort.</li>
+      <li><strong>API cost bleed:</strong> Running on raw API keys is unpredictable. You're spending money and still getting throttled. This gets fixed today (see Priority 1).</li>
+      <li><strong>Team adoption gap:</strong> Your team is AI-aware but not AI-leveraged. They're using ChatGPT without proofing outputs — that's dependency without value, and you called it out exactly right.</li>
+      <li><strong>Data sovereignty under pressure:</strong> You're on month-to-month contracts, paying premium rates, because you refuse to sign away your data rights. Your attorney confirmed it: self-hosted AI is not discoverable. That's not just a principle — it's a legal moat.</li>
+      <li><strong>Marketing ops complexity:</strong> Home services means high spend, tons of digital assets, constant competitor movement. This is automatable — just not yet configured.</li>
+    </ul>
+  </div>
+
+  <!-- Core Vision -->
+  <div class="section">
+    <div class="section-title">What We Heard</div>
+    <h3>Your Core Vision</h3>
+    <p>You don't want AI to replace your judgment. You want it to eliminate the administrative drag so you can spend all your time building. You were clear that AI should amplify your team and make them better — not gut headcount. That's exactly the right frame, and it's also the right business strategy.</p>
+    <div class="quote">
+      "If you own your data for seven, eight, nine years trailing — that's a goldmine. I'm on month-to-month contracts getting price-gouged because I will not sign away my data rights."
+      <cite>— You, on the call</cite>
+    </div>
+    <p>The data sovereignty angle is your biggest long-term advantage. When your Mac Studio arrives and you're running Llama locally, you'll have a fully sovereign AI stack that your competitors can't touch — and that no lawyer can subpoena.</p>
+  </div>
+
+
+  <!-- ═══════════════════════════════════════════════════════════════ -->
+  <!-- PRIORITY 1: CLAUDE MAX UPGRADE -->
+  <!-- ═══════════════════════════════════════════════════════════════ -->
+  <div class="section">
+    <div class="section-title">Priority 1 — Do This Today</div>
+    <h3>Upgrade to Claude Max ($200/mo) — Full Step-by-Step</h3>
+    <p>You're hitting API rate limits and paying unpredictable per-token charges on top of a throttled $20/mo plan. Claude Max gives you a flat monthly rate with dramatically higher capacity — the equivalent of what you're already spending on API overages, but without the throttling and without the surprise charges.</p>
+    <p>This is the first action because it unblocks everything else. Every workflow below runs better when you're not fighting rate limits.</p>
+
+    <div class="callout">
+      ✓ You'll need two terminal windows open side-by-side. Terminal 1 gets your auth token from Anthropic. Terminal 2 drops it into OpenClaw. Takes about 5 minutes.
+    </div>
+
+    <br>
+
+    <div class="step">
+      <div class="step-num">1</div>
+      <div class="step-content">
+        <div class="step-title">Subscribe to Claude Max at claude.ai</div>
+        <div class="step-desc">Go to <strong>claude.ai → Settings → Billing</strong> and upgrade to Claude Max ($200/mo). That's the tier worth having — significantly higher limits and priority access. You're currently spending close to that in API overages anyway, except you're also getting throttled. Fix both problems at once.</div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">2</div>
+      <div class="step-content">
+        <div class="step-title">Terminal 1 — Get Your Claude Setup Token</div>
+        <div class="step-desc">Open your first terminal window. Run the setup-token command — it opens a browser, you log in with your Claude Max account, and it hands you a token to copy.</div>
+        <div class="terminal-block">
+          <div class="terminal-header">
+            <div class="terminal-dot red"></div>
+            <div class="terminal-dot yellow"></div>
+            <div class="terminal-dot green"></div>
+            <span class="terminal-label">Terminal 1 — Get Your Token</span>
+          </div>
+          <div class="terminal-body">
+<span class="comment"># Run this in Terminal 1:</span>
+<span class="cmd">claude setup-token</span>
+
+<span class="comment"># → Browser opens automatically</span>
+<span class="comment"># → Log in with your Claude Max account at claude.ai</span>
+<span class="comment"># → Authorize the connection</span>
+<span class="comment"># → Come back to the terminal — your token appears:</span>
+
+<span class="output">  Setup token:</span>
+<span class="highlight-line output">  sk-ant-xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx</span>
+
+<span class="comment"># ↑ Copy the full token. Keep this window open.</span>
+          </div>
+        </div>
+        <div class="step-note">⚠ If <code>claude</code> isn't installed yet: run <code>npm install -g @anthropic-ai/claude-code</code> first, then retry. The token is only shown once — copy it before moving on.</div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">3</div>
+      <div class="step-content">
+        <div class="step-title">Terminal 2 — Open OpenClaw Config</div>
+        <div class="step-desc">Open a <strong>second</strong> terminal window (keep Terminal 1 visible — you'll need the token). Run the OpenClaw interactive config:</div>
+        <div class="terminal-block">
+          <div class="terminal-header">
+            <div class="terminal-dot red"></div>
+            <div class="terminal-dot yellow"></div>
+            <div class="terminal-dot green"></div>
+            <span class="terminal-label">Terminal 2 — OpenClaw Config</span>
+          </div>
+          <div class="terminal-body">
+<span class="cmd">openclaw config</span>
+
+<span class="comment"># → An interactive menu opens</span>
+<span class="comment"># → Navigate to: Models → Anthropic → Setup Token</span>
+<span class="comment"># → Paste the token from Terminal 1</span>
+<span class="comment"># → Then select your model (Step 4 below)</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">4</div>
+      <div class="step-content">
+        <div class="step-title">Select Your Model</div>
+        <div class="step-desc">Still inside <code>openclaw config</code>, after pasting the token, navigate to model selection:</div>
+        <div class="terminal-block">
+          <div class="terminal-header">
+            <div class="terminal-dot red"></div>
+            <div class="terminal-dot yellow"></div>
+            <div class="terminal-dot green"></div>
+            <span class="terminal-label">Terminal 2 — Pick Your Model</span>
+          </div>
+          <div class="terminal-body">
+<span class="comment"># In the config menu: Models → Anthropic → Select Model</span>
+
+<span class="comment"># RECOMMENDED — daily driver (fast, smart, what Caleb uses):</span>
+<span class="highlight-line output">  anthropic/claude-sonnet-4-6</span>
+
+<span class="comment"># For heavy analysis, long docs, complex decisions (slower):</span>
+<span class="output">  anthropic/claude-opus-4-6</span>
+
+<span class="comment"># → Save and exit — OpenClaw restarts automatically</span>
+          </div>
+        </div>
+        <div class="step-note">⚠ Start with Sonnet. It handles 90% of tasks at much faster speed. Switch to Opus for specific deep-work sessions — major decisions, legal review, long-form analysis.</div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">5</div>
+      <div class="step-content">
+        <div class="step-title">Confirm It's Running</div>
+        <div class="step-desc">After OpenClaw restarts, verify the config took:</div>
+        <div class="terminal-block">
+          <div class="terminal-header">
+            <div class="terminal-dot red"></div>
+            <div class="terminal-dot yellow"></div>
+            <div class="terminal-dot green"></div>
+            <span class="terminal-label">Terminal 2 — Verify</span>
+          </div>
+          <div class="terminal-body">
+<span class="cmd">openclaw gateway status</span>
+
+<span class="comment"># Look for:</span>
+<span class="output">  model: anthropic/claude-sonnet-4-6</span>
+<span class="output">  status: running</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">6</div>
+      <div class="step-content">
+        <div class="step-title">Final Check — Ask Your OpenClaw Directly</div>
+        <div class="step-desc">Open your OpenClaw chat (Telegram or wherever you talk to it) and paste this:</div>
+        <div class="prompt-box">
+          <div class="prompt-header">
+            <span class="prompt-title">Confirmation Prompt</span>
+            <span class="prompt-tag">Copy &amp; Paste</span>
+          </div>
+          <div class="prompt-body">What model are you currently running on, and are you operating under my Anthropic Claude Max subscription or API key billing? Tell me the exact model name and confirm which billing method is active.</div>
+        </div>
+        <div class="step-desc" style="margin-top: 8px;">It should confirm <code>claude-sonnet-4-6</code> and your subscription. If it says API key billing, go back to step 4 and re-check the token was saved correctly.</div>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ═══════════════════════════════════════════════════════════════ -->
+  <!-- PRIORITY 2: DAILY BRIEF -->
+  <!-- ═══════════════════════════════════════════════════════════════ -->
+  <div class="section">
+    <div class="section-title">Priority 2 — Week 1</div>
+    <h3>Your Daily Intelligence Brief</h3>
+    <p>This is your morning command center. Every day you get a crisp brief — what came in overnight, what's on your calendar, what you need to move today. No inbox diving, no Slack spelunking. You start in control instead of reactive.</p>
+    <p>Start by running this manually each morning. Once it's delivering value, automate it as a 6:30am cron push straight to your Telegram.</p>
+
+    <div class="callout callout-blue">
+      💡 To automate: In OpenClaw, type <strong>/cron</strong> and create a daily job at 6:30am running the prompt below. It'll push your brief to Telegram before you're out of bed.
+    </div>
+
+    <br>
+
+    <div class="prompt-box">
+      <div class="prompt-header">
+        <span class="prompt-title">Daily Intelligence Brief</span>
+        <span class="prompt-tag">Copy &amp; Paste into OpenClaw</span>
+      </div>
+      <div class="prompt-body">Run my daily intelligence brief. Here's what I need:
+
+**1. OVERNIGHT SUMMARY**
+Scan my email and Slack from the last 18 hours. Pull out anything that:
+- Requires a decision or response from me today
+- Is time-sensitive (someone waiting on me, a deadline approaching)
+- Is unusual, unexpected, or escalated from normal
+
+Ignore: newsletters, marketing, automated notifications, receipts. Flag anything from my direct reports, key vendors, or clients as higher priority.
+
+**2. TODAY'S SCHEDULE**
+Pull my calendar for today. For each meeting, tell me:
+- What it is and who's in it
+- Any prep I should do (based on context you know about this person/topic)
+- Flag any conflicts or back-to-backs I should know about
+
+**3. TOP 3 PRIORITIES FOR TODAY**
+Based on my email, calendar, and anything I told you recently — give me the 3 things I absolutely must move forward today. Not a task list — the 3 things that, if I do nothing else, make today a win.
+
+**4. ANYTHING I SHOULD WATCH FOR**
+Flag anything that looks like it could blow up, needs a fast decision, or that I'm at risk of dropping. One or two sentences per item. No noise — only real flags.
+
+Format this cleanly. Keep it tight. I want to read it in under 3 minutes.</div>
+    </div>
+
+    <div class="callout">
+      ✓ Run this manually for one week first. Once it's consistently useful, automate the 6:30am push. That's when it becomes a real system — it shows up before you go looking for it.
+    </div>
+
+    <div class="callout callout-blue">
+      💡 Phase 2 — Hourly Email Heartbeat: After the morning brief is dialed in, add a second cron that fires every hour during business hours. A quick push to Telegram: "here's what came in since your last check, here's what needs your attention." No inbox diving. Just signal. This is the proactive filtering you described — staying aware of your email without living in it. Set it up Week 2.
+    </div>
+  </div>
+
+
+  <!-- ═══════════════════════════════════════════════════════════════ -->
+  <!-- PRIORITY 3: EMAIL TRIAGE -->
+  <!-- ═══════════════════════════════════════════════════════════════ -->
+  <div class="section">
+    <div class="section-title">Priority 3 — Week 2</div>
+    <h3>Email Triage — For You and Michelle</h3>
+    <p>You were clear: you don't want AI sending emails autonomously. You want the signal filtered and surfaced so you and Michelle can act on what matters. That's exactly what this does. It reads your inbox, categorizes everything, archives the noise, and hands you a clean action list with draft responses ready for your review. You steer, it drafts, you send.</p>
+
+    <div class="prompt-box">
+      <div class="prompt-header">
+        <span class="prompt-title">Email Triage Prompt</span>
+        <span class="prompt-tag">Copy &amp; Paste into OpenClaw</span>
+      </div>
+      <div class="prompt-body">Run a full email triage on my inbox. Here's how I want you to work:
+
+**STEP 1 — CATEGORIZE**
+Go through the last 48 hours of email (or all unread, whichever is more). Sort every email into one of these buckets:
+
+- 🔴 ACTION REQUIRED — needs my response or a decision, today
+- 🟡 DELEGATE TO MICHELLE — she can handle or respond to this
+- 🟢 FYI / ARCHIVE — no action needed, safe to archive
+- ⚫ NOISE — newsletters, automated, marketing — archive immediately
+
+**STEP 2 — SURFACE THE REDS**
+For each 🔴 item:
+- Who it's from and what they need
+- What I should say back (draft a response — 3-5 sentences, direct, written in my voice)
+- How urgent it actually is (respond today, or can it wait 24h?)
+
+**STEP 3 — BRIEF MICHELLE**
+For each 🟡 item, write a one-line instruction Michelle can act on:
+Example: "Reply to [name] — confirm the Tuesday appointment, ask them to send the contract first."
+
+**STEP 4 — ARCHIVE REPORT**
+Tell me what you archived and why, so I can spot-check your judgment. One line each.
+
+**RULES:**
+- Never draft a response that commits me to something without flagging it
+- Anything from a client, vendor, or lawyer = high priority regardless of category
+- If something feels off — unusual request, angry tone, legal/financial risk — put it at the top and tell me why
+- Keep drafts in my voice: direct, no fluff, get to the point fast</div>
+    </div>
+
+    <div class="callout callout-blue">
+      💡 For Michelle: Have her run this prompt at 8am and 2pm each day. She'll have a prioritized action list before she opens a single email manually. Within a week she'll be processing 2x the volume in half the time.
+    </div>
+
+    <div class="callout callout-warn">
+      ⚠ Exchange Server heads-up: You're on Microsoft 365 with Exchange Server on-premise — not Gmail. OpenClaw's standard email integration is OAuth-based (Google/standard providers). For your setup, you'll need to enable IMAP or Microsoft Graph API access first. This is a one-time configuration step — flag it with your IT contact before running triage, or bring it to your follow-up call with Caleb and he'll walk through it.
+    </div>
+    <br>
+    <div class="callout callout-warn">
+      ⚠ Start read-only for the first two weeks. OpenClaw drafts and flags — you or Michelle reviews and sends. Once you're approving ~80% of drafts without changes, you can expand Michelle's authority to approve directly. Don't skip this trust-building phase.
+    </div>
+  </div>
+
+
+  <!-- CHECKLIST -->
+  <div class="section">
+    <div class="section-title">Your 30-Day Roadmap</div>
+    <h3>What to Do and When</h3>
+    <ul class="checklist">
+      <li><strong>Today:</strong> Upgrade to Claude Max — follow the 6-step guide above</li>
+      <li><strong>Today:</strong> Run the Daily Brief prompt once manually to see your baseline output</li>
+      <li><strong>Day 2:</strong> Run the Email Triage prompt — review everything it produces before acting on it</li>
+      <li><strong>Day 3:</strong> Share both prompts with Michelle. Walk her through triage on a quick call (&lt;20 min)</li>
+      <li><strong>Week 1:</strong> Automate the Daily Brief as a 6:30am cron push to Telegram</li>
+      <li><strong>Week 2:</strong> Refine triage based on what it missed or miscategorized. Add key names to the prompt directly. Add the hourly email heartbeat cron.</li>
+      <li><strong>Month 1:</strong> Is Michelle running triage independently? If yes — she's ready for her own OpenClaw instance</li>
+      <li><strong>Month 2:</strong> Mac Studio arrives. Set up Llama 3.3 locally. Route sensitive ops through local model</li>
+    </ul>
+  </div>
+
+
+  <!-- Full Roadmap -->
+  <div class="section">
+    <div class="section-title">Beyond Week 2</div>
+    <h3>Where This Goes</h3>
+
+    <div class="priority-item">
+      <div class="priority-num">Priority 4 — Month 1</div>
+      <div class="priority-title">Get Michelle Her Own OpenClaw Instance</div>
+      <div class="priority-desc">Once she's running triage independently, give Michelle her own OpenClaw with shared team memory. She starts owning workflows, not just executing tasks. Give her one specific job: own email triage. Once she's producing at 2x, the rest of your team will want in. That's how adoption spreads — one person succeeding visibly, not a mandate from the top.</div>
+    </div>
+
+    <div class="priority-item">
+      <div class="priority-num">Priority 5 — Month 2</div>
+      <div class="priority-title">Local LLM on Mac Studio (Llama 3.3)</div>
+      <div class="priority-desc">When your 512GB Mac Studio arrives, run Llama 3.3 70B locally. Your attorney already confirmed it: self-hosted AI is not discoverable. That's not a nice-to-have — that's a legal and competitive moat your competitors don't have. Route all sensitive ops, client data, and internal strategy through local. Use the frontier models for external-facing, lower-sensitivity work.</div>
+    </div>
+
+    <div class="priority-item">
+      <div class="priority-num">Priority 6 — Month 2–3</div>
+      <div class="priority-title">Slack Signal Extraction</div>
+      <div class="priority-desc">Same triage logic applied to Slack. An agent monitors your channels overnight, surfaces stalled decisions, flags thread-buried action items, gives you a clean morning summary. You described it perfectly on the call — there's signal buried in all that Slack noise. This is the system that harvests it.</div>
+    </div>
+
+    <div class="priority-item">
+      <div class="priority-num">Priority 7 — Month 2–3</div>
+      <div class="priority-title">Marketing Intelligence Agents</div>
+      <div class="priority-desc">Competitor monitoring, ad performance alerts, digital asset tracking. Home services = high marketing spend, high ROI on automation. Start specific: "Watch these 5 competitors and alert me if their Google Ads activity changes significantly week over week." That's one skill, one job, immediate value.</div>
+    </div>
+  </div>
+
+
+  <!-- Watch Out -->
+  <div class="section">
+    <div class="section-title">Traps to Avoid</div>
+    <h3>Things That Will Slow You Down</h3>
+    <ul>
+      <li><strong>Full email autonomy too early:</strong> You were right to pump the brakes here. Start with triage and flagging. Build trust over 60 days before expanding what it can do autonomously.</li>
+      <li><strong>Migrating your comm stack before your AI stack is stable:</strong> You're weighing Slack vs. Teams. Don't migrate until your AI workflows are running smoothly. Adding infrastructure disruption on top of workflow change is a recipe for nothing getting adopted.</li>
+      <li><strong>Letting the team stay at ChatGPT level:</strong> Awareness without leverage is waste. Michelle needs one specific workflow to own — not general AI access. Start there. Her success creates the pull for the rest of the team.</li>
+      <li><strong>Over-running the adversarial agent setup:</strong> It's a great tool — use it for high-stakes decisions (M&amp;A, legal, hiring strategy). Not daily ops. The compute cost and review burden add up fast.</li>
+      <li><strong>Automating everything at once:</strong> Pick one workflow, run it for two weeks, get it to 90% accurate, then add the next. The discipline of going one at a time is what makes the whole system stick.</li>
+    </ul>
+  </div>
+
+
+  <!-- GodMode -->
+  <div class="section">
+    <div class="section-title">The Next Level</div>
+    <h3>GodMode — When You're Ready</h3>
+    <div class="godmode-teaser">
+      <div class="godmode-title">⚛️ GodMode</div>
+      <div class="godmode-desc">Everything you're building right now — the daily brief, email triage, Michelle's workflow, the local LLM — that's the foundation. GodMode is the full personal AI OS layer on top of OpenClaw. It adds persistent memory (your AI remembers what you decided three months ago and why), a consistent identity across every session, and a full skill library of pre-built workflows for every major business function.</div>
+      <br>
+      <div class="godmode-desc">GodMode is currently in private beta — not ready for broad distribution yet. But you're exactly the profile it's being built for: a sovereign-minded operator who wants a personal AI that actually knows your business, not a chatbot that forgets everything between sessions.</div>
+      <br>
+      <div class="godmode-desc" style="color: #bc8cff;">For now: execute this roadmap. Get the Claude Max upgrade done, run the prompts for two weeks, bring Michelle in. When GodMode is ready, you'll have the foundation built — and you'll be first in line.</div>
+    </div>
+  </div>
+
+  <!-- Tags -->
+  <div class="section">
+    <div class="section-title">Tags</div>
+    <span class="tag tag-green">Sovereign AI</span>
+    <span class="tag tag-green">Home Services</span>
+    <span class="tag tag-green">Early Adopter</span>
+    <span class="tag tag-blue">Email Triage</span>
+    <span class="tag tag-blue">Daily Brief</span>
+    <span class="tag tag-blue">Slack Signal Extraction</span>
+    <span class="tag tag-blue">Local LLM</span>
+    <span class="tag tag-yellow">Team Adoption</span>
+    <span class="tag tag-yellow">EA Amplification</span>
+    <span class="tag tag-red">API Cost Bleed → Fixed</span>
+  </div>
+
+  <!-- Next Steps -->
+  <div class="section">
+    <div class="section-title">Next Steps</div>
+    <h3>What Happens Next</h3>
+    <ul>
+      <li>You: Follow the 6-step Claude Max upgrade guide above — do it today</li>
+      <li>You + Michelle: Run both prompts manually for 3 days, then send Caleb feedback on what to refine</li>
+      <li>Michelle: Read this report before the follow-up call — she should walk in with context</li>
+      <li>Caleb: Schedule 30-minute follow-up to review your prompt output and set up the 6:30am brief cron</li>
+      <li>Follow-up call: Walk through the Exchange Server / Microsoft 365 email integration so triage is unblocked</li>
+    </ul>
+  </div>
+
+  <div style="text-align: center; margin-top: 40px; color: #30363d; font-size: 12px; padding-bottom: 20px;">
+    ⚛️ GodMode AI Audit · Rich Hodge · March 2026
+  </div>
+
+</div>
+</body>
+</html>

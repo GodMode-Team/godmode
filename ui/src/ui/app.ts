@@ -570,12 +570,6 @@ export class GodModeApp extends LitElement {
   @state() privateSessions: Map<string, number> = new Map();
   private _privateSessionTimer: ReturnType<typeof setInterval> | null = null;
 
-  // Data tab state
-  @state() dataSources?: import("./views/data").DataSource[];
-  @state() dataLoading = false;
-  @state() dataError: string | null = null;
-  @state() dataSubtab: "dashboard" | "sources" = "dashboard";
-
   // Dynamic HTML slots (AI-generated tab content)
   @state() dynamicSlots: Record<string, string> = {};
 
@@ -1693,6 +1687,11 @@ export class GodModeApp extends LitElement {
 
   async handleSecondBrainOpenInBrowser(path: string) {
     try {
+      // If path is a URL or served route, open directly (preserves relative links)
+      if (path.startsWith("http://") || path.startsWith("https://") || path.startsWith("/")) {
+        window.open(path, "_blank", "noopener,noreferrer");
+        return;
+      }
       const result = await this.client!.request<{ name: string; content: string }>(
         "secondBrain.memoryBankEntry",
         { path },
@@ -3585,40 +3584,6 @@ export class GodModeApp extends LitElement {
     void this.client.request("onboarding.assess", {}).then(() => {
       this.handleLoadCapabilities();
     });
-  }
-
-  // Data tab handlers
-  async handleDataRefresh() {
-    if (!this.client || !this.connected) {
-      return;
-    }
-    this.dataLoading = true;
-    this.dataError = null;
-    try {
-      const result = await this.client.request<{
-        sources: import("./views/data").DataSource[];
-      }>("dataSources.list", {});
-      this.dataSources = result.sources ?? [];
-    } catch (err) {
-      this.dataError = err instanceof Error ? err.message : "Failed to load data sources";
-      console.error("[Data] Load error:", err);
-    } finally {
-      this.dataLoading = false;
-    }
-  }
-
-  handleDataSubtabChange(subtab: "dashboard" | "sources") {
-    this.dataSubtab = subtab;
-  }
-
-  handleDataConnectSource(sourceId: string) {
-    const source = this.dataSources?.find((s) => s.id === sourceId);
-    const name = source?.name ?? sourceId;
-    this.handleStartChatWithPrompt(`Help me connect and configure the ${name} integration.`);
-  }
-
-  handleDataQuerySubmit(query: string) {
-    this.handleStartChatWithPrompt(`Query my connected data: ${query}`);
   }
 
   // User profile handlers

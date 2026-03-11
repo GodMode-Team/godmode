@@ -706,6 +706,63 @@ export async function checkConfigAccess(
   return undefined;
 }
 
+// ── Ephemeral Path Shield ──────────────────────────────────────────
+//
+// Problem: Ally built a website in /tmp, served it locally, macOS cleaned
+// /tmp, work vanished. Massive token waste.
+// Rule: Warn (not block) when exec writes to /tmp or /var/tmp.
+// We warn instead of block because some legitimate commands need /tmp
+// (e.g., package installs, build tools). The warning injects context
+// that nudges the LLM to persist the output somewhere permanent.
+
+const EPHEMERAL_WRITE_PATTERNS = [
+  /\b(>|>>|tee|cp|mv|mkdir|touch|cat\s*>)\s+\/tmp\b/,
+  /\b(>|>>|tee|cp|mv|mkdir|touch|cat\s*>)\s+\/var\/tmp\b/,
+  /\bcd\s+\/tmp\b/,
+  /\bmkdir\s+(-p\s+)?\/tmp\//,
+  /\bwrite_file.*\/tmp\//i,
+  /\bsave.*\/tmp\//i,
+];
+
+/**
+ * Check if an exec command writes to ephemeral directories (/tmp, /var/tmp).
+ * Returns a warning string to inject (does NOT block), or undefined.
+ */
+export function checkEphemeralWrite(
+  toolName: string,
+  params: Record<string, unknown>,
+  sessionKey?: string,
+): string | undefined {
+  const name = toolName.trim().toLowerCase();
+  if (name !== "exec" && name !== "bash" && name !== "shell") return undefined;
+
+  const command =
+    typeof params.command === "string"
+      ? params.command
+      : typeof params.cmd === "string"
+        ? params.cmd
+        : "";
+  if (!command) return undefined;
+
+  const isEphemeral = EPHEMERAL_WRITE_PATTERNS.some((p) => p.test(command));
+  if (!isEphemeral) return undefined;
+
+  void logGateActivity(
+    "ephemeralPathShield",
+    "fired",
+    `Ephemeral write detected: ${command.slice(0, 120)}`,
+    sessionKey,
+  );
+
+  return [
+    "⚠ EPHEMERAL PATH WARNING: This command writes to /tmp which is cleaned by the OS.",
+    "Files in /tmp WILL be lost. After this command completes, you MUST:",
+    "1. Move/copy the output to a permanent location (~/godmode/artifacts/, GitHub repo, or vault).",
+    "2. If this is a website or code project, create a GitHub repo and push it.",
+    "3. Confirm the permanent location before telling the user the task is done.",
+  ].join("\n");
+}
+
 /**
  * Reset prompt shield and output shield tracking for a session.
  */
@@ -1018,6 +1075,77 @@ const NOT_FOUND_PATTERNS: RegExp[] = [
   /(?:couldn'?t|could not) (?:locate|find) (?:any|the|that)/i,
 ];
 
+// Gate 5: Unverified Claim — making factual claims about external systems without tool verification
+// Pre-filter patterns (cheap regex check before invoking LLM judge)
+const UNVERIFIED_CLAIM_PREFILTER: RegExp[] = [
+  /(?:was|were|is|isn't|is not|hasn't been|has not been|wasn't|was not|was never) (?:deployed|published|pushed|live|configured|set up|installed|running|enabled|disabled)/i,
+  /(?:it|this|the (?:page|site|app|api|endpoint|service|route|url|webhook|form)) (?:was never|has never been|isn't|is not|hasn't been) /i,
+  /never (?:deployed|published|pushed|added|configured|set up|created|registered)/i,
+  /(?:doesn't|does not|didn't|did not) (?:exist|work|have|include) (?:on|in|at) (?:vercel|netlify|heroku|aws|cloudflare|production|staging|the server)/i,
+  /(?:broken|down|offline|unreachable|404|not found) (?:since|for|because)/i,
+  /(?:the gap|the issue|the problem):/i,
+  /(?:has|have) (?:no|not been) (?:route|endpoint|page|config|entry|record)/i,
+];
+
+/**
+ * LLM judge for Gate 5: Asks Haiku whether the message contains unverified
+ * factual claims about external systems. Only called when:
+ * 1. Pre-filter regex matched (cheap fast path)
+ * 2. Zero investigation tools were used this turn
+ * Returns true if the LLM confirms an unverified claim is present.
+ */
+async function llmJudgeUnverifiedClaim(content: string): Promise<boolean> {
+  try {
+    const { resolveAnthropicAuth } = await import("../methods/brief-generator.js");
+    const apiKey = resolveAnthropicAuth();
+    if (!apiKey) return false; // Can't judge without API key — fail open
+
+    // Truncate to keep the call tiny
+    const snippet = content.slice(0, 800);
+
+    const resp = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01",
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "claude-haiku-4-5-20251001",
+        max_tokens: 10,
+        system: [
+          "You are a safety gate judge. Given an AI assistant's outbound message, determine if it contains UNVERIFIED factual claims about external systems.",
+          "",
+          "Flag as UNVERIFIED if the message:",
+          "- States deployment status, API state, live URL availability, or system configuration as fact",
+          "- Asserts something 'was never deployed', 'doesn't exist on [platform]', 'has been broken since', 'was not added', etc.",
+          "- Makes claims about what IS or ISN'T live/running/configured without citing tool output",
+          "",
+          "Do NOT flag if the message:",
+          "- Says 'Let me check' or 'I'll verify'",
+          "- References specific tool output it received (e.g., 'I ran vercel ls and...')",
+          "- Is asking the user a question about status rather than asserting",
+          "- Is describing local files, code, or memory contents (not external systems)",
+          "",
+          "Respond with ONLY 'YES' or 'NO'. Nothing else.",
+        ].join("\n"),
+        messages: [{ role: "user", content: snippet }],
+      }),
+      signal: AbortSignal.timeout(4_000),
+    });
+
+    if (!resp.ok) return false; // API error — fail open
+
+    const data = (await resp.json()) as {
+      content?: Array<{ type: string; text?: string }>;
+    };
+    const answer = data.content?.find((c) => c.type === "text")?.text?.trim().toUpperCase();
+    return answer === "YES";
+  } catch {
+    return false; // Timeout or error — fail open
+  }
+}
+
 function matchesAny(content: string, patterns: RegExp[]): boolean {
   return patterns.some(p => p.test(content));
 }
@@ -1127,6 +1255,31 @@ export async function checkEnforcerGates(
         sessionKey,
       );
       return { cancel: true, gate: "searchRetryGate" };
+    }
+  }
+
+  // Gate 5: Unverified Claim — asserting facts about external systems without using tools
+  // Hybrid: cheap regex pre-filter → LLM judge (Haiku) for semantic confirmation.
+  // Only invokes LLM when pre-filter matches AND zero investigation tools used.
+  if (config.gates.unverifiedClaimGate?.enabled && usage.investigationCount === 0) {
+    if (matchesAny(content, UNVERIFIED_CLAIM_PREFILTER)) {
+      const confirmed = await llmJudgeUnverifiedClaim(content);
+      if (confirmed) {
+        enforcerNudgeFlags.set(key, {
+          gate: "Unverified Claim Gate",
+          message: [
+            "Your response was blocked because you made a factual claim about an external system without verifying it first.",
+            "",
+            "Claims about deployment status, API state, live URLs, or system configuration MUST be tool-verified.",
+            "Absence of memory is NOT evidence — if you don't have data, CHECK with a tool before stating facts.",
+            "",
+            "Use exec (curl, vercel ls, git log), read, or search tools to verify before asserting.",
+            "If you can't verify, say 'Let me check' — never state unverified claims as facts.",
+          ].join("\n"),
+        });
+        void logGateActivity("unverifiedClaimGate", "fired", "Blocked: LLM-confirmed unverified claim with 0 investigation tools", sessionKey);
+        return { cancel: true, gate: "unverifiedClaimGate" };
+      }
     }
   }
 

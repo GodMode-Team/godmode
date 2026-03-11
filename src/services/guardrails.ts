@@ -27,7 +27,9 @@ export type GuardrailGateId =
   | "promptShield"
   | "outputShield"
   | "configShield"
-  | "contextPressure";
+  | "ephemeralPathShield"
+  | "contextPressure"
+  | "unverifiedClaimGate";
 
 export type GateConfig = {
   enabled: boolean;
@@ -89,7 +91,9 @@ export const GATE_DEFAULTS: Record<GuardrailGateId, GateConfig> = {
   promptShield: { enabled: true },
   outputShield: { enabled: true },
   configShield: { enabled: true },
+  ephemeralPathShield: { enabled: true },
   contextPressure: { enabled: true, thresholds: { warningPercent: 70, criticalPercent: 90, maxContextTokens: 200000 } },
+  unverifiedClaimGate: { enabled: true },
 };
 
 export const GATE_DESCRIPTORS: Record<GuardrailGateId, GateDescriptor> = {
@@ -187,6 +191,13 @@ export const GATE_DESCRIPTORS: Record<GuardrailGateId, GateDescriptor> = {
     icon: "\u{1F5C4}",
     hook: "before_tool_call",
   },
+  ephemeralPathShield: {
+    name: "Ephemeral Path Shield",
+    description:
+      "Warns when exec commands write to /tmp or /var/tmp. Injects persistence reminder so generated artifacts are saved permanently (GitHub, vault, ~/godmode/artifacts/).",
+    icon: "\u{1F4BE}",
+    hook: "before_tool_call",
+  },
   contextPressure: {
     name: "Context Pressure",
     description:
@@ -198,6 +209,13 @@ export const GATE_DESCRIPTORS: Record<GuardrailGateId, GateDescriptor> = {
       criticalPercent: "Critical threshold (%)",
       maxContextTokens: "Max context tokens",
     },
+  },
+  unverifiedClaimGate: {
+    name: "Unverified Claim Gate",
+    description:
+      "Blocks confident factual claims about external systems (deployments, APIs, configs, live URLs) when no investigation tools were used this turn. Forces verification before assertion.",
+    icon: "\u{26A0}\u{FE0F}",
+    hook: "message_sending",
   },
 };
 

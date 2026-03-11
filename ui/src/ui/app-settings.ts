@@ -287,10 +287,6 @@ export async function refreshActiveTab(host: SettingsHost) {
       );
     });
   }
-  if (host.tab === "data") {
-    const app = host as unknown as GodModeApp;
-    void app.handleDataRefresh();
-  }
   if (host.tab === "channels") {
     await loadChannelsTab(host);
   }
