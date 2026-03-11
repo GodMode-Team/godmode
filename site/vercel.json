@@ -1,6 +1,9 @@
 {
   "rewrites": [
     { "source": "/audit-intake", "destination": "/ai-audit/thank-you.html" },
+    { "source": "/ai-audit/rich-hodge", "destination": "/ai-audit/rich-hodge.html" },
+    { "source": "/ai-audit/john-gulick", "destination": "/ai-audit/john-gulick.html" },
+    { "source": "/ai-audit/thomas-goubau", "destination": "/ai-audit/thomas-goubau.html" },
     { "source": "/install.sh", "destination": "/install.sh" },
     { "source": "/setup", "destination": "/setup/index.html" },
     { "source": "/support", "destination": "/support/index.html" },
