@@ -215,10 +215,19 @@ class ConsciousnessHeartbeat {
         }
       } catch { /* non-fatal */ }
 
-      // 5. Task maintenance (dedup + archival)
+      // 5. Task maintenance (dedup + archival + orphan detection)
       try {
         const { runTaskMaintenance } = await import("../methods/tasks.js");
-        runTaskMaintenance().catch(() => {});
+        const maintResult = await runTaskMaintenance();
+        if (maintResult.warnings.length > 0) {
+          this.logger.warn(`[GodMode][Tasks] Maintenance warnings:\n${maintResult.warnings.join("\n")}`);
+        }
+      } catch { /* non-fatal */ }
+
+      // 5b. Prune action item buffers
+      try {
+        const { actionItemBuffer } = await import("../lib/action-items.js");
+        actionItemBuffer.prune();
       } catch { /* non-fatal */ }
 
       // 6. Expire stale queue items

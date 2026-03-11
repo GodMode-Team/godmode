@@ -110,6 +110,18 @@ export async function handleMessageReceived(
       );
     }
 
+    // Extract action items from brain dumps
+    if (sessionKey && content.length >= 15) {
+      try {
+        const { extractActionItems, actionItemBuffer } = await import("../lib/action-items.js");
+        const items = extractActionItems(content);
+        if (items.length > 0) {
+          actionItemBuffer.add(sessionKey, items);
+          logger.info(`[GodMode][ActionItems] Extracted ${items.length} action item(s) from "${sessionKey}"`);
+        }
+      } catch { /* non-fatal */ }
+    }
+
     // Support session logging
     if (sessionKey === "agent:main:support") {
       try {

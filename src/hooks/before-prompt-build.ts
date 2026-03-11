@@ -292,6 +292,16 @@ export async function handleBeforePromptBuild(
     }
   }
 
+  // P1.5: Action items extracted from user brain dumps
+  let actionItemsBlock: string | null = null;
+  if (sessionKey) {
+    try {
+      const { actionItemBuffer, formatActionItemsForContext } = await import("../lib/action-items.js");
+      const items = actionItemBuffer.drain(sessionKey);
+      actionItemsBlock = formatActionItemsForContext(items);
+    } catch { /* non-fatal */ }
+  }
+
   // P1.5: Skill card
   let skillCard: string | null = null;
   try {
@@ -413,6 +423,7 @@ export async function handleBeforePromptBuild(
     meetingPrep,
     cronFailures,
     queueReview,
+    actionItemsBlock,
     skillCard,
     routingLessons,
     safetyNudges,
