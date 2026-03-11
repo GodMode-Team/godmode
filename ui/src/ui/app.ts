@@ -419,6 +419,8 @@ export class GodModeApp extends LitElement {
   @state() execApprovalBusy = false;
   @state() execApprovalError: string | null = null;
   @state() pendingGatewayUrl: string | null = null;
+  @state() gatewayRestartPending = false;
+  @state() gatewayRestartBusy = false;
 
   @state() configLoading = false;
   @state() configRaw = "{\n}\n";
@@ -2138,6 +2140,27 @@ export class GodModeApp extends LitElement {
 
   handleGatewayUrlCancel() {
     this.pendingGatewayUrl = null;
+  }
+
+  handleGatewayRestartClick() {
+    this.gatewayRestartPending = true;
+  }
+
+  async handleGatewayRestartConfirm() {
+    if (!this.client || this.gatewayRestartBusy) return;
+    this.gatewayRestartBusy = true;
+    try {
+      await this.client.request("godmode.gateway.restart");
+    } catch {
+      // Gateway killed mid-request — this is expected
+    } finally {
+      this.gatewayRestartBusy = false;
+      this.gatewayRestartPending = false;
+    }
+  }
+
+  handleGatewayRestartCancel() {
+    this.gatewayRestartPending = false;
   }
 
   // Sidebar handlers for tool output viewing

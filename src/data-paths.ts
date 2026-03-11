@@ -19,6 +19,9 @@ export const MEMORY_DIR = join(GODMODE_ROOT, "memory");
 /** Artifacts directory: ~/godmode/artifacts — permanent storage for generated files */
 export const ARTIFACTS_DIR = join(GODMODE_ROOT, "artifacts");
 
+/** Interaction Ledger DB path: ~/godmode/data/interaction-ledger.db */
+export const INTERACTION_LEDGER_DB = join(DATA_DIR, "interaction-ledger.db");
+
 /** Obsidian vault path: OBSIDIAN_VAULT_PATH env var or ~/Documents/VAULT */
 export const VAULT_PATH: string | null =
   process.env.OBSIDIAN_VAULT_PATH || null;

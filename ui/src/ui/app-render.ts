@@ -81,6 +81,7 @@ import { renderCron } from "./views/cron";
 import { renderDebug } from "./views/debug";
 import { renderExecApprovalPrompt } from "./views/exec-approval";
 import { renderGatewayUrlConfirmation } from "./views/gateway-url-confirmation";
+import { renderGatewayRestartConfirmation } from "./views/gateway-restart";
 import { renderInstances } from "./views/instances";
 import { renderLogs } from "./views/logs";
 import { renderMarkdownSidebar } from "./views/markdown-sidebar";
@@ -369,6 +370,17 @@ export function renderApp(state: AppViewState) {
                 </a>`
               : nothing
           }
+          <button
+            class="pill pill--restart"
+            @click=${(e: Event) => {
+              e.preventDefault();
+              state.handleGatewayRestartClick();
+            }}
+            title="Restart Gateway"
+          >
+            <span class="pill__icon">${icons.rotateCcw}</span>
+            <span>Restart</span>
+          </button>
           <button
             class="pill pill--support"
             @click=${(e: Event) => {
@@ -2439,6 +2451,7 @@ export function renderApp(state: AppViewState) {
       }) : nothing}
       ${renderExecApprovalPrompt(state)}
       ${renderGatewayUrlConfirmation(state)}
+      ${renderGatewayRestartConfirmation(state)}
       ${
         state.sidebarOpen && state.tab !== "chat"
           ? html`

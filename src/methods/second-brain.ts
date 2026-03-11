@@ -15,6 +15,7 @@
  *   secondBrain.migrateToVault  — trigger migration from ~/godmode/memory/ to vault
  */
 
+import { execFile } from "node:child_process";
 import {
   existsSync,
   lstatSync,
@@ -24,7 +25,9 @@ import {
   statSync,
 } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { homedir } from "node:os";
 import { basename, extname, join, relative } from "node:path";
+import { promisify } from "node:util";
 import type { GatewayRequestHandler } from "openclaw/plugin-sdk";
 import { DATA_DIR, GODMODE_ROOT, MEMORY_DIR } from "../data-paths.js";
 import {
@@ -1054,6 +1057,70 @@ function countNodes(nodes: BrainTreeNode[]): number {
   return count;
 }
 
+// ── QMD Query Helper ──────────────────────────────────────────────────
+
+const execFileAsync = promisify(execFile);
+
+type QmdJsonResult = {
+  docid: string;
+  score: number;
+  file: string;
+  title: string;
+  snippet: string;
+};
+
+/** Parse ~/.config/qmd/index.yml → Map<collectionName, fsRoot>. */
+function buildQmdCollectionMap(): Map<string, string> {
+  const map = new Map<string, string>();
+  try {
+    const raw = readFileSync(join(homedir(), ".config", "qmd", "index.yml"), "utf-8");
+    for (const m of raw.matchAll(/^  ([\w-]+):\n    path:\s*(.+)$/gm)) {
+      map.set(m[1], m[2].trim());
+    }
+  } catch { /* config missing or unreadable — qmd unavailable */ }
+  return map;
+}
+
+/** Convert qmd://collection/relative → absolute fs path. */
+function qmdUriToFsPath(uri: string, collMap: Map<string, string>): string | null {
+  const m = uri.match(/^qmd:\/\/([\w-]+)\/(.+)$/);
+  if (!m) return null;
+  const root = collMap.get(m[1]);
+  return root ? join(root, m[2]) : null;
+}
+
+/** Strip the @@ diff header from qmd snippet output. */
+function cleanQmdSnippet(snippet: string): string {
+  return snippet.replace(/^@@[^\n]*\n/, "").trim();
+}
+
+/**
+ * Run `qmd query` (hybrid search + reranking).
+ * Falls back to `qmd search` (BM25) if the reranker crashes (GPU OOM).
+ * Throws if qmd is not installed or both modes fail.
+ */
+async function runQmdSearch(
+  query: string,
+  collection: string | null,
+  limit: number,
+): Promise<QmdJsonResult[]> {
+  const baseArgs = ["-n", String(Math.min(limit, 50)), "--json"];
+  if (collection) baseArgs.push("-c", collection);
+
+  try {
+    const { stdout } = await execFileAsync("qmd", ["query", query, ...baseArgs], {
+      timeout: 15_000,
+    });
+    return JSON.parse(stdout) as QmdJsonResult[];
+  } catch {
+    // Reranker OOM or process crash — fall back to BM25 full-text search
+    const { stdout } = await execFileAsync("qmd", ["search", query, ...baseArgs], {
+      timeout: 15_000,
+    });
+    return JSON.parse(stdout) as QmdJsonResult[];
+  }
+}
+
 // ── Brain Search ─────────────────────────────────────────────────────
 
 const brainSearch: GatewayRequestHandler = async ({ params, respond }) => {
@@ -1066,6 +1133,55 @@ const brainSearch: GatewayRequestHandler = async ({ params, respond }) => {
     respond(false, undefined, { code: "INVALID_REQUEST", message: "query is required" });
     return;
   }
+
+  type SearchResult = {
+    path: string;
+    name: string;
+    section: string;
+    excerpt: string;
+    matchContext?: string;
+    updatedAt?: string;
+    score?: number;
+  };
+
+  // ── Try qmd hybrid search (query expansion + reranking) ─────────────
+  try {
+    // scope → collection: "sessions" → sessions-main, "all" → no filter, rest → clawvault-main
+    const collection =
+      scope === "sessions" ? "sessions-main" :
+      scope === "all" ? null :
+      "clawvault-main";
+
+    const qmdResults = await runQmdSearch(query, collection, limit);
+    const collMap = buildQmdCollectionMap();
+
+    const results: SearchResult[] = qmdResults
+      .map((r): SearchResult | null => {
+        const fsPath = qmdUriToFsPath(r.file, collMap);
+        if (!fsPath) return null;
+        let updatedAt: string | undefined;
+        try { updatedAt = statSync(fsPath).mtime.toISOString(); } catch { /* skip */ }
+        const ext = extname(fsPath);
+        const collMatch = r.file.match(/^qmd:\/\/([\w-]+)\//);
+        return {
+          path: relative(GODMODE_ROOT, fsPath),
+          name: basename(fsPath, ext),
+          section: collMatch?.[1] ?? "vault",
+          excerpt: "",
+          matchContext: cleanQmdSnippet(r.snippet),
+          updatedAt,
+          score: r.score,
+        };
+      })
+      .filter((r): r is SearchResult => r !== null);
+
+    respond(true, { results, query, total: results.length, source: "qmd" });
+    return;
+  } catch {
+    // qmd not installed, timed out, or both query+search failed — fall through to file walk
+  }
+
+  // ── Fallback: file walk ───────────────────────────────────────────────
 
   // Determine which directories to search (vault-first)
   const searchDirs: Array<{ dir: string; label: string }> = [];
@@ -1097,15 +1213,6 @@ const brainSearch: GatewayRequestHandler = async ({ params, respond }) => {
   }
 
   const q = query.toLowerCase();
-  type SearchResult = {
-    path: string;
-    name: string;
-    section: string;
-    excerpt: string;
-    matchContext?: string;
-    updatedAt?: string;
-  };
-
   const results: SearchResult[] = [];
 
   function searchDir(dirPath: string, section: string, depth: number) {

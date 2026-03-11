@@ -285,16 +285,9 @@ export async function runGatewayStart(
 
   // Fathom post-meeting processor
   try {
-    const { initFathomProcessor, startFathomProcessor, stopFathomProcessor, setBroadcast: setFathomBroadcast, setInjectFn: setFathomInjectFn } = await import("../services/fathom-processor.js");
+    const { initFathomProcessor, startFathomProcessor, stopFathomProcessor, setBroadcast: setFathomBroadcast } = await import("../services/fathom-processor.js");
     initFathomProcessor(logger);
     setFathomBroadcast((event: string, data: unknown) => safeBroadcast(api, event, data));
-    setFathomInjectFn(async (text: string) => {
-      try {
-        await api.request("chat.inject", { sessionKey: "agent:main:webchat", message: text, label: "fathom-post-meeting" });
-      } catch (err: any) {
-        logger.warn(`[GodMode] Fathom system event inject failed: ${String(err)}`);
-      }
-    });
     startFathomProcessor();
     serviceCleanup.push({ name: "fathom-processor", fn: () => { stopFathomProcessor(); } });
     logger.info("[GodMode] Fathom post-meeting processor started");

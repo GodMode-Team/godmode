@@ -50,6 +50,7 @@ import { createQueueActionTool } from "./src/tools/queue-action.js";
 import { createTrustRateTool } from "./src/tools/trust-rate.js";
 import { createXReadTool } from "./src/tools/x-read.js";
 import { createSelfRepairTool } from "./src/tools/self-repair.js";
+import { createTasksCreateTool, createTasksListTool, createTasksUpdateTool } from "./src/tools/tasks-tool.js";
 import { queueHandlers } from "./src/methods/queue.js";
 import { xIntelHandlers } from "./src/methods/x-intel.js";
 import { filesHandlers } from "./src/methods/files.js";
@@ -391,6 +392,9 @@ const godmodePlugin = {
     api.registerTool((ctx: any) => createTrustRateTool(ctx));
     api.registerTool((ctx: any) => createXReadTool(ctx));
     api.registerTool(() => createSelfRepairTool());
+    api.registerTool(() => createTasksCreateTool());
+    api.registerTool(() => createTasksListTool());
+    api.registerTool(() => createTasksUpdateTool());
 
     // ── 7. CLI commands ───────────────────────────────────────────
     api.registerCli(

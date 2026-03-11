@@ -287,6 +287,21 @@ export async function generateSnapshot(): Promise<string> {
     // No trust data yet — skip
   }
 
+  // L6: Interaction Ledger — behavioral signals
+  try {
+    const { getTopSignals, formatForSnapshot, formatConflictsForSnapshot } =
+      await import("./interaction-ledger.js");
+    const topSignals = getTopSignals(5);
+    const block = formatForSnapshot(topSignals);
+    if (block) {
+      lines.push(block);
+      const conflictLine = formatConflictsForSnapshot();
+      if (conflictLine) lines.push(conflictLine);
+    }
+  } catch {
+    // L6 unavailable — non-fatal
+  }
+
   // Team workspaces summary — list active team workspaces with key files
   try {
     const { readWorkspaceConfig } = await import("./workspaces-config.js");

@@ -126,6 +126,8 @@ export type AppViewState = {
   execApprovalBusy: boolean;
   execApprovalError: string | null;
   pendingGatewayUrl: string | null;
+  gatewayRestartPending: boolean;
+  gatewayRestartBusy: boolean;
   configLoading: boolean;
   configRaw: string;
   configRawOriginal: string;
@@ -417,6 +419,9 @@ export type AppViewState = {
   handleExecApprovalDecision: (decision: "allow-once" | "allow-always" | "deny") => Promise<void>;
   handleGatewayUrlConfirm: () => void;
   handleGatewayUrlCancel: () => void;
+  handleGatewayRestartClick: () => void;
+  handleGatewayRestartConfirm: () => Promise<void>;
+  handleGatewayRestartCancel: () => void;
   handleConfigLoad: () => Promise<void>;
   handleConfigSave: () => Promise<void>;
   handleConfigApply: () => Promise<void>;

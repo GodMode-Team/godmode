@@ -319,6 +319,33 @@ export async function runAllCapturePipelines(logger: Logger): Promise<VaultCaptu
     logger.warn(`[VaultCapture] Sessions pipeline error: ${String(err)}`);
   }
 
+  // L6: Feed captured session content to interaction ledger extraction
+  if (sessions.captured > 0) {
+    try {
+      const { processExtraction } = await import("../lib/interaction-ledger.js");
+      const today = localDateString();
+      const agentLogPath = join(MEMORY_DIR, "agent-log", `${today}.json`);
+      if (existsSync(agentLogPath)) {
+        const raw = readFileSync(agentLogPath, "utf-8");
+        const log = JSON.parse(raw) as {
+          completed?: Array<{ item: string; output?: string; completedAt: number }>;
+        };
+        for (const entry of log.completed ?? []) {
+          if (entry.output && entry.output.length >= 50) {
+            await processExtraction(
+              "vault-daily",
+              `${today}:${entry.completedAt}`,
+              entry.output,
+              `vault-${today}`,
+            );
+          }
+        }
+      }
+    } catch {
+      // L6 extraction non-fatal
+    }
+  }
+
   try {
     queueOutputs = await captureQueueOutputsToVault(logger);
   } catch (err) {

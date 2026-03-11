@@ -119,6 +119,36 @@ class ConsciousnessHeartbeat {
         }
       } catch { /* non-fatal */ }
 
+      // L6: Interaction Ledger — extraction, decay, conflict resolution
+      try {
+        const {
+          initLedgerDb, bootstrapFromExistingData,
+          processNewSessions, decayStaleSignals,
+          detectConflicts, autoResolveConflict,
+        } = await import("../lib/interaction-ledger.js");
+
+        initLedgerDb();
+        await bootstrapFromExistingData();
+
+        const extracted = await processNewSessions();
+        if (extracted > 0) {
+          this.logger.info(`[Consciousness] L6: extracted ${extracted} behavioral signals`);
+        }
+
+        const dormant = decayStaleSignals();
+        if (dormant > 0) {
+          this.logger.info(`[Consciousness] L6: ${dormant} signals went dormant`);
+        }
+
+        const conflicts = detectConflicts();
+        for (const c of conflicts) autoResolveConflict(c);
+        if (conflicts.length > 0) {
+          this.logger.info(`[Consciousness] L6: resolved ${conflicts.length} conflicts`);
+        }
+      } catch (err) {
+        this.logger.warn(`[Consciousness] L6 error: ${String(err)}`);
+      }
+
       this.lastSyncAt = Date.now();
       this.broadcast("consciousness:status", {
         status: "ok",

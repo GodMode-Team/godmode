@@ -309,6 +309,22 @@ const pluginRun: GatewayRequestHandler = async ({ respond }) => {
   }
 };
 
+// ── godmode.gateway.restart ───────────────────────────────────────────────
+
+const gatewayRestart: GatewayRequestHandler = ({ respond }) => {
+  // Respond before killing the process — client won't receive the reply otherwise
+  respond(true, {
+    success: true,
+    message: "Gateway is restarting — the UI will reconnect automatically.",
+  });
+
+  // Async restart: kill current gateway, then relaunch
+  void runCommand(
+    'pkill -f "openclaw gateway" 2>/dev/null; sleep 1; nohup openclaw gateway run >/dev/null 2>&1 &',
+    10_000,
+  );
+};
+
 // ── Export ────────────────────────────────────────────────────────────────
 
 export const systemUpdateHandlers: GatewayRequestHandlers = {
@@ -316,4 +332,5 @@ export const systemUpdateHandlers: GatewayRequestHandlers = {
   "godmode.update.run": run,
   "godmode.update.pluginCheck": pluginCheck,
   "godmode.update.pluginRun": pluginRun,
+  "godmode.gateway.restart": gatewayRestart,
 };
