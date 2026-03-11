@@ -29,7 +29,9 @@ export type GuardrailGateId =
   | "configShield"
   | "ephemeralPathShield"
   | "contextPressure"
-  | "unverifiedClaimGate";
+  | "unverifiedClaimGate"
+  | "proactiveLookupGate"
+  | "restartGate";
 
 export type GateConfig = {
   enabled: boolean;
@@ -82,7 +84,7 @@ export const GATE_DEFAULTS: Record<GuardrailGateId, GateConfig> = {
   grepBlocker: { enabled: true },
   sessionHygiene: { enabled: true, thresholds: { maxWorkingLines: 100 } },
   exhaustiveSearch: { enabled: true },
-  selfServiceGate: { enabled: true },
+  selfServiceGate: { enabled: true, thresholds: { minSearchSources: 2 } },
   persistenceGate: { enabled: true, thresholds: { minInvestigationTools: 3 } },
   searchRetryGate: { enabled: true, thresholds: { minSearchAttempts: 3 } },
   planGate: { enabled: true },
@@ -94,6 +96,8 @@ export const GATE_DEFAULTS: Record<GuardrailGateId, GateConfig> = {
   ephemeralPathShield: { enabled: true },
   contextPressure: { enabled: true, thresholds: { warningPercent: 70, criticalPercent: 90, maxContextTokens: 200000 } },
   unverifiedClaimGate: { enabled: true },
+  proactiveLookupGate: { enabled: true, thresholds: { minSearchSources: 2 } },
+  restartGate: { enabled: true },
 };
 
 export const GATE_DESCRIPTORS: Record<GuardrailGateId, GateDescriptor> = {
@@ -216,6 +220,21 @@ export const GATE_DESCRIPTORS: Record<GuardrailGateId, GateDescriptor> = {
       "Blocks confident factual claims about external systems (deployments, APIs, configs, live URLs) when no investigation tools were used this turn. Forces verification before assertion.",
     icon: "\u{26A0}\u{FE0F}",
     hook: "message_sending",
+  },
+  proactiveLookupGate: {
+    name: "Proactive Lookup Gate",
+    description:
+      "LLM-judged gate that catches the ally silently skipping the lookup chain. Fires when the ally asks the user for information (email, link, contact) without having searched at least 2 sources first. Prevents 'lazy lookup' where the ally checks memory once and punts to the user.",
+    icon: "\u{1F9E0}\u{1F50D}",
+    hook: "message_sending",
+    thresholdLabels: { minSearchSources: "Min search sources before asking user" },
+  },
+  restartGate: {
+    name: "Restart Gate",
+    description:
+      "Hard-blocks any agent or subagent attempt to restart the gateway via exec/bash. The user has live sessions — restarts must be manual via the UI Restart button.",
+    icon: "\u{1F6D1}",
+    hook: "before_tool_call",
   },
 };
 

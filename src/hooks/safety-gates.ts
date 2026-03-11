@@ -706,6 +706,71 @@ export async function checkConfigAccess(
   return undefined;
 }
 
+// ── Restart Gate ─────────────────────────────────────────────────────
+//
+// Problem: Agent or subagent restarts the gateway while user has live
+// sessions and conversations. Kills in-flight work with no warning.
+// Rule: HARD BLOCK any exec/bash/shell command that attempts to restart,
+// kill, or cycle the gateway process. No exceptions. The user manually
+// restarts via the UI "Restart" button when they're ready.
+
+const RESTART_COMMAND_PATTERNS = [
+  /(?:pm2|systemctl|launchctl|supervisorctl)\s+restart/i,
+  /kill\s+(?:-\d+\s+)?(?:\$|`|'|")?(?:cat|pgrep).*(?:openclaw|godmode|gateway|node)/i,
+  /(?:pkill|killall)\s+.*(?:openclaw|godmode|gateway|node)/i,
+  /gateway[._-]?restart/i,
+  /restart[._-]?(?:the\s+)?(?:gateway|server|openclaw|godmode)/i,
+  /(?:npx|pnpm|npm)\s+(?:run\s+)?(?:restart|start)\b/i,
+  /process\.exit/i,
+  /(?:shutdown|reboot)\s*\(/i,
+  /openclaw\s+restart/i,
+];
+
+/**
+ * Check if an exec command attempts to restart the gateway.
+ * Returns a block reason if blocked, undefined if allowed.
+ * HARD BLOCK — no fail-open, no override.
+ */
+export async function checkRestartAttempt(
+  toolName: string,
+  params: Record<string, unknown>,
+  sessionKey?: string,
+): Promise<string | undefined> {
+  const config = await readGuardrailsStateCached();
+  if (!config.gates.restartGate?.enabled) return undefined;
+
+  const name = toolName.trim().toLowerCase();
+  if (name !== "exec" && name !== "bash" && name !== "shell") return undefined;
+
+  const command =
+    typeof params.command === "string"
+      ? params.command
+      : typeof params.cmd === "string"
+        ? params.cmd
+        : "";
+  if (!command) return undefined;
+
+  const matches = RESTART_COMMAND_PATTERNS.some(p => p.test(command));
+  if (matches) {
+    void logGateActivity(
+      "restartGate", "blocked",
+      `Blocked restart attempt: ${command.slice(0, 100)}`,
+      sessionKey,
+    );
+    return [
+      "🚫 BLOCKED: Gateway restart is NEVER allowed from agents or subagents.",
+      "",
+      "The user has live sessions and conversations. Restarting would kill in-flight work.",
+      "If your fix requires a restart:",
+      "1. Write ~/godmode/data/pending-deploy.json with details of what changed.",
+      "2. Tell the user: 'A restart is needed to apply this fix. Use the Restart button when ready.'",
+      "3. The user will restart manually via the UI when no critical work is in progress.",
+    ].join("\n");
+  }
+
+  return undefined;
+}
+
 // ── Ephemeral Path Shield ──────────────────────────────────────────
 //
 // Problem: Ally built a website in /tmp, served it locally, macOS cleaned
@@ -933,6 +998,7 @@ const SEARCH_TOOLS = new Set([
 
 const INVESTIGATION_TOOLS = new Set([
   "read", "read_file", "glob", "grep",
+  "exec", "bash", "shell",  // exec counts — Front API, curl, CLI lookups are investigation
   ...SEARCH_TOOLS,
 ]);
 
@@ -1151,7 +1217,70 @@ function matchesAny(content: string, patterns: RegExp[]): boolean {
 }
 
 /**
- * Run all four enforcer gates on an outbound message.
+ * LLM judge for Gate 6: Asks Haiku whether the outbound message is requesting
+ * information from the user that the ally could look up itself. This catches the
+ * "silent skip" — the ally doesn't say "I don't know" but asks "What's their email?"
+ * without having exhausted the lookup chain (memory → vault → tools → queue).
+ * Returns true if the LLM confirms the ally is being lazy.
+ */
+async function llmJudgeProactiveLookup(content: string): Promise<boolean> {
+  try {
+    const { resolveAnthropicAuth } = await import("../methods/brief-generator.js");
+    const apiKey = resolveAnthropicAuth();
+    if (!apiKey) return false; // Fail open
+
+    const snippet = content.slice(0, 800);
+
+    const resp = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01",
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "claude-haiku-4-5-20251001",
+        max_tokens: 10,
+        system: [
+          "You are a safety gate judge for an AI assistant. The assistant has access to: memory search, vault/note search, exec (Front email API, curl, CLI tools), contacts, calendar, task lists, file search, and web search.",
+          "",
+          "Given the assistant's outbound message, determine if it is ASKING THE USER for information the assistant could look up itself using its tools.",
+          "",
+          "Flag as LAZY LOOKUP if the message:",
+          "- Asks the user for contact info (email, phone, address) — the assistant has Front, contacts, and memory",
+          "- Asks the user for a link, URL, or file path — the assistant has vault search, file search, and memory",
+          "- Asks 'do you have', 'could you share', 'could you provide', 'what is their' for factual data",
+          "- Asks the user to confirm information the assistant could verify via tools",
+          "- Implicitly admits it didn't search by saying 'I don't see X in memory' without trying other sources",
+          "",
+          "Do NOT flag if the message:",
+          "- Asks a genuinely subjective question ('How would you like me to handle this?', 'What tone?')",
+          "- Asks for user preferences, decisions, or approvals",
+          "- Asks for clarification about the user's intent (not about factual data)",
+          "- Is confirming an action it's about to take ('Should I send this?')",
+          "- References specific tool output it already received",
+          "",
+          "Respond with ONLY 'YES' or 'NO'. Nothing else.",
+        ].join("\n"),
+        messages: [{ role: "user", content: snippet }],
+      }),
+      signal: AbortSignal.timeout(4_000),
+    });
+
+    if (!resp.ok) return false;
+
+    const data = (await resp.json()) as {
+      content?: Array<{ type: string; text?: string }>;
+    };
+    const answer = data.content?.find((c) => c.type === "text")?.text?.trim().toUpperCase();
+    return answer === "YES";
+  } catch {
+    return false; // Timeout or error — fail open
+  }
+}
+
+/**
+ * Run all enforcer gates on an outbound message.
  * Returns { cancel: true, gate } if a gate fires, undefined otherwise.
  * Called from message_sending in index.ts.
  */
@@ -1186,21 +1315,24 @@ export async function checkEnforcerGates(
   }
 
   // Gate 2: Self-Service — asking the user for searchable facts
+  // Tightened: requires at least 2 search sources before delegation is allowed.
+  // One failed memory_search does NOT earn the right to ask the user.
   if (config.gates.selfServiceGate?.enabled) {
-    if (matchesAny(content, DELEGATION_PATTERNS) && usage.searchCount === 0 && usage.investigationCount === 0) {
+    const minSources = config.gates.selfServiceGate?.thresholds?.minSearchSources ?? 2;
+    if (matchesAny(content, DELEGATION_PATTERNS) && usage.searchCount < minSources) {
       // Only fire if the message contains a question mark (actual delegation, not a statement)
       if (content.includes("?")) {
         enforcerNudgeFlags.set(key, {
           gate: "Self-Service Gate",
           message: [
-            "Your response was blocked because you're asking the user for information you can look up.",
+            `Your response was blocked because you're asking the user for information after only ${usage.searchCount} search(es). Minimum: ${minSources}.`,
             "",
-            "You have search tools (memory_search, qmd search) and file tools (read, glob).",
-            "Search memory, check vault files, read the File Index. Never ask for what you can find.",
-            "Only ask the user when you've genuinely exhausted your search tools.",
+            "The lookup chain is: memory → vault (secondBrain.search) → tools (exec/Front/contacts/calendar) → queue → THEN ask.",
+            "You have: memory_search, qmd search, qmd vsearch, secondBrain.search, secondBrain.memoryBankEntry, exec, glob, read.",
+            "The user asked because they KNOW you can find it. Exhaust the chain before asking them.",
           ].join("\n"),
         });
-        void logGateActivity("selfServiceGate", "fired", "Blocked: delegating to user with 0 tools used", sessionKey);
+        void logGateActivity("selfServiceGate", "fired", `Blocked: delegating to user with only ${usage.searchCount}/${minSources} searches`, sessionKey);
         return { cancel: true, gate: "selfServiceGate" };
       }
     }
@@ -1279,6 +1411,45 @@ export async function checkEnforcerGates(
         });
         void logGateActivity("unverifiedClaimGate", "fired", "Blocked: LLM-confirmed unverified claim with 0 investigation tools", sessionKey);
         return { cancel: true, gate: "unverifiedClaimGate" };
+      }
+    }
+  }
+
+  // Gate 6: Proactive Lookup — LLM-judged catch for silently skipping the lookup chain.
+  // Unlike Gates 1-4 (which pattern-match surrender language), this catches the case where
+  // the ally asks the user for information WITHOUT using surrender language — e.g., "What's
+  // their email?" or "Could you share the link?" after only checking memory once.
+  // Uses Haiku to semantically detect: "is this response asking the user for info the ally
+  // could look up itself?" Fires when searchCount < 2 (didn't exhaust the chain).
+  if (config.gates.proactiveLookupGate?.enabled) {
+    const minSources = config.gates.proactiveLookupGate?.thresholds?.minSearchSources ?? 2;
+    if (usage.searchCount < minSources && content.includes("?")) {
+      // Pre-filter: only invoke LLM if the message has a question and low search count
+      const isLazyLookup = await llmJudgeProactiveLookup(content);
+      if (isLazyLookup) {
+        enforcerNudgeFlags.set(key, {
+          gate: "Proactive Lookup Gate",
+          message: [
+            `Your response was blocked because you're asking the user for information you haven't fully searched for.`,
+            `You used ${usage.searchCount} search source(s) this turn. Minimum before asking: ${minSources}.`,
+            "",
+            "MANDATORY lookup chain — every step before asking the user:",
+            "1. memory_search / qmd search / qmd vsearch (check what you already know)",
+            "2. secondBrain.search / secondBrain.memoryBankEntry (search vault, people files, notes)",
+            "3. Tools: exec (Front API, curl, contacts CLI), calendar, tasks, files, web_search",
+            "4. queue_add for background research if needed",
+            "5. ONLY THEN ask — and list what you already tried.",
+            "",
+            "The user asked because they KNOW you have access. Empty memory is step 1 of 5, not a dead end.",
+            "If you're about to type 'do you have' or 'could you share' — STOP and search instead.",
+          ].join("\n"),
+        });
+        void logGateActivity(
+          "proactiveLookupGate", "fired",
+          `Blocked: LLM confirmed lazy lookup with only ${usage.searchCount}/${minSources} searches`,
+          sessionKey,
+        );
+        return { cancel: true, gate: "proactiveLookupGate" };
       }
     }
   }

@@ -590,6 +590,9 @@ export class GodModeApp extends LitElement {
   @state() skillEdits: Record<string, string> = {};
   @state() skillsBusyKey: string | null = null;
   @state() skillMessages: Record<string, SkillMessage> = {};
+  @state() skillsSubTab: "godmode" | "my-skills" | "clawhub" = "godmode";
+  @state() godmodeSkills: import("./views/skills").GodModeSkillsData | null = null;
+  @state() godmodeSkillsLoading = false;
 
   @state() debugLoading = false;
   @state() debugStatus: StatusSummary | null = null;

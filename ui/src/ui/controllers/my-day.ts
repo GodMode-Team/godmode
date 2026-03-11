@@ -29,6 +29,9 @@ export type MyDayState = {
   // Today's tasks
   todayTasks?: WorkspaceTask[];
   todayTasksLoading?: boolean;
+  // Inbox
+  todayInboxItems?: Array<{ name: string; path: string; updatedAt: string | null; excerpt: string; source?: string }>;
+  todayInboxLoading?: boolean;
   // Methods
   loadBriefNotes?: () => Promise<void>;
 };
@@ -297,6 +300,26 @@ export async function loadTodayTasksWithQueueStatus(state: MyDayState): Promise<
   }
 }
 
+// ── Inbox Items ─────────────────────────────────────────────────
+
+export async function loadInboxItems(state: MyDayState): Promise<void> {
+  if (!state.client || !state.connected) return;
+  state.todayInboxLoading = true;
+  try {
+    const res = await state.client.request<{
+      items: Array<{ name: string; path: string; updatedAt: string | null; excerpt: string; source?: string }>;
+      count: number;
+      available: boolean;
+    }>("secondBrain.inboxItems", {});
+    state.todayInboxItems = res.items ?? [];
+  } catch (err) {
+    console.error("[MyDay] Failed to load inbox items:", err);
+    state.todayInboxItems = [];
+  } finally {
+    state.todayInboxLoading = false;
+  }
+}
+
 // ── Overnight Decision Cards ─────────────────────────────────────
 
 type QueueResultItem = {
@@ -449,6 +472,7 @@ export async function loadMyDay(state: MyDayState) {
     loadBriefNotesPromise,
     withTimeout(loadAgentLog(state.client, date, { refresh: false }), 10_000, "Agent Log"),
     withTimeout(loadTodayTasksWithQueueStatus(state), 8_000, "Today Tasks"),
+    withTimeout(loadInboxItems(state), 5_000, "Inbox"),
   ]);
 
   state.dailyBrief = results[0].status === "fulfilled" ? results[0].value : null;
@@ -459,7 +483,7 @@ export async function loadMyDay(state: MyDayState) {
   // syncTasksFromBrief runs once per day via morning set or manual invocation.
 
   // Log failures but don't block the page
-  const labels = ["Brief", "Brief Notes", "Agent Log", "Today Tasks"];
+  const labels = ["Brief", "Brief Notes", "Agent Log", "Today Tasks", "Inbox"];
   const failures = results
     .map((r, i) => (r.status === "rejected" ? { section: labels[i], reason: r.reason } : null))
     .filter(Boolean);

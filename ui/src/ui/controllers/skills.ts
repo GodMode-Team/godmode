@@ -5,7 +5,7 @@ import type {
   ClawHubSkillItem,
   SkillStatusReport,
 } from "../types";
-import type { SkillsSubTab } from "../views/skills";
+import type { GodModeSkillsData, SkillsSubTab } from "../views/skills";
 import type { ClawHubMessage } from "./clawhub";
 
 export type SkillsState = {
@@ -17,6 +17,9 @@ export type SkillsState = {
   skillsBusyKey: string | null;
   skillEdits: Record<string, string>;
   skillMessages: SkillMessageMap;
+  // GodMode skills
+  godmodeSkills: GodModeSkillsData | null;
+  godmodeSkillsLoading: boolean;
   // ClawHub state
   skillsSubTab: SkillsSubTab;
   clawhubQuery: string;
@@ -83,6 +86,20 @@ export async function loadSkills(state: SkillsState, options?: LoadSkillsOptions
     state.skillsError = getErrorMessage(err);
   } finally {
     state.skillsLoading = false;
+  }
+}
+
+export async function loadGodModeSkills(state: SkillsState) {
+  if (!state.client || !state.connected) return;
+  state.godmodeSkillsLoading = true;
+  try {
+    const res = await state.client.request<GodModeSkillsData>("godmode.skills.list", {});
+    state.godmodeSkills = res ?? null;
+  } catch (err) {
+    console.error("[Skills] Failed to load GodMode skills:", err);
+    state.godmodeSkills = null;
+  } finally {
+    state.godmodeSkillsLoading = false;
   }
 }
 

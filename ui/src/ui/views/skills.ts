@@ -4,7 +4,36 @@ import { clampText } from "../format";
 import type { SkillStatusEntry, SkillStatusReport } from "../types";
 import { renderClawHub, type ClawHubProps } from "./clawhub";
 
-export type SkillsSubTab = "my-skills" | "clawhub";
+export type SkillsSubTab = "godmode" | "my-skills" | "clawhub";
+
+// ── GodMode skill types (from godmode.skills.list RPC) ──
+
+export type GodModeSkillCard = {
+  slug: string;
+  name: string;
+  type: "card";
+  triggers: string[];
+  tools: string[];
+  body: string;
+};
+
+export type GodModeExecSkill = {
+  slug: string;
+  name: string;
+  type: "skill";
+  trigger: string;
+  schedule: string | null;
+  persona: string | null;
+  taskType: string;
+  priority: string;
+  body: string;
+};
+
+export type GodModeSkillsData = {
+  cards: GodModeSkillCard[];
+  skills: GodModeExecSkill[];
+  total: number;
+};
 
 export type SkillsProps = {
   loading: boolean;
@@ -16,6 +45,8 @@ export type SkillsProps = {
   messages: SkillMessageMap;
   subTab: SkillsSubTab;
   clawhub: ClawHubProps;
+  godmodeSkills: GodModeSkillsData | null;
+  godmodeSkillsLoading: boolean;
   onFilterChange: (next: string) => void;
   onRefresh: () => void;
   onToggle: (skillKey: string, enabled: boolean) => void;
@@ -26,17 +57,28 @@ export type SkillsProps = {
 };
 
 export function renderSkills(props: SkillsProps) {
+  const isGodMode = props.subTab === "godmode";
+  const showRefresh = isGodMode || props.subTab === "my-skills";
+
   return html`
     <section class="card">
       <div class="row" style="justify-content: space-between; align-items: center;">
         <div class="chip-row" style="gap: 0;">
+          <button
+            class="chip ${isGodMode ? "chip-ok" : ""}"
+            style="cursor: pointer; border: none; padding: 6px 14px; font-size: 13px;
+                   background: var(${isGodMode ? "--chip-ok-bg, #e6f4ea" : "--chip-bg, #f3f3f3"});"
+            @click=${() => props.onSubTabChange("godmode")}
+          >
+            GodMode Skills
+          </button>
           <button
             class="chip ${props.subTab === "my-skills" ? "chip-ok" : ""}"
             style="cursor: pointer; border: none; padding: 6px 14px; font-size: 13px;
                    background: var(${props.subTab === "my-skills" ? "--chip-ok-bg, #e6f4ea" : "--chip-bg, #f3f3f3"});"
             @click=${() => props.onSubTabChange("my-skills")}
           >
-            My Skills
+            Integrations
           </button>
           <button
             class="chip ${props.subTab === "clawhub" ? "chip-ok" : ""}"
@@ -47,13 +89,14 @@ export function renderSkills(props: SkillsProps) {
             ClawHub
           </button>
         </div>
-        ${props.subTab === "my-skills"
-          ? html`<button class="btn" ?disabled=${props.loading} @click=${props.onRefresh}>
-              ${props.loading ? "Loading\u2026" : "Refresh"}
+        ${showRefresh
+          ? html`<button class="btn" ?disabled=${props.loading || props.godmodeSkillsLoading} @click=${props.onRefresh}>
+              ${props.loading || props.godmodeSkillsLoading ? "Loading\u2026" : "Refresh"}
             </button>`
           : nothing}
       </div>
 
+      ${isGodMode ? renderGodModeSkills(props) : nothing}
       ${props.subTab === "my-skills" ? renderMySkills(props) : nothing}
       ${props.subTab === "clawhub"
         ? html`<div style="margin-top: 16px;">${renderClawHub(props.clawhub)}</div>`
@@ -61,6 +104,93 @@ export function renderSkills(props: SkillsProps) {
     </section>
   `;
 }
+
+// ── GodMode Skills Tab ──────────────────────────────────────────
+
+function renderGodModeSkills(props: SkillsProps) {
+  const data = props.godmodeSkills;
+  const loading = props.godmodeSkillsLoading;
+  const filter = props.filter.trim().toLowerCase();
+
+  if (loading && !data) {
+    return html`<div class="muted" style="margin-top: 16px;">Loading GodMode skills...</div>`;
+  }
+
+  if (!data || data.total === 0) {
+    return html`<div class="muted" style="margin-top: 16px;">No GodMode skills found.</div>`;
+  }
+
+  const allItems = [
+    ...data.skills.map((s) => ({ ...s, _kind: "skill" as const })),
+    ...data.cards.map((c) => ({ ...c, _kind: "card" as const })),
+  ];
+
+  const filtered = filter
+    ? allItems.filter((item) =>
+        [item.slug, item.name, item.body.slice(0, 200)].join(" ").toLowerCase().includes(filter),
+      )
+    : allItems;
+
+  return html`
+    <div class="filters" style="margin-top: 14px;">
+      <label class="field" style="flex: 1;">
+        <span>Filter</span>
+        <input
+          .value=${props.filter}
+          @input=${(e: Event) => props.onFilterChange((e.target as HTMLInputElement).value)}
+          placeholder="Search skills and cards"
+        />
+      </label>
+      <div class="muted">${filtered.length} of ${allItems.length}</div>
+    </div>
+
+    ${filtered.length === 0
+      ? html`<div class="muted" style="margin-top: 16px;">No matches.</div>`
+      : html`<div class="list" style="margin-top: 16px;">
+          ${filtered.map((item) =>
+            item._kind === "skill" ? renderExecSkill(item) : renderSkillCard(item),
+          )}
+        </div>`}
+  `;
+}
+
+function renderExecSkill(skill: GodModeExecSkill & { _kind: "skill" }) {
+  const firstLine = skill.body.split("\n").find((l) => l.trim().length > 0) ?? "";
+  return html`
+    <div class="list-item">
+      <div class="list-main">
+        <div class="list-title">${skill.name}</div>
+        <div class="list-sub">${clampText(firstLine, 120)}</div>
+        <div class="chip-row" style="margin-top: 6px;">
+          <span class="chip chip-ok">skill</span>
+          <span class="chip">${skill.trigger}</span>
+          ${skill.schedule ? html`<span class="chip">${skill.schedule}</span>` : nothing}
+          ${skill.persona ? html`<span class="chip">${skill.persona}</span>` : nothing}
+          <span class="chip">${skill.taskType}</span>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function renderSkillCard(card: GodModeSkillCard & { _kind: "card" }) {
+  return html`
+    <div class="list-item">
+      <div class="list-main">
+        <div class="list-title">${card.name}</div>
+        <div class="list-sub">Triggers: ${card.triggers.join(", ")}</div>
+        <div class="chip-row" style="margin-top: 6px;">
+          <span class="chip">card</span>
+          ${card.tools.length > 0
+            ? html`<span class="chip">${card.tools.length} tools</span>`
+            : nothing}
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+// ── OpenClaw Integrations Tab (existing) ────────────────────────
 
 function renderMySkills(props: SkillsProps) {
   const skills = props.report?.skills ?? [];
@@ -78,7 +208,7 @@ function renderMySkills(props: SkillsProps) {
         <input
           .value=${props.filter}
           @input=${(e: Event) => props.onFilterChange((e.target as HTMLInputElement).value)}
-          placeholder="Search skills"
+          placeholder="Search integrations"
         />
       </label>
       <div class="muted">${filtered.length} shown</div>
@@ -92,7 +222,7 @@ function renderMySkills(props: SkillsProps) {
 
     ${
       filtered.length === 0
-        ? html`<div class="muted" style="margin-top: 16px">No skills found.</div>`
+        ? html`<div class="muted" style="margin-top: 16px">No integrations found.</div>`
         : html`<div class="list" style="margin-top: 16px;">
             ${filtered.map((skill) => renderSkill(skill, props))}
           </div>`
@@ -173,7 +303,7 @@ function renderSkill(skill: SkillStatusEntry, props: SkillsProps) {
                 ?disabled=${busy}
                 @click=${() => props.onInstall(skill.skillKey, skill.name, skill.install[0].id)}
               >
-                ${busy ? "Installing…" : skill.install[0].label}
+                ${busy ? "Installing\u2026" : skill.install[0].label}
               </button>`
               : nothing
           }

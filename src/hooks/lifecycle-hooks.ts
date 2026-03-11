@@ -225,6 +225,16 @@ export async function handleBeforeToolCall(
     }
   } catch { /* non-fatal */ }
 
+  // Gate 1e: Restart Gate — HARD BLOCK any gateway restart attempt
+  try {
+    const { checkRestartAttempt } = await import("./safety-gates.js");
+    const restartBlock = await checkRestartAttempt(name, (event.params ?? {}) as Record<string, unknown>, sessionKey);
+    if (restartBlock) {
+      logger.warn(`[GodMode][SafetyGate] restart gate BLOCKED: ${name}`);
+      return { block: true, blockReason: restartBlock };
+    }
+  } catch { /* non-fatal */ }
+
   // Record tool usage for enforcer gates
   try {
     const { recordToolUsage } = await import("./safety-gates.js");

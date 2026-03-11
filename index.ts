@@ -334,6 +334,35 @@ const godmodePlugin = {
       }
     }) as Parameters<typeof api.registerGatewayMethod>[1]);
 
+    api.registerGatewayMethod("godmode.skills.list", (async ({ respond }: { respond: Function }) => {
+      try {
+        const { loadSkillCards } = await import("./src/lib/skill-cards.js");
+        const { loadSkills } = await import("./src/lib/skills-registry.js");
+        const cards = loadSkillCards().map((c) => ({
+          slug: c.slug,
+          name: c.domain,
+          type: "card" as const,
+          triggers: c.triggers,
+          tools: c.tools,
+          body: c.body,
+        }));
+        const skills = loadSkills().map((s) => ({
+          slug: s.slug,
+          name: s.name,
+          type: "skill" as const,
+          trigger: s.trigger,
+          schedule: s.schedule ?? null,
+          persona: s.persona ?? null,
+          taskType: s.taskType,
+          priority: s.priority,
+          body: s.body,
+        }));
+        respond(true, { cards, skills, total: cards.length + skills.length });
+      } catch (err) {
+        respond(true, { cards: [], skills: [], total: 0, error: String(err) });
+      }
+    }) as Parameters<typeof api.registerGatewayMethod>[1]);
+
     // ── 5. Lifecycle hooks ────────────────────────────────────────
     api.on("gateway_start", async () => {
       api.logger.info("[GodMode] Gateway started — plugin active");

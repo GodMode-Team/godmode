@@ -25,7 +25,7 @@ import { loadMyDay } from "./controllers/my-day";
 import { loadNodes } from "./controllers/nodes";
 import { loadPresence } from "./controllers/presence";
 import { loadArchivedSessions, loadSessions } from "./controllers/sessions";
-import { loadSkills } from "./controllers/skills";
+import { loadGodModeSkills, loadSkills } from "./controllers/skills";
 import { loadWork } from "./controllers/work";
 import { loadWorkspaces } from "./controllers/workspaces";
 import {
@@ -302,6 +302,7 @@ export async function refreshActiveTab(host: SettingsHost) {
   }
   if (host.tab === "skills") {
     await loadSkills(host as unknown as GodModeApp);
+    await loadGodModeSkills(host as unknown as GodModeApp);
   }
   if (host.tab === "nodes") {
     await loadNodes(host as unknown as GodModeApp);

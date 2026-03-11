@@ -89,6 +89,18 @@ export type MyDayProps = {
   decisionCards?: DecisionCardsProps;
   // Evening capture
   onEveningCapture?: () => void;
+  // Inbox items
+  inboxItems?: InboxItem[];
+  inboxLoading?: boolean;
+  onOpenInboxItem?: (path: string) => void;
+};
+
+export type InboxItem = {
+  name: string;
+  path: string;
+  updatedAt: string | null;
+  excerpt: string;
+  source?: string;
 };
 
 // ===== Helper Functions =====
@@ -426,6 +438,65 @@ export function renderMyDayToolbar(props: MyDayProps) {
   `;
 }
 
+// ===== Inbox Panel =====
+
+function renderInboxPanel(props: MyDayProps) {
+  const items = props.inboxItems ?? [];
+  const loading = props.inboxLoading;
+
+  if (loading) {
+    return html`<div class="my-day-card">
+      <div class="my-day-card-header">
+        <div class="my-day-card-title">
+          <span class="my-day-card-icon">&#x1F4E5;</span>
+          <span>INBOX</span>
+        </div>
+      </div>
+      <div class="my-day-card-content"><div class="my-day-empty">Loading inbox...</div></div>
+    </div>`;
+  }
+
+  if (items.length === 0) {
+    return nothing;
+  }
+
+  return html`<div class="my-day-card">
+    <div class="my-day-card-header">
+      <div class="my-day-card-title">
+        <span class="my-day-card-icon">&#x1F4E5;</span>
+        <span>INBOX</span>
+        <span class="tab-badge" style="margin-left: 8px;">${items.length}</span>
+      </div>
+    </div>
+    <div class="my-day-card-content">
+      <div class="inbox-list">
+        ${items.slice(0, 10).map(
+          (item) => html`
+            <div class="inbox-item"
+              @click=${() => props.onOpenInboxItem?.(item.path)}
+              style="cursor: pointer; padding: 8px 0; border-bottom: 1px solid var(--border-color, #e5e5e5);">
+              <div style="font-weight: 500; font-size: 13px;">${item.name}</div>
+              ${item.source
+                ? html`<span class="chip" style="margin-top: 4px; font-size: 11px;">${item.source}</span>`
+                : nothing}
+              ${item.excerpt
+                ? html`<div class="muted" style="margin-top: 4px; font-size: 12px; line-height: 1.4;
+                    overflow: hidden; text-overflow: ellipsis; display: -webkit-box;
+                    -webkit-line-clamp: 2; -webkit-box-orient: vertical;">${item.excerpt}</div>`
+                : nothing}
+            </div>
+          `,
+        )}
+        ${items.length > 10
+          ? html`<div class="muted" style="padding: 8px 0; font-size: 12px;">
+              +${items.length - 10} more in inbox
+            </div>`
+          : nothing}
+      </div>
+    </div>
+  </div>`;
+}
+
 // ===== Tasks View (formerly Command Center) =====
 
 function renderCommandCenter(props: MyDayProps) {
@@ -435,6 +506,7 @@ function renderCommandCenter(props: MyDayProps) {
     <div class="command-center command-center--grid">
       <div class="command-center-col command-center-col--tasks">
         ${renderTaskPanel(props)}
+        ${renderInboxPanel(props)}
       </div>
       <div class="command-center-col command-center-col--results">
         ${hasDecisionCards

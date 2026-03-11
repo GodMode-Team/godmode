@@ -186,7 +186,9 @@ export type AppViewState = {
   skillEdits: Record<string, string>;
   skillMessages: Record<string, SkillMessage>;
   skillsBusyKey: string | null;
-  skillsSubTab: "my-skills" | "clawhub";
+  skillsSubTab: "godmode" | "my-skills" | "clawhub";
+  godmodeSkills: import("./views/skills").GodModeSkillsData | null;
+  godmodeSkillsLoading: boolean;
   clawhubQuery: string;
   clawhubResults: ClawHubSearchResult[] | null;
   clawhubExploreItems: ClawHubSkillItem[] | null;
@@ -243,6 +245,8 @@ export type AppViewState = {
   todayTasksLoading?: boolean;
   todayEditingTaskId?: string | null;
   todayShowCompleted?: boolean;
+  todayInboxItems?: Array<{ name: string; path: string; updatedAt: string | null; excerpt: string; source?: string }>;
+  todayInboxLoading?: boolean;
   // Ally side-chat state
   allyPanelOpen?: boolean;
   allyMessages?: AllyChatMessage[];

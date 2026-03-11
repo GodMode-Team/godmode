@@ -64,6 +64,7 @@ import {
 } from "./controllers/clawhub";
 import {
   installSkill,
+  loadGodModeSkills,
   loadSkills,
   saveSkillApiKey,
   updateSkillEdit,
@@ -1554,6 +1555,10 @@ export function renderApp(state: AppViewState) {
                     onViewOutput: (id: string, path: string) => state.handleDecisionViewOutput(id, path),
                     onOpenChat: (id: string) => state.handleDecisionOpenChat(id),
                   } : undefined,
+                  // Inbox
+                  inboxItems: state.todayInboxItems ?? [],
+                  inboxLoading: state.todayInboxLoading ?? false,
+                  onOpenInboxItem: (path: string) => state.handleOpenSidebar(path, "Inbox Item"),
                   // Evening capture
                   onEveningCapture: () => {
                     state.setTab("chat" as import("./navigation").Tab);
@@ -1744,8 +1749,13 @@ export function renderApp(state: AppViewState) {
                 messages: state.skillMessages,
                 busyKey: state.skillsBusyKey,
                 subTab: state.skillsSubTab,
+                godmodeSkills: state.godmodeSkills ?? null,
+                godmodeSkillsLoading: state.godmodeSkillsLoading ?? false,
                 onFilterChange: (next) => (state.skillsFilter = next),
-                onRefresh: () => loadSkills(state, { clearMessages: true }),
+                onRefresh: () => {
+                  loadSkills(state, { clearMessages: true });
+                  loadGodModeSkills(state);
+                },
                 onToggle: (key, enabled) => updateSkillEnabled(state, key, enabled),
                 onEdit: (key, value) => updateSkillEdit(state, key, value),
                 onSaveKey: (key) => saveSkillApiKey(state, key),
@@ -1753,6 +1763,9 @@ export function renderApp(state: AppViewState) {
                   installSkill(state, skillKey, name, installId),
                 onSubTabChange: (tab) => {
                   state.skillsSubTab = tab;
+                  if (tab === "godmode" && !state.godmodeSkills) {
+                    loadGodModeSkills(state);
+                  }
                   if (tab === "clawhub" && !state.clawhubExploreItems) {
                     exploreClawHub(state);
                   }
