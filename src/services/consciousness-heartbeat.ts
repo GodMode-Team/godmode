@@ -239,7 +239,23 @@ class ConsciousnessHeartbeat {
         }
       } catch { /* non-fatal */ }
 
-      // 7. Clean up expired private sessions
+      // 7b. Self-heal — check all subsystems, auto-repair what's broken
+      try {
+        const { runSelfHeal, cleanOrphanedAgents } = await import("./self-heal.js");
+        const healResult = await runSelfHeal(this.logger, (event, payload) => this.broadcast(event, payload));
+        if (healResult.repaired > 0) {
+          this.logger.info(`[Consciousness] Self-heal: ${healResult.repaired} repair(s), ${healResult.failures.length} persistent failure(s)`);
+        }
+        // Also clean orphaned agent processes
+        const orphansCleaned = await cleanOrphanedAgents(this.logger);
+        if (orphansCleaned > 0) {
+          this.logger.info(`[Consciousness] Cleaned ${orphansCleaned} orphaned agent process(es)`);
+        }
+      } catch (err) {
+        this.logger.warn(`[Consciousness] Self-heal failed: ${String(err)}`);
+      }
+
+      // 8. Clean up expired private sessions
       try {
         const { cleanupExpiredPrivateSessions } = await import("../lib/private-session.js");
         const cleaned = await cleanupExpiredPrivateSessions();

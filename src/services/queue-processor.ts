@@ -29,21 +29,21 @@ const PROMPT_TEMPLATES: Record<QueueItemType, string> = {
   coding:
     "Implement this: {title}\n{description}\n\nCreate a branch, write the code, ensure it builds.\n\nEnd with: ## Next Steps — what the user should do with this.",
   research:
-    "Research this topic: {title}\n{description}\n\nWrite a structured report: Summary, Key Findings, Sources, Recommendations.\n\nBe thorough but concise. Quality over quantity.\n\nThink step by step before acting.\n\nStart with a one-sentence executive summary.\n\nIf you can't fully complete this, document what's blocking you and what you tried.",
+    "Research this topic: {title}\n{description}\n\nWrite a structured report: Summary, Key Findings, Sources, Recommendations.\n\nBe thorough but concise. Quality over quantity.\n\nThink step by step before acting.\n\nStart with a one-sentence executive summary.\n\nIf you can't fully complete this, document what's blocking you and what you tried.\n\nIMPORTANT: Show your sources. Link to evidence.",
   analysis:
     "Analyze this: {title}\n{description}\n\nProvide: Data Summary, Key Insights, Comparisons, Actionable Conclusions.",
   creative:
-    "Create this content: {title}\n{description}\n\nWrite polished, publication-ready output. Include variations if appropriate.",
+    "Create this content: {title}\n{description}\n\nWrite polished, publication-ready output. Include variations if appropriate.\n\nEnd with: ## Next Steps — what the user should do with this.",
   review:
     "Review this: {title}\n{description}\n\nProvide: Summary, Issues Found, Recommendations, Severity Ratings.\n\nFormat output in markdown with clear headers.\n\nStart with a one-sentence executive summary.",
   ops:
-    "Handle this operational task: {title}\n{description}\n\nExecute the task, document what was done and any follow-ups needed.",
+    "Handle this operational task: {title}\n{description}\n\nExecute the task, document what was done and any follow-ups needed.\n\nBe thorough but concise. Quality over quantity.",
   task:
     "Complete this task: {title}\n{description}\n\nDo whatever it takes to get this done. Show your work.\n\nInclude confidence levels for each finding.",
   url:
-    "Analyze this URL: {url}\n{title}\n{description}\n\nFetch the content, analyze it. Write: Source, Key Points, Relevance, Action Items.",
+    "Analyze this URL: {url}\n{title}\n{description}\n\nFetch the content, analyze it. Write: Source, Key Points, Relevance, Action Items.\n\nThink step by step before acting.\n\nEnd with: ## Next Steps — what the user should do with this.",
   idea:
-    "Explore this idea: {title}\n{description}\n\nAnalyze feasibility, implementation approach, potential issues.\n\nIMPORTANT: Show your sources. Link to evidence.",
+    "Explore this idea: {title}\n{description}\n\nAnalyze feasibility, implementation approach, potential issues.\n\nIMPORTANT: Show your sources. Link to evidence.\n\nBe thorough but concise. Quality over quantity.\n\nEnd with: ## Next Steps — what the user should do with this.",
 };
 
 // ── Singleton ──────────────────────────────────────────────────────
@@ -257,6 +257,11 @@ class QueueProcessor {
       clearInterval(this.pollTimer);
       this.pollTimer = null;
     }
+  }
+
+  /** Check if the polling loop is active. Used by self-heal. */
+  isPolling(): boolean {
+    return this.pollTimer !== null && !this.stopped;
   }
 
   private async pollTick(): Promise<void> {
@@ -959,6 +964,10 @@ class QueueProcessor {
       sections.push("", "## Your Role", "", persona.body);
     }
 
+    // Detect godmode-builder persona for codebase-level access
+    const isGodmodeBuilder = item.personaHint === "godmode-builder" ||
+      persona?.name === "GodMode Builder";
+
     sections.push(
       "",
       "## Persistence Protocol",
@@ -966,12 +975,73 @@ class QueueProcessor {
       "- If a tool is unavailable, work around it with another tool.",
       "- If you get stuck, write what you learned so far and what you'd try next.",
       "- NEVER give up without writing output. Partial results are better than nothing.",
-      "",
-      "## Safety Rules",
-      "- Do NOT modify files outside ~/godmode/memory/inbox/.",
-      "- Do NOT run destructive commands (rm -rf, git reset --hard).",
-      "- Do NOT access sensitive config files (.env, openclaw.json, SSH keys).",
-      "- Write your complete output to the path above as markdown.",
+    );
+
+    if (isGodmodeBuilder) {
+      // Builder agents need codebase access — relaxed safety with specific boundaries
+      sections.push(
+        "",
+        "## Safety Rules (Builder Agent)",
+        "- You have full access to the godmode-plugin codebase.",
+        "- Create a feature branch — NEVER commit to main.",
+        "- Do NOT run destructive commands (rm -rf, git reset --hard, git push --force).",
+        "- Do NOT modify .env files or credentials.",
+        "- Run `pnpm build && pnpm typecheck` before committing — both must pass.",
+        "- Write your output summary to the path above AND commit your code changes.",
+      );
+
+      // Tell the builder where the plugin source lives
+      try {
+        const { fileURLToPath } = await import("node:url");
+        const thisFile = fileURLToPath(import.meta.url);
+        const pluginRoot = path.resolve(path.dirname(thisFile), "..", "..");
+        sections.push(
+          "",
+          "## Codebase Location",
+          `The godmode-plugin source lives at: ${pluginRoot}`,
+          `cd there before doing anything. Read CLAUDE.md first.`,
+        );
+      } catch {
+        // Can't resolve plugin root — the builder can find it from GODMODE_ROOT
+      }
+
+      // Inject health ledger and repair context so the builder knows what's broken
+      try {
+        const { health, repairLog } = await import("../lib/health-ledger.js");
+        const snapshot = health.snapshot();
+        const recentRepairs = repairLog.recent(10);
+
+        if (snapshot.alerts.length > 0 || recentRepairs.length > 0) {
+          const healthLines = ["", "## System Health Context"];
+          if (snapshot.alerts.length > 0) {
+            healthLines.push("### Current Alerts");
+            for (const alert of snapshot.alerts) {
+              healthLines.push(`- ${alert}`);
+            }
+          }
+          if (recentRepairs.length > 0) {
+            healthLines.push("### Recent Repair History");
+            for (const r of recentRepairs.slice(-5)) {
+              healthLines.push(
+                `- ${r.subsystem}: ${r.failure} → ${r.repairAction} (${r.verified ? "verified" : "unverified"})`,
+              );
+            }
+          }
+          sections.push(...healthLines);
+        }
+      } catch { /* health context non-fatal */ }
+    } else {
+      sections.push(
+        "",
+        "## Safety Rules",
+        "- Do NOT modify files outside ~/godmode/memory/inbox/.",
+        "- Do NOT run destructive commands (rm -rf, git reset --hard).",
+        "- Do NOT access sensitive config files (.env, openclaw.json, SSH keys).",
+        "- Write your complete output to the path above as markdown.",
+      );
+    }
+
+    sections.push(
       "",
       "## Task",
       body,
