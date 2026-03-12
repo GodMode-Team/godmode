@@ -71,6 +71,18 @@ export function formatApiError(text: string): string | null {
   return null;
 }
 
+/**
+ * Strip inline API error JSON from a larger message body.
+ * The gateway sometimes injects raw error JSON mid-response (e.g., when a
+ * streaming response partially completes then errors). This removes those
+ * JSON blobs and replaces them with a brief notice.
+ */
+const INLINE_API_ERROR_RE = /\{"type":"error","error":\{[^}]*"type":"[^"]*"[^}]*\}[^}]*"request_id":"[^"]*"\}/g;
+
+function stripInlineApiErrors(text: string): string {
+  return text.replace(INLINE_API_ERROR_RE, "*[API temporarily unavailable — retrying]*");
+}
+
 const ENVELOPE_PREFIX = /^\[([^\]]+)\]\s*/;
 const ENVELOPE_CHANNELS = [
   "WebChat",
@@ -128,7 +140,12 @@ export function extractText(message: unknown): string | null {
   if (typeof content === "string") {
     const cleaned = stripSystemContext(content);
     if (!cleaned) return null;
-    const processed = role === "assistant" ? stripThinkingTags(cleaned) : stripEnvelope(cleaned);
+    // Catch raw API error JSON that leaked through (e.g., overloaded_error)
+    const apiError = formatApiError(cleaned);
+    if (apiError) return apiError;
+    // Strip inline API error JSON from partial responses
+    const deErrored = role === "assistant" ? stripInlineApiErrors(cleaned) : cleaned;
+    const processed = role === "assistant" ? stripThinkingTags(deErrored) : stripEnvelope(cleaned);
     // Filter out silent reply tokens
     if (isSilentReply(processed)) {
       return null;
