@@ -8,7 +8,7 @@
  *
  * Storage: SQLite files in ~/godmode/data/ (zero infrastructure)
  * LLM: Anthropic Claude (same API key GodMode already uses)
- * Embeddings: OpenAI text-embedding-3-small or Google gemini-embedding-001
+ * Embeddings: Google gemini-embedding-2-preview (1536d) or OpenAI text-embedding-3-small
  *
  * All Mem0 operations are wrapped in timeouts and try/catch.
  * Memory failures are invisible to the user — the conversation never breaks.
@@ -71,12 +71,12 @@ async function _doInit(): Promise<void> {
         provider: "google",
         config: {
           apiKey: process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY,
-          model: "gemini-embedding-001",
-          embeddingDims: 768,
+          model: "gemini-embedding-2-preview",
+          embeddingDims: 1536,
         },
       };
-      dimension = 768;
-      console.log("[GodMode Memory] Using Gemini embeddings (gemini-embedding-001)");
+      dimension = 1536;
+      console.log("[GodMode Memory] Using Gemini embeddings (gemini-embedding-2-preview, 1536d)");
     } else if (hasOpenAI) {
       embedder = {
         provider: "openai",
