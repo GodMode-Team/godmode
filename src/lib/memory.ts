@@ -32,6 +32,12 @@ const MAX_RETRY_ATTEMPTS = 3;
 const SEARCH_TIMEOUT_MS = 5_000;
 const INGEST_TIMEOUT_MS = 15_000;
 
+/** Circuit breaker for memory search — backs off after consecutive failures */
+let consecutiveSearchFailures = 0;
+let circuitOpenUntil = 0;
+const CIRCUIT_MAX_FAILURES = 3;
+const CIRCUIT_COOLDOWN_MS = 60_000; // 1 minute backoff when circuit opens
+
 /**
  * Initialize Mem0. Called once during gateway_start.
  * Fails silently — GodMode works without memory, just less well.
@@ -194,7 +200,14 @@ let lastSearchFailed = false;
 export function getMemoryStatus(): MemoryStatus {
   if (!memoryInstance || initFailed) return "offline";
   if (lastSearchFailed) return "degraded";
+  if (consecutiveSearchFailures >= CIRCUIT_MAX_FAILURES && Date.now() < circuitOpenUntil) return "degraded";
   return "ready";
+}
+
+/** Reset circuit breaker — called by self-heal after successful repair */
+export function resetSearchCircuitBreaker(): void {
+  consecutiveSearchFailures = 0;
+  circuitOpenUntil = 0;
 }
 
 // ── Proactive Search ─────────────────────────────────────────────────
@@ -218,6 +231,12 @@ export async function searchMemories(
 ): Promise<MemoryResult[]> {
   if (!memoryInstance || !query || query.length < 5) return [];
 
+  // Circuit breaker: skip search if we've failed too many times recently
+  if (consecutiveSearchFailures >= CIRCUIT_MAX_FAILURES && Date.now() < circuitOpenUntil) {
+    health.signal("memory.search", false, { error: "circuit-open", cooldownMs: circuitOpenUntil - Date.now() });
+    return [];
+  }
+
   const start = Date.now();
   try {
     const result: any = await withTimeout(
@@ -226,19 +245,40 @@ export async function searchMemories(
     );
     if (!result?.results) {
       lastSearchFailed = true;
+      consecutiveSearchFailures++;
+      if (consecutiveSearchFailures >= CIRCUIT_MAX_FAILURES) {
+        circuitOpenUntil = Date.now() + CIRCUIT_COOLDOWN_MS;
+        console.warn(`[GodMode Memory] Circuit breaker open — backing off for ${CIRCUIT_COOLDOWN_MS / 1000}s`);
+      }
       health.signal("memory.search", false, { error: "no results object", elapsed: Date.now() - start });
       return [];
     }
 
     lastSearchFailed = false;
+    consecutiveSearchFailures = 0; // Reset circuit breaker on success
+
+    // Score threshold 0.4 — proper nouns (names, places) produce lower
+    // embedding similarity than semantic phrases. Previous 0.55 silently
+    // dropped valid contact matches like "Ashley Robertson".
     const filtered = (result.results as any[])
-      .filter((r) => r.memory && (r.score == null || r.score > 0.55))
+      .filter((r) => r.memory && (r.score == null || r.score > 0.4))
       .map((r) => ({ memory: r.memory as string, score: r.score as number | undefined }));
 
-    health.signal("memory.search", true, { results: filtered.length, elapsed: Date.now() - start });
+    // Log dropped results so we can tune threshold
+    if (process.env.GODMODE_DEBUG) {
+      const dropped = (result.results as any[]).filter((r) => r.memory && r.score != null && r.score <= 0.4);
+      if (dropped.length) console.log(`[GodMode Memory] Dropped ${dropped.length} low-score results (≤0.4):`, dropped.map((r: any) => ({ score: r.score, snippet: String(r.memory).slice(0, 60) })));
+    }
+
+    health.signal("memory.search", true, { results: filtered.length, topScore: filtered[0]?.score, elapsed: Date.now() - start });
     return filtered;
   } catch (err) {
     lastSearchFailed = true;
+    consecutiveSearchFailures++;
+    if (consecutiveSearchFailures >= CIRCUIT_MAX_FAILURES) {
+      circuitOpenUntil = Date.now() + CIRCUIT_COOLDOWN_MS;
+      console.warn(`[GodMode Memory] Circuit breaker open — backing off for ${CIRCUIT_COOLDOWN_MS / 1000}s`);
+    }
     const errMsg = String(err).slice(0, 100);
     health.signal("memory.search", false, { error: errMsg, elapsed: Date.now() - start });
     turnErrors.capture("memory.search", errMsg);
@@ -303,8 +343,15 @@ export async function ingestConversation(
 export async function processRetryQueue(): Promise<number> {
   if (!memoryInstance || retryQueue.length === 0) return 0;
 
+  // Skip retry processing if circuit breaker is open (API is struggling)
+  if (consecutiveSearchFailures >= CIRCUIT_MAX_FAILURES && Date.now() < circuitOpenUntil) {
+    return 0;
+  }
+
   let processed = 0;
-  const batch = retryQueue.splice(0, 5);
+  // Process fewer items when we've had recent failures
+  const batchSize = consecutiveSearchFailures > 0 ? 2 : 5;
+  const batch = retryQueue.splice(0, batchSize);
 
   for (const item of batch) {
     try {
