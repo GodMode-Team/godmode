@@ -17,6 +17,7 @@ import {
   consumeContextPressureNudge,
   getContextPressureLevel,
 } from "./safety-gates.js";
+import { isRecentlyOverloaded } from "./lifecycle-hooks.js";
 
 type Logger = { warn: (msg: string) => void; info: (msg: string) => void };
 
@@ -127,10 +128,19 @@ export async function handleBeforePromptBuild(
     userQuery = typeof _textBlock?.text === "string" ? _textBlock.text : "";
   }
 
-  // P0: Mem0 proactive memory search
+  // ── Overload-aware lightweight mode ──
+  // When the API has recently returned overloaded_error, skip expensive
+  // async operations (memory search, calendar, tasks, cron, queue) to
+  // reduce request size and API pressure. Only inject P0 essentials.
+  const lightMode = isRecentlyOverloaded();
+  if (lightMode) {
+    logger.info(`[GodMode] Light mode active — skipping P1+ context gathering due to recent API overload`);
+  }
+
+  // P0: Mem0 proactive memory search (skip in light mode — it fires a Haiku API call)
   let memoryBlock: string | null = null;
   let memoryStatus: "ready" | "degraded" | "offline" = "offline";
-  if (provenance?.kind !== "inter_session") {
+  if (provenance?.kind !== "inter_session" && !lightMode) {
     try {
       const { isMemoryReady, searchMemories, formatMemoriesForContext, getMemoryStatus } = await import("../lib/memory.js");
       memoryStatus = getMemoryStatus();
@@ -146,11 +156,13 @@ export async function handleBeforePromptBuild(
       logger.warn(`[GodMode] Mem0 search error (non-fatal): ${String(err)}`);
       memoryStatus = "degraded";
     }
+  } else if (lightMode) {
+    memoryStatus = "degraded"; // Signal to ally that memory was skipped
   }
 
-  // P0: Identity graph
+  // P0: Identity graph (skip in light mode)
   let graphBlock: string | null = null;
-  if (provenance?.kind !== "inter_session") {
+  if (provenance?.kind !== "inter_session" && !lightMode) {
     try {
       const { isGraphReady, queryGraph, formatGraphContext } = await import("../lib/identity-graph.js");
       if (isGraphReady()) {
@@ -163,101 +175,111 @@ export async function handleBeforePromptBuild(
     } catch { /* graph query failure is invisible */ }
   }
 
-  // P1: Schedule + meeting prep
+  // P1: Schedule + meeting prep (skip in light mode — network call)
   let schedule: string | null = null;
   let meetingPrep: string | null = null;
-  try {
-    const { fetchCalendarEvents } = await import("../methods/brief-generator.js");
-    const result = await fetchCalendarEvents();
-    if (result.events.length > 0) {
-      const lines = ["## Schedule"];
-      for (const e of result.events.slice(0, 5)) {
-        const time = new Date(e.startTime).toLocaleTimeString("en-US", {
-          hour: "numeric", minute: "2-digit", hour12: true,
-        });
-        lines.push(`- ${time}: ${e.title}`);
-      }
-      schedule = lines.join("\n");
-
-      const now = Date.now();
-      const upcoming = result.events.filter((e: any) => {
-        const start = new Date(e.startTime).getTime();
-        return start > now && start - now <= 2 * 60 * 60 * 1000;
-      });
-      if (upcoming.length > 0) {
-        const next = upcoming[0];
-        const time = new Date(next.startTime).toLocaleTimeString("en-US", {
-          hour: "numeric", minute: "2-digit", hour12: true,
-        });
-        const parts = [`## Upcoming: **${next.title}** at ${time}`];
-        if (next.attendees && next.attendees.length > 0) {
-          parts.push(`Attendees: ${next.attendees.slice(0, 5).join(", ")}`);
+  if (!lightMode) {
+    try {
+      const { fetchCalendarEvents } = await import("../methods/brief-generator.js");
+      const result = await fetchCalendarEvents();
+      if (result.events.length > 0) {
+        const lines = ["## Schedule"];
+        for (const e of result.events.slice(0, 5)) {
+          const time = new Date(e.startTime).toLocaleTimeString("en-US", {
+            hour: "numeric", minute: "2-digit", hour12: true,
+          });
+          lines.push(`- ${time}: ${e.title}`);
         }
-        parts.push("Offer meeting prep if not already discussed.");
-        meetingPrep = parts.join("\n");
-      }
-    } else {
-      schedule = "## Schedule: No meetings today";
-    }
-  } catch { /* calendar unavailable */ }
+        schedule = lines.join("\n");
 
-  // P1: Task + queue counts
+        const now = Date.now();
+        const upcoming = result.events.filter((e: any) => {
+          const start = new Date(e.startTime).getTime();
+          return start > now && start - now <= 2 * 60 * 60 * 1000;
+        });
+        if (upcoming.length > 0) {
+          const next = upcoming[0];
+          const time = new Date(next.startTime).toLocaleTimeString("en-US", {
+            hour: "numeric", minute: "2-digit", hour12: true,
+          });
+          const parts = [`## Upcoming: **${next.title}** at ${time}`];
+          if (next.attendees && next.attendees.length > 0) {
+            parts.push(`Attendees: ${next.attendees.slice(0, 5).join(", ")}`);
+          }
+          parts.push("Offer meeting prep if not already discussed.");
+          meetingPrep = parts.join("\n");
+        }
+      } else {
+        schedule = "## Schedule: No meetings today";
+      }
+    } catch { /* calendar unavailable */ }
+  }
+
+  // P1: Task + queue counts (skip in light mode)
   let operationalCounts: string | null = null;
   let overdueCount = 0;
-  try {
-    const { localDateString: lds } = await import("../data-paths.js");
-    const today = lds();
-    const { readTasks } = await import("../methods/tasks.js");
-    const data = await readTasks();
-    const pending = data.tasks.filter((t: { status: string }) => t.status === "pending");
-    const overdue = pending.filter(
-      (t: { dueDate?: string | null }) => t.dueDate != null && t.dueDate <= today,
-    );
-    overdueCount = overdue.length;
-    const parts = [`Tasks: ${pending.length} pending, ${overdue.length} overdue`];
-    if (overdue.length > 0) parts.push("Surface overdue tasks early.");
-    operationalCounts = parts.join(" | ");
-  } catch { /* tasks unavailable */ }
+  if (!lightMode) {
+    try {
+      const { localDateString: lds } = await import("../data-paths.js");
+      const today = lds();
+      const { readTasks } = await import("../methods/tasks.js");
+      const data = await readTasks();
+      const pending = data.tasks.filter((t: { status: string }) => t.status === "pending");
+      const overdue = pending.filter(
+        (t: { dueDate?: string | null }) => t.dueDate != null && t.dueDate <= today,
+      );
+      overdueCount = overdue.length;
+      const parts = [`Tasks: ${pending.length} pending, ${overdue.length} overdue`];
+      if (overdue.length > 0) parts.push("Surface overdue tasks early.");
+      operationalCounts = parts.join(" | ");
+    } catch { /* tasks unavailable */ }
+  }
 
-  // P1: Priorities
+  // P1: Priorities (skip in light mode)
   let priorities: string | null = null;
-  try {
-    const { parseWinTheDay, getTodayDate } = await import("../methods/daily-brief.js");
-    const { getVaultPath, VAULT_FOLDERS } = await import("../lib/vault-paths.js");
-    const vault = getVaultPath();
-    if (vault) {
-      const briefPath = join(vault, VAULT_FOLDERS.daily, `${getTodayDate()}.md`);
-      const { readFile: rf } = await import("node:fs/promises");
-      const brief = await rf(briefPath, "utf-8");
-      const wtd = parseWinTheDay(brief);
-      if (wtd.length > 0) {
-        const items = wtd.slice(0, 3).map((item: { completed: boolean; title: string }) => {
-          const check = item.completed ? "[x]" : "[ ]";
-          return `- ${check} ${item.title}`;
-        });
-        priorities = "## Priorities\n" + items.join("\n");
+  if (!lightMode) {
+    try {
+      const { parseWinTheDay, getTodayDate } = await import("../methods/daily-brief.js");
+      const { getVaultPath, VAULT_FOLDERS } = await import("../lib/vault-paths.js");
+      const vault = getVaultPath();
+      if (vault) {
+        const briefPath = join(vault, VAULT_FOLDERS.daily, `${getTodayDate()}.md`);
+        const { readFile: rf } = await import("node:fs/promises");
+        const brief = await rf(briefPath, "utf-8");
+        const wtd = parseWinTheDay(brief);
+        if (wtd.length > 0) {
+          const items = wtd.slice(0, 3).map((item: { completed: boolean; title: string }) => {
+            const check = item.completed ? "[x]" : "[ ]";
+            return `- ${check} ${item.title}`;
+          });
+          priorities = "## Priorities\n" + items.join("\n");
+        }
       }
-    }
-  } catch { /* no brief */ }
+    } catch { /* no brief */ }
+  }
 
-  // P2: Cron failures
+  // P2: Cron failures (skip in light mode)
   let cronFailures: string | null = null;
-  try {
-    const { scanForFailures, formatFailuresForSnapshot } = await import("../services/failure-notify.js");
-    const failures = await scanForFailures();
-    cronFailures = formatFailuresForSnapshot(failures) || null;
-  } catch { /* non-fatal */ }
+  if (!lightMode) {
+    try {
+      const { scanForFailures, formatFailuresForSnapshot } = await import("../services/failure-notify.js");
+      const failures = await scanForFailures();
+      cronFailures = formatFailuresForSnapshot(failures) || null;
+    } catch { /* non-fatal */ }
+  }
 
-  // P2: Queue review prompt
+  // P2: Queue review prompt (skip in light mode)
   let queueReview: string | null = null;
-  try {
-    const { readQueueState } = await import("../lib/queue-state.js");
-    const qs = await readQueueState();
-    const review = qs.items.filter((i: { status: string }) => i.status === "review").length;
-    if (review > 0) {
-      queueReview = `${review} queue item(s) ready for review. Prompt the user.`;
-    }
-  } catch { /* non-fatal */ }
+  if (!lightMode) {
+    try {
+      const { readQueueState } = await import("../lib/queue-state.js");
+      const qs = await readQueueState();
+      const review = qs.items.filter((i: { status: string }) => i.status === "review").length;
+      if (review > 0) {
+        queueReview = `${review} queue item(s) ready for review. Prompt the user.`;
+      }
+    } catch { /* non-fatal */ }
+  }
 
   // Extract user message for skill card + routing lesson matching
   let currentUserMessage = "";
@@ -302,26 +324,30 @@ export async function handleBeforePromptBuild(
     } catch { /* non-fatal */ }
   }
 
-  // P1.5: Skill card
+  // P1.5: Skill card (skip in light mode)
   let skillCard: string | null = null;
-  try {
-    if (currentUserMessage.length >= 3) {
-      const { matchSkillCard, formatSkillCard } = await import("../lib/skill-cards.js");
-      const matched = matchSkillCard(currentUserMessage);
-      if (matched) {
-        skillCard = formatSkillCard(matched);
+  if (!lightMode) {
+    try {
+      if (currentUserMessage.length >= 3) {
+        const { matchSkillCard, formatSkillCard } = await import("../lib/skill-cards.js");
+        const matched = matchSkillCard(currentUserMessage);
+        if (matched) {
+          skillCard = formatSkillCard(matched);
+        }
       }
-    }
-  } catch { /* non-fatal */ }
+    } catch { /* non-fatal */ }
+  }
 
-  // P2: Routing lessons
+  // P2: Routing lessons (skip in light mode)
   let routingLessons: string | null = null;
-  try {
-    const { getRoutingLessons, formatRoutingLessons } = await import("../lib/agent-lessons.js");
-    const lessons = await getRoutingLessons();
-    const formatted = formatRoutingLessons(lessons, currentUserMessage);
-    if (formatted) routingLessons = formatted;
-  } catch { /* non-fatal */ }
+  if (!lightMode) {
+    try {
+      const { getRoutingLessons, formatRoutingLessons } = await import("../lib/agent-lessons.js");
+      const lessons = await getRoutingLessons();
+      const formatted = formatRoutingLessons(lessons, currentUserMessage);
+      if (formatted) routingLessons = formatted;
+    } catch { /* non-fatal */ }
+  }
 
   // P3: Safety nudges
   const safetyNudges: string[] = [];

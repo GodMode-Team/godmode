@@ -51,10 +51,33 @@ const API_ERROR_FRIENDLY: Record<string, string> = {
 const OVERLOAD_PLAIN =
   "The AI service is temporarily overloaded. Please try again in a moment.";
 
+// ── Overload Tracking ───────────────────────────────────────────────
+// Tracks recent overload events so before_prompt_build can go lightweight.
+
+let lastOverloadAt = 0;
+let overloadCount = 0;
+const OVERLOAD_WINDOW_MS = 120_000; // 2 minute window
+
+/** Check if we've had recent overload errors — used by before_prompt_build to go lightweight */
+export function isRecentlyOverloaded(): boolean {
+  return Date.now() - lastOverloadAt < OVERLOAD_WINDOW_MS;
+}
+
+/** Get recent overload count for diagnostics */
+export function getOverloadCount(): number {
+  return overloadCount;
+}
+
+function recordOverload(): void {
+  lastOverloadAt = Date.now();
+  overloadCount++;
+}
+
 /** Returns a friendly replacement string if `content` is a raw API error, else null. */
 function interceptApiError(content: string): string | null {
   // Plain-text overload message from gateway
   if (content.trim() === OVERLOAD_PLAIN) {
+    recordOverload();
     return API_ERROR_FRIENDLY.overloaded_error;
   }
 
@@ -64,6 +87,9 @@ function interceptApiError(content: string): string | null {
       const parsed = JSON.parse(content.trim());
       if (parsed?.type === "error" && parsed?.error) {
         const errorType: string = parsed.error.type ?? "unknown_error";
+        if (errorType === "overloaded_error" || errorType === "rate_limit_error") {
+          recordOverload();
+        }
         return (
           API_ERROR_FRIENDLY[errorType] ??
           `I ran into an issue (${errorType}). Please try again in a moment.`
