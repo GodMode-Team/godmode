@@ -84,6 +84,7 @@ import {
   handleLlmOutputPressure,
   handleLlmOutputAutoTitle,
   handleLlmOutputAgentLog,
+  handleAfterToolCall,
   handleAfterCompaction,
 } from "./src/hooks/lifecycle-hooks.js";
 import { registerCliCommands } from "./src/cli/commands.js";
@@ -442,6 +443,10 @@ const godmodePlugin = {
 
     api.on("after_compaction", async (event: any, ctx: any) => {
       await handleAfterCompaction(event, ctx, api);
+    });
+
+    api.on("after_tool_call", async (event: any, ctx: any) => {
+      await handleAfterToolCall(event, ctx, api);
     });
 
     // ── 6. Tools ──────────────────────────────────────────────────

@@ -373,10 +373,20 @@ function renderDocumentHtml(doc: ProofDocument, comments: ProofComment[]): strin
     const slug = "${escapeHtml(doc.slug)}";
     const editor = document.getElementById("editor");
     const status = document.getElementById("saveStatus");
+    // Detect whether we're served via srcdoc (postMessage) or direct HTTP
+    const useSrcdoc = !location.hostname || location.protocol === "about:";
+    const baseUrl = !useSrcdoc && location.pathname.startsWith("/godmode/proof")
+      ? "/godmode/proof"
+      : "";
     async function saveContent() {
       status.textContent = "Saving...";
+      if (useSrcdoc && window.parent !== window) {
+        window.parent.postMessage({ type: "proof-save", slug, content: editor.value }, "*");
+        status.textContent = "Saved"; setTimeout(() => status.textContent = "", 2000);
+        return;
+      }
       try {
-        const res = await fetch("/documents/" + slug, {
+        const res = await fetch(baseUrl + "/documents/" + slug, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ content: editor.value, author: "human" }),
@@ -389,16 +399,26 @@ function renderDocumentHtml(doc: ProofDocument, comments: ProofComment[]): strin
     editor.addEventListener("keydown", (e) => {
       if ((e.metaKey || e.ctrlKey) && e.key === "s") { e.preventDefault(); saveContent(); }
     });
-    // Auto-refresh every 3s to see agent edits
-    setInterval(async () => {
-      try {
-        const res = await fetch("/documents/" + slug);
-        const doc = await res.json();
-        if (doc.content !== editor.value && document.activeElement !== editor) {
-          editor.value = doc.content;
+    // Listen for refresh messages from parent (srcdoc mode)
+    window.addEventListener("message", (e) => {
+      if (e.data?.type === "proof-refresh" && e.data.content != null) {
+        if (e.data.content !== editor.value && document.activeElement !== editor) {
+          editor.value = e.data.content;
         }
-      } catch {}
-    }, 3000);
+      }
+    });
+    // Auto-refresh every 3s (HTTP mode only — srcdoc uses parent messages)
+    if (!useSrcdoc) {
+      setInterval(async () => {
+        try {
+          const res = await fetch(baseUrl + "/documents/" + slug);
+          const doc = await res.json();
+          if (doc.content !== editor.value && document.activeElement !== editor) {
+            editor.value = doc.content;
+          }
+        } catch {}
+      }, 3000);
+    }
   </script>
 </body>
 </html>`;
@@ -596,13 +616,32 @@ export const proofHandlers: Record<string, Function> = {
       respond(false, null, { code: "NOT_FOUND", message: "Proof document not found" });
       return;
     }
+    const comments = getComments(slug);
+    const html = renderDocumentHtml(doc, comments);
     respond(true, {
       slug: doc.slug,
       title: doc.title,
       updatedAt: doc.updatedAt,
       viewUrl: getProofViewUrl(doc.slug),
       filePath: doc.filePath,
+      html,
     });
+  },
+  "proof.save": async ({ params, respond }: { params: Record<string, unknown>; respond: Function }) => {
+    const slug = typeof params.slug === "string" ? params.slug.trim() : "";
+    const content = typeof params.content === "string" ? params.content : "";
+    const author = typeof params.author === "string" ? params.author : "human";
+    if (!slug) {
+      respond(false, null, { code: "INVALID_REQUEST", message: "slug is required" });
+      return;
+    }
+    const doc = readDocument(slug);
+    if (!doc) {
+      respond(false, null, { code: "NOT_FOUND", message: "Proof document not found" });
+      return;
+    }
+    editDocument(slug, content, author);
+    respond(true, { saved: true });
   },
   "proof.list": async ({ respond }: { respond: Function }) => {
     const documents = listDocuments(100).map((doc) => ({

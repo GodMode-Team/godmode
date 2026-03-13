@@ -113,6 +113,8 @@ export type AppViewState = {
   sidebarProofSlug?: string | null;
   /** Fully resolved Proof iframe URL for the current doc */
   sidebarProofUrl?: string | null;
+  /** Pre-rendered HTML from proof.get RPC for srcdoc embedding */
+  sidebarProofHtml?: string | null;
   splitRatio: number;
   lightbox: LightboxState;
   nodesLoading: boolean;

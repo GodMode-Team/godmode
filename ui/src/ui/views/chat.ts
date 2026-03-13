@@ -64,6 +64,7 @@ export type ChatProps = {
   sidebarMode?: "resource" | "proof";
   sidebarProofSlug?: string | null;
   sidebarProofUrl?: string | null;
+  sidebarProofHtml?: string | null;
   splitRatio?: number;
   assistantName: string;
   assistantAvatar: string | null;
@@ -882,6 +883,7 @@ export function renderChat(props: ChatProps) {
                             slug: props.sidebarProofSlug,
                             title: props.sidebarTitle ?? null,
                             viewUrl: props.sidebarProofUrl ?? null,
+                            htmlContent: props.sidebarProofHtml ?? null,
                             filePath: props.sidebarFilePath ?? null,
                             onClose: props.onCloseSidebar!,
                             onPushToDrive: props.onPushToDrive,
@@ -929,6 +931,7 @@ export function renderChat(props: ChatProps) {
                           slug: props.sidebarProofSlug,
                           title: props.sidebarTitle ?? null,
                           viewUrl: props.sidebarProofUrl ?? null,
+                          htmlContent: props.sidebarProofHtml ?? null,
                           filePath: props.sidebarFilePath ?? null,
                           onClose: props.onCloseSidebar!,
                           onPushToDrive: props.onPushToDrive,
