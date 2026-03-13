@@ -6,7 +6,7 @@ export const TAB_GROUPS = [
 ] as const;
 
 export const POWER_USER_GROUPS = [
-  { label: "System", tabs: ["mission-control", "overview", "channels", "instances", "sessions", "cron", "nodes", "debug", "logs"] },
+  { label: "System", tabs: ["mission-control", "overview", "channels", "sessions", "cron", "debug"] },
 ] as const;
 
 /** Tabs that can be dynamically inserted but aren't in static groups. */
@@ -233,25 +233,25 @@ export function titleForTab(tab: Tab) {
     case "workspaces":
       return "Work";
     case "channels":
-      return "Channels";
+      return "Integrations";
     case "instances":
-      return "Instances";
+      return "Devices";
     case "sessions":
       return "Sessions";
     case "cron":
-      return "Cron Jobs";
+      return "Schedules";
     case "skills":
       return "Skills";
     case "agents":
       return "Agents";
     case "nodes":
-      return "Nodes";
+      return "Network";
     case "options":
-      return "Lab";
+      return "Experiments";
     case "trust":
       return "Trust";
     case "guardrails":
-      return "Guardrails";
+      return "Safety";
     case "second-brain":
       return "Second Brain";
     case "mission-control":
@@ -259,9 +259,9 @@ export function titleForTab(tab: Tab) {
     case "dashboards":
       return "Dashboards";
     case "config":
-      return "Config";
+      return "Settings";
     case "debug":
-      return "Debug";
+      return "Developer";
     case "logs":
       return "Logs";
     default:
@@ -341,35 +341,35 @@ export function subtitleForTab(tab: Tab) {
     case "workspaces":
       return "Projects, clients, and personal operating context.";
     case "channels":
-      return "Manage channels and settings.";
+      return "Connected apps — iMessage, Slack, email, calendar, and more.";
     case "instances":
-      return "Presence beacons from connected clients and nodes.";
+      return "Your connected devices and where GodMode is running.";
     case "sessions":
       return "Inspect active sessions and adjust per-session defaults.";
     case "cron":
-      return "Schedule wakeups and recurring agent runs.";
+      return "Recurring tasks — daily briefs, overnight agents, and timed automations.";
     case "skills":
       return "Manage your skills, discover new ones from ClawHub, and personalize them for your workflow.";
     case "agents":
       return "Your agent roster — sub-agents that handle queue tasks, grouped by category.";
     case "nodes":
-      return "Paired devices, capabilities, and command exposure.";
+      return "Devices in your GodMode network and what they can do.";
     case "options":
-      return "Toggle experimental features and modules on and off.";
+      return "Beta features you can toggle on or off.";
     case "trust":
       return "Scores build automatically as you use and rate skills.";
     case "guardrails":
-      return "Safety gates that prevent runaway loops, bad searches, and lazy responses.";
+      return "Boundaries that keep agents focused, honest, and within scope.";
     case "second-brain":
       return "Your Second Brain — identity, knowledge, and live AI context. Stores what your ally needs to act on your behalf.";
     case "mission-control":
-      return "Live command center — active agents, pipelines, and activity feed.";
+      return "Live view — what your agents are doing right now.";
     case "dashboards":
       return "Custom data views built by your AI ally — remix anything.";
     case "config":
-      return "Edit ~/.openclaw/config.json safely.";
+      return "Core settings — model, plugins, and API configuration.";
     case "debug":
-      return "Gateway snapshots, events, and manual RPC calls.";
+      return "Gateway internals, events, and manual RPC calls.";
     case "logs":
       return "Live tail of the gateway file logs.";
     default:
