@@ -295,15 +295,22 @@ function htmlResponse(res: ServerResponse, html: string): void {
   res.end(html);
 }
 
-function renderDocumentHtml(doc: ProofDocument, comments: ProofComment[]): string {
-  const escapedContent = doc.content
+function escapeHtml(str: string): string {
+  return str
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function renderDocumentHtml(doc: ProofDocument, comments: ProofComment[]): string {
+  const escapedContent = escapeHtml(doc.content);
+  const escapedTitle = escapeHtml(doc.title);
 
   const commentsHtml = comments.length > 0
     ? `<div class="comments"><h3>Comments</h3>${comments.map(c =>
-        `<div class="comment"><strong>${c.author}</strong>: ${c.text}<span class="time">${c.timestamp}</span></div>`
+        `<div class="comment"><strong>${escapeHtml(c.author)}</strong>: ${escapeHtml(c.text)}<span class="time">${escapeHtml(c.timestamp)}</span></div>`
       ).join("")}</div>`
     : "";
 
@@ -311,7 +318,7 @@ function renderDocumentHtml(doc: ProofDocument, comments: ProofComment[]): strin
 <html>
 <head>
   <meta charset="utf-8">
-  <title>${doc.title}</title>
+  <title>${escapedTitle}</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
@@ -350,10 +357,10 @@ function renderDocumentHtml(doc: ProofDocument, comments: ProofComment[]): strin
 </head>
 <body>
   <div class="header">
-    <h1>${doc.title}</h1>
+    <h1>${escapedTitle}</h1>
     <div class="meta">
-      <span class="provenance ${doc.author}">${doc.author}</span>
-      Last updated: ${doc.updatedAt}
+      <span class="provenance ${escapeHtml(doc.author)}">${escapeHtml(doc.author)}</span>
+      Last updated: ${escapeHtml(doc.updatedAt)}
     </div>
   </div>
   <div class="toolbar">
@@ -363,7 +370,7 @@ function renderDocumentHtml(doc: ProofDocument, comments: ProofComment[]): strin
   <textarea id="editor">${escapedContent}</textarea>
   ${commentsHtml}
   <script>
-    const slug = "${doc.slug}";
+    const slug = "${escapeHtml(doc.slug)}";
     const editor = document.getElementById("editor");
     const status = document.getElementById("saveStatus");
     async function saveContent() {

@@ -364,29 +364,9 @@ class QueueProcessor {
       return { spawned: false };
     }
 
-    // Create a Proof doc for live agent output (if Proof server is running)
-    try {
-      const { isProofRunning } = await import("./proof-server.js");
-      if (isProofRunning()) {
-        const { createProofDocument } = await import("../lib/proof-bridge.js");
-        const doc = await createProofDocument(
-          item.title,
-          `# ${item.title}\n\n_Agent working..._\n`,
-          "agent",
-        );
-        await updateQueueState((state) => {
-          const qi = state.items.find((i) => i.id === item.id);
-          if (qi) qi.proofDocSlug = doc.slug;
-        });
-        item.proofDocSlug = doc.slug;
-        this.logger.info(`[GodMode][Queue] Created Proof doc "${doc.slug}" for "${item.title}"`);
-
-        // Notify UI to auto-open Proof viewer
-        this.broadcast("proof:open", { slug: doc.slug, title: item.title });
-      }
-    } catch (err) {
-      this.logger.warn(`[GodMode][Queue] Proof doc creation failed for "${item.title}": ${String(err)}`);
-      // Non-fatal — agent will still write to file
+    // Notify UI to auto-open Proof viewer (if a Proof doc was created by ensureProofDocument)
+    if (proofInfo?.slug) {
+      this.broadcast("proof:open", { slug: proofInfo.slug, title: item.title });
     }
 
     const { bin: agentBin, args: agentArgs } = buildSpawnArgs(effectiveEngine, prompt);
@@ -1280,37 +1260,6 @@ class QueueProcessor {
       "[Actionable follow-ups for the human or next agent]",
       "```",
     );
-
-    // Inject Proof live-output instructions if a Proof doc was created
-    if (item.proofDocSlug) {
-      try {
-        const { getProofApiBase } = await import("../lib/proof-bridge.js");
-        const proofBase = getProofApiBase();
-        sections.push(
-          "",
-          "## Live Output (Proof Document)",
-          `A Proof document has been created for this task. The user can see your work in real-time.`,
-          `As you work, periodically update the Proof document with your progress using the HTTP API:`,
-          "",
-          "```bash",
-          `# Update document content (replaces full content):`,
-          `curl -s -X PUT ${proofBase}/documents/${item.proofDocSlug} \\`,
-          `  -H "Content-Type: application/json" \\`,
-          `  -d '{"content": "YOUR_MARKDOWN_HERE", "author": "agent"}'`,
-          "",
-          `# Add a progress comment:`,
-          `curl -s -X POST ${proofBase}/documents/${item.proofDocSlug}/comments \\`,
-          `  -H "Content-Type: application/json" \\`,
-          `  -d '{"author": "agent", "text": "Working on section X..."}'`,
-          "```",
-          "",
-          "Update the Proof doc at each major milestone (after research, after analysis, after writing conclusions).",
-          "The user sees updates live — this is your primary output surface. Still write final results to the file path above.",
-        );
-      } catch {
-        // Proof bridge not available — skip live output instructions
-      }
-    }
 
     sections.push(
       "",
