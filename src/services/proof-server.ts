@@ -574,7 +574,8 @@ export function getProofPort(): number {
 }
 
 export function getProofViewUrl(slug: string): string {
-  return `http://127.0.0.1:${serverPort}/documents/${slug}/view`;
+  // Return gateway-relative path so the iframe works over HTTPS (e.g. Tailscale)
+  return `/godmode/proof/documents/${slug}/view`;
 }
 
 export const proofHandlers: Record<string, Function> = {

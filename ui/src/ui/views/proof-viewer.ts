@@ -23,7 +23,7 @@ export type ProofViewerProps = {
  * Uses an iframe to the Proof server's /documents/:slug/view endpoint.
  */
 export function renderProofViewer(props: ProofViewerProps) {
-  const viewUrl = props.viewUrl?.trim() || `http://127.0.0.1:4000/documents/${props.slug}/view`;
+  const viewUrl = props.viewUrl?.trim() || `/godmode/proof/documents/${props.slug}/view`;
   const title = props.title?.trim() || props.slug;
 
   return html`

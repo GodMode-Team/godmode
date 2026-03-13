@@ -7,6 +7,7 @@
 
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
+import { request as httpRequest } from "node:http";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { DATA_DIR, MEMORY_DIR } from "../data-paths.js";
 import { handleFathomWebhookHttp } from "../methods/fathom-webhook.js";
@@ -115,6 +116,37 @@ export function createGodmodeHttpHandler(deps: HttpHandlerDeps) {
           console.error("[GodMode] Fathom webhook processing error:", err);
         });
       });
+      return true;
+    }
+
+    // Proof document view proxy — serves proof iframe through same origin
+    // so it works when the UI is loaded over HTTPS (e.g. Tailscale)
+    if (pathname.startsWith("/godmode/proof/documents/")) {
+      const { getProofPort, isProofRunning } = await import("../services/proof-server.js");
+      if (!isProofRunning()) {
+        res.writeHead(503, { "Content-Type": "text/plain" });
+        res.end("Proof server not running");
+        return true;
+      }
+      const proofPath = pathname.slice("/godmode/proof".length); // e.g. /documents/:slug/view
+      const proxyReq = httpRequest(
+        {
+          hostname: "127.0.0.1",
+          port: getProofPort(),
+          path: proofPath,
+          method: req.method ?? "GET",
+          headers: { ...req.headers, host: `127.0.0.1:${getProofPort()}` },
+        },
+        (proxyRes) => {
+          res.writeHead(proxyRes.statusCode ?? 502, proxyRes.headers);
+          proxyRes.pipe(res, { end: true });
+        },
+      );
+      proxyReq.on("error", () => {
+        res.writeHead(502, { "Content-Type": "text/plain" });
+        res.end("Proof server unavailable");
+      });
+      req.pipe(proxyReq, { end: true });
       return true;
     }
 

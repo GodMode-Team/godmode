@@ -3945,7 +3945,7 @@ export class GodModeApp extends LitElement {
   async handleOpenProofDoc(slug: string) {
     let title = "Proof Document";
     let filePath: string | null = null;
-    let viewUrl = `http://127.0.0.1:4000/documents/${slug}/view`;
+    let viewUrl = `/godmode/proof/documents/${slug}/view`;
     if (this.client && this.connected) {
       try {
         const result = await this.client.request<{
