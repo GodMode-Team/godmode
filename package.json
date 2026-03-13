@@ -95,8 +95,7 @@
   },
   "pnpm": {
     "onlyBuiltDependencies": ["sqlite3", "better-sqlite3"],
-    "allowedDeprecatedVersions": {},
-    "neverBuiltDependencies": []
+    "allowedDeprecatedVersions": {}
   },
   "openclaw": {
     "extensions": [

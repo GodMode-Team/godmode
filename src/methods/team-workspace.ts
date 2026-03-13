@@ -734,6 +734,83 @@ const listTemplates: GatewayRequestHandler = async ({ respond }) => {
   respond(true, { templates });
 };
 
+/**
+ * workspace.resolveConflict — resolve git merge conflicts for a team workspace.
+ *
+ * Params:
+ * - workspaceId (string, required)
+ * - strategy ("ours" | "theirs", required)
+ */
+const resolveConflict: GatewayRequestHandler = async ({ params, respond }) => {
+  const workspaceId = typeof params.workspaceId === "string" ? String(params.workspaceId).trim() : "";
+  const strategy = typeof params.strategy === "string" ? String(params.strategy).trim() : "";
+
+  if (!workspaceId) {
+    respond(false, undefined, errorShape(ErrorCodes.INVALID_REQUEST, "workspaceId is required"));
+    return;
+  }
+  if (strategy !== "ours" && strategy !== "theirs") {
+    respond(
+      false,
+      undefined,
+      errorShape(ErrorCodes.INVALID_REQUEST, 'strategy must be "ours" or "theirs"'),
+    );
+    return;
+  }
+
+  const config = await readWorkspaceConfig();
+  const workspace = findWorkspaceById(config, workspaceId);
+  if (!workspace) {
+    respond(false, undefined, errorShape(ErrorCodes.NOT_FOUND, `workspace not found: ${workspaceId}`));
+    return;
+  }
+
+  const opts = { cwd: workspace.path, maxBuffer: 5 * 1024 * 1024 };
+  try {
+    // Abort any in-progress rebase (pull --rebase leaves git mid-rebase on conflict)
+    await execFile("git", ["rebase", "--abort"], opts).catch(() => {});
+    // Also abort any in-progress merge, in case the conflict came from a non-rebase pull
+    await execFile("git", ["merge", "--abort"], opts).catch(() => {});
+
+    // Now resolve: reset to the chosen side and commit
+    if (strategy === "ours") {
+      // "ours" = keep local HEAD as-is (rebase --abort already restored it)
+      // Pull remote and force-resolve any remaining conflicts to ours
+      await execFile("git", ["pull", "--no-rebase", "-X", "ours"], opts).catch(() => {});
+    } else {
+      // "theirs" = accept remote changes
+      await execFile("git", ["pull", "--no-rebase", "-X", "theirs"], opts).catch(() => {});
+    }
+    // Stage anything left over and commit if needed
+    await execFile("git", ["add", "-A"], opts);
+    const message = strategy === "ours" ? "resolve: keep local" : "resolve: accept remote";
+    try {
+      await execFile("git", ["commit", "-m", message], opts);
+    } catch (commitErr) {
+      const msg = commitErr instanceof Error ? commitErr.message : String(commitErr);
+      if (!msg.toLowerCase().includes("nothing to commit")) {
+        throw commitErr;
+      }
+    }
+  } catch (err) {
+    respond(
+      false,
+      undefined,
+      errorShape(
+        ErrorCodes.GIT_ERROR,
+        `Conflict resolution failed: ${err instanceof Error ? err.message : String(err)}`,
+      ),
+    );
+    return;
+  }
+
+  // Resume sync now that conflict is resolved
+  const syncService = getWorkspaceSyncService();
+  await syncService.resume(workspaceId);
+
+  respond(true, { workspaceId, strategy, resolved: true });
+};
+
 export const teamWorkspaceHandlers: GatewayRequestHandlers = {
   "workspace.createTeam": createTeam,
   "workspace.provisionTeam": provisionTeam,
@@ -743,4 +820,5 @@ export const teamWorkspaceHandlers: GatewayRequestHandlers = {
   "workspace.syncStatus": syncStatus,
   "workspace.setupFromTemplate": setupFromTemplate,
   "workspace.listTemplates": listTemplates,
+  "workspace.resolveConflict": resolveConflict,
 };

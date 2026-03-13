@@ -1,10 +1,12 @@
 import fs from "node:fs/promises";
 import path from "node:path";
+import { getUnreadMessages, markFeedRead, type FeedMessage } from "../lib/team-feed.js";
+import { resolveGitMemberId } from "../lib/team-workspace-scaffold.js";
 import {
   loadCombinedSessionStoreForGateway,
   loadConfig,
 } from "../lib/workspace-session-store.js";
-import { findWorkspaceById, readWorkspaceConfig } from "../lib/workspaces-config.js";
+import { findWorkspaceById, readWorkspaceConfig, type WorkspaceConfigEntry } from "../lib/workspaces-config.js";
 
 /** Max total chars for injected team context (~15KB, roughly 4K tokens). */
 const CONTEXT_BUDGET = 15_000;
@@ -115,6 +117,48 @@ export async function handleTeamBootstrap(
     });
   }
 
+  // Priority 0.5: Unread comms messages — between SOPs and memory
+  const memberId = workspace.team?.memberId || await resolveGitMemberId(workspace.path);
+  const allUnread = await getUnreadMessages(workspace.path, memberId);
+  // Filter out user's own messages — they don't need to see their own sends echoed back
+  const unreadMessages = allUnread.filter((m) => m.from !== memberId);
+  if (unreadMessages.length > 0) {
+    const capped = unreadMessages.slice(-10);
+    const skipped = unreadMessages.length - capped.length;
+    const lines = capped.map((m) => formatFeedMessage(m));
+    const header = skipped > 0
+      ? `## Unread Team Messages (${workspace.name}) — showing 10 of ${unreadMessages.length}\n\n_(${skipped} older messages not shown)_\n\n`
+      : `## Unread Team Messages (${workspace.name})\n\n`;
+    sections.push({
+      label: "Unread Messages",
+      content: `${header}${lines.join("\n")}`,
+      priority: 0.5,
+    });
+    // Only mark the DISPLAYED messages as read — older ones stay unread for next turn
+    await markFeedRead(workspace.path, memberId, capped);
+  }
+  // Also advance cursor past own messages so they don't accumulate
+  if (allUnread.length > 0 && unreadMessages.length === 0) {
+    await markFeedRead(workspace.path, memberId, allUnread);
+  }
+
+  // Priority 2: Unread counts from OTHER team workspaces
+  const otherTeamWorkspaces = config.workspaces.filter(
+    (w): w is WorkspaceConfigEntry & { team: NonNullable<WorkspaceConfigEntry["team"]> } =>
+      w.type === "team" && w.id !== workspace.id && w.team != null,
+  );
+  if (otherTeamWorkspaces.length > 0) {
+    const otherCounts = await getOtherWorkspaceUnreadCounts(otherTeamWorkspaces);
+    if (otherCounts.length > 0) {
+      const summary = otherCounts.map((c) => `${c.name} (${c.count})`).join(", ");
+      sections.push({
+        label: "Other Workspace Unreads",
+        content: `## Unread in Other Workspaces\n\nYou have unread messages in ${otherCounts.length} other team workspace${otherCounts.length > 1 ? "s" : ""}: ${summary}`,
+        priority: 2,
+      });
+    }
+  }
+
   // Priority 1: MEMORY.md (team knowledge)
   const memoryMd = await safeReadText(path.join(workspace.path, "memory", "MEMORY.md"), MAX_SINGLE_FILE);
   if (memoryMd) {
@@ -155,4 +199,29 @@ export async function handleTeamBootstrap(
   return {
     prependContext: header + fitted.join("\n\n---\n\n"),
   };
+}
+
+function formatFeedMessage(m: FeedMessage): string {
+  const time = m.ts.slice(11, 16); // HH:MM
+  const tag = m.type === "fyi" ? "" : ` [${m.type.toUpperCase()}]`;
+  const to = m.to ? ` → ${m.to}` : "";
+  return `- **${m.from}**${to}${tag} (${time}): ${m.msg}`;
+}
+
+async function getOtherWorkspaceUnreadCounts(
+  workspaces: Array<WorkspaceConfigEntry & { team: NonNullable<WorkspaceConfigEntry["team"]> }>,
+): Promise<Array<{ name: string; count: number }>> {
+  const results: Array<{ name: string; count: number }> = [];
+  for (const ws of workspaces) {
+    try {
+      const mid = ws.team.memberId || await resolveGitMemberId(ws.path);
+      const unread = await getUnreadMessages(ws.path, mid);
+      if (unread.length > 0) {
+        results.push({ name: ws.name, count: unread.length });
+      }
+    } catch {
+      // Non-fatal — workspace may not be synced yet
+    }
+  }
+  return results;
 }

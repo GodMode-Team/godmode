@@ -238,6 +238,34 @@ export class WorkspaceSyncService {
     );
   }
 
+  /**
+   * Resume sync for a workspace after conflict resolution.
+   * Clears the conflict/paused state and restarts the pull interval.
+   */
+  async resume(workspaceId: string): Promise<void> {
+    const workspace = this.workspaceById.get(workspaceId);
+    if (!workspace) return;
+
+    this.status.set(workspaceId, {
+      status: "synced",
+      paused: false,
+      dirty: false,
+      lastActivityAt: Date.now(),
+    });
+
+    // Restart the pull timer if auto-pull is enabled
+    const existingTimer = this.pullTimers.get(workspaceId);
+    if (existingTimer) {
+      clearInterval(existingTimer);
+      this.pullTimers.delete(workspaceId);
+    }
+    if (workspace.sync?.autoPull.enabled) {
+      this.ensureAutoPull(workspace);
+    }
+
+    await this.appendLog(`[${workspaceId}] sync resumed after conflict resolution`);
+  }
+
   /** Cancel any pending debounce timer and push immediately. */
   async pushNow(workspaceId: string): Promise<WorkspaceSyncStatus> {
     await this.ensureStarted();
