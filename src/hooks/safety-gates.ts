@@ -781,8 +781,10 @@ export async function checkRestartAttempt(
 // so blocking user-initiated /tmp writes is safe.
 
 const EPHEMERAL_WRITE_PATTERNS = [
-  /\b(>|>>|tee|cp|mv|mkdir|touch|cat\s*>)\s+\/tmp\b/,
-  /\b(>|>>|tee|cp|mv|mkdir|touch|cat\s*>)\s+\/var\/tmp\b/,
+  /\b(>|>>|tee|cp|mv|mkdir|touch)\s+\/tmp\b/,
+  /(>|>>)\s*\/tmp\b/,
+  /\b(>|>>|tee|cp|mv|mkdir|touch)\s+\/var\/tmp\b/,
+  /(>|>>)\s*\/var\/tmp\b/,
   /\bcd\s+\/tmp\b/,
   /\bmkdir\s+(-p\s+)?\/tmp\//,
   /\bwrite_file.*\/tmp\//i,
