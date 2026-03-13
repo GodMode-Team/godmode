@@ -415,6 +415,21 @@ async function handleSwarmRunLog({ params, respond }: { params: Record<string, u
   }
 }
 
+/**
+ * godmode.delegation.clear — Clear all projects from Mission Control (in-memory + disk).
+ */
+async function handleSwarmClear({ respond }: { params: Record<string, unknown>; respond: Function }) {
+  if (!isPaperclipRunning()) {
+    return respond(true, { cleared: false, message: "Agent team not running" });
+  }
+  const adapter = getPaperclipAdapter();
+  if (!adapter) {
+    return respond(true, { cleared: false, message: "Agent team not available" });
+  }
+  await adapter.clearProjects();
+  return respond(true, { cleared: true, message: "All projects cleared from Mission Control" });
+}
+
 // ── Export handler map ────────────────────────────────────────────
 
 export const delegationHandlers: Record<string, unknown> = {
@@ -423,4 +438,5 @@ export const delegationHandlers: Record<string, unknown> = {
   "godmode.delegation.steer": handleSwarmSteer,
   "godmode.delegation.feed": handleSwarmFeed,
   "godmode.delegation.runLog": handleSwarmRunLog,
+  "godmode.delegation.clear": handleSwarmClear,
 };

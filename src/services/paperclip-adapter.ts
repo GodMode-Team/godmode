@@ -626,6 +626,12 @@ export class PaperclipAdapter {
     }
   }
 
+  /** Clear all projects from in-memory + persisted bridge state */
+  async clearProjects(): Promise<void> {
+    this.state.projects = [];
+    await this.saveState();
+  }
+
   /** List all delegated projects */
   listProjects(): Array<{ projectId: string; title: string; issueCount: number; createdAt: string }> {
     return this.state.projects.map(p => ({
