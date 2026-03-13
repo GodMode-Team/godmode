@@ -149,8 +149,6 @@ async function handleSwarmStatus({ params, respond }: { params: Record<string, u
   const agents: SwarmAgentState[] = [];
   const issues: SwarmIssueNode[] = [];
   const seenAgents = new Set<string>();
-  let totalTokenSpend = 0;
-
   for (const issue of status.issues) {
     const slug = issue.assignee;
     const personaName = slug.replace(/-/g, " ").replace(/\b\w/g, c => c.toUpperCase());
@@ -168,7 +166,7 @@ async function handleSwarmStatus({ params, respond }: { params: Record<string, u
     }
 
     issues.push({
-      issueId: issue.title,
+      issueId: issue.issueId,
       title: issue.title,
       status: realStatus,
       assignee: slug,
@@ -208,7 +206,7 @@ async function handleSwarmStatus({ params, respond }: { params: Record<string, u
     proofWorkspace: status.proofWorkspace,
     agents,
     issues,
-    tokenSpend: totalTokenSpend > 0 ? totalTokenSpend : undefined,
+    tokenSpend: undefined, // TODO: wire up from Paperclip getCostsByAgent() when available
   };
 
   return respond(true, detail);
@@ -285,7 +283,7 @@ async function handleSwarmFeed({ params, respond }: { params: Record<string, unk
 
       if (realStatus === "done" || realStatus === "in_review") {
         events.push({
-          id: `${p.projectId}-${issue.title}-done`,
+          id: `${p.projectId}-${issue.issueId}-done`,
           timestamp: qi?.completedAt ?? Date.now(),
           type: "agent_completed",
           summary: `${personaName} completed "${issue.title}"`,
@@ -296,7 +294,7 @@ async function handleSwarmFeed({ params, respond }: { params: Record<string, unk
         });
       } else if (realStatus === "in_progress" || realStatus === "todo") {
         events.push({
-          id: `${p.projectId}-${issue.title}-active`,
+          id: `${p.projectId}-${issue.issueId}-active`,
           timestamp: qi?.startedAt ?? qi?.createdAt ?? Date.now(),
           type: "agent_started",
           summary: `${personaName} ${realStatus === "in_progress" ? "working on" : "assigned to"} "${issue.title}"`,
@@ -307,7 +305,7 @@ async function handleSwarmFeed({ params, respond }: { params: Record<string, unk
         });
       } else if (realStatus === "failed" || realStatus === "cancelled") {
         events.push({
-          id: `${p.projectId}-${issue.title}-failed`,
+          id: `${p.projectId}-${issue.issueId}-failed`,
           timestamp: qi?.completedAt ?? Date.now(),
           type: "agent_failed",
           summary: `${personaName} failed on "${issue.title}"`,

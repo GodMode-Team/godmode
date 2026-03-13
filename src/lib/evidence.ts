@@ -133,16 +133,12 @@ export function checkEvidence(taskType: TaskType, output: string): EvidenceResul
 
     case "research": {
       const urlCount = artifacts.filter((a) => a.type === "url" || a.type === "pr_link").length;
-      if (urlCount >= 2) {
-        return { passed: true, missing: [], artifacts, reason: "", hint: "" };
-      }
-      // Also accept if there's at least 1 URL (legacy compat with queue-processor)
       if (urlCount >= 1) {
         return { passed: true, missing: [], artifacts, reason: "", hint: "" };
       }
       return {
         passed: false,
-        missing: ["source URLs (at least 2)"],
+        missing: ["source URLs (at least 1)"],
         artifacts,
         reason: "No source URLs found in research output",
         hint: "at least one source URL (https://...) to back up findings",

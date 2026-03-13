@@ -120,6 +120,7 @@ export interface ProjectStatus {
   status: string;
   proofWorkspace: string;
   issues: Array<{
+    issueId: string;
     title: string;
     status: string;
     assignee: string;
@@ -307,7 +308,7 @@ export class PaperclipAdapter {
     }
 
     if (registered > 0) {
-      this.saveState(); // persist immediately so partial registrations aren't lost on crash
+      await this.saveState(); // persist immediately so partial registrations aren't lost on crash
       this.logger.info(`[Paperclip] Synced ${registered} agent(s) (total: ${this.state.agents.length})`);
     }
 
@@ -494,14 +495,14 @@ export class PaperclipAdapter {
         const { getQueueProcessor } = await import("./queue-processor.js");
 
         let fallbackSkipped = 0;
-        for (const task of brief.issues) {
-          const assignee = this.findAgent(task.personaHint || "");
-          const issueRecord = issueRecords.find(r => r.title === task.title);
+        for (let i = 0; i < brief.issues.length; i++) {
+          const task = brief.issues[i];
+          const issueRecord = issueRecords[i]; // 1:1 correspondence — built in same order
           const taskType = this.inferTaskType(task.personaHint || task.title);
           const proofSlug = issueRecord?.proofDocSlug;
 
           // Trust gating: skip agents that are disabled or dormant
-          const personaSlug = assignee?.personaSlug;
+          const personaSlug = issueRecord?.personaSlug;
           if (personaSlug) {
             try {
               const { getAutonomyLevel } = await import("../methods/trust-tracker.js");
@@ -533,7 +534,7 @@ export class PaperclipAdapter {
               status: "pending" as const,
               source: "chat" as const,
               createdAt: Date.now(),
-              personaHint: assignee?.personaSlug ?? task.personaHint,
+              personaHint: issueRecord?.personaSlug ?? task.personaHint,
               proofDocSlug: proofSlug,
               workspaceId: workspace,
             };
@@ -574,6 +575,7 @@ export class PaperclipAdapter {
         issues: local.issues.map(li => {
           const remote = items?.find(i => i.id === li.issueId);
           return {
+            issueId: li.issueId,
             title: li.title,
             status: remote?.status ?? "unknown",
             assignee: li.personaSlug,
@@ -733,9 +735,9 @@ export class PaperclipAdapter {
 
       // Write output to inbox file
       const output = run.stdoutExcerpt || run.resultJson?.summary || "";
+      const { MEMORY_DIR } = await import("../data-paths.js");
       if (output) {
         try {
-          const { MEMORY_DIR } = await import("../data-paths.js");
           const inboxDir = path.join(MEMORY_DIR, "inbox");
           await fs.mkdir(inboxDir, { recursive: true });
           const outPath = path.join(inboxDir, `${issue.issueId}.md`);
@@ -762,7 +764,7 @@ export class PaperclipAdapter {
         runId: run.id,
         exitCode: run.exitCode ?? null,
         outputPreview: output.length > 500 ? output.slice(0, 500) + "…" : output,
-        outputPath: path.join("~/godmode/memory/inbox", `${issue.issueId}.md`),
+        outputPath: path.join(MEMORY_DIR, "inbox", `${issue.issueId}.md`),
         proofDocSlug: issue.proofDocSlug,
         cost: run.usageJson ?? null,
       };
@@ -914,6 +916,7 @@ export class PaperclipAdapter {
       status,
       proofWorkspace: local.proofWorkspace,
       issues: local.issues.map(i => ({
+        issueId: i.issueId,
         title: i.title,
         status: "pending",
         assignee: i.personaSlug,
