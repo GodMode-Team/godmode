@@ -432,8 +432,14 @@ export async function handleMessageSending(
           }
 
           const title = await generateSessionTitle(pending.message, content);
-          logger.info(`[GodMode][AutoTitle] LLM title: ${title ? `"${title}"` : "null — skipping (no truncated-message fallback)"}`);
-          if (!title) return; // Never use truncated raw message as title — it produces garbage
+          logger.info(`[GodMode][AutoTitle] LLM title: ${title ? `"${title}"` : "null — giving up (won't retry with later messages)"}`);
+          if (!title) {
+            // Mark as titled even on failure — retrying on subsequent turns
+            // captures irrelevant later messages and produces garbage titles
+            // like "heartbeat" or random fragments from turn N.
+            titledSessions.add(sessionKey);
+            return;
+          }
 
           const storePath = resolveStorePath(cfg.session?.store);
           await updateSessionStore(storePath, (storeData) => {

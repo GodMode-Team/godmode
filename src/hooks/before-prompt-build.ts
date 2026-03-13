@@ -8,10 +8,6 @@
 import { join } from "node:path";
 import { extractSessionKey } from "../lib/host-context.js";
 import {
-  pendingAutoTitles,
-  titledSessions,
-} from "../lib/auto-title.js";
-import {
   consumePromptShieldNudge,
   consumeOutputShieldNudge,
   consumeContextPressureNudge,
@@ -333,22 +329,11 @@ export async function handleBeforePromptBuild(
     isFirstTurn = userMsgCount <= 1;
   } catch { /* non-fatal */ }
 
-  // ── Auto-title: capture user message for untitled sessions ──
-  {
-    const { isCronSessionKey } = await import("../lib/workspace-session-store.js");
-    const skipReason = !sessionKey ? "no-sessionKey"
-      : !currentUserMessage ? "no-userMessage"
-      : titledSessions.has(sessionKey) ? "already-titled"
-      : pendingAutoTitles.has(sessionKey) ? "already-pending"
-      : isCronSessionKey(sessionKey!) ? "cron-session"
-      : null;
-    if (skipReason) {
-      logger.info(`[GodMode][AutoTitle] before_prompt_build SKIP for "${sessionKey ?? "?"}" — reason: ${skipReason}, msgLen=${currentUserMessage.length}`);
-    } else {
-      pendingAutoTitles.set(sessionKey!, { message: currentUserMessage, attempts: 0, capturedAt: Date.now() });
-      logger.info(`[GodMode][AutoTitle] Captured message via before_prompt_build for "${sessionKey}" (${currentUserMessage.slice(0, 60)}...)`);
-    }
-  }
+  // Auto-title capture removed from before_prompt_build — message_received
+  // is the single capture point. Having two capture points caused the second
+  // one to overwrite with later (irrelevant) messages when the first title
+  // attempt failed, producing garbage titles like "heartbeat" or random
+  // fragments from turn N instead of the actual session topic.
 
   // P1.5: Action items extracted from user brain dumps
   let actionItemsBlock: string | null = null;
