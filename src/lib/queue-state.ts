@@ -75,6 +75,8 @@ export type QueueItem = {
   proofDocSlug?: string;
   /** Artifact mirror path for the Proof document markdown export */
   proofDocFilePath?: string;
+  /** Workspace this item belongs to (auto-detected or explicit) */
+  workspaceId?: string;
   /** Structured handoff context from a predecessor agent */
   handoff?: {
     fromAgent: string;

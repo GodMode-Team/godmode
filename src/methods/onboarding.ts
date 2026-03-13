@@ -21,6 +21,7 @@ import { DATA_DIR, GODMODE_ROOT } from "../data-paths.js";
 import { secureWriteFile, secureMkdir } from "../lib/secure-fs.js";
 import { existsSync } from "node:fs";
 import { invalidateIdentityCache } from "../lib/awareness-snapshot.js";
+import { generateRosterConfig } from "../lib/agent-roster.js";
 import type { GatewayRequestHandler } from "openclaw/plugin-sdk";
 import {
   type OnboardingState,
@@ -743,6 +744,16 @@ export const onboardingHandlers: GatewayRequestHandlers = {
 
     await writeOnboarding(state);
 
+    // Auto-configure roster based on onboarding answers
+    try {
+      const rosterConfig = await generateRosterConfig(state);
+      try {
+        context?.broadcast?.("roster:configured", rosterConfig);
+      } catch {}
+    } catch {
+      // Non-fatal — roster config generation failure doesn't block onboarding
+    }
+
     try {
       context?.broadcast?.("onboarding:update", state);
     } catch {}
@@ -1151,6 +1162,13 @@ export const onboardingHandlers: GatewayRequestHandlers = {
     state.completedPhases.sort();
     if (state.phase < 3) state.phase = 3 as OnboardingPhase;
     await writeOnboarding(state);
+
+    // Auto-configure roster based on wizard answers
+    try {
+      await generateRosterConfig(state);
+    } catch {
+      // Non-fatal
+    }
 
     try {
       context?.broadcast?.("onboarding:update", state);

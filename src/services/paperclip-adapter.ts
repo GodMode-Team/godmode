@@ -123,6 +123,7 @@ export class PaperclipAdapter {
   private pollTimer: ReturnType<typeof setInterval> | null = null;
   private onCompletionCallback: ((projectId: string, issueTitle: string, status: string) => void) | null = null;
   private notifiedIssues = new Set<string>();
+  private static MAX_NOTIFIED = 2_000;
   private statusCache = new Map<string, { data: ProjectStatus; ts: number }>();
   private static STATUS_TTL = 30_000; // 30s cache for getStatus
 
@@ -229,6 +230,7 @@ export class PaperclipAdapter {
     }
 
     if (registered > 0) {
+      this.saveState(); // persist immediately so partial registrations aren't lost on crash
       this.logger.info(`[Paperclip] Synced ${registered} agent(s) (total: ${this.state.agents.length})`);
     }
   }
@@ -265,13 +267,28 @@ export class PaperclipAdapter {
     const workspace = `project-${project.id.slice(0, 8)}`;
     const issueRecords: BridgeState["projects"][0]["issues"] = [];
 
+    // Build toolkit context for issue descriptions
+    let toolkitContext = "";
+    try {
+      const { isToolkitRunning, getToolkitBaseUrl } = await import("./agent-toolkit-server.js");
+      if (isToolkitRunning()) {
+        toolkitContext = [
+          "\n\n---\n## GodMode Toolkit API",
+          `Base URL: ${getToolkitBaseUrl()}`,
+          "Use /search, /memory, /skills, /awareness, /identity endpoints to access knowledge.",
+          "Use /agents/active to check what other agents are working on before starting.",
+          "Search before building. Check existing artifacts. Never overwrite without backup.",
+        ].join("\n");
+      }
+    } catch { /* toolkit not available */ }
+
     for (const task of brief.issues) {
       const assignee = this.findAgent(task.personaHint || "");
 
       const issue = await this.api<PcIssue>("POST", `/api/companies/${this.state.companyId}/issues`, {
         projectId: project.id,
         title: task.title,
-        description: task.description,
+        description: `${task.description}${toolkitContext}`,
         status: "todo",
         priority: task.priority || "medium",
         assigneeAgentId: assignee?.paperclipId ?? null,
@@ -433,6 +450,11 @@ export class PaperclipAdapter {
             const key = `${project.projectId}:${issue.id}:${issue.status}`;
             if (this.notifiedIssues.has(key)) continue;
             this.notifiedIssues.add(key);
+            // Cap set growth — evict oldest entries when limit reached
+            if (this.notifiedIssues.size > PaperclipAdapter.MAX_NOTIFIED) {
+              const first = this.notifiedIssues.values().next().value;
+              if (first) this.notifiedIssues.delete(first);
+            }
             const local = project.issues.find(i => i.issueId === issue.id);
             if (local && this.onCompletionCallback) {
               this.onCompletionCallback(project.projectId, local.title, issue.status);

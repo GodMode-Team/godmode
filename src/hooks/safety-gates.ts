@@ -1419,6 +1419,9 @@ function getTurnToolUsage(sessionKey: string | undefined): TurnToolUsage {
 export function resetSessionToolUsage(sessionKey: string | undefined): void {
   const key = sessionKey ?? "__default__";
   turnToolUsage.delete(key);
+  // Prune session-level state to prevent unbounded growth from dead sessions
+  callHistory.delete(key);
+  warnedTools.delete(key);
 }
 
 // ── Enforcer Gates (message_sending) ────────────────────────────

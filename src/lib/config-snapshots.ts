@@ -8,7 +8,7 @@
  * The heartbeat takes one snapshot per day, capped at 30.
  */
 
-import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync, unlinkSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync, unlinkSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { DATA_DIR, localDateString } from "../data-paths.js";
 
@@ -98,17 +98,14 @@ export async function captureSnapshot(): Promise<ConfigSnapshot> {
     cronJobCount = getCronSkills().length;
   } catch { /* skills registry unavailable */ }
 
-  // Memory entry count (Mem0)
+  // Memory status (Mem0) — check if DB exists, exact count not worth a query
   let memoryEntryCount: number | null = null;
   try {
     const dbPath = join(DATA_DIR, "mem0-vectors.db");
     if (existsSync(dbPath)) {
-      // Use a simple file-existence check; avoid importing heavy DB deps.
-      // If the search function is available, do a wildcard count.
-      const { searchMemory } = await import("./memory.js");
-      const results = await searchMemory("*", 1);
-      // We can't get exact count from search — mark as available but unknown
-      memoryEntryCount = results.length > 0 ? -1 : 0; // -1 = "has entries, count unknown"
+      const stat = statSync(dbPath);
+      // If DB is > 4KB it has entries (empty SQLite is ~4KB)
+      memoryEntryCount = stat.size > 4096 ? -1 : 0; // -1 = "has entries, count unknown"
     }
   } catch { /* memory unavailable */ }
 

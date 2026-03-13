@@ -277,8 +277,11 @@ export async function runGatewayStart(
       startConsciousnessHeartbeat,
       stopConsciousnessHeartbeat,
       setConsciousnessHeartbeatApiRequest,
+      setConsciousnessHeartbeatBroadcast,
     } = await import("../services/consciousness-heartbeat.js");
     initConsciousnessHeartbeat(logger);
+    // Wire broadcast so heartbeat notifications (cron results, daily brief, failure alerts) reach the UI
+    setConsciousnessHeartbeatBroadcast((event: string, data: unknown) => safeBroadcast(api, event, data));
     // Wire api.request for the session distiller pipeline (Pipeline 3)
     if (typeof api.request === "function") {
       setConsciousnessHeartbeatApiRequest(

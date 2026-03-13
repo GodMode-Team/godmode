@@ -6,11 +6,15 @@
  */
 
 // ── State ─────────────────────────────────────────────────────────────
-/** First user message per session, captured in message_received for auto-titling */
-export const pendingAutoTitles = new Map<string, string>();
+/** First user message per session + metadata for retry/expiry */
+export const pendingAutoTitles = new Map<string, { message: string; attempts: number; capturedAt: number }>();
 /** Sessions that already have titles — skip future auto-title attempts */
 export const titledSessions = new Set<string>();
 const TITLED_SESSIONS_MAX = 5_000;
+/** Max llm_output fires to wait for assistant text before giving up and using string derivation */
+export const MAX_TITLE_ATTEMPTS = 8;
+/** Expire pending entries after 5 minutes (handles sessions that never get a response) */
+export const PENDING_TTL_MS = 5 * 60_000;
 
 /**
  * Internal system terms that should never be used as session titles.

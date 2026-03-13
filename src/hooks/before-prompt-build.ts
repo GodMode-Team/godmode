@@ -347,7 +347,7 @@ export async function handleBeforePromptBuild(
     if (skipReason) {
       logger.info(`[GodMode][AutoTitle] before_prompt_build SKIP for "${sessionKey ?? "?"}" — reason: ${skipReason}, msgLen=${currentUserMessage.length}`);
     } else {
-      pendingAutoTitles.set(sessionKey!, currentUserMessage);
+      pendingAutoTitles.set(sessionKey!, { message: currentUserMessage, attempts: 0, capturedAt: Date.now() });
       logger.info(`[GodMode][AutoTitle] Captured message via before_prompt_build for "${sessionKey}" (${currentUserMessage.slice(0, 60)}...)`);
     }
   }

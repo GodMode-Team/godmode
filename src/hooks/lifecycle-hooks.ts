@@ -207,7 +207,7 @@ export async function handleMessageReceived(
       !pendingAutoTitles.has(sessionKey) &&
       !isCronSessionKey(sessionKey)
     ) {
-      pendingAutoTitles.set(sessionKey, content);
+      pendingAutoTitles.set(sessionKey, { message: content, attempts: 0, capturedAt: Date.now() });
       logger.info(`[GodMode][AutoTitle] Captured first message for "${sessionKey}" (${content.slice(0, 60)}...)`);
     }
   }
@@ -482,23 +482,34 @@ export async function handleLlmOutputAutoTitle(
   const sessionKey = extractSessionKey(ctx);
   if (!sessionKey) return;
 
-  const firstMessage = pendingAutoTitles.get(sessionKey);
-  if (!firstMessage) return;
+  const pending = pendingAutoTitles.get(sessionKey);
+  if (!pending) return;
   if (titledSessions.has(sessionKey)) {
     pendingAutoTitles.delete(sessionKey);
     return;
   }
 
-  // Only consume the pending message when we have actual assistant text.
-  // llm_output fires for EVERY intermediate LLM call (tool-use rounds too).
-  // If we consume on a tool-use turn, the real final response finds nothing.
-  const assistantText = (event as { assistantTexts?: string[] }).assistantTexts?.join("") ?? "";
-  if (!assistantText.trim()) {
-    logger.info(`[GodMode][AutoTitle] No assistant text yet for "${sessionKey}" — waiting for final response`);
+  // Expire stale entries (session never got a response)
+  const { MAX_TITLE_ATTEMPTS, PENDING_TTL_MS } = await import("../lib/auto-title.js");
+  if (Date.now() - pending.capturedAt > PENDING_TTL_MS) {
+    logger.info(`[GodMode][AutoTitle] Pending entry expired for "${sessionKey}" — removing`);
+    pendingAutoTitles.delete(sessionKey);
     return;
   }
 
-  // Consume now — we have real assistant text to work with
+  pending.attempts++;
+
+  // Only consume when we have actual assistant text.
+  // llm_output fires for EVERY intermediate LLM call (tool-use rounds too).
+  // If we consume on a tool-use turn, the real final response finds nothing.
+  const assistantText = (event as { assistantTexts?: string[] }).assistantTexts?.join("") ?? "";
+  if (!assistantText.trim() && pending.attempts < MAX_TITLE_ATTEMPTS) {
+    logger.info(`[GodMode][AutoTitle] No assistant text yet for "${sessionKey}" (attempt ${pending.attempts}/${MAX_TITLE_ATTEMPTS}) — waiting`);
+    return;
+  }
+
+  // Consume — either we have text, or we've hit max attempts (fall through to string derivation)
+  const firstMessage = pending.message;
   pendingAutoTitles.delete(sessionKey);
 
   try {
