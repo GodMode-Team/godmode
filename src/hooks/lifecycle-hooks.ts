@@ -407,6 +407,55 @@ export async function handleMessageSending(
     }
   } catch { /* invisible */ }
 
+  // ── Auto-title: runs once on the first assistant text response ──
+  // message_sending fires when the final text is being delivered to the user,
+  // guaranteeing we have actual assistant text (unlike llm_output which fires
+  // for every intermediate tool-use round with empty text).
+  if (sessionKey && content.trim().length > 10) {
+    const pending = pendingAutoTitles.get(sessionKey);
+    if (pending && !titledSessions.has(sessionKey)) {
+      pendingAutoTitles.delete(sessionKey);
+      // Fire and forget — don't block message delivery
+      void (async () => {
+        try {
+          const cfg = await loadSessionConfig();
+          const { store } = await loadCombinedSessionStoreForGateway(cfg);
+
+          const normalizedKey = sessionKey.trim().toLowerCase();
+          const entry = store[normalizedKey];
+          if (entry) {
+            const existingTitle = (entry.displayName || entry.label || entry.subject || "").trim();
+            if (existingTitle) {
+              titledSessions.add(sessionKey);
+              return;
+            }
+          }
+
+          const title = await generateSessionTitle(pending.message, content);
+          logger.info(`[GodMode][AutoTitle] LLM title: ${title ? `"${title}"` : "null — skipping (no truncated-message fallback)"}`);
+          if (!title) return; // Never use truncated raw message as title — it produces garbage
+
+          const storePath = resolveStorePath(cfg.session?.store);
+          await updateSessionStore(storePath, (storeData) => {
+            const existing = storeData[normalizedKey] ?? {};
+            storeData[normalizedKey] = {
+              ...existing,
+              displayName: title!,
+              updatedAt: Date.now(),
+            };
+          });
+
+          titledSessions.add(sessionKey);
+          evictTitledSessions();
+          logger.info(`[GodMode] Auto-titled "${sessionKey}" → "${title}"`);
+          safeBroadcast(api, "sessions:updated", { sessionKey, title });
+        } catch (err) {
+          logger.warn(`[GodMode] Auto-title error: ${String(err)}`);
+        }
+      })();
+    }
+  }
+
   // Dashboard auto-save safety net: if the ally output dashboard-like HTML
   // but didn't call dashboards.save, save it automatically.
   if (sessionKey && !_dashboardSaveCalled.has(sessionKey) && content.length > 500) {
@@ -471,87 +520,19 @@ export async function handleLlmOutputPressure(
   }
 }
 
-// ── llm_output: auto-title ────────────────────────────────────────────
+// ── llm_output: auto-title (DEPRECATED — moved to message_sending) ───
+// Auto-titling now runs in message_sending where we're guaranteed to have
+// the assistant's actual text response. The old llm_output approach failed
+// because it fired for every tool-use round (8+ times) before any text,
+// exhausting MAX_TITLE_ATTEMPTS and falling back to raw message truncation.
 
 export async function handleLlmOutputAutoTitle(
-  event: any,
-  ctx: any,
-  api: any,
+  _event: any,
+  _ctx: any,
+  _api: any,
 ): Promise<void> {
-  const logger: Logger = api.logger;
-  const sessionKey = extractSessionKey(ctx);
-  if (!sessionKey) return;
-
-  const pending = pendingAutoTitles.get(sessionKey);
-  if (!pending) return;
-  if (titledSessions.has(sessionKey)) {
-    pendingAutoTitles.delete(sessionKey);
-    return;
-  }
-
-  // Expire stale entries (session never got a response)
-  const { MAX_TITLE_ATTEMPTS, PENDING_TTL_MS } = await import("../lib/auto-title.js");
-  if (Date.now() - pending.capturedAt > PENDING_TTL_MS) {
-    logger.info(`[GodMode][AutoTitle] Pending entry expired for "${sessionKey}" — removing`);
-    pendingAutoTitles.delete(sessionKey);
-    return;
-  }
-
-  pending.attempts++;
-
-  // Only consume when we have actual assistant text.
-  // llm_output fires for EVERY intermediate LLM call (tool-use rounds too).
-  // If we consume on a tool-use turn, the real final response finds nothing.
-  const assistantText = (event as { assistantTexts?: string[] }).assistantTexts?.join("") ?? "";
-  if (!assistantText.trim() && pending.attempts < MAX_TITLE_ATTEMPTS) {
-    logger.info(`[GodMode][AutoTitle] No assistant text yet for "${sessionKey}" (attempt ${pending.attempts}/${MAX_TITLE_ATTEMPTS}) — waiting`);
-    return;
-  }
-
-  // Consume — either we have text, or we've hit max attempts (fall through to string derivation)
-  const firstMessage = pending.message;
-  pendingAutoTitles.delete(sessionKey);
-
-  try {
-    const cfg = await loadSessionConfig();
-    const { store } = await loadCombinedSessionStoreForGateway(cfg);
-
-    const normalizedKey = sessionKey.trim().toLowerCase();
-    const entry = store[normalizedKey];
-    if (entry) {
-      const existingTitle = (entry.displayName || entry.label || entry.subject || "").trim();
-      if (existingTitle) {
-        titledSessions.add(sessionKey);
-        return;
-      }
-    }
-
-    let title = await generateSessionTitle(firstMessage, assistantText);
-    logger.info(`[GodMode][AutoTitle] LLM title result: ${title ? `"${title}"` : "null (falling back to string derivation)"}`);
-    if (!title) {
-      title = deriveSessionTitle(entry ?? {}, firstMessage) ?? null;
-      logger.info(`[GodMode][AutoTitle] String fallback result: ${title ? `"${title}"` : "null"}`);
-    }
-    if (!title) return;
-
-    const storePath = resolveStorePath(cfg.session?.store);
-    await updateSessionStore(storePath, (storeData) => {
-      const existing = storeData[normalizedKey] ?? {};
-      storeData[normalizedKey] = {
-        ...existing,
-        displayName: title!,
-        updatedAt: Date.now(),
-      };
-    });
-
-    titledSessions.add(sessionKey);
-    evictTitledSessions();
-    logger.info(`[GodMode] Auto-titled session "${sessionKey}" → "${title}"`);
-
-    safeBroadcast(api, "sessions:updated", { sessionKey, title });
-  } catch (err) {
-    logger.warn(`[GodMode] Auto-title error for "${sessionKey}": ${String(err)}`);
-  }
+  // No-op — kept as export to avoid breaking index.ts registration.
+  // Will be removed in a future cleanup pass.
 }
 
 // ── llm_output: agent log ─────────────────────────────────────────────

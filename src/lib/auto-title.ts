@@ -64,9 +64,17 @@ export async function generateSessionTitle(
       .replace(/\s+/g, " ")
       .trim();
 
+    // Strip system content from assistant response too (message_sending may include tags)
+    const cleanResponse = assistantResponse
+      .replace(/<system-context>[\s\S]*?<\/system-context>/g, "")
+      .replace(/<system-reminder>[\s\S]*?<\/system-reminder>/g, "")
+      .replace(/<[a-z][a-z_-]*>[\s\S]*?<\/[a-z][a-z_-]*>/g, "")
+      .replace(/\s+/g, " ")
+      .trim();
+
     // Truncate inputs to keep the call tiny
     const userSnippet = cleanMessage.slice(0, 300);
-    const assistantSnippet = assistantResponse.slice(0, 300);
+    const assistantSnippet = cleanResponse.slice(0, 300);
 
     const resp = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
