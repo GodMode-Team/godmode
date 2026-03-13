@@ -305,7 +305,7 @@ export async function handleBeforePromptBuild(
               }
             }
             if (done.length > 0) {
-              lines.push(`READY FOR REVIEW: ${done.length} issue(s) in "${p.title}" — open the Proof doc(s) to review with the user.`);
+              lines.push(`READY FOR REVIEW: ${done.length} issue(s) in "${p.title}" — output files are in ~/godmode/memory/inbox/. Present the results to the user in chat. If a Proof doc exists, also link to it.`);
             }
             if (active.length > 0 && blocked.length === 0 && done.length === 0) {
               lines.push(`IN PROGRESS: "${p.title}" — ${active.length} issue(s) being worked on.`);

@@ -678,10 +678,14 @@ class QueueProcessor {
 
     // Notify Ally chat so the user sees a notification in real-time
     try {
+      const outputPreview = summary.length > 500 ? summary.slice(0, 500) + "…" : summary;
       this.broadcast("ally:notification", {
         type: "queue-complete",
         title: completedItem?.title ?? itemId,
         summary: `Agent finished "${completedItem?.title ?? itemId}" — ready for review.`,
+        outputPreview,
+        outputPath: outPath,
+        proofDocSlug: completedItem?.proofDocSlug,
         actions: [
           { label: "Review", action: "navigate", target: "today" },
           { label: "Approve", action: "rpc", method: "queue.approve", params: { id: itemId } },

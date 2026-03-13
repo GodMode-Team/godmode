@@ -326,7 +326,7 @@ export class PaperclipAdapter {
     });
     await this.saveState();
 
-    // Wake the lead agent to start work
+    // Wake the lead agent to start work (Paperclip tracking only)
     if (ceoId) {
       try {
         await this.api("POST", `/api/companies/${this.state.companyId}/agents/${ceoId}/wake`, {
@@ -334,6 +334,50 @@ export class PaperclipAdapter {
           reason: `New project delegated: ${brief.title}`,
         });
       } catch { /* non-fatal */ }
+    }
+
+    // ── CRITICAL: Actually queue work for execution via queue-processor ──
+    // Paperclip is just a tracking layer. The queue-processor spawns real agents.
+    try {
+      const { updateQueueState, newQueueItemId } = await import("../lib/queue-state.js");
+      const { getQueueProcessor } = await import("./queue-processor.js");
+
+      for (const task of brief.issues) {
+        const assignee = this.findAgent(task.personaHint || "");
+        const issueRecord = issueRecords.find(r => r.title === task.title);
+        const taskType = this.inferTaskType(task.personaHint || task.title);
+        const proofSlug = issueRecord?.proofDocSlug;
+
+        await updateQueueState((state) => {
+          const newItem = {
+            id: newQueueItemId(task.title),
+            type: taskType,
+            title: task.title,
+            description:
+              `Project: ${brief.title}\n\n${task.description}\n\n` +
+              `**Success Criteria:** Complete your section of the project. Write all output to the designated file.` +
+              (proofSlug ? `\n\nShared Proof doc slug: ${proofSlug} (optional — file output is primary)` : ""),
+            priority: (task.priority === "critical" ? "high" : task.priority === "high" ? "high" : "normal") as "high" | "normal" | "low",
+            status: "pending" as const,
+            source: "chat" as const,
+            createdAt: Date.now(),
+            personaHint: assignee?.personaSlug ?? task.personaHint,
+            proofDocSlug: proofSlug,
+            workspaceId: workspace,
+          };
+          state.items.push(newItem);
+          return newItem;
+        });
+      }
+
+      // Kick the queue processor so agents start immediately
+      const qp = getQueueProcessor();
+      if (qp) {
+        void qp.processAllPending();
+      }
+      this.logger.info(`[Paperclip] Queued ${brief.issues.length} issue(s) for execution via queue-processor`);
+    } catch (err) {
+      this.logger.warn(`[Paperclip] Failed to queue issues for execution: ${String(err)}`);
     }
 
     return this.buildStatus(this.state.projects[this.state.projects.length - 1], project.status);
@@ -466,6 +510,17 @@ export class PaperclipAdapter {
   }
 
   // ── Helpers ────────────────────────────────────────────────────────
+
+  /** Map persona hints / titles to queue item types for execution */
+  private inferTaskType(hint: string): import("../lib/queue-state.js").QueueItemType {
+    const h = hint.toLowerCase();
+    if (h.includes("engineer") || h.includes("developer") || h.includes("frontend") || h.includes("build") || h.includes("code")) return "coding";
+    if (h.includes("research") || h.includes("analyst") || h.includes("seo")) return "research";
+    if (h.includes("design") || h.includes("creative") || h.includes("brand") || h.includes("copy") || h.includes("content") || h.includes("writer")) return "creative";
+    if (h.includes("review") || h.includes("qa") || h.includes("check")) return "review";
+    if (h.includes("ops") || h.includes("deploy") || h.includes("runner")) return "ops";
+    return "task";
+  }
 
   private findAgent(hint: string): BridgeState["agents"][0] | undefined {
     if (!hint) return undefined;
