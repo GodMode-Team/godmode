@@ -11,7 +11,6 @@
  * All operations wrapped in try/catch. Failures are invisible — the conversation never breaks.
  */
 
-// @ts-expect-error — better-sqlite3 has no bundled types; runtime import works fine
 import Database from "better-sqlite3";
 import { join } from "node:path";
 import { readFileSync } from "node:fs";

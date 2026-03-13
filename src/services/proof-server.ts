@@ -19,8 +19,11 @@
  */
 
 import { createServer, type Server, type IncomingMessage, type ServerResponse } from "node:http";
-import { join } from "node:path";
-import { DATA_DIR } from "../data-paths.js";
+import { mkdirSync } from "node:fs";
+import { join, dirname } from "node:path";
+import Database from "better-sqlite3";
+import { ARTIFACTS_DIR, DATA_DIR } from "../data-paths.js";
+import { secureMkdir, secureWriteFileSync } from "../lib/secure-fs.js";
 import { randomUUID } from "node:crypto";
 
 type Logger = { info: (msg: string) => void; warn: (msg: string) => void; error: (msg: string) => void };
@@ -34,6 +37,7 @@ export type ProofDocument = {
   author: string;
   createdAt: string;
   updatedAt: string;
+  filePath: string;
   /** Provenance: tracks who wrote which sections */
   edits: ProofEdit[];
 };
@@ -59,12 +63,17 @@ export type ProofComment = {
 // ── Database ─────────────────────────────────────────────────────
 
 const DB_PATH = join(DATA_DIR, "proof-docs.db");
-let db: any = null;
+const PROOF_ARTIFACTS_DIR = join(ARTIFACTS_DIR, "proof");
+let db: InstanceType<typeof Database> | null = null;
+
+export function getProofDocumentFilePath(slug: string): string {
+  return join(PROOF_ARTIFACTS_DIR, `${slug}.md`);
+}
 
 function getDb() {
   if (db) return db;
   try {
-    const Database = require("better-sqlite3");
+    mkdirSync(dirname(DB_PATH), { recursive: true });
     db = new Database(DB_PATH);
     db.pragma("journal_mode = WAL");
     db.exec(`
@@ -103,6 +112,16 @@ function getDb() {
   }
 }
 
+function syncDocumentArtifact(slug: string, title: string, content: string): string {
+  const filePath = getProofDocumentFilePath(slug);
+  secureMkdir(PROOF_ARTIFACTS_DIR).catch(() => {});
+  const normalized = content.trim().startsWith("#")
+    ? content
+    : `# ${title}\n\n${content}`.trim() + "\n";
+  secureWriteFileSync(filePath, normalized.endsWith("\n") ? normalized : normalized + "\n");
+  return filePath;
+}
+
 // ── Document CRUD ────────────────────────────────────────────────
 
 export function createDocument(title: string, initialContent?: string, author?: string): ProofDocument {
@@ -118,13 +137,25 @@ export function createDocument(title: string, initialContent?: string, author?: 
   d.prepare(
     "INSERT INTO documents (slug, title, content, author, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
   ).run(slug, title, content, author ?? "ally", now, now);
+  const filePath = syncDocumentArtifact(slug, title, content);
 
-  return { slug, title, content, author: author ?? "ally", createdAt: now, updatedAt: now, edits: [] };
+  return {
+    slug,
+    title,
+    content,
+    author: author ?? "ally",
+    createdAt: now,
+    updatedAt: now,
+    filePath,
+    edits: [],
+  };
 }
 
 export function readDocument(slug: string): ProofDocument | null {
   const d = getDb();
-  const row = d.prepare("SELECT * FROM documents WHERE slug = ?").get(slug);
+  const row = d.prepare("SELECT * FROM documents WHERE slug = ?").get(slug) as
+    | { slug: string; title: string; content: string; author: string; created_at: string; updated_at: string }
+    | undefined;
   if (!row) return null;
 
   const edits = d
@@ -146,6 +177,7 @@ export function readDocument(slug: string): ProofDocument | null {
     author: row.author,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+    filePath: getProofDocumentFilePath(row.slug),
     edits,
   };
 }
@@ -155,13 +187,21 @@ export function editDocument(
   content: string,
   author: "agent" | "ally" | "human",
   authorName?: string,
+  mode: "replace" | "append" = "replace",
 ): boolean {
   const d = getDb();
   const now = new Date().toISOString();
+  const existing = d.prepare("SELECT title, content FROM documents WHERE slug = ?").get(slug) as
+    | { title: string; content: string }
+    | undefined;
+  if (!existing) return false;
+  const nextContent = mode === "append"
+    ? [existing.content, content].filter(Boolean).join(existing.content.trim() ? "\n\n" : "")
+    : content;
 
   const result = d
     .prepare("UPDATE documents SET content = ?, updated_at = ? WHERE slug = ?")
-    .run(content, now, slug);
+    .run(nextContent, now, slug);
 
   if (result.changes === 0) return false;
 
@@ -169,6 +209,7 @@ export function editDocument(
   d.prepare(
     "INSERT INTO edits (id, slug, author, author_name, content, timestamp) VALUES (?, ?, ?, ?, ?, ?)",
   ).run(randomUUID(), slug, author, authorName ?? null, content.slice(0, 500), now);
+  syncDocumentArtifact(slug, existing.title, nextContent);
 
   return true;
 }
@@ -197,6 +238,7 @@ export function listDocuments(limit = 50): ProofDocument[] {
       author: row.author,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
+      filePath: getProofDocumentFilePath(row.slug),
       edits: [],
     }));
 }
@@ -430,7 +472,13 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse): Promise
     // Update document
     if (!sub && method === "PUT") {
       const body = await parseBody(req);
-      const ok = editDocument(slug, body.content ?? "", body.author ?? "human", body.authorName);
+      const ok = editDocument(
+        slug,
+        body.content ?? "",
+        body.author ?? "human",
+        body.authorName,
+        body.mode === "append" ? "append" : "replace",
+      );
       if (!ok) { json(res, 404, { error: "not found" }); return; }
       json(res, 200, { updated: true });
       return;
@@ -449,8 +497,14 @@ export async function startProofServer(log: Logger): Promise<void> {
 
   // Init DB
   try {
+    await secureMkdir(dirname(DB_PATH));
+    await secureMkdir(PROOF_ARTIFACTS_DIR);
     getDb();
   } catch (err) {
+    try {
+      const { health } = await import("../lib/health-ledger.js");
+      health.signal("proof-server", false, { error: String(err) });
+    } catch { /* non-fatal */ }
     log.warn(`[Proof] Database init failed: ${String(err)}`);
     return;
   }
@@ -476,7 +530,7 @@ export async function startProofServer(log: Logger): Promise<void> {
       // Register with health ledger
       try {
         const { health } = await import("../lib/health-ledger.js");
-        health.signal("proof-server", true);
+        health.signal("proof-server", true, { port: serverPort });
       } catch { /* health ledger not available */ }
 
       return;
@@ -485,6 +539,10 @@ export async function startProofServer(log: Logger): Promise<void> {
     }
   }
 
+  try {
+    const { health } = await import("../lib/health-ledger.js");
+    health.signal("proof-server", false, { error: "no-port-available" });
+  } catch { /* non-fatal */ }
   log.warn("[Proof] Could not bind to any port 4000-4009");
 }
 
@@ -506,3 +564,45 @@ export function isProofRunning(): boolean {
 export function getProofPort(): number {
   return serverPort;
 }
+
+export function getProofViewUrl(slug: string): string {
+  return `http://127.0.0.1:${serverPort}/documents/${slug}/view`;
+}
+
+export const proofHandlers: Record<string, Function> = {
+  "proof.status": async ({ respond }: { respond: Function }) => {
+    respond(true, {
+      running: isProofRunning(),
+      port: getProofPort(),
+    });
+  },
+  "proof.get": async ({ params, respond }: { params: Record<string, unknown>; respond: Function }) => {
+    const slug = typeof params.slug === "string" ? params.slug.trim() : "";
+    if (!slug) {
+      respond(false, null, { code: "INVALID_REQUEST", message: "slug is required" });
+      return;
+    }
+    const doc = readDocument(slug);
+    if (!doc) {
+      respond(false, null, { code: "NOT_FOUND", message: "Proof document not found" });
+      return;
+    }
+    respond(true, {
+      slug: doc.slug,
+      title: doc.title,
+      updatedAt: doc.updatedAt,
+      viewUrl: getProofViewUrl(doc.slug),
+      filePath: doc.filePath,
+    });
+  },
+  "proof.list": async ({ respond }: { respond: Function }) => {
+    const documents = listDocuments(100).map((doc) => ({
+      slug: doc.slug,
+      title: doc.title,
+      updatedAt: doc.updatedAt,
+      viewUrl: getProofViewUrl(doc.slug),
+      filePath: doc.filePath,
+    }));
+    respond(true, { documents });
+  },
+};

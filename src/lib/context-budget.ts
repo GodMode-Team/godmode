@@ -23,6 +23,7 @@
 
 import { getAllyNameLower } from "./ally-identity.js";
 import { listRoster } from "./agent-roster.js";
+import { isProofRunning } from "../services/proof-server.js";
 
 // ── ACP Provenance ────────────────────────────────────────────────
 // Tells us who sent this message so the ally can adjust behavior.
@@ -297,12 +298,20 @@ const CAPABILITY_MAP = [
 function buildAgentRosterNudge(): string | null {
   const count = listRoster().length;
   if (count === 0) return null;
-  return [
+  const proofReady = isProofRunning();
+  const lines = [
     "## Agent Team",
     `You have ${count} specialist agents available for delegation (sales, engineering, marketing, design, product, ops, research, creative).`,
     "When the user needs async work — research, content, analysis, outreach, code review, etc. — proactively offer to queue it.",
     "The right persona is auto-matched by task type, or use queue_add with a specific persona slug if you know it.",
-  ].join("\n");
+    proofReady
+      ? "Agents can write output to a live Proof document — the user can watch progress and steer mid-task via proof_editor."
+      : "",
+    proofReady
+      ? "Use proof_editor for collaborative writing tasks (emails, proposals, blog posts) when live co-editing would help."
+      : "",
+  ];
+  return lines.filter(Boolean).join("\n");
 }
 
 // ── Context Wrapper ──────────────────────────────────────────────────

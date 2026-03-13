@@ -11,7 +11,6 @@
  * All operations wrapped in try/catch — failures are invisible.
  */
 
-// @ts-expect-error — better-sqlite3 has no bundled types; runtime import works fine
 import Database from "better-sqlite3";
 import { randomUUID } from "node:crypto";
 import { readFileSync, existsSync } from "node:fs";

@@ -320,7 +320,11 @@ class QueueProcessor {
       }
     }
 
-    const prompt = await this.buildPromptForItem(item);
+    const proofInfo = await this.ensureProofDocument(item);
+    const itemForPrompt = proofInfo
+      ? { ...item, proofDocSlug: proofInfo.slug, proofDocFilePath: proofInfo.filePath }
+      : item;
+    const prompt = await this.buildPromptForItem(itemForPrompt);
 
     // Resolve which engine to use: explicit on item > persona > default claude
     const persona = resolvePersona(item.type, item.personaHint);
@@ -345,6 +349,12 @@ class QueueProcessor {
         qi.startedAt = Date.now();
         qi.agentPrompt = prompt;
         qi.engine = effectiveEngine;
+        if (proofInfo?.slug) {
+          qi.proofDocSlug = proofInfo.slug;
+        }
+        if (proofInfo?.filePath) {
+          qi.proofDocFilePath = proofInfo.filePath;
+        }
         claimed = true;
       }
     });
@@ -352,6 +362,31 @@ class QueueProcessor {
     if (!claimed) {
       this.logger.info(`[GodMode][Queue] Item "${item.title}" already claimed, skipping`);
       return { spawned: false };
+    }
+
+    // Create a Proof doc for live agent output (if Proof server is running)
+    try {
+      const { isProofRunning } = await import("./proof-server.js");
+      if (isProofRunning()) {
+        const { createProofDocument } = await import("../lib/proof-bridge.js");
+        const doc = await createProofDocument(
+          item.title,
+          `# ${item.title}\n\n_Agent working..._\n`,
+          "agent",
+        );
+        await updateQueueState((state) => {
+          const qi = state.items.find((i) => i.id === item.id);
+          if (qi) qi.proofDocSlug = doc.slug;
+        });
+        item.proofDocSlug = doc.slug;
+        this.logger.info(`[GodMode][Queue] Created Proof doc "${doc.slug}" for "${item.title}"`);
+
+        // Notify UI to auto-open Proof viewer
+        this.broadcast("proof:open", { slug: doc.slug, title: item.title });
+      }
+    } catch (err) {
+      this.logger.warn(`[GodMode][Queue] Proof doc creation failed for "${item.title}": ${String(err)}`);
+      // Non-fatal — agent will still write to file
     }
 
     const { bin: agentBin, args: agentArgs } = buildSpawnArgs(effectiveEngine, prompt);
@@ -438,6 +473,7 @@ class QueueProcessor {
         itemId: item.id,
         status: "processing",
         engine: effectiveEngine,
+        proofDocSlug: itemForPrompt.proofDocSlug ?? null,
       });
 
       return { spawned: true, pid: pid ?? undefined };
@@ -471,6 +507,9 @@ class QueueProcessor {
     let outputContent = "";
     let artifacts: string[] = [];
 
+    const currentState = await readQueueState();
+    const currentItem = currentState.items.find((i) => i.id === itemId);
+
     try {
       outputContent = await fs.readFile(outPath, "utf-8");
       // Extract first 3 non-empty lines for summary
@@ -484,9 +523,27 @@ class QueueProcessor {
       summary = "Output file not found — agent may have completed without writing results.";
     }
 
+    if ((!outputContent || outputContent.trim().length === 0) && currentItem?.proofDocSlug) {
+      try {
+        const { readProofDocument } = await import("../lib/proof-bridge.js");
+        const proofDoc = await readProofDocument(currentItem.proofDocSlug);
+        if (proofDoc.content.trim()) {
+          outputContent = proofDoc.content;
+          await fs.mkdir(INBOX_DIR, { recursive: true });
+          await fs.writeFile(outPath, outputContent, "utf-8");
+          const lines = outputContent
+            .split("\n")
+            .filter((l) => l.trim().length > 0)
+            .slice(0, 3);
+          summary = lines.join(" ").slice(0, 500);
+          artifacts = extractArtifacts(outputContent);
+        }
+      } catch {
+        // Proof fallback is best-effort.
+      }
+    }
+
     // Retrieve the item's type for evidence checking
-    const currentState = await readQueueState();
-    const currentItem = currentState.items.find((i) => i.id === itemId);
     const itemType = currentItem?.type ?? "task";
 
     // Evidence check: verify output contains expected artifacts for this task type
@@ -523,7 +580,11 @@ class QueueProcessor {
       if (qi) {
         qi.status = "review";
         qi.completedAt = Date.now();
-        qi.result = { summary, outputPath: outPath };
+        qi.result = {
+          summary,
+          outputPath: outPath,
+          proofDocSlug: qi.proofDocSlug,
+        };
         qi.artifacts = artifacts;
       }
       return state;
@@ -616,6 +677,7 @@ class QueueProcessor {
         },
         proofDocSlug: completedItem?.proofDocSlug,
         outputPath: outPath,
+        sessionId: completedItem?.sessionId,
       });
     } catch (err) {
       this.logger.warn(`[GodMode][Queue] Inbox push failed for ${itemId}: ${String(err)}`);
@@ -992,6 +1054,37 @@ class QueueProcessor {
       sections.push("", "## Your Role", "", persona.body);
     }
 
+    if (item.proofDocSlug) {
+      try {
+        const { getProofApiBase, getProofViewUrl } = await import("../lib/proof-bridge.js");
+        const proofApi = getProofApiBase();
+        const proofUrl = getProofViewUrl(item.proofDocSlug);
+        sections.push(
+          "",
+          "## Live Proof Document",
+          `Work live in the Proof doc while you think and write: ${proofUrl}`,
+          `Proof doc slug: ${item.proofDocSlug}`,
+          `Proof API base: ${proofApi}`,
+          "Before drafting, write a short outline to the Proof doc. Update the doc after each major section or finding.",
+          "Re-read the Proof doc before each major update so you incorporate any human edits or Prosper steering comments.",
+          "When you finish, mirror the final markdown to the required output file path below.",
+          "",
+          "Example commands:",
+          "```bash",
+          `curl -s ${proofApi}/documents/${item.proofDocSlug}`,
+          `curl -s -X PUT ${proofApi}/documents/${item.proofDocSlug} \\`,
+          "  -H 'Content-Type: application/json' \\",
+          `  -d '{"content":"## Outline\\n- ...","author":"agent","authorName":"${roleName}"}'`,
+          `curl -s -X PUT ${proofApi}/documents/${item.proofDocSlug} \\`,
+          "  -H 'Content-Type: application/json' \\",
+          `  -d '{"content":"## Next update\\n...","author":"agent","authorName":"${roleName}","mode":"append"}'`,
+          "```",
+        );
+      } catch {
+        // Proof server may be unavailable mid-run; continue with file output only.
+      }
+    }
+
     // Detect godmode-builder persona for codebase-level access
     const isGodmodeBuilder = item.personaHint === "godmode-builder" ||
       persona?.name === "GodMode Builder";
@@ -1065,6 +1158,7 @@ class QueueProcessor {
         "- Do NOT modify files outside ~/godmode/memory/inbox/.",
         "- Do NOT run destructive commands (rm -rf, git reset --hard).",
         "- Do NOT access sensitive config files (.env, openclaw.json, SSH keys).",
+        "- You MAY use the local Proof API on 127.0.0.1 for live document updates if a Proof doc is assigned.",
         "- Write your complete output to the path above as markdown.",
       );
     }
@@ -1162,6 +1256,9 @@ class QueueProcessor {
       "",
       "## Output Instructions",
       `Write your complete results to: ${outPath}`,
+      item.proofDocSlug
+        ? `Also keep the Proof doc (${item.proofDocSlug}) updated as you work so the human can watch progress live.`
+        : "",
       "",
       "Use this structure:",
       "```",
@@ -1182,6 +1279,40 @@ class QueueProcessor {
       "## Suggested Next Steps",
       "[Actionable follow-ups for the human or next agent]",
       "```",
+    );
+
+    // Inject Proof live-output instructions if a Proof doc was created
+    if (item.proofDocSlug) {
+      try {
+        const { getProofApiBase } = await import("../lib/proof-bridge.js");
+        const proofBase = getProofApiBase();
+        sections.push(
+          "",
+          "## Live Output (Proof Document)",
+          `A Proof document has been created for this task. The user can see your work in real-time.`,
+          `As you work, periodically update the Proof document with your progress using the HTTP API:`,
+          "",
+          "```bash",
+          `# Update document content (replaces full content):`,
+          `curl -s -X PUT ${proofBase}/documents/${item.proofDocSlug} \\`,
+          `  -H "Content-Type: application/json" \\`,
+          `  -d '{"content": "YOUR_MARKDOWN_HERE", "author": "agent"}'`,
+          "",
+          `# Add a progress comment:`,
+          `curl -s -X POST ${proofBase}/documents/${item.proofDocSlug}/comments \\`,
+          `  -H "Content-Type: application/json" \\`,
+          `  -d '{"author": "agent", "text": "Working on section X..."}'`,
+          "```",
+          "",
+          "Update the Proof doc at each major milestone (after research, after analysis, after writing conclusions).",
+          "The user sees updates live — this is your primary output surface. Still write final results to the file path above.",
+        );
+      } catch {
+        // Proof bridge not available — skip live output instructions
+      }
+    }
+
+    sections.push(
       "",
       "Do your best work. Be thorough.",
       "If you get stuck, write what you tried and what you'd do differently.",
@@ -1189,6 +1320,31 @@ class QueueProcessor {
     );
 
     return sections.join("\n");
+  }
+
+  private async ensureProofDocument(
+    item: QueueItem,
+  ): Promise<{ slug: string; filePath?: string } | null> {
+    if (item.proofDocSlug) {
+      return { slug: item.proofDocSlug, filePath: item.proofDocFilePath };
+    }
+
+    try {
+      const { isProofRunning } = await import("./proof-server.js");
+      if (!isProofRunning()) {
+        return null;
+      }
+      const { createProofDocument } = await import("../lib/proof-bridge.js");
+      const proofDoc = await createProofDocument(
+        item.title,
+        `# ${item.title}\n\n## Working Draft\n\n`,
+        "ally",
+      );
+      return { slug: proofDoc.slug, filePath: proofDoc.filePath };
+    } catch (err) {
+      this.logger.warn(`[GodMode][Queue] Proof doc creation failed for ${item.id}: ${String(err)}`);
+      return null;
+    }
   }
 
   // ── Broadcast helper ───────────────────────────────────────────

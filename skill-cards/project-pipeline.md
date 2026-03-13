@@ -53,6 +53,14 @@ Use `queue_add` with `handoff_summary` and `handoff_deliverable` to pass context
 - handoff_summary: "Brand Guardian defined the visual identity and voice. Key decisions: [summary]"
 - handoff_deliverable: "Use the brand guide above to write all page copy. Maintain the voice and tone."
 
+## Live Output via Proof
+Each queued agent automatically gets a Proof document for live output. The user can:
+- Watch agent progress in real-time in the sidebar
+- Steer mid-task via `queue_steer` if the agent is going in the wrong direction
+- Review and edit deliverables directly in the Proof doc before approving
+
+When reviewing agent output, open the Proof doc with `proof_editor` action `open` to show it in the sidebar.
+
 ## Rules
 - ALWAYS scope before queuing — you are the chief of staff, not a task router
 - Queue tasks in order — wait for each to complete before queuing the next (the output is the input for the next agent)
