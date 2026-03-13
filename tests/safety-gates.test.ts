@@ -173,27 +173,45 @@ describe("Config Shield", () => {
 });
 
 describe("Ephemeral Path Shield", () => {
-  it("warns on /tmp writes via exec/bash", () => {
+  it("blocks /tmp writes via exec/bash", () => {
     const session = `ephemeral-${Date.now()}`;
-    // Ephemeral shield only checks exec/bash/shell tools, not files.write
     const result = checkEphemeralWrite(
       "exec",
       { command: "cat report.html > /tmp/report.html" },
       session,
     );
-    // May or may not trigger depending on pattern match
-    // The shield is pattern-based, so just verify it doesn't throw
-    expect(result === undefined || typeof result === "string").toBe(true);
+    expect(typeof result === "string").toBe(true);
+    expect(result).toContain("BLOCKED");
   });
 
-  it("does not warn on non-exec tools", () => {
-    const session = `ephemeral-ok-${Date.now()}`;
+  it("blocks files.write to /tmp", () => {
+    const session = `ephemeral-write-${Date.now()}`;
     const result = checkEphemeralWrite(
       "files.write",
       { path: "/tmp/report.html" },
       session,
     );
-    // files.write is not checked by ephemeral shield (only exec/bash/shell)
+    expect(typeof result === "string").toBe(true);
+    expect(result).toContain("BLOCKED");
+  });
+
+  it("allows files.write to permanent paths", () => {
+    const session = `ephemeral-ok-${Date.now()}`;
+    const result = checkEphemeralWrite(
+      "files.write",
+      { path: "/Users/caleb/godmode/artifacts/report.html" },
+      session,
+    );
+    expect(result).toBeUndefined();
+  });
+
+  it("does not block unrelated tools", () => {
+    const session = `ephemeral-other-${Date.now()}`;
+    const result = checkEphemeralWrite(
+      "files.read",
+      { path: "/tmp/report.html" },
+      session,
+    );
     expect(result).toBeUndefined();
   });
 });

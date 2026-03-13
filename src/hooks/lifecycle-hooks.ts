@@ -33,6 +33,16 @@ import {
 
 type Logger = { warn: (msg: string) => void; info: (msg: string) => void };
 
+// ── Dashboard save tracking ──────────────────────────────────────────
+// Track sessions where dashboards.save was called so we can auto-save
+// dashboard HTML if the ally forgets.
+const _dashboardSaveCalled = new Set<string>();
+const _dashboardSaveCalledTTL = 5 * 60 * 1000; // 5 min
+function markDashboardSaved(sessionKey: string): void {
+  _dashboardSaveCalled.add(sessionKey);
+  setTimeout(() => _dashboardSaveCalled.delete(sessionKey), _dashboardSaveCalledTTL);
+}
+
 // ── API Error Shield ──────────────────────────────────────────────────
 
 const API_ERROR_FRIENDLY: Record<string, string> = {
@@ -75,16 +85,44 @@ function recordOverload(): void {
 
 /** Returns a friendly replacement string if `content` is a raw API error, else null. */
 function interceptApiError(content: string): string | null {
+  const trimmed = content.trim();
+
   // Plain-text overload message from gateway
-  if (content.trim() === OVERLOAD_PLAIN) {
+  if (trimmed === OVERLOAD_PLAIN) {
     recordOverload();
     return API_ERROR_FRIENDLY.overloaded_error;
   }
 
+  // HTTP status code prefixed errors: "529 {"type":"error",...}" or "400 Unsupported value..."
+  const httpPrefixMatch = trimmed.match(/^(\d{3})\s+(.+)/s);
+  if (httpPrefixMatch) {
+    const status = Number(httpPrefixMatch[1]);
+    const body = httpPrefixMatch[2]!;
+    if (status === 529 || status === 503) {
+      recordOverload();
+      // Try to parse JSON body for details
+      try {
+        const parsed = JSON.parse(body);
+        if (parsed?.error?.type === "overloaded_error") {
+          return API_ERROR_FRIENDLY.overloaded_error;
+        }
+      } catch { /* not JSON */ }
+      return API_ERROR_FRIENDLY.overloaded_error;
+    }
+    if (status === 400) {
+      // Model compatibility error (e.g., thinking level not supported) — suppress raw error
+      return "__SUPPRESS__";
+    }
+    if (status === 429) {
+      recordOverload();
+      return API_ERROR_FRIENDLY.rate_limit_error;
+    }
+  }
+
   // Raw JSON error payload: {"type":"error","error":{"type":"overloaded_error",...}}
-  if (content.includes('"type":"error"') && content.includes('"error"')) {
+  if (trimmed.includes('"type":"error"') && trimmed.includes('"error"')) {
     try {
-      const parsed = JSON.parse(content.trim());
+      const parsed = JSON.parse(trimmed);
       if (parsed?.type === "error" && parsed?.error) {
         const errorType: string = parsed.error.type ?? "unknown_error";
         if (errorType === "overloaded_error" || errorType === "rate_limit_error") {
@@ -98,6 +136,12 @@ function interceptApiError(content: string): string | null {
     } catch {
       // Not valid JSON — fall through
     }
+  }
+
+  // Catch "Unsupported value" errors from model compatibility issues
+  if (trimmed.startsWith("Unsupported value:") || trimmed.includes("is not supported with the")) {
+    // Suppress — gateway retries these automatically
+    return "__SUPPRESS__";
   }
 
   return null;
@@ -241,13 +285,13 @@ export async function handleBeforeToolCall(
     return { block: true, blockReason: configBlock };
   }
 
-  // Gate 1d: Ephemeral Path Shield
+  // Gate 1d: Ephemeral Path Shield — HARD BLOCK /tmp writes
   try {
     const { checkEphemeralWrite } = await import("./safety-gates.js");
-    const ephemeralWarn = checkEphemeralWrite(name, (event.params ?? {}) as Record<string, unknown>, sessionKey);
-    if (ephemeralWarn) {
-      logger.warn(`[GodMode][SafetyGate] ephemeral path shield fired: ${name}`);
-      return { prependContext: ephemeralWarn };
+    const ephemeralBlock = checkEphemeralWrite(name, (event.params ?? {}) as Record<string, unknown>, sessionKey);
+    if (ephemeralBlock) {
+      logger.warn(`[GodMode][SafetyGate] ephemeral path shield BLOCKED: ${name}`);
+      return { block: true, blockReason: ephemeralBlock };
     }
   } catch { /* non-fatal */ }
 
@@ -267,6 +311,11 @@ export async function handleBeforeToolCall(
     recordToolUsage(sessionKey, name);
   } catch { /* non-fatal */ }
 
+  // Track dashboards.save calls so we know if ally saved the dashboard
+  if (name === "dashboards.save" && sessionKey) {
+    markDashboardSaved(sessionKey);
+  }
+
   return undefined;
 }
 
@@ -285,6 +334,10 @@ export async function handleMessageSending(
   // The gateway sometimes surfaces raw JSON error payloads or plain-text
   // error strings as assistant messages. Intercept and humanize them.
   const friendly = interceptApiError(content);
+  if (friendly === "__SUPPRESS__") {
+    logger.warn(`[GodMode][ErrorShield] Suppressed transient error (gateway will retry)`);
+    return { cancel: true };
+  }
   if (friendly) {
     logger.warn(`[GodMode][ErrorShield] Caught raw API error — replacing with friendly message`);
     return { content: friendly };
@@ -323,6 +376,38 @@ export async function handleMessageSending(
       void extractAndStore(content);
     }
   } catch { /* invisible */ }
+
+  // Dashboard auto-save safety net: if the ally output dashboard-like HTML
+  // but didn't call dashboards.save, save it automatically.
+  if (sessionKey && !_dashboardSaveCalled.has(sessionKey) && content.length > 500) {
+    try {
+      const hasStyleBlock = /<style[\s>]/i.test(content);
+      const hasHtmlStructure = (/<div[\s>]/i.test(content) || /<section[\s>]/i.test(content))
+        && (/<table[\s>]/i.test(content) || /<svg[\s>]/i.test(content) || /<h[1-3][\s>]/i.test(content));
+      if (hasStyleBlock && hasHtmlStructure) {
+        // Extract a title from the first <h1>, <h2>, or <title> tag
+        const titleMatch = content.match(/<(?:h[12]|title)[^>]*>(.*?)<\/(?:h[12]|title)>/i);
+        const dashTitle = titleMatch?.[1]?.replace(/<[^>]*>/g, "").trim() || "Untitled Dashboard";
+
+        logger.info(`[GodMode][DashboardAutoSave] Detected unsaved dashboard HTML: "${dashTitle}"`);
+
+        const { saveDashboardDirect } = await import("../methods/dashboards.js");
+        void saveDashboardDirect({
+          title: dashTitle,
+          html: content,
+          scope: "global",
+          description: "Auto-saved from chat (ally did not call dashboards.save)",
+        }).then((result) => {
+          if (result?.ok) {
+            logger.info(`[GodMode][DashboardAutoSave] Saved dashboard "${dashTitle}" (id: ${result.id})`);
+            safeBroadcast(api, "dashboards:updated", { id: result.id, title: dashTitle });
+          }
+        }).catch((err: unknown) => {
+          logger.warn(`[GodMode][DashboardAutoSave] Failed: ${String(err)}`);
+        });
+      }
+    } catch { /* non-fatal */ }
+  }
 
   return undefined;
 }

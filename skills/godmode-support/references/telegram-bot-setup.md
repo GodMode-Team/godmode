@@ -23,7 +23,7 @@ Then set this description:
 ```
 Welcome to GodMode Support!
 
-I'm Atlas, your AI support assistant. I can help with:
+I'm {{ALLY_NAME}}, your AI support assistant. I can help with:
 
 - GodMode questions and troubleshooting
 - Configuration help
@@ -93,7 +93,7 @@ Support hours: Chat 24/7, Remote access 9-5 CT
 ```
 Checking your GodMode status...
 
-[Atlas will look up the user's Telegram ID in the registry and report their system status]
+[{{ALLY_NAME}} will look up the user's Telegram ID in the registry and report their system status]
 ```
 
 ### /hours
@@ -143,9 +143,9 @@ Configure via BotFather:
 /setinline - Set to DISABLE (not needed)
 ```
 
-## Integration with Atlas
+## Integration with {{ALLY_NAME}}
 
-The bot token needs to be added to Atlas's configuration:
+The bot token needs to be added to {{ALLY_NAME}}'s configuration:
 
 ```json
 // ~/.openclaw/config.json
@@ -159,7 +159,7 @@ The bot token needs to be added to Atlas's configuration:
 }
 ```
 
-Atlas will:
+{{ALLY_NAME}} will:
 
 1. Listen for messages to this bot
 2. Look up the sender's Telegram ID in the support registry
@@ -169,7 +169,7 @@ Atlas will:
 ## Testing
 
 1. Message the bot from your personal Telegram account
-2. Verify Atlas receives and responds to the message
+2. Verify {{ALLY_NAME}} receives and responds to the message
 3. Test the `/start`, `/help`, `/status` commands
 4. Verify your Telegram user ID shows in the registry lookup
 
@@ -178,7 +178,7 @@ Atlas will:
 To find a user's Telegram ID for the registry:
 
 1. Have them message the bot
-2. Check Atlas logs for the incoming message
+2. Check {{ALLY_NAME}} logs for the incoming message
 3. The user ID will be in the message metadata
 
 Or use [@userinfobot](https://t.me/userinfobot) - have them forward a message from themselves to get their ID.

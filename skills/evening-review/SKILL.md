@@ -18,6 +18,10 @@ Runs at 9 PM daily via cron. This is the **user-facing** evening check-in — a 
 
 ## Process
 
+### Step 0: Sync Brief Checkboxes → Tasks
+
+Before gathering context, sync the daily brief's checkbox state to the task system. Throughout the day, the user may have checked off Win The Day items directly in the daily brief markdown. Call `dailyBrief.syncTasks` with today's date to propagate those completions to the task list. This ensures the task statuses are accurate before you report on what got done.
+
 ### Step 1: Gather Context
 
 Before composing the message, pull together today's context from **all** sources — not just GodMode sessions:
@@ -90,7 +94,7 @@ Send the composed message using the `message` tool:
 
 ## Reply Handling
 
-This skill runs in the **main Prosper session** — not an isolated cron session. When the user replies to the iMessage, their reply arrives naturally in the conversation. Prosper handles it like a conversation, not a form.
+This skill runs in the **main {{ALLY_NAME}} session** — not an isolated cron session. When the user replies to the iMessage, their reply arrives naturally in the conversation. {{ALLY_NAME}} handles it like a conversation, not a form.
 
 ### What to do with the reply:
 
@@ -108,7 +112,7 @@ This skill runs in the **main Prosper session** — not an isolated cron session
 
 ### Key principle
 
-The user can reply in any format — one word, a paragraph, voice dictation, or a structured brain dump. Prosper interprets it naturally. No pipe-delimited templates. No numbered survey responses. If the reply is complete, close the loop. If there's work to do overnight, queue it and let the user know you're on it.
+The user can reply in any format — one word, a paragraph, voice dictation, or a structured brain dump. {{ALLY_NAME}} interprets it naturally. No pipe-delimited templates. No numbered survey responses. If the reply is complete, close the loop. If there's work to do overnight, queue it and let the user know you're on it.
 
 ## Example Output
 
@@ -175,14 +179,14 @@ Score your day 1-10 and brain dump anything on your mind.
 > **IMPORTANT**: This skill MUST use `sessionTarget: "main"` — NEVER `"isolated"`.
 > Isolated sessions create a separate agent context. When the user replies to the
 > check-in message, their reply gets captured by the isolated session instead of
-> the main Prosper session, effectively swallowing the message. The main session
-> never sees it — and Prosper can't act on the user's brain dump.
+> the main {{ALLY_NAME}} session, effectively swallowing the message. The main session
+> never sees it — and {{ALLY_NAME}} can't act on the user's brain dump.
 
 ```
 Schedule: 0 21 * * * (9 PM daily, user's timezone)
 Session: main (NEVER isolated — replies get swallowed)
 Payload kind: systemEvent (not agentTurn)
-Delivery: none (Prosper sends via message tool directly)
+Delivery: none ({{ALLY_NAME}} sends via message tool directly)
 ```
 
 ### Safe cron job config example
@@ -195,7 +199,7 @@ Delivery: none (Prosper sends via message tool directly)
   "wakeMode": "now",
   "payload": {
     "kind": "systemEvent",
-    "text": "EVENING REVIEW (9 PM): Time for the evening check-in. Run the evening-review skill — gather today's context (daily brief, agent log, sessions, tomorrow's calendar), compose a warm personal iMessage check-in (under 800 chars), and send it via the message tool. After sending, stay present for the user's reply. When they respond, handle it naturally: capture their reflection to the daily brief, extract any tasks they mention and create them, queue any work they want done overnight, and if you're not sure what to prioritize, ask. This is a conversation, not a form."
+    "text": "EVENING REVIEW (9 PM): Time for the evening check-in. Run the evening-review skill — first call dailyBrief.syncTasks to sync any checked-off Win The Day items to the task list, then gather today's context (daily brief, agent log, sessions, tomorrow's calendar), compose a warm personal iMessage check-in (under 800 chars), and send it via the message tool. After sending, stay present for the user's reply. When they respond, handle it naturally: capture their reflection to the daily brief, extract any tasks they mention and create them, queue any work they want done overnight, and if you're not sure what to prioritize, ask. This is a conversation, not a form."
   },
   "delivery": { "mode": "none" },
   "schedule": { "kind": "cron", "expr": "0 21 * * *", "tz": "America/Chicago" }

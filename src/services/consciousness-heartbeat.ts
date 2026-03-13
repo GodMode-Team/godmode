@@ -188,6 +188,34 @@ class ConsciousnessHeartbeat {
                 mkdirSync(DATA_DIR, { recursive: true });
                 writeFileSync(briefFlagFile, new Date().toISOString(), "utf-8");
               } catch { /* flag write non-fatal */ }
+              // Add a queue entry so the daily brief appears as a rateable decision card
+              try {
+                const { updateQueueState, newQueueItemId } = await import("../lib/queue-state.js");
+                await updateQueueState((state) => {
+                  // Dedup: don't add if one already exists for today's brief
+                  const existing = state.items.find(
+                    (i) => i.source === "cron" && i.title === "Daily Brief" &&
+                      i.createdAt > Date.now() - 24 * 60 * 60 * 1000,
+                  );
+                  if (existing) return;
+                  state.items.push({
+                    id: newQueueItemId("daily-brief"),
+                    type: "ops",
+                    title: "Daily Brief",
+                    description: `Daily brief generated with ${result.sections.length} sections.`,
+                    priority: "normal",
+                    status: "review",
+                    source: "cron",
+                    personaHint: "daily brief",
+                    result: {
+                      summary: `Daily brief generated — ${result.sections.length} sections.`,
+                      outputPath: dailyPath,
+                    },
+                    createdAt: Date.now(),
+                    completedAt: Date.now(),
+                  });
+                });
+              } catch { /* queue entry non-fatal */ }
               try {
                 this.broadcast("ally:notification", {
                   type: "cron-result",

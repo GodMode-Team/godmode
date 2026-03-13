@@ -28,7 +28,10 @@ export function createMorningSetTool(_ctx: ToolContext): AnyAgentTool {
       "Finalize the Morning Set by locking in today's priorities. " +
       "This updates the Win The Day section in the daily note and scopes today's tasks " +
       "to only the selected priorities (other tasks get un-dated). " +
-      "Call this after discussing and refining the user's daily priorities. " +
+      "IMPORTANT: Do NOT call this tool until the user has explicitly approved the proposed plan. " +
+      "First, present a plan: which tasks you'll handle as agents, which the user should do, " +
+      "and in what order. Ask clarifying questions (e.g. 'which Zach?', 'draft or send?'). " +
+      "Only call this tool after the user says to go ahead. " +
       "Provide the final ordered list of 3-5 priority items.",
     parameters: {
       type: "object" as const,
@@ -95,6 +98,15 @@ export function createMorningSetTool(_ctx: ToolContext): AnyAgentTool {
           // Scoping is best-effort
         }
 
+        // 4. Pre-create session keys for all today's tasks so links work immediately
+        let taskSessions: Array<{ id: string; title: string; sessionId: string }> = [];
+        try {
+          const { ensureTaskSessions } = await import("../methods/tasks.js");
+          taskSessions = await ensureTaskSessions(today);
+        } catch {
+          // Non-fatal
+        }
+
         return jsonResult({
           finalized: true,
           focusTitle: items[0].title,
@@ -102,6 +114,7 @@ export function createMorningSetTool(_ctx: ToolContext): AnyAgentTool {
           noteRewritten: rewriteResult.rewritten,
           tasksSynced: syncResult,
           tasksDeferred: scopeResult.deferred,
+          taskSessions,
           message:
             `Morning set locked in. Top priority: "${items[0].title}" ` +
             `(${items.length} priorities).` +
@@ -112,7 +125,11 @@ export function createMorningSetTool(_ctx: ToolContext): AnyAgentTool {
               ? " Daily note updated."
               : rewriteResult.error
                 ? ` Note: ${rewriteResult.error}.`
-                : ""),
+                : "") +
+            (taskSessions.length > 0
+              ? ` Present the user with clickable links for each task session. ` +
+                `Format each as: [Task Title](openclaw://session/{sessionId}) so they can jump directly into any task.`
+              : ""),
         });
       } catch (err) {
         return jsonResult({

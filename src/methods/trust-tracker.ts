@@ -361,10 +361,22 @@ export const trustTrackerHandlers: GatewayRequestHandlers = {
       }
     });
 
+    // Write feedback directly into the persona/skill markdown file
+    let fileResult: { applied: boolean; filePath?: string; consolidated?: boolean } = { applied: false };
+    try {
+      const { applyFeedbackToFile } = await import("../lib/trust-refinement.js");
+      fileResult = await applyFeedbackToFile(normalized, feedback.trim());
+    } catch (err) {
+      console.error("[TrustTracker] Failed to apply feedback to file:", err);
+    }
+
     context?.broadcast?.("trust:feedback", { workflow: normalized, feedback: feedback.trim() });
     respond(true, {
       stored: true,
-      message: `Feedback noted for "${normalized}". I'll apply this next time.`,
+      appliedToFile: fileResult.applied,
+      message: fileResult.applied
+        ? `Feedback written to ${fileResult.consolidated ? "consolidated " : ""}persona/skill file. It'll take effect on the next run.`
+        : `Feedback noted for "${normalized}". I'll apply this next time.`,
       feedbackCount: (state.workflowFeedback[normalized] ?? []).length,
     });
   },

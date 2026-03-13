@@ -266,7 +266,7 @@ function applySessionDefaults(host: GatewayHost, defaults?: SessionDefaultsSnaps
     return;
   }
   // IMPORTANT: Don't normalize "main" to a per-connection webchat session.
-  // The pinned Prosper tab uses "main" which the gateway resolves server-side
+  // The pinned ally tab uses "main" which the gateway resolves server-side
   // to the shared main session (same as iMessage, same as all channels).
   // Normalizing it to "agent:main:webchat-XXX" breaks cross-channel continuity.
   const ALLY_KEY = "main";
@@ -641,8 +641,8 @@ const SYSTEM_FINGERPRINTS = [
   "you are resourceful and thorough. your job is to get the job done",
   "## persistence protocol",
   "## core behaviors",
-  "## your role as prosper",
-  "your role as prosper (godmode ea)",
+  "## your role as ",
+  "(godmode ea)",
   "elite executive assistant powering a personal ai operating system",
   "be diligent first time.",
   "exhaust reasonable options.",
@@ -1589,6 +1589,7 @@ function handleGatewayEventUnsafe(host: GatewayHost, evt: GatewayEventFrame) {
   if (evt.event === "ally:notification") {
     const payload = evt.payload as
       | {
+          type?: string;
           summary?: string;
           actions?: Array<{
             label: string;
@@ -1612,6 +1613,7 @@ function handleGatewayEventUnsafe(host: GatewayHost, evt: GatewayEventFrame) {
         allyUnread?: number;
         tab?: string;
         requestUpdate?: () => void;
+        loadTodayQueueResults?: () => Promise<unknown>;
       };
       const msg = {
         role: "assistant" as const,
@@ -1623,6 +1625,11 @@ function handleGatewayEventUnsafe(host: GatewayHost, evt: GatewayEventFrame) {
       allyHost.allyMessages = [...(allyHost.allyMessages ?? []), msg];
       if (!allyHost.allyPanelOpen && host.tab !== "chat") {
         allyHost.allyUnread = (allyHost.allyUnread ?? 0) + 1;
+      }
+      // Reload decision cards when queue/cron results arrive so Inbox badge updates
+      const queueTypes = ["queue-complete", "queue-needs-review", "queue-failed", "cron-result"];
+      if (payload.type && queueTypes.includes(payload.type) && allyHost.loadTodayQueueResults) {
+        allyHost.loadTodayQueueResults().catch(() => {});
       }
       allyHost.requestUpdate?.();
     }

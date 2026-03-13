@@ -1,5 +1,32 @@
 import { html, nothing } from "lit";
 
+// ===== Resource Types =====
+
+export type ResourceType =
+  | "html_report"
+  | "plan"
+  | "analysis"
+  | "code"
+  | "doc"
+  | "data"
+  | "image"
+  | "script";
+
+export type Resource = {
+  id: string;
+  title: string;
+  type: ResourceType;
+  path?: string;
+  url?: string;
+  sessionKey: string;
+  createdAt: string;
+  pinned: boolean;
+  summary?: string;
+  tags?: string[];
+};
+
+export type ResourceFilter = "all" | "pinned" | "html_report" | "plan" | "code" | "recent";
+
 // ===== Types =====
 
 export type ProjectTask = {
@@ -52,6 +79,14 @@ export type WorkProps = {
   onPersonClick?: (personId: string) => void;
   onFileClick?: (path: string) => void;
   onSkillClick?: (skill: string, projectName: string) => void;
+  // Resources
+  resources?: Resource[];
+  resourcesLoading?: boolean;
+  resourceFilter?: ResourceFilter;
+  onResourceFilterChange?: (filter: ResourceFilter) => void;
+  onResourceClick?: (resource: Resource) => void;
+  onResourcePin?: (id: string, pinned: boolean) => void;
+  onResourceDelete?: (id: string) => void;
 };
 
 // ===== Workspace Files (flat, capped) =====
@@ -395,6 +430,148 @@ function renderLegacyFileTree(outputs: ProjectOutput[]) {
   `;
 }
 
+// ===== Resources Section =====
+
+const RESOURCE_ICONS: Record<string, string> = {
+  html_report: "📊",
+  plan: "📋",
+  analysis: "🔍",
+  code: "💻",
+  doc: "📝",
+  data: "📦",
+  image: "🖼️",
+  script: "⚙️",
+};
+
+const RESOURCE_FILTERS: { key: ResourceFilter; label: string }[] = [
+  { key: "all", label: "All" },
+  { key: "pinned", label: "Pinned" },
+  { key: "html_report", label: "Reports" },
+  { key: "plan", label: "Plans" },
+  { key: "code", label: "Code" },
+  { key: "recent", label: "Recent" },
+];
+
+function filterResources(resources: Resource[], filter: ResourceFilter): Resource[] {
+  switch (filter) {
+    case "pinned":
+      return resources.filter((r) => r.pinned);
+    case "html_report":
+    case "plan":
+    case "code":
+      return resources.filter((r) => r.type === filter);
+    case "recent": {
+      const cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000;
+      return resources.filter((r) => new Date(r.createdAt).getTime() > cutoff);
+    }
+    default:
+      return resources;
+  }
+}
+
+function renderResourceCard(
+  resource: Resource,
+  onClick?: (resource: Resource) => void,
+  onPin?: (id: string, pinned: boolean) => void,
+  onDelete?: (id: string) => void,
+) {
+  const icon = RESOURCE_ICONS[resource.type] || "📄";
+  const date = new Date(resource.createdAt);
+  const dateStr = relativeTime(date.getTime());
+
+  return html`
+    <div class="resource-card">
+      <button
+        class="resource-card-main"
+        @click=${() => onClick?.(resource)}
+        title=${resource.summary || resource.title}
+      >
+        <span class="resource-card-icon">${icon}</span>
+        <div class="resource-card-info">
+          <span class="resource-card-title">${resource.title}</span>
+          <span class="resource-card-meta">
+            <span class="resource-type-badge">${resource.type.replace("_", " ")}</span>
+            <span>${dateStr}</span>
+          </span>
+        </div>
+      </button>
+      <div class="resource-card-actions">
+        <button
+          class="resource-action-btn${resource.pinned ? " pinned" : ""}"
+          title=${resource.pinned ? "Unpin" : "Pin"}
+          @click=${(e: Event) => {
+            e.stopPropagation();
+            onPin?.(resource.id, !resource.pinned);
+          }}
+        >${resource.pinned ? "★" : "☆"}</button>
+        <button
+          class="resource-action-btn delete"
+          title="Delete"
+          @click=${(e: Event) => {
+            e.stopPropagation();
+            onDelete?.(resource.id);
+          }}
+        >×</button>
+      </div>
+    </div>
+  `;
+}
+
+function renderResourcesSection(props: WorkProps) {
+  const {
+    resources = [],
+    resourcesLoading,
+    resourceFilter = "all",
+    onResourceFilterChange,
+    onResourceClick,
+    onResourcePin,
+    onResourceDelete,
+  } = props;
+
+  const filtered = filterResources(resources, resourceFilter);
+
+  // Sort: pinned first, then newest
+  filtered.sort((a, b) => {
+    if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
+    return b.createdAt.localeCompare(a.createdAt);
+  });
+
+  return html`
+    <div class="work-workspaces-section">
+      <h2 class="work-section-title">Resources</h2>
+
+      <div class="resource-filter-strip">
+        ${RESOURCE_FILTERS.map(
+          (f) => html`
+            <button
+              class="resource-filter-btn${resourceFilter === f.key ? " active" : ""}"
+              @click=${() => onResourceFilterChange?.(f.key)}
+            >${f.label}</button>
+          `,
+        )}
+      </div>
+
+      ${resourcesLoading
+        ? html`<div class="work-detail-loading">
+            <div class="spinner" style="width: 16px; height: 16px"></div>
+            Loading resources...
+          </div>`
+        : filtered.length === 0
+          ? html`<div class="my-day-card">
+              <div class="my-day-card-content">
+                <div class="my-day-empty">
+                  No resources yet. Resources are created automatically when the ally generates reports, plans, or docs.
+                </div>
+              </div>
+            </div>`
+          : html`<div class="resource-grid">
+              ${filtered.map((r) => renderResourceCard(r, onResourceClick, onResourcePin, onResourceDelete))}
+            </div>`
+      }
+    </div>
+  `;
+}
+
 // ===== Main Render Function =====
 
 export function renderWork(props: WorkProps) {
@@ -455,6 +632,9 @@ export function renderWork(props: WorkProps) {
             : nothing
         }
       </div>
+
+      <!-- Resources Section -->
+      ${renderResourcesSection(props)}
 
       <!-- Workspaces Section -->
       <div class="work-workspaces-section">

@@ -2,13 +2,13 @@
 
 **Purpose:** Provide first-line customer support for GodMode users via Telegram DM, including remote diagnostics and SSH access (with approval) to customer Mac Minis.
 
-**Invoke:** Customer messages Atlas directly via Telegram DM for GodMode help.
+**Invoke:** Customer messages {{ALLY_NAME}} directly via Telegram DM for GodMode help.
 
 ---
 
 ## Overview
 
-This skill enables Atlas to:
+This skill enables {{ALLY_NAME}} to:
 
 1. Answer GodMode questions and provide guidance
 2. Perform remote diagnostics via allowlisted commands
@@ -21,7 +21,7 @@ This skill enables Atlas to:
 
 ## Support Hours
 
-- **Chat support:** 24/7 (Atlas always responds to messages)
+- **Chat support:** 24/7 ({{ALLY_NAME}} always responds to messages)
 - **SSH access:** 9 AM - 5 PM Central Time only
 - **Escalation:** Issues outside SSH hours are logged for next business day
 
@@ -41,13 +41,13 @@ fi
 
 ## Support Channel: Telegram DM
 
-Each customer DMs Atlas directly via a dedicated support Telegram bot.
+Each customer DMs {{ALLY_NAME}} directly via a dedicated support Telegram bot.
 
 **Setup:**
 
-1. Support bot: `@GodModeSupportBot` (separate from main Atlas bot)
+1. Support bot: `@GodModeSupportBot` (separate from main {{ALLY_NAME}} bot)
 2. Customer given bot username during onboarding
-3. Atlas routes messages to this skill via Telegram user ID lookup
+3. {{ALLY_NAME}} routes messages to this skill via Telegram user ID lookup
 
 **Bot Token:** `8389581060:AAGvq-Rzd7CJmQafd55dlrHIek0igeIyRMo`
 (See `references/telegram-bot-setup.md` for full bot configuration)
@@ -74,7 +74,7 @@ Common topics:
 
 ```
 Customer: "How do I change the morning brief time?"
-Atlas: "You can update it in ~/.openclaw/config.json under the 'briefs' section.
+{{ALLY_NAME}}: "You can update it in ~/.openclaw/config.json under the 'briefs' section.
         Set 'time' to your preferred time in 24-hour format (e.g., '07:00').
         Want me to walk you through it?"
 ```
@@ -93,12 +93,12 @@ When self-service fails, request SSH access.
 
 **Flow:**
 
-1. Atlas determines SSH is needed
+1. {{ALLY_NAME}} determines SSH is needed
 2. Check if within SSH hours (9-5 CT)
 3. Send message: "I need to connect to your Mac Mini to fix this. You'll get a Tailscale notification to approve."
 4. Customer receives Tailscale push notification
 5. Customer taps "Approve" (grants 15-minute access window)
-6. Atlas connects via `godmode-support` CLI
+6. {{ALLY_NAME}} connects via `godmode-support` CLI
 7. Run only allowlisted commands
 8. Log everything
 9. Connection auto-expires
@@ -119,7 +119,7 @@ can try yourself: [self-service steps]"
 - Issue requires non-allowlisted commands
 - Customer requests human support
 - Data loss risk detected
-- Atlas determines complexity exceeds capability
+- {{ALLY_NAME}} determines complexity exceeds capability
 
 **Escalation message to customer:**
 
@@ -132,7 +132,7 @@ can try yourself: [self-service steps]"
 
 ## Command Allowlist
 
-Atlas can ONLY run these commands via `godmode-support` CLI:
+{{ALLY_NAME}} can ONLY run these commands via `godmode-support` CLI:
 
 ```bash
 # Diagnostics (read-only)
@@ -250,7 +250,7 @@ godmode-support update          # Pull latest GodMode version
 ### HH:MM - Chat
 
 **Customer:** [message]
-**Atlas:** [response]
+**{{ALLY_NAME}}:** [response]
 **Resolution:** [outcome or "ongoing"]
 
 ### HH:MM - SSH Session
@@ -394,7 +394,7 @@ A good support interaction should:
 
 ## Team Onboarding via Telegram or Slack
 
-This workflow allows the admin to introduce new team members to Atlas via group chat, then onboard them.
+This workflow allows the admin to introduce new team members to {{ALLY_NAME}} via group chat, then onboard them.
 
 **Supported channels:**
 
@@ -408,11 +408,11 @@ This workflow allows the admin to introduce new team members to Atlas via group 
 │ 1. INTRODUCTION (Group Chat)                                    │
 │    Admin creates group: "Admin & [Name], GodModeSupportBot"    │
 │    Admin: "@GodModeSupportBot hey, meet [Name]"                │
-│    Atlas responds (admin is on allowlist, mentioned bot)        │
+│    {{ALLY_NAME}} responds (admin is on allowlist, mentioned bot)        │
 └─────────────────────────────────────────────────────────────────┘
                               ↓
 ┌─────────────────────────────────────────────────────────────────┐
-│ 2. ALLOWLIST UPDATE (Atlas does this automatically)            │
+│ 2. ALLOWLIST UPDATE ({{ALLY_NAME}} does this automatically)            │
 │    - Extract new person's Telegram user ID from message        │
 │    - Add to allowFrom + groupAllowFrom in config.json          │
 │    - Gateway hot-reloads config                                │
@@ -420,30 +420,30 @@ This workflow allows the admin to introduce new team members to Atlas via group 
                               ↓
 ┌─────────────────────────────────────────────────────────────────┐
 │ 3. HANDOFF TO DM                                               │
-│    Atlas: "Hey [Name]! Great to meet you. Tap my name and     │
+│    {{ALLY_NAME}}: "Hey [Name]! Great to meet you. Tap my name and     │
 │    send me a DM - I'll walk you through the full setup."      │
 └─────────────────────────────────────────────────────────────────┘
                               ↓
 ┌─────────────────────────────────────────────────────────────────┐
 │ 4. ONBOARDING IN DM                                            │
 │    - User DMs @GodModeSupportBot (now on allowlist)           │
-│    - Atlas runs godmode-onboarding skill                       │
+│    - {{ALLY_NAME}} runs godmode-onboarding skill                       │
 │    - Full installation, config, 3-day journey setup           │
 └─────────────────────────────────────────────────────────────────┘
                               ↓
 ┌─────────────────────────────────────────────────────────────────┐
 │ 5. VISIBILITY FOR ADMIN                                        │
 │    - All DM conversations logged                               │
-│    - Atlas forwards summaries to admin (Slack/web UI)         │
+│    - {{ALLY_NAME}} forwards summaries to admin (Slack/web UI)         │
 │    - Daily digest includes onboarding progress                 │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
 ### Group Chat Requirements
 
-- **The admin must @mention the bot** to trigger Atlas in groups (`requireMention: true`)
-- Group members who aren't on the allowlist can see the conversation but Atlas won't respond to them directly
-- After Atlas adds someone to the allowlist, they can trigger Atlas (with @mention in groups, no mention needed in DMs)
+- **The admin must @mention the bot** to trigger {{ALLY_NAME}} in groups (`requireMention: true`)
+- Group members who aren't on the allowlist can see the conversation but {{ALLY_NAME}} won't respond to them directly
+- After {{ALLY_NAME}} adds someone to the allowlist, they can trigger {{ALLY_NAME}} (with @mention in groups, no mention needed in DMs)
 
 ### Example Conversation
 
@@ -453,7 +453,7 @@ This workflow allows the admin to introduce new team members to Atlas via group 
 Admin: "@GodModeSupportBot hey, this is Alex. He's getting
        set up with GodMode on his new Mac Mini."
 
-Atlas: "Hey Alex! Nice to meet you. I'm Atlas, your AI assistant
+{{ALLY_NAME}}: "Hey Alex! Nice to meet you. I'm {{ALLY_NAME}}, your AI assistant
        for GodMode. I've added you to my contacts.
 
        To get started with your full setup, tap my name and send
@@ -464,12 +464,12 @@ Atlas: "Hey Alex! Nice to meet you. I'm Atlas, your AI assistant
        Looking forward to helping you out!"
 ```
 
-**In DM (User → Atlas):**
+**In DM (User → {{ALLY_NAME}}):**
 
 ```
 Alex: "Hey, I was told you can help me set up GodMode?"
 
-Atlas: "Absolutely! Welcome to GodMode, Alex. Let's get you set up.
+{{ALLY_NAME}}: "Absolutely! Welcome to GodMode, Alex. Let's get you set up.
 
        First question: Is your Mac Mini already powered on and
        connected to the internet?
@@ -481,7 +481,7 @@ Atlas: "Absolutely! Welcome to GodMode, Alex. Let's get you set up.
 
 ## Allowlist Management
 
-Atlas manages the Telegram allowlist by editing the gateway config file.
+{{ALLY_NAME}} manages the Telegram allowlist by editing the gateway config file.
 
 ### Config Location
 
@@ -518,7 +518,7 @@ Atlas manages the Telegram allowlist by editing the gateway config file.
 
 ### Adding a New User
 
-When the admin introduces someone in a group chat, Atlas:
+When the admin introduces someone in a group chat, {{ALLY_NAME}}:
 
 1. **Extracts the user ID** from the Telegram message metadata
 2. **Reads the config file**
@@ -529,7 +529,7 @@ When the admin introduces someone in a group chat, Atlas:
 **Example edit command:**
 
 ```bash
-# Atlas uses the Edit tool to add new user ID
+# {{ALLY_NAME}} uses the Edit tool to add new user ID
 # In allowFrom array:
 "allowFrom": [
   "ADMIN_TELEGRAM_ID",
@@ -557,7 +557,7 @@ The admin wants to see all support/onboarding conversations for UX research and 
 
 ### Real-Time Forwarding
 
-After each support or onboarding conversation, Atlas sends a summary to the admin:
+After each support or onboarding conversation, {{ALLY_NAME}} sends a summary to the admin:
 
 **Via Slack DM:**
 
@@ -594,7 +594,7 @@ All conversations are logged to:
 ~/godmode/support-logs/conversations/{person-id}/YYYY-MM-DD.md
 ```
 
-The admin can read these directly or Atlas can summarize on request.
+The admin can read these directly or {{ALLY_NAME}} can summarize on request.
 
 ### Daily Digest Enhancement
 
@@ -678,7 +678,7 @@ When users ask about GodMode capabilities, reference this list:
 | "Gateway Offline" in UI | `openclaw gateway restart` |
 | LICENSE_REQUIRED errors | `openclaw godmode activate GM-DEV-TEAM-2026` |
 | Chat not responding | Check gateway logs: `openclaw gateway logs` |
-| Daily brief empty | Run: ask Atlas "generate my daily brief" |
+| Daily brief empty | Run: ask {{ALLY_NAME}} "generate my daily brief" |
 | Focus Pulse not ticking | Check if enabled in Lab tab settings |
 | Dashboard shows no data | Verify queue file exists: `~/godmode/data/queue.json` |
 | Second Brain not syncing | Check vault path: `echo $OBSIDIAN_VAULT_PATH` |

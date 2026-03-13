@@ -55,14 +55,39 @@ function stripSystemContext(text: string): string {
 /**
  * Detect raw API error JSON and convert to a friendly message.
  * Matches patterns like: {"type":"error","error":{"type":"overloaded_error",...}}
+ * Also catches HTTP-prefixed errors like "529 {"type":"error",...}"
  */
 const API_ERROR_JSON_RE = /^\s*\{[^{}]*"type"\s*:\s*"error"[^{}]*"error"\s*:\s*\{/;
+const HTTP_ERROR_PREFIX_RE = /^\s*(\d{3})\s+\{/;
 
 export function formatApiError(text: string): string | null {
-  if (!API_ERROR_JSON_RE.test(text)) return null;
+  const trimmed = text.trim();
+
+  // HTTP status prefixed JSON: "529 {"type":"error",...}"
+  const httpMatch = trimmed.match(HTTP_ERROR_PREFIX_RE);
+  if (httpMatch) {
+    const status = Number(httpMatch[1]);
+    if (status === 529 || status === 503) {
+      return "*Switching models — Claude is temporarily overloaded.*";
+    }
+    if (status === 400 && trimmed.includes("Unsupported value")) {
+      return null; // Suppress — gateway retries automatically
+    }
+  }
+
+  // "Unsupported value" errors from model fallback
+  if (trimmed.startsWith("Unsupported value:") || trimmed.includes("is not supported with the")) {
+    return null; // Suppress
+  }
+
+  if (!API_ERROR_JSON_RE.test(trimmed)) return null;
   try {
-    const obj = JSON.parse(text);
+    const obj = JSON.parse(trimmed);
     if (obj?.type === "error" && obj?.error?.message) {
+      const errorType = obj.error.type ?? "";
+      if (errorType === "overloaded_error") {
+        return "*Switching models — Claude is temporarily overloaded.*";
+      }
       return `*API error: ${obj.error.message}*`;
     }
   } catch {
@@ -74,13 +99,22 @@ export function formatApiError(text: string): string | null {
 /**
  * Strip inline API error JSON from a larger message body.
  * The gateway sometimes injects raw error JSON mid-response (e.g., when a
- * streaming response partially completes then errors). This removes those
- * JSON blobs and replaces them with a brief notice.
+ * streaming response partially completes then errors, or during retry loops
+ * where 529/503 errors are streamed as text chunks before a fallback model
+ * responds). This removes those error blobs completely.
  */
 const INLINE_API_ERROR_RE = /\{"type":"error","error":\{[^}]*"type":"[^"]*"[^}]*\}[^}]*"request_id":"[^"]*"\}/g;
+// 529/503 prefixed error lines: "529 {"type":"error",...}\nhttps://docs.claude.com/..."
+const HTTP_PREFIXED_ERROR_RE = /\d{3}\s+\{"type":"error"[^\n]*\}\n?(?:https?:\/\/[^\n]*\n?)?/g;
+// Standalone overloaded JSON without HTTP prefix
+const STANDALONE_ERROR_JSON_RE = /\{"type":"error","error":\{"details":[^}]*"type":"overloaded_error"[^}]*\}[^}]*"request_id":"[^"]*"\}\n?/g;
 
 function stripInlineApiErrors(text: string): string {
-  return text.replace(INLINE_API_ERROR_RE, "*[API temporarily unavailable — retrying]*");
+  return text
+    .replace(HTTP_PREFIXED_ERROR_RE, "")
+    .replace(INLINE_API_ERROR_RE, "")
+    .replace(STANDALONE_ERROR_JSON_RE, "")
+    .trim();
 }
 
 const ENVELOPE_PREFIX = /^\[([^\]]+)\]\s*/;
@@ -145,6 +179,7 @@ export function extractText(message: unknown): string | null {
     if (apiError) return apiError;
     // Strip inline API error JSON from partial responses
     const deErrored = role === "assistant" ? stripInlineApiErrors(cleaned) : cleaned;
+    if (role === "assistant" && !deErrored) return null; // All content was error noise
     const processed = role === "assistant" ? stripThinkingTags(deErrored) : stripEnvelope(cleaned);
     // Filter out silent reply tokens
     if (isSilentReply(processed)) {

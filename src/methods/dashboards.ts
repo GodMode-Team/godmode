@@ -206,6 +206,55 @@ const save: GatewayRequestHandler = async ({ params, respond }) => {
   respond(true, { ok: true, id, manifest });
 };
 
+/**
+ * Standalone save — callable from hooks (no RPC plumbing needed).
+ * Returns { ok: true, id } on success, { ok: false } on failure.
+ */
+export async function saveDashboardDirect(opts: {
+  title: string;
+  html: string;
+  scope?: string;
+  description?: string;
+}): Promise<{ ok: boolean; id?: string }> {
+  try {
+    const title = opts.title.trim();
+    if (!title || !opts.html) return { ok: false };
+
+    const id = sanitizeSlug(title);
+    const now = new Date().toISOString();
+    const index = await readIndex();
+    const existingIdx = index.dashboards.findIndex((d) => d.id === id);
+
+    const manifest: DashboardManifest = {
+      id,
+      title,
+      description: opts.description,
+      scope: opts.scope ?? "global",
+      createdAt: existingIdx >= 0 ? index.dashboards[existingIdx].createdAt : now,
+      updatedAt: now,
+      createdBy: "agent",
+    };
+
+    if (existingIdx >= 0) {
+      index.dashboards[existingIdx] = manifest;
+    } else {
+      index.dashboards.push(manifest);
+    }
+
+    const dashDir = path.join(DASHBOARDS_DIR, id);
+    await secureMkdir(dashDir);
+    await secureWriteFile(path.join(dashDir, "index.html"), opts.html);
+    await secureWriteFile(
+      path.join(dashDir, "manifest.json"),
+      JSON.stringify(manifest, null, 2) + "\n",
+    );
+    await writeIndex(index);
+    return { ok: true, id };
+  } catch {
+    return { ok: false };
+  }
+}
+
 // ── Remove ───────────────────────────────────────────────────────────
 
 const remove: GatewayRequestHandler = async ({ params, respond }) => {

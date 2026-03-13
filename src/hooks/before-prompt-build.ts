@@ -46,7 +46,9 @@ export async function handleBeforePromptBuild(
       const fsP = await import("node:fs/promises");
       const pathM = await import("node:path");
       const skillPath = pathM.join(pluginRoot, "skills", "godmode-support", "SKILL.md");
-      const skillContent = await fsP.readFile(skillPath, "utf-8").catch(() => "");
+      const { getAllyName } = await import("../lib/ally-identity.js");
+      const rawSkillContent = await fsP.readFile(skillPath, "utf-8").catch(() => "");
+      const skillContent = rawSkillContent.replaceAll("{{ALLY_NAME}}", getAllyName());
       const { collectDiagnosticsInternal } = await import("../methods/support.js");
       const diagnostics = await collectDiagnosticsInternal();
       const supportChunks = [

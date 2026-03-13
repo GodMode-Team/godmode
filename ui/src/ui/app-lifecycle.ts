@@ -270,7 +270,7 @@ function normalizeOpenTabs(host: LifecycleHost, sessions: SessionsListResult["se
     return;
   }
 
-  // Main session aliases are handled by the pinned Prosper tab — strip them
+  // Main session aliases are handled by the pinned ally tab — strip them
   const isMainAlias = (k: string): boolean => {
     const lower = k.toLowerCase();
     return lower === "main" || lower === "agent:main:main" || lower.endsWith(":main");
@@ -340,7 +340,7 @@ function normalizeOpenTabs(host: LifecycleHost, sessions: SessionsListResult["se
   const didDedup = dedupedTabs.length !== host.settings.openTabs.length;
 
   if (changed || didDedup) {
-    // Empty openTabs is OK — the pinned Prosper tab handles the main session.
+    // Empty openTabs is OK — the pinned ally tab handles the main session.
     // Only add a fallback if the current session is NOT a main alias.
 
     const normalizedTabLastViewed: Record<string, number> = {};
@@ -367,8 +367,8 @@ function normalizeOpenTabs(host: LifecycleHost, sessions: SessionsListResult["se
       identityToTabKey.get(currentSessionIdentity) ??
       currentSession?.key ??
       (host.sessionKey.trim() || dedupedTabs[0] || "main");
-    // The pinned Prosper tab (ALLY_SESSION_KEY = "main") is never in openTabs,
-    // so don't fall back to the first open tab when the user is on Prosper.
+    // The pinned ally tab (ALLY_SESSION_KEY = "main") is never in openTabs,
+    // so don't fall back to the first open tab when the user is on the ally tab.
     const isMainAlias =
       canonicalSessionKey === "main" ||
       canonicalSessionKey.endsWith(":main");

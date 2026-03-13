@@ -17,6 +17,7 @@
 import { join } from "node:path";
 import { DATA_DIR } from "../data-paths.js";
 import { health, turnErrors } from "./health-ledger.js";
+import { getAllyNameLower } from "./ally-identity.js";
 
 // Disable Mem0 telemetry before any import
 process.env.MEM0_TELEMETRY = "false";
@@ -321,7 +322,7 @@ export async function ingestConversation(
   const start = Date.now();
   try {
     await withTimeout(
-      memoryInstance.add(content, { userId, agentId: "prosper" }),
+      memoryInstance.add(content, { userId, agentId: getAllyNameLower() }),
       INGEST_TIMEOUT_MS,
     );
     health.signal("memory.ingest", true, { elapsed: Date.now() - start, contentLen: content.length });
@@ -356,7 +357,7 @@ export async function processRetryQueue(): Promise<number> {
   for (const item of batch) {
     try {
       await withTimeout(
-        memoryInstance.add(item.messages, { userId: item.userId, agentId: "prosper" }),
+        memoryInstance.add(item.messages, { userId: item.userId, agentId: getAllyNameLower() }),
         INGEST_TIMEOUT_MS,
       );
       processed++;
@@ -431,7 +432,7 @@ export async function seedFromVault(userId: string): Promise<void> {
         const batch = lines.slice(i, i + 3).join(". ");
         if (batch.length > 30) {
           try {
-            await memoryInstance.add(batch, { userId, agentId: "prosper" });
+            await memoryInstance.add(batch, { userId, agentId: getAllyNameLower() });
             seedSuccesses++;
           } catch {
             // Individual batch failure — non-fatal
@@ -461,7 +462,7 @@ export async function seedFromVault(userId: string): Promise<void> {
           if (summary.length > 30) {
             await memoryInstance.add(
               `Skill: ${f.replace(".md", "")}. ${summary}`,
-              { userId, agentId: "prosper" },
+              { userId, agentId: getAllyNameLower() },
             );
             seedSuccesses++;
           }

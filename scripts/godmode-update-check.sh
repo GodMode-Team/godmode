@@ -118,7 +118,7 @@ main() {
         [[ "$oc_update" == true ]] && echo "**OpenClaw update:** v$current -> v$oc_latest" >> "$brief_tmp"
         [[ "$plugin_update" == true ]] && echo "**GodMode update:** v$plugin_current -> v$plugin_latest" >> "$brief_tmp"
         echo '' >> "$brief_tmp"
-        echo '> Run `openclaw update` or tell Atlas: "update yourself"' >> "$brief_tmp"
+        echo '> Run `openclaw update` or tell your ally: "update yourself"' >> "$brief_tmp"
 
         local brief_content
         brief_content=$(cat "$brief_tmp")

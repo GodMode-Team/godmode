@@ -168,11 +168,24 @@ export async function generateSnapshot(): Promise<string> {
     const { readQueueState } = await import("./queue-state.js");
     const qs = await readQueueState();
     const processing = qs.items.filter((i: { status: string }) => i.status === "processing").length;
-    const review = qs.items.filter((i: { status: string }) => i.status === "review").length;
+    const reviewItems = qs.items.filter((i: { status: string }) => i.status === "review");
+    const review = reviewItems.length;
+    const cronReview = reviewItems.filter(
+      (i: { source?: string }) => i.source === "cron",
+    );
     if (processing > 0 || review > 0) {
       lines.push(`## Queue: ${processing} processing, ${review} ready for review`);
       if (review > 0) {
         lines.push("Prompt the user to review completed queue items.");
+      }
+      if (cronReview.length > 0) {
+        const cronNames = cronReview
+          .map((i: { title: string }) => i.title.replace(/^\[Cron\] /, ""))
+          .join(", ");
+        lines.push(
+          `${cronReview.length} skill result${cronReview.length > 1 ? "s" : ""} awaiting rating: ${cronNames}. ` +
+          "Ask the user to rate them (1-10) in the Inbox tab or in chat using the trust_rate tool.",
+        );
       }
     }
   } catch {
@@ -332,7 +345,7 @@ export async function generateSnapshot(): Promise<string> {
 
   // Operational rules
   lines.push("## Operational Rules");
-  lines.push("- ARTIFACTS: When sharing files from ~/godmode/memory/inbox/, link to /godmode/artifacts/{filename}. NEVER invent /reports/ URLs.");
+  lines.push("- ARTIFACTS: Save ALL generated files (HTML reports, scripts, exports) to ~/godmode/artifacts/ or ~/godmode/data/dashboards/. Link via /godmode/artifacts/{filename}. NEVER write to /tmp — it WILL be blocked. NEVER invent /reports/ URLs.");
   lines.push("- PRE-FLIGHT: Before launching ANY background script, verify: 1) dependencies installed (npm/bun install), 2) env vars available, 3) run a quick smoke test. NEVER say 'running' without confirming exit code 0.");
   lines.push("- MONITORING: After spawning background processes, check exit codes within 30s. If a process fails, tell the user immediately — do NOT wait until morning.");
   lines.push("- PROMISES: Never promise overnight deliverables without pre-flight validation. If a script might fail, say so upfront.");
@@ -383,7 +396,7 @@ export function invalidateIdentityCache(): void {
 
 /**
  * Load a concise identity digest from USER.md (first 15 lines).
- * Gives Prosper essential context: who the user is, communication style,
+ * Gives the ally essential context: who the user is, communication style,
  * current priorities — without injecting the full 2KB file.
  */
 async function loadIdentityDigest(): Promise<string | null> {

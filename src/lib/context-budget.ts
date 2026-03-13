@@ -21,6 +21,9 @@
 // P2 (trim under pressure): Meeting prep, cron failures, queue review, routing lessons
 // P3 (first to drop): Safety nudges, conditional context
 
+import { getAllyNameLower } from "./ally-identity.js";
+import { listRoster } from "./agent-roster.js";
+
 // ── ACP Provenance ────────────────────────────────────────────────
 // Tells us who sent this message so the ally can adjust behavior.
 // See: openclaw acp --provenance meta
@@ -190,6 +193,12 @@ export function assembleContext(inputs: ContextInputs): string {
     chunks.push(inputs.priorities);
   }
 
+  // P1: Agent team nudge — lightweight reminder, not full roster
+  const rosterNudge = buildAgentRosterNudge();
+  if (rosterNudge) {
+    chunks.push(rosterNudge);
+  }
+
   // P1.5: Action items — extracted from brain dumps
   if (inputs.actionItemsBlock) {
     chunks.push(inputs.actionItemsBlock);
@@ -281,6 +290,21 @@ const CAPABILITY_MAP = [
   "If a fix requires a restart, write a pending-deploy.json flag and tell the user a restart is needed. They will do it manually.",
 ].join("\n");
 
+// ── Agent Roster Nudge ──────────────────────────────────────────────
+// Lightweight reminder that specialist agents exist. The full roster
+// is discovered at queue time via resolvePersona(), not injected here.
+
+function buildAgentRosterNudge(): string | null {
+  const count = listRoster().length;
+  if (count === 0) return null;
+  return [
+    "## Agent Team",
+    `You have ${count} specialist agents available for delegation (sales, engineering, marketing, design, product, ops, research, creative).`,
+    "When the user needs async work — research, content, analysis, outreach, code review, etc. — proactively offer to queue it.",
+    "The right persona is auto-matched by task type, or use queue_add with a specific persona slug if you know it.",
+  ].join("\n");
+}
+
 // ── Context Wrapper ──────────────────────────────────────────────────
 // Replaces the old "invisible background context" framing that caused the
 // LLM to deprioritize instructions.
@@ -323,7 +347,7 @@ const OPS_WORDS = [
   "planning", "work", "project", "deadline",
   "queue", "progress", "update", "brief me",
   "catch me up", "what am i", "morning", "start the day",
-  "good morning", "hey prosper", "release", "backlog",
+  "good morning", "release", "backlog",
   "anything urgent", "what needs", "blockers", "blocked",
   "retro", "ship it", "how's it going", "sprint",
   "deploy", "ship", "retrospective", "recap",
@@ -335,7 +359,9 @@ function isTimeRelevant(msg: string): boolean {
 }
 
 function isOpsRelevant(msg: string): boolean {
-  return OPS_WORDS.some((w) => msg.includes(w));
+  if (OPS_WORDS.some((w) => msg.includes(w))) return true;
+  // Dynamic: "hey <ally name>" triggers ops context
+  return msg.includes(`hey ${getAllyNameLower()}`);
 }
 
 /**

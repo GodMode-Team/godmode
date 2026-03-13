@@ -5,7 +5,7 @@ import type { Tab } from "../navigation.js";
  * The ally side-chat uses the real main session — same conversation
  * thread as iMessage, the Chat tab, and all other entry points.
  *
- * This is the living nerve center: direct chat with Prosper, notifications,
+ * This is the living nerve center: direct chat with the ally, notifications,
  * agent results, morning brief flags, schedule alerts. System plumbing
  * (heartbeat prompts, consciousness dumps) is filtered at the UI layer
  * via isAutomatedMessage() in app.ts.

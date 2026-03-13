@@ -25,7 +25,7 @@ export type MyDayState = {
   // Date navigation
   todaySelectedDate?: string;
   // View mode
-  todayViewMode?: "brief" | "command-center" | "agent-log";
+  todayViewMode?: "brief" | "tasks" | "inbox";
   // Today's tasks
   todayTasks?: WorkspaceTask[];
   todayTasksLoading?: boolean;
@@ -265,13 +265,13 @@ export async function loadTodayTasksWithQueueStatus(state: MyDayState): Promise<
     // Build sourceTaskId → queue status map
     const queueByTask = new Map<
       string,
-      { status: "processing" | "review" | "failed"; type: string; roleName: string; queueItemId: string }
+      { status: "processing" | "review" | "done" | "failed"; type: string; roleName: string; queueItemId: string }
     >();
     for (const qi of queueResult.items) {
       if (!qi.sourceTaskId) continue;
-      if (qi.status === "processing" || qi.status === "review" || qi.status === "failed") {
+      if (qi.status === "processing" || qi.status === "review" || qi.status === "done" || qi.status === "failed") {
         queueByTask.set(qi.sourceTaskId, {
-          status: qi.status as "processing" | "review" | "failed",
+          status: qi.status as "processing" | "review" | "done" | "failed",
           type: qi.type,
           roleName: AGENT_ROLE_NAMES[qi.type] ?? qi.type,
           queueItemId: qi.id,
@@ -330,6 +330,8 @@ type QueueResultItem = {
   status: string;
   completedAt?: number;
   sourceTaskId?: string;
+  source?: string;
+  personaHint?: string;
   result?: {
     summary: string;
     outputPath?: string;
@@ -363,6 +365,7 @@ export async function loadTodayQueueResults(state: MyDayState): Promise<Decision
         if (item.status === "done" && (item.completedAt ?? 0) < cutoff) return false;
         return true;
       })
+      .sort((a, b) => (b.completedAt ?? 0) - (a.completedAt ?? 0))
       .map((item): DecisionCardItem => ({
         id: item.id,
         title: item.title,
@@ -372,6 +375,8 @@ export async function loadTodayQueueResults(state: MyDayState): Promise<Decision
         outputPath: item.result?.outputPath,
         prUrl: item.result?.prUrl,
         sourceTaskId: item.sourceTaskId,
+        persona: item.personaHint ?? undefined,
+        source: item.source as DecisionCardItem["source"],
       }));
   } catch (err) {
     console.error("[MyDay] Failed to load queue results for decision cards:", err);

@@ -22,6 +22,14 @@ export type DecisionCardItem = {
   outputPath?: string;
   prUrl?: string;
   sourceTaskId?: string;
+  /** Persona/workflow name for trust rating (e.g. "daily brief", "ops-runner") */
+  persona?: string;
+  /** Source of this item — "cron" items show Rate instead of Approve/Reject */
+  source?: "chat" | "brief" | "cron" | "proactive" | "manual";
+  /** User's trust rating (1-10), set after rating */
+  userRating?: number;
+  /** True when rating < 7 and we're waiting for improvement feedback */
+  feedbackPending?: boolean;
 };
 
 export type DecisionCardsProps = {
@@ -31,6 +39,9 @@ export type DecisionCardsProps = {
   onDismiss: (id: string) => void;
   onViewOutput: (id: string, outputPath: string) => void;
   onOpenChat: (id: string) => void;
+  onMarkComplete?: (id: string) => void;
+  onRate?: (id: string, workflow: string, rating: number) => void;
+  onFeedback?: (id: string, workflow: string, feedback: string) => void;
 };
 
 export type AgentLogData = {
@@ -62,10 +73,10 @@ export type MyDayProps = {
   onDatePrev?: () => void;
   onDateNext?: () => void;
   onDateToday?: () => void;
-  // View mode: "brief" (default), "command-center", or "agent-log"
-  viewMode?: "brief" | "command-center" | "agent-log";
-  onViewModeChange?: (mode: "brief" | "command-center" | "agent-log") => void;
-  // Agent log props
+  // View mode: "brief" (default), "tasks", or "inbox"
+  viewMode?: "brief" | "tasks" | "inbox";
+  onViewModeChange?: (mode: "brief" | "tasks" | "inbox") => void;
+  // Agent log props (legacy, kept for type compat)
   agentLog?: AgentLogData | null;
   agentLogLoading?: boolean;
   agentLogError?: string | null;
@@ -78,6 +89,7 @@ export type MyDayProps = {
   todayTasksLoading?: boolean;
   onToggleTaskComplete?: (taskId: string, currentStatus: string) => void;
   onStartTask?: (taskId: string) => void;
+  onViewTaskOutput?: (taskId: string) => void;
   // Task panel additions
   onCreateTask?: (title: string) => void;
   onEditTask?: (taskId: string | null) => void;
@@ -277,6 +289,7 @@ function renderTaskPanel(props: MyDayProps) {
                         props.editingTaskId,
                         props.onEditTask,
                         props.onUpdateTask,
+                        props.onViewTaskOutput,
                       ),
                     )}
               </div>
@@ -323,44 +336,116 @@ function formatTimeAgo(timestamp: number): string {
   return new Date(timestamp).toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
+function renderRatingBar(
+  item: DecisionCardItem,
+  onRate?: (id: string, workflow: string, rating: number) => void,
+  onFeedback?: (id: string, workflow: string, feedback: string) => void,
+) {
+  if (!onRate || !item.persona) return nothing;
+
+  const handleFeedbackSubmit = (e: Event) => {
+    e.preventDefault();
+    if (!onFeedback || !item.persona) return;
+    const form = e.currentTarget as HTMLFormElement;
+    const input = form.querySelector("textarea") as HTMLTextAreaElement;
+    const text = input.value.trim();
+    if (!text) return;
+    onFeedback(item.id, item.persona, text);
+  };
+
+  return html`
+    <div class="decision-card-rating">
+      <span class="decision-card-rating-label">Rate:</span>
+      <div class="decision-card-rating-bar">
+        ${[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(
+          (n) => html`
+            <button
+              class="rating-btn ${item.userRating === n ? "rating-btn--active" : ""}"
+              @click=${() => onRate(item.id, item.persona!, n)}
+              title="${n}/10"
+            >${n}</button>
+          `,
+        )}
+      </div>
+      ${item.userRating
+        ? html`<span class="decision-card-rating-value">${item.userRating}/10</span>`
+        : nothing}
+    </div>
+    ${item.feedbackPending
+      ? html`
+        <form class="decision-card-feedback" @submit=${handleFeedbackSubmit}>
+          <label class="decision-card-feedback-label">What would make this better?</label>
+          <textarea
+            class="decision-card-feedback-input"
+            rows="2"
+            placeholder="e.g. Include more actionable items, less filler..."
+          ></textarea>
+          <div class="decision-card-feedback-actions">
+            <button type="submit" class="decision-card-btn decision-card-btn--approve">Submit Feedback</button>
+            <button type="button" class="decision-card-btn decision-card-btn--dismiss"
+              @click=${() => onFeedback?.(item.id, item.persona!, "")}>Skip</button>
+          </div>
+        </form>
+      `
+      : nothing}
+  `;
+}
+
 function renderDecisionCard(item: DecisionCardItem, props: DecisionCardsProps) {
   const isReview = item.status === "review";
+  const isCron = item.source === "cron";
   const statusClass = isReview ? "decision-card-status--review" : "decision-card-status--done";
-  const statusLabel = isReview ? "Needs Review" : "Complete";
+  const statusLabel = isCron ? "Skill Result" : isReview ? "Needs Review" : "Complete";
   const timeLabel = item.completedAt ? formatTimeAgo(item.completedAt) : "";
 
   return html`
     <div class="decision-card">
       <div class="decision-card-header">
-        <span class="decision-card-status ${statusClass}">${statusLabel}</span>
+        <span class="decision-card-status ${isCron ? "decision-card-status--cron" : statusClass}">${statusLabel}</span>
         ${timeLabel ? html`<span class="decision-card-time">${timeLabel}</span>` : nothing}
       </div>
       <h4 class="decision-card-title">${item.title}</h4>
       <p class="decision-card-summary">${item.summary}</p>
+      ${renderRatingBar(item, props.onRate, props.onFeedback)}
       <div class="decision-card-actions">
-        ${isReview
+        ${isCron
           ? html`
-              <button class="decision-card-btn decision-card-btn--approve"
-                @click=${() => props.onApprove(item.id)}>Approve</button>
               ${item.outputPath
                 ? html`<button class="decision-card-btn decision-card-btn--view"
                     @click=${() => props.onViewOutput(item.id, item.outputPath!)}>View Output</button>`
                 : nothing}
-              <button class="decision-card-btn decision-card-btn--chat"
-                @click=${() => props.onOpenChat(item.id)}>Open Chat</button>
-              <button class="decision-card-btn decision-card-btn--reject"
-                @click=${() => props.onReject(item.id)}>Reject</button>
               <button class="decision-card-btn decision-card-btn--dismiss"
                 @click=${() => props.onDismiss(item.id)}>Dismiss</button>
             `
-          : html`
-              ${item.outputPath
-                ? html`<button class="decision-card-btn decision-card-btn--view"
-                    @click=${() => props.onViewOutput(item.id, item.outputPath!)}>View Output</button>`
-                : nothing}
-              <button class="decision-card-btn decision-card-btn--dismiss"
-                @click=${() => props.onDismiss(item.id)}>Dismiss</button>
-            `}
+          : isReview
+            ? html`
+                <button class="decision-card-btn decision-card-btn--approve"
+                  @click=${() => props.onApprove(item.id)}>Approve</button>
+                ${item.outputPath
+                  ? html`<button class="decision-card-btn decision-card-btn--view"
+                      @click=${() => props.onViewOutput(item.id, item.outputPath!)}>View Output</button>`
+                  : nothing}
+                <button class="decision-card-btn decision-card-btn--chat"
+                  @click=${() => props.onOpenChat(item.id)}>Open Chat</button>
+                <button class="decision-card-btn decision-card-btn--reject"
+                  @click=${() => props.onReject(item.id)}>Reject</button>
+                <button class="decision-card-btn decision-card-btn--dismiss"
+                  @click=${() => props.onDismiss(item.id)}>Dismiss</button>
+              `
+            : html`
+                ${item.outputPath
+                  ? html`<button class="decision-card-btn decision-card-btn--view"
+                      @click=${() => props.onViewOutput(item.id, item.outputPath!)}>View Output</button>`
+                  : nothing}
+                <button class="decision-card-btn decision-card-btn--chat"
+                  @click=${() => props.onOpenChat(item.id)}>Open Chat</button>
+                ${props.onMarkComplete && item.sourceTaskId
+                  ? html`<button class="decision-card-btn decision-card-btn--complete"
+                      @click=${() => props.onMarkComplete!(item.id)}>Mark Complete</button>`
+                  : nothing}
+                <button class="decision-card-btn decision-card-btn--dismiss"
+                  @click=${() => props.onDismiss(item.id)}>Dismiss</button>
+              `}
         ${item.prUrl
           ? html`<a class="decision-card-btn decision-card-btn--view" href="${item.prUrl}" target="_blank" rel="noopener">View PR</a>`
           : nothing}
@@ -413,18 +498,18 @@ export function renderMyDayToolbar(props: MyDayProps) {
       <div class="today-view-tabs">
         <button class="today-view-tab ${viewMode === "brief" ? "active" : ""}"
           @click=${() => props.onViewModeChange?.("brief")}>Brief</button>
-        <button class="today-view-tab ${viewMode === "command-center" ? "active" : ""}"
-          @click=${() => props.onViewModeChange?.("command-center")}>Tasks${props.decisionCards && props.decisionCards.items.filter(i => i.status === "review").length > 0
-            ? html`<span class="tab-badge">${props.decisionCards.items.filter(i => i.status === "review").length}</span>`
+        <button class="today-view-tab ${viewMode === "tasks" ? "active" : ""}"
+          @click=${() => props.onViewModeChange?.("tasks")}>Tasks</button>
+        <button class="today-view-tab ${viewMode === "inbox" ? "active" : ""}"
+          @click=${() => props.onViewModeChange?.("inbox")}>Inbox${props.decisionCards && props.decisionCards.items.length > 0
+            ? html`<span class="tab-badge">${props.decisionCards.items.length}</span>`
             : nothing}</button>
-        <button class="today-view-tab ${viewMode === "agent-log" ? "active" : ""}"
-          @click=${() => props.onViewModeChange?.("agent-log")}>Agent Log</button>
       </div>
       <div class="today-quick-actions">
         ${new Date().getHours() < 15
           ? (!props.focusPulseActive && props.onStartMorningSet
               ? html`<button class="today-morning-set-btn" @click=${props.onStartMorningSet}
-                  title="Start your morning focus ritual">\u2600\uFE0F Morning Set</button>`
+                  title="Start your morning focus ritual">\u2600\uFE0F Start my day</button>`
               : nothing)
           : (props.onEveningCapture
               ? html`<button class="today-evening-btn" @click=${props.onEveningCapture}
@@ -497,32 +582,26 @@ function renderInboxPanel(props: MyDayProps) {
   </div>`;
 }
 
-// ===== Tasks View (formerly Command Center) =====
+// ===== Inbox View (Agent Results Stream) =====
 
-function renderCommandCenter(props: MyDayProps) {
-  const hasDecisionCards = props.decisionCards && props.decisionCards.items.length > 0;
+function renderInbox(props: MyDayProps) {
+  const hasItems = props.decisionCards && props.decisionCards.items.length > 0;
 
   return html`
-    <div class="command-center command-center--grid">
-      <div class="command-center-col command-center-col--tasks">
-        ${renderTaskPanel(props)}
-        ${renderInboxPanel(props)}
-      </div>
-      <div class="command-center-col command-center-col--results">
-        ${hasDecisionCards
-          ? renderDecisionCards(props.decisionCards!)
-          : html`<div class="my-day-card">
-              <div class="my-day-card-header">
-                <div class="my-day-card-title">
-                  <span class="my-day-card-icon">&#x26A1;</span>
-                  <span>AGENT RESULTS</span>
-                </div>
+    <div class="my-day-brief-full">
+      ${hasItems
+        ? renderDecisionCards(props.decisionCards!)
+        : html`<div class="my-day-card">
+            <div class="my-day-card-header">
+              <div class="my-day-card-title">
+                <span class="my-day-card-icon">&#x1F4E5;</span>
+                <span>INBOX</span>
               </div>
-              <div class="my-day-card-content">
-                <div class="my-day-empty">No overnight results yet. Queue tasks for your agents and check back in the morning.</div>
-              </div>
-            </div>`}
-      </div>
+            </div>
+            <div class="my-day-card-content">
+              <div class="my-day-empty">Nothing in your inbox yet. Agent results, notifications, and completed work will appear here.</div>
+            </div>
+          </div>`}
     </div>
   `;
 }
@@ -533,7 +612,6 @@ export function renderMyDay(props: MyDayProps) {
   const todayStr = localDateString();
   const selectedDate = props.selectedDate ?? todayStr;
   const viewMode = props.viewMode ?? "brief";
-  const agentLog = props.agentLog ?? null;
 
   if (props.loading) {
     return html`
@@ -580,9 +658,9 @@ export function renderMyDay(props: MyDayProps) {
         ? html`<div class="my-day-brief-full">
             ${renderDailyBrief(briefProps)}
           </div>`
-        : viewMode === "command-center"
-          ? renderCommandCenter(props)
-          : html`<div class="my-day-brief-full">${renderAgentLog(props, agentLog, formatDateFromString(selectedDate))}</div>`}
+        : viewMode === "tasks"
+          ? html`<div class="my-day-brief-full">${renderTaskPanel(props)}</div>`
+          : renderInbox(props)}
     </div>
   `;
 }

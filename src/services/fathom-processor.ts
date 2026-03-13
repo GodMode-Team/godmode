@@ -5,7 +5,7 @@
  *   1. Creates NativeTasks from action items
  *   2. Files meeting notes to the Obsidian vault
  *   3. Drafts follow-up emails
- *   4. Appends key decisions to WORKING.md
+ *   4. Appends key decisions to daily note
  *   5. Broadcasts a notification to the ally chat
  *   6. Marks the meeting as processed
  *
@@ -22,7 +22,6 @@ import { DATA_DIR, localDateString } from "../data-paths.js";
 import {
   getVaultPath,
   isAllowedPath,
-  resolveWorkingPath,
   VAULT_FOLDERS,
 } from "../lib/vault-paths.js";
 
@@ -267,13 +266,13 @@ async function processMeeting(meeting: MeetingQueueItem): Promise<void> {
     logger.warn(`[FathomProcessor] Email draft failed for ${meeting.id}: ${String(err)}`);
   }
 
-  // ── Step 4: Update WORKING.md with key decisions ───────────────
+  // ── Step 4: Append key decisions to daily note ─────────────────
   try {
-    await appendDecisionsToWorking(meeting, meetingDate);
-    processingNotes.push("Decisions appended to WORKING.md");
+    await appendDecisionsToDaily(meeting, meetingDate);
+    processingNotes.push("Decisions appended to daily note");
   } catch (err) {
-    processingNotes.push(`WORKING.md update failed: ${String(err)}`);
-    logger.warn(`[FathomProcessor] WORKING.md update failed for ${meeting.id}: ${String(err)}`);
+    processingNotes.push(`Daily note update failed: ${String(err)}`);
+    logger.warn(`[FathomProcessor] Daily note update failed for ${meeting.id}: ${String(err)}`);
   }
 
   // ── Step 5: Broadcast notification ─────────────────────────────
@@ -732,60 +731,53 @@ async function draftFollowUpEmail(meeting: MeetingQueueItem): Promise<void> {
   logger.info(`[FathomProcessor] Email draft saved: ${draftPath}`);
 }
 
-// ── Step 4: Update WORKING.md ────────────────────────────────────────
+// ── Step 4: Append decisions to daily note ───────────────────────────
 
-async function appendDecisionsToWorking(
+async function appendDecisionsToDaily(
   meeting: MeetingQueueItem,
   meetingDate: string,
 ): Promise<void> {
   const keyDecisions = extractKeyDecisions(meeting.summary);
   if (keyDecisions.length === 0) return;
 
-  const { path: workingPath } = resolveWorkingPath();
-  if (!isAllowedPath(workingPath)) {
-    logger.warn(`[FathomProcessor] WORKING.md path not allowed: ${workingPath}`);
+  const vault = getVaultPath();
+  if (!vault) {
+    logger.warn("[FathomProcessor] No vault path — skipping decision capture");
+    return;
+  }
+
+  const dailyPath = join(vault, VAULT_FOLDERS.daily, `${meetingDate}.md`);
+  if (!isAllowedPath(dailyPath)) {
+    logger.warn(`[FathomProcessor] Daily note path not allowed: ${dailyPath}`);
     return;
   }
 
   // Ensure parent directory exists
-  const parentDir = dirname(workingPath);
+  const parentDir = dirname(dailyPath);
   if (!existsSync(parentDir)) {
     mkdirSync(parentDir, { recursive: true });
   }
 
   let content = "";
   try {
-    content = await readFile(workingPath, "utf-8");
+    content = await readFile(dailyPath, "utf-8");
   } catch {
-    content = "# Working Memory\n";
+    content = `# ${meetingDate}\n`;
   }
 
   const decisionsBlock = [
     "",
-    `### ${meeting.title} (${meetingDate})`,
+    `### Decisions — ${meeting.title}`,
     ...keyDecisions.map((d) => `- ${d}`),
     "",
   ].join("\n");
 
-  // Find or create "## Recent Decisions" section
-  const sectionHeader = "## Recent Decisions";
-  if (content.includes(sectionHeader)) {
-    // Append after the header line
-    const headerIdx = content.indexOf(sectionHeader);
-    const afterHeader = headerIdx + sectionHeader.length;
-    content =
-      content.slice(0, afterHeader) +
-      "\n" +
-      decisionsBlock +
-      content.slice(afterHeader);
-  } else {
-    // Append section at the end
-    const separator = content.endsWith("\n") ? "\n" : "\n\n";
-    content += `${separator}${sectionHeader}\n${decisionsBlock}`;
-  }
+  // Append at the end of the daily note
+  const separator = content.endsWith("\n") ? "" : "\n";
+  content += `${separator}${decisionsBlock}`;
 
-  await secureWriteFile(workingPath, content);
-  logger.info(`[FathomProcessor] Appended ${keyDecisions.length} decision(s) to WORKING.md`);
+  await secureWriteFile(dailyPath, content);
+  logger.info(`[FathomProcessor] Appended ${keyDecisions.length} decision(s) to daily note ${meetingDate}`);
 }
 
 // ── Step 5: Broadcast notification ───────────────────────────────────

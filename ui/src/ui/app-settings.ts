@@ -26,7 +26,7 @@ import { loadNodes } from "./controllers/nodes";
 import { loadPresence } from "./controllers/presence";
 import { loadArchivedSessions, loadSessions } from "./controllers/sessions";
 import { loadGodModeSkills, loadSkills } from "./controllers/skills";
-import { loadWork } from "./controllers/work";
+import { loadWork, loadResources } from "./controllers/work";
 import { loadWorkspaces } from "./controllers/workspaces";
 import {
   inferBasePathFromPathname,
@@ -63,7 +63,7 @@ function normalizeOpenTabs(openTabs: string[] | undefined, sessionKey: string): 
     ? [...new Set(openTabs.map((key) => key.trim()).filter((key) => key.length > 0))]
     : [];
   if (deduped.length === 0 && sessionKey) {
-    // Main session aliases are handled by the pinned Prosper tab — skip them
+    // Main session aliases are handled by the pinned ally tab — skip them
     const lower = sessionKey.toLowerCase();
     const isMainAlias = lower === "main" || lower === "agent:main:main" || lower.endsWith(":main");
     if (!isMainAlias) {
@@ -154,7 +154,7 @@ export function applySettingsFromUrl(host: SettingsHost) {
     const session = sessionRaw.trim();
     if (session) {
       host.sessionKey = session;
-      // Main session aliases are handled by the pinned Prosper tab — don't add to openTabs
+      // Main session aliases are handled by the pinned ally tab — don't add to openTabs
       const lower = session.toLowerCase();
       const isMainAlias = lower === "main" || lower === "agent:main:main" || lower.endsWith(":main");
       const openTabs = isMainAlias
@@ -276,7 +276,10 @@ export async function refreshActiveTab(host: SettingsHost) {
     }).catch(() => {});
   }
   if (host.tab === "work") {
-    await loadWork(host as unknown as GodModeApp);
+    await Promise.all([
+      loadWork(host as unknown as GodModeApp),
+      loadResources(host as unknown as GodModeApp),
+    ]);
   }
   if (host.tab === "workspaces") {
     await loadWorkspaces(host as unknown as GodModeApp);
@@ -303,6 +306,10 @@ export async function refreshActiveTab(host: SettingsHost) {
   if (host.tab === "skills") {
     await loadSkills(host as unknown as GodModeApp);
     await loadGodModeSkills(host as unknown as GodModeApp);
+  }
+  if (host.tab === "agents") {
+    const { loadRoster } = await import("./controllers/agents");
+    await loadRoster(host as unknown as GodModeApp);
   }
   if (host.tab === "nodes") {
     await loadNodes(host as unknown as GodModeApp);

@@ -12,7 +12,7 @@ export type WorkspaceTask = {
   completedAt: string | null;
   briefSection?: string | null;
   queueStatus?: {
-    status: "processing" | "review" | "failed";
+    status: "processing" | "review" | "done" | "failed";
     type: string;
     roleName: string;
     queueItemId: string;
@@ -91,6 +91,7 @@ export type WorkspacesProps = {
   allTasks?: WorkspaceTask[];
   taskFilter?: TaskFilter;
   taskSort?: TaskSort;
+  taskSearch?: string;
   showCompletedTasks?: boolean;
   editingTaskId?: string | null;
   workspaceNames?: string[];
@@ -110,6 +111,7 @@ export type WorkspacesProps = {
   onCreateTask?: (title: string, project: string) => void;
   onSetTaskFilter?: (filter: TaskFilter) => void;
   onSetTaskSort?: (sort: TaskSort) => void;
+  onSetTaskSearch?: (query: string) => void;
   onToggleCompletedTasks?: () => void;
   onStartTask?: (taskId: string) => void;
   onEditTask?: (taskId: string | null) => void;
@@ -227,6 +229,7 @@ export function renderTaskRow(
   editingTaskId?: string | null,
   onEditTask?: (taskId: string | null) => void,
   onUpdateTask?: (taskId: string, updates: { title?: string; dueDate?: string | null }) => void,
+  onViewTaskOutput?: (taskId: string) => void,
 ): ReturnType<typeof html> {
   const isComplete = task.status === "complete";
   const isEditing = editingTaskId === task.id;
@@ -298,13 +301,30 @@ export function renderTaskRow(
               @click=${() => onStartTask(task.id)}
               title="Review agent output"
             >Review</button>`
-          : !isComplete && onStartTask
-            ? html`<button
-                class="ws-task-start-btn"
-                @click=${() => onStartTask(task.id)}
-                title="Start working on this task"
-              >Start</button>`
-            : nothing}
+          : task.queueStatus?.status === "done"
+            ? html`
+                ${onViewTaskOutput
+                  ? html`<button
+                      class="ws-task-start-btn ws-task-start-btn--done"
+                      @click=${() => onViewTaskOutput(task.id)}
+                      title="Preview agent output"
+                    >View Output</button>`
+                  : nothing}
+                ${onStartTask
+                  ? html`<button
+                      class="ws-task-start-btn ws-task-start-btn--chat"
+                      @click=${() => onStartTask(task.id)}
+                      title="Open chat session for this task"
+                    >Open Chat</button>`
+                  : nothing}
+              `
+            : !isComplete && onStartTask
+              ? html`<button
+                  class="ws-task-start-btn"
+                  @click=${() => onStartTask(task.id)}
+                  title="Start working on this task"
+                >Start</button>`
+              : nothing}
     </div>
   `;
 }
@@ -316,6 +336,7 @@ export function renderAllTaskRow(
   editingTaskId?: string | null,
   onEditTask?: (taskId: string | null) => void,
   onUpdateTask?: (taskId: string, updates: { title?: string; dueDate?: string | null }) => void,
+  onViewTaskOutput?: (taskId: string) => void,
 ): ReturnType<typeof html> {
   const isComplete = task.status === "complete";
   const isEditing = editingTaskId === task.id;
@@ -388,13 +409,30 @@ export function renderAllTaskRow(
               @click=${() => onStartTask(task.id)}
               title="Review agent output"
             >Review</button>`
-          : !isComplete && onStartTask
-            ? html`<button
-                class="ws-task-start-btn"
-                @click=${() => onStartTask(task.id)}
-                title="Start working on this task"
-              >Start</button>`
-            : nothing}
+          : task.queueStatus?.status === "done"
+            ? html`
+                ${onViewTaskOutput
+                  ? html`<button
+                      class="ws-task-start-btn ws-task-start-btn--done"
+                      @click=${() => onViewTaskOutput(task.id)}
+                      title="Preview agent output"
+                    >View Output</button>`
+                  : nothing}
+                ${onStartTask
+                  ? html`<button
+                      class="ws-task-start-btn ws-task-start-btn--chat"
+                      @click=${() => onStartTask(task.id)}
+                      title="Open chat session for this task"
+                    >Open Chat</button>`
+                  : nothing}
+              `
+            : !isComplete && onStartTask
+              ? html`<button
+                  class="ws-task-start-btn"
+                  @click=${() => onStartTask(task.id)}
+                  title="Start working on this task"
+                >Start</button>`
+              : nothing}
     </div>
   `;
 }
@@ -1171,6 +1209,7 @@ export function renderWorkspaces(props: WorkspacesProps) {
     allTasks = [],
     taskFilter = "outstanding",
     taskSort = "due" as TaskSort,
+    taskSearch = "",
     showCompletedTasks = false,
     editingTaskId,
     workspaceNames = [],
@@ -1190,6 +1229,7 @@ export function renderWorkspaces(props: WorkspacesProps) {
     onCreateTask,
     onSetTaskFilter,
     onSetTaskSort,
+    onSetTaskSearch,
     onToggleCompletedTasks,
     onStartTask,
     onEditTask,
@@ -1347,9 +1387,11 @@ export function renderWorkspaces(props: WorkspacesProps) {
                   tasks: allTasks,
                   taskFilter,
                   taskSort,
+                  taskSearch,
                   onToggleTaskComplete,
                   onSetTaskFilter,
                   onSetTaskSort,
+                  onSetTaskSearch,
                   onCreateTask,
                   workspaceNames,
                   onStartTask,
@@ -1368,9 +1410,11 @@ function renderAllTasksSection(props: {
   tasks: WorkspaceTask[];
   taskFilter: TaskFilter;
   taskSort?: TaskSort;
+  taskSearch?: string;
   onToggleTaskComplete?: (taskId: string, currentStatus: string) => void;
   onSetTaskFilter?: (filter: TaskFilter) => void;
   onSetTaskSort?: (sort: TaskSort) => void;
+  onSetTaskSearch?: (query: string) => void;
   onCreateTask?: (title: string, project: string) => void;
   workspaceNames?: string[];
   onStartTask?: (taskId: string) => void;
@@ -1379,8 +1423,8 @@ function renderAllTasksSection(props: {
   onUpdateTask?: (taskId: string, updates: { title?: string; dueDate?: string | null }) => void;
 }): ReturnType<typeof html> {
   const {
-    tasks, taskFilter, taskSort = "due", onToggleTaskComplete, onSetTaskFilter, onSetTaskSort,
-    onCreateTask, workspaceNames = [], onStartTask, editingTaskId, onEditTask, onUpdateTask,
+    tasks, taskFilter, taskSort = "due", taskSearch = "", onToggleTaskComplete, onSetTaskFilter, onSetTaskSort,
+    onSetTaskSearch, onCreateTask, workspaceNames = [], onStartTask, editingTaskId, onEditTask, onUpdateTask,
   } = props;
 
   if (tasks.length === 0 && !onCreateTask) {
@@ -1398,13 +1442,28 @@ function renderAllTasksSection(props: {
   } else {
     filtered = tasks;
   }
+  if (taskSearch) {
+    const q = taskSearch.toLowerCase();
+    filtered = filtered.filter((t) => t.title.toLowerCase().includes(q) || t.project?.toLowerCase().includes(q));
+  }
   const sorted = sortTasks(filtered, taskSort);
 
   return html`
     <div class="ws-all-tasks-section">
       <section class="ws-section">
         <div class="ws-section__header">
-          <h3>All Tasks</h3>
+          <div class="ws-section__header-left">
+            <h3>All Tasks</h3>
+            ${onSetTaskSearch
+              ? html`<input
+                  type="text"
+                  class="ws-task-search"
+                  placeholder="Search tasks..."
+                  .value=${taskSearch}
+                  @input=${(e: Event) => onSetTaskSearch((e.target as HTMLInputElement).value)}
+                />`
+              : nothing}
+          </div>
           <div class="ws-task-controls">
             <div class="ws-task-filters">
               <button

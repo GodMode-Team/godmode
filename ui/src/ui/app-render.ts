@@ -70,6 +70,7 @@ import {
   updateSkillEdit,
   updateSkillEnabled,
 } from "./controllers/skills";
+import { loadRoster } from "./controllers/agents";
 import { checkForUpdates } from "./controllers/updates";
 import { icons } from "./icons";
 import { TAB_GROUPS, POWER_USER_GROUPS, subtitleForTab, titleForTab, type Tab } from "./navigation";
@@ -91,6 +92,7 @@ import { renderNodes } from "./views/nodes";
 import { renderOverview } from "./views/overview";
 import { renderSessions } from "./views/sessions";
 import { renderSkills } from "./views/skills";
+import { renderAgents } from "./views/agents";
 import { renderLightbox } from "./chat/lightbox";
 import { getResolvedImageUrl } from "./app-gateway";
 import { renderToasts } from "./views/toast";
@@ -210,7 +212,7 @@ function getSessionTabIdentity(key: string, session: ReturnType<typeof findSessi
 
 /**
  * Check if a session key is an alias for the pinned ally/main session.
- * The pinned Prosper tab handles the main session, so we hide duplicates
+ * The pinned ally tab handles the main session, so we hide duplicates
  * like "agent:main:main" or "agent:X:main" from the regular tab bar.
  */
 function isMainSessionAlias(key: string): boolean {
@@ -245,7 +247,7 @@ function getRenderableSessionTabState(state: AppViewState): {
   }
 
   const tabKeys = [...tabsByIdentity.values()];
-  // Empty is OK — the pinned Prosper tab always shows the main session.
+  // Empty is OK — the pinned ally tab always shows the main session.
   // Only add a fallback if the active session is NOT a main alias.
   if (tabKeys.length === 0) {
     const fallback = state.sessionKey.trim() || "main";
@@ -371,17 +373,21 @@ export function renderApp(state: AppViewState) {
                 </a>`
               : nothing
           }
-          <button
-            class="pill pill--restart"
-            @click=${(e: Event) => {
-              e.preventDefault();
-              state.handleGatewayRestartClick();
-            }}
-            title="Restart Gateway"
-          >
-            <span class="pill__icon">${icons.rotateCcw}</span>
-            <span>Restart</span>
-          </button>
+          ${
+            state.updateStatus?.pendingDeploy
+              ? html`<button
+                  class="pill pill--restart"
+                  @click=${(e: Event) => {
+                    e.preventDefault();
+                    state.handleGatewayRestartClick();
+                  }}
+                  title="Restart to apply: ${state.updateStatus.pendingDeploy.summary ?? "pending fix"}"
+                >
+                  <span class="pill__icon">${icons.rotateCcw}</span>
+                  <span>Restart</span>
+                </button>`
+              : nothing
+          }
           <button
             class="pill pill--support"
             @click=${(e: Event) => {
@@ -1007,7 +1013,7 @@ export function renderApp(state: AppViewState) {
                               }
                               const newTabs = state.settings.openTabs.filter((t) => t !== key);
                               const wasActive = key === state.sessionKey;
-                              // Fall back to pinned Prosper tab when no other tabs remain
+                              // Fall back to pinned ally tab when no other tabs remain
                               const fallbackKey = newTabs[0] || ALLY_SESSION_KEY;
                               state.applySettings({
                                 ...state.settings,
@@ -1068,7 +1074,7 @@ export function renderApp(state: AppViewState) {
                   } : undefined,
                   onEveningCapture: () => {
                     state.setTab("chat" as import("./navigation").Tab);
-                    void state.handleSendChat("Let's do my evening capture. Ask me: What went well today? What didn't get done? What should tomorrow's brief prioritize?");
+                    void state.handleSendChat("Let's do my evening capture. Walk me through these:\n1. What went well today?\n2. What didn't get done?\n3. What should tomorrow's brief prioritize?\n4. Ask me for an overall GodMode score (1-10) for today and any feedback. Submit it with the daily rating tool.");
                   },
                 })
               : nothing}
@@ -1352,6 +1358,7 @@ export function renderApp(state: AppViewState) {
                 allTasks: state.allTasks ?? [],
                 taskFilter: state.taskFilter ?? "outstanding",
                 taskSort: state.taskSort ?? "due",
+                taskSearch: state.taskSearch ?? "",
                 showCompletedTasks: state.showCompletedTasks ?? false,
                 onToggleTaskComplete: async (taskId, currentStatus) => {
                   const { toggleTaskComplete, loadAllTasksWithQueueStatus, getWorkspace } =
@@ -1393,6 +1400,9 @@ export function renderApp(state: AppViewState) {
                 },
                 onSetTaskSort: (sort) => {
                   state.taskSort = sort;
+                },
+                onSetTaskSearch: (query) => {
+                  state.taskSearch = query;
                 },
                 onToggleCompletedTasks: () => {
                   state.showCompletedTasks = !(state.showCompletedTasks ?? false);
@@ -1527,8 +1537,9 @@ export function renderApp(state: AppViewState) {
                   agentLogLoading: state.agentLogLoading ?? false,
                   agentLogError: state.agentLogError ?? null,
                   onAgentLogRefresh: () => state.handleMyDayRefresh(),
-                  // Focus Pulse
+                  // Focus Pulse / Morning Set
                   focusPulseActive: false,
+                  onStartMorningSet: () => state.handleFocusPulseStartMorning(),
                   // Today's tasks
                   todayTasks: state.todayTasks ?? [],
                   todayTasksLoading: state.todayTasksLoading ?? false,
@@ -1538,6 +1549,7 @@ export function renderApp(state: AppViewState) {
                       currentStatus === "complete" ? "pending" : "complete",
                     ),
                   onStartTask: (taskId: string) => state.handleTodayStartTask(taskId),
+                  onViewTaskOutput: (taskId: string) => state.handleTodayViewTaskOutput(taskId),
                   // Task panel additions
                   onCreateTask: (title: string) => state.handleTodayCreateTask(title),
                   onEditTask: (taskId: string | null) => state.handleTodayEditTask(taskId),
@@ -1554,6 +1566,9 @@ export function renderApp(state: AppViewState) {
                     onDismiss: (id: string) => state.handleDecisionDismiss(id),
                     onViewOutput: (id: string, path: string) => state.handleDecisionViewOutput(id, path),
                     onOpenChat: (id: string) => state.handleDecisionOpenChat(id),
+                    onMarkComplete: (id: string) => state.handleDecisionMarkComplete(id),
+                    onRate: (id: string, workflow: string, rating: number) => state.handleDecisionRate(id, workflow, rating),
+                    onFeedback: (id: string, workflow: string, feedback: string) => state.handleDecisionFeedback(id, workflow, feedback),
                   } : undefined,
                   // Inbox
                   inboxItems: state.todayInboxItems ?? [],
@@ -1562,7 +1577,7 @@ export function renderApp(state: AppViewState) {
                   // Evening capture
                   onEveningCapture: () => {
                     state.setTab("chat" as import("./navigation").Tab);
-                    void state.handleSendChat("Let's do my evening capture. Ask me: What went well today? What didn't get done? What should tomorrow's brief prioritize?");
+                    void state.handleSendChat("Let's do my evening capture. Walk me through these:\n1. What went well today?\n2. What didn't get done?\n3. What should tomorrow's brief prioritize?\n4. Ask me for an overall GodMode score (1-10) for today and any feedback. Submit it with the daily rating tool.");
                   },
                 })
             : nothing
@@ -1586,6 +1601,13 @@ export function renderApp(state: AppViewState) {
                   onFileClick: (path) => state.handleWorkFileClick(path),
                   onSkillClick: (skill, projectName) =>
                     state.handleWorkSkillClick(skill, projectName),
+                  resources: state.workResources ?? [],
+                  resourcesLoading: state.workResourcesLoading ?? false,
+                  resourceFilter: state.workResourceFilter ?? "all",
+                  onResourceFilterChange: (filter) => state.handleResourceFilterChange(filter),
+                  onResourceClick: (resource) => state.handleResourceClick(resource),
+                  onResourcePin: (id, pinned) => state.handleResourcePin(id, pinned),
+                  onResourceDelete: (id) => state.handleResourceDelete(id),
                 })
             : nothing
         }
@@ -1751,6 +1773,7 @@ export function renderApp(state: AppViewState) {
                 subTab: state.skillsSubTab,
                 godmodeSkills: state.godmodeSkills ?? null,
                 godmodeSkillsLoading: state.godmodeSkillsLoading ?? false,
+                expandedSkills: state.expandedSkills ?? new Set(),
                 onFilterChange: (next) => (state.skillsFilter = next),
                 onRefresh: () => {
                   loadSkills(state, { clearMessages: true });
@@ -1769,6 +1792,15 @@ export function renderApp(state: AppViewState) {
                   if (tab === "clawhub" && !state.clawhubExploreItems) {
                     exploreClawHub(state);
                   }
+                },
+                onToggleExpand: (slug) => {
+                  const next = new Set(state.expandedSkills);
+                  if (next.has(slug)) {
+                    next.delete(slug);
+                  } else {
+                    next.add(slug);
+                  }
+                  state.expandedSkills = next;
                 },
                 clawhub: {
                   loading: state.clawhubLoading,
@@ -1799,6 +1831,29 @@ export function renderApp(state: AppViewState) {
                       state.chatMessage = prompt;
                     }
                   },
+                },
+              })
+            : nothing
+        }
+
+        ${
+          state.tab === "agents"
+            ? renderAgents({
+                loading: state.rosterLoading,
+                error: state.rosterError,
+                roster: state.rosterData ?? [],
+                filter: state.rosterFilter ?? "",
+                expandedAgents: state.expandedAgents ?? new Set(),
+                onFilterChange: (next) => (state.rosterFilter = next),
+                onRefresh: () => loadRoster(state),
+                onToggleExpand: (slug) => {
+                  const next = new Set(state.expandedAgents);
+                  if (next.has(slug)) {
+                    next.delete(slug);
+                  } else {
+                    next.add(slug);
+                  }
+                  state.expandedAgents = next;
                 },
               })
             : nothing
@@ -2230,7 +2285,8 @@ export function renderApp(state: AppViewState) {
                 onOpenTaskSession: (taskId) => state.handleMissionControlOpenTaskSession(taskId),
                 onStartQueueItem: (id) => state.handleMissionControlStartQueueItem(id),
                 onViewTaskFiles: (id) => state.handleMissionControlViewTaskFiles(id),
-                onAskProsper: () => { state.handleAllyToggle(); state.handleAllyDraftChange("What should I focus on next?"); },
+                onAskAlly: () => { state.handleAllyToggle(); state.handleAllyDraftChange("What should I focus on next?"); },
+                allyName: state.assistantName,
               })
             : nothing
         }

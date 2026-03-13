@@ -12,6 +12,7 @@ import { readFile, writeFile, mkdir, stat } from "node:fs/promises";
 import { join, dirname } from "node:path";
 import { homedir } from "node:os";
 import { localDateString } from "../data-paths.js";
+import { getAllyName } from "../lib/ally-identity.js";
 
 // ── Types ────────────────────────────────────────────────────────
 
@@ -242,7 +243,7 @@ export function sanitizeAnswers(raw: Partial<OnboardingAnswers>): OnboardingAnsw
 // ── File Generators ─────────────────────────────────────────────
 
 /** Generate a starter AGENTS.md (kept under ~150 lines). */
-function generateAgentsMd(answers: OnboardingAnswers): string {
+function generateAgentsMd(answers: OnboardingAnswers, allyName = "Ally"): string {
   // Build confirmation rules from soul profile
   const confirmRules = (answers.soulProfile?.confirmBeforeActions ?? [])
     .map((a) => `Always confirm before: ${a}`);
@@ -273,7 +274,7 @@ function generateAgentsMd(answers: OnboardingAnswers): string {
 
 ## Identity
 
-**Atlas** -- Main agent for ${answers.name}.
+${allyName} -- Main agent for ${answers.name}.
 
 Core traits: Direct, resourceful, action-oriented. Earn trust through competence and verified execution. Speaks concisely. Matches energy to user state.
 
@@ -314,7 +315,7 @@ IMMEDIATELY under \`## Captured\`. No special format. No confirmation. Just capt
 
 | Need | Location |
 |------|----------|
-| Current task state | \`memory/WORKING.md\` |
+| Current state | Awareness snapshot (auto-generated every 15 min) |
 | Errors-turned-rules | \`memory/MISTAKES.md\` |
 | User patterns | \`memory/tacit.md\` |
 | Long-term memory | \`memory/curated.md\` |
@@ -335,16 +336,15 @@ ${hardRulesBlock}
 
 **On every session start, read in order:**
 
-1. \`memory/WORKING.md\` -- What am I currently working on?
+1. Awareness snapshot (auto-injected) -- schedule, priorities, tasks, queue status
 2. \`memory/MISTAKES.md\` -- What errors must I never repeat?
 3. \`memory/daily/YYYY-MM-DD.md\` (today + yesterday) -- What happened recently?
 4. \`memory/tacit.md\` -- How does ${answers.name} operate?
 5. \`memory/curated.md\` -- Long-term identity facts
 
 **Before ending a session:**
-1. Update WORKING.md with current state, next steps, open questions
-2. Mark completed tasks \`[DONE]\`, clear resolved questions
-3. If mistakes were made, add one-liner to \`memory/MISTAKES.md\`
+1. If mistakes were made, add one-liner to \`memory/MISTAKES.md\`
+2. Important context is captured automatically via memory ingestion + daily notes
 `;
 }
 
@@ -740,10 +740,10 @@ If you change this file, tell ${answers.name}. It's your soul, and they should k
 `;
 }
 
-function generateHeartbeatMd(answers: OnboardingAnswers): string {
+function generateHeartbeatMd(answers: OnboardingAnswers, allyName = "Ally"): string {
   return `# HEARTBEAT.md -- System Pulse
 
-## Active Agent: Atlas
+## Active Agent: ${allyName}
 ## Owner: ${answers.name}
 ## Timezone: ${answers.timezone}
 
@@ -751,28 +751,25 @@ function generateHeartbeatMd(answers: OnboardingAnswers): string {
 
 ## Morning Routine
 
-1. Read WORKING.md for context
+1. Awareness snapshot is auto-injected (schedule, priorities, tasks, queue)
 2. Check today's daily note
-3. Review priorities
-4. Surface any overnight captures or scheduled items
+3. Surface any overnight captures or scheduled items
 
 ## Evening Routine
 
 1. Review what was accomplished today
-2. Update WORKING.md with end-of-day state
-3. Capture any loose threads to daily note
-4. Flag anything that needs attention tomorrow
+2. Capture any loose threads to daily note
+3. Flag anything that needs attention tomorrow
 
 ## Health Checks
 
 - Memory search functional
 - Daily notes being written
-- WORKING.md under 100 lines
 - No stale items (> 7 days without update)
 `;
 }
 
-function generateWorkingMd(): string {
+function generateWorkingMd(allyName = "Ally"): string {
   return `# WORKING.md -- Current State
 
 *Last updated: ${nowTimestamp()}*
@@ -780,7 +777,7 @@ function generateWorkingMd(): string {
 ---
 
 ## Active Right Now
-<!-- ONE task. What is Atlas doing this instant? -->
+<!-- ONE task. What is ${allyName} doing this instant? -->
 
 ## Today's Priorities
 <!-- Ordered list. Max 5 items. -->
@@ -915,7 +912,7 @@ function generateProjectMd(projectName: string, ownerName: string): string {
 `;
 }
 
-function generateDailyNoteMd(answers: OnboardingAnswers): string {
+function generateDailyNoteMd(answers: OnboardingAnswers, allyName = "Ally"): string {
   return `# ${today()} -- Daily Note
 
 ## Morning Context
@@ -924,7 +921,7 @@ function generateDailyNoteMd(answers: OnboardingAnswers): string {
 
 ## Priorities
 - [ ] Explore the memory system
-- [ ] Start a conversation with Atlas
+- [ ] Start a conversation with ${allyName}
 
 ## Captured
 <!-- Auto-captured facts, decisions, and context go here -->
@@ -1202,8 +1199,10 @@ export async function generateWorkspaceFiles(
     results.push(await safeWriteIfNew(join(workspacePath, relPath), content, force));
   }
 
+  const allyName = getAllyName();
+
   // 1. AGENTS.md
-  await maybeWrite("AGENTS.md", generateAgentsMd(answers));
+  await maybeWrite("AGENTS.md", generateAgentsMd(answers, allyName));
 
   // 2. USER.md
   await maybeWrite("USER.md", generateUserMd(answers));
@@ -1212,10 +1211,9 @@ export async function generateWorkspaceFiles(
   await maybeWrite("SOUL.md", generateSoulMd(answers));
 
   // 4. HEARTBEAT.md
-  await maybeWrite("HEARTBEAT.md", generateHeartbeatMd(answers));
+  await maybeWrite("HEARTBEAT.md", generateHeartbeatMd(answers, allyName));
 
-  // 5. memory/WORKING.md
-  await maybeWrite("memory/WORKING.md", generateWorkingMd());
+  // 5. memory/WORKING.md — DEPRECATED: replaced by awareness-snapshot (auto-generated)
 
   // 6. memory/MISTAKES.md
   await maybeWrite("memory/MISTAKES.md", generateMistakesMd());
@@ -1241,7 +1239,7 @@ export async function generateWorkspaceFiles(
   }
 
   // 11. Today's daily note
-  await maybeWrite(`memory/daily/${today()}.md`, generateDailyNoteMd(answers));
+  await maybeWrite(`memory/daily/${today()}.md`, generateDailyNoteMd(answers, allyName));
 
   // 12. Desired workflows → data/workflows.json (if soul profile has them)
   if (answers.soulProfile?.desiredWorkflows && answers.soulProfile.desiredWorkflows.length > 0) {
@@ -1355,7 +1353,6 @@ export async function checkOnboardingStatus(
 
   const criticalFiles = [
     "AGENTS.md",
-    "memory/WORKING.md",
     "memory/MISTAKES.md",
     "memory/curated.md",
     "memory/tacit.md",
@@ -1366,7 +1363,6 @@ export async function checkOnboardingStatus(
     "USER.md",
     "SOUL.md",
     "HEARTBEAT.md",
-    "memory/WORKING.md",
     "memory/MISTAKES.md",
     "memory/tacit.md",
     "memory/curated.md",
@@ -1456,7 +1452,6 @@ export async function previewOnboarding(
     "USER.md",
     "SOUL.md",
     "HEARTBEAT.md",
-    "memory/WORKING.md",
     "memory/MISTAKES.md",
     "memory/tacit.md",
     "memory/curated.md",

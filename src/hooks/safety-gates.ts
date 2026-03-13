@@ -773,12 +773,12 @@ export async function checkRestartAttempt(
 
 // ── Ephemeral Path Shield ──────────────────────────────────────────
 //
-// Problem: Ally built a website in /tmp, served it locally, macOS cleaned
-// /tmp, work vanished. Massive token waste.
-// Rule: Warn (not block) when exec writes to /tmp or /var/tmp.
-// We warn instead of block because some legitimate commands need /tmp
-// (e.g., package installs, build tools). The warning injects context
-// that nudges the LLM to persist the output somewhere permanent.
+// Problem: Ally built reports/websites in /tmp, served them locally,
+// macOS cleaned /tmp, work vanished. Massive token waste.
+// Rule: HARD BLOCK when exec writes to /tmp or /var/tmp.
+// Warnings were insufficient — the ally ignored them repeatedly.
+// Package managers that need /tmp use their own internal temp dirs,
+// so blocking user-initiated /tmp writes is safe.
 
 const EPHEMERAL_WRITE_PATTERNS = [
   /\b(>|>>|tee|cp|mv|mkdir|touch|cat\s*>)\s+\/tmp\b/,
@@ -791,7 +791,30 @@ const EPHEMERAL_WRITE_PATTERNS = [
 
 /**
  * Check if an exec command writes to ephemeral directories (/tmp, /var/tmp).
- * Returns a warning string to inject (does NOT block), or undefined.
+ * Returns a BLOCK reason string, or undefined if the command is safe.
+ */
+const EPHEMERAL_BLOCK_MESSAGE = [
+  "🚫 BLOCKED: Writing to /tmp is not allowed. Files in /tmp are deleted by the OS on reboot.",
+  "Use one of these permanent locations instead:",
+  "• ~/godmode/artifacts/ — for HTML reports, generated files, and agent output",
+  "• ~/godmode/data/dashboards/{id}/ — for dashboard HTML (use dashboards.save RPC)",
+  "• ~/godmode/memory/inbox/ — for queue agent output (served at /godmode/artifacts/)",
+  "• A GitHub repo — for websites or code projects",
+  "Rewrite your command to target a permanent path and try again.",
+].join("\n");
+
+/** Paths that are always ephemeral */
+const EPHEMERAL_ROOTS = ["/tmp/", "/tmp", "/var/tmp/", "/var/tmp"];
+
+function isEphemeralPath(filePath: string): boolean {
+  const p = filePath.trim();
+  return EPHEMERAL_ROOTS.some((root) => p === root || p.startsWith(root + "/") || p.startsWith(root));
+}
+
+/**
+ * Check if a tool call writes to ephemeral directories (/tmp, /var/tmp).
+ * Covers exec/bash/shell commands AND file-write tools (files.write, write_file, etc.).
+ * Returns a BLOCK reason string, or undefined if the command is safe.
  */
 export function checkEphemeralWrite(
   toolName: string,
@@ -799,6 +822,37 @@ export function checkEphemeralWrite(
   sessionKey?: string,
 ): string | undefined {
   const name = toolName.trim().toLowerCase();
+
+  // Check file-write tools by path parameter
+  if (
+    name === "files.write" ||
+    name === "write_file" ||
+    name === "files.create" ||
+    name === "create_file" ||
+    name === "files.move" ||
+    name === "files.copy"
+  ) {
+    const filePath =
+      typeof params.path === "string"
+        ? params.path
+        : typeof params.file_path === "string"
+          ? params.file_path
+          : typeof params.destination === "string"
+            ? params.destination
+            : "";
+    if (filePath && isEphemeralPath(filePath)) {
+      void logGateActivity(
+        "ephemeralPathShield",
+        "fired",
+        `Ephemeral file write BLOCKED: ${name} → ${filePath.slice(0, 120)}`,
+        sessionKey,
+      );
+      return EPHEMERAL_BLOCK_MESSAGE;
+    }
+    return undefined;
+  }
+
+  // Check exec/bash/shell commands
   if (name !== "exec" && name !== "bash" && name !== "shell") return undefined;
 
   const command =
@@ -815,17 +869,11 @@ export function checkEphemeralWrite(
   void logGateActivity(
     "ephemeralPathShield",
     "fired",
-    `Ephemeral write detected: ${command.slice(0, 120)}`,
+    `Ephemeral write BLOCKED: ${command.slice(0, 120)}`,
     sessionKey,
   );
 
-  return [
-    "⚠ EPHEMERAL PATH WARNING: This command writes to /tmp which is cleaned by the OS.",
-    "Files in /tmp WILL be lost. After this command completes, you MUST:",
-    "1. Move/copy the output to a permanent location (~/godmode/artifacts/, GitHub repo, or vault).",
-    "2. If this is a website or code project, create a GitHub repo and push it.",
-    "3. Confirm the permanent location before telling the user the task is done.",
-  ].join("\n");
+  return EPHEMERAL_BLOCK_MESSAGE;
 }
 
 /**

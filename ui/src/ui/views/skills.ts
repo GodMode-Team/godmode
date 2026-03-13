@@ -47,6 +47,7 @@ export type SkillsProps = {
   clawhub: ClawHubProps;
   godmodeSkills: GodModeSkillsData | null;
   godmodeSkillsLoading: boolean;
+  expandedSkills: Set<string>;
   onFilterChange: (next: string) => void;
   onRefresh: () => void;
   onToggle: (skillKey: string, enabled: boolean) => void;
@@ -54,6 +55,7 @@ export type SkillsProps = {
   onSaveKey: (skillKey: string) => void;
   onInstall: (skillKey: string, name: string, installId: string) => void;
   onSubTabChange: (tab: SkillsSubTab) => void;
+  onToggleExpand: (slug: string) => void;
 };
 
 export function renderSkills(props: SkillsProps) {
@@ -148,43 +150,143 @@ function renderGodModeSkills(props: SkillsProps) {
       ? html`<div class="muted" style="margin-top: 16px;">No matches.</div>`
       : html`<div class="list" style="margin-top: 16px;">
           ${filtered.map((item) =>
-            item._kind === "skill" ? renderExecSkill(item) : renderSkillCard(item),
+            item._kind === "skill"
+              ? renderExecSkill(item, props.expandedSkills.has(item.slug), props.onToggleExpand)
+              : renderSkillCard(item, props.expandedSkills.has(item.slug), props.onToggleExpand),
           )}
         </div>`}
   `;
 }
 
-function renderExecSkill(skill: GodModeExecSkill & { _kind: "skill" }) {
+function renderExecSkill(
+  skill: GodModeExecSkill & { _kind: "skill" },
+  expanded: boolean,
+  onToggle: (slug: string) => void,
+) {
   const firstLine = skill.body.split("\n").find((l) => l.trim().length > 0) ?? "";
+  const hasSchedule = !!skill.schedule;
+
   return html`
-    <div class="list-item">
+    <div
+      class="list-item"
+      style="cursor: pointer;"
+      @click=${() => onToggle(skill.slug)}
+    >
       <div class="list-main">
-        <div class="list-title">${skill.name}</div>
-        <div class="list-sub">${clampText(firstLine, 120)}</div>
-        <div class="chip-row" style="margin-top: 6px;">
+        <div class="row" style="align-items: center; gap: 8px;">
+          <span style="font-size: 10px; color: var(--muted-color, #888); transition: transform 0.15s;
+                       display: inline-block; transform: rotate(${expanded ? "90deg" : "0deg"});">
+            \u25B6
+          </span>
+          <div class="list-title" style="flex: 1;">${skill.name}</div>
+          ${hasSchedule
+            ? html`<span class="chip chip-ok" style="font-size: 11px;">scheduled</span>`
+            : html`<span class="chip" style="font-size: 11px;">on-demand</span>`}
+        </div>
+        <div class="list-sub" style="margin-left: 18px;">${clampText(firstLine, 120)}</div>
+        <div class="chip-row" style="margin-top: 6px; margin-left: 18px;">
           <span class="chip chip-ok">skill</span>
           <span class="chip">${skill.trigger}</span>
           ${skill.schedule ? html`<span class="chip">${skill.schedule}</span>` : nothing}
           ${skill.persona ? html`<span class="chip">${skill.persona}</span>` : nothing}
           <span class="chip">${skill.taskType}</span>
         </div>
+        ${expanded
+          ? html`
+              <div
+                style="margin-top: 12px; margin-left: 18px; padding: 12px; border-radius: 8px;
+                       background: var(--card-bg, #fafafa); border: 1px solid var(--border-color, #eee);"
+              >
+                <div style="display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; font-size: 13px;">
+                  <span class="muted">Trigger:</span>
+                  <span>${skill.trigger}</span>
+                  <span class="muted">Task type:</span>
+                  <span>${skill.taskType}</span>
+                  <span class="muted">Priority:</span>
+                  <span>${skill.priority}</span>
+                  ${skill.persona
+                    ? html`
+                        <span class="muted">Persona:</span>
+                        <span>${skill.persona}</span>
+                      `
+                    : nothing}
+                  ${skill.schedule
+                    ? html`
+                        <span class="muted">Schedule:</span>
+                        <span>${skill.schedule}</span>
+                      `
+                    : nothing}
+                </div>
+                <div
+                  style="margin-top: 10px; font-size: 13px; line-height: 1.5;
+                         white-space: pre-wrap; color: var(--text-color, #333);
+                         max-height: 200px; overflow-y: auto;"
+                >
+                  ${skill.body}
+                </div>
+              </div>
+            `
+          : nothing}
       </div>
     </div>
   `;
 }
 
-function renderSkillCard(card: GodModeSkillCard & { _kind: "card" }) {
+function renderSkillCard(
+  card: GodModeSkillCard & { _kind: "card" },
+  expanded: boolean,
+  onToggle: (slug: string) => void,
+) {
   return html`
-    <div class="list-item">
+    <div
+      class="list-item"
+      style="cursor: pointer;"
+      @click=${() => onToggle(card.slug)}
+    >
       <div class="list-main">
-        <div class="list-title">${card.name}</div>
-        <div class="list-sub">Triggers: ${card.triggers.join(", ")}</div>
-        <div class="chip-row" style="margin-top: 6px;">
+        <div class="row" style="align-items: center; gap: 8px;">
+          <span style="font-size: 10px; color: var(--muted-color, #888); transition: transform 0.15s;
+                       display: inline-block; transform: rotate(${expanded ? "90deg" : "0deg"});">
+            \u25B6
+          </span>
+          <div class="list-title" style="flex: 1;">${card.name}</div>
+          <span class="chip" style="font-size: 11px;">passive</span>
+        </div>
+        <div class="list-sub" style="margin-left: 18px;">
+          Triggers: ${card.triggers.join(", ")}
+        </div>
+        <div class="chip-row" style="margin-top: 6px; margin-left: 18px;">
           <span class="chip">card</span>
           ${card.tools.length > 0
             ? html`<span class="chip">${card.tools.length} tools</span>`
             : nothing}
         </div>
+        ${expanded
+          ? html`
+              <div
+                style="margin-top: 12px; margin-left: 18px; padding: 12px; border-radius: 8px;
+                       background: var(--card-bg, #fafafa); border: 1px solid var(--border-color, #eee);"
+              >
+                <div style="display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; font-size: 13px;">
+                  <span class="muted">Keywords:</span>
+                  <span>${card.triggers.join(", ")}</span>
+                  ${card.tools.length > 0
+                    ? html`
+                        <span class="muted">Tools:</span>
+                        <span>${card.tools.join(", ")}</span>
+                      `
+                    : nothing}
+                </div>
+                <div
+                  style="margin-top: 10px; font-size: 13px; line-height: 1.5;
+                         white-space: pre-wrap; color: var(--text-color, #333);
+                         max-height: 200px; overflow-y: auto;"
+                >
+                  ${card.body}
+                </div>
+              </div>
+            `
+          : nothing}
       </div>
     </div>
   `;

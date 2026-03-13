@@ -133,6 +133,14 @@ const check: GatewayRequestHandler = async ({ respond }) => {
     const pluginUpdateAvailable =
       pluginLatest !== null && isNewerVersion(pluginLatest, _pluginVersion);
 
+    // Check for pending builder deploys that need a restart
+    let pendingDeploy: { summary: string; ts: number; files?: string[] } | null = null;
+    try {
+      const pendingPath = join(DATA_DIR, "pending-deploy.json");
+      const raw = readFileSync(pendingPath, "utf-8");
+      if (raw) pendingDeploy = JSON.parse(raw);
+    } catch { /* no pending deploy */ }
+
     respond(true, {
       openclaw: {
         version: openclawVersion,
@@ -146,6 +154,7 @@ const check: GatewayRequestHandler = async ({ respond }) => {
         latest: pluginLatest,
         updateAvailable: pluginUpdateAvailable,
       },
+      pendingDeploy,
       fetchOk: true,
     });
   } catch (err) {

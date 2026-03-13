@@ -90,12 +90,14 @@ import { startMeetingNotifications, stopMeetingNotifications } from "./controlle
 import {
   loadMyDay as loadMyDayInternal,
   loadBriefOnly as loadBriefOnlyInternal,
-  loadAgentLogOnly as loadAgentLogOnlyInternal,
   openBriefInObsidian as openBriefInObsidianInternal,
 } from "./controllers/my-day";
 import {
   loadWork as loadWorkInternal,
   loadProjectDetails as loadProjectDetailsInternal,
+  loadResources as loadResourcesInternal,
+  pinResource as pinResourceInternal,
+  deleteResource as deleteResourceInternal,
 } from "./controllers/work";
 import { loadWorkspaces as loadWorkspacesInternal } from "./controllers/workspaces";
 import type { GatewayBrowserClient, GatewayHelloOk } from "./gateway";
@@ -195,7 +197,7 @@ function cleanForAlly(text: string, role: string): string | null {
   }
 
   // Consciousness/system file dumps (toolResult content shown as message)
-  if (/^#\s*(?:🧠|Atlas Consciousness)/i.test(t)) {
+  if (/^#\s*(?:🧠|\w+ Consciousness)/i.test(t)) {
     console.debug("[Ally] Filtered message:", role, t.substring(0, 100));
     return null;
   }
@@ -256,8 +258,8 @@ function cleanForAlly(text: string, role: string): string | null {
     console.debug("[Ally] Filtered message (persona leak):", role, t.substring(0, 100));
     return null;
   }
-  // Prosper role description echoed
-  if (/^##?\s*Your Role as Prosper/i.test(t)) {
+  // Ally role description echoed (matches any ally name)
+  if (/^##?\s*Your Role as \w+/i.test(t)) {
     console.debug("[Ally] Filtered message (persona leak):", role, t.substring(0, 100));
     return null;
   }
@@ -266,7 +268,7 @@ function cleanForAlly(text: string, role: string): string | null {
   const tLower = t.toLowerCase();
   const sysSignals = [
     "persistence protocol", "core principles:", "core behaviors",
-    "your role as prosper", "be diligent first time", "exhaust reasonable options",
+    "your role as ", "be diligent first time", "exhaust reasonable options",
     "assume capability exists", "elite executive assistant",
     "consciousness context", "working context", "enforcement:",
     "internal system context injected by godmode",
@@ -279,6 +281,14 @@ function cleanForAlly(text: string, role: string): string | null {
   // Schedule table headers
   if (/^(?:ID\s+START\s+END\s+SUMMARY)/i.test(t)) {
     console.debug("[Ally] Filtered message:", role, t.substring(0, 100));
+    return null;
+  }
+
+  // Raw file/directory listing dumps (long runs of filenames with extensions)
+  // Matches messages that are mostly .json/.db/.html/.log filenames
+  const fileExtMatches = t.match(/\b[\w.-]+\.(?:json\b|db\b|html\b|log\b|flag\b|jsonl\b|bak\b|css\b|js\b|ts\b|md\b|txt\b)/gi);
+  if (fileExtMatches && fileExtMatches.length >= 8 && fileExtMatches.join(" ").length > t.length * 0.4) {
+    console.debug("[Ally] Filtered message (file listing dump):", role, t.substring(0, 100));
     return null;
   }
 
@@ -525,6 +535,7 @@ export class GodModeApp extends LitElement {
   @state() allTasks?: WorkspaceTask[];
   @state() taskFilter?: TaskFilter;
   @state() taskSort?: TaskSort;
+  @state() taskSearch?: string;
   @state() showCompletedTasks?: boolean;
   @state() editingTaskId: string | null = null;
 
@@ -539,7 +550,7 @@ export class GodModeApp extends LitElement {
   @state() myDayLoading = false;
   @state() myDayError: string | null = null;
   @state() todaySelectedDate: string = localDateString();
-  @state() todayViewMode: "brief" | "command-center" | "agent-log" = "brief";
+  @state() todayViewMode: "brief" | "tasks" | "inbox" = "brief";
 
   // Daily Brief state
   @state() dailyBrief?: import("./views/daily-brief").DailyBriefData | null;
@@ -582,6 +593,9 @@ export class GodModeApp extends LitElement {
   @state() workExpandedProjects: Set<string> = new Set();
   @state() workProjectFiles: Record<string, unknown[]> = {};
   @state() workDetailLoading: Set<string> = new Set();
+  @state() workResources?: import("./views/work").Resource[];
+  @state() workResourcesLoading = false;
+  @state() workResourceFilter: import("./views/work").ResourceFilter = "all";
 
   @state() skillsLoading = false;
   @state() skillsReport: SkillStatusReport | null = null;
@@ -593,6 +607,13 @@ export class GodModeApp extends LitElement {
   @state() skillsSubTab: "godmode" | "my-skills" | "clawhub" = "godmode";
   @state() godmodeSkills: import("./views/skills").GodModeSkillsData | null = null;
   @state() godmodeSkillsLoading = false;
+  @state() expandedSkills: Set<string> = new Set();
+
+  @state() rosterData: import("./views/agents").RosterAgent[] = [];
+  @state() rosterLoading = false;
+  @state() rosterError: string | null = null;
+  @state() rosterFilter = "";
+  @state() expandedAgents: Set<string> = new Set();
 
   @state() debugLoading = false;
   @state() debugStatus: StatusSummary | null = null;
@@ -697,7 +718,6 @@ export class GodModeApp extends LitElement {
   private nodesPollInterval: number | null = null;
   private logsPollInterval: number | null = null;
   private debugPollInterval: number | null = null;
-  private agentLogPollInterval: number | null = null;
   private logsScrollFrame: number | null = null;
   private toolStreamById = new Map<string, ToolStreamEntry>();
   private toolStreamOrder: string[] = [];
@@ -741,20 +761,6 @@ export class GodModeApp extends LitElement {
       this.todaySelectedDate = today;
     }
 
-    if (this.agentLogPollInterval == null) {
-      this.agentLogPollInterval = window.setInterval(() => {
-        if (!this.connected) {
-          return;
-        }
-        const onTodayTab = this.tab === "today" || this.tab === "my-day";
-        if (!onTodayTab || this.todayViewMode !== "agent-log") {
-          return;
-        }
-        void loadAgentLogOnlyInternal(this);
-      }, 60_000);
-    }
-
-    // Agent log updates are handled by the 60s poll interval above.
     // daily-brief:update events are handled centrally in app-gateway.ts.
 
     // Start meeting notifications (polls every 60s, fires toast 15 min before)
@@ -771,10 +777,6 @@ export class GodModeApp extends LitElement {
   disconnectedCallback() {
     stopMeetingNotifications();
     this._stopPrivateSessionTimer();
-    if (this.agentLogPollInterval != null) {
-      clearInterval(this.agentLogPollInterval);
-      this.agentLogPollInterval = null;
-    }
     handleDisconnected(this as unknown as Parameters<typeof handleDisconnected>[0]);
     super.disconnectedCallback();
   }
@@ -866,7 +868,7 @@ export class GodModeApp extends LitElement {
 
     // Then switch to chat and kick off the morning priority conversation in a new session
     this.setTab("chat" as import("./navigation").Tab);
-    const prompt = "Let's do my morning set. Check my daily note for today's Win The Day items, then help me review priorities and pick my #1 focus to lock in.";
+    const prompt = "Let's do my morning set. Check my daily note for today's Win The Day items, review my calendar, and then walk me through a proposed plan for the day. Ask me clarifying questions before finalizing anything. Suggest which tasks you can handle vs what I should do myself. Do NOT call the morning_set tool or kick off any agents until I explicitly approve the plan.";
     const { createNewSession } = await import("./app-render.helpers.js");
     createNewSession(this);
     void this.handleSendChat(prompt);
@@ -1258,6 +1260,43 @@ export class GodModeApp extends LitElement {
         const { extractText, formatApiError } = await import("./chat/message-extract.js");
         this.allyMessages = res.messages
           .map((m) => {
+            const role = (m.role as string) ?? "assistant";
+
+            // Skip tool results, system messages, and other non-conversation roles.
+            // These carry raw tool output (directory listings, file reads, etc.)
+            // that should never appear in the ally bubble.
+            const roleLower = role.toLowerCase();
+            if (
+              roleLower === "tool" ||
+              roleLower === "toolresult" ||
+              roleLower === "tool_result" ||
+              roleLower === "function" ||
+              roleLower === "system"
+            ) return null;
+
+            // Also detect tool results disguised as assistant messages
+            // (messages with toolCallId / tool_call_id fields)
+            const raw = m as Record<string, unknown>;
+            if (raw.toolCallId || raw.tool_call_id || raw.toolName || raw.tool_name) return null;
+
+            // Skip messages whose content array is ONLY tool blocks (no text).
+            // Assistant messages often mix text + tool_use — keep those (extractText grabs only text parts).
+            // Only drop messages that have zero text content alongside tool blocks.
+            if (Array.isArray(m.content)) {
+              const items = m.content as Array<Record<string, unknown>>;
+              const hasTextBlock = items.some((item) => {
+                const t = (typeof item.type === "string" ? item.type : "").toLowerCase();
+                return (t === "text" || t === "") && typeof item.text === "string" && item.text.trim().length > 0;
+              });
+              if (!hasTextBlock) {
+                const hasToolBlocks = items.some((item) => {
+                  const t = (typeof item.type === "string" ? item.type : "").toLowerCase();
+                  return t === "tool_use" || t === "tool_result" || t === "toolresult" || t === "tooluse";
+                });
+                if (hasToolBlocks) return null;
+              }
+            }
+
             let text = extractText(m);
             if (!text) return null;
             // Convert raw API error JSON to friendly message
@@ -1267,11 +1306,10 @@ export class GodModeApp extends LitElement {
             text = text.replace(/^\[GodMode Context:[^\]]*\]\s*/i, "").trim();
             if (!text) return null;
             // Filter system plumbing, keep real content
-            const role = (m.role as string) ?? "assistant";
             const cleaned = cleanForAlly(text, role);
             if (!cleaned) return null;
             return {
-              role: role as "user" | "assistant",
+              role: (roleLower === "user" ? "user" : "assistant") as "user" | "assistant",
               content: cleaned,
               timestamp: m.timestamp,
             };
@@ -1326,6 +1364,73 @@ export class GodModeApp extends LitElement {
     } catch (e) {
       console.error("[DecisionCard] Dismiss failed:", e);
       this.showToast("Failed to dismiss", "error");
+    }
+  }
+
+  async handleDecisionMarkComplete(id: string) {
+    if (!this.client || !this.connected) return;
+    try {
+      const item = this.todayQueueResults?.find((r) => r.id === id);
+      if (item?.sourceTaskId) {
+        await this.client.request("tasks.update", {
+          id: item.sourceTaskId,
+          updates: { status: "complete" },
+        });
+      }
+      await this.client.request("queue.remove", { id });
+      this.todayQueueResults = this.todayQueueResults.filter(r => r.id !== id);
+      this.showToast("Task marked complete", "success");
+    } catch (e) {
+      console.error("[DecisionCard] Mark complete failed:", e);
+      this.showToast("Failed to mark complete", "error");
+    }
+  }
+
+  async handleDecisionRate(id: string, workflow: string, rating: number) {
+    if (!this.client || !this.connected) return;
+    try {
+      await this.client.request("trust.rate", { workflow, rating });
+      // Below threshold (7) — ask for improvement feedback before dismissing
+      const needsFeedback = rating < 7;
+      this.todayQueueResults = this.todayQueueResults.map((r) =>
+        r.id === id ? { ...r, userRating: rating, feedbackPending: needsFeedback } : r,
+      );
+      if (!needsFeedback) {
+        // Good rating — auto-dismiss cron results, toast for queue items
+        const item = this.todayQueueResults?.find((r) => r.id === id);
+        if (item?.source === "cron") {
+          await this.client.request("queue.remove", { id });
+          this.todayQueueResults = this.todayQueueResults.filter((r) => r.id !== id);
+        }
+        this.showToast(`Rated ${workflow} ${rating}/10`, "success");
+      } else {
+        this.showToast(`Rated ${workflow} ${rating}/10 — what could be better?`, "info");
+      }
+    } catch (e) {
+      console.error("[DecisionCard] Rate failed:", e);
+      this.showToast("Failed to submit rating", "error");
+    }
+  }
+
+  async handleDecisionFeedback(id: string, workflow: string, feedback: string) {
+    if (!this.client || !this.connected) return;
+    try {
+      // Submit improvement feedback (if provided — skip means empty string)
+      if (feedback) {
+        await this.client.request("trust.feedback", { workflow, feedback });
+        this.showToast(`Feedback saved for ${workflow} — will apply next time`, "success");
+      }
+      // Dismiss the card now that feedback is collected (or skipped)
+      const item = this.todayQueueResults?.find((r) => r.id === id);
+      if (item?.source === "cron") {
+        await this.client.request("queue.remove", { id });
+      }
+      this.todayQueueResults = this.todayQueueResults
+        .map((r) => r.id === id ? { ...r, feedbackPending: false } : r)
+        .filter((r) => !(r.id === id && r.source === "cron"));
+    } catch (e) {
+      console.error("[DecisionCard] Feedback failed:", e);
+      this.showToast("Failed to save feedback", "error");
     }
   }
 
@@ -2756,10 +2861,6 @@ export class GodModeApp extends LitElement {
 
   // My Day handlers
   async handleMyDayRefresh() {
-    if (this.todayViewMode === "agent-log") {
-      await loadAgentLogOnlyInternal(this, { refresh: true });
-      return;
-    }
     await loadMyDayInternal(this);
     // Also refresh decision cards
     this._loadDecisionCards();
@@ -2769,6 +2870,11 @@ export class GodModeApp extends LitElement {
     import("./controllers/my-day.js").then(async (mod) => {
       this.todayQueueResults = await mod.loadTodayQueueResults(this as any);
     }).catch(() => {});
+  }
+
+  /** Public wrapper for gateway event handler to trigger decision card refresh */
+  async loadTodayQueueResults(): Promise<void> {
+    this._loadDecisionCards();
   }
 
   async handleMyDayTaskStatusChange(taskId: string, newStatus: "pending" | "complete") {
@@ -2827,6 +2933,35 @@ export class GodModeApp extends LitElement {
     this.todayShowCompleted = !this.todayShowCompleted;
   }
 
+  async handleTodayViewTaskOutput(taskId: string) {
+    if (!this.client || !this.connected) return;
+    try {
+      // Find the queue item linked to this task
+      const queueResult = await this.client.request<{
+        items: Array<{ id: string; sourceTaskId?: string; result?: { outputPath?: string; summary?: string } }>;
+      }>("queue.list", { limit: 100 });
+      const qi = queueResult?.items?.find((i) => i.sourceTaskId === taskId);
+      if (!qi?.result?.outputPath) {
+        this.showToast("No output available for this task", "info");
+        return;
+      }
+      // Read the output and open in sidebar
+      const result = await this.client.request<{ content: string }>(
+        "queue.readOutput",
+        { path: qi.result.outputPath },
+      );
+      const title = qi.result.outputPath.split("/").pop() ?? "Agent Output";
+      this.handleOpenSidebar(result.content, {
+        mimeType: "text/markdown",
+        filePath: qi.result.outputPath,
+        title,
+      });
+    } catch (err) {
+      console.error("[Tasks] View output failed:", err);
+      this.showToast("Failed to load agent output", "error");
+    }
+  }
+
   async handleTodayStartTask(taskId: string) {
     if (!this.client || !this.connected) {
       return;
@@ -2845,10 +2980,13 @@ export class GodModeApp extends LitElement {
       );
       const key = result?.sessionId ?? result?.sessionKey;
       if (key) {
-        // Set the tab title to the task name
+        // Set the tab title to the task name and persist it
         if (result.task?.title) {
           const { autoTitleCache } = await import("./controllers/sessions.js");
           autoTitleCache.set(key, result.task.title);
+          // Persist to OpenClaw so it survives refresh
+          const { hostPatchSession } = await import("../lib/host-compat.js");
+          void hostPatchSession(this.client, key, result.task.title);
         }
         this.setTab("chat" as import("./navigation").Tab);
         this.sessionKey = key;
@@ -2892,10 +3030,6 @@ export class GodModeApp extends LitElement {
     const d = new Date(this.todaySelectedDate + "T12:00:00");
     d.setDate(d.getDate() - 1);
     this.todaySelectedDate = localDateString(d);
-    if (this.todayViewMode === "agent-log") {
-      void loadAgentLogOnlyInternal(this);
-      return;
-    }
     void loadBriefOnlyInternal(this);
   }
 
@@ -2909,10 +3043,6 @@ export class GodModeApp extends LitElement {
       return;
     }
     this.todaySelectedDate = next;
-    if (this.todayViewMode === "agent-log") {
-      void loadAgentLogOnlyInternal(this);
-      return;
-    }
     void loadBriefOnlyInternal(this);
   }
 
@@ -2978,11 +3108,8 @@ export class GodModeApp extends LitElement {
     }
   }
 
-  handleTodayViewModeChange(mode: "brief" | "command-center" | "agent-log") {
+  handleTodayViewModeChange(mode: "brief" | "tasks" | "inbox") {
     this.todayViewMode = mode;
-    if (mode === "agent-log" && !this.agentLog) {
-      void loadAgentLogOnlyInternal(this);
-    }
   }
 
   handlePrivateModeToggle() {
@@ -3167,7 +3294,27 @@ export class GodModeApp extends LitElement {
 
   // Work tab handlers
   async handleWorkRefresh() {
-    await loadWorkInternal(this);
+    await Promise.all([loadWorkInternal(this), loadResourcesInternal(this)]);
+  }
+
+  async handleResourcePin(id: string, pinned: boolean) {
+    await pinResourceInternal(this, id, pinned);
+  }
+
+  async handleResourceDelete(id: string) {
+    await deleteResourceInternal(this, id);
+  }
+
+  handleResourceFilterChange(filter: import("./views/work").ResourceFilter) {
+    this.workResourceFilter = filter;
+  }
+
+  handleResourceClick(resource: import("./views/work").Resource) {
+    if (resource.path) {
+      this.handleWorkFileClick(resource.path);
+    } else if (resource.url) {
+      window.open(resource.url, "_blank", "noopener,noreferrer");
+    }
   }
 
   handleWorkToggleProject(projectId: string) {

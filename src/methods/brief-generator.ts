@@ -1704,6 +1704,9 @@ ${cronFailures && cronFailures.cronErrors.length > 0
   : "(all clear — no failures)"}
 ${cronFailures && cronFailures.cronErrors.length > 0 ? "\nIMPORTANT: Surface these failures prominently in the brief. The user needs to know what broke overnight." : ""}`;
 
+  // Trust feedback is now baked directly into persona/skill markdown files
+  // by trust-refinement.ts — no runtime injection needed here.
+
   // ── Call Claude to render the brief ─────────────────────────────
   console.log("[BriefGenerator] Calling Claude Sonnet 4.6 to render brief...");
   let briefContent = await callClaude(BRIEF_SYSTEM_PROMPT, briefUserPrompt, {

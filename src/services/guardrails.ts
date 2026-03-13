@@ -118,10 +118,9 @@ export const GATE_DESCRIPTORS: Record<GuardrailGateId, GateDescriptor> = {
   sessionHygiene: {
     name: "Session Hygiene",
     description:
-      "Auto-prunes WORKING.md on session reset. Removes [DONE] items and trims to max lines.",
+      "DEPRECATED — WORKING.md replaced by awareness-snapshot (auto-generated every 15 min).",
     icon: "\u{1F9F9}",
     hook: "before_reset",
-    thresholdLabels: { maxWorkingLines: "Max WORKING.md lines" },
   },
   exhaustiveSearch: {
     name: "Exhaustive Search",

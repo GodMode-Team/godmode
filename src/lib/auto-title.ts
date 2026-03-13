@@ -12,6 +12,17 @@ export const pendingAutoTitles = new Map<string, string>();
 export const titledSessions = new Set<string>();
 const TITLED_SESSIONS_MAX = 5_000;
 
+/**
+ * Internal system terms that should never be used as session titles.
+ * If the LLM generates one of these, fall back to string derivation.
+ */
+const TITLE_BLOCKLIST = new Set([
+  "heartbeat",
+  "heartbeat config",
+  "heartbeat config review",
+  "heartbeat status",
+]);
+
 /** Evict oldest entries when titledSessions grows too large */
 export function evictTitledSessions(): void {
   if (titledSessions.size <= TITLED_SESSIONS_MAX) return;
@@ -73,7 +84,7 @@ export async function generateSessionTitle(
           "User: 'hows our memory working?' → Memory System Status",
           "User: 'can you research community platforms for TRP?' → TRP Community Platforms",
           "User: 'what tips could I give Scott about his ads?' → Scott Ad Strategy Tips",
-          "User: 'read HEARTBEAT.md if it exists' → Heartbeat Config Review",
+          "User: 'build me a front intelligence dashboard' → Front Email Intelligence",
         ].join("\n"),
         messages: [{
           role: "user",
@@ -101,6 +112,9 @@ export async function generateSessionTitle(
 
     // Reject if it looks like it echoed the assistant response
     if (assistantResponse.toLowerCase().startsWith(title.toLowerCase())) return null;
+
+    // Reject internal system terms that shouldn't be session titles
+    if (TITLE_BLOCKLIST.has(title.toLowerCase())) return null;
 
     return title || null;
   } catch {

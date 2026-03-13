@@ -3,6 +3,7 @@ dist/
 ui/dist/
 .DS_Store
 *.log
+*.db
 coverage/
 .tmp/
 .worktrees/

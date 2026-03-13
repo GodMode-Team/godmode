@@ -331,6 +331,19 @@ export function renderDailyBrief(props: DailyBriefProps) {
     if (localPath && onOpenFile) {
       e.preventDefault();
       void onOpenFile(localPath);
+      return;
+    }
+
+    // External links — contenteditable suppresses normal navigation,
+    // so we need to open them manually.
+    const anchor = (target.closest?.("a") ??
+      target.parentElement?.closest("a")) as HTMLAnchorElement | null;
+    if (anchor) {
+      const href = anchor.getAttribute("href") ?? "";
+      if (/^https?:\/\//i.test(href)) {
+        e.preventDefault();
+        window.open(href, "_blank", "noopener,noreferrer");
+      }
     }
   };
 

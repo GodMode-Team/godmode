@@ -217,6 +217,7 @@ export function listRoster(): Array<{
   taskTypes: string[];
   engine?: AgentEngine;
   mission?: string;
+  body: string;
 }> {
   return loadRoster().map((p) => ({
     slug: p.slug,
@@ -225,5 +226,6 @@ export function listRoster(): Array<{
     taskTypes: p.taskTypes,
     engine: p.engine,
     mission: p.mission,
+    body: p.body,
   }));
 }

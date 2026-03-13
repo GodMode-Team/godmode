@@ -108,14 +108,16 @@ function autoScrollIfNeeded(props: AllyChatProps) {
     const container = panel.querySelector(".ally-panel__messages");
     if (!container) return;
 
-    const state = scrollState.get(container) ?? { lastMsgCount: 0, lastStreamLen: 0 };
+    const prev = scrollState.get(container);
+    const state = prev ?? { lastMsgCount: 0, lastStreamLen: 0 };
     const msgCount = props.messages.length;
     const streamLen = props.stream?.length ?? 0;
     const isNew = msgCount !== state.lastMsgCount || streamLen > state.lastStreamLen;
     scrollState.set(container, { lastMsgCount: msgCount, lastStreamLen: streamLen });
 
     if (!isNew) return;
-    if (isNearBottom(container as HTMLElement, 120)) {
+    // Always scroll to bottom on first open (no prior scroll state)
+    if (!prev || isNearBottom(container as HTMLElement, 120)) {
       scrollToBottom(panel as HTMLElement);
     }
   });

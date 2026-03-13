@@ -2,7 +2,7 @@ import type { IconName } from "./icons.js";
 
 export const TAB_GROUPS = [
   { label: "", tabs: ["chat", "today", "workspaces", "second-brain", "dashboards"] },
-  { label: "Settings", tabs: ["config", "skills", "trust", "guardrails", "options"] },
+  { label: "Settings", tabs: ["config", "skills", "agents", "trust", "guardrails", "options"] },
 ] as const;
 
 export const POWER_USER_GROUPS = [
@@ -27,6 +27,7 @@ export type Tab =
   | "sessions"
   | "cron"
   | "skills"
+  | "agents"
   | "nodes"
   | "chat"
   | "config"
@@ -51,6 +52,7 @@ const TAB_PATHS: Record<Tab, string> = {
   sessions: "/sessions",
   cron: "/cron",
   skills: "/skills",
+  agents: "/agents",
   nodes: "/nodes",
   chat: "/chat",
   trust: "/trust",
@@ -186,6 +188,8 @@ export function iconForTab(tab: Tab): IconName {
       return "loader";
     case "skills":
       return "zap";
+    case "agents":
+      return "radio";
     case "nodes":
       return "monitor";
     case "options":
@@ -238,6 +242,8 @@ export function titleForTab(tab: Tab) {
       return "Cron Jobs";
     case "skills":
       return "Skills";
+    case "agents":
+      return "Agents";
     case "nodes":
       return "Nodes";
     case "options":
@@ -290,6 +296,8 @@ export function emojiForTab(tab: Tab): string {
       return "\u{23F0}";
     case "skills":
       return "\u{1F9E9}";
+    case "agents":
+      return "\u{1F916}";
     case "nodes":
       return "\u{1F5A5}\uFE0F";
     case "options":
@@ -342,6 +350,8 @@ export function subtitleForTab(tab: Tab) {
       return "Schedule wakeups and recurring agent runs.";
     case "skills":
       return "Manage your skills, discover new ones from ClawHub, and personalize them for your workflow.";
+    case "agents":
+      return "Your agent roster — sub-agents that handle queue tasks, grouped by category.";
     case "nodes":
       return "Paired devices, capabilities, and command exposure.";
     case "options":

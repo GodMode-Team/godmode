@@ -152,7 +152,7 @@ export function matchSkillCard(userMessage: string): SkillCard | null {
 
 // ── Format for Context ──────────────────────────────────────────
 
-const MAX_CARD_LINES = 15;
+const MAX_CARD_LINES = 40;
 
 /**
  * Format a skill card for context injection.

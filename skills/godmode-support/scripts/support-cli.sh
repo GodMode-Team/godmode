@@ -1,7 +1,7 @@
 #!/bin/bash
 # godmode-support CLI
 # This script is installed on customer Mac Minis to provide allowlisted
-# support commands. Atlas can only run these commands during SSH sessions.
+# support commands. {{ALLY_NAME}} can only run these commands during SSH sessions.
 #
 # Installation: Copy to /usr/local/bin/godmode-support and chmod +x
 # Usage: godmode-support <command> [args]

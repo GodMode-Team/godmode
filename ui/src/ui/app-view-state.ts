@@ -189,6 +189,12 @@ export type AppViewState = {
   skillsSubTab: "godmode" | "my-skills" | "clawhub";
   godmodeSkills: import("./views/skills").GodModeSkillsData | null;
   godmodeSkillsLoading: boolean;
+  expandedSkills: Set<string>;
+  rosterData: import("./views/agents").RosterAgent[];
+  rosterLoading: boolean;
+  rosterError: string | null;
+  rosterFilter: string;
+  expandedAgents: Set<string>;
   clawhubQuery: string;
   clawhubResults: ClawHubSearchResult[] | null;
   clawhubExploreItems: ClawHubSkillItem[] | null;
@@ -233,13 +239,14 @@ export type AppViewState = {
   allTasks?: WorkspaceTask[];
   taskFilter?: TaskFilter;
   taskSort?: TaskSort;
+  taskSearch?: string;
   showCompletedTasks?: boolean;
   editingTaskId?: string | null;
   // My Day state
   myDayLoading?: boolean;
   myDayError?: string | null;
   todaySelectedDate?: string;
-  todayViewMode?: "brief" | "command-center" | "agent-log";
+  todayViewMode?: "brief" | "tasks" | "inbox";
   // Today tasks
   todayTasks?: WorkspaceTask[];
   todayTasksLoading?: boolean;
@@ -280,6 +287,9 @@ export type AppViewState = {
   workExpandedProjects?: Set<string>;
   workProjectFiles?: Record<string, unknown[]>;
   workDetailLoading?: Set<string>;
+  workResources?: import("./views/work").Resource[];
+  workResourcesLoading?: boolean;
+  workResourceFilter?: import("./views/work").ResourceFilter;
   // Onboarding experience state (6-phase flow)
   onboardingActive?: boolean;
   onboardingPhase?: import("./views/onboarding").OnboardingPhase;
@@ -334,6 +344,7 @@ export type AppViewState = {
     pluginVersion: string;
     pluginLatest: string | null;
     pluginUpdateAvailable: boolean;
+    pendingDeploy: { summary: string; ts: number; files?: string[] } | null;
     fetchOk: boolean | null;
   } | null;
   updateLoading: boolean;
@@ -509,6 +520,7 @@ export type AppViewState = {
   handleMyDayRefresh: () => Promise<void>;
   handleMyDayTaskStatusChange: (taskId: string, newStatus: "pending" | "complete") => Promise<void>;
   handleTodayStartTask: (taskId: string) => Promise<void>;
+  handleTodayViewTaskOutput: (taskId: string) => Promise<void>;
   handleTodayCreateTask: (title: string) => Promise<void>;
   handleTodayEditTask: (taskId: string | null) => void;
   handleTodayUpdateTask: (taskId: string, updates: { title?: string; dueDate?: string | null }) => Promise<void>;
@@ -524,7 +536,7 @@ export type AppViewState = {
   handleBriefSave: (content: string) => Promise<void>;
   handleBriefToggleCheckbox: (index: number, checked: boolean) => Promise<void>;
   // Today view mode handler
-  handleTodayViewModeChange: (mode: "brief" | "command-center" | "agent-log") => void;
+  handleTodayViewModeChange: (mode: "brief" | "tasks" | "inbox") => void;
   handlePrivateModeToggle: () => void;
   // Ally side-chat handlers
   handleAllyToggle: () => void;
@@ -539,6 +551,8 @@ export type AppViewState = {
   handleDecisionDismiss: (id: string) => Promise<void>;
   handleDecisionViewOutput: (id: string, outputPath: string) => Promise<void>;
   handleDecisionOpenChat: (id: string) => void;
+  handleDecisionRate: (id: string, workflow: string, rating: number) => Promise<void>;
+  handleDecisionFeedback: (id: string, workflow: string, feedback: string) => Promise<void>;
   // File open handler
   handleOpenFile: (filePath: string) => Promise<void>;
   // Inner Work handlers
@@ -549,6 +563,10 @@ export type AppViewState = {
   handleWorkToggleProject: (projectId: string) => void;
   handleWorkFileClick: (path: string) => void;
   handleWorkSkillClick: (skill: string, projectName: string) => void;
+  handleResourceFilterChange: (filter: import("./views/work").ResourceFilter) => void;
+  handleResourceClick: (resource: import("./views/work").Resource) => void;
+  handleResourcePin: (id: string, pinned: boolean) => Promise<void>;
+  handleResourceDelete: (id: string) => Promise<void>;
   // People tab handlers
   // Workspaces handlers
   handleWorkspacesRefresh: () => Promise<void>;

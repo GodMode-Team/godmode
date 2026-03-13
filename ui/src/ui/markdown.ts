@@ -229,6 +229,7 @@ export function toEditableMarkdownHtml(markdown: string): string {
   const sanitized = DOMPurify.sanitize(rendered, {
     ALLOWED_TAGS: allowedTags,
     ALLOWED_ATTR: allowedAttrs,
+    ALLOWED_URI_REGEXP: ALLOWED_URI_RE,
   });
   // Remove disabled attr from checkboxes so they are interactive
   return sanitized.replace(/<input([^>]*)\bdisabled\b([^>]*)>/g, "<input$1$2>");

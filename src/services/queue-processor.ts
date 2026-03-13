@@ -1117,6 +1117,9 @@ class QueueProcessor {
       // agent-lessons module may not exist yet — non-fatal
     }
 
+    // Trust feedback is now baked directly into persona/skill markdown files
+    // by trust-refinement.ts — no runtime injection needed here.
+
     // Include previous error context for retries
     if (item.lastError) {
       sections.push(

@@ -9,6 +9,14 @@ export type DriveAccount = {
   label: string;
 };
 
+export type SidebarResource = {
+  id: string;
+  title: string;
+  type: string;
+  pinned: boolean;
+  createdAt: string;
+};
+
 export type MarkdownSidebarProps = {
   content: string | null;
   error: string | null;
@@ -27,6 +35,12 @@ export type MarkdownSidebarProps = {
   onToggleDrivePicker?: () => void;
   /** Whether a Drive upload is currently in progress. */
   driveUploading?: boolean;
+  /** Resource metadata if this file is already registered. */
+  resource?: SidebarResource | null;
+  /** Callback to save file as a resource. */
+  onSaveAsResource?: (filePath: string, title: string) => void;
+  /** Callback to toggle pin on a resource. */
+  onToggleResourcePin?: (id: string, pinned: boolean) => void;
 };
 
 const MARKDOWN_EXTENSIONS = new Set(["md", "markdown", "mdx"]);
@@ -301,7 +315,40 @@ export function renderMarkdownSidebar(props: MarkdownSidebarProps) {
           </button>
         </div>
       </div>
+      ${renderResourceBar(props)}
       <div class="sidebar-content">${renderBody(props)}</div>
     </div>
   `;
+}
+
+function renderResourceBar(props: MarkdownSidebarProps) {
+  if (props.resource) {
+    // File is already a registered resource — show metadata + pin toggle
+    return html`
+      <div class="sidebar-resource-bar">
+        <span class="resource-type-badge">${props.resource.type.replace("_", " ")}</span>
+        <span style="flex: 1;">${props.resource.title}</span>
+        <button
+          class="sidebar-pin-btn${props.resource.pinned ? " pinned" : ""}"
+          title=${props.resource.pinned ? "Unpin" : "Pin"}
+          @click=${() => props.onToggleResourcePin?.(props.resource!.id, !props.resource!.pinned)}
+        >${props.resource.pinned ? "★" : "☆"}</button>
+      </div>
+    `;
+  }
+
+  if (props.filePath && props.onSaveAsResource) {
+    // File is NOT a resource yet — show "Save as Resource" button
+    const title = props.title?.trim() || basenamePath(props.filePath);
+    return html`
+      <div class="sidebar-resource-bar">
+        <button
+          class="sidebar-save-resource-btn"
+          @click=${() => props.onSaveAsResource!(props.filePath!, title)}
+        >Save as Resource</button>
+      </div>
+    `;
+  }
+
+  return nothing;
 }

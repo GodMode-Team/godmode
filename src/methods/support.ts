@@ -65,7 +65,8 @@ export async function logExchangeInternal(
   const logFile = join(CONVERSATIONS_DIR, `${dateStr}.md`);
   await secureMkdir(CONVERSATIONS_DIR);
 
-  const label = role === "user" ? "Customer" : "Atlas";
+  const { getAllyName } = await import("../lib/ally-identity.js");
+  const label = role === "user" ? "Customer" : getAllyName();
   const entry = `### ${timeStr()} — ${label}\n${content.trim()}\n\n`;
 
   let existing = "";

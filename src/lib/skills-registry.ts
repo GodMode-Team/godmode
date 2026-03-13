@@ -23,6 +23,7 @@ import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { join, basename, dirname } from "node:path";
 import { MEMORY_DIR, DATA_DIR } from "../data-paths.js";
 import { getVaultPath, VAULT_FOLDERS } from "./vault-paths.js";
+import { getAllyName } from "./ally-identity.js";
 import type { QueueItemType } from "./queue-state.js";
 
 // ── Types ────────────────────────────────────────────────────────
@@ -109,7 +110,7 @@ function parseSkillFile(filePath: string): SkillProfile | null {
       persona: meta.persona || undefined,
       taskType,
       priority,
-      body: body.trim(),
+      body: body.trim().replaceAll("{{ALLY_NAME}}", getAllyName()),
     };
   } catch {
     return null;

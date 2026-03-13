@@ -41,7 +41,8 @@ export type MissionControlProps = {
   onOpenSession?: (sessionKey: string) => void;
   onOpenTaskSession?: (taskId: string) => void;
   onStartQueueItem?: (itemId: string) => void;
-  onAskProsper?: () => void;
+  onAskAlly?: () => void;
+  allyName?: string;
   onViewTaskFiles?: (itemId: string) => void;
 };
 
@@ -366,12 +367,12 @@ function renderQueueDepthHint(items: QueueItemRpc[]) {
   return html`<div class="mc-queue-depth-text">${pending.length} more queued</div>`;
 }
 
-function renderIdleCta(onAskProsper?: () => void) {
-  if (!onAskProsper) return nothing;
+function renderIdleCta(onAskAlly?: () => void, allyName = "Ally") {
+  if (!onAskAlly) return nothing;
   return html`
     <div class="mc-idle-cta">
-      <p>Prosper is idle.</p>
-      <button class="mc-open-session-btn" @click=${onAskProsper}>Ask Prosper what to work on</button>
+      <p>${allyName} is idle.</p>
+      <button class="mc-open-session-btn" @click=${onAskAlly}>Ask ${allyName} what to work on</button>
     </div>
   `;
 }
@@ -532,7 +533,7 @@ export function renderMissionControl(props: MissionControlProps) {
           ${renderQueueDepthHint(data.queueItems)}
 
           ${data.stats.activeNow === 0 && data.stats.queueDepth === 0
-            ? renderIdleCta(props.onAskProsper)
+            ? renderIdleCta(props.onAskAlly, props.allyName)
             : nothing}
 
           ${renderActivityFeed(data.activityFeed, false, props.onViewDetail, true)}

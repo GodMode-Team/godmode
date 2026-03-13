@@ -66,6 +66,18 @@ export async function loadSecondBrain(state: SecondBrainState): Promise<void> {
   // Always load vault health alongside the current subtab
   loadVaultHealth(state).catch(() => {});
 
+  // Pre-fetch sources + memory bank for context health score (non-blocking, skip if already loaded)
+  if (!state.secondBrainSourcesData) {
+    state.client.request<SecondBrainSourcesData>("secondBrain.sources", {})
+      .then(r => { state.secondBrainSourcesData = r; })
+      .catch(() => {});
+  }
+  if (!state.secondBrainMemoryBank) {
+    state.client.request<SecondBrainMemoryBankData>("secondBrain.memoryBank", {})
+      .then(r => { state.secondBrainMemoryBank = r; })
+      .catch(() => {});
+  }
+
   try {
     if (subtab === "identity") {
       const result = await state.client.request<SecondBrainIdentityData>("secondBrain.identity", {});

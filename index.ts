@@ -16,6 +16,7 @@
  */
 
 import { existsSync, readFileSync } from "node:fs";
+import { homedir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk";
@@ -62,6 +63,7 @@ import { supportHandlers } from "./src/methods/support.js";
 import { fathomWebhookHandlers } from "./src/methods/fathom-webhook.js";
 import { authHandlers } from "./src/methods/auth.js";
 import { sessionPrivacyHandlers } from "./src/methods/session-privacy.js";
+import { resourcesHandlers } from "./src/methods/resources.js";
 
 // Extracted modules
 import { initLicenseFromConfig, withLicenseGate, getLicenseState } from "./src/lib/license.js";
@@ -135,6 +137,7 @@ const godmodePlugin = {
       ...queueHandlers, ...dashboardsHandlers, ...supportHandlers,
       ...xIntelHandlers, ...filesHandlers, ...integrationsHandlers,
       ...fathomWebhookHandlers, ...authHandlers, ...sessionPrivacyHandlers,
+      ...resourcesHandlers,
     };
 
     for (const [method, handler] of Object.entries(allHandlers)) {
@@ -222,65 +225,91 @@ const godmodePlugin = {
         return;
       }
       try {
-        const sessionsRes = await (api as any).request("sessions.list", { limit: 200 }) as {
-          sessions?: Array<{ key: string; label?: string; displayName?: string }>;
-        } | null;
-        const sessions = sessionsRes?.sessions ?? [];
-        if (sessions.length === 0) {
+        // Read session index directly from the filesystem (plugin API has no request() method)
+        const stateDir = process.env.OPENCLAW_STATE_DIR || join(homedir(), ".openclaw");
+        const agentSessionsDir = join(stateDir, "agents", "main", "sessions");
+        const sessionsIndexPath = join(agentSessionsDir, "sessions.json");
+        if (!existsSync(sessionsIndexPath)) {
           respond(true, { ts: Date.now(), results: [] });
           return;
         }
 
-        const CONCURRENCY = 10;
+        const sessionsIndex = JSON.parse(readFileSync(sessionsIndexPath, "utf-8")) as Record<string, {
+          sessionId?: string;
+          sessionFile?: string;
+          updatedAt?: number;
+          displayName?: string;
+        }>;
+
+        const sessionEntries = Object.entries(sessionsIndex)
+          .map(([key, meta]) => ({ key, ...meta }))
+          .sort((a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0))
+          .slice(0, 200); // cap to avoid scanning too many
+
+        if (sessionEntries.length === 0) {
+          respond(true, { ts: Date.now(), results: [] });
+          return;
+        }
+
         const results: Array<{
           key: string; label?: string; displayName?: string;
           matches: Array<{ role: string; text: string; timestamp?: number }>;
         }> = [];
 
-        for (let i = 0; i < sessions.length && results.length < limit; i += CONCURRENCY) {
-          const batch = sessions.slice(i, i + CONCURRENCY);
-          const batchResults = await Promise.allSettled(
-            batch.map(async (s) => {
-              const nameMatch = [s.label, s.displayName, s.key]
-                .filter(Boolean)
-                .some((f) => f!.toLowerCase().includes(query));
+        for (const s of sessionEntries) {
+          if (results.length >= limit) break;
 
-              const histRes = await (api as any).request("chat.history", {
-                sessionKey: s.key, limit: 50,
-              }) as { messages?: Array<{ role: string; content: string; timestamp?: number }> } | null;
-              const messages = histRes?.messages ?? [];
+          const nameMatch = [s.displayName, s.key]
+            .filter(Boolean)
+            .some((f) => f!.toLowerCase().includes(query));
 
-              const contentMatches: Array<{ role: string; text: string; timestamp?: number }> = [];
-              for (const msg of messages) {
-                const text = typeof msg.content === "string" ? msg.content : "";
-                const clean = text
-                  .replace(/<system-context>[\s\S]*?<\/system-context>/g, "")
-                  .replace(/<system-reminder>[\s\S]*?<\/system-reminder>/g, "")
-                  .replace(/<[a-z][a-z_-]*>[\s\S]*?<\/[a-z][a-z_-]*>/g, "");
-                if (clean.toLowerCase().includes(query)) {
-                  const idx = clean.toLowerCase().indexOf(query);
-                  const start = Math.max(0, idx - 40);
-                  const end = Math.min(clean.length, idx + query.length + 60);
-                  const snippet = (start > 0 ? "..." : "") +
-                    clean.slice(start, end).replace(/\n/g, " ").trim() +
-                    (end < clean.length ? "..." : "");
-                  contentMatches.push({ role: msg.role, text: snippet, timestamp: msg.timestamp });
-                }
-                if (contentMatches.length >= 3) break;
-              }
-
-              if (nameMatch || contentMatches.length > 0) {
-                return { key: s.key, label: s.label, displayName: s.displayName, matches: contentMatches };
-              }
-              return null;
-            }),
-          );
-
-          for (const r of batchResults) {
-            if (r.status === "fulfilled" && r.value) {
-              results.push(r.value);
-              if (results.length >= limit) break;
+          // Resolve the session JSONL file path
+          const sessionFile = s.sessionFile
+            ?? (s.sessionId ? join(agentSessionsDir, `${s.sessionId}.jsonl`) : null);
+          if (!sessionFile || !existsSync(sessionFile)) {
+            if (nameMatch) {
+              results.push({ key: s.key, displayName: s.displayName, matches: [] });
             }
+            continue;
+          }
+
+          // Read and search session content
+          const contentMatches: Array<{ role: string; text: string; timestamp?: number }> = [];
+          try {
+            const raw = readFileSync(sessionFile, "utf-8");
+            const lines = raw.split("\n");
+            for (const line of lines) {
+              if (!line.trim()) continue;
+              let entry: any;
+              try { entry = JSON.parse(line); } catch { continue; }
+              if (entry.type !== "message" || !entry.message) continue;
+              const msg = entry.message;
+              const content = typeof msg.content === "string"
+                ? msg.content
+                : Array.isArray(msg.content)
+                  ? msg.content.filter((b: any) => b.type === "text").map((b: any) => b.text).join(" ")
+                  : "";
+              const clean = content
+                .replace(/<system-context>[\s\S]*?<\/system-context>/g, "")
+                .replace(/<system-reminder>[\s\S]*?<\/system-reminder>/g, "")
+                .replace(/<[a-z][a-z_-]*>[\s\S]*?<\/[a-z][a-z_-]*>/g, "");
+              if (clean.toLowerCase().includes(query)) {
+                const idx = clean.toLowerCase().indexOf(query);
+                const start = Math.max(0, idx - 40);
+                const end = Math.min(clean.length, idx + query.length + 60);
+                const snippet = (start > 0 ? "..." : "") +
+                  clean.slice(start, end).replace(/\n/g, " ").trim() +
+                  (end < clean.length ? "..." : "");
+                contentMatches.push({ role: msg.role, text: snippet, timestamp: entry.timestamp ? new Date(entry.timestamp).getTime() : undefined });
+              }
+              if (contentMatches.length >= 3) break;
+            }
+          } catch {
+            // Unreadable session file — skip content search
+          }
+
+          if (nameMatch || contentMatches.length > 0) {
+            results.push({ key: s.key, displayName: s.displayName, matches: contentMatches });
           }
         }
 

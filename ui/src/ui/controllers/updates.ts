@@ -16,6 +16,7 @@ type GodModeUpdateCheckResult = {
     latest: string | null;
     updateAvailable: boolean;
   };
+  pendingDeploy: { summary: string; ts: number; files?: string[] } | null;
   fetchOk: boolean;
 };
 
@@ -30,6 +31,7 @@ function mapToUpdateStatus(result: GodModeUpdateCheckResult) {
     pluginVersion: result.plugin.version,
     pluginLatest: result.plugin.latest,
     pluginUpdateAvailable: result.plugin.updateAvailable,
+    pendingDeploy: result.pendingDeploy ?? null,
     fetchOk: result.fetchOk,
   };
 }
@@ -46,6 +48,7 @@ function mapLegacyStatus(result: Record<string, unknown>) {
     pluginVersion: "unknown",
     pluginLatest: null,
     pluginUpdateAvailable: false,
+    pendingDeploy: null as { summary: string; ts: number; files?: string[] } | null,
     fetchOk: result.fetchOk as boolean | null,
   };
 }

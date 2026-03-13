@@ -23,7 +23,7 @@ const MULTI_SIGNAL_PATTERNS = [
   "persistence protocol",
   "core principles:",
   "core behaviors",
-  "your role as prosper",
+  "your role as ",
   "be diligent first time",
   "exhaust reasonable options",
   "assume capability exists",
@@ -63,7 +63,7 @@ export function isSystemPromptNoise(msg: Record<string, unknown>): boolean {
   if (t === "NO_REPLY" || t.startsWith("NO_REPLY\n")) return true;
 
   // Consciousness / system file dumps
-  if (/^#\s*(?:🧠|Atlas Consciousness)/i.test(t)) return true;
+  if (/^#\s*(?:🧠|\w+ Consciousness)/i.test(t)) return true;
   if (t.startsWith("# WORKING.md") || t.startsWith("# MISTAKES.md")) return true;
 
   // Verification checklists / consciousness dump mid-stream
@@ -81,7 +81,7 @@ export function isSystemPromptNoise(msg: Record<string, unknown>): boolean {
   // Persistence protocol / persona blocks
   if (/^##?\s*Persistence Protocol/i.test(t)) return true;
   if (/^##?\s*Core (?:Behaviors|Principles)/i.test(t)) return true;
-  if (/^##?\s*Your Role as Prosper/i.test(t)) return true;
+  if (/^##?\s*Your Role as \w+/i.test(t)) return true;
 
   // Agent roster dump (entire message is roster)
   if (/^##\s*Your Team\s*\(Agent Roster\)/i.test(t) && t.indexOf("\n\n## ") === -1) return true;

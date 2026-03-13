@@ -39,13 +39,13 @@ This document describes the log directory structure for GodMode remote support.
 ### HH:MM - Chat
 
 **Customer:** [verbatim message]
-**Atlas:** [verbatim response]
+**{{ALLY_NAME}}:** [verbatim response]
 **Resolution:** [outcome: resolved | ongoing | escalated]
 
 ### HH:MM - Chat
 
 **Customer:** [message]
-**Atlas:** [response]
+**{{ALLY_NAME}}:** [response]
 **Resolution:** [outcome]
 ```
 

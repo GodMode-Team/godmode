@@ -16,7 +16,7 @@ function renderGroup(message: unknown): HTMLDivElement {
   render(
     renderMessageGroup(group, {
       showReasoning: false,
-      assistantName: "Atlas",
+      assistantName: "TestAlly",
       userName: "TestUser",
     }),
     container,

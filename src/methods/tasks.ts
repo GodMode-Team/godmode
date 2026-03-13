@@ -1123,4 +1123,31 @@ export const tasksHandlers: GatewayRequestHandlers = {
   "tasks.markDoneByTitle": markDoneByTitle,
 };
 
+/**
+ * Ensure all today's pending tasks have session keys pre-created.
+ * Returns task id → sessionId map.
+ */
+export async function ensureTaskSessions(
+  date?: string,
+): Promise<Array<{ id: string; title: string; sessionId: string }>> {
+  const today = date ?? localDateString();
+
+  const { result } = await updateTasks((data) => {
+    const results: Array<{ id: string; title: string; sessionId: string }> = [];
+    for (const task of data.tasks) {
+      if (task.status !== "pending") continue;
+      if (task.dueDate !== today) continue;
+
+      if (!task.sessionId) {
+        const uuid = randomUUID();
+        task.sessionId = `agent:main:webchat-${uuid.slice(0, 8)}`;
+      }
+      results.push({ id: task.id, title: task.title, sessionId: task.sessionId });
+    }
+    return results;
+  });
+
+  return result;
+}
+
 export { syncTeamTasks, type NativeTask, type TasksData };

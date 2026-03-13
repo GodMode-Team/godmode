@@ -1,5 +1,6 @@
 import type { GatewayBrowserClient } from "../gateway";
 import type { AgentsListResult } from "../types";
+import type { RosterAgent } from "../views/agents";
 
 export type AgentsState = {
   client: GatewayBrowserClient | null;
@@ -7,6 +8,14 @@ export type AgentsState = {
   agentsLoading: boolean;
   agentsError: string | null;
   agentsList: AgentsListResult | null;
+};
+
+export type RosterState = {
+  client: GatewayBrowserClient | null;
+  connected: boolean;
+  rosterLoading: boolean;
+  rosterError: string | null;
+  rosterData: RosterAgent[];
 };
 
 export async function loadAgents(state: AgentsState) {
@@ -21,5 +30,20 @@ export async function loadAgents(state: AgentsState) {
     state.agentsError = String(err);
   } finally {
     state.agentsLoading = false;
+  }
+}
+
+export async function loadRoster(state: RosterState) {
+  if (!state.client || !state.connected) return;
+  if (state.rosterLoading) return;
+  state.rosterLoading = true;
+  state.rosterError = null;
+  try {
+    const res = await state.client.request<{ roster: RosterAgent[] }>("queue.roster", {});
+    if (res?.roster) state.rosterData = res.roster;
+  } catch (err) {
+    state.rosterError = String(err);
+  } finally {
+    state.rosterLoading = false;
   }
 }
