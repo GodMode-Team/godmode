@@ -87,7 +87,7 @@ try {
   console.log(`   ✓ Issue: ${issue.id?.slice(0, 8)} "${issue.title}" → ${eng.name}`);
 
   // Verify we can read it back
-  const readProject = await api("GET", `/api/companies/${company.id}/projects/${project.id}`);
+  const readProject = await api("GET", `/api/projects/${project.id}`);
   console.log(`   ✓ Read back: "${readProject.name}" status=${readProject.status}`);
 
   console.log("5. Shutting down...");
