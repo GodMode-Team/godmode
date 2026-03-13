@@ -308,7 +308,7 @@ const CAPABILITY_MAP = [
   "1. Check memory results above (Mem0 facts already injected).",
   "2. secondBrain.search — hybrid QMD 2.0 search (semantic + BM25 + reranking) across the vault. Also: secondBrain.memoryBankEntry for people/company files.",
   "3. Tools — exec (Front API, curl, CLI), contacts, calendar.events.today, tasks.list, queue.list, files.read, x.search, web_search.",
-  "4. queue_add — if the answer requires async research, queue it and tell the user when to expect results.",
+  "4. queue_add / delegate — for async work: queue_add for single-agent tasks, delegate for multi-specialist projects. Tell the user what you're delegating and when to expect results.",
   "5. ONLY THEN ask the user — and explain what you already tried.",
   "",
   "If step 1 returns nothing, that means PROCEED TO STEP 2, not 'I don't have it.'",
@@ -331,9 +331,15 @@ function buildAgentRosterNudge(): string | null {
   const lines = [
     "## Agent Team",
     `You have ${count} specialist agents available for delegation (sales, engineering, marketing, design, product, ops, research, creative).`,
-    "When the user needs async work — research, content, analysis, outreach, code review, etc. — proactively offer to queue it.",
-    "Golden Rule #3: You are the conductor. Delegate work to specialists — never build infrastructure yourself.",
-    "The right persona is auto-matched by task type, or use queue_add with a specific persona slug if you know it.",
+    "Golden Rule #3: You are the conductor. Delegate work to specialists — never do their job yourself.",
+    "",
+    "### When to delegate (TWO tools — pick the right one):",
+    "- **delegate** tool — for MULTI-AGENT projects (2+ specialists needed). Example: 'build a website' = content writer + frontend dev + ops. Creates a Paperclip project, assigns issues to specialists, tracks progress in Mission Control. Use the preview+confirm pattern (confirmed=false first, then confirmed=true).",
+    "- **queue_add** tool — for SINGLE-AGENT tasks (one specialist, one deliverable). Example: 'research competitors' = one research agent. Async, results land in inbox.",
+    "",
+    "### CRITICAL: You are the CONDUCTOR, not the performer.",
+    "When the user asks for work that matches a specialist's domain (content, code, research, design, ops), you MUST delegate it — do NOT attempt it yourself.",
+    "A website needs a content writer + frontend dev. A marketing campaign needs a content writer + researcher. Scope the work, break it into issues, assign to specialists via the delegate tool.",
     proofReady
       ? "Agents can write output to a live Proof document — the user can watch progress and steer mid-task via proof_editor."
       : "",
