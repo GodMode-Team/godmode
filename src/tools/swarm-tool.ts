@@ -25,10 +25,12 @@ export function createDelegateTool(): AnyAgentTool {
       "Delegate complex work to the agent team. " +
       "Use this when a task needs multiple specialists (research, content, design, engineering, etc.) " +
       "or would take too long to handle inline. " +
-      "For 'delegate' action: present the scoped brief first (confirmed=false), " +
-      "then call again with confirmed=true after user approval. " +
+      "DELEGATION FLOW: Step 1 — call with action='delegate', confirmed=false to get a preview. " +
+      "Step 2 — present the brief to the user. " +
+      "Step 3 — when user approves (says 'go', 'yes', 'do it', etc.), call AGAIN with action='delegate', confirmed=true and THE SAME title/description/issues. " +
+      "CRITICAL: 'go' means EXECUTE (confirmed=true), NOT check status. " +
       "All agents write output to files. If Proof is available, a shared doc is created for live collaboration. " +
-      "Actions: delegate, status, steer, cancel, projects, team.",
+      "Actions: delegate (create project), status (check progress), steer (send feedback), cancel, projects (list all), team (show roster).",
     parameters: {
       type: "object" as const,
       properties: {
@@ -133,8 +135,20 @@ export function createDelegateTool(): AnyAgentTool {
         }
 
         case "status": {
-          const projectId = params.projectId as string | undefined;
-          if (!projectId) return jsonResult({ error: "Missing projectId." });
+          let projectId = params.projectId as string | undefined;
+          if (!projectId) {
+            // Auto-select most recent project if only one exists or none specified
+            const projects = adapter!.listProjects();
+            if (projects.length === 0) return jsonResult({ error: "No active projects." });
+            if (projects.length === 1) {
+              projectId = projects[0].projectId;
+            } else {
+              return jsonResult({
+                error: "Multiple projects active. Specify projectId.",
+                projects: projects.map(p => ({ projectId: p.projectId, title: p.title })),
+              });
+            }
+          }
           const status = await adapter!.getStatus(projectId);
           if (!status) return jsonResult({ error: `Project not found: ${projectId}` });
           return jsonResult(status);
