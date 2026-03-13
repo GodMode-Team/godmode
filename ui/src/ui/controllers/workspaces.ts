@@ -563,17 +563,18 @@ export async function loadAllTasksWithQueueStatus(
     // Build sourceTaskId → queue status map
     const queueByTask = new Map<
       string,
-      { status: "processing" | "review" | "failed"; type: string; roleName: string; queueItemId: string }
+      { status: "processing" | "review" | "needs-review" | "failed"; type: string; roleName: string; queueItemId: string }
     >();
     for (const qi of queueResult.items) {
       if (!qi.sourceTaskId) continue;
       if (
         qi.status === "processing" ||
         qi.status === "review" ||
+        qi.status === "needs-review" ||
         qi.status === "failed"
       ) {
         queueByTask.set(qi.sourceTaskId, {
-          status: qi.status as "processing" | "review" | "failed",
+          status: (qi.status === "needs-review" ? "review" : qi.status) as "processing" | "review" | "failed",
           type: qi.type,
           roleName: AGENT_ROLE_NAMES[qi.type] ?? qi.type,
           queueItemId: qi.id,

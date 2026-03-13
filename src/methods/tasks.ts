@@ -342,6 +342,26 @@ const updateTask: GatewayRequestHandler = async ({ params, respond }) => {
     }
   }
 
+  // Runtime validation for enum fields
+  if ("status" in updates && updates.status !== undefined) {
+    if (updates.status !== "pending" && updates.status !== "complete") {
+      respond(false, null, { code: "INVALID_REQUEST", message: `Invalid status "${updates.status}". Must be "pending" or "complete".` });
+      return;
+    }
+  }
+  if ("priority" in updates && updates.priority !== undefined) {
+    if (!["high", "medium", "low"].includes(updates.priority)) {
+      respond(false, null, { code: "INVALID_REQUEST", message: `Invalid priority "${updates.priority}". Must be "high", "medium", or "low".` });
+      return;
+    }
+  }
+  if ("source" in updates && updates.source !== undefined) {
+    if (!["chat", "cron", "import"].includes(updates.source)) {
+      respond(false, null, { code: "INVALID_REQUEST", message: `Invalid source "${updates.source}".` });
+      return;
+    }
+  }
+
   const { result: task } = await updateTasks((data) => {
     const idx = data.tasks.findIndex((t) => t.id === id);
     if (idx === -1) return null;

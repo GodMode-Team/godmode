@@ -5,6 +5,7 @@ import path from "node:path";
 import { promisify } from "node:util";
 import type { GatewayRequestHandler } from "openclaw/plugin-sdk";
 import { readQueueState } from "../lib/queue-state.js";
+import { isAllowedPath } from "../lib/vault-paths.js";
 import { readWorkspaceConfig } from "../lib/workspaces-config.js";
 
 const execFile = promisify(execFileCb);
@@ -353,14 +354,11 @@ const readFile: GatewayRequestHandler = async ({ params, respond }) => {
     return;
   }
 
-  // SECURITY: Validate path is within user's home directory, resolving symlinks.
-  // files.read is local-only (sidebar display) so HOME is the safe boundary.
-  // Drive uploads use the stricter isAllowedPath (godmode root + vault + workspaces).
+  // SECURITY: Validate path is within GodMode-owned dirs, vault, or workspaces.
+  // Resolves symlinks before checking to prevent traversal via symlink.
   const resolvedPath = path.resolve(filePath);
   const realPath = await fs.realpath(resolvedPath).catch(() => resolvedPath);
-  const homeDir = process.env.HOME || process.env.USERPROFILE || "";
-  const homePrefix = homeDir.endsWith(path.sep) ? homeDir : homeDir + path.sep;
-  if (!homeDir || (!realPath.startsWith(homePrefix) && realPath !== homeDir)) {
+  if (!isAllowedPath(realPath)) {
     respond(false, null, { code: "ACCESS_DENIED", message: "Path not allowed" });
     return;
   }

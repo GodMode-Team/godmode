@@ -8,8 +8,8 @@
  * Also provides error message sanitization for user-facing responses.
  */
 
-import { writeFile as _writeFile, mkdir as _mkdir } from "node:fs/promises";
-import { writeFileSync as _writeFileSync, mkdirSync as _mkdirSync } from "node:fs";
+import { writeFile as _writeFile, rename as _rename, mkdir as _mkdir } from "node:fs/promises";
+import { writeFileSync as _writeFileSync, renameSync as _renameSync, mkdirSync as _mkdirSync } from "node:fs";
 import { homedir } from "node:os";
 
 const FILE_MODE = 0o600;
@@ -17,22 +17,28 @@ const DIR_MODE = 0o700;
 
 // ── Secure file write ────────────────────────────────────────────────
 
-/** Write a file with owner-only permissions (0o600). */
+/** Write a file atomically with owner-only permissions (0o600).
+ *  Writes to a .tmp sibling then renames into place so a crash mid-write
+ *  never corrupts the target file. */
 export async function secureWriteFile(
   filePath: string,
   data: string,
   encoding: BufferEncoding = "utf-8",
 ): Promise<void> {
-  await _writeFile(filePath, data, { encoding, mode: FILE_MODE });
+  const tmp = filePath + ".tmp";
+  await _writeFile(tmp, data, { encoding, mode: FILE_MODE });
+  await _rename(tmp, filePath);
 }
 
-/** Synchronous write with owner-only permissions (0o600). */
+/** Synchronous atomic write with owner-only permissions (0o600). */
 export function secureWriteFileSync(
   filePath: string,
   data: string,
   encoding: BufferEncoding = "utf-8",
 ): void {
-  _writeFileSync(filePath, data, { encoding, mode: FILE_MODE });
+  const tmp = filePath + ".tmp";
+  _writeFileSync(tmp, data, { encoding, mode: FILE_MODE });
+  _renameSync(tmp, filePath);
 }
 
 // ── Secure directory creation ────────────────────────────────────────
