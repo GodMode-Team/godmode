@@ -428,7 +428,10 @@ export class PaperclipAdapter {
     await this.saveState();
 
     // ── Execute: wake agents via Paperclip or fall back to queue-processor ──
-    const usePaperclipExecution = process.env.GODMODE_PAPERCLIP_EXECUTE !== "false"
+    // Native Paperclip execution requires device pairing (openclaw_gateway adapter).
+    // Default to queue-processor fallback until pairing is automated.
+    // Set GODMODE_PAPERCLIP_EXECUTE=true to opt in to native execution.
+    const usePaperclipExecution = process.env.GODMODE_PAPERCLIP_EXECUTE === "true"
       && this.state.adapterConfigured;
 
     if (usePaperclipExecution) {
