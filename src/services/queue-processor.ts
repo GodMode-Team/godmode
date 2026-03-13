@@ -334,16 +334,25 @@ class QueueProcessor {
       );
     }
 
-    // Mark item as processing and store the prompt for later session context
+    // Mark item as processing and store the prompt for later session context.
+    // Re-check status is still "pending" to prevent TOCTOU race when multiple
+    // callers (heartbeat + poll) invoke processAllPending concurrently.
+    let claimed = false;
     await updateQueueState((state) => {
       const qi = state.items.find((i) => i.id === item.id);
-      if (qi) {
+      if (qi && qi.status === "pending") {
         qi.status = "processing";
         qi.startedAt = Date.now();
         qi.agentPrompt = prompt;
         qi.engine = effectiveEngine;
+        claimed = true;
       }
     });
+
+    if (!claimed) {
+      this.logger.info(`[GodMode][Queue] Item "${item.title}" already claimed, skipping`);
+      return { spawned: false };
+    }
 
     const { bin: agentBin, args: agentArgs } = buildSpawnArgs(effectiveEngine, prompt);
     const env = buildChildEnv();
@@ -592,6 +601,25 @@ class QueueProcessor {
       personaHint: personaSlug,
       askTrustRating: !!personaSlug,
     });
+
+    // Push to universal inbox (background agent work always goes to inbox)
+    try {
+      const { addInboxItem } = await import("./inbox.js");
+      await addInboxItem({
+        type: "agent-execution",
+        title: completedItem?.title ?? itemId,
+        summary: summary.slice(0, 300),
+        source: {
+          persona: personaSlug,
+          queueItemId: itemId,
+          taskId: completedItem?.sourceTaskId,
+        },
+        proofDocSlug: completedItem?.proofDocSlug,
+        outputPath: outPath,
+      });
+    } catch (err) {
+      this.logger.warn(`[GodMode][Queue] Inbox push failed for ${itemId}: ${String(err)}`);
+    }
 
     // Notify Ally chat so the user sees a notification in real-time
     try {
@@ -1084,7 +1112,7 @@ class QueueProcessor {
 
       // Today's daily brief — current priorities and context
       try {
-        const today = new Date().toISOString().slice(0, 10);
+        const today = localDateString();
         const vault = getVaultPath();
         if (vault) {
           const dailyDir = path.join(vault, VAULT_FOLDERS.daily);

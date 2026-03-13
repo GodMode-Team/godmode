@@ -68,6 +68,8 @@ export type QueueItem = {
   engine?: "claude" | "codex" | "gemini";
   /** Whether this item needs human approval before processing */
   needsApproval?: boolean;
+  /** Slug of the Proof document for live co-editing output */
+  proofDocSlug?: string;
   /** Structured handoff context from a predecessor agent */
   handoff?: {
     fromAgent: string;

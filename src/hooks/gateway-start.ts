@@ -287,6 +287,25 @@ export async function runGatewayStart(
     logger.warn(`[GodMode] Queue processor failed to init: ${String(err)}`);
   }
 
+  // Universal inbox broadcast hook
+  try {
+    const { setInboxBroadcast } = await import("../services/inbox.js");
+    setInboxBroadcast((event: string, data: unknown) => safeBroadcast(api, event, data));
+    logger.info("[GodMode] Universal inbox initialized");
+  } catch (err) {
+    logger.warn(`[GodMode] Inbox broadcast setup failed: ${String(err)}`);
+  }
+
+  // Proof document server
+  try {
+    const { startProofServer, stopProofServer } = await import("../services/proof-server.js");
+    await startProofServer(logger);
+    serviceCleanup.push({ name: "proof-server", fn: () => stopProofServer() });
+    logger.info("[GodMode] Proof document server started");
+  } catch (err) {
+    logger.warn(`[GodMode] Proof server failed to start: ${String(err)}`);
+  }
+
   // Obsidian Sync
   try {
     const { initObsidianSync, stopObsidianSync } = await import("../services/obsidian-sync.js");

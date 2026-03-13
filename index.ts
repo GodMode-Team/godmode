@@ -52,6 +52,8 @@ import { createTrustRateTool } from "./src/tools/trust-rate.js";
 import { createXReadTool } from "./src/tools/x-read.js";
 import { createSelfRepairTool } from "./src/tools/self-repair.js";
 import { createTasksCreateTool, createTasksListTool, createTasksUpdateTool } from "./src/tools/tasks-tool.js";
+import { createProofEditorTool } from "./src/tools/proof-tool.js";
+import { createQueueSteerTool } from "./src/tools/queue-steer.js";
 import { queueHandlers } from "./src/methods/queue.js";
 import { xIntelHandlers } from "./src/methods/x-intel.js";
 import { filesHandlers } from "./src/methods/files.js";
@@ -64,6 +66,7 @@ import { fathomWebhookHandlers } from "./src/methods/fathom-webhook.js";
 import { authHandlers } from "./src/methods/auth.js";
 import { sessionPrivacyHandlers } from "./src/methods/session-privacy.js";
 import { resourcesHandlers } from "./src/methods/resources.js";
+import { inboxHandlers } from "./src/services/inbox.js";
 
 // Extracted modules
 import { initLicenseFromConfig, withLicenseGate, getLicenseState } from "./src/lib/license.js";
@@ -138,6 +141,7 @@ const godmodePlugin = {
       ...xIntelHandlers, ...filesHandlers, ...integrationsHandlers,
       ...fathomWebhookHandlers, ...authHandlers, ...sessionPrivacyHandlers,
       ...resourcesHandlers,
+      ...inboxHandlers,
     };
 
     for (const [method, handler] of Object.entries(allHandlers)) {
@@ -453,6 +457,8 @@ const godmodePlugin = {
     api.registerTool(() => createTasksCreateTool());
     api.registerTool(() => createTasksListTool());
     api.registerTool(() => createTasksUpdateTool());
+    api.registerTool(() => createProofEditorTool());
+    api.registerTool(() => createQueueSteerTool());
 
     // ── 7. CLI commands ───────────────────────────────────────────
     api.registerCli(
