@@ -282,6 +282,23 @@ export class PaperclipAdapter {
       }
     } catch { /* toolkit not available */ }
 
+    // ONE shared Proof doc per project — all agents write to their own sections
+    let projectProofSlug: string | undefined;
+    if (isProofRunning()) {
+      try {
+        const sectionHeaders = brief.issues.map((t, i) => `## ${i + 1}. ${t.title}\n\n*Assigned to: ${t.personaHint || "TBD"}*\n\n(Agent will write here)\n`).join("\n---\n\n");
+        const doc = await createProofDocument(
+          brief.title,
+          `# ${brief.title}\n\n${brief.description}\n\n---\n\n${sectionHeaders}`,
+          "ally",
+        );
+        projectProofSlug = doc.slug;
+        this.logger.info(`[Paperclip] Shared Proof doc created for project: ${doc.slug}`);
+      } catch (err) {
+        this.logger.warn(`[Paperclip] Proof doc creation failed for project "${brief.title}": ${String(err)}`);
+      }
+    }
+
     for (const task of brief.issues) {
       const assignee = this.findAgent(task.personaHint || "");
 
@@ -294,26 +311,11 @@ export class PaperclipAdapter {
         assigneeAgentId: assignee?.paperclipId ?? null,
       });
 
-      // Bridge: create a Proof doc for each issue
-      let proofDocSlug: string | undefined;
-      if (isProofRunning()) {
-        try {
-          const doc = await createProofDocument(
-            `${brief.title}: ${task.title}`,
-            `# ${task.title}\n\n${task.description}\n\n---\n*Project: ${brief.title} | Workspace: ${workspace}*\n`,
-            "ally",
-          );
-          proofDocSlug = doc.slug;
-        } catch (err) {
-          this.logger.warn(`[Paperclip] Proof doc creation failed for "${task.title}": ${String(err)}`);
-        }
-      }
-
       issueRecords.push({
         issueId: issue.id,
         title: task.title,
         personaSlug: assignee?.personaSlug ?? "unassigned",
-        proofDocSlug,
+        proofDocSlug: projectProofSlug, // All issues share the same project Proof doc
       });
     }
 

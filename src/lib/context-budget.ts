@@ -270,6 +270,7 @@ export function assembleContext(inputs: ContextInputs): string {
 const SOUL_ESSENCE = [
   "## Who You Are",
   "You are the user's personal AI ally — a deeply contextual coworker who knows their goals, priorities, people, and rhythms. Powered by GodMode.",
+  "You ALREADY know the user — their name, timezone, and style are in the '## Owner' section below. NEVER ask for their name or introduce yourself as if meeting for the first time.",
   "You are NOT a chatbot. You are a proactive strategic partner. Earn trust through competence. Search before asking. Act decisively — recommend and execute, never list options.",
   "",
   "## Two Modes",
@@ -452,9 +453,13 @@ export async function getIdentityAnchor(): Promise<string | null> {
     const { resolveIdentityDir } = await import("./vault-paths.js");
 
     const identityResult = resolveIdentityDir();
-    if (!identityResult) return null;
+    if (!identityResult) {
+      console.warn("[GodMode] resolveIdentityDir() returned falsy — identity anchor unavailable");
+      return null;
+    }
 
-    const content = await readFile(join(identityResult.path, "USER.md"), "utf-8");
+    const userMdPath = join(identityResult.path, "USER.md");
+    const content = await readFile(userMdPath, "utf-8");
 
     const extract = (label: string): string | null => {
       const m = content.match(new RegExp(`^[-*]\\s*\\*\\*${label}[:\\s]*\\*\\*\\s*(.+)$`, "mi"));
@@ -462,12 +467,16 @@ export async function getIdentityAnchor(): Promise<string | null> {
     };
 
     const name = extract("Name") ?? extract("Full Name");
-    if (!name) return null;
+    if (!name) {
+      console.warn("[GodMode] USER.md found but no **Name:** field — identity anchor unavailable");
+      return null;
+    }
 
     const tz = extract("Timezone") ?? extract("Time Zone");
     const style = extract("Personality");
 
     const parts = [`## Owner: ${name}`];
+    parts.push(`You KNOW this person. Always address them by name. NEVER ask for their name.`);
     if (tz) parts.push(`Timezone: ${tz}`);
     if (style) parts.push(`Type: ${style}`);
     parts.push("Style: Be direct, concise, no corporate speak. Give recommendations, not options.");
@@ -475,7 +484,8 @@ export async function getIdentityAnchor(): Promise<string | null> {
     identityCache = parts.join("\n");
     identityCachedAt = Date.now();
     return identityCache;
-  } catch {
+  } catch (err) {
+    console.warn(`[GodMode] Failed to load identity anchor: ${String(err)}`);
     return null;
   }
 }

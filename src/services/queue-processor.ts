@@ -730,6 +730,9 @@ class QueueProcessor {
         type: "queue-complete",
         title: completedItem?.title ?? itemId,
         summary: `Agent finished "${completedItem?.title ?? itemId}" — ready for review.`,
+        outputPreview: summary.slice(0, 500),
+        outputPath: outPath,
+        proofDocSlug: completedItem?.proofDocSlug,
         actions: [
           { label: "Review", action: "navigate", target: "today" },
           { label: "Approve", action: "rpc", method: "queue.approve", params: { id: itemId } },
@@ -1135,13 +1138,13 @@ class QueueProcessor {
         } else {
         sections.push(
           "",
-          "## Live Proof Document",
-          `Work live in the Proof doc while you think and write: ${proofUrl}`,
+          "## Live Proof Document (optional — file output is primary)",
+          `A shared Proof doc is available for this project: ${proofUrl}`,
           `Proof doc slug: ${item.proofDocSlug}`,
           `Proof API base: ${proofApi}`,
-          "Before drafting, write a short outline to the Proof doc. Update the doc after each major section or finding.",
-          "Re-read the Proof doc before each major update so you incorporate any human edits or Prosper steering comments.",
-          "When you finish, mirror the final markdown to the required output file path below.",
+          "You MAY write progress updates to the Proof doc, but your PRIMARY output MUST go to the file path above.",
+          "If Proof API calls fail, ignore them and continue working — write everything to the output file.",
+          "The output file is what gets reviewed. Proof is a live preview bonus, not a requirement.",
           "",
           "Example commands (use the Proof agent bridge API):",
           "```bash",

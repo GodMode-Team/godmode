@@ -27,7 +27,7 @@ export function createDelegateTool(): AnyAgentTool {
       "or would take too long to handle inline. " +
       "For 'delegate' action: present the scoped brief first (confirmed=false), " +
       "then call again with confirmed=true after user approval. " +
-      "Each issue gets a Proof doc where the assigned agent writes their deliverable. " +
+      "All agents write output to files. If Proof is available, a shared doc is created for live collaboration. " +
       "Actions: delegate, status, steer, cancel, projects, team.",
     parameters: {
       type: "object" as const,
@@ -57,7 +57,7 @@ export function createDelegateTool(): AnyAgentTool {
             },
             required: ["title", "description"],
           },
-          description: "Issues to create. Each becomes a task assigned to an agent with its own Proof doc.",
+          description: "Issues to create. Each becomes a task assigned to an agent. Agents write output to files (and optionally to a shared Proof doc).",
         },
         projectId: {
           type: "string",
