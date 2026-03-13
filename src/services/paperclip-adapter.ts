@@ -461,7 +461,13 @@ export class PaperclipAdapter {
             }
           }
         }
-      } catch { /* silent — poll retries next cycle */ }
+      } catch (err) {
+        this.logger.warn(`[Paperclip] Poll error for project ${project.projectId}: ${String(err)}`);
+        try {
+          const { health } = await import("../lib/health-ledger.js");
+          health.signal("paperclip-poll", false, { error: String(err), projectId: project.projectId });
+        } catch { /* health ledger not available */ }
+      }
     }
   }
 

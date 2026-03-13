@@ -350,6 +350,18 @@ export async function runGatewayStart(
     const paperclip = new PaperclipAdapter(logger);
     const started = await paperclip.init();
     if (started) {
+      // Wire completion callback so Paperclip issue completions surface to ally
+      paperclip.onCompletion((projectId, issueTitle, status) => {
+        logger.info(`[GodMode][Paperclip] Issue completed: "${issueTitle}" (${status}) in project ${projectId}`);
+        safeBroadcast(api, "ally:notification", {
+          type: "paperclip-complete",
+          title: issueTitle,
+          summary: `Agent finished "${issueTitle}" — status: ${status}. Ready for review.`,
+          actions: [
+            { label: "Review", action: "navigate", target: "today" },
+          ],
+        });
+      });
       serviceCleanup.push({ name: "paperclip", fn: () => paperclip.stop() });
       logger.info("[GodMode] Paperclip agent team started");
     } else {

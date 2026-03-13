@@ -382,6 +382,23 @@ class QueueProcessor {
       env.GEMINI_API_KEY = process.env.GEMINI_API_KEY;
     }
 
+    // Issue a toolkit token so the spawned agent can access GodMode knowledge systems
+    try {
+      const { createAgentToken } = await import("./agent-toolkit-server.js");
+      const tokenResult = createAgentToken({
+        agentId: item.personaHint ?? item.id,
+        workspaceId: item.workspaceId,
+        permissions: ["read"],
+      });
+      if (tokenResult) {
+        this.toolkitTokens.set(item.id, tokenResult.token);
+        env.GODMODE_TOOLKIT_TOKEN = tokenResult.token;
+        env.GODMODE_TOOLKIT_URL = tokenResult.baseUrl;
+      }
+    } catch {
+      // Toolkit server may not be running — agent continues without it
+    }
+
     try {
       const child = spawn(agentBin, agentArgs, {
         cwd: os.homedir(),
@@ -397,11 +414,40 @@ class QueueProcessor {
         updateQueueState((state) => {
           const qi = state.items.find((i) => i.id === item.id);
           if (qi) qi.pid = pid;
-        }).catch(() => {});
+        }).catch(() => {
+          // Retry once after 500ms — PID is critical for orphan detection
+          setTimeout(() => {
+            updateQueueState((state) => {
+              const qi = state.items.find((i) => i.id === item.id);
+              if (qi) qi.pid = pid;
+            }).catch((err) => {
+              this.logger.warn(`[GodMode][Queue] PID write failed for ${item.id}: ${String(err)}`);
+            });
+          }, 500);
+        });
       }
 
       // Set a timeout to kill long-running agents
       let exited = false;
+
+      // Intermediate liveness check — verify process is still alive at 10min and 20min
+      const livenessChecks = [10, 20].map((min) =>
+        setTimeout(() => {
+          if (exited || !pid) return;
+          try {
+            process.kill(pid, 0); // Signal 0 = check if alive without killing
+            this.logger.info(`[GodMode][Queue] Agent for ${item.id} still alive at ${min}min (pid=${pid})`);
+          } catch {
+            this.logger.warn(`[GodMode][Queue] Agent for ${item.id} appears dead at ${min}min — pid ${pid} unreachable`);
+            this.broadcast("ally:notification", {
+              type: "agent-stall",
+              title: item.title,
+              summary: `Agent working on "${item.title}" may be stuck (${min}min, process unreachable).`,
+            });
+          }
+        }, min * 60_000),
+      );
+
       const killTimer = setTimeout(() => {
         if (!exited && pid) {
           this.logger.warn(
@@ -422,6 +468,7 @@ class QueueProcessor {
       child.on("exit", (code) => {
         exited = true;
         clearTimeout(killTimer);
+        livenessChecks.forEach(clearTimeout);
         this.logger.info(
           `[GodMode][Queue] Agent for item ${item.id} exited (code=${code})`,
         );
@@ -435,6 +482,7 @@ class QueueProcessor {
       child.on("error", (err) => {
         exited = true;
         clearTimeout(killTimer);
+        livenessChecks.forEach(clearTimeout);
         this.logger.error(
           `[GodMode][Queue] Agent spawn error for item ${item.id}: ${String(err)}`,
         );
@@ -1048,12 +1096,43 @@ class QueueProcessor {
       sections.push("", "## Your Role", "", persona.body);
     }
 
+    // Inject toolkit access instructions if token was issued
+    try {
+      const { isToolkitRunning, getToolkitBaseUrl } = await import("./agent-toolkit-server.js");
+      if (isToolkitRunning()) {
+        const tkUrl = getToolkitBaseUrl();
+        sections.push(
+          "",
+          "## GodMode Toolkit API",
+          `You have access to the owner's knowledge systems via: ${tkUrl}`,
+          `Auth: Pass the GODMODE_TOOLKIT_TOKEN env var as a Bearer token.`,
+          "Available endpoints:",
+          "- GET /search?q=... — search vault, memory, and files",
+          "- GET /memory?q=... — search conversational memory (Mem0)",
+          "- GET /skills — list available skill cards",
+          "- GET /awareness — current system state snapshot",
+          "- GET /identity — owner identity (USER.md + SOUL.md)",
+          "- POST /checkpoint — save progress (body: { summary, artifacts })",
+          "Use these to ground your work in the owner's actual context and preferences.",
+        );
+      }
+    } catch { /* toolkit not available */ }
+
     if (item.proofDocSlug) {
       try {
         const { getProofApiBase, getProofViewUrl, getProofToken } = await import("../lib/proof-bridge.js");
         const proofApi = getProofApiBase();
         const proofUrl = getProofViewUrl(item.proofDocSlug);
-        const proofToken = getProofToken(item.proofDocSlug) ?? "MISSING_TOKEN";
+        const proofToken = getProofToken(item.proofDocSlug);
+        if (!proofToken) {
+          sections.push(
+            "",
+            "## Proof Document (read-only)",
+            `A Proof document was created for this task but the auth token is unavailable.`,
+            `View URL: ${getProofViewUrl(item.proofDocSlug)}`,
+            `Write your output to the file path above instead. The user can copy it into Proof later.`,
+          );
+        } else {
         sections.push(
           "",
           "## Live Proof Document",
@@ -1079,6 +1158,7 @@ class QueueProcessor {
           "```",
           "The Proof editor handles real-time sync — your writes appear live to the user.",
         );
+        } // end else (proofToken exists)
       } catch {
         // Proof server may be unavailable mid-run; continue with file output only.
       }
