@@ -567,6 +567,18 @@ async function handleChatThreadLinkClick(event: MouseEvent, props: ChatProps) {
       return;
     }
 
+    // Proof links: intercept proofeditor.ai URLs and open in sidebar instead of browser.
+    if (props.onOpenProof) {
+      try {
+        const proofMatch = href.match(/(?:proofeditor\.ai|127\.0\.0\.1:\d+|localhost:\d+)\/d\/([a-zA-Z0-9_-]+)/);
+        if (proofMatch) {
+          event.preventDefault();
+          props.onOpenProof(proofMatch[1]);
+          return;
+        }
+      } catch { /* fall through */ }
+    }
+
     // External URLs: open synchronously via window.open BEFORE any await.
     // Calling window.open after an await breaks the user-gesture chain and
     // gets silently blocked by popup blockers / webview security.
@@ -884,6 +896,7 @@ export function renderChat(props: ChatProps) {
                             title: props.sidebarTitle ?? null,
                             viewUrl: props.sidebarProofUrl ?? null,
                             filePath: props.sidebarFilePath ?? null,
+                            fallbackMarkdown: props.sidebarProofHtml ?? null,
                             onClose: props.onCloseSidebar!,
                             onPushToDrive: props.onPushToDrive,
                           })
@@ -931,6 +944,7 @@ export function renderChat(props: ChatProps) {
                           title: props.sidebarTitle ?? null,
                           viewUrl: props.sidebarProofUrl ?? null,
                           filePath: props.sidebarFilePath ?? null,
+                          fallbackMarkdown: props.sidebarProofHtml ?? null,
                           onClose: props.onCloseSidebar!,
                           onPushToDrive: props.onPushToDrive,
                         })

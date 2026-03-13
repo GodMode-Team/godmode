@@ -149,7 +149,7 @@ export function createProofEditorTool(): AnyAgentTool {
               shared: true,
               slug,
               viewUrl: shared.viewUrl,
-              message: `Share this Proof doc: ${shared.viewUrl}`,
+              message: "Shareable link copied. The user can paste it anywhere.",
             });
           }
 

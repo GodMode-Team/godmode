@@ -1,4 +1,5 @@
 import { html, nothing } from "lit";
+import { repeat } from "lit/directives/repeat.js";
 import { unsafeHTML } from "lit/directives/unsafe-html.js";
 import type { AssistantIdentity } from "../assistant-identity";
 import { toSanitizedMarkdownHtml } from "../markdown";
@@ -491,20 +492,23 @@ export function renderMessageGroup(
         userAvatar: opts.userAvatar ?? null,
       })}
       <div class="chat-group-messages">
-        ${group.messages.map((item, index) =>
-          renderGroupedMessage(
-            item.message,
-            {
-              isStreaming: group.isStreaming && index === group.messages.length - 1,
-              showReasoning: opts.showReasoning,
-            },
-            opts.onOpenSidebar,
-            opts.onOpenFile,
-            opts.onOpenProof,
-            opts.onImageClick,
-            opts.resolveImageUrl,
-            opts.onPushToDrive,
-          ),
+        ${repeat(
+          group.messages,
+          (item) => item.key,
+          (item, index) =>
+            renderGroupedMessage(
+              item.message,
+              {
+                isStreaming: group.isStreaming && index === group.messages.length - 1,
+                showReasoning: opts.showReasoning,
+              },
+              opts.onOpenSidebar,
+              opts.onOpenFile,
+              opts.onOpenProof,
+              opts.onImageClick,
+              opts.resolveImageUrl,
+              opts.onPushToDrive,
+            ),
         )}
         <div class="chat-group-footer">
           <span class="chat-sender-name">${who}</span>
