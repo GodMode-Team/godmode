@@ -1374,7 +1374,7 @@ export class GodModeApp extends LitElement {
       if (item?.sourceTaskId) {
         await this.client.request("tasks.update", {
           id: item.sourceTaskId,
-          updates: { status: "complete" },
+          status: "complete",
         });
       }
       await this.client.request("queue.remove", { id });
@@ -3818,6 +3818,121 @@ export class GodModeApp extends LitElement {
     } catch (err) {
       console.error("[onboarding] Failed to mark complete:", err);
     }
+  }
+
+  // ── Universal Inbox handlers ──────────────────────────────────
+
+  async handleInboxRefresh() {
+    if (!this.client || !this.connected) return;
+    this.inboxLoading = true;
+    try {
+      const result = await this.client.request<{
+        items: NonNullable<import("./app-view-state").AppViewState["inboxItems"]>;
+        total: number;
+        pendingCount: number;
+      }>("inbox.list", { status: "pending", limit: 50 });
+      this.inboxItems = result.items;
+      this.inboxCount = result.pendingCount;
+    } catch (err) {
+      console.error("[Inbox] Failed to load:", err);
+    } finally {
+      this.inboxLoading = false;
+    }
+  }
+
+  async handleInboxScore(itemId: string, score: number, feedback?: string) {
+    if (!this.client || !this.connected) return;
+    try {
+      await this.client.request("inbox.score", { itemId, score, feedback });
+      this.inboxScoringId = null;
+      this.inboxScoringValue = undefined;
+      this.inboxFeedbackText = undefined;
+      await this.handleInboxRefresh();
+    } catch (err) {
+      console.error("[Inbox] Score failed:", err);
+    }
+  }
+
+  async handleInboxDismiss(itemId: string) {
+    if (!this.client || !this.connected) return;
+    try {
+      await this.client.request("inbox.dismiss", { itemId });
+      await this.handleInboxRefresh();
+    } catch (err) {
+      console.error("[Inbox] Dismiss failed:", err);
+    }
+  }
+
+  async handleInboxMarkAll() {
+    if (!this.client || !this.connected) return;
+    try {
+      await this.client.request("inbox.markAllComplete", {});
+      await this.handleInboxRefresh();
+    } catch (err) {
+      console.error("[Inbox] Mark all failed:", err);
+    }
+  }
+
+  async handleInboxViewOutput(itemId: string) {
+    const item = this.inboxItems?.find((i) => i.id === itemId);
+    if (!item) return;
+
+    // If there's a Proof doc, open in Proof viewer
+    if (item.proofDocSlug) {
+      this.handleOpenProofDoc(item.proofDocSlug);
+      return;
+    }
+
+    // Otherwise open the output file in sidebar
+    if (item.outputPath && this.client) {
+      try {
+        const result = await this.client.request<{ content: string }>(
+          "files.read",
+          { path: item.outputPath, maxSize: 500_000 },
+        );
+        if (result?.content) {
+          this.handleOpenSidebar(result.content, {
+            mimeType: "text/markdown",
+            filePath: item.outputPath,
+            title: item.title,
+          });
+        }
+      } catch (err) {
+        console.error("[Inbox] Failed to load output:", err);
+      }
+    }
+  }
+
+  handleInboxOpenChat(itemId: string) {
+    const item = this.inboxItems?.find((i) => i.id === itemId);
+    if (item?.sessionId) {
+      this.setSessionKey(item.sessionId);
+      this.setTab("chat" as import("./navigation").Tab);
+    }
+  }
+
+  handleInboxSetScoring(itemId: string | null, score?: number) {
+    this.inboxScoringId = itemId;
+    this.inboxScoringValue = score ?? 7;
+    this.inboxFeedbackText = "";
+  }
+
+  handleInboxFeedbackChange(text: string) {
+    this.inboxFeedbackText = text;
+  }
+
+  // ── Proof sidebar handlers ──────────────────────────────────
+
+  handleOpenProofDoc(slug: string) {
+    this.sidebarOpen = true;
+    this.sidebarMode = "proof";
+    this.sidebarProofSlug = slug;
+  }
+
+  handleCloseProofDoc() {
+    this.sidebarOpen = false;
+    this.sidebarMode = "resource";
+    this.sidebarProofSlug = null;
   }
 
   render() {

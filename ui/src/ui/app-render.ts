@@ -87,6 +87,7 @@ import { renderGatewayRestartConfirmation } from "./views/gateway-restart";
 import { renderInstances } from "./views/instances";
 import { renderLogs } from "./views/logs";
 import { renderMarkdownSidebar } from "./views/markdown-sidebar";
+import { renderProofViewer } from "./views/proof-viewer";
 import { renderMyDay, renderMyDayToolbar } from "./views/my-day";
 import { renderNodes } from "./views/nodes";
 import { renderOverview } from "./views/overview";
@@ -2527,30 +2528,35 @@ export function renderApp(state: AppViewState) {
             <div class="global-document-viewer">
               <div class="global-document-viewer__overlay" @click=${() => state.handleCloseSidebar()}></div>
               <div class="global-document-viewer__panel">
-                ${renderMarkdownSidebar({
-                  content: state.sidebarContent ?? null,
-                  error: state.sidebarError ?? null,
-                  mimeType: state.sidebarMimeType ?? null,
-                  filePath: state.sidebarFilePath ?? null,
-                  title: state.sidebarTitle ?? null,
-                  onClose: () => state.handleCloseSidebar(),
-                  onViewRawText: () => {
-                    if (!state.sidebarContent) {
-                      return;
-                    }
-                    state.handleOpenSidebar(state.sidebarContent, {
-                      mimeType: "text/plain",
-                      filePath: state.sidebarFilePath,
-                      title: state.sidebarTitle,
-                    });
-                  },
-                  onOpenFile: (path: string) => state.handleOpenFile(path),
-                  onPushToDrive: (path: string, account?: string) => state.handlePushToDrive(path, account),
-                  driveAccounts: state.driveAccounts,
-                  showDrivePicker: state.showDrivePicker,
-                  driveUploading: state.driveUploading,
-                  onToggleDrivePicker: () => state.handleToggleDrivePicker(),
-                })}
+                ${state.sidebarMode === "proof" && state.sidebarProofSlug
+                  ? renderProofViewer({
+                      slug: state.sidebarProofSlug,
+                      onClose: () => state.handleCloseProofDoc(),
+                    })
+                  : renderMarkdownSidebar({
+                      content: state.sidebarContent ?? null,
+                      error: state.sidebarError ?? null,
+                      mimeType: state.sidebarMimeType ?? null,
+                      filePath: state.sidebarFilePath ?? null,
+                      title: state.sidebarTitle ?? null,
+                      onClose: () => state.handleCloseSidebar(),
+                      onViewRawText: () => {
+                        if (!state.sidebarContent) {
+                          return;
+                        }
+                        state.handleOpenSidebar(state.sidebarContent, {
+                          mimeType: "text/plain",
+                          filePath: state.sidebarFilePath,
+                          title: state.sidebarTitle,
+                        });
+                      },
+                      onOpenFile: (path: string) => state.handleOpenFile(path),
+                      onPushToDrive: (path: string, account?: string) => state.handlePushToDrive(path, account),
+                      driveAccounts: state.driveAccounts,
+                      showDrivePicker: state.showDrivePicker,
+                      driveUploading: state.driveUploading,
+                      onToggleDrivePicker: () => state.handleToggleDrivePicker(),
+                    })}
               </div>
             </div>
           `

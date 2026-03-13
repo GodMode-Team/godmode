@@ -107,6 +107,10 @@ export type AppViewState = {
   sidebarMimeType: string | null;
   sidebarFilePath: string | null;
   sidebarTitle: string | null;
+  /** Sidebar mode: "resource" for files/markdown, "proof" for Proof doc iframe */
+  sidebarMode?: "resource" | "proof";
+  /** Proof document slug when sidebarMode === "proof" */
+  sidebarProofSlug?: string | null;
   splitRatio: number;
   lightbox: LightboxState;
   nodesLoading: boolean;
@@ -254,6 +258,26 @@ export type AppViewState = {
   todayShowCompleted?: boolean;
   todayInboxItems?: Array<{ name: string; path: string; updatedAt: string | null; excerpt: string; source?: string }>;
   todayInboxLoading?: boolean;
+  // Universal Inbox state
+  inboxItems?: Array<{
+    id: string;
+    type: string;
+    title: string;
+    summary: string;
+    source: { persona?: string; skill?: string; taskId?: string; queueItemId?: string };
+    proofDocSlug?: string;
+    outputPath?: string;
+    sessionId?: string;
+    createdAt: string;
+    status: string;
+    score?: number;
+    feedback?: string;
+  }>;
+  inboxLoading?: boolean;
+  inboxCount?: number;
+  inboxScoringId?: string | null;
+  inboxScoringValue?: number;
+  inboxFeedbackText?: string;
   // Ally side-chat state
   allyPanelOpen?: boolean;
   allyMessages?: AllyChatMessage[];
@@ -639,6 +663,18 @@ export type AppViewState = {
   handleDashboardCategoryFilter: (category: string | null) => void;
   handleDashboardBack: () => void;
   handleDashboardOpenSession: (dashboardId: string) => Promise<void>;
+  // Inbox handlers
+  handleInboxRefresh: () => Promise<void>;
+  handleInboxScore: (itemId: string, score: number, feedback?: string) => Promise<void>;
+  handleInboxDismiss: (itemId: string) => Promise<void>;
+  handleInboxMarkAll: () => Promise<void>;
+  handleInboxViewOutput: (itemId: string) => Promise<void>;
+  handleInboxOpenChat: (itemId: string) => void;
+  handleInboxSetScoring: (itemId: string | null, score?: number) => void;
+  handleInboxFeedbackChange: (text: string) => void;
+  // Proof sidebar handlers
+  handleOpenProofDoc: (slug: string) => void;
+  handleCloseProofDoc: () => void;
   // Proactive Intel handlers
   handleIntelLoad: () => Promise<void>;
   handleIntelDismiss: (id: string) => Promise<void>;
