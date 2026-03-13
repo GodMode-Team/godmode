@@ -924,30 +924,39 @@ export function renderChat(props: ChatProps) {
                 `
                 : html`
                   <div class="chat-sidebar">
-                    ${renderMarkdownSidebar({
-                      content: props.sidebarContent ?? null,
-                      error: props.sidebarError ?? null,
-                      mimeType: props.sidebarMimeType ?? null,
-                      filePath: props.sidebarFilePath ?? null,
-                      title: props.sidebarTitle ?? null,
-                      onClose: props.onCloseSidebar!,
-                      onViewRawText: () => {
-                        if (!props.sidebarContent || !props.onOpenSidebar) {
-                          return;
-                        }
-                        props.onOpenSidebar(props.sidebarContent, {
-                          mimeType: "text/plain",
+                    ${props.sidebarMode === "proof" && props.sidebarProofSlug
+                      ? renderProofViewer({
+                          slug: props.sidebarProofSlug,
+                          title: props.sidebarTitle ?? null,
+                          viewUrl: props.sidebarProofUrl ?? null,
+                          filePath: props.sidebarFilePath ?? null,
+                          onClose: props.onCloseSidebar!,
+                          onPushToDrive: props.onPushToDrive,
+                        })
+                      : renderMarkdownSidebar({
+                          content: props.sidebarContent ?? null,
+                          error: props.sidebarError ?? null,
+                          mimeType: props.sidebarMimeType ?? null,
                           filePath: props.sidebarFilePath ?? null,
                           title: props.sidebarTitle ?? null,
-                        });
-                      },
-                      onOpenFile: props.onOpenFile,
-                      onPushToDrive: props.onPushToDrive,
-                      driveAccounts: props.driveAccounts,
-                      showDrivePicker: props.showDrivePicker,
-                      driveUploading: props.driveUploading,
-                      onToggleDrivePicker: props.onToggleDrivePicker,
-                    })}
+                          onClose: props.onCloseSidebar!,
+                          onViewRawText: () => {
+                            if (!props.sidebarContent || !props.onOpenSidebar) {
+                              return;
+                            }
+                            props.onOpenSidebar(props.sidebarContent, {
+                              mimeType: "text/plain",
+                              filePath: props.sidebarFilePath ?? null,
+                              title: props.sidebarTitle ?? null,
+                            });
+                          },
+                          onOpenFile: props.onOpenFile,
+                          onPushToDrive: props.onPushToDrive,
+                          driveAccounts: props.driveAccounts,
+                          showDrivePicker: props.showDrivePicker,
+                          driveUploading: props.driveUploading,
+                          onToggleDrivePicker: props.onToggleDrivePicker,
+                        })}
                   </div>
                 `
               }
