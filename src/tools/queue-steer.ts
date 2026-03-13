@@ -10,7 +10,7 @@
 import { type AnyAgentTool, jsonResult } from "openclaw/plugin-sdk";
 import { readQueueState } from "../lib/queue-state.js";
 import { isProofRunning } from "../services/proof-server.js";
-import { addProofComment, readProofDocument, editProofDocument } from "../lib/proof-bridge.js";
+import { addProofComment, appendProofDocument } from "../lib/proof-bridge.js";
 
 export function createQueueSteerTool(): AnyAgentTool {
   return {
@@ -61,12 +61,11 @@ export function createQueueSteerTool(): AnyAgentTool {
           // Add as a comment for provenance tracking
           await addProofComment(item.proofDocSlug, "ally", `[STEERING] ${instruction}`);
 
-          // Also append to the document content so agent sees it on next read
-          const doc = await readProofDocument(item.proofDocSlug);
+          // Append a visible steering block without rewriting the whole document.
           const steeringBlock = `\n\n---\n**[Steering from Prosper]:** ${instruction}\n---\n`;
-          await editProofDocument(
+          await appendProofDocument(
             item.proofDocSlug,
-            doc.content + steeringBlock,
+            steeringBlock,
             "ally",
             "Prosper",
           );

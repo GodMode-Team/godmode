@@ -4,6 +4,16 @@ This file tracks recent development changes so Atlas and other agents can quickl
 
 ---
 
+## Proof Steering Safety Follow-up (2026-03-13)
+
+### What Landed
+- Changed `queue_steer` to append Prosper steering blocks instead of rewriting the full Proof doc, which avoids clobbering concurrent agent or human edits.
+- Declared the `proof_editor.mode` parameter so the ally can intentionally choose append vs replace writes when editing a Proof draft.
+
+### Verification
+- `pnpm typecheck`
+- `pnpm build`
+
 ## Proof + Universal Inbox Prototype (2026-03-13)
 
 ### What Landed

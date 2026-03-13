@@ -46,6 +46,11 @@ export function createProofEditorTool(): AnyAgentTool {
           type: "string",
           description: "Content to write (for 'create' or 'write')",
         },
+        mode: {
+          type: "string",
+          enum: ["replace", "append"],
+          description: "For write actions: replace the document or append to the existing draft",
+        },
         comment: {
           type: "string",
           description: "Comment text (for 'comment' action)",
