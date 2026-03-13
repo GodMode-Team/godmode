@@ -1298,10 +1298,15 @@ function messageKey(message: unknown, index: number): string {
   if (messageId) {
     return `msg:${messageId}`;
   }
+  // Use timestamp + role as a stable key — avoid array index which shifts
+  // when new messages arrive, causing all group keys to change and
+  // triggering full DOM destruction via Lit's repeat directive.
   const timestamp = typeof m.timestamp === "number" ? m.timestamp : null;
   const role = typeof m.role === "string" ? m.role : "unknown";
   if (timestamp != null) {
-    return `msg:${role}:${timestamp}:${index}`;
+    // Include a content snippet for uniqueness when timestamps collide
+    const content = typeof m.content === "string" ? m.content.slice(0, 32) : "";
+    return `msg:${role}:${timestamp}:${content || index}`;
   }
   return `msg:${role}:${index}`;
 }
