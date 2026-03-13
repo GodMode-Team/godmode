@@ -233,6 +233,8 @@ class QueueProcessor {
   private activeCount = 0;
   private stopped = false;
   private pollTimer: ReturnType<typeof setInterval> | null = null;
+  /** Toolkit tokens issued to agents — keyed by item ID for revocation on completion */
+  private toolkitTokens = new Map<string, string>();
 
   constructor(logger: Logger) {
     this.logger = logger;
@@ -466,11 +468,22 @@ class QueueProcessor {
 
   // ── Completion handler ─────────────────────────────────────────
 
+  /** Revoke any toolkit token issued for this agent */
+  private revokeToolkitTokenForItem(itemId: string): void {
+    const token = this.toolkitTokens.get(itemId);
+    if (!token) return;
+    this.toolkitTokens.delete(itemId);
+    import("./agent-toolkit-server.js")
+      .then(({ revokeAgentToken }) => revokeAgentToken(token))
+      .catch(() => {});
+  }
+
   async handleItemCompleted(
     itemId: string,
     exitCode: number | null,
   ): Promise<void> {
     this.activeCount = Math.max(0, this.activeCount - 1);
+    this.revokeToolkitTokenForItem(itemId);
 
     if (exitCode !== 0) {
       // Pass skipDecrement=true since we already decremented above
@@ -683,6 +696,7 @@ class QueueProcessor {
     if (!skipDecrement) {
       this.activeCount = Math.max(0, this.activeCount - 1);
     }
+    this.revokeToolkitTokenForItem(itemId);
 
     const { state } = await updateQueueState((state) => {
       const qi = state.items.find((i) => i.id === itemId);
@@ -1226,6 +1240,90 @@ class QueueProcessor {
 
     // Trust feedback is now baked directly into persona/skill markdown files
     // by trust-refinement.ts — no runtime injection needed here.
+
+    // ── Toolkit API + Workspace context ───────────────────────────────
+    try {
+      const { isToolkitRunning, createAgentToken, revokeAgentToken } = await import("./agent-toolkit-server.js");
+      if (isToolkitRunning()) {
+        // Resolve workspace
+        let workspaceId = item.workspaceId;
+        if (!workspaceId) {
+          try {
+            const { readWorkspaceConfig, detectWorkspaceFromText } = await import("../lib/workspaces-config.js");
+            const wsConfig = await readWorkspaceConfig({ initializeIfMissing: false });
+            const detected = detectWorkspaceFromText(wsConfig, `${item.title} ${item.description ?? ""}`);
+            if (detected.workspaceId) workspaceId = detected.workspaceId;
+          } catch { /* workspace detection non-fatal */ }
+        }
+
+        const toolkit = createAgentToken({
+          agentId: item.id,
+          workspaceId,
+        });
+
+        if (toolkit) {
+          // Store token on item so we can revoke on completion
+          this.toolkitTokens.set(item.id, toolkit.token);
+
+          sections.push(
+            "",
+            "## Your Toolkit API",
+            `You have runtime access to GodMode's knowledge systems at: ${toolkit.baseUrl}`,
+            `Auth: Bearer ${toolkit.token}`,
+            "",
+            "Available endpoints:",
+            "- GET /search?query=...&scope=all&limit=20 — Search the vault, projects, research",
+            "- GET /memory?query=...&limit=10 — Search conversational memory (Mem0)",
+            "- GET /skills — List available skill cards",
+            "- GET /awareness — Current system awareness snapshot",
+            "- GET /identity — Owner identity context (USER.md + SOUL.md)",
+            "- GET /guardrails — Active safety guardrails",
+            "- GET /agents/active — Currently running agents (prevent duplicate work)",
+            "- GET /agents/history?limit=10 — Recent completed agent work",
+            "- POST /checkpoint — Write advisory checkpoint before risky actions",
+            workspaceId ? "- GET /workspace — Your assigned workspace config" : "",
+            workspaceId ? "- GET /workspace/guidelines — Project-specific guidelines" : "",
+            workspaceId ? "- GET /workspace/history?limit=10 — Recent work in this workspace" : "",
+            workspaceId ? "- GET /workspace/artifacts — Existing artifacts (don't duplicate)" : "",
+            "",
+            "Example:",
+            "```bash",
+            `curl -s -H "Authorization: Bearer ${toolkit.token}" ${toolkit.baseUrl}/search?query=your+topic`,
+            "```",
+            "",
+            "**IMPORTANT:** Search before building. Check existing artifacts. Never overwrite without backup.",
+          );
+
+          // Workspace context
+          if (workspaceId) {
+            try {
+              const { readWorkspaceConfig, findWorkspaceById } = await import("../lib/workspaces-config.js");
+              const wsConfig = await readWorkspaceConfig({ initializeIfMissing: false });
+              const ws = findWorkspaceById(wsConfig, workspaceId);
+              if (ws) {
+                sections.push(
+                  "",
+                  "## Your Workspace",
+                  `Project: ${ws.name} (${ws.type})`,
+                  `Path: ${ws.path}`,
+                );
+
+                // Load guidelines if they exist
+                try {
+                  const guidelinesPath = path.join(ws.path, ".godmode", "guidelines.md");
+                  const guidelines = await fs.readFile(guidelinesPath, "utf-8");
+                  if (guidelines.trim()) {
+                    sections.push("", "### Project Guidelines", guidelines.slice(0, 2000));
+                  }
+                } catch { /* no guidelines file — that's fine */ }
+              }
+            } catch { /* workspace resolution non-fatal */ }
+          }
+        }
+      }
+    } catch {
+      // Toolkit server not available — agents run without runtime access (still works)
+    }
 
     // Include previous error context for retries
     if (item.lastError) {

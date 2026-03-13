@@ -327,6 +327,20 @@ export async function runGatewayStart(
     logger.warn(`[GodMode] Proof service failed to init: ${String(err)}`);
   }
 
+  // Agent Toolkit Server (runtime knowledge API for spawned agents)
+  try {
+    const { startToolkitServer, stopToolkitServer } = await import("../services/agent-toolkit-server.js");
+    const toolkitOk = await startToolkitServer(logger);
+    if (toolkitOk) {
+      serviceCleanup.push({ name: "toolkit-server", fn: () => stopToolkitServer() });
+      logger.info("[GodMode] Agent Toolkit Server started");
+    } else {
+      logger.warn("[GodMode] Agent Toolkit Server unavailable (ports 5000-5009 busy)");
+    }
+  } catch (err) {
+    logger.warn(`[GodMode] Toolkit server failed to start: ${String(err)}`);
+  }
+
   // Paperclip agent team (sidecar)
   try {
     const { PaperclipAdapter } = await import("../services/paperclip-adapter.js");
