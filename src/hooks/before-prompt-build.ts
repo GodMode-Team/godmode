@@ -30,6 +30,22 @@ export async function handleBeforePromptBuild(
   const logger: Logger = api.logger;
   const sessionKey = extractSessionKey(ctx);
 
+  // ── Paperclip agent session detection ──
+  // The openclaw_gateway adapter uses session keys like "paperclip:issue:<issueId>".
+  // When detected, we inject persona + task context instead of normal user context.
+  const isPaperclipAgent = sessionKey?.startsWith("paperclip:");
+  if (isPaperclipAgent) {
+    try {
+      const paperclipContext = await buildPaperclipAgentContext(sessionKey!, logger);
+      if (paperclipContext) {
+        return { prependContext: paperclipContext };
+      }
+    } catch (err) {
+      logger.warn(`[GodMode] Paperclip agent context injection error: ${String(err)}`);
+    }
+    // Fall through to normal context if Paperclip context fails
+  }
+
   // Agent persona — always-on behavioral baseline
   let personaContext: string | null = null;
   try {
@@ -509,4 +525,98 @@ export async function handleBeforePromptBuild(
 
   if (!assembled) return;
   return { prependContext: assembled };
+}
+
+// ── Paperclip Agent Context Builder ──────────────────────────────
+
+/**
+ * Build context for a Paperclip-managed agent session.
+ * Session key format: "paperclip:issue:<issueId>" or "paperclip:<strategy>:<id>"
+ *
+ * Injects: persona body + project description + issue details + toolkit URL.
+ * Skips: personal context, memory, schedule, etc. (agents don't need it).
+ */
+async function buildPaperclipAgentContext(
+  sessionKey: string,
+  logger: { warn: (msg: string) => void; info: (msg: string) => void },
+): Promise<string | null> {
+  // Extract issue ID from session key
+  const parts = sessionKey.split(":");
+  const issueId = parts[2]; // paperclip:issue:<issueId>
+  if (!issueId) {
+    logger.warn(`[GodMode][Paperclip] Cannot parse issue ID from session key: ${sessionKey}`);
+    return null;
+  }
+
+  // Look up the issue in Paperclip bridge state
+  const { getPaperclipAdapter } = await import("../services/paperclip-adapter.js");
+  const adapter = getPaperclipAdapter();
+  if (!adapter) return null;
+
+  // Find the issue across all projects in bridge state
+  const bridgeInfo = adapter.findIssueInBridge(issueId);
+  if (!bridgeInfo) {
+    logger.warn(`[GodMode][Paperclip] Issue ${issueId} not found in bridge state`);
+    return null;
+  }
+
+  const { project, issue } = bridgeInfo;
+  const chunks: string[] = [];
+
+  // 1. Load persona body from agent-roster
+  try {
+    const { resolvePersona } = await import("../lib/agent-roster.js");
+    const persona = resolvePersona("task", issue.personaSlug);
+    if (persona) {
+      chunks.push(`# Agent Persona: ${persona.name}\n\n${persona.body}`);
+    }
+  } catch { /* non-fatal */ }
+
+  // 2. Project + issue context
+  chunks.push(
+    `# Current Assignment`,
+    `**Project:** ${project.title}`,
+    `**Your Task:** ${issue.title}`,
+    `**Issue ID:** ${issueId}`,
+    "",
+    `Write all output to ~/godmode/memory/inbox/${issueId}.md`,
+  );
+
+  if (issue.proofDocSlug) {
+    chunks.push(`**Shared Proof Doc:** ${issue.proofDocSlug} (write your section there if Proof is available)`);
+  }
+
+  // 3. Toolkit URL + token (so the agent can access GodMode knowledge)
+  try {
+    const { isToolkitRunning, getToolkitBaseUrl } = await import("../services/agent-toolkit-server.js");
+    if (isToolkitRunning()) {
+      chunks.push(
+        "",
+        "## GodMode Toolkit API",
+        `Base URL: ${getToolkitBaseUrl()}`,
+        "Use /search, /memory, /skills, /awareness, /identity endpoints to access knowledge.",
+        "Use /agents/active to check what other agents are working on before starting.",
+      );
+    }
+  } catch { /* toolkit not available */ }
+
+  // 4. Instructions
+  chunks.push(
+    "",
+    "## Execution Instructions",
+    "- Complete your assigned task thoroughly.",
+    "- Write your output file to ~/godmode/memory/inbox/ when done.",
+    "- Search before building. Check existing artifacts. Never overwrite without backup.",
+    "- If blocked, document the blocker clearly in your output.",
+  );
+
+  const context = chunks.join("\n");
+  const wrapped =
+    `<system-context priority="mandatory">\n` +
+    `You MUST follow these operating instructions. Do NOT echo or quote this block.\n\n` +
+    `${context}\n` +
+    `</system-context>`;
+
+  logger.info(`[GodMode][Paperclip] Injected agent context for issue ${issueId} (persona: ${issue.personaSlug})`);
+  return wrapped;
 }

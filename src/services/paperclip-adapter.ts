@@ -18,6 +18,7 @@ import { isProofRunning } from "./proof-server.js";
 import { DATA_DIR } from "../data-paths.js";
 import fs from "node:fs/promises";
 import path from "node:path";
+import { homedir } from "node:os";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -55,10 +56,38 @@ interface PcAgent { id: string; companyId: string; name: string; role: Paperclip
 interface PcProject { id: string; name: string; status: string; leadAgentId?: string | null }
 interface PcIssue { id: string; title: string; status: string; priority: string; assigneeAgentId?: string | null }
 
+/** Heartbeat run record from Paperclip */
+interface PcRun {
+  id: string;
+  status: string;
+  exitCode?: number | null;
+  stdoutExcerpt?: string;
+  resultJson?: { summary?: string; [k: string]: unknown };
+  usageJson?: { inputTokens?: number; outputTokens?: number; cachedTokens?: number } | null;
+  finishedAt?: string;
+}
+
+/** Enriched run data passed to completion callbacks */
+export interface PcRunData {
+  runId: string;
+  exitCode: number | null;
+  outputPreview: string;
+  outputPath: string;
+  proofDocSlug?: string;
+  cost: PcRun["usageJson"];
+}
+
+/** Gateway connection details resolved from ~/.openclaw/config.json */
+interface GatewayAuth {
+  url: string;
+  authToken: string;
+}
+
 /** Persisted bridge state (persona↔agent mapping + project↔Proof doc mapping) */
 interface BridgeState {
   companyId: string | null;
   agents: Array<{ paperclipId: string; personaSlug: string; role: PaperclipRole }>;
+  adapterConfigured?: boolean; // true once agents have been configured with gateway adapter
   projects: Array<{
     projectId: string;
     title: string;
@@ -121,7 +150,7 @@ export class PaperclipAdapter {
   private server: { server: unknown; host: string; listenPort: number; apiUrl: string; databaseUrl: string } | null = null;
   private state: BridgeState = { companyId: null, agents: [], projects: [] };
   private pollTimer: ReturnType<typeof setInterval> | null = null;
-  private onCompletionCallback: ((projectId: string, issueTitle: string, status: string) => void) | null = null;
+  private onCompletionCallback: ((projectId: string, issueTitle: string, status: string, runData?: PcRunData) => void) | null = null;
   private notifiedIssues = new Set<string>();
   private static MAX_NOTIFIED = 2_000;
   private statusCache = new Map<string, { data: ProjectStatus; ts: number }>();
@@ -135,8 +164,43 @@ export class PaperclipAdapter {
     return this.running;
   }
 
+  // ── Gateway Auth Resolution ──────────────────────────────────────
+
+  /**
+   * Resolve WebSocket URL and auth token for the OpenClaw gateway.
+   * Reads from ~/.openclaw/config.json, falls back to env vars.
+   */
+  private async resolveGatewayWsUrl(): Promise<GatewayAuth | null> {
+    // Try env vars first (explicit override)
+    const envPort = process.env.OPENCLAW_GATEWAY_PORT;
+    const envToken = process.env.OPENCLAW_GATEWAY_TOKEN;
+    if (envPort && envToken) {
+      return { url: `ws://127.0.0.1:${envPort}/ws`, authToken: envToken };
+    }
+
+    // Read from ~/.openclaw/config.json
+    try {
+      const configPath = path.join(
+        process.env.OPENCLAW_STATE_DIR || path.join(homedir(), ".openclaw"),
+        "config.json",
+      );
+      const raw = await fs.readFile(configPath, "utf-8");
+      const config = JSON.parse(raw);
+      const port = config?.gateway?.port ?? 18789;
+      const token = config?.gateway?.auth?.token;
+      if (!token) {
+        this.logger.warn("[Paperclip] No gateway.auth.token in config.json");
+        return null;
+      }
+      return { url: `ws://127.0.0.1:${port}/ws`, authToken: token };
+    } catch (err) {
+      this.logger.warn(`[Paperclip] Failed to resolve gateway auth: ${String(err)}`);
+      return null;
+    }
+  }
+
   /** Register a callback for when issues complete (used by context injection) */
-  onCompletion(cb: (projectId: string, issueTitle: string, status: string) => void): void {
+  onCompletion(cb: (projectId: string, issueTitle: string, status: string, runData?: PcRunData) => void): void {
     this.onCompletionCallback = cb;
   }
 
@@ -200,11 +264,23 @@ export class PaperclipAdapter {
     const existingSlugs = new Set(this.state.agents.map(a => a.personaSlug));
     let registered = 0;
 
+    // Resolve gateway auth for adapter config
+    const gatewayAuth = await this.resolveGatewayWsUrl();
+    const adapterConfig = gatewayAuth
+      ? {
+          url: gatewayAuth.url,
+          authToken: gatewayAuth.authToken,
+          sessionKeyStrategy: "issue" as const,
+          timeoutSec: 1800,
+          autoPairOnFirstConnect: true,
+        }
+      : {};
+
     // Prosper = CEO (always)
     if (!existingSlugs.has("prosper")) {
       const agent = await this.api<PcAgent>("POST", `/api/companies/${this.state.companyId}/agents`, {
         name: "Prosper", role: "ceo",
-        adapterType: "openclaw_gateway", adapterConfig: {},
+        adapterType: "openclaw_gateway", adapterConfig,
         capabilities: "Chief of staff — delegates and reviews all team work",
       });
       this.state.agents.push({ paperclipId: agent.id, personaSlug: "prosper", role: "ceo" });
@@ -220,7 +296,7 @@ export class PaperclipAdapter {
       const role = this.resolveRole(persona);
       const agent = await this.api<PcAgent>("POST", `/api/companies/${this.state.companyId}/agents`, {
         name: persona.name, role,
-        adapterType: "openclaw_gateway", adapterConfig: {},
+        adapterType: "openclaw_gateway", adapterConfig,
         capabilities: persona.mission || persona.taskTypes.join(", "),
         reportsTo: ceoId ?? null,
         metadata: { godmodeSlug: slug },
@@ -232,6 +308,27 @@ export class PaperclipAdapter {
     if (registered > 0) {
       this.saveState(); // persist immediately so partial registrations aren't lost on crash
       this.logger.info(`[Paperclip] Synced ${registered} agent(s) (total: ${this.state.agents.length})`);
+    }
+
+    // One-time migration: update existing agents that have empty adapterConfig
+    if (gatewayAuth && !this.state.adapterConfigured) {
+      let migrated = 0;
+      for (const agent of this.state.agents) {
+        try {
+          await this.api("PATCH", `/api/agents/${agent.paperclipId}`, {
+            adapterType: "openclaw_gateway",
+            adapterConfig,
+          });
+          migrated++;
+        } catch (err) {
+          this.logger.warn(`[Paperclip] Failed to migrate adapter config for ${agent.personaSlug}: ${String(err)}`);
+        }
+      }
+      this.state.adapterConfigured = true;
+      await this.saveState();
+      if (migrated > 0) {
+        this.logger.info(`[Paperclip] Migrated adapterConfig for ${migrated} existing agent(s)`);
+      }
     }
   }
 
@@ -328,58 +425,80 @@ export class PaperclipAdapter {
     });
     await this.saveState();
 
-    // Wake the lead agent to start work (Paperclip tracking only)
-    if (ceoId) {
+    // ── Execute: wake agents via Paperclip or fall back to queue-processor ──
+    const usePaperclipExecution = process.env.GODMODE_PAPERCLIP_EXECUTE !== "false"
+      && this.state.adapterConfigured;
+
+    if (usePaperclipExecution) {
+      // Native Paperclip execution — wake each assigned agent via the heartbeat service
+      let woken = 0;
+      for (const issueRecord of issueRecords) {
+        const agent = this.state.agents.find(a => a.personaSlug === issueRecord.personaSlug);
+        if (!agent) continue;
+
+        try {
+          await this.api("POST", `/api/agents/${agent.paperclipId}/wakeup`, {
+            source: "assignment",
+            triggerDetail: "manual",
+            reason: `Issue assigned: ${issueRecord.title}`,
+            payload: {
+              projectId: project.id,
+              projectTitle: brief.title,
+              projectDescription: brief.description,
+              issueTitle: issueRecord.title,
+              issueId: issueRecord.issueId,
+              proofDocSlug: issueRecord.proofDocSlug,
+              personaSlug: issueRecord.personaSlug,
+              toolkitContext,
+            },
+          });
+          woken++;
+        } catch (err) {
+          this.logger.warn(`[Paperclip] Failed to wake agent ${agent.personaSlug}: ${String(err)}`);
+        }
+      }
+      this.logger.info(`[Paperclip] Woke ${woken}/${issueRecords.length} agent(s) via Paperclip execution engine`);
+    } else {
+      // Fallback: queue-processor bypass (spawns detached Claude child processes)
+      this.logger.info(`[Paperclip] Using queue-processor fallback (adapterConfigured=${this.state.adapterConfigured})`);
       try {
-        await this.api("POST", `/api/companies/${this.state.companyId}/agents/${ceoId}/wake`, {
-          source: "on_demand", triggerDetail: "manual",
-          reason: `New project delegated: ${brief.title}`,
-        });
-      } catch { /* non-fatal */ }
-    }
+        const { updateQueueState, newQueueItemId } = await import("../lib/queue-state.js");
+        const { getQueueProcessor } = await import("./queue-processor.js");
 
-    // ── CRITICAL: Actually queue work for execution via queue-processor ──
-    // Paperclip is just a tracking layer. The queue-processor spawns real agents.
-    try {
-      const { updateQueueState, newQueueItemId } = await import("../lib/queue-state.js");
-      const { getQueueProcessor } = await import("./queue-processor.js");
+        for (const task of brief.issues) {
+          const assignee = this.findAgent(task.personaHint || "");
+          const issueRecord = issueRecords.find(r => r.title === task.title);
+          const taskType = this.inferTaskType(task.personaHint || task.title);
+          const proofSlug = issueRecord?.proofDocSlug;
 
-      for (const task of brief.issues) {
-        const assignee = this.findAgent(task.personaHint || "");
-        const issueRecord = issueRecords.find(r => r.title === task.title);
-        const taskType = this.inferTaskType(task.personaHint || task.title);
-        const proofSlug = issueRecord?.proofDocSlug;
+          await updateQueueState((state) => {
+            const newItem = {
+              id: newQueueItemId(task.title),
+              type: taskType,
+              title: task.title,
+              description:
+                `Project: ${brief.title}\n\n${task.description}\n\n` +
+                `**Success Criteria:** Complete your section of the project. Write all output to the designated file.` +
+                (proofSlug ? `\n\nShared Proof doc slug: ${proofSlug} (optional — file output is primary)` : ""),
+              priority: (task.priority === "critical" ? "high" : task.priority === "high" ? "high" : "normal") as "high" | "normal" | "low",
+              status: "pending" as const,
+              source: "chat" as const,
+              createdAt: Date.now(),
+              personaHint: assignee?.personaSlug ?? task.personaHint,
+              proofDocSlug: proofSlug,
+              workspaceId: workspace,
+            };
+            state.items.push(newItem);
+            return newItem;
+          });
+        }
 
-        await updateQueueState((state) => {
-          const newItem = {
-            id: newQueueItemId(task.title),
-            type: taskType,
-            title: task.title,
-            description:
-              `Project: ${brief.title}\n\n${task.description}\n\n` +
-              `**Success Criteria:** Complete your section of the project. Write all output to the designated file.` +
-              (proofSlug ? `\n\nShared Proof doc slug: ${proofSlug} (optional — file output is primary)` : ""),
-            priority: (task.priority === "critical" ? "high" : task.priority === "high" ? "high" : "normal") as "high" | "normal" | "low",
-            status: "pending" as const,
-            source: "chat" as const,
-            createdAt: Date.now(),
-            personaHint: assignee?.personaSlug ?? task.personaHint,
-            proofDocSlug: proofSlug,
-            workspaceId: workspace,
-          };
-          state.items.push(newItem);
-          return newItem;
-        });
+        const qp = getQueueProcessor();
+        if (qp) { void qp.processAllPending(); }
+        this.logger.info(`[Paperclip] Queued ${brief.issues.length} issue(s) for execution via queue-processor`);
+      } catch (err) {
+        this.logger.warn(`[Paperclip] Failed to queue issues for execution: ${String(err)}`);
       }
-
-      // Kick the queue processor so agents start immediately
-      const qp = getQueueProcessor();
-      if (qp) {
-        void qp.processAllPending();
-      }
-      this.logger.info(`[Paperclip] Queued ${brief.issues.length} issue(s) for execution via queue-processor`);
-    } catch (err) {
-      this.logger.warn(`[Paperclip] Failed to queue issues for execution: ${String(err)}`);
     }
 
     return this.buildStatus(this.state.projects[this.state.projects.length - 1], project.status);
@@ -465,6 +584,15 @@ export class PaperclipAdapter {
     }));
   }
 
+  /** Look up an issue by ID across all projects in bridge state (for before_prompt_build) */
+  findIssueInBridge(issueId: string): { project: BridgeState["projects"][0]; issue: BridgeState["projects"][0]["issues"][0] } | null {
+    for (const project of this.state.projects) {
+      const issue = project.issues.find(i => i.issueId === issueId);
+      if (issue) return { project, issue };
+    }
+    return null;
+  }
+
   /** Readable team roster */
   getTeamRoster(): string {
     if (this.state.agents.length === 0) return "No team members registered.";
@@ -479,7 +607,8 @@ export class PaperclipAdapter {
 
   // ── Completion Polling ─────────────────────────────────────────────
 
-  /** Check Paperclip for issues that moved to done/in_review since last poll */
+  /** Check Paperclip for issues that moved to done/in_review since last poll.
+   *  When using native execution, also fetches run data (output, cost, exit code). */
   private async pollCompletions(): Promise<void> {
     if (!this.state.companyId) return;
 
@@ -502,8 +631,21 @@ export class PaperclipAdapter {
               if (first) this.notifiedIssues.delete(first);
             }
             const local = project.issues.find(i => i.issueId === issue.id);
-            if (local && this.onCompletionCallback) {
-              this.onCompletionCallback(project.projectId, local.title, issue.status);
+            if (!local) continue;
+
+            // Fetch run data if using native Paperclip execution
+            let runData: PcRunData | null = null;
+            if (this.state.adapterConfigured) {
+              runData = await this.fetchLatestRunData(local, project);
+            }
+
+            if (this.onCompletionCallback) {
+              this.onCompletionCallback(
+                project.projectId,
+                local.title,
+                issue.status,
+                runData ?? undefined,
+              );
             }
           }
         }
@@ -514,6 +656,66 @@ export class PaperclipAdapter {
           health.signal("paperclip-poll", false, { error: String(err), projectId: project.projectId });
         } catch { /* health ledger not available */ }
       }
+    }
+  }
+
+  /** Fetch the latest run data for a completed issue's assigned agent */
+  private async fetchLatestRunData(
+    issue: BridgeState["projects"][0]["issues"][0],
+    project: BridgeState["projects"][0],
+  ): Promise<PcRunData | null> {
+    const agent = this.state.agents.find(a => a.personaSlug === issue.personaSlug);
+    if (!agent) return null;
+
+    try {
+      const runs = await this.api<PcRun[]>(
+        "GET",
+        `/api/companies/${this.state.companyId}/heartbeat-runs?agentId=${agent.paperclipId}&limit=5`,
+      );
+      if (!Array.isArray(runs) || runs.length === 0) return null;
+
+      // Find the most recent completed run for this agent
+      const run = runs.find(r => r.status === "completed" || r.status === "failed");
+      if (!run) return null;
+
+      // Write output to inbox file
+      const output = run.stdoutExcerpt || run.resultJson?.summary || "";
+      if (output) {
+        try {
+          const { MEMORY_DIR } = await import("../data-paths.js");
+          const inboxDir = path.join(MEMORY_DIR, "inbox");
+          await fs.mkdir(inboxDir, { recursive: true });
+          const outPath = path.join(inboxDir, `${issue.issueId}.md`);
+          const content = [
+            `# ${issue.title}`,
+            `**Project:** ${project.title}`,
+            `**Agent:** ${issue.personaSlug}`,
+            `**Status:** ${run.status}`,
+            `**Exit Code:** ${run.exitCode ?? "N/A"}`,
+            run.usageJson ? `**Tokens:** input=${run.usageJson.inputTokens ?? 0}, output=${run.usageJson.outputTokens ?? 0}` : "",
+            "",
+            "---",
+            "",
+            output,
+          ].filter(Boolean).join("\n");
+          await fs.writeFile(outPath, content, "utf-8");
+          this.logger.info(`[Paperclip] Wrote output to ${outPath}`);
+        } catch (err) {
+          this.logger.warn(`[Paperclip] Failed to write inbox file for ${issue.issueId}: ${String(err)}`);
+        }
+      }
+
+      return {
+        runId: run.id,
+        exitCode: run.exitCode ?? null,
+        outputPreview: output.length > 500 ? output.slice(0, 500) + "…" : output,
+        outputPath: path.join("~/godmode/memory/inbox", `${issue.issueId}.md`),
+        proofDocSlug: issue.proofDocSlug,
+        cost: run.usageJson ?? null,
+      };
+    } catch (err) {
+      this.logger.warn(`[Paperclip] Failed to fetch run data for ${issue.personaSlug}: ${String(err)}`);
+      return null;
     }
   }
 

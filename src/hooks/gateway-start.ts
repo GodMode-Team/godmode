@@ -351,15 +351,29 @@ export async function runGatewayStart(
     const started = await paperclip.init();
     if (started) {
       // Wire completion callback so Paperclip issue completions surface to ally
-      paperclip.onCompletion((projectId, issueTitle, status) => {
-        logger.info(`[GodMode][Paperclip] Issue completed: "${issueTitle}" (${status}) in project ${projectId}`);
+      paperclip.onCompletion((projectId, issueTitle, status, runData) => {
+        logger.info(`[GodMode][Paperclip] Issue completed: "${issueTitle}" (${status}) in project ${projectId}${runData ? ` [run ${runData.runId}]` : ""}`);
         safeBroadcast(api, "ally:notification", {
           type: "paperclip-complete",
           title: issueTitle,
           summary: `Agent finished "${issueTitle}" — status: ${status}. Ready for review.`,
+          outputPreview: runData?.outputPreview,
+          outputPath: runData?.outputPath,
+          proofDocSlug: runData?.proofDocSlug,
+          cost: runData?.cost,
+          runId: runData?.runId,
           actions: [
             { label: "Review", action: "navigate", target: "today" },
+            { label: "Approve", action: "rpc", method: "queue.approve", params: { projectId } },
           ],
+        });
+
+        // Also broadcast queue:update so Mission Control refreshes
+        safeBroadcast(api, "queue:update", {
+          type: "issue-complete",
+          projectId,
+          issueTitle,
+          status,
         });
       });
       serviceCleanup.push({ name: "paperclip", fn: () => paperclip.stop() });
