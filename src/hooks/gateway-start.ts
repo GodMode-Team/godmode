@@ -138,6 +138,22 @@ export async function runGatewayStart(
         logger.info(`[GodMode] Seeded ${sourceSkills.length} starter skills`);
       }
     }
+    // Sync skill cards — copy any new cards from repo, don't overwrite user edits
+    const cardsTarget = join(MEMORY_DIR, "skill-cards");
+    const cardsSource = join(seedPluginRoot, "skill-cards");
+    if (existsSync(cardsSource)) {
+      mkdirSync(cardsTarget, { recursive: true });
+      const sourceCards = readdirSync(cardsSource).filter(f => f.endsWith(".md"));
+      let synced = 0;
+      for (const f of sourceCards) {
+        const dest = join(cardsTarget, f);
+        if (!existsSync(dest)) {
+          copyFileSync(join(cardsSource, f), dest);
+          synced++;
+        }
+      }
+      if (synced > 0) logger.info(`[GodMode] Synced ${synced} new skill card(s)`);
+    }
   } catch (err) {
     logger.warn(`[GodMode] Starter content seeding failed: ${String(err)}`);
   }
