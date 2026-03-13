@@ -40,6 +40,8 @@ type DashboardManifest = {
   widgets?: string[];
   pinned?: boolean;
   sessionId?: string | null;
+  archived?: boolean;
+  archivedAt?: string;
 };
 
 type DashboardIndex = {
@@ -83,9 +85,14 @@ function safeReadJson(filePath: string): unknown {
 // ── List ─────────────────────────────────────────────────────────────
 
 const list: GatewayRequestHandler = async ({ params, respond }) => {
-  const p = params as { scope?: string };
+  const p = params as { scope?: string; includeArchived?: boolean };
   const index = await readIndex();
   let dashboards = index.dashboards;
+
+  // Hide archived dashboards unless explicitly requested
+  if (!p.includeArchived) {
+    dashboards = dashboards.filter((d) => !d.archived);
+  }
 
   if (typeof p.scope === "string" && p.scope.trim()) {
     dashboards = dashboards.filter(
@@ -211,10 +218,9 @@ const remove: GatewayRequestHandler = async ({ params, respond }) => {
   const id = sanitizeSlug(rawId);
 
   const index = await readIndex();
-  const before = index.dashboards.length;
-  index.dashboards = index.dashboards.filter((d) => d.id !== id);
+  const dashboard = index.dashboards.find((d) => d.id === id);
 
-  if (index.dashboards.length === before) {
+  if (!dashboard) {
     respond(false, undefined, { code: "NOT_FOUND", message: `Dashboard not found: ${id}` });
     return;
   }
@@ -223,20 +229,12 @@ const remove: GatewayRequestHandler = async ({ params, respond }) => {
     index.activeDashboard = undefined;
   }
 
-  // SECURITY: Verify resolved path stays within DASHBOARDS_DIR before deletion
-  const dashDir = path.join(DASHBOARDS_DIR, id);
-  if (!dashDir.startsWith(DASHBOARDS_DIR + path.sep)) {
-    respond(false, undefined, { code: "ACCESS_DENIED", message: "Invalid dashboard id" });
-    return;
-  }
-  try {
-    await fs.rm(dashDir, { recursive: true, force: true });
-  } catch {
-    /* non-critical */
-  }
+  // Soft-archive: flag it instead of deleting files
+  dashboard.archived = true;
+  dashboard.archivedAt = new Date().toISOString();
 
   await writeIndex(index);
-  respond(true, { ok: true, removed: id });
+  respond(true, { ok: true, archived: id });
 };
 
 // ── Set Active ───────────────────────────────────────────────────────
