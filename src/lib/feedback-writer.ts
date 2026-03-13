@@ -13,12 +13,14 @@
  */
 
 import { readFile, appendFile, writeFile } from "node:fs/promises";
-import { existsSync } from "node:fs";
+import { existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { addLesson, type LessonCategory } from "./agent-lessons.js";
-import { MEMORY_DIR } from "../data-paths.js";
+import { DATA_DIR, MEMORY_DIR } from "../data-paths.js";
 import { getVaultPath, VAULT_FOLDERS } from "./vault-paths.js";
 import type { InboxItem } from "../services/inbox.js";
+
+const LESSONS_JSONL = join(DATA_DIR, "agent-lessons.jsonl");
 
 // ── Public API ───────────────────────────────────────────────────
 
@@ -36,6 +38,19 @@ export async function writeFeedbackToSource(
   // 1. Write to agent-lessons (for routing intelligence)
   if (item.source.persona && feedback) {
     const category = inferCategory(feedback);
+    await appendFile(
+      LESSONS_JSONL,
+      JSON.stringify({
+        ts: new Date().toISOString(),
+        persona: item.source.persona,
+        score,
+        category,
+        feedback,
+        sourceTaskId: item.source.queueItemId ?? item.id,
+        title: item.title,
+      }) + "\n",
+      "utf-8",
+    ).catch(() => {});
     await addLesson(
       {
         rule: feedback,
@@ -133,7 +148,6 @@ function resolvePersonaPath(personaSlug: string): string | null {
 
     // Check subdirs
     try {
-      const { readdirSync } = require("node:fs");
       const entries = readdirSync(vaultRoster, { withFileTypes: true });
       for (const entry of entries) {
         if (entry.isDirectory()) {
@@ -150,7 +164,6 @@ function resolvePersonaPath(personaSlug: string): string | null {
   if (existsSync(localFlat)) return localFlat;
 
   try {
-    const { readdirSync } = require("node:fs");
     const entries = readdirSync(localRoster, { withFileTypes: true });
     for (const entry of entries) {
       if (entry.isDirectory()) {

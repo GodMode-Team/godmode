@@ -79,11 +79,33 @@ export function renderToolCardSidebar(
   card: ToolCard,
   onOpenSidebar?: (content: string) => void,
   onOpenFile?: (filePath: string) => void,
+  onOpenProof?: (slug: string) => void,
   onPushToDrive?: (filePath: string) => void,
 ) {
   const display = resolveToolDisplay({ name: card.name, args: card.args });
   const detail = formatToolDetail(display);
   const hasText = Boolean(card.text?.trim());
+  const sidebarAction = parseSidebarAction(card.text);
+
+  if (sidebarAction?.type === "proof" && sidebarAction.slug) {
+    return html`
+      <div class="chat-artifact-card">
+        <div class="chat-artifact-card__icon">${icons.fileText}</div>
+        <div class="chat-artifact-card__info">
+          <span class="chat-artifact-card__name">${sidebarAction.title ?? "Proof Document"}</span>
+          <span class="chat-artifact-card__type">Live doc</span>
+        </div>
+        <div class="chat-artifact-card__actions">
+          ${onOpenProof
+            ? html`<button class="chat-artifact-card__btn" @click=${(e: Event) => { e.stopPropagation(); onOpenProof(sidebarAction.slug); }}>Open</button>`
+            : nothing}
+          ${sidebarAction.filePath && onPushToDrive
+            ? html`<button class="chat-artifact-card__btn chat-artifact-card__btn--drive" @click=${(e: Event) => { e.stopPropagation(); onPushToDrive(sidebarAction.filePath!); }}>Drive</button>`
+            : nothing}
+        </div>
+      </div>
+    `;
+  }
 
   const filePath = FILE_TOOLS.has(card.name.toLowerCase())
     ? (extractFilePathFromArgs(card.args) ?? extractFilePathFromText(card.text))
@@ -232,6 +254,31 @@ function extractToolText(item: Record<string, unknown>): string | undefined {
     return item.content;
   }
   return undefined;
+}
+
+function parseSidebarAction(text: string | undefined): {
+  type?: string;
+  slug?: string;
+  title?: string;
+  filePath?: string;
+} | null {
+  if (!text) return null;
+  try {
+    const parsed = JSON.parse(text) as {
+      _sidebarAction?: { type?: string; slug?: string };
+      title?: string;
+      filePath?: string;
+    };
+    if (!parsed._sidebarAction) return null;
+    return {
+      type: parsed._sidebarAction.type,
+      slug: parsed._sidebarAction.slug,
+      title: parsed.title,
+      filePath: parsed.filePath,
+    };
+  } catch {
+    return null;
+  }
 }
 
 /** Check if tool output is a "(no new output)" polling update that should be hidden.

@@ -299,9 +299,13 @@ export async function runGatewayStart(
   // Proof document server
   try {
     const { startProofServer, stopProofServer } = await import("../services/proof-server.js");
-    await startProofServer(logger);
-    serviceCleanup.push({ name: "proof-server", fn: () => stopProofServer() });
-    logger.info("[GodMode] Proof document server started");
+    const started = await startProofServer(logger);
+    if (started) {
+      serviceCleanup.push({ name: "proof-server", fn: () => stopProofServer() });
+      logger.info("[GodMode] Proof document server started");
+    } else {
+      logger.warn("[GodMode] Proof document server unavailable");
+    }
   } catch (err) {
     logger.warn(`[GodMode] Proof server failed to start: ${String(err)}`);
   }

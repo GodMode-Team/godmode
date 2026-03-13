@@ -4,6 +4,19 @@ This file tracks recent development changes so Atlas and other agents can quickl
 
 ---
 
+## Proof + Universal Inbox Prototype (2026-03-13)
+
+### What Landed
+- Wired a real universal inbox flow into the Today tab with scoring, dismissal, mark-all-complete, and feedback writes back into persona/skill files.
+- Finished the lightweight local Proof stack: queue items now get Proof docs, the sidebar has a Proof viewer mode, proof docs mirror to markdown artifacts, and Proof metadata is exposed via RPC.
+- Added Proof-aware queue behavior and UI plumbing so background items can open live docs, tool cards can open Proof docs, and the chief-of-staff/project workflow cards know about Proof + cron workflows.
+
+### Verification
+- `pnpm typecheck`
+- `pnpm build`
+- `pnpm ui:sync`
+- `rg "\.\./\.\./\.\./\.\./src/" -n`
+
 ## Artifact Persistence Guardrails (2026-03-09)
 
 ### Problem

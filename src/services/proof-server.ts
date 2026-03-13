@@ -499,7 +499,7 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse): Promise
 
 let logger: Logger | null = null;
 
-export async function startProofServer(log: Logger): Promise<void> {
+export async function startProofServer(log: Logger): Promise<boolean> {
   logger = log;
 
   // Init DB
@@ -513,7 +513,7 @@ export async function startProofServer(log: Logger): Promise<void> {
       health.signal("proof-server", false, { error: String(err) });
     } catch { /* non-fatal */ }
     log.warn(`[Proof] Database init failed: ${String(err)}`);
-    return;
+    return false;
   }
 
   // Try ports 4000-4009
@@ -540,7 +540,7 @@ export async function startProofServer(log: Logger): Promise<void> {
         health.signal("proof-server", true, { port: serverPort });
       } catch { /* health ledger not available */ }
 
-      return;
+      return true;
     } catch {
       continue;
     }
@@ -551,6 +551,7 @@ export async function startProofServer(log: Logger): Promise<void> {
     health.signal("proof-server", false, { error: "no-port-available" });
   } catch { /* non-fatal */ }
   log.warn("[Proof] Could not bind to any port 4000-4009");
+  return false;
 }
 
 export function stopProofServer(): void {

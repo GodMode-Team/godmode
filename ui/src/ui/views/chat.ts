@@ -19,6 +19,7 @@ import type { ChatItem, MessageGroup, ToolExecutionInfo } from "../types/chat-ty
 import type { ChatAttachment, ChatQueueItem } from "../ui-types";
 import { validateFilesForUpload } from "../upload-constants";
 import { renderMarkdownSidebar } from "./markdown-sidebar";
+import { renderProofViewer } from "./proof-viewer";
 import { renderAllyInline, type AllyChatProps } from "./ally-chat";
 import "../components/resizable-divider";
 
@@ -60,6 +61,9 @@ export type ChatProps = {
   sidebarMimeType?: string | null;
   sidebarFilePath?: string | null;
   sidebarTitle?: string | null;
+  sidebarMode?: "resource" | "proof";
+  sidebarProofSlug?: string | null;
+  sidebarProofUrl?: string | null;
   splitRatio?: number;
   assistantName: string;
   assistantAvatar: string | null;
@@ -93,6 +97,7 @@ export type ChatProps = {
   ) => void;
   onMessageLinkClick?: (href: string) => boolean | Promise<boolean>;
   onCloseSidebar?: () => void;
+  onOpenProof?: (slug: string) => void;
   onOpenFile?: (filePath: string) => void;
   onSplitRatioChange?: (ratio: number) => void;
   onImageClick?: (url: string, allImages: LightboxImage[], index: number) => void;
@@ -734,6 +739,7 @@ export function renderChat(props: ChatProps) {
               return renderMessageGroup(item, {
                 onOpenSidebar: props.onOpenSidebar,
                 onOpenFile: props.onOpenFile,
+                onOpenProof: props.onOpenProof,
                 onPushToDrive: props.onPushToDrive,
                 onImageClick: props.onImageClick,
                 resolveImageUrl,
@@ -869,32 +875,41 @@ export function renderChat(props: ChatProps) {
               ></resizable-divider>
               ${props.allyPanelOpen && props.allyProps
                 ? html`
-                  <div class="chat-sidebar chat-sidebar--split">
-                    <div class="chat-sidebar-top">
-                      ${renderMarkdownSidebar({
-                        content: props.sidebarContent ?? null,
-                        error: props.sidebarError ?? null,
-                        mimeType: props.sidebarMimeType ?? null,
-                        filePath: props.sidebarFilePath ?? null,
-                        title: props.sidebarTitle ?? null,
-                        onClose: props.onCloseSidebar!,
-                        onViewRawText: () => {
-                          if (!props.sidebarContent || !props.onOpenSidebar) {
-                            return;
-                          }
-                          props.onOpenSidebar(props.sidebarContent, {
-                            mimeType: "text/plain",
+                    <div class="chat-sidebar chat-sidebar--split">
+                      <div class="chat-sidebar-top">
+                      ${props.sidebarMode === "proof" && props.sidebarProofSlug
+                        ? renderProofViewer({
+                            slug: props.sidebarProofSlug,
+                            title: props.sidebarTitle ?? null,
+                            viewUrl: props.sidebarProofUrl ?? null,
+                            filePath: props.sidebarFilePath ?? null,
+                            onClose: props.onCloseSidebar!,
+                            onPushToDrive: props.onPushToDrive,
+                          })
+                        : renderMarkdownSidebar({
+                            content: props.sidebarContent ?? null,
+                            error: props.sidebarError ?? null,
+                            mimeType: props.sidebarMimeType ?? null,
                             filePath: props.sidebarFilePath ?? null,
                             title: props.sidebarTitle ?? null,
-                          });
-                        },
-                        onOpenFile: props.onOpenFile,
-                        onPushToDrive: props.onPushToDrive,
-                        driveAccounts: props.driveAccounts,
-                        showDrivePicker: props.showDrivePicker,
-                        driveUploading: props.driveUploading,
-                        onToggleDrivePicker: props.onToggleDrivePicker,
-                      })}
+                            onClose: props.onCloseSidebar!,
+                            onViewRawText: () => {
+                              if (!props.sidebarContent || !props.onOpenSidebar) {
+                                return;
+                              }
+                              props.onOpenSidebar(props.sidebarContent, {
+                                mimeType: "text/plain",
+                                filePath: props.sidebarFilePath ?? null,
+                                title: props.sidebarTitle ?? null,
+                              });
+                            },
+                            onOpenFile: props.onOpenFile,
+                            onPushToDrive: props.onPushToDrive,
+                            driveAccounts: props.driveAccounts,
+                            showDrivePicker: props.showDrivePicker,
+                            driveUploading: props.driveUploading,
+                            onToggleDrivePicker: props.onToggleDrivePicker,
+                          })}
                     </div>
                     <resizable-divider
                       direction="vertical"

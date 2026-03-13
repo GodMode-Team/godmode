@@ -1585,6 +1585,38 @@ function handleGatewayEventUnsafe(host: GatewayHost, evt: GatewayEventFrame) {
     return;
   }
 
+  if (evt.event === "inbox:update") {
+    const inboxHost = host as unknown as {
+      handleInboxRefresh?: () => Promise<unknown>;
+      requestUpdate?: () => void;
+    };
+    inboxHost.handleInboxRefresh?.().catch(() => {});
+    inboxHost.requestUpdate?.();
+    return;
+  }
+
+  if (evt.event === "queue:update") {
+    const payload = evt.payload as
+      | {
+          status?: string;
+          proofDocSlug?: string | null;
+        }
+      | undefined;
+    const queueHost = host as unknown as {
+      handleOpenProofDoc?: (slug: string) => Promise<unknown>;
+      handleInboxRefresh?: () => Promise<unknown>;
+      loadTodayQueueResults?: () => Promise<unknown>;
+      requestUpdate?: () => void;
+    };
+    if (payload?.status === "processing" && payload.proofDocSlug) {
+      queueHost.handleOpenProofDoc?.(payload.proofDocSlug).catch(() => {});
+    }
+    queueHost.handleInboxRefresh?.().catch(() => {});
+    queueHost.loadTodayQueueResults?.().catch(() => {});
+    queueHost.requestUpdate?.();
+    return;
+  }
+
   // Ally notification events (proactive messages from the ally)
   if (evt.event === "ally:notification") {
     const payload = evt.payload as
@@ -1614,6 +1646,7 @@ function handleGatewayEventUnsafe(host: GatewayHost, evt: GatewayEventFrame) {
         tab?: string;
         requestUpdate?: () => void;
         loadTodayQueueResults?: () => Promise<unknown>;
+        handleInboxRefresh?: () => Promise<unknown>;
       };
       const msg = {
         role: "assistant" as const,
@@ -1630,6 +1663,9 @@ function handleGatewayEventUnsafe(host: GatewayHost, evt: GatewayEventFrame) {
       const queueTypes = ["queue-complete", "queue-needs-review", "queue-failed", "cron-result"];
       if (payload.type && queueTypes.includes(payload.type) && allyHost.loadTodayQueueResults) {
         allyHost.loadTodayQueueResults().catch(() => {});
+      }
+      if (payload.type && queueTypes.includes(payload.type) && allyHost.handleInboxRefresh) {
+        allyHost.handleInboxRefresh().catch(() => {});
       }
       allyHost.requestUpdate?.();
     }

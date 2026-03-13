@@ -7,12 +7,14 @@
 
 import { type AnyAgentTool, jsonResult } from "openclaw/plugin-sdk";
 import {
+  appendProofDocument,
   createProofDocument,
   readProofDocument,
   editProofDocument,
   addProofComment,
   listProofDocuments,
   getProofViewUrl,
+  shareProofDocument,
 } from "../lib/proof-bridge.js";
 import { isProofRunning } from "../services/proof-server.js";
 
@@ -29,7 +31,7 @@ export function createProofEditorTool(): AnyAgentTool {
       properties: {
         action: {
           type: "string",
-          enum: ["create", "write", "read", "comment", "open", "list"],
+          enum: ["create", "write", "read", "comment", "suggest", "open", "share", "export_gdrive", "list"],
           description: "Action to perform on a Proof document",
         },
         title: {
@@ -71,6 +73,7 @@ export function createProofEditorTool(): AnyAgentTool {
               slug: doc.slug,
               title: doc.title,
               viewUrl: doc.url,
+              filePath: doc.filePath,
               message: `Created Proof doc "${doc.title}". Opening in sidebar.`,
               _sidebarAction: { type: "proof", slug: doc.slug },
             });
@@ -80,7 +83,8 @@ export function createProofEditorTool(): AnyAgentTool {
             const slug = String(params.slug ?? "");
             if (!slug) return jsonResult({ error: "slug is required for write" });
             const content = String(params.content ?? "");
-            await editProofDocument(slug, content, "ally");
+            const mode = params.mode === "append" ? "append" : "replace";
+            await editProofDocument(slug, content, "ally", undefined, mode);
             return jsonResult({
               updated: true,
               slug,
@@ -97,6 +101,7 @@ export function createProofEditorTool(): AnyAgentTool {
               title: doc.title,
               content: doc.content,
               updatedAt: doc.updatedAt,
+              filePath: doc.filePath,
             });
           }
 
@@ -108,6 +113,15 @@ export function createProofEditorTool(): AnyAgentTool {
             return jsonResult({ commented: true, slug });
           }
 
+          case "suggest": {
+            const slug = String(params.slug ?? "");
+            if (!slug) return jsonResult({ error: "slug is required for suggest" });
+            const text = String(params.comment ?? params.content ?? "");
+            await addProofComment(slug, "ally", `[SUGGESTION] ${text}`);
+            await appendProofDocument(slug, `> Suggestion from Prosper: ${text}`, "ally", "Prosper");
+            return jsonResult({ suggested: true, slug });
+          }
+
           case "open": {
             const slug = String(params.slug ?? "");
             if (!slug) return jsonResult({ error: "slug is required for open" });
@@ -116,8 +130,33 @@ export function createProofEditorTool(): AnyAgentTool {
               slug: doc.slug,
               title: doc.title,
               viewUrl: getProofViewUrl(slug),
+              filePath: doc.filePath,
               message: `Opening "${doc.title}" in sidebar.`,
               _sidebarAction: { type: "proof", slug: doc.slug },
+            });
+          }
+
+          case "share": {
+            const slug = String(params.slug ?? "");
+            if (!slug) return jsonResult({ error: "slug is required for share" });
+            const shared = shareProofDocument(slug);
+            return jsonResult({
+              shared: true,
+              slug,
+              viewUrl: shared.viewUrl,
+              message: `Share this Proof doc: ${shared.viewUrl}`,
+            });
+          }
+
+          case "export_gdrive": {
+            const slug = String(params.slug ?? "");
+            if (!slug) return jsonResult({ error: "slug is required for export_gdrive" });
+            const doc = await readProofDocument(slug);
+            return jsonResult({
+              exportReady: true,
+              slug,
+              filePath: doc.filePath,
+              message: `Proof doc exported to markdown at ${doc.filePath}. Use the Drive button to upload it.`,
             });
           }
 

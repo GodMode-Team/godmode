@@ -7,7 +7,11 @@
  *   - UI (opens Proof docs in sidebar via iframe)
  */
 
-import { getProofPort, isProofRunning } from "../services/proof-server.js";
+import {
+  getProofPort,
+  getProofViewUrl as getServerProofViewUrl,
+  isProofRunning,
+} from "../services/proof-server.js";
 
 type ProofResponse<T> = T & { error?: string };
 
@@ -34,18 +38,17 @@ export async function createProofDocument(
   title: string,
   initialContent?: string,
   author?: string,
-): Promise<{ slug: string; title: string; url: string }> {
-  const doc = await proofFetch<{ slug: string; title: string }>("/documents", {
+): Promise<{ slug: string; title: string; url: string; filePath: string }> {
+  const doc = await proofFetch<{ slug: string; title: string; filePath: string }>("/documents", {
     method: "POST",
     body: JSON.stringify({ title, content: initialContent, author }),
   });
-  const port = getProofPort();
-  return { ...doc, url: `http://127.0.0.1:${port}/documents/${doc.slug}/view` };
+  return { ...doc, url: getServerProofViewUrl(doc.slug) };
 }
 
 export async function readProofDocument(
   slug: string,
-): Promise<{ slug: string; title: string; content: string; updatedAt: string }> {
+): Promise<{ slug: string; title: string; content: string; updatedAt: string; filePath: string }> {
   return proofFetch(`/documents/${slug}`);
 }
 
@@ -54,11 +57,21 @@ export async function editProofDocument(
   content: string,
   author: "agent" | "ally" | "human",
   authorName?: string,
+  mode: "replace" | "append" = "replace",
 ): Promise<void> {
   await proofFetch(`/documents/${slug}`, {
     method: "PUT",
-    body: JSON.stringify({ content, author, authorName }),
+    body: JSON.stringify({ content, author, authorName, mode }),
   });
+}
+
+export async function appendProofDocument(
+  slug: string,
+  content: string,
+  author: "agent" | "ally" | "human",
+  authorName?: string,
+): Promise<void> {
+  await editProofDocument(slug, content, author, authorName, "append");
 }
 
 export async function addProofComment(
@@ -84,8 +97,7 @@ export async function listProofDocuments(): Promise<
  * Get the iframe URL for embedding a Proof doc in the sidebar.
  */
 export function getProofViewUrl(slug: string): string {
-  const port = getProofPort();
-  return `http://127.0.0.1:${port}/documents/${slug}/view`;
+  return getServerProofViewUrl(slug);
 }
 
 /**
@@ -94,4 +106,8 @@ export function getProofViewUrl(slug: string): string {
 export function getProofApiBase(): string {
   const port = getProofPort();
   return `http://127.0.0.1:${port}`;
+}
+
+export function shareProofDocument(slug: string): { slug: string; viewUrl: string } {
+  return { slug, viewUrl: getProofViewUrl(slug) };
 }

@@ -30,8 +30,22 @@ export type MyDayState = {
   todayTasks?: WorkspaceTask[];
   todayTasksLoading?: boolean;
   // Inbox
-  todayInboxItems?: Array<{ name: string; path: string; updatedAt: string | null; excerpt: string; source?: string }>;
-  todayInboxLoading?: boolean;
+  inboxItems?: Array<{
+    id: string;
+    type: string;
+    title: string;
+    summary: string;
+    source: { persona?: string; skill?: string; taskId?: string; queueItemId?: string };
+    proofDocSlug?: string;
+    outputPath?: string;
+    sessionId?: string;
+    createdAt: string;
+    status: string;
+    score?: number;
+    feedback?: string;
+  }>;
+  inboxLoading?: boolean;
+  inboxCount?: number;
   // Methods
   loadBriefNotes?: () => Promise<void>;
 };
@@ -265,13 +279,13 @@ export async function loadTodayTasksWithQueueStatus(state: MyDayState): Promise<
     // Build sourceTaskId → queue status map
     const queueByTask = new Map<
       string,
-      { status: "processing" | "review" | "done" | "failed"; type: string; roleName: string; queueItemId: string }
+      { status: "processing" | "review" | "needs-review" | "done" | "failed"; type: string; roleName: string; queueItemId: string }
     >();
     for (const qi of queueResult.items) {
       if (!qi.sourceTaskId) continue;
-      if (qi.status === "processing" || qi.status === "review" || qi.status === "done" || qi.status === "failed") {
+      if (qi.status === "processing" || qi.status === "review" || qi.status === "needs-review" || qi.status === "done" || qi.status === "failed") {
         queueByTask.set(qi.sourceTaskId, {
-          status: qi.status as "processing" | "review" | "done" | "failed",
+          status: qi.status as "processing" | "review" | "needs-review" | "done" | "failed",
           type: qi.type,
           roleName: AGENT_ROLE_NAMES[qi.type] ?? qi.type,
           queueItemId: qi.id,
@@ -304,19 +318,20 @@ export async function loadTodayTasksWithQueueStatus(state: MyDayState): Promise<
 
 export async function loadInboxItems(state: MyDayState): Promise<void> {
   if (!state.client || !state.connected) return;
-  state.todayInboxLoading = true;
+  state.inboxLoading = true;
   try {
     const res = await state.client.request<{
-      items: Array<{ name: string; path: string; updatedAt: string | null; excerpt: string; source?: string }>;
-      count: number;
-      available: boolean;
-    }>("secondBrain.inboxItems", {});
-    state.todayInboxItems = res.items ?? [];
+      items: NonNullable<MyDayState["inboxItems"]>;
+      pendingCount: number;
+    }>("inbox.list", { status: "pending", limit: 50 });
+    state.inboxItems = res.items ?? [];
+    state.inboxCount = res.pendingCount ?? 0;
   } catch (err) {
     console.error("[MyDay] Failed to load inbox items:", err);
-    state.todayInboxItems = [];
+    state.inboxItems = [];
+    state.inboxCount = 0;
   } finally {
-    state.todayInboxLoading = false;
+    state.inboxLoading = false;
   }
 }
 
@@ -360,8 +375,8 @@ export async function loadTodayQueueResults(state: MyDayState): Promise<Decision
 
     return items
       .filter((item) => {
-        if (item.status !== "review" && item.status !== "done") return false;
-        // Include review items regardless of age, done items only within 24h
+        if (item.status !== "review" && item.status !== "needs-review" && item.status !== "done") return false;
+        // Include review/needs-review items regardless of age, done items only within 24h
         if (item.status === "done" && (item.completedAt ?? 0) < cutoff) return false;
         return true;
       })
@@ -370,7 +385,7 @@ export async function loadTodayQueueResults(state: MyDayState): Promise<Decision
         id: item.id,
         title: item.title,
         summary: item.result?.summary ?? item.description ?? "",
-        status: item.status as "review" | "done",
+        status: (item.status === "needs-review" ? "review" : item.status) as "review" | "done",
         completedAt: item.completedAt,
         outputPath: item.result?.outputPath,
         prUrl: item.result?.prUrl,

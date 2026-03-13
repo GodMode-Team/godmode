@@ -50,9 +50,12 @@ export type QueueItem = {
   lastError?: string;
   /** The full prompt sent to the agent (stored for session context) */
   agentPrompt?: string;
+  /** Source chat session that created or is reviewing this item */
+  sessionId?: string;
   result?: {
     summary: string;
     outputPath?: string;
+    proofDocSlug?: string;
     prUrl?: string;
     prDiff?: string;
   };
@@ -70,6 +73,8 @@ export type QueueItem = {
   needsApproval?: boolean;
   /** Slug of the Proof document for live co-editing output */
   proofDocSlug?: string;
+  /** Artifact mirror path for the Proof document markdown export */
+  proofDocFilePath?: string;
   /** Structured handoff context from a predecessor agent */
   handoff?: {
     fromAgent: string;

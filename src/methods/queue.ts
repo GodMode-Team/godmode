@@ -2,7 +2,7 @@ import { readFile } from "node:fs/promises";
 import { execFile as execFileCb } from "node:child_process";
 import { join, resolve, normalize } from "node:path";
 import { promisify } from "node:util";
-import { DATA_DIR, GODMODE_ROOT } from "../data-paths.js";
+import { DATA_DIR, GODMODE_ROOT, localDateString } from "../data-paths.js";
 import {
   readQueueState,
   updateQueueState,
@@ -14,6 +14,8 @@ import {
 import { updateTasks } from "./tasks.js";
 import type { GatewayRequestHandler } from "openclaw/plugin-sdk";
 import type { LessonCategory } from "../lib/agent-lessons.js";
+import { createProofDocument } from "../lib/proof-bridge.js";
+import { isProofRunning } from "../services/proof-server.js";
 
 const execFile = promisify(execFileCb);
 
@@ -41,7 +43,7 @@ function countsByStatus(items: QueueItem[]): Record<QueueItemStatus, number> {
 // ── RPC Handlers ─────────────────────────────────────────────────
 
 const addItem: GatewayRequestHandler = async ({ params, respond }) => {
-  const { type, title, description, url, repoRoot, priority, sourceTaskId, personaHint, engine } = params as {
+  const { type, title, description, url, repoRoot, priority, sourceTaskId, personaHint, engine, sessionId } = params as {
     type?: QueueItemType;
     title?: string;
     description?: string;
@@ -51,6 +53,7 @@ const addItem: GatewayRequestHandler = async ({ params, respond }) => {
     sourceTaskId?: string;
     personaHint?: string;
     engine?: "claude" | "codex" | "gemini";
+    sessionId?: string;
   };
   if (!title) {
     respond(false, null, { code: "INVALID_REQUEST", message: "Missing title" });
@@ -59,6 +62,22 @@ const addItem: GatewayRequestHandler = async ({ params, respond }) => {
   if (!type) {
     respond(false, null, { code: "INVALID_REQUEST", message: "Missing type" });
     return;
+  }
+
+  let proofDocSlug: string | undefined;
+  let proofDocFilePath: string | undefined;
+  if (isProofRunning()) {
+    try {
+      const proofDoc = await createProofDocument(
+        title,
+        `# ${title}\n\n## Working Draft\n\n`,
+        "ally",
+      );
+      proofDocSlug = proofDoc.slug;
+      proofDocFilePath = proofDoc.filePath;
+    } catch {
+      // Proof doc creation is best-effort at queue time.
+    }
   }
 
   const { result: item } = await updateQueueState((state) => {
@@ -73,8 +92,11 @@ const addItem: GatewayRequestHandler = async ({ params, respond }) => {
       status: "pending",
       source: "manual",
       sourceTaskId: sourceTaskId || undefined,
+      sessionId: sessionId || undefined,
       personaHint: personaHint || undefined,
       engine: engine || undefined,
+      proofDocSlug,
+      proofDocFilePath,
       createdAt: Date.now(),
     };
     state.items.push(newItem);
@@ -101,6 +123,17 @@ const listItems: GatewayRequestHandler = async ({ params, respond }) => {
   }
 
   const counts = countsByStatus(state.items);
+
+  // Sort: active statuses first (processing > pending > review/needs-review), then by most recent activity
+  const statusOrder: Record<string, number> = {
+    processing: 0, pending: 1, "needs-review": 2, review: 3, failed: 4, done: 5,
+  };
+  items = items.sort((a, b) => {
+    const sa = statusOrder[a.status] ?? 9;
+    const sb = statusOrder[b.status] ?? 9;
+    if (sa !== sb) return sa - sb;
+    return (b.completedAt ?? b.createdAt) - (a.completedAt ?? a.createdAt);
+  });
 
   if (limit && limit > 0) {
     items = items.slice(0, limit);
@@ -162,8 +195,8 @@ const approveItem: GatewayRequestHandler = async ({ params, respond }) => {
     const idx = state.items.findIndex((i) => i.id === id);
     if (idx === -1) return { item: null, error: "Queue item not found" };
     const existing = state.items[idx];
-    if (existing.status !== "review") {
-      return { item: null, error: `Cannot approve item with status "${existing.status}". Only "review" items can be approved.` };
+    if (existing.status !== "review" && existing.status !== "needs-review") {
+      return { item: null, error: `Cannot approve item with status "${existing.status}". Only "review" or "needs-review" items can be approved.` };
     }
     existing.status = "done";
     existing.completedAt = Date.now();
@@ -177,15 +210,26 @@ const approveItem: GatewayRequestHandler = async ({ params, respond }) => {
   }
 
   // If item has a sourceTaskId, mark the linked NativeTask as complete
+  // and sync brief checkboxes + team tasks to match.
   if (result.item.sourceTaskId) {
     try {
-      await updateTasks((data) => {
+      const { result: updatedTask } = await updateTasks((data) => {
         const taskIdx = data.tasks.findIndex((t) => t.id === result.item!.sourceTaskId);
         if (taskIdx !== -1) {
           data.tasks[taskIdx].status = "complete";
           data.tasks[taskIdx].completedAt = new Date().toISOString();
+          return data.tasks[taskIdx];
         }
+        return null;
       });
+      // Sync brief checkbox and team tasks (same path as tasks.update)
+      if (updatedTask) {
+        try {
+          const { syncBriefFromTasks } = await import("./daily-brief.js");
+          const syncDate = updatedTask.dueDate || localDateString();
+          await syncBriefFromTasks(syncDate, { taskTitle: updatedTask.title });
+        } catch { /* Brief sync is best-effort */ }
+      }
     } catch {
       // Task sync is best-effort; don't fail the approval
     }
@@ -226,7 +270,7 @@ const rejectItem: GatewayRequestHandler = async ({ params, respond }) => {
     const idx = state.items.findIndex((i) => i.id === id);
     if (idx === -1) return { item: null, error: "Queue item not found" };
     const existing = state.items[idx];
-    if (existing.status !== "review") {
+    if (existing.status !== "review" && existing.status !== "needs-review") {
       return { item: null, error: `Cannot reject item with status "${existing.status}"` };
     }
     existing.status = "failed";
@@ -305,22 +349,18 @@ const removeItem: GatewayRequestHandler = async ({ params, respond }) => {
 const processItem: GatewayRequestHandler = async ({ params, respond }) => {
   const { id } = params as { id?: string };
 
-  const { result: item } = await updateQueueState((state) => {
-    let target: QueueItem | undefined;
-    if (id) {
-      target = state.items.find((i) => i.id === id);
-    } else {
-      // Find next pending item (highest priority first)
-      const priorityOrder = { high: 0, normal: 1, low: 2 };
-      const pending = state.items
-        .filter((i) => i.status === "pending")
-        .sort((a, b) => (priorityOrder[a.priority] ?? 1) - (priorityOrder[b.priority] ?? 1));
-      target = pending[0];
-    }
-    if (!target) return null;
-    // For now, just keep status as pending — processor will be wired later
-    return target;
-  });
+  const state = await readQueueState();
+  let item: QueueItem | undefined;
+  if (id) {
+    item = state.items.find((i) => i.id === id);
+  } else {
+    // Find next pending item (highest priority first)
+    const priorityOrder: Record<string, number> = { high: 0, normal: 1, low: 2 };
+    const pending = state.items
+      .filter((i) => i.status === "pending")
+      .sort((a, b) => (priorityOrder[a.priority] ?? 1) - (priorityOrder[b.priority] ?? 1));
+    item = pending[0];
+  }
 
   if (!item) {
     respond(true, { item: null, spawned: false, message: "No pending items in queue" });
@@ -460,8 +500,8 @@ const retryItem: GatewayRequestHandler = async ({ params, respond }) => {
     const idx = state.items.findIndex((i) => i.id === id);
     if (idx === -1) return { item: null, error: "Queue item not found" };
     const existing = state.items[idx];
-    if (existing.status !== "failed" && existing.status !== "review") {
-      return { item: null, error: `Cannot retry item with status "${existing.status}". Only "failed" or "review" items can be retried.` };
+    if (existing.status !== "failed" && existing.status !== "review" && existing.status !== "needs-review") {
+      return { item: null, error: `Cannot retry item with status "${existing.status}". Only "failed", "review", or "needs-review" items can be retried.` };
     }
     existing.status = "pending";
     existing.error = undefined;

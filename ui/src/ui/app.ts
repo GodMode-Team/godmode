@@ -387,6 +387,9 @@ export class GodModeApp extends LitElement {
   @state() sidebarMimeType: string | null = null;
   @state() sidebarFilePath: string | null = null;
   @state() sidebarTitle: string | null = null;
+  @state() sidebarMode: "resource" | "proof" = "resource";
+  @state() sidebarProofSlug: string | null = null;
+  @state() sidebarProofUrl: string | null = null;
   @state() splitRatio = this.settings.splitRatio;
   @state() lightbox: LightboxState = createLightboxState();
 
@@ -577,6 +580,12 @@ export class GodModeApp extends LitElement {
   @state() allyWorking = false;
   @state() allyAttachments: import("./ui-types").ChatAttachment[] = [];
   @state() todayQueueResults: DecisionCardItem[] = [];
+  @state() inboxItems: NonNullable<import("./app-view-state").AppViewState["inboxItems"]> = [];
+  @state() inboxLoading = false;
+  @state() inboxCount = 0;
+  @state() inboxScoringId: string | null = null;
+  @state() inboxScoringValue: number | undefined = undefined;
+  @state() inboxFeedbackText: string | undefined = undefined;
 
   @state() chatPrivateMode = false;
   /** Maps private session keys → expiry timestamp (ms). Ephemeral sessions auto-delete. */
@@ -2285,6 +2294,9 @@ export class GodModeApp extends LitElement {
     this.sidebarMimeType = opts.mimeType?.trim() || null;
     this.sidebarFilePath = opts.filePath?.trim() || null;
     this.sidebarTitle = opts.title?.trim() || null;
+    this.sidebarMode = "resource";
+    this.sidebarProofSlug = null;
+    this.sidebarProofUrl = null;
     this.sidebarOpen = true;
   }
 
@@ -2304,6 +2316,9 @@ export class GodModeApp extends LitElement {
       this.sidebarMimeType = null;
       this.sidebarFilePath = null;
       this.sidebarTitle = null;
+      this.sidebarMode = "resource";
+      this.sidebarProofSlug = null;
+      this.sidebarProofUrl = null;
       this.sidebarCloseTimer = null;
     }, 200);
   }
@@ -3905,6 +3920,10 @@ export class GodModeApp extends LitElement {
 
   handleInboxOpenChat(itemId: string) {
     const item = this.inboxItems?.find((i) => i.id === itemId);
+    if (item?.source.taskId) {
+      void this.handleMissionControlOpenTaskSession(item.source.taskId);
+      return;
+    }
     if (item?.sessionId) {
       this.setSessionKey(item.sessionId);
       this.setTab("chat" as import("./navigation").Tab);
@@ -3923,16 +3942,37 @@ export class GodModeApp extends LitElement {
 
   // ── Proof sidebar handlers ──────────────────────────────────
 
-  handleOpenProofDoc(slug: string) {
+  async handleOpenProofDoc(slug: string) {
+    let title = "Proof Document";
+    let filePath: string | null = null;
+    let viewUrl = `http://127.0.0.1:4000/documents/${slug}/view`;
+    if (this.client && this.connected) {
+      try {
+        const result = await this.client.request<{
+          title?: string;
+          filePath?: string | null;
+          viewUrl?: string;
+        }>("proof.get", { slug });
+        title = result.title?.trim() || title;
+        filePath = result.filePath?.trim() || null;
+        viewUrl = result.viewUrl?.trim() || viewUrl;
+      } catch (err) {
+        console.warn("[Proof] Failed to resolve document metadata:", err);
+      }
+    }
     this.sidebarOpen = true;
     this.sidebarMode = "proof";
     this.sidebarProofSlug = slug;
+    this.sidebarProofUrl = viewUrl;
+    this.sidebarFilePath = filePath;
+    this.sidebarTitle = title;
   }
 
   handleCloseProofDoc() {
-    this.sidebarOpen = false;
     this.sidebarMode = "resource";
     this.sidebarProofSlug = null;
+    this.sidebarProofUrl = null;
+    this.handleCloseSidebar();
   }
 
   render() {

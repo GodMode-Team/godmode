@@ -455,6 +455,7 @@ export function renderMessageGroup(
   opts: {
     onOpenSidebar?: (content: string) => void;
     onOpenFile?: (filePath: string) => void;
+    onOpenProof?: (slug: string) => void;
     onPushToDrive?: (filePath: string) => void;
     onImageClick?: (url: string, allImages: LightboxImage[], index: number) => void;
     resolveImageUrl?: (messageIndex: number, imageIndex: number) => string | null;
@@ -499,6 +500,7 @@ export function renderMessageGroup(
             },
             opts.onOpenSidebar,
             opts.onOpenFile,
+            opts.onOpenProof,
             opts.onImageClick,
             opts.resolveImageUrl,
             opts.onPushToDrive,
@@ -683,12 +685,22 @@ function renderGroupedMessage(
   opts: { isStreaming: boolean; showReasoning: boolean },
   onOpenSidebar?: (content: string) => void,
   onOpenFile?: (filePath: string) => void,
+  onOpenProof?: (slug: string) => void,
   onImageClick?: (url: string, allImages: LightboxImage[], index: number) => void,
   resolveImageUrl?: (messageIndex: number, imageIndex: number) => string | null,
   onPushToDrive?: (filePath: string) => void,
 ) {
   try {
-    return renderGroupedMessageUnsafe(message, opts, onOpenSidebar, onOpenFile, onImageClick, resolveImageUrl, onPushToDrive);
+    return renderGroupedMessageUnsafe(
+      message,
+      opts,
+      onOpenSidebar,
+      onOpenFile,
+      onOpenProof,
+      onImageClick,
+      resolveImageUrl,
+      onPushToDrive,
+    );
   } catch (err) {
     console.error("[chat] message render error:", err);
     return html`
@@ -704,6 +716,7 @@ function renderGroupedMessageUnsafe(
   opts: { isStreaming: boolean; showReasoning: boolean },
   onOpenSidebar?: (content: string) => void,
   onOpenFile?: (filePath: string) => void,
+  onOpenProof?: (slug: string) => void,
   onImageClick?: (url: string, allImages: LightboxImage[], index: number) => void,
   resolveImageUrl?: (messageIndex: number, imageIndex: number) => string | null,
   onPushToDrive?: (filePath: string) => void,
@@ -777,7 +790,7 @@ function renderGroupedMessageUnsafe(
   if (hasToolCards && isToolResult) {
     return html`
       ${hasImages ? renderMessageImages(images, onImageClick, boundResolver) : nothing}
-      ${toolCards.map((card) => renderToolCardSidebar(card, onOpenSidebar, onOpenFile, onPushToDrive))}
+      ${toolCards.map((card) => renderToolCardSidebar(card, onOpenSidebar, onOpenFile, onOpenProof, onPushToDrive))}
     `;
   }
 
@@ -835,7 +848,7 @@ function renderGroupedMessageUnsafe(
             )}</div>`
           : nothing
       }
-      ${toolCards.map((card) => renderToolCardSidebar(card, onOpenSidebar, onOpenFile, onPushToDrive))}
+      ${toolCards.map((card) => renderToolCardSidebar(card, onOpenSidebar, onOpenFile, onOpenProof, onPushToDrive))}
     </div>
   `;
 }

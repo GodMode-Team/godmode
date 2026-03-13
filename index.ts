@@ -67,6 +67,7 @@ import { authHandlers } from "./src/methods/auth.js";
 import { sessionPrivacyHandlers } from "./src/methods/session-privacy.js";
 import { resourcesHandlers } from "./src/methods/resources.js";
 import { inboxHandlers } from "./src/services/inbox.js";
+import { proofHandlers } from "./src/services/proof-server.js";
 
 // Extracted modules
 import { initLicenseFromConfig, withLicenseGate, getLicenseState } from "./src/lib/license.js";
@@ -142,6 +143,7 @@ const godmodePlugin = {
       ...fathomWebhookHandlers, ...authHandlers, ...sessionPrivacyHandlers,
       ...resourcesHandlers,
       ...inboxHandlers,
+      ...proofHandlers,
     };
 
     for (const [method, handler] of Object.entries(allHandlers)) {

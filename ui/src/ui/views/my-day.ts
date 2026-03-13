@@ -5,6 +5,7 @@ import { toSanitizedMarkdownHtml } from "../markdown.js";
 import { extractOpenablePathFromEventTarget } from "../openable-file-path.js";
 import type { DailyBriefData, DailyBriefProps } from "./daily-brief.js";
 import { renderDailyBrief } from "./daily-brief.js";
+import { renderInboxSection, type InboxViewItem } from "./inbox.js";
 import type { WorkspaceTask } from "./workspaces.js";
 import { renderAllTaskRow, sortTasks } from "./workspaces.js";
 
@@ -101,18 +102,20 @@ export type MyDayProps = {
   decisionCards?: DecisionCardsProps;
   // Evening capture
   onEveningCapture?: () => void;
-  // Inbox items
-  inboxItems?: InboxItem[];
+  // Universal inbox
+  inboxItems?: InboxViewItem[];
   inboxLoading?: boolean;
-  onOpenInboxItem?: (path: string) => void;
-};
-
-export type InboxItem = {
-  name: string;
-  path: string;
-  updatedAt: string | null;
-  excerpt: string;
-  source?: string;
+  inboxCount?: number;
+  inboxScoringId?: string | null;
+  inboxScoringValue?: number;
+  inboxFeedbackText?: string;
+  onInboxViewOutput?: (itemId: string) => void;
+  onInboxOpenChat?: (itemId: string) => void;
+  onInboxDismiss?: (itemId: string) => void;
+  onInboxScore?: (itemId: string, score: number, feedback?: string) => void;
+  onInboxSetScoring?: (itemId: string | null, score?: number) => void;
+  onInboxFeedbackChange?: (text: string) => void;
+  onInboxMarkAll?: () => void;
 };
 
 // ===== Helper Functions =====
@@ -501,8 +504,8 @@ export function renderMyDayToolbar(props: MyDayProps) {
         <button class="today-view-tab ${viewMode === "tasks" ? "active" : ""}"
           @click=${() => props.onViewModeChange?.("tasks")}>Tasks</button>
         <button class="today-view-tab ${viewMode === "inbox" ? "active" : ""}"
-          @click=${() => props.onViewModeChange?.("inbox")}>Inbox${props.decisionCards && props.decisionCards.items.length > 0
-            ? html`<span class="tab-badge">${props.decisionCards.items.length}</span>`
+          @click=${() => props.onViewModeChange?.("inbox")}>Inbox${(props.inboxCount ?? props.inboxItems?.filter((item) => item.status === "pending").length ?? props.decisionCards?.items.length ?? 0) > 0
+            ? html`<span class="tab-badge">${props.inboxCount ?? props.inboxItems?.filter((item) => item.status === "pending").length ?? props.decisionCards?.items.length}</span>`
             : nothing}</button>
       </div>
       <div class="today-quick-actions">
@@ -523,85 +526,26 @@ export function renderMyDayToolbar(props: MyDayProps) {
   `;
 }
 
-// ===== Inbox Panel =====
-
-function renderInboxPanel(props: MyDayProps) {
-  const items = props.inboxItems ?? [];
-  const loading = props.inboxLoading;
-
-  if (loading) {
-    return html`<div class="my-day-card">
-      <div class="my-day-card-header">
-        <div class="my-day-card-title">
-          <span class="my-day-card-icon">&#x1F4E5;</span>
-          <span>INBOX</span>
-        </div>
-      </div>
-      <div class="my-day-card-content"><div class="my-day-empty">Loading inbox...</div></div>
-    </div>`;
-  }
-
-  if (items.length === 0) {
-    return nothing;
-  }
-
-  return html`<div class="my-day-card">
-    <div class="my-day-card-header">
-      <div class="my-day-card-title">
-        <span class="my-day-card-icon">&#x1F4E5;</span>
-        <span>INBOX</span>
-        <span class="tab-badge" style="margin-left: 8px;">${items.length}</span>
-      </div>
-    </div>
-    <div class="my-day-card-content">
-      <div class="inbox-list">
-        ${items.slice(0, 10).map(
-          (item) => html`
-            <div class="inbox-item"
-              @click=${() => props.onOpenInboxItem?.(item.path)}
-              style="cursor: pointer; padding: 8px 0; border-bottom: 1px solid var(--border-color, #e5e5e5);">
-              <div style="font-weight: 500; font-size: 13px;">${item.name}</div>
-              ${item.source
-                ? html`<span class="chip" style="margin-top: 4px; font-size: 11px;">${item.source}</span>`
-                : nothing}
-              ${item.excerpt
-                ? html`<div class="muted" style="margin-top: 4px; font-size: 12px; line-height: 1.4;
-                    overflow: hidden; text-overflow: ellipsis; display: -webkit-box;
-                    -webkit-line-clamp: 2; -webkit-box-orient: vertical;">${item.excerpt}</div>`
-                : nothing}
-            </div>
-          `,
-        )}
-        ${items.length > 10
-          ? html`<div class="muted" style="padding: 8px 0; font-size: 12px;">
-              +${items.length - 10} more in inbox
-            </div>`
-          : nothing}
-      </div>
-    </div>
-  </div>`;
-}
-
 // ===== Inbox View (Agent Results Stream) =====
 
 function renderInbox(props: MyDayProps) {
-  const hasItems = props.decisionCards && props.decisionCards.items.length > 0;
-
   return html`
     <div class="my-day-brief-full">
-      ${hasItems
-        ? renderDecisionCards(props.decisionCards!)
-        : html`<div class="my-day-card">
-            <div class="my-day-card-header">
-              <div class="my-day-card-title">
-                <span class="my-day-card-icon">&#x1F4E5;</span>
-                <span>INBOX</span>
-              </div>
-            </div>
-            <div class="my-day-card-content">
-              <div class="my-day-empty">Nothing in your inbox yet. Agent results, notifications, and completed work will appear here.</div>
-            </div>
-          </div>`}
+      ${renderInboxSection({
+        items: props.inboxItems ?? [],
+        loading: props.inboxLoading,
+        count: props.inboxCount,
+        scoringId: props.inboxScoringId,
+        scoringValue: props.inboxScoringValue,
+        feedbackText: props.inboxFeedbackText,
+        onViewOutput: (itemId: string) => props.onInboxViewOutput?.(itemId),
+        onOpenChat: (itemId: string) => props.onInboxOpenChat?.(itemId),
+        onDismiss: (itemId: string) => props.onInboxDismiss?.(itemId),
+        onScore: (itemId: string, score: number, feedback?: string) => props.onInboxScore?.(itemId, score, feedback),
+        onSetScoring: (itemId: string | null, score?: number) => props.onInboxSetScoring?.(itemId, score),
+        onFeedbackChange: (text: string) => props.onInboxFeedbackChange?.(text),
+        onMarkAll: () => props.onInboxMarkAll?.(),
+      })}
     </div>
   `;
 }

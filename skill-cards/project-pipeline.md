@@ -1,7 +1,7 @@
 ---
 domain: projects
 triggers: build me, create a website, landing page, project, app, full project, end to end, design and build, need a site, new product, launch
-tools: queue_add, queue_check, queue_action
+tools: queue_add, queue_check, queue_action, proof_editor, queue_steer
 ---
 ## When to Use
 - User asks for a multi-disciplinary project (website, app, campaign, product launch)
@@ -60,6 +60,8 @@ Each queued agent automatically gets a Proof document for live output. The user 
 - Review and edit deliverables directly in the Proof doc before approving
 
 When reviewing agent output, open the Proof doc with `proof_editor` action `open` to show it in the sidebar.
+
+For writing-heavy deliverables, create the Proof doc first so Prosper and the user can collaborate before the queue item finishes.
 
 ## Rules
 - ALWAYS scope before queuing — you are the chief of staff, not a task router

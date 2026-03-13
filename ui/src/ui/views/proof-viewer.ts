@@ -11,8 +11,11 @@ import { icons } from "../icons";
 
 export type ProofViewerProps = {
   slug: string;
-  proofPort?: number;
+  title?: string | null;
+  viewUrl?: string | null;
+  filePath?: string | null;
   onClose: () => void;
+  onPushToDrive?: (filePath: string, account?: string) => void;
 };
 
 /**
@@ -20,17 +23,35 @@ export type ProofViewerProps = {
  * Uses an iframe to the Proof server's /documents/:slug/view endpoint.
  */
 export function renderProofViewer(props: ProofViewerProps) {
-  const port = props.proofPort ?? 4000;
-  const viewUrl = `http://127.0.0.1:${port}/documents/${props.slug}/view`;
+  const viewUrl = props.viewUrl?.trim() || `http://127.0.0.1:4000/documents/${props.slug}/view`;
+  const title = props.title?.trim() || props.slug;
 
   return html`
     <div class="sidebar-panel proof-viewer">
       <div class="sidebar-header">
         <div class="sidebar-title-wrap">
-          <div class="sidebar-title">Proof Document</div>
-          <div class="sidebar-path" title=${viewUrl}>Live co-editing</div>
+          <div class="sidebar-title">${title}</div>
+          <div class="sidebar-path" title=${viewUrl}>Live co-editing via Proof</div>
         </div>
         <div class="sidebar-header-actions">
+          <button
+            class="btn sidebar-open-browser-btn"
+            title="Copy share link"
+            @click=${async () => {
+              try {
+                await navigator.clipboard.writeText(viewUrl);
+              } catch {
+                window.prompt("Copy Proof link", viewUrl);
+              }
+            }}
+          >Share</button>
+          ${props.filePath && props.onPushToDrive
+            ? html`<button
+                class="btn sidebar-open-browser-btn"
+                title="Upload the Proof markdown mirror to Google Drive"
+                @click=${() => props.onPushToDrive?.(props.filePath!)}
+              >Drive</button>`
+            : nothing}
           <button
             class="btn sidebar-open-browser-btn"
             title="Open in browser"

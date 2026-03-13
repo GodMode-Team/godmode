@@ -1065,14 +1065,8 @@ export function renderApp(state: AppViewState) {
                   viewMode: state.todayViewMode ?? "brief",
                   onViewModeChange: (mode) => state.handleTodayViewModeChange(mode),
                   focusPulseActive: false,
-                  decisionCards: (state.todayQueueResults ?? []).length > 0 ? {
-                    items: state.todayQueueResults!,
-                    onApprove: () => {},
-                    onReject: () => {},
-                    onDismiss: () => {},
-                    onViewOutput: () => {},
-                    onOpenChat: () => {},
-                  } : undefined,
+                  inboxItems: state.inboxItems ?? [],
+                  inboxCount: state.inboxCount ?? 0,
                   onEveningCapture: () => {
                     state.setTab("chat" as import("./navigation").Tab);
                     void state.handleSendChat("Let's do my evening capture. Walk me through these:\n1. What went well today?\n2. What didn't get done?\n3. What should tomorrow's brief prioritize?\n4. Ask me for an overall GodMode score (1-10) for today and any feedback. Submit it with the daily rating tool.");
@@ -1572,9 +1566,21 @@ export function renderApp(state: AppViewState) {
                     onFeedback: (id: string, workflow: string, feedback: string) => state.handleDecisionFeedback(id, workflow, feedback),
                   } : undefined,
                   // Inbox
-                  inboxItems: state.todayInboxItems ?? [],
-                  inboxLoading: state.todayInboxLoading ?? false,
-                  onOpenInboxItem: (path: string) => state.handleOpenSidebar(path, "Inbox Item"),
+                  inboxItems: state.inboxItems ?? [],
+                  inboxLoading: state.inboxLoading ?? false,
+                  inboxCount: state.inboxCount ?? 0,
+                  inboxScoringId: state.inboxScoringId ?? null,
+                  inboxScoringValue: state.inboxScoringValue,
+                  inboxFeedbackText: state.inboxFeedbackText,
+                  onInboxViewOutput: (itemId: string) => void state.handleInboxViewOutput(itemId),
+                  onInboxOpenChat: (itemId: string) => state.handleInboxOpenChat(itemId),
+                  onInboxDismiss: (itemId: string) => void state.handleInboxDismiss(itemId),
+                  onInboxScore: (itemId: string, score: number, feedback?: string) =>
+                    void state.handleInboxScore(itemId, score, feedback),
+                  onInboxSetScoring: (itemId: string | null, score?: number) =>
+                    state.handleInboxSetScoring(itemId, score),
+                  onInboxFeedbackChange: (text: string) => state.handleInboxFeedbackChange(text),
+                  onInboxMarkAll: () => void state.handleInboxMarkAll(),
                   // Evening capture
                   onEveningCapture: () => {
                     state.setTab("chat" as import("./navigation").Tab);
@@ -2163,6 +2169,9 @@ export function renderApp(state: AppViewState) {
                 sidebarMimeType: state.sidebarMimeType,
                 sidebarFilePath: state.sidebarFilePath,
                 sidebarTitle: state.sidebarTitle,
+                sidebarMode: state.sidebarMode,
+                sidebarProofSlug: state.sidebarProofSlug,
+                sidebarProofUrl: state.sidebarProofUrl,
                 splitRatio: state.splitRatio,
                 onOpenSidebar: (
                   content: string,
@@ -2174,6 +2183,7 @@ export function renderApp(state: AppViewState) {
                 ) => state.handleOpenSidebar(content, opts),
                 onMessageLinkClick: (href: string) => state.handleOpenMessageFileLink(href),
                 onCloseSidebar: () => state.handleCloseSidebar(),
+                onOpenProof: (slug: string) => void state.handleOpenProofDoc(slug),
                 onOpenFile: (path: string) => state.handleOpenFile(path),
                 onSplitRatioChange: (ratio: number) => state.handleSplitRatioChange(ratio),
                 onPushToDrive: (path: string, account?: string) => state.handlePushToDrive(path, account),
@@ -2531,7 +2541,11 @@ export function renderApp(state: AppViewState) {
                 ${state.sidebarMode === "proof" && state.sidebarProofSlug
                   ? renderProofViewer({
                       slug: state.sidebarProofSlug,
+                      title: state.sidebarTitle,
+                      viewUrl: state.sidebarProofUrl,
+                      filePath: state.sidebarFilePath,
                       onClose: () => state.handleCloseProofDoc(),
+                      onPushToDrive: (path: string, account?: string) => state.handlePushToDrive(path, account),
                     })
                   : renderMarkdownSidebar({
                       content: state.sidebarContent ?? null,

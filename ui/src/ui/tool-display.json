@@ -55,6 +55,26 @@
       "title": "Attach",
       "detailKeys": ["path", "url", "fileName"]
     },
+    "proof_editor": {
+      "icon": "fileText",
+      "title": "Proof Editor",
+      "actions": {
+        "create": { "label": "create", "detailKeys": ["title"] },
+        "write": { "label": "write", "detailKeys": ["slug"] },
+        "read": { "label": "read", "detailKeys": ["slug"] },
+        "comment": { "label": "comment", "detailKeys": ["slug"] },
+        "suggest": { "label": "suggest", "detailKeys": ["slug"] },
+        "open": { "label": "open", "detailKeys": ["slug"] },
+        "share": { "label": "share", "detailKeys": ["slug"] },
+        "export_gdrive": { "label": "drive", "detailKeys": ["slug"] },
+        "list": { "label": "list" }
+      }
+    },
+    "queue_steer": {
+      "icon": "messageSquare",
+      "title": "Queue Steer",
+      "detailKeys": ["itemId", "instruction"]
+    },
     "browser": {
       "icon": "globe",
       "title": "Browser",

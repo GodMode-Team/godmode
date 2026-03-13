@@ -1,14 +1,35 @@
-/**
- * inbox.ts — Universal Inbox UI component.
- *
- * Renders inbox cards with scoring, feedback, and quick actions.
- * Integrates into the Today tab as a section.
- */
-
 import { html, nothing } from "lit";
-import type { AppViewState } from "../app-view-state";
 
-type InboxItemView = NonNullable<AppViewState["inboxItems"]>[number];
+export type InboxViewItem = {
+  id: string;
+  type: string;
+  title: string;
+  summary: string;
+  source: { persona?: string; skill?: string; taskId?: string; queueItemId?: string };
+  proofDocSlug?: string;
+  outputPath?: string;
+  sessionId?: string;
+  createdAt: string;
+  status: string;
+  score?: number;
+  feedback?: string;
+};
+
+export type InboxSectionProps = {
+  items: InboxViewItem[];
+  loading?: boolean;
+  count?: number;
+  scoringId?: string | null;
+  scoringValue?: number;
+  feedbackText?: string;
+  onViewOutput: (itemId: string) => void;
+  onOpenChat: (itemId: string) => void;
+  onDismiss: (itemId: string) => void;
+  onScore: (itemId: string, score: number, feedback?: string) => void;
+  onSetScoring: (itemId: string | null, score?: number) => void;
+  onFeedbackChange: (text: string) => void;
+  onMarkAll: () => void;
+};
 
 function timeAgo(dateStr: string): string {
   const diff = Date.now() - new Date(dateStr).getTime();
@@ -21,7 +42,7 @@ function timeAgo(dateStr: string): string {
   return `${days}d ago`;
 }
 
-function personaLabel(item: InboxItemView): string {
+function personaLabel(item: InboxViewItem): string {
   if (item.source.persona) {
     return item.source.persona.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
   }
@@ -29,10 +50,11 @@ function personaLabel(item: InboxItemView): string {
   return item.type === "agent-execution" ? "Agent" : "Skill";
 }
 
-function renderScoreWidget(state: AppViewState, item: InboxItemView) {
-  if (state.inboxScoringId !== item.id) return nothing;
+function renderScoreWidget(props: InboxSectionProps, item: InboxViewItem) {
+  if (props.scoringId !== item.id) return nothing;
 
-  const score = state.inboxScoringValue ?? 7;
+  const score = props.scoringValue ?? 7;
+  const feedbackText = props.feedbackText ?? "";
   const needsFeedback = score <= 4;
   const optionalFeedback = score >= 9;
 
@@ -43,50 +65,41 @@ function renderScoreWidget(state: AppViewState, item: InboxItemView) {
           (n) => html`
             <button
               class="inbox-score-btn${n === score ? " active" : ""}${n <= 4 ? " low" : n >= 9 ? " high" : ""}"
-              @click=${() => state.handleInboxSetScoring(item.id, n)}
+              @click=${() => props.onSetScoring(item.id, n)}
             >${n}</button>
           `,
         )}
       </div>
-      ${needsFeedback
+      ${needsFeedback || optionalFeedback
         ? html`
             <div class="inbox-feedback">
               <textarea
                 class="inbox-feedback-input"
-                placeholder="What went wrong? (required)"
-                .value=${state.inboxFeedbackText ?? ""}
-                @input=${(e: Event) => state.handleInboxFeedbackChange((e.target as HTMLTextAreaElement).value)}
+                placeholder=${needsFeedback ? "What went wrong? (required)" : "What was great? (optional)"}
+                .value=${feedbackText}
+                @input=${(e: Event) => props.onFeedbackChange((e.target as HTMLTextAreaElement).value)}
               ></textarea>
             </div>
           `
-        : optionalFeedback
-          ? html`
-              <div class="inbox-feedback">
-                <textarea
-                  class="inbox-feedback-input"
-                  placeholder="What was great? (optional)"
-                  .value=${state.inboxFeedbackText ?? ""}
-                  @input=${(e: Event) => state.handleInboxFeedbackChange((e.target as HTMLTextAreaElement).value)}
-                ></textarea>
-              </div>
-            `
-          : nothing}
+        : nothing}
       <div class="inbox-score-actions">
         <button
           class="btn inbox-score-submit"
-          ?disabled=${needsFeedback && !(state.inboxFeedbackText?.trim())}
-          @click=${() => state.handleInboxScore(item.id, score, state.inboxFeedbackText?.trim() || undefined)}
+          ?disabled=${needsFeedback && !feedbackText.trim()}
+          @click=${() => props.onScore(item.id, score, feedbackText.trim() || undefined)}
         >Complete (${score}/10)</button>
         <button
           class="btn inbox-score-cancel"
-          @click=${() => state.handleInboxSetScoring(null)}
+          @click=${() => props.onSetScoring(null)}
         >Cancel</button>
       </div>
     </div>
   `;
 }
 
-function renderInboxCard(state: AppViewState, item: InboxItemView) {
+function renderInboxCard(props: InboxSectionProps, item: InboxViewItem) {
+  const hasViewableOutput = Boolean(item.proofDocSlug || item.outputPath);
+  const hasChat = Boolean(item.sessionId || item.source.taskId || item.source.queueItemId);
   return html`
     <div class="inbox-card">
       <div class="inbox-card-header">
@@ -94,62 +107,61 @@ function renderInboxCard(state: AppViewState, item: InboxItemView) {
         <span class="inbox-card-time">${timeAgo(item.createdAt)}</span>
       </div>
       <div class="inbox-card-title">${item.title}</div>
-      <div class="inbox-card-summary">${item.summary.slice(0, 200)}${item.summary.length > 200 ? "..." : ""}</div>
+      <div class="inbox-card-summary">${item.summary.slice(0, 220)}${item.summary.length > 220 ? "..." : ""}</div>
       <div class="inbox-card-actions">
-        ${item.outputPath
-          ? html`<button class="btn btn-sm" @click=${() => state.handleInboxViewOutput(item.id)}>View Output</button>`
+        ${hasViewableOutput
+          ? html`<button class="btn btn-sm" @click=${() => props.onViewOutput(item.id)}>View Output</button>`
           : nothing}
-        ${item.source.queueItemId
-          ? html`<button class="btn btn-sm" @click=${() => state.handleInboxOpenChat(item.id)}>Open Chat</button>`
+        ${hasChat
+          ? html`<button class="btn btn-sm" @click=${() => props.onOpenChat(item.id)}>Open Chat</button>`
           : nothing}
-        <button class="btn btn-sm btn-primary" @click=${() => state.handleInboxSetScoring(item.id, 7)}>Complete</button>
-        <button class="btn btn-sm btn-ghost" @click=${() => state.handleInboxDismiss(item.id)}>Dismiss</button>
+        <button class="btn btn-sm btn-primary" @click=${() => props.onSetScoring(item.id, 7)}>Complete</button>
+        <button class="btn btn-sm btn-ghost" @click=${() => props.onDismiss(item.id)}>Dismiss</button>
       </div>
-      ${renderScoreWidget(state, item)}
+      ${renderScoreWidget(props, item)}
     </div>
   `;
 }
 
-/**
- * Render the inbox section for the Today tab.
- */
-export function renderInboxSection(state: AppViewState) {
-  const items = state.inboxItems ?? [];
-  const pendingItems = items.filter((i) => i.status === "pending");
-  const count = state.inboxCount ?? pendingItems.length;
+export function renderInboxSection(props: InboxSectionProps) {
+  const pendingItems = props.items.filter((item) => item.status === "pending");
+  const count = props.count ?? pendingItems.length;
 
-  if (count === 0 && !state.inboxLoading) {
+  if (props.loading) {
+    return html`<div class="inbox-loading">Loading inbox...</div>`;
+  }
+
+  if (count === 0) {
     return html`
-      <div class="inbox-empty">
-        <div class="inbox-empty-text">No pending items</div>
+      <div class="my-day-card">
+        <div class="my-day-card-header">
+          <div class="my-day-card-title">
+            <span class="my-day-card-icon">&#x1F4E5;</span>
+            <span>INBOX</span>
+          </div>
+        </div>
+        <div class="my-day-card-content">
+          <div class="my-day-empty">Nothing pending. Background agent work will appear here when it lands.</div>
+        </div>
       </div>
     `;
   }
 
   return html`
-    <div class="inbox-section">
-      ${state.inboxLoading
-        ? html`<div class="inbox-loading">Loading inbox...</div>`
-        : nothing}
-      ${pendingItems.length > 0
-        ? html`
-            <div class="inbox-bulk-actions">
-              <span class="inbox-count">${count} item${count !== 1 ? "s" : ""} to review</span>
-              <button class="btn btn-sm" @click=${() => state.handleInboxMarkAll()}>Mark All Complete</button>
-            </div>
-            <div class="inbox-list">
-              ${pendingItems.map((item) => renderInboxCard(state, item))}
-            </div>
-          `
-        : nothing}
+    <div class="my-day-card">
+      <div class="my-day-card-header">
+        <div class="my-day-card-title">
+          <span class="my-day-card-icon">&#x1F4E5;</span>
+          <span>INBOX</span>
+          <span class="tab-badge" style="margin-left: 8px;">${count}</span>
+        </div>
+        <button class="btn btn-sm" @click=${() => props.onMarkAll()}>Mark All Complete</button>
+      </div>
+      <div class="my-day-card-content">
+        <div class="inbox-list">
+          ${pendingItems.map((item) => renderInboxCard(props, item))}
+        </div>
+      </div>
     </div>
   `;
-}
-
-/**
- * Render inbox badge count for the Today tab label.
- */
-export function renderInboxBadge(count: number) {
-  if (count <= 0) return nothing;
-  return html`<span class="inbox-badge">${count > 99 ? "99+" : count}</span>`;
 }

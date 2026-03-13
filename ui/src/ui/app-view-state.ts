@@ -111,6 +111,8 @@ export type AppViewState = {
   sidebarMode?: "resource" | "proof";
   /** Proof document slug when sidebarMode === "proof" */
   sidebarProofSlug?: string | null;
+  /** Fully resolved Proof iframe URL for the current doc */
+  sidebarProofUrl?: string | null;
   splitRatio: number;
   lightbox: LightboxState;
   nodesLoading: boolean;
@@ -673,7 +675,7 @@ export type AppViewState = {
   handleInboxSetScoring: (itemId: string | null, score?: number) => void;
   handleInboxFeedbackChange: (text: string) => void;
   // Proof sidebar handlers
-  handleOpenProofDoc: (slug: string) => void;
+  handleOpenProofDoc: (slug: string) => Promise<void>;
   handleCloseProofDoc: () => void;
   // Proactive Intel handlers
   handleIntelLoad: () => Promise<void>;
