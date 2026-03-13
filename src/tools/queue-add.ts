@@ -2,8 +2,6 @@ import { type AnyAgentTool, jsonResult } from "openclaw/plugin-sdk";
 import { updateQueueState, newQueueItemId, type QueueItemType } from "../lib/queue-state.js";
 import { resolvePersona } from "../lib/agent-roster.js";
 import { getQueueProcessor } from "../services/queue-processor.js";
-import { createProofDocument } from "../lib/proof-bridge.js";
-import { isProofRunning } from "../services/proof-server.js";
 
 type ToolContext = {
   sessionKey?: string;
@@ -130,21 +128,8 @@ export function createQueueAddTool(_ctx: ToolContext): AnyAgentTool {
             }
           : undefined;
 
-      let proofDocSlug: string | undefined;
-      let proofDocFilePath: string | undefined;
-      if (isProofRunning()) {
-        try {
-          const proofDoc = await createProofDocument(
-            title,
-            `# ${title}\n\n## Working Draft\n\n`,
-            "ally",
-          );
-          proofDocSlug = proofDoc.slug;
-          proofDocFilePath = proofDoc.filePath;
-        } catch {
-          // Proof is best-effort; queue item can still run without it.
-        }
-      }
+      // Proof doc creation is handled by ensureProofDocument in queue-processor
+      // when the item starts processing. No need to create here.
 
       const { result: item } = await updateQueueState((state) => {
         const newItem = {
@@ -162,8 +147,6 @@ export function createQueueAddTool(_ctx: ToolContext): AnyAgentTool {
           sessionId: _ctx.sessionKey ?? undefined,
           personaHint: personaSlug ?? persona?.slug,
           engine: params.engine ? (String(params.engine) as "claude" | "codex" | "gemini") : undefined,
-          proofDocSlug,
-          proofDocFilePath,
           handoff,
         };
         state.items.push(newItem);

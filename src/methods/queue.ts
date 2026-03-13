@@ -14,8 +14,6 @@ import {
 import { updateTasks } from "./tasks.js";
 import type { GatewayRequestHandler } from "openclaw/plugin-sdk";
 import type { LessonCategory } from "../lib/agent-lessons.js";
-import { createProofDocument } from "../lib/proof-bridge.js";
-import { isProofRunning } from "../services/proof-server.js";
 
 const execFile = promisify(execFileCb);
 
@@ -64,21 +62,8 @@ const addItem: GatewayRequestHandler = async ({ params, respond }) => {
     return;
   }
 
-  let proofDocSlug: string | undefined;
-  let proofDocFilePath: string | undefined;
-  if (isProofRunning()) {
-    try {
-      const proofDoc = await createProofDocument(
-        title,
-        `# ${title}\n\n## Working Draft\n\n`,
-        "ally",
-      );
-      proofDocSlug = proofDoc.slug;
-      proofDocFilePath = proofDoc.filePath;
-    } catch {
-      // Proof doc creation is best-effort at queue time.
-    }
-  }
+  // Proof doc creation is handled by ensureProofDocument in queue-processor
+  // when the item starts processing. No need to create here.
 
   const { result: item } = await updateQueueState((state) => {
     const newItem: QueueItem = {
@@ -95,8 +80,6 @@ const addItem: GatewayRequestHandler = async ({ params, respond }) => {
       sessionId: sessionId || undefined,
       personaHint: personaHint || undefined,
       engine: engine || undefined,
-      proofDocSlug,
-      proofDocFilePath,
       createdAt: Date.now(),
     };
     state.items.push(newItem);

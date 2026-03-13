@@ -124,9 +124,13 @@ export async function addInboxItem(
 
   state.items.unshift(entry);
 
-  // Cap inbox size
+  // Cap inbox size — only drop reviewed/dismissed items, never pending
   if (state.items.length > MAX_INBOX_ITEMS) {
-    state.items = state.items.slice(0, MAX_INBOX_ITEMS);
+    const pending = state.items.filter((i) => i.status === "pending");
+    const rest = state.items.filter((i) => i.status !== "pending");
+    // Keep all pending, trim oldest reviewed/dismissed to fit budget
+    const budget = MAX_INBOX_ITEMS - pending.length;
+    state.items = [...pending, ...rest.slice(0, Math.max(0, budget))];
   }
 
   await writeInboxState(state);

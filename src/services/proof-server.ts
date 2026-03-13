@@ -23,7 +23,7 @@ import { mkdirSync } from "node:fs";
 import { join, dirname } from "node:path";
 import Database from "better-sqlite3";
 import { ARTIFACTS_DIR, DATA_DIR } from "../data-paths.js";
-import { secureMkdir, secureWriteFileSync } from "../lib/secure-fs.js";
+import { secureMkdir, secureMkdirSync, secureWriteFileSync } from "../lib/secure-fs.js";
 import { randomUUID } from "node:crypto";
 
 type Logger = { info: (msg: string) => void; warn: (msg: string) => void; error: (msg: string) => void };
@@ -114,7 +114,7 @@ function getDb() {
 
 function syncDocumentArtifact(slug: string, title: string, content: string): string {
   const filePath = getProofDocumentFilePath(slug);
-  secureMkdir(PROOF_ARTIFACTS_DIR).catch(() => {});
+  secureMkdirSync(PROOF_ARTIFACTS_DIR);
   const normalized = content.trim().startsWith("#")
     ? content
     : `# ${title}\n\n${content}`.trim() + "\n";
