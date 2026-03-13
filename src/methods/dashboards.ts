@@ -118,12 +118,18 @@ const get: GatewayRequestHandler = async ({ params, respond }) => {
     return;
   }
 
+  // Try subdirectory layout first ({id}/index.html), then flat file ({id}.html)
   const htmlPath = path.join(DASHBOARDS_DIR, id, "index.html");
+  const flatPath = path.join(DASHBOARDS_DIR, `${id}.html`);
   let html = "";
   try {
     html = await fs.readFile(htmlPath, "utf-8");
   } catch {
-    html = `<div style="padding: 2rem; text-align: center; color: var(--muted);">Dashboard "${manifest.title}" has no content yet.</div>`;
+    try {
+      html = await fs.readFile(flatPath, "utf-8");
+    } catch {
+      html = `<div style="padding: 2rem; text-align: center; color: var(--muted);">Dashboard "${manifest.title}" has no content yet.</div>`;
+    }
   }
 
   respond(true, { manifest, html });
