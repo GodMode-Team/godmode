@@ -1,9 +1,7 @@
 /**
  * evidence.ts — Shared evidence checking and artifact extraction for agent outputs.
  *
- * Extracted from queue-processor.ts so both the queue completion handler and
- * the Paperclip adapter's post-completion pipeline can verify output quality
- * using the same rules.
+ * Extracted from queue-processor.ts for reuse across the completion pipeline.
  */
 
 // ── Types ────────────────────────────────────────────────────────

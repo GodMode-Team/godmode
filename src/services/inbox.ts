@@ -24,7 +24,7 @@ import { DATA_DIR } from "../data-paths.js";
 
 // ── Types ────────────────────────────────────────────────────────
 
-export type InboxItemType = "agent-execution" | "skill-run";
+export type InboxItemType = "agent-execution" | "skill-run" | "project-completion";
 export type InboxItemStatus = "pending" | "reviewed" | "dismissed";
 
 export type InboxItem = {
@@ -47,6 +47,17 @@ export type InboxItem = {
   feedback?: string;
   /** Set true when the user reviews this item in the live chat session */
   reviewedInSession?: boolean;
+  /** Delegated project ID (for project-completion items) */
+  projectId?: string;
+  /** All deliverables in this project (for project-completion items) */
+  deliverables?: Array<{
+    title: string;
+    persona: string;
+    proofDocSlug?: string;
+    summary?: string;
+  }>;
+  /** Session created for coworking on project review */
+  coworkSessionId?: string;
 };
 
 export type InboxState = {

@@ -1,12 +1,13 @@
 /**
- * Delegation RPC methods — UI-facing endpoints for Paperclip team data.
+ * Delegation RPC methods — UI-facing endpoints for Mission Control.
  *
  * These provide the data contract the Mission Control UI consumes
- * to render org charts, agent cards, activity feeds, and steering.
+ * to render org charts, agent cards, activity feeds, and project status.
+ * Data comes from projects-state (grouping) + queue-state (execution).
  */
 
-import { getPaperclipAdapter, isPaperclipRunning } from "../services/paperclip-adapter.js";
-import { readQueueState } from "../lib/queue-state.js";
+import { readProjects, clearProjects } from "../lib/projects-state.js";
+import { readQueueState, type QueueItem } from "../lib/queue-state.js";
 
 // ── Response types ────────────────────────────────────────────────
 
@@ -17,7 +18,7 @@ export interface SwarmAgentState {
   role: string;
   status: "idle" | "working" | "done" | "failed";
   currentTask?: string;
-  progress?: number; // 0-100
+  progress?: number;
   startedAt?: number;
   endedAt?: number;
   tokenSpend?: number;
@@ -70,94 +71,113 @@ export interface SwarmFeedEvent {
   issueTitle?: string;
 }
 
+// ── Helpers ───────────────────────────────────────────────────────
+
+function slugToName(slug: string): string {
+  return slug.replace(/-/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+}
+
+function mapQueueStatusToDisplay(queueStatus: string): string {
+  switch (queueStatus) {
+    case "processing": return "in_progress";
+    case "review": case "needs-review": return "in_review";
+    case "done": return "done";
+    case "failed": return "failed";
+    case "pending": return "todo";
+    default: return queueStatus;
+  }
+}
+
+function mapDisplayToAgentStatus(status: string): SwarmAgentState["status"] {
+  switch (status) {
+    case "in_progress": case "processing": return "working";
+    case "done": case "in_review": case "review": case "needs-review": return "done";
+    case "failed": case "cancelled": return "failed";
+    default: return "idle";
+  }
+}
+
+/** Find the queue item matching an issue (by issueId, with title fallback for compat) */
+function findQueueItem(
+  issueId: string,
+  issueTitle: string,
+  byIssueId: Map<string, QueueItem>,
+  byTitle: Map<string, QueueItem>,
+): QueueItem | undefined {
+  return byIssueId.get(issueId) ?? byTitle.get(issueTitle);
+}
+
+/** Build issueId→QueueItem and title→QueueItem lookup maps */
+function buildQueueLookups(items: QueueItem[]): {
+  byIssueId: Map<string, QueueItem>;
+  byTitle: Map<string, QueueItem>;
+} {
+  const byIssueId = new Map<string, QueueItem>();
+  const byTitle = new Map<string, QueueItem>();
+  for (const qi of items) {
+    const id = qi.meta?.issueId ?? qi.meta?.paperclipIssueId;
+    if (id) byIssueId.set(id, qi);
+    byTitle.set(qi.title, qi);
+  }
+  return { byIssueId, byTitle };
+}
+
 // ── RPC handlers ──────────────────────────────────────────────────
 
-/**
- * godmode.delegation.projects — List active/recent delegated projects.
- */
 async function handleSwarmProjects({ respond }: { respond: Function }) {
-  if (!isPaperclipRunning()) {
-    return respond(true, { projects: [], running: false });
-  }
+  const [projectsState, qs] = await Promise.all([readProjects(), readQueueState()]);
+  const { byIssueId, byTitle } = buildQueueLookups(qs.items);
 
-  const adapter = getPaperclipAdapter();
-  if (!adapter) {
-    return respond(true, { projects: [], running: false });
-  }
+  const projects: SwarmProject[] = projectsState.projects.map(p => {
+    let completedCount = 0;
+    let failedCount = 0;
 
-  const raw = adapter.listProjects();
-  const projects: SwarmProject[] = [];
+    for (const issue of p.issues) {
+      const qi = findQueueItem(issue.issueId, issue.title, byIssueId, byTitle);
+      const status = qi ? mapQueueStatusToDisplay(qi.status) : "todo";
+      if (status === "done" || status === "in_review") completedCount++;
+      if (status === "failed") failedCount++;
+    }
 
-  for (const p of raw) {
-    const status = await adapter.getStatus(p.projectId);
-    const completedCount = status?.issues.filter(i => i.status === "done").length ?? 0;
-    const failedCount = status?.issues.filter(i => i.status === "failed" || i.status === "cancelled").length ?? 0;
-
-    projects.push({
+    return {
       projectId: p.projectId,
       title: p.title,
-      status: status?.status ?? "unknown",
-      issueCount: p.issueCount,
+      status: p.status,
+      issueCount: p.issues.length,
       completedCount,
       failedCount,
-      createdAt: p.createdAt,
-      proofWorkspace: status?.proofWorkspace ?? "",
-    });
-  }
+      createdAt: new Date(p.createdAt).toISOString(),
+      proofWorkspace: p.proofWorkspace,
+    };
+  });
 
   return respond(true, { projects, running: true });
 }
 
-/**
- * godmode.delegation.status — Detailed status for one project (org chart, agent states).
- */
 async function handleSwarmStatus({ params, respond }: { params: Record<string, unknown>; respond: Function }) {
   const projectId = params.projectId as string | undefined;
   if (!projectId) {
     return respond(false, null, { code: "INVALID_REQUEST", message: "Missing projectId" });
   }
 
-  if (!isPaperclipRunning()) {
-    return respond(false, null, { code: "UNAVAILABLE", message: "Agent team not running" });
-  }
-
-  const adapter = getPaperclipAdapter();
-  if (!adapter) {
-    return respond(false, null, { code: "UNAVAILABLE", message: "Agent team not available" });
-  }
-
-  const status = await adapter.getStatus(projectId);
-  if (!status) {
+  const [projectsState, qs] = await Promise.all([readProjects(), readQueueState()]);
+  const project = projectsState.projects.find(p => p.projectId === projectId);
+  if (!project) {
     return respond(false, null, { code: "NOT_FOUND", message: `Project not found: ${projectId}` });
   }
 
-  // Cross-reference queue state for real execution statuses
-  // Paperclip is a tracking layer; the queue-processor has the real status
-  let queueItems: import("../lib/queue-state.js").QueueItem[] = [];
-  try {
-    const qs = await readQueueState();
-    queueItems = qs.items;
-  } catch { /* queue not available */ }
+  const { byIssueId, byTitle } = buildQueueLookups(qs.items);
 
-  // Build a lookup: issue title → queue item (titles match because delegate() uses issue titles)
-  const queueByTitle = new Map<string, import("../lib/queue-state.js").QueueItem>();
-  for (const qi of queueItems) {
-    queueByTitle.set(qi.title, qi);
-  }
-
-  // Map issues to agent states and issue nodes
   const agents: SwarmAgentState[] = [];
   const issues: SwarmIssueNode[] = [];
   const seenAgents = new Set<string>();
-  for (const issue of status.issues) {
-    const slug = issue.assignee;
-    const personaName = slug.replace(/-/g, " ").replace(/\b\w/g, c => c.toUpperCase());
 
-    // Merge real status from queue if available
-    const qi = queueByTitle.get(issue.title);
-    const realStatus = qi ? mapQueueStatusToIssueStatus(qi.status) : issue.status;
+  for (const issue of project.issues) {
+    const slug = issue.personaSlug;
+    const personaName = slugToName(slug);
+    const qi = findQueueItem(issue.issueId, issue.title, byIssueId, byTitle);
+    const displayStatus = qi ? mapQueueStatusToDisplay(qi.status) : "todo";
 
-    // Extract output preview from queue result
     let outputPreview: string | undefined;
     if (qi?.result?.summary) {
       outputPreview = qi.result.summary.length > 200
@@ -168,7 +188,7 @@ async function handleSwarmStatus({ params, respond }: { params: Record<string, u
     issues.push({
       issueId: issue.issueId,
       title: issue.title,
-      status: realStatus,
+      status: displayStatus,
       assignee: slug,
       personaName,
       proofDocSlug: issue.proofDocSlug,
@@ -178,7 +198,7 @@ async function handleSwarmStatus({ params, respond }: { params: Record<string, u
 
     if (!seenAgents.has(slug)) {
       seenAgents.add(slug);
-      const agentStatus = mapIssueStatusToAgentStatus(realStatus);
+      const agentStatus = mapDisplayToAgentStatus(displayStatus);
       agents.push({
         id: slug,
         personaSlug: slug,
@@ -193,124 +213,77 @@ async function handleSwarmStatus({ params, respond }: { params: Record<string, u
     }
   }
 
-  // Determine overall project status from issue statuses
   const allDone = issues.length > 0 && issues.every(i => i.status === "done" || i.status === "in_review");
-  const anyFailed = issues.some(i => i.status === "failed" || i.status === "cancelled");
+  const anyFailed = issues.some(i => i.status === "failed");
   const anyInProgress = issues.some(i => i.status === "in_progress");
-  const projectStatus = allDone ? "completed" : anyFailed ? "at_risk" : anyInProgress ? "in_progress" : status.status;
+  const projectStatus = allDone ? "completed" : anyFailed ? "at_risk" : anyInProgress ? "in_progress" : project.status;
 
   const detail: SwarmProjectDetail = {
-    projectId: status.projectId,
-    title: status.title,
+    projectId: project.projectId,
+    title: project.title,
     status: projectStatus,
-    proofWorkspace: status.proofWorkspace,
+    proofWorkspace: project.proofWorkspace,
     agents,
     issues,
-    tokenSpend: undefined, // TODO: wire up from Paperclip getCostsByAgent() when available
   };
 
   return respond(true, detail);
 }
 
-/**
- * godmode.delegation.steer — Send steering instruction to an agent on a project issue.
- */
-async function handleSwarmSteer({ params, respond }: { params: Record<string, unknown>; respond: Function }) {
-  const projectId = params.projectId as string | undefined;
-  const issueTitle = params.issueTitle as string | undefined;
-  const instructions = params.instructions as string | undefined;
-
-  if (!projectId || !issueTitle || !instructions) {
-    return respond(false, null, { code: "INVALID_REQUEST", message: "Missing projectId, issueTitle, or instructions" });
-  }
-
-  if (!isPaperclipRunning()) {
-    return respond(false, null, { code: "UNAVAILABLE", message: "Agent team not running" });
-  }
-
-  const adapter = getPaperclipAdapter();
-  if (!adapter) {
-    return respond(false, null, { code: "UNAVAILABLE", message: "Agent team not available" });
-  }
-
-  const ok = await adapter.steer(projectId, issueTitle, instructions);
-  if (ok) {
-    return respond(true, { success: true, message: `Steering sent for "${issueTitle}"` });
-  }
-  return respond(false, null, { code: "STEER_FAILED", message: "Failed to steer. Check projectId and issueTitle." });
+async function handleSwarmSteer({ respond }: { params: Record<string, unknown>; respond: Function }) {
+  return respond(false, null, {
+    code: "UNSUPPORTED",
+    message: "Steering is not supported for running CLI processes. Wait for completion and provide feedback in the review.",
+  });
 }
 
-/**
- * godmode.delegation.feed — Activity feed for a project (or all projects).
- */
 async function handleSwarmFeed({ params, respond }: { params: Record<string, unknown>; respond: Function }) {
-  const projectId = params.projectId as string | undefined;
+  const filterProjectId = params.projectId as string | undefined;
 
-  if (!isPaperclipRunning()) {
-    return respond(true, { events: [], running: false });
-  }
+  const [projectsState, qs] = await Promise.all([readProjects(), readQueueState()]);
+  const { byIssueId, byTitle } = buildQueueLookups(qs.items);
 
-  const adapter = getPaperclipAdapter();
-  if (!adapter) {
-    return respond(true, { events: [], running: false });
-  }
-
-  // Cross-reference queue state for real statuses + timestamps
-  let queueItems: import("../lib/queue-state.js").QueueItem[] = [];
-  try {
-    const qs = await readQueueState();
-    queueItems = qs.items;
-  } catch { /* queue not available */ }
-  const queueByTitle = new Map<string, import("../lib/queue-state.js").QueueItem>();
-  for (const qi of queueItems) {
-    queueByTitle.set(qi.title, qi);
-  }
-
-  // Build feed from project status snapshots
   const events: SwarmFeedEvent[] = [];
-  const projectList = projectId
-    ? [{ projectId, title: "", issueCount: 0, createdAt: "" }]
-    : adapter.listProjects();
+  const projects = filterProjectId
+    ? projectsState.projects.filter(p => p.projectId === filterProjectId)
+    : projectsState.projects;
 
-  for (const p of projectList) {
-    const status = await adapter.getStatus(p.projectId);
-    if (!status) continue;
+  for (const project of projects) {
+    for (const issue of project.issues) {
+      const personaName = slugToName(issue.personaSlug);
+      const qi = findQueueItem(issue.issueId, issue.title, byIssueId, byTitle);
+      const displayStatus = qi ? mapQueueStatusToDisplay(qi.status) : "todo";
 
-    for (const issue of status.issues) {
-      const personaName = issue.assignee.replace(/-/g, " ").replace(/\b\w/g, c => c.toUpperCase());
-      const qi = queueByTitle.get(issue.title);
-      const realStatus = qi ? mapQueueStatusToIssueStatus(qi.status) : issue.status;
-
-      if (realStatus === "done" || realStatus === "in_review") {
+      if (displayStatus === "done" || displayStatus === "in_review") {
         events.push({
-          id: `${p.projectId}-${issue.issueId}-done`,
+          id: `${project.projectId}-${issue.issueId}-done`,
           timestamp: qi?.completedAt ?? Date.now(),
           type: "agent_completed",
           summary: `${personaName} completed "${issue.title}"`,
-          projectId: p.projectId,
-          personaSlug: issue.assignee,
+          projectId: project.projectId,
+          personaSlug: issue.personaSlug,
           personaName,
           issueTitle: issue.title,
         });
-      } else if (realStatus === "in_progress" || realStatus === "todo") {
+      } else if (displayStatus === "in_progress" || displayStatus === "todo") {
         events.push({
-          id: `${p.projectId}-${issue.issueId}-active`,
+          id: `${project.projectId}-${issue.issueId}-active`,
           timestamp: qi?.startedAt ?? qi?.createdAt ?? Date.now(),
           type: "agent_started",
-          summary: `${personaName} ${realStatus === "in_progress" ? "working on" : "assigned to"} "${issue.title}"`,
-          projectId: p.projectId,
-          personaSlug: issue.assignee,
+          summary: `${personaName} ${displayStatus === "in_progress" ? "working on" : "assigned to"} "${issue.title}"`,
+          projectId: project.projectId,
+          personaSlug: issue.personaSlug,
           personaName,
           issueTitle: issue.title,
         });
-      } else if (realStatus === "failed" || realStatus === "cancelled") {
+      } else if (displayStatus === "failed") {
         events.push({
-          id: `${p.projectId}-${issue.issueId}-failed`,
+          id: `${project.projectId}-${issue.issueId}-failed`,
           timestamp: qi?.completedAt ?? Date.now(),
           type: "agent_failed",
           summary: `${personaName} failed on "${issue.title}"`,
-          projectId: p.projectId,
-          personaSlug: issue.assignee,
+          projectId: project.projectId,
+          personaSlug: issue.personaSlug,
           personaName,
           issueTitle: issue.title,
         });
@@ -322,32 +295,6 @@ async function handleSwarmFeed({ params, respond }: { params: Record<string, unk
   return respond(true, { events: events.slice(0, 100), running: true });
 }
 
-// ── Helpers ───────────────────────────────────────────────────────
-
-function mapIssueStatusToAgentStatus(status: string): SwarmAgentState["status"] {
-  switch (status) {
-    case "in_progress": case "processing": return "working";
-    case "done": case "in_review": case "review": case "needs-review": return "done";
-    case "failed": case "cancelled": return "failed";
-    default: return "idle";
-  }
-}
-
-/** Map queue-processor status → Paperclip-style issue status for UI */
-function mapQueueStatusToIssueStatus(queueStatus: string): string {
-  switch (queueStatus) {
-    case "processing": return "in_progress";
-    case "review": case "needs-review": return "in_review";
-    case "done": return "done";
-    case "failed": return "failed";
-    case "pending": return "todo";
-    default: return queueStatus;
-  }
-}
-
-/**
- * godmode.delegation.runLog — Fetch log/output for a specific agent run (by queue item ID).
- */
 async function handleSwarmRunLog({ params, respond }: { params: Record<string, unknown>; respond: Function }) {
   const queueItemId = params.queueItemId as string | undefined;
   if (!queueItemId) {
@@ -387,7 +334,6 @@ async function handleSwarmRunLog({ params, respond }: { params: Record<string, u
 
     if (item.result?.outputPath) {
       lines.push(`**Output file:** ${item.result.outputPath}`);
-      // Try to read first 100 lines of the output file
       try {
         const fs = await import("node:fs/promises");
         const content = await fs.readFile(item.result.outputPath, "utf-8");
@@ -415,18 +361,8 @@ async function handleSwarmRunLog({ params, respond }: { params: Record<string, u
   }
 }
 
-/**
- * godmode.delegation.clear — Clear all projects from Mission Control (in-memory + disk).
- */
 async function handleSwarmClear({ respond }: { params: Record<string, unknown>; respond: Function }) {
-  if (!isPaperclipRunning()) {
-    return respond(true, { cleared: false, message: "Agent team not running" });
-  }
-  const adapter = getPaperclipAdapter();
-  if (!adapter) {
-    return respond(true, { cleared: false, message: "Agent team not available" });
-  }
-  await adapter.clearProjects();
+  await clearProjects();
   return respond(true, { cleared: true, message: "All projects cleared from Mission Control" });
 }
 

@@ -77,6 +77,17 @@ export type QueueItem = {
   proofDocFilePath?: string;
   /** Workspace this item belongs to (auto-detected or explicit) */
   workspaceId?: string;
+  /** Project tracking metadata — links queue items to delegated projects */
+  meta?: {
+    issueId?: string;
+    projectId?: string;
+    /** @deprecated Use issueId. Kept for backward compat with in-flight items. */
+    paperclipIssueId?: string;
+    /** @deprecated Use projectId. Kept for backward compat with in-flight items. */
+    paperclipProjectId?: string;
+    /** True for auto-injected QA review stages — gated behind project work completion */
+    isQAStage?: boolean;
+  };
   /** Structured handoff context from a predecessor agent */
   handoff?: {
     fromAgent: string;
@@ -118,9 +129,23 @@ function sanitizeState(input: unknown): QueueState {
     return createDefaultState();
   }
   const value = input as Partial<QueueState>;
+  const items = Array.isArray(value.items) ? value.items : [];
+
+  // Migrate old meta field names (paperclipIssueId → issueId, paperclipProjectId → projectId)
+  for (const item of items) {
+    if (item.meta) {
+      if (item.meta.paperclipIssueId && !item.meta.issueId) {
+        item.meta.issueId = item.meta.paperclipIssueId;
+      }
+      if (item.meta.paperclipProjectId && !item.meta.projectId) {
+        item.meta.projectId = item.meta.paperclipProjectId;
+      }
+    }
+  }
+
   return {
     version: 1,
-    items: Array.isArray(value.items) ? value.items : [],
+    items,
     updatedAt: typeof value.updatedAt === "number" ? value.updatedAt : Date.now(),
   };
 }

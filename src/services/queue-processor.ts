@@ -609,24 +609,38 @@ class QueueProcessor {
       askTrustRating: !!personaSlug,
     });
 
-    // Push to universal inbox (background agent work always goes to inbox)
-    try {
-      const { addInboxItem } = await import("./inbox.js");
-      await addInboxItem({
-        type: "agent-execution",
-        title: completedItem?.title ?? itemId,
-        summary: summary.slice(0, 300),
-        source: {
-          persona: personaSlug,
-          queueItemId: itemId,
-          taskId: completedItem?.sourceTaskId,
-        },
-        proofDocSlug: completedItem?.proofDocSlug,
-        outputPath: outPath,
-        sessionId: completedItem?.sessionId,
-      });
-    } catch (err) {
-      this.logger.warn(`[GodMode][Queue] Inbox push failed for ${itemId}: ${String(err)}`);
+    // Push to universal inbox (skip for multi-issue projects — project-level inbox handles those)
+    const projectId = completedItem?.meta?.projectId ?? completedItem?.meta?.paperclipProjectId;
+    const isMultiIssue = projectId
+      ? await this.isMultiIssueProject(projectId)
+      : false;
+
+    if (!isMultiIssue) {
+      try {
+        const { addInboxItem } = await import("./inbox.js");
+        await addInboxItem({
+          type: "agent-execution",
+          title: completedItem?.title ?? itemId,
+          summary: summary.slice(0, 300),
+          source: {
+            persona: personaSlug,
+            queueItemId: itemId,
+            taskId: completedItem?.sourceTaskId,
+          },
+          proofDocSlug: completedItem?.proofDocSlug,
+          outputPath: outPath,
+          sessionId: completedItem?.sessionId,
+        });
+      } catch (err) {
+        this.logger.warn(`[GodMode][Queue] Inbox push failed for ${itemId}: ${String(err)}`);
+      }
+    } else {
+      this.logger.info(`[GodMode][Queue] Skipping per-task inbox for ${itemId} — project-level inbox will handle`);
+    }
+
+    // Check for project-level completion (all sibling items in same project are terminal)
+    if (projectId && isMultiIssue) {
+      void this.checkProjectCompletion(projectId);
     }
 
     // Notify Ally chat so the user sees a notification in real-time
@@ -860,6 +874,154 @@ class QueueProcessor {
     }
   }
 
+  // ── Helpers ──────────────────────────────────────────────────────
+
+  /** Check if a project has more than one queue item */
+  private async isMultiIssueProject(projectId: string): Promise<boolean> {
+    const state = await readQueueState();
+    const count = state.items.filter(
+      (i) => (i.meta?.projectId ?? i.meta?.paperclipProjectId) === projectId,
+    ).length;
+    return count > 1;
+  }
+
+  /** Check if all items in a project are terminal — if so, fire project completion */
+  private async checkProjectCompletion(projectId: string): Promise<void> {
+    const state = await readQueueState();
+    const projectItems = state.items.filter(
+      (i) => (i.meta?.projectId ?? i.meta?.paperclipProjectId) === projectId,
+    );
+    if (projectItems.length === 0) return;
+
+    const allTerminal = projectItems.every(
+      (qi) => qi.status === "done" || qi.status === "review" || qi.status === "needs-review" || qi.status === "failed",
+    );
+    if (!allTerminal) return;
+
+    // Mark project as completed in projects-state (idempotent — only fires once)
+    let didTransition = false;
+    try {
+      const { updateProjects } = await import("../lib/projects-state.js");
+      const { result } = await updateProjects((ps) => {
+        const project = ps.projects.find(p => p.projectId === projectId);
+        if (project && project.status === "active") {
+          project.status = "completed";
+          project.completedAt = Date.now();
+          return true; // we transitioned
+        }
+        return false;
+      });
+      didTransition = result;
+    } catch { /* projects-state not available */ }
+
+    // Guard: only one call creates the inbox item / session / broadcasts
+    if (!didTransition) return;
+
+    // Get project metadata for notifications
+    let projectTitle = "";
+    let proofDocSlug: string | undefined;
+    try {
+      const { getProject } = await import("../lib/projects-state.js");
+      const project = await getProject(projectId);
+      if (project) {
+        projectTitle = project.title;
+        proofDocSlug = project.issues.find(i => i.proofDocSlug)?.proofDocSlug;
+      }
+    } catch { /* best effort */ }
+
+    if (!projectTitle) {
+      projectTitle = projectItems[0]?.title ?? "Untitled Project";
+    }
+
+    this.logger.info(`[GodMode][Queue] Project "${projectTitle}" fully complete (${projectItems.length} tasks)`);
+
+    // Build deliverables list
+    const deliverables: Array<{ title: string; persona: string; proofDocSlug?: string; summary?: string }> = [];
+    for (const qi of projectItems) {
+      deliverables.push({
+        title: qi.title,
+        persona: qi.personaHint ?? "unassigned",
+        proofDocSlug: qi.proofDocSlug,
+        summary: qi.result?.summary?.slice(0, 200) ?? `Completed by ${qi.personaHint ?? "agent"}`,
+      });
+    }
+
+    // Create cowork session seeded with project context
+    let coworkSessionId: string | undefined;
+    try {
+      const { randomUUID } = await import("node:crypto");
+      const { readFile: _, writeFile, mkdir } = await import("node:fs/promises");
+      const { join } = await import("node:path");
+      coworkSessionId = randomUUID();
+      const sessionsDir = join(DATA_DIR, "sessions");
+      await mkdir(sessionsDir, { recursive: true });
+
+      const deliverablesList = deliverables
+        .map((d, i) => `${i + 1}. **${d.title}** (${d.persona}): ${d.summary}`)
+        .join("\n");
+
+      const seedMessage = [
+        `Project "${projectTitle}" is complete — all ${projectItems.length} deliverables are ready for review.`,
+        "",
+        "## Deliverables",
+        deliverablesList,
+        "",
+        proofDocSlug ? `Proof document: ${proofDocSlug}` : "",
+        "",
+        "Walk me through each deliverable. Highlight what's strong, flag anything that needs iteration, and let me score the overall project.",
+      ].filter(Boolean).join("\n");
+
+      const session = {
+        id: coworkSessionId,
+        title: `Review: ${projectTitle}`,
+        messages: [{ role: "user", content: seedMessage, ts: Date.now() }],
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        projectId,
+        proofDocSlug,
+      };
+      await writeFile(
+        join(sessionsDir, `${coworkSessionId}.json`),
+        JSON.stringify(session, null, 2) + "\n",
+      );
+    } catch (err) {
+      this.logger.warn(`[GodMode][Queue] Failed to create cowork session: ${String(err)}`);
+    }
+
+    // Create ONE project-level inbox item
+    try {
+      const { addInboxItem } = await import("./inbox.js");
+      await addInboxItem({
+        type: "project-completion",
+        title: `Project Complete: ${projectTitle}`,
+        summary: `All ${projectItems.length} tasks finished. Deliverables ready for review.`,
+        source: { queueItemId: projectId },
+        projectId,
+        proofDocSlug,
+        deliverables,
+        coworkSessionId,
+      });
+    } catch (err) {
+      this.logger.warn(`[GodMode][Queue] Project inbox push failed: ${String(err)}`);
+    }
+
+    // Broadcast notifications
+    this.broadcast("ally:notification", {
+      type: "project-complete",
+      title: projectTitle,
+      summary: `Project "${projectTitle}" is complete — ${projectItems.length} deliverables ready for review.`,
+      projectId,
+      proofDocSlug,
+      coworkSessionId,
+      actions: [
+        { label: "Review with Prosper", action: "cowork", target: coworkSessionId },
+        { label: "View Deliverables", action: "navigate", target: "today" },
+      ],
+    });
+    this.broadcast("inbox:update", {});
+    this.broadcast("queue:update", { type: "project-complete", projectId });
+  }
+
   // ── Batch process all pending ──────────────────────────────────
 
   async processAllPending(): Promise<{ spawned: number; skipped: number }> {
@@ -889,6 +1051,23 @@ class QueueProcessor {
       if (spawned >= slotsAvailable) {
         skipped++;
         continue;
+      }
+
+      // QA stages are gated — don't start until all other project items are terminal
+      const qaProjectId = item.meta?.projectId ?? item.meta?.paperclipProjectId;
+      if (item.meta?.isQAStage && qaProjectId) {
+        const projectItems = state.items.filter(
+          (qi) =>
+            (qi.meta?.projectId ?? qi.meta?.paperclipProjectId) === qaProjectId &&
+            !qi.meta?.isQAStage,
+        );
+        const allTerminal = projectItems.length > 0 && projectItems.every(
+          (qi) => qi.status === "done" || qi.status === "review" || qi.status === "needs-review" || qi.status === "failed",
+        );
+        if (!allTerminal) {
+          skipped++;
+          continue;
+        }
       }
 
       const result = await this.processItem(item);

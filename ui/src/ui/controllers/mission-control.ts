@@ -493,7 +493,7 @@ export async function loadMissionControl(
     const stats = computeStats(agents, queueDepthCount, queueReviewCount);
     const activityFeed = buildActivityFeed(agents);
 
-    // ── Swarm data (Paperclip) — optional, gracefully degrades ──
+    // ── Delegation data — optional, gracefully degrades ──
     let swarmData: SwarmData = { projects: [], selectedProjectId: null, detail: null, feed: [], running: false };
     try {
       const swarmProjectsResult = await host.client.request<{ projects: SwarmProject[]; running: boolean }>(
@@ -530,7 +530,7 @@ export async function loadMissionControl(
         swarmData = { projects, selectedProjectId, detail, feed, running: true };
       }
     } catch {
-      // swarm RPC not available — expected when Paperclip isn't running
+      // delegation RPC not available — non-fatal
     }
 
     h.missionControlData = {

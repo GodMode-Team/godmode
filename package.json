@@ -61,8 +61,6 @@
   },
   "dependencies": {
     "@noble/ed25519": "3.0.0",
-    "@paperclipai/adapter-openclaw-gateway": "^0.3.1",
-    "@paperclipai/server": "^0.3.1",
     "better-sqlite3": "^11.8.1",
     "chokidar": "^4.0.3",
     "clawhub": "^0.7.0",
@@ -70,8 +68,7 @@
     "json5": "^2.2.3",
     "lit": "^3.3.2",
     "marked": "^17.0.1",
-    "mem0ai": "^2.2.4",
-    "paperclipai": "^0.3.1"
+    "mem0ai": "^2.2.4"
   },
   "devDependencies": {
     "@types/node": "^24.3.3",
