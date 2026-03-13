@@ -110,7 +110,7 @@ export async function loadSecondBrain(state: SecondBrainState): Promise<void> {
     }
   } catch (err) {
     console.error("[SecondBrain] Failed to load:", err);
-    state.secondBrainError = err instanceof Error ? err.message : "Failed to load Context Vault data";
+    state.secondBrainError = err instanceof Error ? err.message : "Failed to load Second Brain data";
   } finally {
     state.secondBrainLoading = false;
   }

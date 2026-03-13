@@ -1981,7 +1981,7 @@ export class GodModeApp extends LitElement {
     const { createNewSession } = await import("./app-render.helpers.js");
     createNewSession(this);
     void this.handleSendChat(
-      "I want to add a new data source to my Context Vault. Help me figure out what I need — whether it's an API integration, a local file sync, or a new skill. Ask me what source I'd like to connect.",
+      "I want to add a new data source to my Second Brain. Help me figure out what I need — whether it's an API integration, a local file sync, or a new skill. Ask me what source I'd like to connect.",
     );
   }
 

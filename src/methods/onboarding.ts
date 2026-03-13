@@ -386,7 +386,7 @@ function buildChecklist(state: OnboardingState): OnboardingChecklist {
     {
       id: "second-brain",
       phase: 2,
-      title: "Context Vault",
+      title: "Second Brain",
       description: "Set up your memory, notes, and daily brief",
       emoji: "\u{1F9E0}",
       status: milestoneStatus(2, phase, cp),
@@ -550,7 +550,7 @@ export const onboardingHandlers: GatewayRequestHandlers = {
       } catch { /* ignore */ }
       cards.push({
         id: "obsidian-vault",
-        title: "Context Vault",
+        title: "Second Brain",
         description: "Connect your Obsidian vault for persistent AI memory.",
         icon: "\u{1F9E0}",
         status: vaultConfigured ? "active" : "available",

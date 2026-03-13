@@ -261,7 +261,7 @@ const googleCalendar: IntegrationProvider = {
 const obsidianVault: IntegrationProvider = {
   id: "obsidian-vault",
   name: "Obsidian Vault",
-  description: "Your Context Vault — daily briefs, research, and knowledge all live here",
+  description: "Your Second Brain — daily briefs, research, and knowledge all live here",
   briefSection: "Daily Brief storage",
   tier: "core",
   platforms: ["darwin", "linux", "win32"],

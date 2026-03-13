@@ -855,7 +855,7 @@ function renderFilesTab(props: SecondBrainProps) {
         <input
           type="text"
           class="sb-files-search-input"
-          placeholder="Search across your Context Vault..."
+          placeholder="Search across your Second Brain..."
           .value=${props.fileSearchQuery ?? ""}
           @input=${(e: InputEvent) => {
             const target = e.target as HTMLInputElement;
