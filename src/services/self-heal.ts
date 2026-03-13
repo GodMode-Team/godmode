@@ -201,6 +201,37 @@ export async function runSelfHeal(
     logger.info(`[SelfHeal] Auto-repaired ${repairs.length} subsystem(s): ${repairs.join(", ")}`);
   }
 
+  // ── Code Repair Escalation ──────────────────────────────────────
+  // If runtime repairs aren't working, escalate to Claude Code CLI
+  // to do an actual code fix (runs in background, non-blocking).
+  const escalationCandidates = Array.from(registry.values())
+    .filter((s) => s.state !== "healthy" && s.state !== "repaired")
+    .map((s) => ({
+      id: s.id,
+      message: s.message,
+      consecutiveFailures: s.consecutiveFailures,
+      repairCount: s.repairCount,
+    }));
+
+  if (escalationCandidates.some((c) => c.consecutiveFailures >= 5 && c.repairCount >= 2)) {
+    try {
+      const { maybeEscalateToCodeRepair } = await import("./code-repair.js");
+      const result = await maybeEscalateToCodeRepair(logger, escalationCandidates);
+      if (result?.started) {
+        logger.info(`[SelfHeal] Escalated to code repair (pid=${result.pid})`);
+        if (broadcast) {
+          broadcast("ally:notification", {
+            type: "code-repair-started",
+            summary: "GodMode is spawning Claude Code to fix a persistent issue",
+            pid: result.pid,
+          });
+        }
+      }
+    } catch (err) {
+      logger.warn(`[SelfHeal] Code repair escalation error: ${String(err)}`);
+    }
+  }
+
   return { checked, repaired: repairs.length, failures };
 }
 

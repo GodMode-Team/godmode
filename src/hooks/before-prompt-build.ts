@@ -283,6 +283,42 @@ export async function handleBeforePromptBuild(
     } catch { /* non-fatal */ }
   }
 
+  // P2: Agent team status — surface blocked/completed issues from Paperclip
+  let teamStatus: string | null = null;
+  if (!lightMode) {
+    try {
+      const { isPaperclipRunning, getPaperclipAdapter } = await import("../services/paperclip-adapter.js");
+      if (isPaperclipRunning()) {
+        const adapter = getPaperclipAdapter();
+        if (adapter) {
+          const lines: string[] = [];
+          const projects = adapter.listProjects();
+          for (const p of projects.slice(0, 3)) {
+            const status = await adapter.getStatus(p.projectId);
+            if (!status) continue;
+            const blocked = status.issues.filter(i => i.status === "blocked");
+            const done = status.issues.filter(i => i.status === "done" || i.status === "in_review");
+            const active = status.issues.filter(i => i.status === "in_progress");
+            if (blocked.length > 0) {
+              for (const b of blocked) {
+                lines.push(`BLOCKED: "${b.title}" (${b.assignee}) needs your input — check the issue comments or ask the user.`);
+              }
+            }
+            if (done.length > 0) {
+              lines.push(`READY FOR REVIEW: ${done.length} issue(s) in "${p.title}" — open the Proof doc(s) to review with the user.`);
+            }
+            if (active.length > 0 && blocked.length === 0 && done.length === 0) {
+              lines.push(`IN PROGRESS: "${p.title}" — ${active.length} issue(s) being worked on.`);
+            }
+          }
+          if (lines.length > 0) {
+            teamStatus = "## Agent Team\n" + lines.join("\n");
+          }
+        }
+      }
+    } catch { /* non-fatal */ }
+  }
+
   // Extract user message for skill card + routing lesson matching
   let currentUserMessage = "";
   let isFirstTurn = false;
@@ -451,6 +487,7 @@ export async function handleBeforePromptBuild(
     meetingPrep,
     cronFailures,
     queueReview,
+    teamStatus,
     actionItemsBlock,
     skillCard,
     routingLessons,

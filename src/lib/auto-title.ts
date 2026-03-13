@@ -47,7 +47,10 @@ export async function generateSessionTitle(
   try {
     const { resolveAnthropicAuth } = await import("../methods/brief-generator.js");
     const apiKey = resolveAnthropicAuth();
-    if (!apiKey) return null;
+    if (!apiKey) {
+      console.warn("[GodMode][AutoTitle] No Anthropic API key found — LLM title generation skipped. Check ANTHROPIC_API_KEY or auth-profiles.json.");
+      return null;
+    }
 
     // Strip system content from user message before sending to title generator
     const cleanMessage = userMessage
@@ -94,7 +97,10 @@ export async function generateSessionTitle(
       signal: AbortSignal.timeout(8_000),
     });
 
-    if (!resp.ok) return null;
+    if (!resp.ok) {
+      console.warn(`[GodMode][AutoTitle] Haiku API returned ${resp.status} — falling back to string derivation`);
+      return null;
+    }
 
     const data = (await resp.json()) as {
       content?: Array<{ type: string; text?: string }>;

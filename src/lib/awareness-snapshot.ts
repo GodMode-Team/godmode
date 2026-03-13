@@ -300,6 +300,29 @@ export async function generateSnapshot(): Promise<string> {
     // No trust data yet — skip
   }
 
+  // Memory search engine status
+  try {
+    const { execFile: ef } = await import("node:child_process");
+    const { promisify: pfy } = await import("node:util");
+    const execAsync = pfy(ef);
+    const { stdout } = await execAsync("qmd", ["--version"], { timeout: 3_000 });
+    const ver = stdout.trim();
+    lines.push(`## Search Engine: QMD ${ver} (hybrid semantic + BM25 + reranking)`);
+  } catch {
+    lines.push("## Search Engine: File walk fallback (QMD not available)");
+  }
+
+  // Retrieval trajectory stats (last 24h)
+  try {
+    const { getRetrievalStats } = await import("./retrieval-log.js");
+    const stats = getRetrievalStats();
+    if (stats.totalSearches > 0) {
+      lines.push(`## Retrieval (24h): ${stats.totalSearches} searches, ${stats.totalResults} results, avg score ${stats.avgTopScore.toFixed(2)}, ${stats.emptySearches} empty`);
+    }
+  } catch {
+    // Retrieval log unavailable — non-fatal
+  }
+
   // L6: Interaction Ledger — behavioral signals
   try {
     const { getTopSignals, formatForSnapshot, formatConflictsForSnapshot } =

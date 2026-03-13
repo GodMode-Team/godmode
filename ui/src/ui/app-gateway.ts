@@ -178,6 +178,42 @@ async function cacheAndResolveImages(app: GodModeApp): Promise<void> {
   }
 }
 
+// ── Proof auto-open helper ────────────────────────────────────────────
+
+/** Track last auto-opened slug to avoid reopening on every history reload */
+let _lastAutoOpenedProofSlug: string | null = null;
+
+/**
+ * Scan the most recent messages for a _sidebarAction with type "proof"
+ * and auto-open the Proof doc in the sidebar.
+ */
+function autoOpenProofFromMessages(app: GodModeApp): void {
+  if (!app.chatMessages?.length) return;
+  // Only scan the last 5 messages (tool results from the most recent turn)
+  const recent = app.chatMessages.slice(-5);
+  for (const msg of recent) {
+    const m = msg as Record<string, unknown>;
+    const content = Array.isArray(m.content) ? m.content : [];
+    for (const block of content) {
+      const b = block as Record<string, unknown>;
+      const text = typeof b.text === "string" ? b.text : typeof b.content === "string" ? b.content : null;
+      if (!text) continue;
+      try {
+        const parsed = JSON.parse(text) as { _sidebarAction?: { type?: string; slug?: string } };
+        if (parsed._sidebarAction?.type === "proof" && parsed._sidebarAction.slug) {
+          const slug = parsed._sidebarAction.slug;
+          if (slug === _lastAutoOpenedProofSlug) return; // Already opened this one
+          _lastAutoOpenedProofSlug = slug;
+          void app.handleOpenProofDoc(slug);
+          return;
+        }
+      } catch {
+        // Not JSON — skip
+      }
+    }
+  }
+}
+
 /**
  * Trigger image resolution for the current session.
  * Called after history loads to resolve omitted images from cache.
@@ -832,26 +868,10 @@ async function maybeAutoTitleSession(host: GatewayHost, sessionKey: string) {
       }
     }
 
-    // Try LLM-generated title via server RPC, fall back to local string derivation
-    let title: string | null = null;
-    const firstUser = messages.find((m: { role: string }) => m.role === "user");
-    const firstAssistant = messages.find((m: { role: string }) => m.role === "assistant");
-    if (firstUser && host.client) {
-      try {
-        const res = await host.client.request("sessions.generateTitle", {
-          userMessage: extractMessageText(firstUser as { content: unknown }),
-          assistantMessage: firstAssistant ? extractMessageText(firstAssistant as { content: unknown }) : "",
-        });
-        if (res?.title) {
-          title = res.title;
-        }
-      } catch {
-        // RPC failed — fall through to local derivation
-      }
-    }
-    if (!title) {
-      title = deriveSessionTitle(messages);
-    }
+    // Server-side auto-title (via llm_output hook) handles the LLM call.
+    // Client only does local string derivation as a safety net.
+    // This avoids a duplicate Haiku API call that races with the server.
+    const title = deriveSessionTitle(messages);
 
     if (!title) {
       // Don't mark as applied — will retry on next response when more messages exist
@@ -1347,6 +1367,8 @@ function handleGatewayEventUnsafe(host: GatewayHost, evt: GatewayEventFrame) {
         void cacheAndResolveImages(host as unknown as GodModeApp);
         // Refresh session resources strip after each assistant turn
         void (host as any).loadSessionResources?.();
+        // Auto-open Proof docs when a tool result contains a _sidebarAction
+        autoOpenProofFromMessages(host as unknown as GodModeApp);
       });
 
       // Auto-refresh dashboard when its session completes (agent may have updated it)

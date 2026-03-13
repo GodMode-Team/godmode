@@ -2,45 +2,23 @@
  * http-handler.ts — HTTP route handler for GodMode endpoints.
  *
  * Serves the GodMode UI, health endpoint, artifact files, Fathom webhook,
- * Mission Control proxy, and legacy /reports/ redirect.
+ * and legacy /reports/ redirect.
  */
 
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { DATA_DIR, MEMORY_DIR } from "../data-paths.js";
+import { MEMORY_DIR } from "../data-paths.js";
 import { handleFathomWebhookHttp } from "../methods/fathom-webhook.js";
-import {
-  isOpsPath,
-  requestPathname,
-  shouldProxyOpsApiRequest,
-  proxyOpsRequest,
-} from "../lib/ops-proxy.js";
 import type { LicenseState } from "../lib/license.js";
 
-// ── Options file reader (for feature flags) ─────────────────────────
-const OPTIONS_FILE_PATH = join(DATA_DIR, "godmode-options.json");
-const OPTIONS_CACHE_TTL_MS = 5_000;
-let cachedOptions: Record<string, unknown> = {};
-let optionsCachedAt = 0;
-
-const OPTIONS_DEFAULTS: Record<string, unknown> = {
-  "missionControl.enabled": false,
-};
-
-function readOptionsSync(): Record<string, unknown> {
-  const now = Date.now();
-  if (now - optionsCachedAt < OPTIONS_CACHE_TTL_MS) {
-    return cachedOptions;
-  }
+function requestPathname(url: string): string {
   try {
-    const raw = readFileSync(OPTIONS_FILE_PATH, "utf-8");
-    cachedOptions = { ...OPTIONS_DEFAULTS, ...JSON.parse(raw) };
+    return new URL(url, "http://localhost").pathname;
   } catch {
-    cachedOptions = { ...OPTIONS_DEFAULTS };
+    const [pathname] = url.split("?", 1);
+    return pathname || "/";
   }
-  optionsCachedAt = now;
-  return cachedOptions;
 }
 
 export interface HttpHandlerDeps {
@@ -72,30 +50,6 @@ export function createGodmodeHttpHandler(deps: HttpHandlerDeps) {
       };
       res.writeHead(200, { "Content-Type": "application/json", "Cache-Control": "no-cache" });
       res.end(JSON.stringify(health, null, 2));
-      return true;
-    }
-
-    // Mission Control sidecar proxy
-    if (isOpsPath(pathname)) {
-      const opts = readOptionsSync();
-      if (!opts["missionControl.enabled"]) {
-        res.writeHead(200, { "Content-Type": "application/json", "Cache-Control": "no-cache" });
-        res.end(JSON.stringify({ disabled: true, message: "Mission Control is not enabled. Enable it in GodMode Options." }));
-        return true;
-      }
-      await proxyOpsRequest(req, res);
-      return true;
-    }
-
-    // Mission Control API fallback
-    if (shouldProxyOpsApiRequest(req, pathname)) {
-      const opts = readOptionsSync();
-      if (!opts["missionControl.enabled"]) {
-        res.writeHead(200, { "Content-Type": "application/json", "Cache-Control": "no-cache" });
-        res.end(JSON.stringify({ disabled: true, message: "Mission Control is not enabled. Enable it in GodMode Options." }));
-        return true;
-      }
-      await proxyOpsRequest(req, res);
       return true;
     }
 

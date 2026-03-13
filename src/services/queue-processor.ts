@@ -1036,9 +1036,10 @@ class QueueProcessor {
 
     if (item.proofDocSlug) {
       try {
-        const { getProofApiBase, getProofViewUrl } = await import("../lib/proof-bridge.js");
+        const { getProofApiBase, getProofViewUrl, getProofToken } = await import("../lib/proof-bridge.js");
         const proofApi = getProofApiBase();
         const proofUrl = getProofViewUrl(item.proofDocSlug);
+        const proofToken = getProofToken(item.proofDocSlug) ?? "MISSING_TOKEN";
         sections.push(
           "",
           "## Live Proof Document",
@@ -1049,16 +1050,20 @@ class QueueProcessor {
           "Re-read the Proof doc before each major update so you incorporate any human edits or Prosper steering comments.",
           "When you finish, mirror the final markdown to the required output file path below.",
           "",
-          "Example commands:",
+          "Example commands (use the Proof agent bridge API):",
           "```bash",
-          `curl -s ${proofApi}/documents/${item.proofDocSlug}`,
-          `curl -s -X PUT ${proofApi}/documents/${item.proofDocSlug} \\`,
-          "  -H 'Content-Type: application/json' \\",
-          `  -d '{"content":"## Outline\\n- ...","author":"agent","authorName":"${roleName}"}'`,
-          `curl -s -X PUT ${proofApi}/documents/${item.proofDocSlug} \\`,
-          "  -H 'Content-Type: application/json' \\",
-          `  -d '{"content":"## Next update\\n...","author":"agent","authorName":"${roleName}","mode":"append"}'`,
+          `# Read current document state`,
+          `curl -s -H "Authorization: Bearer ${proofToken}" ${proofApi}/api/agent/${item.proofDocSlug}/state`,
+          `# Replace full content`,
+          `curl -s -X POST -H "Content-Type: application/json" -H "Authorization: Bearer ${proofToken}" -H "X-Agent-Id: godmode-${roleName.toLowerCase().replace(/\s+/g, "-")}" \\`,
+          `  ${proofApi}/api/agent/${item.proofDocSlug}/ops \\`,
+          `  -d '{"type":"rewrite.apply","by":"ai:godmode-${roleName.toLowerCase().replace(/\s+/g, "-")}","content":"## Outline\\n- ..."}'`,
+          `# Append content`,
+          `curl -s -X POST -H "Content-Type: application/json" -H "Authorization: Bearer ${proofToken}" -H "X-Agent-Id: godmode-${roleName.toLowerCase().replace(/\s+/g, "-")}" \\`,
+          `  ${proofApi}/api/agent/${item.proofDocSlug}/edit \\`,
+          `  -d '{"by":"ai:godmode-${roleName.toLowerCase().replace(/\s+/g, "-")}","operations":[{"op":"append","section":"","content":"\\n\\n## Next update\\n..."}]}'`,
           "```",
+          "The Proof editor handles real-time sync — your writes appear live to the user.",
         );
       } catch {
         // Proof server may be unavailable mid-run; continue with file output only.

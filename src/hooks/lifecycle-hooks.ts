@@ -305,6 +305,36 @@ export async function handleBeforeToolCall(
     }
   } catch { /* non-fatal */ }
 
+  // Gate 1f: Architecture Gate — HARD BLOCK new infrastructure without architecture review
+  try {
+    const { checkArchitectureGate } = await import("./safety-gates.js");
+    const archBlock = await checkArchitectureGate(name, (event.params ?? {}) as Record<string, unknown>, sessionKey);
+    if (archBlock) {
+      logger.warn(`[GodMode][SafetyGate] architecture gate BLOCKED: ${name}`);
+      return { block: true, blockReason: archBlock };
+    }
+  } catch { /* non-fatal */ }
+
+  // Gate 1g: Deployment Gate — HARD BLOCK production deploys, pushes to main, PR merges
+  try {
+    const { checkDeploymentGate } = await import("./safety-gates.js");
+    const deployBlock = await checkDeploymentGate(name, (event.params ?? {}) as Record<string, unknown>, sessionKey);
+    if (deployBlock) {
+      logger.warn(`[GodMode][SafetyGate] deployment gate BLOCKED: ${name}`);
+      return { block: true, blockReason: deployBlock };
+    }
+  } catch { /* non-fatal */ }
+
+  // Gate 1h: Destructive Write Gate — HARD BLOCK rm -rf, git reset --hard, DROP TABLE
+  try {
+    const { checkDestructiveWriteGate } = await import("./safety-gates.js");
+    const destructiveBlock = await checkDestructiveWriteGate(name, (event.params ?? {}) as Record<string, unknown>, sessionKey);
+    if (destructiveBlock) {
+      logger.warn(`[GodMode][SafetyGate] destructive write gate BLOCKED: ${name}`);
+      return { block: true, blockReason: destructiveBlock };
+    }
+  } catch { /* non-fatal */ }
+
   // Record tool usage for enforcer gates
   try {
     const { recordToolUsage } = await import("./safety-gates.js");
@@ -452,16 +482,24 @@ export async function handleLlmOutputAutoTitle(
   const sessionKey = extractSessionKey(ctx);
   if (!sessionKey) return;
 
-  logger.info(`[GodMode][AutoTitle] llm_output fired for "${sessionKey}", pending keys: [${[...pendingAutoTitles.keys()].join(", ")}]`);
-
   const firstMessage = pendingAutoTitles.get(sessionKey);
-  if (!firstMessage) {
-    logger.info(`[GodMode][AutoTitle] No pending message for "${sessionKey}" — skipping`);
+  if (!firstMessage) return;
+  if (titledSessions.has(sessionKey)) {
+    pendingAutoTitles.delete(sessionKey);
     return;
   }
 
+  // Only consume the pending message when we have actual assistant text.
+  // llm_output fires for EVERY intermediate LLM call (tool-use rounds too).
+  // If we consume on a tool-use turn, the real final response finds nothing.
+  const assistantText = (event as { assistantTexts?: string[] }).assistantTexts?.join("") ?? "";
+  if (!assistantText.trim()) {
+    logger.info(`[GodMode][AutoTitle] No assistant text yet for "${sessionKey}" — waiting for final response`);
+    return;
+  }
+
+  // Consume now — we have real assistant text to work with
   pendingAutoTitles.delete(sessionKey);
-  if (titledSessions.has(sessionKey)) return;
 
   try {
     const cfg = await loadSessionConfig();
@@ -476,8 +514,6 @@ export async function handleLlmOutputAutoTitle(
         return;
       }
     }
-
-    const assistantText = (event as { assistantTexts?: string[] }).assistantTexts?.join("") ?? "";
 
     let title = await generateSessionTitle(firstMessage, assistantText);
     logger.info(`[GodMode][AutoTitle] LLM title result: ${title ? `"${title}"` : "null (falling back to string derivation)"}`);

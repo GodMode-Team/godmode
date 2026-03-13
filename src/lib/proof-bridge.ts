@@ -1,35 +1,80 @@
 /**
- * proof-bridge.ts — Client wrapper for the Proof document server.
+ * proof-bridge.ts — Client wrapper for the Proof editor.
  *
  * All Proof operations go through this bridge. Used by:
  *   - proof_editor tool (Prosper creates/edits docs)
  *   - queue-processor (agents write output to Proof docs)
  *   - UI (opens Proof docs in sidebar via iframe)
+ *
+ * Configurable target:
+ *   - Default: https://www.proofeditor.ai (hosted, zero-setup)
+ *   - Self-hosted: set PROOF_API_URL=http://127.0.0.1:4000 (proof-sdk local)
+ *   - Sovereignty: self-hosted keeps all data on your machine
+ *
+ * Auth: Per-document share tokens stored in ~/godmode/data/proof-tokens.json.
+ * Local mirror: Markdown copies in ~/godmode/artifacts/proof/ for vault/Drive.
  */
 
+import { join } from "node:path";
+import { randomUUID } from "node:crypto";
+import { ARTIFACTS_DIR } from "../data-paths.js";
+import { secureMkdirSync, secureWriteFileSync } from "./secure-fs.js";
 import {
-  getProofPort,
-  getProofViewUrl as getServerProofViewUrl,
-  isProofRunning,
+  getTokenForSlug,
+  storeToken,
+  getTokenMap,
+  getProofDocumentFilePath,
 } from "../services/proof-server.js";
 
-type ProofResponse<T> = T & { error?: string };
+/** Resolve the Proof API base URL. Self-hosted takes priority. */
+const PROOF_API = (process.env.PROOF_API_URL ?? "https://www.proofeditor.ai").replace(/\/+$/, "");
+const PROOF_ARTIFACTS_DIR = join(ARTIFACTS_DIR, "proof");
 
-async function proofFetch<T>(path: string, opts?: RequestInit): Promise<T> {
-  if (!isProofRunning()) {
-    throw new Error("Proof server is not running");
+// ── API Helpers ──────────────────────────────────────────────────
+
+async function proofApiFetch<T>(
+  path: string,
+  opts: RequestInit & { token?: string } = {},
+): Promise<T> {
+  const { token, ...fetchOpts } = opts;
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    ...(fetchOpts.headers as Record<string, string> ?? {}),
+  };
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+    headers["X-Agent-Id"] = "godmode-ally";
   }
-  const port = getProofPort();
-  const url = `http://127.0.0.1:${port}${path}`;
-  const res = await fetch(url, {
-    ...opts,
-    headers: { "Content-Type": "application/json", ...opts?.headers },
-  });
-  const data = await res.json() as ProofResponse<T>;
+
+  const url = `${PROOF_API}${path}`;
+  const res = await fetch(url, { ...fetchOpts, headers });
+
   if (!res.ok) {
-    throw new Error((data as any).error ?? `Proof API error: ${res.status}`);
+    const text = await res.text().catch(() => "");
+    let errorMsg = `Proof API ${res.status}: ${text}`;
+    try {
+      const parsed = JSON.parse(text);
+      if (parsed.code) errorMsg = `Proof API ${parsed.code}: ${parsed.message ?? text}`;
+    } catch { /* raw text is fine */ }
+    throw new Error(errorMsg);
   }
-  return data;
+
+  const ct = res.headers.get("content-type") ?? "";
+  if (ct.includes("json")) {
+    return res.json() as Promise<T>;
+  }
+  return {} as T;
+}
+
+/** Write a local markdown mirror for vault capture and Google Drive export. */
+function syncLocalMirror(slug: string, title: string, content: string): string {
+  const filePath = getProofDocumentFilePath(slug);
+  secureMkdirSync(PROOF_ARTIFACTS_DIR);
+  const normalized = content.trim().startsWith("#")
+    ? content
+    : `# ${title}\n\n${content}`.trim() + "\n";
+  secureWriteFileSync(filePath, normalized.endsWith("\n") ? normalized : normalized + "\n");
+  return filePath;
 }
 
 // ── Public API ───────────────────────────────────────────────────
@@ -39,17 +84,71 @@ export async function createProofDocument(
   initialContent?: string,
   author?: string,
 ): Promise<{ slug: string; title: string; url: string; filePath: string }> {
-  const doc = await proofFetch<{ slug: string; title: string; filePath: string }>("/documents", {
-    method: "POST",
-    body: JSON.stringify({ title, content: initialContent, author }),
-  });
-  return { ...doc, url: getServerProofViewUrl(doc.slug) };
+  const markdown = initialContent?.trim()
+    ? initialContent
+    : `# ${title}\n\n`;
+
+  // POST /share/markdown creates a new doc and returns a shareable URL
+  const result = await proofApiFetch<{ url?: string; slug?: string; id?: string }>(
+    "/share/markdown",
+    { method: "POST", body: JSON.stringify({ markdown }) },
+  );
+
+  // Extract slug and token from the returned URL
+  // Expected URL format: https://www.proofeditor.ai/d/<slug>?token=<token>
+  let slug = result.slug ?? result.id ?? "";
+  let token = "";
+  if (result.url) {
+    try {
+      const parsed = new URL(result.url);
+      const pathParts = parsed.pathname.split("/").filter(Boolean);
+      if (pathParts.length >= 2) {
+        slug = pathParts[pathParts.length - 1];
+      }
+      token = parsed.searchParams.get("token") ?? "";
+    } catch { /* use slug from response body */ }
+  }
+
+  if (!slug) {
+    throw new Error("Proof API did not return a document identifier");
+  }
+
+  if (token) {
+    storeToken(slug, token, title);
+  }
+
+  const filePath = syncLocalMirror(slug, title, markdown);
+
+  return {
+    slug,
+    title,
+    url: getProofViewUrl(slug),
+    filePath,
+  };
 }
 
 export async function readProofDocument(
   slug: string,
 ): Promise<{ slug: string; title: string; content: string; updatedAt: string; filePath: string }> {
-  return proofFetch(`/documents/${slug}`);
+  const token = getTokenForSlug(slug);
+  if (!token) {
+    throw new Error(`No auth token for Proof document: ${slug}`);
+  }
+
+  const state = await proofApiFetch<{
+    text?: string;
+    content?: string;
+    markdown?: string;
+    title?: string;
+    updatedAt?: string;
+  }>(`/api/agent/${slug}/state`, { token });
+
+  const content = state.text ?? state.content ?? state.markdown ?? "";
+  const title = state.title ?? slug;
+  const updatedAt = state.updatedAt ?? new Date().toISOString();
+  const filePath = syncLocalMirror(slug, title, content);
+
+  return { slug, title, content, updatedAt, filePath };
 }
 
 export async function editProofDocument(
@@ -59,10 +158,43 @@ export async function editProofDocument(
   authorName?: string,
   mode: "replace" | "append" = "replace",
 ): Promise<void> {
-  await proofFetch(`/documents/${slug}`, {
-    method: "PUT",
-    body: JSON.stringify({ content, author, authorName, mode }),
-  });
+  const token = getTokenForSlug(slug);
+  if (!token) {
+    throw new Error(`No auth token for Proof document: ${slug}`);
+  }
+
+  const agentId = authorName
+    ? `godmode-${authorName.toLowerCase().replace(/\s+/g, "-")}`
+    : `godmode-${author}`;
+
+  if (mode === "replace") {
+    await proofApiFetch(`/api/agent/${slug}/ops`, {
+      method: "POST",
+      token,
+      headers: { "X-Agent-Id": agentId, "Idempotency-Key": randomUUID() },
+      body: JSON.stringify({
+        type: "rewrite.apply",
+        by: `ai:${agentId}`,
+        content,
+      }),
+    });
+  } else {
+    await proofApiFetch(`/api/agent/${slug}/edit`, {
+      method: "POST",
+      token,
+      headers: { "X-Agent-Id": agentId, "Idempotency-Key": randomUUID() },
+      body: JSON.stringify({
+        by: `ai:${agentId}`,
+        operations: [{ op: "append", section: "", content: "\n\n" + content }],
+      }),
+    });
+  }
+
+  // Update local mirror
+  try {
+    const state = await readProofDocument(slug);
+    syncLocalMirror(slug, state.title, state.content);
+  } catch { /* mirror sync failure is non-fatal */ }
 }
 
 export async function appendProofDocument(
@@ -78,36 +210,73 @@ export async function addProofComment(
   slug: string,
   author: string,
   text: string,
-  position?: number,
+  _position?: number,
 ): Promise<{ id: string }> {
-  return proofFetch(`/documents/${slug}/comments`, {
+  const token = getTokenForSlug(slug);
+  if (!token) {
+    throw new Error(`No auth token for Proof document: ${slug}`);
+  }
+
+  const agentId = `godmode-${author.toLowerCase().replace(/\s+/g, "-")}`;
+
+  const result = await proofApiFetch<{ id?: string }>(`/api/agent/${slug}/ops`, {
     method: "POST",
-    body: JSON.stringify({ author, text, position }),
+    token,
+    headers: { "X-Agent-Id": agentId },
+    body: JSON.stringify({
+      type: "comment.add",
+      by: `ai:${agentId}`,
+      text,
+    }),
   });
+
+  return { id: result.id ?? randomUUID() };
 }
 
 export async function listProofDocuments(): Promise<
   Array<{ slug: string; title: string; updatedAt: string; author: string }>
 > {
-  const result = await proofFetch<{ documents: Array<{ slug: string; title: string; updatedAt: string; author: string }> }>("/documents");
-  return result.documents;
+  const tokenMap = getTokenMap();
+  return Object.entries(tokenMap).map(([slug, entry]) => ({
+    slug,
+    title: entry.title ?? slug,
+    updatedAt: entry.storedAt,
+    author: "ally",
+  }));
 }
 
 /**
- * Get the iframe URL for embedding a Proof doc in the sidebar.
+ * Get the Proof editor URL for embedding in sidebar iframe.
+ * Points to hosted or self-hosted depending on PROOF_API_URL env.
  */
 export function getProofViewUrl(slug: string): string {
-  return getServerProofViewUrl(slug);
+  const token = getTokenForSlug(slug);
+  if (token) {
+    return `${PROOF_API}/d/${slug}?token=${token}`;
+  }
+  return `${PROOF_API}/d/${slug}`;
 }
 
-/**
- * Get the API base URL for the Proof server.
- */
+/** Get the configured API base URL. */
 export function getProofApiBase(): string {
-  const port = getProofPort();
-  return `http://127.0.0.1:${port}`;
+  return PROOF_API;
+}
+
+/** Get the auth token for a Proof document (used by queue-processor for agent prompts). */
+export function getProofToken(slug: string): string | null {
+  return getTokenForSlug(slug) ?? null;
 }
 
 export function shareProofDocument(slug: string): { slug: string; viewUrl: string } {
   return { slug, viewUrl: getProofViewUrl(slug) };
+}
+
+/** Check if the configured Proof API is reachable. */
+export async function checkProofHealth(): Promise<boolean> {
+  try {
+    const res = await fetch(`${PROOF_API}/health`, { signal: AbortSignal.timeout(3000) });
+    return res.ok;
+  } catch {
+    return false;
+  }
 }

@@ -878,6 +878,314 @@ export function checkEphemeralWrite(
   return EPHEMERAL_BLOCK_MESSAGE;
 }
 
+// ── Architecture Gate ──────────────────────────────────────────────
+//
+// Problem: Prosper created an hourly bash cron watcher + iMessage alerts
+// to detect OpenClaw update breakage — functionality already handled by
+// the TypeScript post-update health audit in system-update.ts.
+// Cost: iMessage spam, redundant systems, fragile count-based diffing.
+//
+// Rule: HARD BLOCK any attempt to create new infrastructure (scripts,
+// cron jobs, services, daemons, watchers, systemd units) without first
+// reading the architecture docs. Forces the agent to check what already
+// exists before building something new.
+//
+// Hook: before_tool_call on exec/bash/shell + file-write tools.
+// Detection: regex patterns for infrastructure creation commands.
+
+const INFRA_CREATION_PATTERNS = [
+  // Cron job manipulation
+  /crontab\s+(-[elr]\b|<<|.*\|.*crontab)/i,
+  /\bcron\b.*\b(add|create|install|schedule|register)\b/i,
+
+  // Script creation (writing executable files)
+  /(?:cat|tee)\s*>.*\.sh\b/,
+  /chmod\s+\+?[0-7]*x.*\.sh\b/,
+  /(?:cat|tee)\s*>.*\.(?:command|zsh|bash)\b/,
+
+  // Service/daemon creation
+  /launchctl\s+(?:load|bootstrap|enable)/i,
+  /(?:cat|tee)\s*>.*\.plist\b/,
+  /(?:cat|tee)\s*>.*\.service\b/,
+  /systemctl\s+(?:enable|start)/i,
+
+  // Process managers
+  /pm2\s+(?:start|save|startup)/i,
+  /supervisorctl/i,
+
+  // New watcher/monitor/polling scripts
+  /(?:while\s+true|watch\s+-n|inotifywait|fswatch)\b/,
+
+  // iMessage/notification automation
+  /osascript.*Messages.*send/i,
+  /osascript.*(?:notification|display\s+alert)/i,
+];
+
+const INFRA_FILE_PATTERNS = [
+  // New shell scripts
+  /\.sh$/,
+  // Plist files (launchd services)
+  /\.plist$/,
+  // Systemd unit files
+  /\.service$/,
+  // Cron directories
+  /\/cron\.d\//,
+  /\/cron\/.*\.(?:sh|json)$/,
+];
+
+const ARCHITECTURE_BLOCK_MESSAGE = [
+  "\u{1F3D7}\u{FE0F} BLOCKED: Architecture Gate — you cannot create new infrastructure without consulting the architecture first.",
+  "",
+  "You are attempting to create a new script, cron job, service, or daemon.",
+  "Before building ANYTHING new, you MUST:",
+  "",
+  "1. Read `docs/GODMODE-META-ARCHITECTURE.md` — the definitive product blueprint",
+  "2. Check `src/methods/system-update.ts`, `src/services/`, and existing cron jobs for overlapping functionality",
+  "3. Ask: 'Does this already exist? Can I wire into what's already built instead of building something new?'",
+  "",
+  "Golden Rule #1: Code as little as possible. If the capability exists, use it.",
+  "Golden Rule #2: Conduct, don't rebuild. Connect to existing systems, never duplicate them.",
+  "",
+  "If after reviewing the architecture you determine new infrastructure is genuinely needed,",
+  "present the plan to the user with: what it does, why existing systems can't handle it,",
+  "and how it integrates with (not duplicates) the current architecture.",
+].join("\n");
+
+/**
+ * Check if an exec command or file write is creating new infrastructure.
+ * Returns a BLOCK reason string, or undefined if the command is safe.
+ */
+export async function checkArchitectureGate(
+  toolName: string,
+  params: Record<string, unknown>,
+  sessionKey?: string,
+): Promise<string | undefined> {
+  const config = await readGuardrailsStateCached();
+  if (!config.gates.architectureGate?.enabled) return undefined;
+
+  const name = toolName.trim().toLowerCase();
+
+  // Check file-write tools for infrastructure file patterns
+  if (
+    name === "write" ||
+    name === "files.write" ||
+    name === "write_file" ||
+    name === "create" ||
+    name === "files.create" ||
+    name === "create_file"
+  ) {
+    const filePath =
+      typeof params.path === "string"
+        ? params.path
+        : typeof params.file_path === "string"
+          ? params.file_path
+          : "";
+    if (filePath && INFRA_FILE_PATTERNS.some((p) => p.test(filePath))) {
+      void logGateActivity(
+        "architectureGate",
+        "blocked",
+        `Infrastructure file creation BLOCKED: ${name} → ${filePath.slice(0, 120)}`,
+        sessionKey,
+      );
+      return ARCHITECTURE_BLOCK_MESSAGE;
+    }
+    return undefined;
+  }
+
+  // Check exec/bash/shell commands for infrastructure creation
+  if (name !== "exec" && name !== "bash" && name !== "shell") return undefined;
+
+  const command =
+    typeof params.command === "string"
+      ? params.command
+      : typeof params.cmd === "string"
+        ? params.cmd
+        : "";
+  if (!command) return undefined;
+
+  const matches = INFRA_CREATION_PATTERNS.some((p) => p.test(command));
+  if (matches) {
+    void logGateActivity(
+      "architectureGate",
+      "blocked",
+      `Infrastructure creation BLOCKED: ${command.slice(0, 120)}`,
+      sessionKey,
+    );
+    return ARCHITECTURE_BLOCK_MESSAGE;
+  }
+
+  return undefined;
+}
+
+// ── Deployment Gate ────────────────────────────────────────────────
+//
+// Problem: Agents doing client work (websites, funnels, campaigns) must
+// NEVER deploy to production or push to main. All production changes
+// require human review via preview links.
+//
+// Rule: HARD BLOCK on production deploys, pushes to main/master, PR merges,
+// and force pushes. Agents create draft PRs with dev preview links instead.
+
+const DEPLOYMENT_PATTERNS = [
+  // Production deploys
+  /vercel\s+deploy\s+--prod/i,
+  /vercel\s+promote/i,
+  /netlify\s+deploy\s+--prod/i,
+  /firebase\s+deploy(?!\s+--only\s+hosting:preview)/i,
+  /surge\s+--domain\s/i,
+  /fly\s+deploy/i,
+
+  // Push to protected branches
+  /git\s+push\s+(?:\S+\s+)?(?:main|master|production|prod)\b/i,
+  /git\s+push\s+origin\s+(?:main|master|production|prod)\b/i,
+  /git\s+push\s+(?:--force|-f)\b/i,
+  /git\s+push\s+\S+\s+\+/,  // refspec force push (e.g., git push origin +branch)
+
+  // PR merges — agents don't merge their own PRs
+  /gh\s+pr\s+merge/i,
+  /git\s+merge\s+(?:\S+\s+)?(?:main|master|production)\b/i,
+
+  // Release creation (non-draft)
+  /gh\s+release\s+create(?!.*--draft)/i,
+];
+
+const DEPLOYMENT_BLOCK_MESSAGE = [
+  "\u{1F6A8} BLOCKED: Production deployment requires human approval.",
+  "",
+  "Instead:",
+  "1. Push your feature branch: `git push origin feat/your-branch`",
+  "2. Create a DRAFT PR: `gh pr create --draft`",
+  "3. Generate a dev preview link:",
+  "   - Vercel: `vercel deploy` (no --prod) \u2192 preview URL",
+  "   - Netlify: `netlify deploy` (no --prod) \u2192 draft URL",
+  "4. Include the preview link in the PR description",
+  "5. A human will review the preview, approve, and deploy.",
+  "",
+  "NEVER deploy to production. NEVER merge your own PR. NEVER push to main.",
+  "NEVER force push to any branch.",
+].join("\n");
+
+/**
+ * Check if an exec command attempts a production deployment or push to main.
+ * Returns a BLOCK reason string, or undefined if the command is safe.
+ */
+export async function checkDeploymentGate(
+  toolName: string,
+  params: Record<string, unknown>,
+  sessionKey?: string,
+): Promise<string | undefined> {
+  const config = await readGuardrailsStateCached();
+  if (!config.gates.deploymentGate?.enabled) return undefined;
+
+  const name = toolName.trim().toLowerCase();
+  if (name !== "exec" && name !== "bash" && name !== "shell") return undefined;
+
+  const command =
+    typeof params.command === "string"
+      ? params.command
+      : typeof params.cmd === "string"
+        ? params.cmd
+        : "";
+  if (!command) return undefined;
+
+  const matches = DEPLOYMENT_PATTERNS.some((p) => p.test(command));
+  if (matches) {
+    void logGateActivity(
+      "deploymentGate",
+      "blocked",
+      `Production deployment BLOCKED: ${command.slice(0, 120)}`,
+      sessionKey,
+    );
+    return DEPLOYMENT_BLOCK_MESSAGE;
+  }
+
+  return undefined;
+}
+
+// ── Destructive Write Gate ────────────────────────────────────────
+//
+// Problem: Agents can overwrite live client work — rm -rf a project dir,
+// git reset --hard, drop database tables, bulk delete files — with no
+// backup and no recovery path.
+//
+// Rule: HARD BLOCK on destructive operations. Forces backup-first workflow.
+
+const DESTRUCTIVE_PATTERNS = [
+  // Recursive deletion on project/workspace directories
+  /rm\s+(-rf|-fr|-r\s+-f|-f\s+-r)\s+(?!\/tmp\b|\/var\/tmp\b)/,
+
+  // Git destructive operations
+  /git\s+reset\s+--hard/i,
+  /git\s+clean\s+-f/i,
+  /git\s+checkout\s+--\s+\./,  // discard all changes
+  /git\s+restore\s+--staged\s+--worktree\s+\./,
+
+  // Database destructive operations
+  /DROP\s+(?:TABLE|DATABASE|SCHEMA)\b/i,
+  /DELETE\s+FROM\s+\S+\s*(?:;|$)/i,  // DELETE without WHERE
+  /TRUNCATE\s+TABLE/i,
+
+  // Overwrite without backup
+  />\s+[^|]+\.(?:html|css|js|tsx?|json|md|yaml|yml)\b/,  // redirect overwrite of code files
+];
+
+const DESTRUCTIVE_BLOCK_MESSAGE = [
+  "\u{1F4A3} BLOCKED: Destructive operation requires backup first.",
+  "",
+  "Before running destructive commands, you MUST:",
+  "1. Create a backup branch: `git checkout -b backup/$(date +%Y%m%d-%H%M%S)`",
+  "   Then switch back: `git checkout -`",
+  "2. Or copy the target: `cp -r target/ target.backup/`",
+  "3. Then retry your command.",
+  "",
+  "For git operations:",
+  "- Instead of `git reset --hard`: use `git stash` or create a backup branch first",
+  "- Instead of `rm -rf`: use `git worktree` or backup first",
+  "",
+  "For database operations:",
+  "- Always include a WHERE clause with DELETE",
+  "- Take a backup/snapshot before DROP or TRUNCATE",
+  "",
+  "Client work is irreplaceable. Measure twice, cut once.",
+].join("\n");
+
+/**
+ * Check if an exec command performs destructive operations without backup.
+ * Returns a BLOCK reason string, or undefined if the command is safe.
+ */
+export async function checkDestructiveWriteGate(
+  toolName: string,
+  params: Record<string, unknown>,
+  sessionKey?: string,
+): Promise<string | undefined> {
+  const config = await readGuardrailsStateCached();
+  if (!config.gates.destructiveWriteGate?.enabled) return undefined;
+
+  const name = toolName.trim().toLowerCase();
+  if (name !== "exec" && name !== "bash" && name !== "shell") return undefined;
+
+  const command =
+    typeof params.command === "string"
+      ? params.command
+      : typeof params.cmd === "string"
+        ? params.cmd
+        : "";
+  if (!command) return undefined;
+
+  const matches = DESTRUCTIVE_PATTERNS.some((p) => p.test(command));
+  if (matches) {
+    void logGateActivity(
+      "destructiveWriteGate",
+      "blocked",
+      `Destructive operation BLOCKED: ${command.slice(0, 120)}`,
+      sessionKey,
+    );
+    return DESTRUCTIVE_BLOCK_MESSAGE;
+  }
+
+  return undefined;
+}
+
 /**
  * Reset prompt shield and output shield tracking for a session.
  */

@@ -1,6 +1,6 @@
 ---
 domain: people
-triggers: who is, person, contact, team, coworker, client, relationship, met with, meeting with, attendee, attendees, who was, who's the, talked to
+triggers: who is, person, contact, team, coworker, client, relationship, met with, meeting with, attendee, attendees, who was, who's the, talked to, email, invite, admin, member, onboard, add user
 tools: secondBrain.search, secondBrain.memoryBankEntry, secondBrain.memoryBank
 ---
 ## When to Use

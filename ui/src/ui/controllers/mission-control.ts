@@ -1,5 +1,72 @@
 import type { GodModeApp } from "../app.js";
 
+// ── Swarm types (matching src/methods/swarm-rpc.ts response shapes) ──
+
+export type SwarmAgentState = {
+  id: string;
+  personaSlug: string;
+  personaName: string;
+  role: string;
+  status: "idle" | "working" | "done" | "failed";
+  currentTask?: string;
+  progress?: number;
+  startedAt?: number;
+  endedAt?: number;
+  tokenSpend?: number;
+  lastHeartbeat?: number;
+  proofDocSlug?: string;
+};
+
+export type SwarmIssueNode = {
+  issueId: string;
+  title: string;
+  status: string;
+  assignee: string;
+  personaName: string;
+  proofDocSlug?: string;
+  dependsOn?: string[];
+};
+
+export type SwarmProject = {
+  projectId: string;
+  title: string;
+  status: string;
+  issueCount: number;
+  completedCount: number;
+  failedCount: number;
+  createdAt: string;
+  proofWorkspace: string;
+};
+
+export type SwarmProjectDetail = {
+  projectId: string;
+  title: string;
+  status: string;
+  proofWorkspace: string;
+  agents: SwarmAgentState[];
+  issues: SwarmIssueNode[];
+  tokenSpend?: number;
+};
+
+export type SwarmFeedEvent = {
+  id: string;
+  timestamp: number;
+  type: "agent_started" | "agent_completed" | "agent_failed" | "handoff" | "steering" | "project_completed" | "project_failed";
+  summary: string;
+  projectId: string;
+  personaSlug?: string;
+  personaName?: string;
+  issueTitle?: string;
+};
+
+export type SwarmData = {
+  projects: SwarmProject[];
+  selectedProjectId: string | null;
+  detail: SwarmProjectDetail | null;
+  feed: SwarmFeedEvent[];
+  running: boolean;
+};
+
 // ── Types (client-side view models matching backend RPC shapes) ──
 
 type SerializedRun = {
@@ -64,7 +131,7 @@ const AGENT_ROLE_NAMES: Record<string, string> = {
   coding: "Builder", research: "Researcher", analysis: "Analyst",
   creative: "Creative", review: "Reviewer", ops: "Ops",
   task: "Agent", url: "Reader", idea: "Explorer",
-  subagent: "Sub-Agent", swarm: "Swarm",
+  subagent: "Sub-Agent", swarm: "Team",
 };
 
 function agentRoleName(type: string, subType?: string, personaHint?: string): string {
@@ -125,6 +192,7 @@ export type MissionControlData = {
   activityFeed: ActivityFeedItem[];
   lastRefreshedAt: number;
   queueItems: QueueItemRpc[];
+  swarm: SwarmData;
 };
 
 // ── Helpers ──
@@ -422,12 +490,53 @@ export async function loadMissionControl(
     const stats = computeStats(agents, queueDepthCount, queueReviewCount);
     const activityFeed = buildActivityFeed(agents);
 
+    // ── Swarm data (Paperclip) — optional, gracefully degrades ──
+    let swarmData: SwarmData = { projects: [], selectedProjectId: null, detail: null, feed: [], running: false };
+    try {
+      const swarmProjectsResult = await host.client.request<{ projects: SwarmProject[]; running: boolean }>(
+        "godmode.delegation.projects",
+        {},
+      );
+      if (swarmProjectsResult?.running && swarmProjectsResult.projects.length > 0) {
+        const projects = swarmProjectsResult.projects;
+        // Use previously selected project or pick the first active one
+        const prevSelected = h.missionControlData?.swarm?.selectedProjectId;
+        const selectedProjectId = prevSelected && projects.some(p => p.projectId === prevSelected)
+          ? prevSelected
+          : projects.find(p => p.status === "in_progress")?.projectId ?? projects[0].projectId;
+
+        let detail: SwarmProjectDetail | null = null;
+        let feed: SwarmFeedEvent[] = [];
+
+        if (selectedProjectId) {
+          try {
+            detail = await host.client.request<SwarmProjectDetail>(
+              "godmode.delegation.status",
+              { projectId: selectedProjectId },
+            );
+          } catch { /* non-fatal */ }
+          try {
+            const feedResult = await host.client.request<{ events: SwarmFeedEvent[] }>(
+              "godmode.delegation.feed",
+              { projectId: selectedProjectId },
+            );
+            feed = feedResult?.events ?? [];
+          } catch { /* non-fatal */ }
+        }
+
+        swarmData = { projects, selectedProjectId, detail, feed, running: true };
+      }
+    } catch {
+      // swarm RPC not available — expected when Paperclip isn't running
+    }
+
     h.missionControlData = {
       agents,
       stats,
       activityFeed,
       lastRefreshedAt: Date.now(),
       queueItems: pendingQueueItems,
+      swarm: swarmData,
     };
   } catch (err) {
     console.error("[MissionControl] load error:", err);
@@ -557,6 +666,51 @@ export async function loadAgentDetail(
   }
 
   return { content: `# ${agent.task}\n\nNo details available.`, title: agent.task, mimeType: "text/markdown" };
+}
+
+// ── Swarm actions ──
+
+export async function selectSwarmProject(
+  host: GodModeApp,
+  projectId: string,
+): Promise<void> {
+  const h = host as unknown as {
+    missionControlData: MissionControlData | null;
+  };
+  if (h.missionControlData?.swarm) {
+    h.missionControlData = {
+      ...h.missionControlData,
+      swarm: { ...h.missionControlData.swarm, selectedProjectId: projectId },
+    };
+  }
+  // Reload to fetch detail for the newly selected project
+  await loadMissionControl(host, { quiet: true });
+}
+
+export async function steerSwarmAgent(
+  host: GodModeApp,
+  projectId: string,
+  issueTitle: string,
+  instructions: string,
+): Promise<boolean> {
+  if (!host.client || !host.connected) return false;
+  try {
+    const result = await host.client.request<{ success?: boolean; error?: string }>(
+      "godmode.delegation.steer",
+      { projectId, issueTitle, instructions },
+    );
+    if (result?.success) {
+      host.showToast("Steering sent", "success", 2000);
+      await loadMissionControl(host, { quiet: true });
+      return true;
+    }
+    host.showToast(result?.error ?? "Failed to steer", "error");
+    return false;
+  } catch (err) {
+    host.showToast("Failed to send steering", "error");
+    console.error("[MissionControl] steer error:", err);
+    return false;
+  }
 }
 
 export { type QueueItemRpc, AGENT_ROLE_NAMES };

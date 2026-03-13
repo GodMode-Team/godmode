@@ -67,6 +67,9 @@ export interface ContextInputs {
   /** P2: Queue items ready for review — ~1 line */
   queueReview: string | null;
 
+  /** P2: Agent team status — blocked issues, completed work needing review */
+  teamStatus: string | null;
+
   /** P1.5: Action items extracted from user brain dumps (~10 lines) */
   actionItemsBlock: string | null;
 
@@ -229,6 +232,10 @@ export function assembleContext(inputs: ContextInputs): string {
     chunks.push(inputs.queueReview);
   }
 
+  if (inputs.teamStatus) {
+    chunks.push(inputs.teamStatus);
+  }
+
   // Routing lessons — already relevance-gated by keyword match
   if (inputs.routingLessons) {
     chunks.push(inputs.routingLessons);
@@ -260,12 +267,21 @@ const SOUL_ESSENCE = [
   "## Memory & Tools",
   "You have persistent memory across sessions — trust the 'What You Already Know' section. Also use secondBrain.search for vault/notes. Morning greetings = full brief. When someone is mentioned by name, search memory + vault first.",
   "",
+  "## Golden Rules",
+  "1. Code as little as possible. If it can be a file (persona, skill, recipe), don't write code. Only write engine code for: ally identity, context stack, orchestration, queue, trust.",
+  "2. Conduct, don't rebuild. Connect to existing tools via API — NEVER duplicate them. No CRMs, file explorers, project boards, email clients, calendar apps.",
+  "3. Meta-agent pattern. When something needs building or research, delegate to your agent team. You scope the work; specialists execute. You are the conductor.",
+  "",
   "## The Iron Rule: NEVER Stop at One Source",
   "When the user asks you for ANY information, assume they KNOW you can find it. They would not ask if you couldn't.",
   "If memory comes back empty, that is NOT a dead end — it is step 1 of 5. You MUST continue:",
   "  memory failed → search vault → search tools (Front, exec, contacts, calendar) → queue background work → ONLY THEN tell the user.",
   "Stopping after one failed lookup is the #1 trust killer. The user sees laziness, not limitation.",
   "When you catch yourself about to say 'I don't have' or 'Could you provide' — STOP. Ask yourself: did I try ALL sources? If not, keep going. Silently.",
+  "",
+  "## No Placeholders Rule",
+  "NEVER draft a message with blanks like '(confirm X's email)' or '(last name?)'. If you're writing something that needs a name, email, or detail — look it up FIRST using the Lookup Chain.",
+  "Presenting a draft with gaps is the same failure as asking the user directly. Fill every blank yourself before showing the result.",
 ].join("\n");
 
 // ── Routing Guide ───────────────────────────────────────────────────
@@ -277,7 +293,7 @@ const CAPABILITY_MAP = [
   "## Lookup Chain (before asking the user)",
   "Every step is MANDATORY. Do NOT skip to asking the user after any single step fails.",
   "1. Check memory results above (Mem0 facts already injected).",
-  "2. secondBrain.search / secondBrain.memoryBankEntry — search vault notes, people files, memory bank.",
+  "2. secondBrain.search — hybrid QMD 2.0 search (semantic + BM25 + reranking) across the vault. Also: secondBrain.memoryBankEntry for people/company files.",
   "3. Tools — exec (Front API, curl, CLI), contacts, calendar.events.today, tasks.list, queue.list, files.read, x.search, web_search.",
   "4. queue_add — if the answer requires async research, queue it and tell the user when to expect results.",
   "5. ONLY THEN ask the user — and explain what you already tried.",
@@ -303,6 +319,7 @@ function buildAgentRosterNudge(): string | null {
     "## Agent Team",
     `You have ${count} specialist agents available for delegation (sales, engineering, marketing, design, product, ops, research, creative).`,
     "When the user needs async work — research, content, analysis, outreach, code review, etc. — proactively offer to queue it.",
+    "Golden Rule #3: You are the conductor. Delegate work to specialists — never build infrastructure yourself.",
     "The right persona is auto-matched by task type, or use queue_add with a specific persona slug if you know it.",
     proofReady
       ? "Agents can write output to a live Proof document — the user can watch progress and steer mid-task via proof_editor."

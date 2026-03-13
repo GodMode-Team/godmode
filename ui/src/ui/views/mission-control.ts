@@ -4,6 +4,12 @@ import type {
   AgentRunView,
   ActivityFeedItem,
   MissionControlStats,
+  SwarmData,
+  SwarmProjectDetail,
+  SwarmAgentState,
+  SwarmIssueNode,
+  SwarmFeedEvent,
+  SwarmProject,
 } from "../controllers/mission-control.js";
 import { formatDuration } from "../controllers/mission-control.js";
 
@@ -44,6 +50,9 @@ export type MissionControlProps = {
   onAskAlly?: () => void;
   allyName?: string;
   onViewTaskFiles?: (itemId: string) => void;
+  onSelectSwarmProject?: (projectId: string) => void;
+  onSteerSwarmAgent?: (projectId: string, issueTitle: string, instructions: string) => void;
+  onViewProofDoc?: (docSlug: string) => void;
 };
 
 // ===== Helpers =====
@@ -457,6 +466,272 @@ function renderRecentCompleted(agents: AgentRunView[], callbacks: AgentCardCallb
   `;
 }
 
+// ===== Swarm Renders =====
+
+function swarmAgentAvatar(name: string): string {
+  // First letter of each word for avatar initials
+  return name.split(" ").map(w => w[0] ?? "").join("").slice(0, 2).toUpperCase();
+}
+
+function swarmIssueStatusClass(status: string): string {
+  switch (status) {
+    case "done": case "in_review": return "mc-swarm-node--done";
+    case "in_progress": return "mc-swarm-node--active";
+    case "failed": case "cancelled": return "mc-swarm-node--failed";
+    default: return "mc-swarm-node--pending";
+  }
+}
+
+function renderSwarmProjectSwitcher(
+  projects: SwarmProject[],
+  selectedId: string | null,
+  onSelect?: (projectId: string) => void,
+) {
+  if (projects.length <= 1) return nothing;
+  return html`
+    <div class="mc-swarm-switcher">
+      ${projects.map(p => html`
+        <button
+          class="mc-swarm-switcher-btn ${p.projectId === selectedId ? "mc-swarm-switcher-btn--active" : ""}"
+          @click=${() => onSelect?.(p.projectId)}>
+          <span class="mc-swarm-switcher-title">${p.title}</span>
+          <span class="mc-swarm-switcher-meta">${p.completedCount}/${p.issueCount}</span>
+        </button>
+      `)}
+    </div>
+  `;
+}
+
+function renderSwarmOrgChart(
+  detail: SwarmProjectDetail,
+  onSteer?: (projectId: string, issueTitle: string, instructions: string) => void,
+  onViewProofDoc?: (docSlug: string) => void,
+) {
+  if (!detail.issues || detail.issues.length === 0) return nothing;
+
+  return html`
+    <div class="mc-swarm-org">
+      <h3 class="mc-section-title">Pipeline</h3>
+      <div class="mc-swarm-graph">
+        ${detail.issues.map((issue, i) => html`
+          ${i > 0 ? html`<div class="mc-swarm-connector"></div>` : nothing}
+          <div class="mc-swarm-node ${swarmIssueStatusClass(issue.status)}"
+               @click=${() => {
+                 if (steeringTarget === issue.title) {
+                   steeringTarget = null;
+                 } else {
+                   steeringTarget = issue.title;
+                   steeringProjectId = detail.projectId;
+                 }
+               }}>
+            <div class="mc-swarm-node-avatar">${swarmAgentAvatar(issue.personaName)}</div>
+            <div class="mc-swarm-node-info">
+              <div class="mc-swarm-node-persona">${issue.personaName}</div>
+              <div class="mc-swarm-node-task">${issue.title}</div>
+              <div class="mc-swarm-node-status">${issue.status.replace(/_/g, " ")}</div>
+            </div>
+            <div class="mc-swarm-node-actions">
+              ${issue.proofDocSlug && onViewProofDoc ? html`
+                <button class="mc-detail-btn" @click=${(e: Event) => { e.stopPropagation(); onViewProofDoc(issue.proofDocSlug!); }}>Doc</button>
+              ` : nothing}
+            </div>
+          </div>
+          ${steeringTarget === issue.title ? renderSteeringInline(detail.projectId, issue.title, onSteer) : nothing}
+        `)}
+      </div>
+    </div>
+  `;
+}
+
+// Module-level steering state
+let steeringTarget: string | null = null;
+let steeringProjectId: string | null = null;
+let steeringText = "";
+
+function renderSteeringInline(
+  projectId: string,
+  issueTitle: string,
+  onSteer?: (projectId: string, issueTitle: string, instructions: string) => void,
+) {
+  return html`
+    <div class="mc-steer-panel">
+      <div class="mc-steer-label">Steer: ${issueTitle}</div>
+      <div class="mc-steer-row">
+        <input
+          class="mc-steer-input"
+          type="text"
+          placeholder="Give feedback or instructions..."
+          .value=${steeringText}
+          @input=${(e: Event) => { steeringText = (e.target as HTMLInputElement).value; }}
+          @keydown=${(e: KeyboardEvent) => {
+            if (e.key === "Enter" && steeringText.trim()) {
+              onSteer?.(projectId, issueTitle, steeringText.trim());
+              steeringText = "";
+              steeringTarget = null;
+            }
+          }}
+        />
+        <button class="mc-steer-send" @click=${() => {
+          if (steeringText.trim()) {
+            onSteer?.(projectId, issueTitle, steeringText.trim());
+            steeringText = "";
+            steeringTarget = null;
+          }
+        }}>Send</button>
+      </div>
+    </div>
+  `;
+}
+
+function renderSwarmAgentCards(agents: SwarmAgentState[]) {
+  if (agents.length === 0) return nothing;
+
+  return html`
+    <div class="mc-swarm-agents">
+      <h3 class="mc-section-title">Team</h3>
+      <div class="mc-swarm-agents-grid">
+        ${agents.map(agent => {
+          const elapsed = agent.startedAt ? formatDuration(agent.startedAt, agent.endedAt ?? undefined) : null;
+          const heartbeatAge = agent.lastHeartbeat
+            ? Math.floor((Date.now() - agent.lastHeartbeat) / 1000)
+            : null;
+          return html`
+            <div class="mc-swarm-agent-card mc-swarm-agent-card--${agent.status}">
+              <div class="mc-swarm-agent-header">
+                <div class="mc-swarm-node-avatar">${swarmAgentAvatar(agent.personaName)}</div>
+                <div class="mc-swarm-agent-name">${agent.personaName}</div>
+                ${agent.status === "working" ? html`<span class="mc-active-dot"></span>` : nothing}
+              </div>
+              ${agent.currentTask ? html`
+                <div class="mc-swarm-agent-task">${agent.currentTask}</div>
+              ` : html`
+                <div class="mc-swarm-agent-task mc-swarm-agent-task--idle">${agent.status}</div>
+              `}
+              <div class="mc-swarm-agent-meta">
+                ${elapsed ? html`<span>${elapsed}</span>` : nothing}
+                ${agent.progress != null ? html`
+                  <div class="mc-swarm-progress">
+                    <div class="mc-swarm-progress-bar" style="width:${agent.progress}%"></div>
+                  </div>
+                  <span>${agent.progress}%</span>
+                ` : nothing}
+                ${agent.tokenSpend != null ? html`<span>${(agent.tokenSpend / 1000).toFixed(1)}k tok</span>` : nothing}
+                ${heartbeatAge != null ? html`<span class="mc-swarm-heartbeat">${heartbeatAge}s ago</span>` : nothing}
+              </div>
+            </div>
+          `;
+        })}
+      </div>
+    </div>
+  `;
+}
+
+function renderSwarmBudget(detail: SwarmProjectDetail) {
+  if (!detail.tokenSpend && !detail.agents.some(a => a.tokenSpend != null)) return nothing;
+  const totalTokens = detail.agents.reduce((sum, a) => sum + (a.tokenSpend ?? 0), 0) || detail.tokenSpend || 0;
+  if (totalTokens === 0) return nothing;
+
+  return html`
+    <div class="mc-swarm-budget">
+      <h3 class="mc-section-title">Budget</h3>
+      <div class="mc-swarm-budget-total">${(totalTokens / 1000).toFixed(1)}k tokens</div>
+      ${detail.agents.filter(a => a.tokenSpend).map(a => html`
+        <div class="mc-swarm-budget-row">
+          <span>${a.personaName}</span>
+          <span>${((a.tokenSpend ?? 0) / 1000).toFixed(1)}k</span>
+        </div>
+      `)}
+    </div>
+  `;
+}
+
+function swarmFeedIcon(type: SwarmFeedEvent["type"]): string {
+  switch (type) {
+    case "agent_started": return "\u{25B6}\uFE0F";
+    case "agent_completed": return "\u2705";
+    case "agent_failed": return "\u274C";
+    case "handoff": return "\u{1F91D}";
+    case "steering": return "\u{1F3AF}";
+    case "project_completed": return "\u{1F389}";
+    case "project_failed": return "\u{1F6A8}";
+    default: return "\u{1F4CB}";
+  }
+}
+
+function renderSwarmFeed(events: SwarmFeedEvent[]) {
+  if (events.length === 0) return nothing;
+  return html`
+    <div class="mc-feed">
+      <h3 class="mc-section-title">Team Activity</h3>
+      <div class="mc-feed-list">
+        ${events.slice(0, 30).map(ev => html`
+          <div class="mc-feed-item">
+            <span class="mc-feed-time">${relativeTime(ev.timestamp)}</span>
+            <span class="mc-feed-icon">${swarmFeedIcon(ev.type)}</span>
+            <span class="mc-feed-text">${ev.summary}</span>
+          </div>
+        `)}
+      </div>
+    </div>
+  `;
+}
+
+function renderSwarmDeliverables(
+  detail: SwarmProjectDetail,
+  onViewProofDoc?: (docSlug: string) => void,
+) {
+  const completedWithDocs = detail.issues.filter(i =>
+    (i.status === "done" || i.status === "in_review") && i.proofDocSlug,
+  );
+  if (completedWithDocs.length === 0) return nothing;
+
+  return html`
+    <div style="margin-bottom: 1.5rem">
+      <h3 class="mc-section-title">Deliverables (${completedWithDocs.length})</h3>
+      <div class="mc-swarm-deliverables">
+        ${completedWithDocs.map(issue => html`
+          <div class="mc-swarm-deliverable">
+            <div class="mc-swarm-deliverable-info">
+              <span class="mc-swarm-deliverable-persona">${issue.personaName}</span>
+              <span class="mc-swarm-deliverable-title">${issue.title}</span>
+            </div>
+            ${onViewProofDoc ? html`
+              <button class="mc-detail-btn" @click=${() => onViewProofDoc(issue.proofDocSlug!)}>Review</button>
+            ` : nothing}
+          </div>
+        `)}
+      </div>
+    </div>
+  `;
+}
+
+function renderSwarmSection(
+  swarm: SwarmData,
+  props: MissionControlProps,
+) {
+  if (!swarm.running || swarm.projects.length === 0) return nothing;
+
+  return html`
+    <div class="mc-swarm-section">
+      <div class="mc-swarm-header">
+        <h2 class="mc-section-title" style="font-size:0.9375rem; margin:0">Team Projects</h2>
+        ${swarm.running ? html`<span class="mc-active-dot"></span>` : nothing}
+      </div>
+
+      ${renderSwarmProjectSwitcher(swarm.projects, swarm.selectedProjectId, props.onSelectSwarmProject)}
+
+      ${swarm.detail ? html`
+        ${renderSwarmOrgChart(swarm.detail, props.onSteerSwarmAgent, props.onViewProofDoc)}
+        ${renderSwarmAgentCards(swarm.detail.agents)}
+        ${renderSwarmBudget(swarm.detail)}
+        ${renderSwarmDeliverables(swarm.detail, props.onViewProofDoc)}
+      ` : nothing}
+
+      ${renderSwarmFeed(swarm.feed)}
+    </div>
+  `;
+}
+
 // ===== Main Render =====
 
 export function renderMissionControl(props: MissionControlProps) {
@@ -505,6 +780,7 @@ export function renderMissionControl(props: MissionControlProps) {
       ${props.fullControl ? renderStatsBanner(data.stats) : renderStatusLine(data.stats)}
 
       ${props.fullControl ? html`
+        ${data.swarm ? renderSwarmSection(data.swarm, props) : nothing}
         <div class="mc-two-col">
           <div class="mc-col-main">
             <h3 class="mc-section-title">Active Agents</h3>
@@ -523,6 +799,8 @@ export function renderMissionControl(props: MissionControlProps) {
         </div>
       ` : html`
         <div>
+          ${data.swarm ? renderSwarmSection(data.swarm, props) : nothing}
+
           ${renderAttentionItems(data.agents, cardCallbacks, props.onApproveItem)}
 
           ${data.stats.activeNow > 0 || data.agents.some(a => a.status === "active" || a.status === "queued") ? html`

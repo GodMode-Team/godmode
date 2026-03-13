@@ -1,10 +1,9 @@
 /**
  * proof-viewer.ts — Proof document viewer for the sidebar.
  *
- * Embeds the Proof document editor using srcdoc (HTML fetched via RPC)
- * to avoid cross-origin/mixed-content issues when the UI loads over HTTPS.
- * Supports live co-editing: agents write via API, humans edit in the iframe.
- * Save operations use postMessage to communicate with the parent.
+ * Embeds the Proof editor via iframe src URL pointing to the configured
+ * Proof API (hosted proofeditor.ai or self-hosted proof-sdk).
+ * The hosted editor handles real-time sync — no polling needed.
  */
 
 import { html, nothing } from "lit";
@@ -14,39 +13,35 @@ export type ProofViewerProps = {
   slug: string;
   title?: string | null;
   viewUrl?: string | null;
-  /** Pre-rendered HTML from proof.get RPC (srcdoc mode) */
-  htmlContent?: string | null;
   filePath?: string | null;
   onClose: () => void;
   onPushToDrive?: (filePath: string, account?: string) => void;
-  onSaveContent?: (slug: string, content: string) => void;
 };
 
 /**
  * Render the Proof document viewer in the sidebar.
- * Prefers srcdoc (htmlContent) over src URL for HTTPS compatibility.
+ * Uses the viewUrl from the Proof API (hosted or self-hosted).
  */
 export function renderProofViewer(props: ProofViewerProps) {
-  const directUrl = `http://127.0.0.1:4000/documents/${props.slug}/view`;
   const title = props.title?.trim() || props.slug;
-  const useHtml = !!props.htmlContent;
+  const viewUrl = props.viewUrl || "";
 
   return html`
     <div class="sidebar-panel proof-viewer">
       <div class="sidebar-header">
         <div class="sidebar-title-wrap">
           <div class="sidebar-title">${title}</div>
-          <div class="sidebar-path" title=${directUrl}>Live co-editing via Proof</div>
+          <div class="sidebar-path" title=${viewUrl}>Live co-editing via Proof</div>
         </div>
         <div class="sidebar-header-actions">
           <button
             class="btn sidebar-open-browser-btn"
-            title="Copy direct link"
+            title="Copy shareable link"
             @click=${async () => {
               try {
-                await navigator.clipboard.writeText(directUrl);
+                await navigator.clipboard.writeText(viewUrl);
               } catch {
-                window.prompt("Copy Proof link", directUrl);
+                window.prompt("Copy Proof link", viewUrl);
               }
             }}
           >Share</button>
@@ -59,28 +54,23 @@ export function renderProofViewer(props: ProofViewerProps) {
             : nothing}
           <button
             class="btn sidebar-open-browser-btn"
-            title="Open in browser (local access only — requires direct connection to the gateway machine)"
-            @click=${() => window.open(directUrl, "_blank", "noopener,noreferrer")}
-          >Open Local</button>
+            title="Open in browser"
+            @click=${() => window.open(viewUrl, "_blank", "noopener,noreferrer")}
+          >Open</button>
           <button @click=${props.onClose} class="btn" title="Close sidebar">
             ${icons.x}
           </button>
         </div>
       </div>
       <div class="sidebar-content proof-content" style="padding: 0;">
-        ${useHtml
+        ${viewUrl
           ? html`<iframe
-              .srcdoc=${props.htmlContent}
+              src=${viewUrl}
               class="proof-iframe"
               style="width: 100%; height: 100%; border: none; flex: 1;"
-              sandbox="allow-same-origin allow-scripts allow-forms"
+              sandbox="allow-same-origin allow-scripts allow-forms allow-popups"
             ></iframe>`
-          : html`<iframe
-              src=${directUrl}
-              class="proof-iframe"
-              style="width: 100%; height: 100%; border: none; flex: 1;"
-              sandbox="allow-same-origin allow-scripts allow-forms"
-            ></iframe>`
+          : html`<div style="padding: 24px; color: #888;">No Proof URL available. Is the Proof API reachable?</div>`
         }
       </div>
     </div>

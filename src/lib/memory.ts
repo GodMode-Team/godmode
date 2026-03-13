@@ -271,7 +271,27 @@ export async function searchMemories(
       if (dropped.length) console.log(`[GodMode Memory] Dropped ${dropped.length} low-score results (≤0.4):`, dropped.map((r: any) => ({ score: r.score, snippet: String(r.memory).slice(0, 60) })));
     }
 
-    health.signal("memory.search", true, { results: filtered.length, topScore: filtered[0]?.score, elapsed: Date.now() - start });
+    const elapsed = Date.now() - start;
+    health.signal("memory.search", true, { results: filtered.length, topScore: filtered[0]?.score, elapsed });
+
+    // Retrieval trajectory logging
+    try {
+      const { logRetrieval } = await import("./retrieval-log.js");
+      logRetrieval({
+        ts: new Date().toISOString(),
+        source: "mem0",
+        query,
+        resultCount: filtered.length,
+        topScore: filtered[0]?.score ?? null,
+        topResults: filtered.slice(0, 3).map((r) => ({
+          snippet: r.memory.slice(0, 120),
+          score: r.score,
+        })),
+        elapsedMs: elapsed,
+        injected: filtered.length > 0,
+      });
+    } catch { /* logging non-fatal */ }
+
     return filtered;
   } catch (err) {
     lastSearchFailed = true;

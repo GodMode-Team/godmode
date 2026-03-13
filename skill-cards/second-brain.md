@@ -10,7 +10,7 @@ tools: secondBrain.search, secondBrain.identity, secondBrain.memoryBank, secondB
 - ANY time you're about to ask the user for info — search here first
 
 ## How to Use
-- `secondBrain.search` — { query } — semantic search across the entire vault
+- `secondBrain.search` — { query, scope?, limit? } — hybrid QMD 2.0 search (semantic + BM25 + LLM reranking) across the vault. Scopes: "all" (default), "sessions", or vault collection. Falls back to file walk if QMD unavailable.
 - `secondBrain.identity` — read USER.md and SOUL.md identity files
 - `secondBrain.memoryBank` — list all people/company files
 - `secondBrain.memoryBankEntry` — { name } — get a specific person/company file
@@ -26,10 +26,11 @@ tools: secondBrain.search, secondBrain.identity, secondBrain.memoryBank, secondB
 - 99-System/ — system files, agent-roster, skill-cards
 
 ## Gotchas
-- Search is semantic, not exact — use natural language queries, not keywords
+- Search uses QMD 2.0 hybrid retrieval (semantic + full-text + reranking) — natural language queries work best but keywords also work via BM25
 - People files are in 06-Brain/People/ — search by name
 - If search returns nothing, try broader terms or different phrasing
 - Vault is the source of truth for long-term knowledge — Mem0 is for conversational context
+- All searches are logged to retrieval-log.jsonl for trajectory analysis
 
 ## Tips
 - When user mentions a person, immediately search for their people file

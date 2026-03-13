@@ -31,7 +31,12 @@ export type GuardrailGateId =
   | "contextPressure"
   | "unverifiedClaimGate"
   | "proactiveLookupGate"
-  | "restartGate";
+  | "restartGate"
+  | "veiledAskGate"
+  | "evidenceTokenGate"
+  | "architectureGate"
+  | "deploymentGate"
+  | "destructiveWriteGate";
 
 export type GateConfig = {
   enabled: boolean;
@@ -98,6 +103,11 @@ export const GATE_DEFAULTS: Record<GuardrailGateId, GateConfig> = {
   unverifiedClaimGate: { enabled: true },
   proactiveLookupGate: { enabled: true, thresholds: { minSearchSources: 2 } },
   restartGate: { enabled: true },
+  veiledAskGate: { enabled: true },
+  evidenceTokenGate: { enabled: true, thresholds: { minSearchSources: 2, tokenTtlSeconds: 60 } },
+  architectureGate: { enabled: true },
+  deploymentGate: { enabled: true },
+  destructiveWriteGate: { enabled: true },
 };
 
 export const GATE_DESCRIPTORS: Record<GuardrailGateId, GateDescriptor> = {
@@ -233,6 +243,47 @@ export const GATE_DESCRIPTORS: Record<GuardrailGateId, GateDescriptor> = {
     description:
       "Hard-blocks any agent or subagent attempt to restart the gateway via exec/bash. The user has live sessions — restarts must be manual via the UI Restart button.",
     icon: "\u{1F6D1}",
+    hook: "before_tool_call",
+  },
+  veiledAskGate: {
+    name: "Veiled Ask Gate",
+    description:
+      "Catches passive delegation disguised as politeness — 'if you want', 'feel free to', 'let me know if' — that pushes work back to the user without a question mark. Enforces proactive behavior.",
+    icon: "\u{1F3AD}",
+    hook: "message_sending",
+  },
+  evidenceTokenGate: {
+    name: "Evidence Token Gate",
+    description:
+      "Requires a search tool call (evidence token) before the ally can ask ANY factual question. No search = no question. Turns the Iron Rule from policy into physics.",
+    icon: "\u{1F3AB}",
+    hook: "message_sending",
+    thresholdLabels: { minSearchSources: "Min search sources before asking", tokenTtlSeconds: "Evidence token TTL (seconds)" },
+  },
+  architectureGate: {
+    name: "Architecture Gate",
+    description:
+      "HARD BLOCK on creating new infrastructure (scripts, cron jobs, services, daemons, watchers) " +
+      "without consulting the architecture first. Nothing gets built without checking what already exists. " +
+      "Prevents redundant systems, scope creep, and brute-force solutions.",
+    icon: "\u{1F3D7}",
+    hook: "before_tool_call",
+  },
+  deploymentGate: {
+    name: "Deployment Gate",
+    description:
+      "HARD BLOCK on production deployments, pushes to main/master, PR merges, and force pushes. " +
+      "Agents must work on feature branches, create draft PRs with preview links, and let humans approve. " +
+      "Protects live client websites and production infrastructure.",
+    icon: "\u{1F6A8}",
+    hook: "before_tool_call",
+  },
+  destructiveWriteGate: {
+    name: "Destructive Write Gate",
+    description:
+      "HARD BLOCK on destructive operations: rm -rf on project dirs, git reset --hard, " +
+      "force pushes, DROP TABLE, and bulk deletes. Forces backup-first workflow.",
+    icon: "\u{1F4A3}",
     hook: "before_tool_call",
   },
 };

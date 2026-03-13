@@ -253,7 +253,7 @@ export function titleForTab(tab: Tab) {
     case "guardrails":
       return "Guardrails";
     case "second-brain":
-      return "Second Brain";
+      return "Context Vault";
     case "mission-control":
       return "Mission Control";
     case "dashboards":
@@ -361,7 +361,7 @@ export function subtitleForTab(tab: Tab) {
     case "guardrails":
       return "Safety gates that prevent runaway loops, bad searches, and lazy responses.";
     case "second-brain":
-      return "Your Obsidian-powered second brain — identity, knowledge, and live AI context.";
+      return "Your Context Vault — identity, knowledge, and live AI context. Stores what your ally needs to act on your behalf.";
     case "mission-control":
       return "Live command center — active agents, pipelines, and activity feed.";
     case "dashboards":

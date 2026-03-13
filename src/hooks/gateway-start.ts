@@ -303,18 +303,17 @@ export async function runGatewayStart(
     logger.warn(`[GodMode] Inbox broadcast setup failed: ${String(err)}`);
   }
 
-  // Proof document server
+  // Proof service (API client — no local server)
   try {
-    const { startProofServer, stopProofServer } = await import("../services/proof-server.js");
-    const started = await startProofServer(logger);
-    if (started) {
-      serviceCleanup.push({ name: "proof-server", fn: () => stopProofServer() });
-      logger.info("[GodMode] Proof document server started");
+    const { initProofService } = await import("../services/proof-server.js");
+    const ok = await initProofService(logger);
+    if (ok) {
+      logger.info("[GodMode] Proof service initialized");
     } else {
-      logger.warn("[GodMode] Proof document server unavailable");
+      logger.warn("[GodMode] Proof service unavailable");
     }
   } catch (err) {
-    logger.warn(`[GodMode] Proof server failed to start: ${String(err)}`);
+    logger.warn(`[GodMode] Proof service failed to init: ${String(err)}`);
   }
 
   // Paperclip agent team (sidecar)

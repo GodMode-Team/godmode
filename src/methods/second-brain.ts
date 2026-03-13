@@ -413,7 +413,7 @@ const KNOWN_SOURCES: Array<{
     name: "Obsidian Vault",
     type: "vault",
     icon: "\u{1F4D3}",
-    description: "Your second brain — the canonical data store for all knowledge",
+    description: "Your Context Vault — the canonical data store for all knowledge",
     detect: () => {
       const vault = getVaultPath();
       if (!vault) return { connected: false };
@@ -491,7 +491,7 @@ const EXTERNAL_SOURCE_META: Record<string, { icon: string; description: string }
   "fathom": { icon: "\u{1F3A4}", description: "Meeting recordings and transcriptions" },
   "weather": { icon: "\u{26C5}", description: "Local weather and conditions" },
   "slack": { icon: "\u{1F4AC}", description: "Team messaging and channels" },
-  "obsidian": { icon: "\u{1F4D3}", description: "Your second brain — daily notes, projects, references" },
+  "obsidian": { icon: "\u{1F4D3}", description: "Your Context Vault — daily notes, projects, references" },
 };
 
 const sources: GatewayRequestHandler = async ({ respond }) => {
@@ -1145,6 +1145,7 @@ const brainSearch: GatewayRequestHandler = async ({ params, respond }) => {
   };
 
   // ── Try qmd hybrid search (query expansion + reranking) ─────────────
+  const qmdStart = Date.now();
   try {
     // scope → collection: "sessions" → sessions-main, "all" → no filter, rest → clawvault-main
     const collection =
@@ -1174,6 +1175,25 @@ const brainSearch: GatewayRequestHandler = async ({ params, respond }) => {
         };
       })
       .filter((r): r is SearchResult => r !== null);
+
+    // Retrieval trajectory logging
+    try {
+      const { logRetrieval } = await import("../lib/retrieval-log.js");
+      logRetrieval({
+        ts: new Date().toISOString(),
+        source: "qmd",
+        query,
+        resultCount: results.length,
+        topScore: qmdResults[0]?.score ?? null,
+        topResults: results.slice(0, 3).map((r) => ({
+          snippet: (r.matchContext ?? r.name).slice(0, 120),
+          score: r.score,
+        })),
+        elapsedMs: Date.now() - qmdStart,
+        injected: true,
+        scope: collection ?? "all",
+      });
+    } catch { /* logging non-fatal */ }
 
     respond(true, { results, query, total: results.length, source: "qmd" });
     return;
@@ -1288,6 +1308,25 @@ const brainSearch: GatewayRequestHandler = async ({ params, respond }) => {
     if (results.length >= limit) break;
     searchDir(dir, label, 0);
   }
+
+  // Retrieval trajectory logging — file walk fallback
+  try {
+    const { logRetrieval } = await import("../lib/retrieval-log.js");
+    logRetrieval({
+      ts: new Date().toISOString(),
+      source: "file-walk",
+      query,
+      resultCount: results.length,
+      topScore: null,
+      topResults: results.slice(0, 3).map((r) => ({
+        snippet: (r.matchContext ?? r.name).slice(0, 120),
+      })),
+      elapsedMs: Date.now() - qmdStart,
+      injected: true,
+      scope: scope ?? "all",
+      emptyReason: results.length === 0 ? "no matches in file walk" : undefined,
+    });
+  } catch { /* logging non-fatal */ }
 
   respond(true, { results, query, total: results.length });
 };

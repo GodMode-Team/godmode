@@ -768,13 +768,6 @@ export class GodModeApp extends LitElement {
 
     handleConnected(this as unknown as Parameters<typeof handleConnected>[0]);
 
-    // Listen for proof iframe save messages
-    window.addEventListener("message", (e: MessageEvent) => {
-      if (e.data?.type === "proof-save" && e.data.slug && e.data.content != null) {
-        this._handleProofSave(e.data.slug, e.data.content);
-      }
-    });
-
     // Auto-advance to today if the selected date is stale (e.g. app left open overnight)
     const today = localDateString();
     if (this.todaySelectedDate !== today) {
@@ -4023,17 +4016,17 @@ export class GodModeApp extends LitElement {
   async handleOpenProofDoc(slug: string) {
     let title = "Proof Document";
     let filePath: string | null = null;
-    let proofHtml: string | null = null;
+    let viewUrl: string | null = null;
     if (this.client && this.connected) {
       try {
         const result = await this.client.request<{
           title?: string;
           filePath?: string | null;
-          html?: string;
+          viewUrl?: string;
         }>("proof.get", { slug });
         title = result.title?.trim() || title;
         filePath = result.filePath?.trim() || null;
-        proofHtml = result.html || null;
+        viewUrl = result.viewUrl?.trim() || null;
       } catch (err) {
         console.warn("[Proof] Failed to resolve document metadata:", err);
       }
@@ -4041,42 +4034,10 @@ export class GodModeApp extends LitElement {
     this.sidebarOpen = true;
     this.sidebarMode = "proof";
     this.sidebarProofSlug = slug;
-    this.sidebarProofHtml = proofHtml;
+    this.sidebarProofUrl = viewUrl;
+    this.sidebarProofHtml = null;
     this.sidebarFilePath = filePath;
     this.sidebarTitle = title;
-
-    // Set up auto-refresh via RPC (every 3s)
-    this._proofRefreshTimer = window.setInterval(async () => {
-      if (!this.sidebarProofSlug || this.sidebarMode !== "proof") return;
-      try {
-        const result = await this.client?.request<{ html?: string }>("proof.get", { slug: this.sidebarProofSlug });
-        if (result?.html) {
-          // Send refresh to iframe via postMessage
-          const iframe = this.renderRoot?.querySelector?.(".proof-iframe") as HTMLIFrameElement | null;
-          if (iframe?.contentWindow) {
-            // Extract content from HTML to send as refresh
-            const match = result.html.match(/<textarea[^>]*>([\s\S]*?)<\/textarea>/);
-            if (match) {
-              const content = match[1]
-                .replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">")
-                .replace(/&quot;/g, '"').replace(/&#39;/g, "'");
-              iframe.contentWindow.postMessage({ type: "proof-refresh", content }, "*");
-            }
-          }
-        }
-      } catch { /* ignore */ }
-    }, 3000);
-  }
-
-  private _proofRefreshTimer: number | null = null;
-
-  private async _handleProofSave(slug: string, content: string) {
-    if (!this.client || !this.connected) return;
-    try {
-      await this.client.request("proof.save", { slug, content, author: "human" });
-    } catch (err) {
-      console.warn("[Proof] Save failed:", err);
-    }
   }
 
   handleCloseProofDoc() {
@@ -4084,10 +4045,6 @@ export class GodModeApp extends LitElement {
     this.sidebarProofSlug = null;
     this.sidebarProofUrl = null;
     this.sidebarProofHtml = null;
-    if (this._proofRefreshTimer) {
-      clearInterval(this._proofRefreshTimer);
-      this._proofRefreshTimer = null;
-    }
     this.handleCloseSidebar();
   }
 

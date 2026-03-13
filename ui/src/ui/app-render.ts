@@ -2567,7 +2567,6 @@ export function renderApp(state: AppViewState) {
                       slug: state.sidebarProofSlug,
                       title: state.sidebarTitle,
                       viewUrl: state.sidebarProofUrl,
-                      htmlContent: state.sidebarProofHtml,
                       filePath: state.sidebarFilePath,
                       onClose: () => state.handleCloseProofDoc(),
                       onPushToDrive: (path: string, account?: string) => state.handlePushToDrive(path, account),
