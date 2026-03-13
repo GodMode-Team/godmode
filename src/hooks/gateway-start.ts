@@ -418,6 +418,31 @@ export async function runGatewayStart(
           }
         })();
       });
+      // Wire failure callback so users are notified when agent runs fail
+      paperclip.onFailure((projectId, projectTitle, failedCount, error) => {
+        logger.warn(`[GodMode][Paperclip] PROJECT FAILURE: "${projectTitle}" — ${failedCount} agents failed: ${error}`);
+
+        // Shorten error for display
+        const shortError = error.length > 120 ? error.slice(0, 120) + "..." : error;
+
+        safeBroadcast(api, "ally:notification", {
+          type: "paperclip-failure",
+          title: `Agent team failed: ${projectTitle}`,
+          summary: `${failedCount} agent(s) failed on "${projectTitle}". Auto-retrying via queue. Error: ${shortError}`,
+          actions: [
+            { label: "View in Mission Control", action: "navigate", target: "mission-control" },
+          ],
+        });
+
+        safeBroadcast(api, "queue:update", {
+          type: "project-failure-fallback",
+          projectId,
+          projectTitle,
+          failedCount,
+          error: shortError,
+        });
+      });
+
       serviceCleanup.push({ name: "paperclip", fn: () => paperclip.stop() });
       logger.info("[GodMode] Paperclip agent team started");
     } else {

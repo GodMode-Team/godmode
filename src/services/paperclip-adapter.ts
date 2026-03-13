@@ -153,6 +153,7 @@ export class PaperclipAdapter {
   private state: BridgeState = { companyId: null, agents: [], projects: [] };
   private pollTimer: ReturnType<typeof setInterval> | null = null;
   private onCompletionCallback: ((projectId: string, issueTitle: string, status: string, runData?: PcRunData) => void) | null = null;
+  private onFailureCallback: ((projectId: string, projectTitle: string, failedCount: number, error: string) => void) | null = null;
   private notifiedIssues = new Set<string>();
   private static MAX_NOTIFIED = 2_000;
   private statusCache = new Map<string, { data: ProjectStatus; ts: number }>();
@@ -204,6 +205,11 @@ export class PaperclipAdapter {
   /** Register a callback for when issues complete (used by context injection) */
   onCompletion(cb: (projectId: string, issueTitle: string, status: string, runData?: PcRunData) => void): void {
     this.onCompletionCallback = cb;
+  }
+
+  /** Register a callback for when agent runs fail (broadcasts to user) */
+  onFailure(cb: (projectId: string, projectTitle: string, failedCount: number, error: string) => void): void {
+    this.onFailureCallback = cb;
   }
 
   // ── Lifecycle ──────────────────────────────────────────────────────
@@ -682,11 +688,11 @@ export class PaperclipAdapter {
         if (!items) continue;
 
         for (const issue of items) {
+          const key = `${project.projectId}:${issue.id}:${issue.status}`;
+          if (this.notifiedIssues.has(key)) continue;
+
           if (issue.status === "done" || issue.status === "in_review") {
-            const key = `${project.projectId}:${issue.id}:${issue.status}`;
-            if (this.notifiedIssues.has(key)) continue;
             this.notifiedIssues.add(key);
-            // Cap set growth — evict oldest entries when limit reached
             if (this.notifiedIssues.size > PaperclipAdapter.MAX_NOTIFIED) {
               const first = this.notifiedIssues.values().next().value;
               if (first) this.notifiedIssues.delete(first);
@@ -694,13 +700,11 @@ export class PaperclipAdapter {
             const local = project.issues.find(i => i.issueId === issue.id);
             if (!local) continue;
 
-            // Fetch run data if using native Paperclip execution
             let runData: PcRunData | null = null;
             if (this.state.adapterConfigured) {
               runData = await this.fetchLatestRunData(local, project);
             }
 
-            // Run post-completion pipeline (evidence check, inbox push)
             await this.handleRunCompletion(project, local, issue);
 
             if (this.onCompletionCallback) {
@@ -713,12 +717,105 @@ export class PaperclipAdapter {
             }
           }
         }
+
+        // ── Detect failed runs for issues still at "todo" ──
+        // If native execution is configured, check for failed heartbeat runs.
+        // This catches silent failures like device pairing errors.
+        if (this.state.adapterConfigured) {
+          await this.detectFailedRuns(project);
+        }
       } catch (err) {
         this.logger.warn(`[Paperclip] Poll error for project ${project.projectId}: ${String(err)}`);
         try {
           const { health } = await import("../lib/health-ledger.js");
           health.signal("paperclip-poll", false, { error: String(err), projectId: project.projectId });
         } catch { /* health ledger not available */ }
+      }
+    }
+  }
+
+  /** Detect failed heartbeat runs and notify the user + auto-fallback to queue */
+  private async detectFailedRuns(project: BridgeState["projects"][0]): Promise<void> {
+    const failKey = `failcheck:${project.projectId}`;
+    if (this.notifiedIssues.has(failKey)) return; // Only check once per project
+
+    // Check for failed runs across all agents in this project
+    let allFailed = true;
+    let failedCount = 0;
+    let failError = "";
+
+    for (const issue of project.issues) {
+      const agent = this.state.agents.find(a => a.personaSlug === issue.personaSlug);
+      if (!agent) continue;
+
+      try {
+        const runs = await this.api<PcRun[]>(
+          "GET",
+          `/api/companies/${this.state.companyId}/heartbeat-runs?agentId=${agent.paperclipId}&limit=5`,
+        );
+        if (!Array.isArray(runs) || runs.length === 0) {
+          allFailed = false;
+          continue;
+        }
+
+        // Check if the most recent runs for this agent all failed
+        const recentFailed = runs.filter(r => r.status === "failed");
+        if (recentFailed.length > 0) {
+          failedCount++;
+          if (!failError && recentFailed[0].error) {
+            failError = recentFailed[0].error;
+          }
+        } else {
+          allFailed = false;
+        }
+      } catch {
+        allFailed = false;
+      }
+    }
+
+    if (failedCount > 0 && allFailed) {
+      this.notifiedIssues.add(failKey);
+      this.logger.warn(`[Paperclip] All ${failedCount} agent runs FAILED for project "${project.title}": ${failError}`);
+
+      // Notify via onFailureCallback (broadcast to user)
+      if (this.onFailureCallback) {
+        this.onFailureCallback(
+          project.projectId,
+          project.title,
+          failedCount,
+          failError,
+        );
+      }
+
+      // Auto-fallback: re-queue via queue-processor if native execution failed
+      this.logger.info(`[Paperclip] Auto-falling back to queue-processor for project "${project.title}"`);
+      try {
+        const { updateQueueState, newQueueItemId } = await import("../lib/queue-state.js");
+        for (const issue of project.issues) {
+          const taskType = this.inferTaskType(issue.personaSlug);
+          await updateQueueState((state) => {
+            // Don't re-add if already in queue
+            if (state.items.some(i => i.title === issue.title)) return;
+            state.items.push({
+              id: newQueueItemId(issue.title),
+              type: taskType,
+              title: issue.title,
+              description: `Project: ${project.title}\n\nFailed native execution — auto-retrying via queue.\n\nOriginal issue for persona: ${issue.personaSlug}`,
+              priority: "normal" as const,
+              status: "pending" as const,
+              createdAt: Date.now(),
+              personaHint: issue.personaSlug,
+            });
+          });
+        }
+        this.logger.info(`[Paperclip] Re-queued ${project.issues.length} issues via queue-processor fallback`);
+
+        // Kick the queue processor
+        const { getQueueProcessor } = await import("./queue-processor.js");
+        const qp = getQueueProcessor();
+        qp?.kick();
+      } catch (err) {
+        this.logger.warn(`[Paperclip] Auto-fallback failed: ${String(err)}`);
       }
     }
   }
