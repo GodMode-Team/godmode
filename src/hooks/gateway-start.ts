@@ -272,8 +272,19 @@ export async function runGatewayStart(
 
   // Consciousness heartbeat
   try {
-    const { initConsciousnessHeartbeat, startConsciousnessHeartbeat, stopConsciousnessHeartbeat } = await import("../services/consciousness-heartbeat.js");
+    const {
+      initConsciousnessHeartbeat,
+      startConsciousnessHeartbeat,
+      stopConsciousnessHeartbeat,
+      setConsciousnessHeartbeatApiRequest,
+    } = await import("../services/consciousness-heartbeat.js");
     initConsciousnessHeartbeat(logger);
+    // Wire api.request for the session distiller pipeline (Pipeline 3)
+    if (typeof api.request === "function") {
+      setConsciousnessHeartbeatApiRequest(
+        (method: string, params: Record<string, unknown>) => api.request(method, params),
+      );
+    }
     startConsciousnessHeartbeat();
     serviceCleanup.push({ name: "consciousness-heartbeat", fn: () => stopConsciousnessHeartbeat() });
     logger.info("[GodMode] Consciousness heartbeat service started");

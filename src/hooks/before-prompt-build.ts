@@ -376,6 +376,13 @@ export async function handleBeforePromptBuild(
     } catch { /* non-fatal */ }
   }
 
+  // P2: Skill drafts pending review (session distiller)
+  let skillDraftCount = 0;
+  try {
+    const { countPendingDrafts } = await import("../lib/session-distiller.js");
+    skillDraftCount = countPendingDrafts();
+  } catch { /* non-fatal */ }
+
   // P2: Routing lessons (skip in light mode)
   let routingLessons: string | null = null;
   if (!lightMode) {
@@ -490,6 +497,7 @@ export async function handleBeforePromptBuild(
     teamStatus,
     actionItemsBlock,
     skillCard,
+    skillDraftCount,
     routingLessons,
     safetyNudges,
     contextPressure,

@@ -313,7 +313,7 @@ function determineCurrentBlock(interview: MaybeInterview, sp: MaybeSoul): string
 
 function buildPhase2Prompt(state: OnboardingState): string {
   const brain = state.secondBrain;
-  return `## GodMode Onboarding — Phase 2: Second Brain Setup
+  return `## GodMode Onboarding — Phase 2: Context Vault Setup
 
 Set up the user's memory so nothing gets lost. This is what makes GodMode remember everything
 across sessions — conversations, decisions, preferences, people, projects.
@@ -380,7 +380,7 @@ Help the user connect their core integrations. Use \`integrations.status\` to ch
 1. **X Intelligence** — powers the daily Intel Scan section. Needs XAI_API_KEY from x.ai/api
 2. **Tailscale** — critical for remote/VPS access. Needs tailscale CLI + hostname
 3. **Google Calendar** — powers Calendar & Meeting Prep sections. Needs gog CLI + OAuth
-4. **Obsidian Vault** — Second Brain storage. Needs vault path
+4. **Obsidian Vault** — Context Vault storage. Needs vault path
 5. **GitHub CLI** — coding task orchestration. Needs gh auth login
 6. **Messaging** — phone notifications. Direct user to the Channels tab in the UI
 

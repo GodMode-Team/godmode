@@ -88,25 +88,37 @@ export async function createProofDocument(
     ? initialContent
     : `# ${title}\n\n`;
 
-  // POST /share/markdown creates a new doc and returns a shareable URL
-  const result = await proofApiFetch<{ url?: string; slug?: string; id?: string }>(
+  // POST /share/markdown creates a new doc and returns slug + accessToken
+  const result = await proofApiFetch<{
+    slug?: string;
+    id?: string;
+    accessToken?: string;
+    tokenUrl?: string;
+    url?: string;
+  }>(
     "/share/markdown",
     { method: "POST", body: JSON.stringify({ markdown }) },
   );
 
-  // Extract slug and token from the returned URL
-  // Expected URL format: https://www.proofeditor.ai/d/<slug>?token=<token>
   let slug = result.slug ?? result.id ?? "";
-  let token = "";
-  if (result.url) {
-    try {
-      const parsed = new URL(result.url);
-      const pathParts = parsed.pathname.split("/").filter(Boolean);
-      if (pathParts.length >= 2) {
-        slug = pathParts[pathParts.length - 1];
-      }
-      token = parsed.searchParams.get("token") ?? "";
-    } catch { /* use slug from response body */ }
+  let token = result.accessToken ?? "";
+
+  // Fallback: extract from URL if accessToken not in response body
+  if (!slug || !token) {
+    const urlStr = result.tokenUrl ?? result.url;
+    if (urlStr) {
+      try {
+        const fullUrl = urlStr.startsWith("http") ? urlStr : `${PROOF_API}${urlStr}`;
+        const parsed = new URL(fullUrl);
+        const pathParts = parsed.pathname.split("/").filter(Boolean);
+        if (!slug && pathParts.length >= 2) {
+          slug = pathParts[pathParts.length - 1];
+        }
+        if (!token) {
+          token = parsed.searchParams.get("token") ?? "";
+        }
+      } catch { /* use what we have */ }
+    }
   }
 
   if (!slug) {
@@ -127,6 +139,22 @@ export async function createProofDocument(
   };
 }
 
+/** State response from Proof API — includes content + mutation metadata. */
+type ProofState = {
+  text?: string;
+  content?: string;
+  markdown?: string;
+  title?: string;
+  updatedAt?: string;
+  revision?: number;
+  mutationBase?: { token?: string };
+};
+
+/** Read document state from Proof API. Returns content + revision for optimistic concurrency. */
+async function readProofState(slug: string, token: string): Promise<ProofState> {
+  return proofApiFetch<ProofState>(`/api/agent/${slug}/state`, { token });
+}
+
 export async function readProofDocument(
   slug: string,
 ): Promise<{ slug: string; title: string; content: string; updatedAt: string; filePath: string }> {
@@ -135,13 +163,7 @@ export async function readProofDocument(
     throw new Error(`No auth token for Proof document: ${slug}`);
   }
 
-  const state = await proofApiFetch<{
-    text?: string;
-    content?: string;
-    markdown?: string;
-    title?: string;
-    updatedAt?: string;
-  }>(`/api/agent/${slug}/state`, { token });
+  const state = await readProofState(slug, token);
 
   const content = state.text ?? state.content ?? state.markdown ?? "";
   const title = state.title ?? slug;
@@ -167,6 +189,10 @@ export async function editProofDocument(
     ? `godmode-${authorName.toLowerCase().replace(/\s+/g, "-")}`
     : `godmode-${author}`;
 
+  // Read current state for optimistic concurrency (baseRevision)
+  const state = await readProofState(slug, token);
+  const baseRevision = state.revision;
+
   if (mode === "replace") {
     await proofApiFetch(`/api/agent/${slug}/ops`, {
       method: "POST",
@@ -176,6 +202,7 @@ export async function editProofDocument(
         type: "rewrite.apply",
         by: `ai:${agentId}`,
         content,
+        baseRevision,
       }),
     });
   } else {
@@ -185,6 +212,7 @@ export async function editProofDocument(
       headers: { "X-Agent-Id": agentId, "Idempotency-Key": randomUUID() },
       body: JSON.stringify({
         by: `ai:${agentId}`,
+        baseRevision,
         operations: [{ op: "append", section: "", content: "\n\n" + content }],
       }),
     });

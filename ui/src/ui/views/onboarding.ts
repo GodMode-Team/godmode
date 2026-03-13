@@ -103,7 +103,7 @@ type OnboardingProps = {
 const PHASE_LABELS: Record<number, string> = {
 	0: "Assessment",
 	1: "Interview",
-	2: "Second Brain",
+	2: "Context Vault",
 	3: "Workflow Audit",
 	4: "Configuration",
 	5: "First Win",

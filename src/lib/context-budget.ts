@@ -82,6 +82,9 @@ export interface ContextInputs {
   /** P3: Safety nudges (enforcer, output shield, prompt shield) */
   safetyNudges: string[];
 
+  /** P2: Skill drafts pending review — extracted by session distiller */
+  skillDraftCount?: number;
+
   /** Current context pressure: 0 = empty, 1 = full */
   contextPressure: number;
 
@@ -234,6 +237,15 @@ export function assembleContext(inputs: ContextInputs): string {
 
   if (inputs.teamStatus) {
     chunks.push(inputs.teamStatus);
+  }
+
+  // Skill drafts pending review — extracted by session distiller (P10: Pattern Absorption)
+  if (inputs.skillDraftCount && inputs.skillDraftCount > 0) {
+    chunks.push(
+      `## Skill Drafts: ${inputs.skillDraftCount} pending review\n` +
+      `You've extracted ${inputs.skillDraftCount} reusable pattern(s) from recent conversations.\n` +
+      `Offer to review them: "I've noticed some patterns in our recent work — want to review them as reusable skills?"`,
+    );
   }
 
   // Routing lessons — already relevance-gated by keyword match

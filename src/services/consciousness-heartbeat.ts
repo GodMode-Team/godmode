@@ -31,9 +31,12 @@ const DEFAULT_INTERVAL_MS = 15 * 60 * 1000; // 15 minutes
 
 let instance: ConsciousnessHeartbeat | null = null;
 
+type ApiRequestFn = (method: string, params: Record<string, unknown>) => Promise<unknown>;
+
 class ConsciousnessHeartbeat {
   private timer: ReturnType<typeof setInterval> | null = null;
   private broadcastFn: BroadcastFn | null = null;
+  private apiRequestFn: ApiRequestFn | null = null;
   private logger: Logger;
   private intervalMs: number;
   private lastSyncAt: number | null = null;
@@ -46,6 +49,11 @@ class ConsciousnessHeartbeat {
 
   setBroadcast(fn: BroadcastFn): void {
     this.broadcastFn = fn;
+  }
+
+  /** Wire the host API request function for vault-capture Pipeline 3 (session distiller). */
+  setApiRequest(fn: ApiRequestFn): void {
+    this.apiRequestFn = fn;
   }
 
   start(): void {
@@ -322,6 +330,16 @@ class ConsciousnessHeartbeat {
         this.logger.warn(`[Consciousness] Self-heal failed: ${String(err)}`);
       }
 
+      // 7c. Daily config snapshot (once per day, cap at 30)
+      try {
+        const { hasTodaySnapshot, captureSnapshot, pruneSnapshots } = await import("../lib/config-snapshots.js");
+        if (!hasTodaySnapshot()) {
+          await captureSnapshot();
+          const pruned = pruneSnapshots();
+          this.logger.info(`[Consciousness] Config snapshot captured${pruned > 0 ? `, pruned ${pruned} old` : ""}`);
+        }
+      } catch { /* config snapshot non-fatal */ }
+
       // 8. Clean up expired private sessions
       try {
         const { cleanupExpiredPrivateSessions } = await import("../lib/private-session.js");
@@ -331,10 +349,13 @@ class ConsciousnessHeartbeat {
         }
       } catch { /* non-fatal */ }
 
-      // 8. Vault auto-capture pipelines (Sessions→Daily, Queue→Inbox)
+      // 8. Vault auto-capture pipelines (Sessions→Daily, Queue→Inbox, Session Distiller)
       try {
         const { runAllCapturePipelines } = await import("./vault-capture.js");
-        const captureResult = await runAllCapturePipelines(this.logger);
+        const captureResult = await runAllCapturePipelines(
+          this.logger,
+          this.apiRequestFn ?? undefined,
+        );
         if (captureResult.totalCaptured > 0) {
           this.logger.info(
             `[Consciousness] Vault capture: ${captureResult.totalCaptured} captured`,
@@ -343,6 +364,17 @@ class ConsciousnessHeartbeat {
             captured: captureResult.totalCaptured,
             sessions: captureResult.sessions.captured,
           });
+        }
+        if (captureResult.distiller.distilled > 0) {
+          this.logger.info(
+            `[Consciousness] Session distiller: ${captureResult.distiller.distilled} session(s) distilled, ${captureResult.distiller.draftsCreated} draft(s) created`,
+          );
+          if (captureResult.distiller.draftsCreated > 0) {
+            this.broadcast("ally:notification", {
+              type: "distiller",
+              summary: `Extracted ${captureResult.distiller.draftsCreated} skill draft(s) from recent conversations.`,
+            });
+          }
         }
       } catch { /* non-fatal */ }
 
@@ -564,4 +596,9 @@ export function stopConsciousnessHeartbeat(): void {
 
 export function setConsciousnessHeartbeatBroadcast(fn: BroadcastFn): void {
   instance?.setBroadcast(fn);
+}
+
+/** Wire the host API request function for the session distiller pipeline. */
+export function setConsciousnessHeartbeatApiRequest(fn: ApiRequestFn): void {
+  instance?.setApiRequest(fn);
 }

@@ -1805,7 +1805,7 @@ const STARTER_TIPS = [
   "Try saying 'queue a research task on [topic]' to delegate work to an agent.",
   "You can connect your Google Calendar for a richer morning brief — ask me how.",
   "Want me to set up a recurring skill? Just tell me what you want done and when.",
-  "Your Second Brain in Obsidian is where all your agent outputs land — check it out.",
+  "Your Context Vault in Obsidian is where all your agent outputs land — check it out.",
   "Rate your agent outputs to build trust scores — the system learns from your feedback.",
   "Tell me your top 3 goals and I'll weave them into every morning brief.",
   "Ask me to create a dashboard — I'll build a live view of anything you want to track.",

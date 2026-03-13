@@ -283,26 +283,74 @@ export async function captureQueueOutputsToVault(logger: Logger): Promise<Captur
 }
 
 // ═══════════════════════════════════════════════════════════════════════
+// PIPELINE 3: Session Distiller — Extract Patterns from Idle Sessions
+// ═══════════════════════════════════════════════════════════════════════
+
+type DistillerResult = {
+  distilled: number;
+  draftsCreated: number;
+  errors: string[];
+};
+
+type ApiRequestFn = (method: string, params: Record<string, unknown>) => Promise<unknown>;
+
+/**
+ * Distill idle sessions into skill drafts, preferences, and entities.
+ * Requires apiRequest to fetch transcripts via chat.history RPC.
+ * Skips silently if apiRequest is not available (e.g., during early startup).
+ */
+async function runDistillerPipeline(
+  logger: Logger,
+  apiRequest?: ApiRequestFn,
+): Promise<DistillerResult> {
+  if (!apiRequest) return { distilled: 0, draftsCreated: 0, errors: [] };
+
+  try {
+    const { distillIdleSessions } = await import("../lib/session-distiller.js");
+    return await distillIdleSessions(logger, apiRequest);
+  } catch (err) {
+    logger.warn(`[VaultCapture] Distiller pipeline error: ${String(err)}`);
+    return { distilled: 0, draftsCreated: 0, errors: [String(err)] };
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════
 // MASTER PIPELINE RUNNER
 // ═══════════════════════════════════════════════════════════════════════
 
 export type VaultCaptureResult = {
   sessions: CaptureResult;
   queueOutputs: CaptureResult;
+  distiller: DistillerResult;
   totalCaptured: number;
 };
 
 /**
  * Run all vault capture pipelines. Called during consciousness heartbeat tick.
  * Each pipeline runs independently — failures in one don't block others.
+ *
+ * @param apiRequest — optional host API request function for Pipeline 3 (distiller).
+ *   Passed from the heartbeat, which receives it via setApiRequest().
  */
-export async function runAllCapturePipelines(logger: Logger): Promise<VaultCaptureResult> {
+export async function runAllCapturePipelines(
+  logger: Logger,
+  apiRequest?: ApiRequestFn,
+): Promise<VaultCaptureResult> {
   const vault = getVaultPath();
+  const empty: CaptureResult = { captured: 0, skipped: 0, errors: [] };
+  const emptyDistiller: DistillerResult = { distilled: 0, draftsCreated: 0, errors: [] };
+
   if (!vault) {
-    const empty: CaptureResult = { captured: 0, skipped: 0, errors: [] };
+    // Distiller doesn't need the vault — it writes to ~/godmode/memory/
+    let distiller = emptyDistiller;
+    try {
+      distiller = await runDistillerPipeline(logger, apiRequest);
+    } catch { /* non-fatal */ }
+
     return {
       sessions: empty,
       queueOutputs: empty,
+      distiller,
       totalCaptured: 0,
     };
   }
@@ -312,6 +360,7 @@ export async function runAllCapturePipelines(logger: Logger): Promise<VaultCaptu
 
   let sessions: CaptureResult = { captured: 0, skipped: 0, errors: [] };
   let queueOutputs: CaptureResult = { captured: 0, skipped: 0, errors: [] };
+  let distiller: DistillerResult = emptyDistiller;
 
   try {
     sessions = await captureSessionsToDailyNotes(logger);
@@ -352,11 +401,18 @@ export async function runAllCapturePipelines(logger: Logger): Promise<VaultCaptu
     logger.warn(`[VaultCapture] Queue outputs pipeline error: ${String(err)}`);
   }
 
+  try {
+    distiller = await runDistillerPipeline(logger, apiRequest);
+  } catch (err) {
+    logger.warn(`[VaultCapture] Distiller pipeline error: ${String(err)}`);
+  }
+
   const totalCaptured = sessions.captured + queueOutputs.captured;
 
   return {
     sessions,
     queueOutputs,
+    distiller,
     totalCaptured,
   };
 }
