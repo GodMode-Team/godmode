@@ -535,6 +535,96 @@ export async function handleLlmOutputAgentLog(
   } catch { /* non-fatal */ }
 }
 
+// ── after_tool_call: auto-register resources ─────────────────────────
+
+/** Tool names that create files worth tracking as resources. */
+const FILE_WRITE_TOOLS = new Set([
+  "write", "files.write", "write_file", "files.create", "create_file",
+]);
+
+/** Infer resource type from file extension. */
+function inferResourceType(filePath: string): string {
+  const ext = filePath.split(".").pop()?.toLowerCase() ?? "";
+  const map: Record<string, string> = {
+    html: "html_report", htm: "html_report",
+    md: "doc", txt: "doc", pdf: "doc",
+    ts: "code", js: "code", py: "code", sh: "script",
+    json: "data", csv: "data", xml: "data",
+    png: "image", jpg: "image", jpeg: "image", gif: "image", svg: "image", webp: "image",
+  };
+  return map[ext] ?? "doc";
+}
+
+export async function handleAfterToolCall(
+  event: any,
+  ctx: any,
+  api: any,
+): Promise<void> {
+  const logger: Logger = api.logger;
+  const sessionKey = extractSessionKey(ctx);
+  const toolName = (event.toolName ?? "").trim().toLowerCase();
+
+  // ── Trust feedback (fire and forget) ──
+  try {
+    const { handlePostToolFeedback } = await import("./trust-feedback.js");
+    await handlePostToolFeedback(toolName, sessionKey, event.error);
+  } catch { /* non-fatal */ }
+
+  // ── Auto-register resources ──
+  if (!FILE_WRITE_TOOLS.has(toolName)) return;
+  if (event.error) return; // don't register failed writes
+
+  const filePath =
+    typeof event.params?.path === "string" ? event.params.path :
+    typeof event.params?.file_path === "string" ? event.params.file_path : "";
+  if (!filePath) return;
+
+  // Skip internal GodMode data files and ephemeral paths
+  if (filePath.includes("/godmode/data/") || filePath.includes("/.openclaw/")) return;
+  if (filePath.startsWith("/tmp/") || filePath.startsWith("/tmp") || filePath.startsWith("/var/tmp")) return;
+
+  try {
+    const { randomUUID } = await import("node:crypto");
+    const { readFile } = await import("node:fs/promises");
+    const { join } = await import("node:path");
+    const { secureWriteFile, secureMkdir } = await import("../lib/secure-fs.js");
+    const { DATA_DIR } = await import("../data-paths.js");
+
+    const RESOURCES_PATH = join(DATA_DIR, "resources.json");
+
+    // Read existing registry
+    let registry: { version: number; resources: any[] };
+    try {
+      const raw = await readFile(RESOURCES_PATH, "utf-8");
+      registry = JSON.parse(raw);
+    } catch {
+      registry = { version: 1, resources: [] };
+    }
+
+    // Don't duplicate — skip if same path already registered
+    if (registry.resources.some((r: any) => r.path === filePath)) return;
+
+    const title = filePath.split("/").pop() ?? filePath;
+    const type = inferResourceType(filePath);
+
+    registry.resources.push({
+      id: randomUUID(),
+      title,
+      type,
+      path: filePath,
+      sessionKey: sessionKey ?? "unknown",
+      createdAt: new Date().toISOString(),
+      pinned: false,
+    });
+
+    await secureMkdir(DATA_DIR);
+    await secureWriteFile(RESOURCES_PATH, JSON.stringify(registry, null, 2) + "\n");
+    logger.info(`[GodMode][Resources] Auto-registered: ${title} (${type})`);
+  } catch (err) {
+    logger.warn(`[GodMode][Resources] Auto-register failed: ${String(err)}`);
+  }
+}
+
 // ── after_compaction ──────────────────────────────────────────────────
 
 export async function handleAfterCompaction(

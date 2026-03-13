@@ -134,3 +134,33 @@ export function stopUpdatePolling(app: GodModeApp) {
   clearInterval(host.updatePollInterval);
   host.updatePollInterval = null;
 }
+
+/** Check for post-update audit results on reconnect. Shows a toast if an update just completed. */
+export async function checkPostUpdateStatus(app: GodModeApp) {
+  if (!app.client || !app.connected) return;
+
+  try {
+    const status = await app.client.request<Record<string, unknown>>(
+      "godmode.update.postStatus",
+      {},
+    );
+    if (!status) return;
+
+    const overall = status.overallStatus as string | undefined;
+    const summary = status.summary as string | undefined;
+    if (!summary) return;
+
+    // Show toast based on overall status
+    const toastType: "success" | "warning" | "error" =
+      overall === "healthy" ? "success" : overall === "degraded" ? "error" : "warning";
+
+    if (typeof (app as any).showToast === "function") {
+      (app as any).showToast(summary, toastType);
+    }
+
+    // Trigger an update check to refresh version display
+    void checkForUpdates(app);
+  } catch {
+    // Non-fatal — post-update status is informational only
+  }
+}

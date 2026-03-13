@@ -323,6 +323,7 @@ export async function refreshActiveTab(host: SettingsHost) {
       host as unknown as Parameters<typeof scheduleChatScroll>[0],
       !host.chatHasAutoScrolled,
     );
+    void (host as any).loadSessionResources?.();
   }
   if (host.tab === "options") {
     const app = host as unknown as GodModeApp;

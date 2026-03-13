@@ -825,8 +825,10 @@ export function checkEphemeralWrite(
 
   // Check file-write tools by path parameter
   if (
+    name === "write" ||
     name === "files.write" ||
     name === "write_file" ||
+    name === "create" ||
     name === "files.create" ||
     name === "create_file" ||
     name === "files.move" ||
@@ -1327,6 +1329,198 @@ async function llmJudgeProactiveLookup(content: string): Promise<boolean> {
   }
 }
 
+// ── Behavior Audit Log ──────────────────────────────────────────
+//
+// Every enforcer gate decision is logged to a JSONL file for drift
+// analysis. Each entry records: ALLOW, BLOCK, BYPASS, or PASS.
+//
+// File: ~/godmode/data/behavior-audit.jsonl
+
+const BEHAVIOR_AUDIT_PATH = path.join(GODMODE_ROOT, "data", "behavior-audit.jsonl");
+
+type BehaviorDecision = "ALLOW" | "BLOCK" | "BYPASS" | "PASS";
+
+interface BehaviorAuditEntry {
+  ts: string;
+  sessionKey: string | undefined;
+  decision: BehaviorDecision;
+  gate?: string;
+  searchCount: number;
+  investigationCount: number;
+  contentSnippet: string;
+  reason?: string;
+}
+
+async function logBehaviorDecision(entry: BehaviorAuditEntry): Promise<void> {
+  try {
+    await fs.mkdir(path.dirname(BEHAVIOR_AUDIT_PATH), { recursive: true });
+    await fs.appendFile(BEHAVIOR_AUDIT_PATH, JSON.stringify(entry) + "\n", "utf-8");
+  } catch { /* best-effort — never block gates */ }
+}
+
+// ── Source Bypass Classification ────────────────────────────────
+//
+// Cron-origin, heartbeat-origin, and subagent-completion-origin
+// messages should auto-bypass behavior enforcement gates.
+// Without this, overnight queue announcements and heartbeat
+// messages would false-positive.
+
+const BYPASS_SESSION_PATTERNS = [
+  ":cron:",
+  ":heartbeat:",
+  ":subagent:",
+  "agent:queue:",
+  "agent:overnight:",
+];
+
+function shouldBypassEnforcement(sessionKey: string | undefined): boolean {
+  if (!sessionKey) return false;
+  return BYPASS_SESSION_PATTERNS.some(p => sessionKey.includes(p));
+}
+
+// ── Gate 7: Veiled Ask — passive delegation without question marks ──
+//
+// "If you want", "feel free to", "let me know if" — these push
+// work back to the user while technically avoiding a question mark.
+// Same effect as asking, harder to catch.
+
+const VEILED_ASK_PATTERNS: RegExp[] = [
+  /\bif you(?:'d)? (?:want|like|prefer|need|wish)\b/i,
+  /\bfeel free to\b/i,
+  /\blet me know if\b/i,
+  /\bwhenever you(?:'re| are) ready\b/i,
+  /\byou(?:'re| are) welcome to\b/i,
+  /\bup to you\b/i,
+  /\bjust let me know\b/i,
+  /\bwhen you get a chance\b/i,
+  /\bif you(?:'d)? (?:rather|prefer)\b/i,
+  /\bno rush,? but\b/i,
+  /\bif (?:that|it) (?:works|helps)\b/i,
+];
+
+// ── Gate 7 LLM Judge: Veiled Ask ────────────────────────────────
+//
+// Regex catches the phrase, but LLM decides if it's genuinely
+// pushing work back or just polite language after completing a task.
+// "I drafted the email, feel free to review" = polite (NO).
+// "Feel free to send me the details" = delegation (YES).
+
+async function llmJudgeVeiledAsk(content: string): Promise<boolean> {
+  try {
+    const { resolveAnthropicAuth } = await import("../methods/brief-generator.js");
+    const apiKey = resolveAnthropicAuth();
+    if (!apiKey) return false; // Fail open
+
+    const snippet = content.slice(0, 800);
+
+    const resp = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01",
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "claude-haiku-4-5-20251001",
+        max_tokens: 10,
+        system: [
+          "You are a safety gate judge. Given an AI assistant's outbound message that contains phrases like 'if you want', 'feel free to', 'let me know if', etc., determine if the assistant is GENUINELY DELEGATING WORK BACK to the user.",
+          "",
+          "Flag as DELEGATION (YES) if:",
+          "- The assistant hasn't done the work and is pushing it to the user",
+          "- The phrase is a substitute for looking something up or taking action",
+          "- The assistant is deferring a decision it could make or research itself",
+          "- The assistant is asking the user to do something the assistant has tools for",
+          "",
+          "Do NOT flag (NO) if:",
+          "- The assistant completed the work and is being polite ('Here's the draft, feel free to review')",
+          "- The assistant is offering a genuine choice after presenting results",
+          "- The assistant is confirming before an irreversible action ('I'll send this if you want')",
+          "- The phrase is incidental in a longer substantive response where the work is done",
+          "- The assistant is wrapping up after delivering a complete answer",
+          "",
+          "Respond with ONLY 'YES' or 'NO'. Nothing else.",
+        ].join("\n"),
+        messages: [{ role: "user", content: snippet }],
+      }),
+      signal: AbortSignal.timeout(4_000),
+    });
+
+    if (!resp.ok) return false;
+
+    const data = (await resp.json()) as {
+      content?: Array<{ type: string; text?: string }>;
+    };
+    const answer = data.content?.find((c) => c.type === "text")?.text?.trim().toUpperCase();
+    return answer === "YES";
+  } catch {
+    return false; // Timeout or error — fail open
+  }
+}
+
+// ── Gate 8: Evidence Token — mechanical search-before-ask ───────
+//
+// The Iron Rule: before the ally can ask ANY question, it must
+// have "minted" an evidence token by calling a search tool.
+// The token is the turn's searchCount > 0. No search = no question.
+//
+// Uses LLM judge to distinguish factual questions (blocked without
+// evidence) from subjective/preference/approval questions (allowed).
+
+async function llmJudgeFactualQuestion(content: string): Promise<boolean> {
+  try {
+    const { resolveAnthropicAuth } = await import("../methods/brief-generator.js");
+    const apiKey = resolveAnthropicAuth();
+    if (!apiKey) return false; // Fail open
+
+    const snippet = content.slice(0, 800);
+
+    const resp = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01",
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "claude-haiku-4-5-20251001",
+        max_tokens: 10,
+        system: [
+          "You are a safety gate judge. Given an AI assistant's outbound message, determine if it contains a FACTUAL QUESTION — a question the assistant could answer itself using search tools, memory, files, or API calls.",
+          "",
+          "Flag as FACTUAL QUESTION if the message asks the user for:",
+          "- Contact info, links, file paths, account details, credentials",
+          "- Dates, times, deadlines, schedule details the assistant could look up",
+          "- Status of systems, deploys, or processes the assistant could check",
+          "- Facts about people, companies, or projects in the assistant's memory",
+          "- Any data the assistant has tools to retrieve",
+          "",
+          "Do NOT flag if the message asks for:",
+          "- User preferences, opinions, or creative direction ('What tone?', 'Which approach?')",
+          "- Approvals or confirmations ('Should I proceed?', 'Want me to send this?')",
+          "- Clarification of intent ('Did you mean X or Y?')",
+          "- Subjective choices ('Do you prefer A or B?')",
+          "- Acknowledgments or next-step questions ('What should we work on next?')",
+          "",
+          "Respond with ONLY 'YES' or 'NO'. Nothing else.",
+        ].join("\n"),
+        messages: [{ role: "user", content: snippet }],
+      }),
+      signal: AbortSignal.timeout(4_000),
+    });
+
+    if (!resp.ok) return false;
+
+    const data = (await resp.json()) as {
+      content?: Array<{ type: string; text?: string }>;
+    };
+    const answer = data.content?.find((c) => c.type === "text")?.text?.trim().toUpperCase();
+    return answer === "YES";
+  } catch {
+    return false; // Timeout or error — fail open
+  }
+}
+
 /**
  * Run all enforcer gates on an outbound message.
  * Returns { cancel: true, gate } if a gate fires, undefined otherwise.
@@ -1338,6 +1532,20 @@ export async function checkEnforcerGates(
 ): Promise<{ cancel: boolean; gate?: string } | undefined> {
   // Skip very short messages (greetings, confirmations)
   if (content.length < 30) return undefined;
+
+  // ── Source bypass — cron, heartbeat, subagent sessions skip enforcement
+  if (shouldBypassEnforcement(sessionKey)) {
+    void logBehaviorDecision({
+      ts: new Date().toISOString(),
+      sessionKey,
+      decision: "BYPASS",
+      searchCount: 0,
+      investigationCount: 0,
+      contentSnippet: content.slice(0, 100),
+      reason: "session origin bypass",
+    });
+    return undefined;
+  }
 
   const config = await readGuardrailsStateCached();
   const key = sessionKey ?? "__default__";
@@ -1358,6 +1566,7 @@ export async function checkEnforcerGates(
         ].join("\n"),
       });
       void logGateActivity("exhaustiveSearch", "fired", "Blocked: claimed ignorance with 0 searches", sessionKey);
+      void logBehaviorDecision({ ts: new Date().toISOString(), sessionKey, decision: "BLOCK", gate: "exhaustiveSearch", searchCount: usage.searchCount, investigationCount: usage.investigationCount, contentSnippet: content.slice(0, 100) });
       return { cancel: true, gate: "exhaustiveSearch" };
     }
   }
@@ -1381,6 +1590,7 @@ export async function checkEnforcerGates(
           ].join("\n"),
         });
         void logGateActivity("selfServiceGate", "fired", `Blocked: delegating to user with only ${usage.searchCount}/${minSources} searches`, sessionKey);
+        void logBehaviorDecision({ ts: new Date().toISOString(), sessionKey, decision: "BLOCK", gate: "selfServiceGate", searchCount: usage.searchCount, investigationCount: usage.investigationCount, contentSnippet: content.slice(0, 100) });
         return { cancel: true, gate: "selfServiceGate" };
       }
     }
@@ -1410,6 +1620,7 @@ export async function checkEnforcerGates(
         `Blocked: surrendered with only ${usage.investigationCount}/${minTools} tools used`,
         sessionKey,
       );
+      void logBehaviorDecision({ ts: new Date().toISOString(), sessionKey, decision: "BLOCK", gate: "persistenceGate", searchCount: usage.searchCount, investigationCount: usage.investigationCount, contentSnippet: content.slice(0, 100) });
       return { cancel: true, gate: "persistenceGate" };
     }
   }
@@ -1434,6 +1645,7 @@ export async function checkEnforcerGates(
         `Blocked: "not found" after only ${usage.searchCount}/${minSearches} searches`,
         sessionKey,
       );
+      void logBehaviorDecision({ ts: new Date().toISOString(), sessionKey, decision: "BLOCK", gate: "searchRetryGate", searchCount: usage.searchCount, investigationCount: usage.investigationCount, contentSnippet: content.slice(0, 100) });
       return { cancel: true, gate: "searchRetryGate" };
     }
   }
@@ -1458,6 +1670,7 @@ export async function checkEnforcerGates(
           ].join("\n"),
         });
         void logGateActivity("unverifiedClaimGate", "fired", "Blocked: LLM-confirmed unverified claim with 0 investigation tools", sessionKey);
+        void logBehaviorDecision({ ts: new Date().toISOString(), sessionKey, decision: "BLOCK", gate: "unverifiedClaimGate", searchCount: usage.searchCount, investigationCount: usage.investigationCount, contentSnippet: content.slice(0, 100) });
         return { cancel: true, gate: "unverifiedClaimGate" };
       }
     }
@@ -1497,10 +1710,111 @@ export async function checkEnforcerGates(
           `Blocked: LLM confirmed lazy lookup with only ${usage.searchCount}/${minSources} searches`,
           sessionKey,
         );
+        void logBehaviorDecision({ ts: new Date().toISOString(), sessionKey, decision: "BLOCK", gate: "proactiveLookupGate", searchCount: usage.searchCount, investigationCount: usage.investigationCount, contentSnippet: content.slice(0, 100) });
         return { cancel: true, gate: "proactiveLookupGate" };
       }
     }
   }
+
+  // Gate 7: Veiled Ask — passive delegation without question marks.
+  // "If you want", "feel free to", "let me know if" are polite ways to
+  // push work back to the user. They don't use "?" but have the same effect.
+  //
+  // Two-layer check: regex pre-filter → LLM judge (is this genuine delegation
+  // or just polite language after completing work?).
+  //
+  // SOFT NUDGE (burn-in): message goes through, guidance injected next turn.
+  // Does NOT cancel the message — collects data before escalating to hard-block.
+  if (config.gates.veiledAskGate?.enabled) {
+    if (matchesAny(content, VEILED_ASK_PATTERNS) && usage.searchCount === 0) {
+      // LLM judge: is this genuinely pushing work back, or just polite?
+      const isDelegation = await llmJudgeVeiledAsk(content);
+      if (isDelegation) {
+        // Soft nudge — let the message through, inject guidance on next turn
+        enforcerNudgeFlags.set(key, {
+          gate: "Veiled Ask Gate",
+          message: [
+            "Your previous response contained passive delegation language that was flagged.",
+            "The message was allowed through (burn-in mode), but be aware:",
+            "",
+            "Phrases like 'if you want', 'feel free to', 'let me know if', 'whenever you're ready'",
+            "push work back to the user without technically asking a question.",
+            "",
+            "Instead of offering options you haven't investigated:",
+            "- Search first, then state what you found and what you'll do",
+            "- If you genuinely need a preference, ask directly: 'Which do you prefer: A or B?'",
+            "- If you're unsure, say 'I'll look into that' — then actually do it",
+            "- Never use hedge language as a substitute for doing the work",
+          ].join("\n"),
+        });
+        void logGateActivity("veiledAskGate", "fired", "Nudge: LLM-confirmed veiled ask with 0 searches (soft mode)", sessionKey);
+        void logBehaviorDecision({
+          ts: new Date().toISOString(),
+          sessionKey,
+          decision: "PASS",
+          gate: "veiledAskGate",
+          searchCount: usage.searchCount,
+          investigationCount: usage.investigationCount,
+          contentSnippet: content.slice(0, 100),
+          reason: "soft nudge — message allowed, guidance injected next turn",
+        });
+        // NOTE: No return here — message passes through. Nudge injected on next turn.
+      }
+    }
+  }
+
+  // Gate 8: Evidence Token — mechanical search-before-ask enforcement.
+  // ANY question mark in the outbound message requires an "evidence token" —
+  // proof that the ally called a search tool this turn. The token IS the
+  // searchCount. No search happened = question blocked.
+  // Uses LLM judge to skip subjective/preference/approval questions.
+  if (config.gates.evidenceTokenGate?.enabled) {
+    const minSources = config.gates.evidenceTokenGate?.thresholds?.minSearchSources ?? 2;
+    if (content.includes("?") && usage.searchCount < minSources) {
+      // Only invoke LLM judge if there's a question mark + insufficient searches
+      const isFactual = await llmJudgeFactualQuestion(content);
+      if (isFactual) {
+        enforcerNudgeFlags.set(key, {
+          gate: "Evidence Token Gate",
+          message: [
+            `Your response was blocked because you asked a factual question without earning an evidence token.`,
+            `Evidence tokens are earned by calling search tools. You used ${usage.searchCount}/${minSources} required.`,
+            "",
+            "THE IRON RULE: Search before you ask. Every factual question must be preceded by tool calls.",
+            "Lookup chain: memory_search → secondBrain.search → exec/read/glob → queue_add → THEN ask.",
+            "",
+            "If you need information from the user, FIRST exhaust your own sources.",
+            "If truly not found after multiple searches, explain what you tried.",
+          ].join("\n"),
+        });
+        void logGateActivity(
+          "evidenceTokenGate", "fired",
+          `Blocked: factual question with only ${usage.searchCount}/${minSources} evidence tokens`,
+          sessionKey,
+        );
+        void logBehaviorDecision({
+          ts: new Date().toISOString(),
+          sessionKey,
+          decision: "BLOCK",
+          gate: "evidenceTokenGate",
+          searchCount: usage.searchCount,
+          investigationCount: usage.investigationCount,
+          contentSnippet: content.slice(0, 100),
+        });
+        return { cancel: true, gate: "evidenceTokenGate" };
+      }
+    }
+  }
+
+  // All gates passed — log ALLOW decision
+  void logBehaviorDecision({
+    ts: new Date().toISOString(),
+    sessionKey,
+    decision: "ALLOW",
+    searchCount: usage.searchCount,
+    investigationCount: usage.investigationCount,
+    contentSnippet: content.slice(0, 100),
+  });
 
   return undefined;
 }

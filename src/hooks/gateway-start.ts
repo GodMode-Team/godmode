@@ -21,6 +21,7 @@ export async function runGatewayStart(
   pluginVersion: string,
   pluginRoot: string,
   serviceCleanup: CleanupEntry[],
+  methodCount = 0,
 ): Promise<void> {
   const logger: Logger = api.logger;
 
@@ -250,17 +251,23 @@ export async function runGatewayStart(
     logger.warn(`[GodMode] image cache cleanup failed: ${String(err)}`);
   }
 
-  // Post-update compatibility check
+  // Post-update health audit
   try {
     const { execSync } = await import("node:child_process");
-    const { runPostUpdateHealthCheck } = await import("../methods/system-update.js");
+    const { runPostUpdateHealthAudit } = await import("../methods/system-update.js");
     let currentOcVersion = "unknown";
     try {
       currentOcVersion = execSync("openclaw --version 2>/dev/null", { timeout: 5000 }).toString().trim();
     } catch { /* openclaw not on PATH */ }
-    runPostUpdateHealthCheck(currentOcVersion, 0, logger);
+    runPostUpdateHealthAudit(
+      currentOcVersion,
+      methodCount,
+      pluginVersion,
+      logger,
+      (event, data) => safeBroadcast(api, event, data),
+    );
   } catch (err) {
-    logger.warn(`[GodMode] Post-update health check error: ${String(err)}`);
+    logger.warn(`[GodMode] Post-update audit error: ${String(err)}`);
   }
 
   // Consciousness heartbeat
@@ -308,6 +315,21 @@ export async function runGatewayStart(
     }
   } catch (err) {
     logger.warn(`[GodMode] Proof server failed to start: ${String(err)}`);
+  }
+
+  // Paperclip agent team (sidecar)
+  try {
+    const { PaperclipAdapter } = await import("../services/paperclip-adapter.js");
+    const paperclip = new PaperclipAdapter(logger);
+    const started = await paperclip.init();
+    if (started) {
+      serviceCleanup.push({ name: "paperclip", fn: () => paperclip.stop() });
+      logger.info("[GodMode] Paperclip agent team started");
+    } else {
+      logger.warn("[GodMode] Paperclip agent team unavailable");
+    }
+  } catch (err) {
+    logger.warn(`[GodMode] Paperclip failed to start: ${String(err)}`);
   }
 
   // Obsidian Sync

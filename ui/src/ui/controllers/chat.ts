@@ -222,11 +222,12 @@ export async function sendChatMessage(
     return false;
   }
 
-  // When sending attachments without text, provide a default prompt so the
+  // When sending attachments without text, provide a minimal placeholder so the
   // gateway's empty-body guard doesn't short-circuit the agent run.
+  // Keep it neutral — don't inject prompts like "What's in this image?" that
+  // can mislead the model when the user has conversational context.
   if (!msg && hasAttachments) {
-    const hasImages = attachments.some((a) => a.mimeType.startsWith("image/"));
-    msg = hasImages ? "What's in this image?" : "See attached file.";
+    msg = "[attached]";
   }
 
   const now = Date.now();

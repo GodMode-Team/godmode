@@ -355,6 +355,9 @@ export type AppViewState = {
   handleMissionControlOpenSession: (sessionKey: string) => Promise<void>;
   handleMissionControlOpenTaskSession: (sourceTaskId: string) => Promise<void>;
   handleMissionControlStartQueueItem: (itemId: string) => Promise<void>;
+  handleSwarmSelectProject: (projectId: string) => Promise<void>;
+  handleSwarmSteer: (projectId: string, issueTitle: string, instructions: string) => Promise<void>;
+  handleSwarmViewProofDoc: (docSlug: string) => Promise<void>;
   handleOpenSupportChat: () => void;
   seedSessionWithAgentOutput: (taskTitle: string, output: string, agentPrompt?: string) => Promise<void>;
   // GodMode Options state
@@ -595,6 +598,13 @@ export type AppViewState = {
   handleResourceClick: (resource: import("./views/work").Resource) => void;
   handleResourcePin: (id: string, pinned: boolean) => Promise<void>;
   handleResourceDelete: (id: string) => Promise<void>;
+  // Session resources (Manus-style chat strip)
+  sessionResources: Array<{ id: string; title: string; type: string; path?: string; url?: string }>;
+  sessionResourcesCollapsed: boolean;
+  loadSessionResources: () => Promise<void>;
+  handleSessionResourceClick: (resource: { path?: string; url?: string }) => void;
+  handleToggleSessionResources: () => void;
+  handleViewAllResources: () => void;
   // People tab handlers
   // Workspaces handlers
   handleWorkspacesRefresh: () => Promise<void>;

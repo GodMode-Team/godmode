@@ -606,6 +606,9 @@ export class GodModeApp extends LitElement {
   @state() workResources?: import("./views/work").Resource[];
   @state() workResourcesLoading = false;
   @state() workResourceFilter: import("./views/work").ResourceFilter = "all";
+  // Session-level resources (Manus-style strip in chat)
+  @state() sessionResources: Array<{ id: string; title: string; type: string; path?: string; url?: string }> = [];
+  @state() sessionResourcesCollapsed = false;
 
   @state() skillsLoading = false;
   @state() skillsReport: SkillStatusReport | null = null;
@@ -826,6 +829,8 @@ export class GodModeApp extends LitElement {
 
   resetToolStream() {
     resetToolStreamInternal(this as unknown as Parameters<typeof resetToolStreamInternal>[0]);
+    // Clear session-scoped resources so stale chips don't flash on switch
+    this.sessionResources = [];
   }
 
   resetChatScroll() {
@@ -1024,6 +1029,7 @@ export class GodModeApp extends LitElement {
     void this.loadAssistantIdentity();
     const { loadChatHistory } = await import("./controllers/chat.js");
     await loadChatHistory(this);
+    void this.loadSessionResources();
   }
 
   async handleMissionControlOpenTaskSession(sourceTaskId: string) {
@@ -1065,6 +1071,36 @@ export class GodModeApp extends LitElement {
   async handleMissionControlStartQueueItem(itemId: string) {
     // Open a session for this queue item so the user can spec it out before processing
     await this.handleMissionControlOpenTaskSession(itemId);
+  }
+
+  async handleSwarmSelectProject(projectId: string) {
+    const { selectSwarmProject } = await import("./controllers/mission-control.js");
+    await selectSwarmProject(this, projectId);
+  }
+
+  async handleSwarmSteer(projectId: string, issueTitle: string, instructions: string) {
+    const { steerSwarmAgent } = await import("./controllers/mission-control.js");
+    await steerSwarmAgent(this, projectId, issueTitle, instructions);
+  }
+
+  async handleSwarmViewProofDoc(docSlug: string) {
+    if (!this.client || !this.connected) return;
+    try {
+      const result = await this.client.request<{ html?: string; title?: string }>(
+        "proof.get",
+        { slug: docSlug },
+      );
+      if (result?.html) {
+        this.handleOpenSidebar(result.html, {
+          mimeType: "text/html",
+          title: result.title ?? "Proof Document",
+        });
+      } else {
+        this.showToast("Document not found", "error");
+      }
+    } catch {
+      this.showToast("Failed to load Proof document", "error");
+    }
   }
 
   async handleMissionControlViewTaskFiles(itemId: string) {
@@ -1254,6 +1290,7 @@ export class GodModeApp extends LitElement {
     this.resetChatScroll();
     void this.loadAssistantIdentity();
     void import("./controllers/chat.js").then(({ loadChatHistory }) => loadChatHistory(this));
+    void this.loadSessionResources();
   }
 
   private _scrollAllyToBottom() {
@@ -1649,6 +1686,7 @@ export class GodModeApp extends LitElement {
           this.resetToolStream();
           const { loadChatHistory } = await import("./controllers/chat.js");
           await loadChatHistory(this);
+          void this.loadSessionResources();
 
           // Default open the chat panel for dashboards
           this.dashboardChatOpen = true;
@@ -3032,6 +3070,7 @@ export class GodModeApp extends LitElement {
         void this.loadAssistantIdentity();
         const { loadChatHistory } = await import("./controllers/chat.js");
         await loadChatHistory(this);
+        void this.loadSessionResources();
         // Seed empty sessions with agent output (handles new + pre-existing empty sessions)
         if (result.queueOutput && this.chatMessages.length === 0) {
           void this.seedSessionWithAgentOutput(
@@ -3340,6 +3379,36 @@ export class GodModeApp extends LitElement {
     }
   }
 
+  /** Load resources filtered to the current session (for Manus-style chat strip). */
+  async loadSessionResources() {
+    if (!this.client || !this.connected) return;
+    try {
+      const result = await this.client.request<{
+        resources: Array<{ id: string; title: string; type: string; path?: string; url?: string; sessionKey: string }>;
+      }>("resources.list", { sessionKey: this.sessionKey, limit: 20 });
+      this.sessionResources = result.resources ?? [];
+    } catch (err) {
+      console.warn("[SessionResources] load failed:", err);
+      this.sessionResources = [];
+    }
+  }
+
+  handleSessionResourceClick(resource: { path?: string; url?: string }) {
+    if (resource.path) {
+      void this.handleOpenFile(resource.path);
+    } else if (resource.url) {
+      window.open(resource.url, "_blank", "noopener,noreferrer");
+    }
+  }
+
+  handleToggleSessionResources() {
+    this.sessionResourcesCollapsed = !this.sessionResourcesCollapsed;
+  }
+
+  handleViewAllResources() {
+    this.setTab("work" as import("./navigation.js").Tab);
+  }
+
   handleWorkToggleProject(projectId: string) {
     const next = new Set(this.workExpandedProjects);
     if (next.has(projectId)) {
@@ -3581,6 +3650,7 @@ export class GodModeApp extends LitElement {
 
     void import("./controllers/chat.js").then(({ loadChatHistory }) => {
       loadChatHistory(this).then(() => {
+        void this.loadSessionResources();
         // If this is a fresh support session (no history), seed with welcome message
         if (this.chatMessages.length === 0 && this.sessionKey === supportKey) {
           this.chatMessages = [

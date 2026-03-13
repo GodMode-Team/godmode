@@ -95,7 +95,7 @@ import { renderSessions } from "./views/sessions";
 import { renderSkills } from "./views/skills";
 import { renderAgents } from "./views/agents";
 import { renderLightbox } from "./chat/lightbox";
-import { getResolvedImageUrl } from "./app-gateway";
+import { getResolvedImageUrl, triggerImageResolve } from "./app-gateway";
 import { renderToasts } from "./views/toast";
 import { renderOptions } from "./views/options";
 import { renderOnboardingWizard, type WizardStep } from "./views/onboarding-wizard";
@@ -550,6 +550,7 @@ export function renderApp(state: AppViewState) {
                        });
                        void state.loadAssistantIdentity();
                        void loadChatHistory(state);
+                       void state.loadSessionResources();
                        void loadSessions(state);
                      }}
                      title="${state.assistantName || 'Ally'}">
@@ -656,6 +657,7 @@ export function renderApp(state: AppViewState) {
                           void state.loadAssistantIdentity();
                           syncUrlWithSessionKey(state, key, true);
                           void loadChatHistory(state);
+                          void state.loadSessionResources();
                           // Refresh sessions to get accurate context token counts
                           void loadSessions(state);
                         }}
@@ -930,6 +932,7 @@ export function renderApp(state: AppViewState) {
                                   void state.loadAssistantIdentity();
                                   syncUrlWithSessionKey(state, key, true);
                                   void loadChatHistory(state);
+                                  void state.loadSessionResources();
                                   void loadSessions(state);
                                 }
                               }, 250);
@@ -1025,8 +1028,10 @@ export function renderApp(state: AppViewState) {
                               });
                               if (wasActive) {
                                 state.sessionKey = fallbackKey;
+                                state.sessionResources = [];
                                 syncUrlWithSessionKey(state, fallbackKey, true);
                                 void loadChatHistory(state);
+                                void state.loadSessionResources();
                               }
                             }}
                             title=${state.privateSessions?.has(key) ? "Destroy private session" : "Close tab"}
@@ -1065,6 +1070,7 @@ export function renderApp(state: AppViewState) {
                   viewMode: state.todayViewMode ?? "brief",
                   onViewModeChange: (mode) => state.handleTodayViewModeChange(mode),
                   focusPulseActive: false,
+                  onStartMorningSet: () => state.handleFocusPulseStartMorning(),
                   inboxItems: state.inboxItems ?? [],
                   inboxCount: state.inboxCount ?? 0,
                   onEveningCapture: () => {
@@ -1198,6 +1204,7 @@ export function renderApp(state: AppViewState) {
                     lastActiveSessionKey: next,
                   });
                   void state.loadAssistantIdentity();
+                  void state.loadSessionResources();
                 },
                 onConnect: () => state.connect(),
                 onRefresh: () => state.loadOverview(),
@@ -1310,6 +1317,7 @@ export function renderApp(state: AppViewState) {
                   void state.loadAssistantIdentity();
                   syncUrlWithSessionKey(state, nextKey, true);
                   void loadChatHistory(state);
+                  void state.loadSessionResources();
                 },
                 onPinToggle: async (workspaceId, filePath, pinned) => {
                   const { toggleWorkspacePin } = await import("./controllers/workspaces");
@@ -1453,6 +1461,7 @@ export function renderApp(state: AppViewState) {
                   void state.loadAssistantIdentity();
                   syncUrlWithSessionKey(state, nextKey, true);
                   await loadChatHistory(state);
+                  void state.loadSessionResources();
                   // Seed empty sessions with agent output (handles new + pre-existing empty sessions)
                   if (result.queueOutput && state.chatMessages.length === 0) {
                     void state.seedSessionWithAgentOutput(
@@ -2073,6 +2082,7 @@ export function renderApp(state: AppViewState) {
                     void state.loadAssistantIdentity();
                     syncUrlWithSessionKey(state, sessionKey, true);
                     void loadChatHistory(state).then(() => {
+                      void state.loadSessionResources();
                       state.chatMessage = message;
                       void state.handleSendChat(message);
                     });
@@ -2113,6 +2123,8 @@ export function renderApp(state: AppViewState) {
                   void state.loadAssistantIdentity();
                   void loadChatHistory(state);
                   void refreshChatAvatar(state);
+                  void state.loadSessionResources();
+                  triggerImageResolve(state as unknown as import("./app").GodModeApp);
                 },
                 thinkingLevel: state.chatThinkingLevel,
                 showThinking,
@@ -2135,6 +2147,8 @@ export function renderApp(state: AppViewState) {
                 focusMode: chatFocus,
                 onRefresh: () => {
                   state.resetToolStream();
+                  void state.loadSessionResources();
+                  triggerImageResolve(state as unknown as import("./app").GodModeApp);
                   return Promise.all([loadChatHistory(state), refreshChatAvatar(state)]);
                 },
                 onToggleFocusMode: () => {
@@ -2238,6 +2252,12 @@ export function renderApp(state: AppViewState) {
                   onAttachmentsChange: (attachments) => state.handleAllyAttachmentsChange(attachments),
                   onAction: (action, target, method, params) => state.handleAllyAction(action, target, method, params),
                 } : null,
+                // Session resources strip (Manus-style)
+                sessionResources: state.sessionResources,
+                sessionResourcesCollapsed: state.sessionResourcesCollapsed,
+                onToggleSessionResources: () => state.handleToggleSessionResources(),
+                onSessionResourceClick: (r: { path?: string; url?: string }) => state.handleSessionResourceClick(r),
+                onViewAllResources: () => state.handleViewAllResources(),
               })
             : nothing
         }
@@ -2297,6 +2317,9 @@ export function renderApp(state: AppViewState) {
                 onOpenTaskSession: (taskId) => state.handleMissionControlOpenTaskSession(taskId),
                 onStartQueueItem: (id) => state.handleMissionControlStartQueueItem(id),
                 onViewTaskFiles: (id) => state.handleMissionControlViewTaskFiles(id),
+                onSelectSwarmProject: (projectId) => state.handleSwarmSelectProject(projectId),
+                onSteerSwarmAgent: (projectId, issueTitle, instructions) => state.handleSwarmSteer(projectId, issueTitle, instructions),
+                onViewProofDoc: (docSlug) => state.handleSwarmViewProofDoc(docSlug),
                 onAskAlly: () => { state.handleAllyToggle(); state.handleAllyDraftChange("What should I focus on next?"); },
                 allyName: state.assistantName,
               })

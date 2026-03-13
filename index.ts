@@ -53,6 +53,7 @@ import { createXReadTool } from "./src/tools/x-read.js";
 import { createSelfRepairTool } from "./src/tools/self-repair.js";
 import { createTasksCreateTool, createTasksListTool, createTasksUpdateTool } from "./src/tools/tasks-tool.js";
 import { createProofEditorTool } from "./src/tools/proof-tool.js";
+import { createDelegateTool } from "./src/tools/swarm-tool.js";
 import { createQueueSteerTool } from "./src/tools/queue-steer.js";
 import { queueHandlers } from "./src/methods/queue.js";
 import { xIntelHandlers } from "./src/methods/x-intel.js";
@@ -194,7 +195,6 @@ const godmodePlugin = {
 
     if (typeof (api as any).registerHttpRoute === "function") {
       (api as any).registerHttpRoute({ path: "/godmode", auth: "plugin", match: "prefix", handler: godmodeHttpHandler });
-      (api as any).registerHttpRoute({ path: "/ops", auth: "plugin", match: "prefix", handler: godmodeHttpHandler });
       (api as any).registerHttpRoute({ path: "/reports", auth: "plugin", match: "prefix", handler: godmodeHttpHandler });
     } else if (typeof (api as any).registerHttpHandler === "function") {
       (api as any).registerHttpHandler(godmodeHttpHandler);
@@ -402,7 +402,7 @@ const godmodePlugin = {
     // ── 5. Lifecycle hooks ────────────────────────────────────────
     api.on("gateway_start", async () => {
       api.logger.info("[GodMode] Gateway started — plugin active");
-      await runGatewayStart(api, pluginVersion, pluginRoot, serviceCleanup);
+      await runGatewayStart(api, pluginVersion, pluginRoot, serviceCleanup, methodCount);
     });
 
     api.on("gateway_stop", async () => {
@@ -466,6 +466,7 @@ const godmodePlugin = {
     api.registerTool(() => createTasksUpdateTool());
     api.registerTool(() => createProofEditorTool());
     api.registerTool(() => createQueueSteerTool());
+    api.registerTool(() => createDelegateTool());
 
     // ── 7. CLI commands ───────────────────────────────────────────
     api.registerCli(

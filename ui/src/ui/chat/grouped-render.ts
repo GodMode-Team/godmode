@@ -617,18 +617,18 @@ function renderMessageImages(
       ${resolved.map((img) => {
         const displayUrl = img.resolvedUrl || img.url;
         if (!displayUrl) {
-          // Still omitted, no cached version available
+          // Still omitted, no cached version available — show compact placeholder
           const sizeLabel = formatImageSize(img.bytes);
           const typeLabel = img.mimeType ? img.mimeType.replace("image/", "").toUpperCase() : null;
-          const meta = [typeLabel, sizeLabel, "preview omitted"].filter(Boolean).join(" - ");
+          const meta = [typeLabel, sizeLabel].filter(Boolean).join(" · ");
           return html`
             <div
               class="chat-message-image chat-message-image--omitted"
-              title=${img.alt ?? "Attached image"}
-              aria-label="Attached image preview omitted"
+              title=${img.alt ?? "Sent image"}
+              aria-label="Sent image"
             >
-              <span class="chat-message-image__omitted-label">Image attached</span>
-              <span class="chat-message-image__omitted-meta">${meta}</span>
+              <span class="chat-message-image__omitted-icon">🖼</span>
+              <span class="chat-message-image__omitted-label">${meta || "Image"}</span>
             </div>
           `;
         }

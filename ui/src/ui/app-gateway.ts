@@ -25,7 +25,7 @@ import {
 } from "./controllers/exec-approval";
 import { loadNodes } from "./controllers/nodes";
 import { autoTitleCache, loadSessions } from "./controllers/sessions";
-import { startUpdatePolling, stopUpdatePolling } from "./controllers/updates";
+import { startUpdatePolling, stopUpdatePolling, checkPostUpdateStatus } from "./controllers/updates";
 import type { GatewayEventFrame, GatewayHelloOk } from "./gateway";
 import { GatewayBrowserClient } from "./gateway";
 import { initHostCompat } from "../lib/host-compat.js";
@@ -158,14 +158,18 @@ async function cacheAndResolveImages(app: GodModeApp): Promise<void> {
 
     const resolved = await doResolve();
 
-    // If nothing was resolved but there are omitted images, retry once after
-    // a short delay — the session index write may still be in flight.
+    // If nothing was resolved but there are omitted images, retry with
+    // increasing delays — the session index write may still be in flight.
     if (!resolved && app.chatMessages?.some((m) => {
       const imgs = extractImages(m);
       return imgs.some((img) => img.omitted || !img.url);
     })) {
-      await new Promise((r) => setTimeout(r, 500));
-      await doResolve();
+      for (const delay of [500, 1500, 3000]) {
+        await new Promise((r) => setTimeout(r, delay));
+        if (await doResolve()) break;
+        // Bail if session changed during retries
+        if (app.sessionKey !== sessionKey) break;
+      }
     }
   } catch {
     // Cache miss is fine
@@ -1042,6 +1046,8 @@ export function connectGateway(host: GatewayHost) {
       void loadOptionsOnConnect(host);
       // Start background update check heartbeat (every 30 min)
       startUpdatePolling(host as unknown as GodModeApp);
+      // Check for post-update audit results (shows toast if update just completed)
+      void checkPostUpdateStatus(host as unknown as GodModeApp);
       // Handle ?openTask= URL parameter for task → session deep linking
       handleOpenTaskParam(host as unknown as GodModeApp);
     },
@@ -1339,6 +1345,8 @@ function handleGatewayEventUnsafe(host: GatewayHost, evt: GatewayEventFrame) {
       const allowShrink = Boolean(host.compactionStatus?.completedAt);
       void loadChatHistoryAfterFinal(host as unknown as GodModeApp, { allowShrink }).then(() => {
         void cacheAndResolveImages(host as unknown as GodModeApp);
+        // Refresh session resources strip after each assistant turn
+        void (host as any).loadSessionResources?.();
       });
 
       // Auto-refresh dashboard when its session completes (agent may have updated it)

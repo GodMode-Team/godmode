@@ -13,6 +13,7 @@
 import fs from "node:fs/promises";
 import { existsSync } from "node:fs";
 import path from "node:path";
+import { randomUUID } from "node:crypto";
 import { secureWriteFile, secureMkdir } from "../lib/secure-fs.js";
 import type { GatewayRequestHandler } from "openclaw/plugin-sdk";
 import { DATA_DIR } from "../data-paths.js";
@@ -161,10 +162,70 @@ const remove: GatewayRequestHandler = async ({ params, respond }) => {
   respond(true, { success: true });
 };
 
+// ── Register ────────────────────────────────────────────────────────
+
+const VALID_TYPES = new Set<string>([
+  "html_report", "plan", "analysis", "code", "doc", "data", "image", "script",
+]);
+
+const register: GatewayRequestHandler = async ({ params, respond }) => {
+  const p = params as {
+    title?: string;
+    type?: string;
+    path?: string;
+    url?: string;
+    sessionKey?: string;
+    summary?: string;
+    tags?: string[];
+  };
+
+  const title = typeof p.title === "string" ? p.title.trim() : "";
+  const type = typeof p.type === "string" ? p.type.trim() : "";
+
+  if (!title) {
+    respond(false, undefined, { code: "INVALID_REQUEST", message: "title is required" });
+    return;
+  }
+  if (!VALID_TYPES.has(type)) {
+    respond(false, undefined, {
+      code: "INVALID_REQUEST",
+      message: `type must be one of: ${[...VALID_TYPES].join(", ")}`,
+    });
+    return;
+  }
+  if (!p.path && !p.url) {
+    respond(false, undefined, {
+      code: "INVALID_REQUEST",
+      message: "At least one of path or url is required",
+    });
+    return;
+  }
+
+  const resource: Resource = {
+    id: randomUUID(),
+    title,
+    type: type as ResourceType,
+    ...(p.path ? { path: p.path } : {}),
+    ...(p.url ? { url: p.url } : {}),
+    sessionKey: p.sessionKey ?? "unknown",
+    createdAt: new Date().toISOString(),
+    pinned: false,
+    ...(p.summary ? { summary: p.summary } : {}),
+    ...(p.tags && p.tags.length > 0 ? { tags: p.tags } : {}),
+  };
+
+  const registry = await readRegistry();
+  registry.resources.push(resource);
+  await writeRegistry(registry);
+
+  respond(true, { id: resource.id, title: resource.title });
+};
+
 // ── Export ────────────────────────────────────────────────────────────
 
 export const resourcesHandlers: GatewayRequestHandlers = {
   "resources.list": list,
   "resources.pin": pin,
   "resources.delete": remove,
+  "resources.register": register,
 };
