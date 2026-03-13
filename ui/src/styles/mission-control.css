@@ -802,9 +802,10 @@
 }
 
 .mc-swarm-node-status {
+  display: flex;
+  align-items: center;
   font-size: 11px;
   color: var(--text-muted, var(--muted));
-  text-transform: capitalize;
   opacity: 0.7;
   margin-top: 2px;
 }
@@ -1041,4 +1042,43 @@
   .mc-swarm-agents-grid {
     grid-template-columns: 1fr;
   }
+}
+
+/* ── Swarm Progress Text (header) ── */
+
+.mc-swarm-progress-text {
+  font-size: 11px;
+  color: var(--text-muted, var(--muted));
+  opacity: 0.7;
+}
+
+/* ── Swarm Status Icon ── */
+
+.mc-swarm-status-icon {
+  margin-right: 3px;
+}
+
+/* ── Swarm Node Cost ── */
+
+.mc-swarm-node-cost {
+  font-size: 10px;
+  color: var(--text-muted, var(--muted));
+  opacity: 0.6;
+  margin-top: 2px;
+}
+
+/* ── Swarm Output Preview ── */
+
+.mc-swarm-output-preview {
+  margin: 4px 0 8px 36px;
+  padding: 8px 12px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--text-muted, var(--muted));
+  background: var(--bg-hover, rgba(255, 255, 255, 0.03));
+  border-left: 2px solid var(--accent, #14b8a6);
+  border-radius: 4px;
+  white-space: pre-wrap;
+  max-height: 80px;
+  overflow: hidden;
 }

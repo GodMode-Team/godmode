@@ -12,7 +12,8 @@
  */
 
 import type { PersonaProfile } from "../lib/agent-roster.js";
-import { loadRoster } from "../lib/agent-roster.js";
+import { loadRoster, isPersonaDormant } from "../lib/agent-roster.js";
+import { checkEvidence, extractArtifacts } from "../lib/evidence.js";
 import { createProofDocument } from "../lib/proof-bridge.js";
 import { isProofRunning } from "./proof-server.js";
 import { DATA_DIR } from "../data-paths.js";
@@ -432,9 +433,35 @@ export class PaperclipAdapter {
     if (usePaperclipExecution) {
       // Native Paperclip execution — wake each assigned agent via the heartbeat service
       let woken = 0;
+      let skippedCount = 0;
       for (const issueRecord of issueRecords) {
         const agent = this.state.agents.find(a => a.personaSlug === issueRecord.personaSlug);
         if (!agent) continue;
+
+        // Trust gating: skip agents that are disabled or dormant
+        const personaSlug = agent.personaSlug;
+        try {
+          const { getAutonomyLevel } = await import("../methods/trust-tracker.js");
+          const autonomy = await getAutonomyLevel(personaSlug);
+          if (autonomy === "disabled") {
+            this.logger.warn(`[Paperclip] Skipping disabled agent: ${personaSlug}`);
+            skippedCount++;
+            continue;
+          }
+        } catch { /* trust tracker unavailable — allow execution */ }
+
+        if (isPersonaDormant(personaSlug)) {
+          this.logger.warn(`[Paperclip] Skipping dormant agent: ${personaSlug}`);
+          skippedCount++;
+          continue;
+        }
+
+        // Determine if this is a coding task — if so, request git worktree isolation
+        const taskType = this.inferTaskType(issueRecord.personaSlug);
+        const workspaceRuntime = taskType === "coding" ? {
+          strategy: "git_worktree",
+          branchTemplate: "godmode/{{agent.name}}/{{issue.identifier}}",
+        } : undefined;
 
         try {
           await this.api("POST", `/api/agents/${agent.paperclipId}/wakeup`, {
@@ -451,13 +478,14 @@ export class PaperclipAdapter {
               personaSlug: issueRecord.personaSlug,
               toolkitContext,
             },
+            ...(workspaceRuntime ? { workspaceRuntime } : {}),
           });
           woken++;
         } catch (err) {
           this.logger.warn(`[Paperclip] Failed to wake agent ${agent.personaSlug}: ${String(err)}`);
         }
       }
-      this.logger.info(`[Paperclip] Woke ${woken}/${issueRecords.length} agent(s) via Paperclip execution engine`);
+      this.logger.info(`[Paperclip] Woke ${woken}/${issueRecords.length} agent(s) via Paperclip execution engine${skippedCount > 0 ? ` (${skippedCount} skipped — disabled/dormant)` : ""}`);
     } else {
       // Fallback: queue-processor bypass (spawns detached Claude child processes)
       this.logger.info(`[Paperclip] Using queue-processor fallback (adapterConfigured=${this.state.adapterConfigured})`);
@@ -465,11 +493,32 @@ export class PaperclipAdapter {
         const { updateQueueState, newQueueItemId } = await import("../lib/queue-state.js");
         const { getQueueProcessor } = await import("./queue-processor.js");
 
+        let fallbackSkipped = 0;
         for (const task of brief.issues) {
           const assignee = this.findAgent(task.personaHint || "");
           const issueRecord = issueRecords.find(r => r.title === task.title);
           const taskType = this.inferTaskType(task.personaHint || task.title);
           const proofSlug = issueRecord?.proofDocSlug;
+
+          // Trust gating: skip agents that are disabled or dormant
+          const personaSlug = assignee?.personaSlug;
+          if (personaSlug) {
+            try {
+              const { getAutonomyLevel } = await import("../methods/trust-tracker.js");
+              const autonomy = await getAutonomyLevel(personaSlug);
+              if (autonomy === "disabled") {
+                this.logger.warn(`[Paperclip] Skipping disabled agent: ${personaSlug}`);
+                fallbackSkipped++;
+                continue;
+              }
+            } catch { /* trust tracker unavailable — allow execution */ }
+
+            if (isPersonaDormant(personaSlug)) {
+              this.logger.warn(`[Paperclip] Skipping dormant agent: ${personaSlug}`);
+              fallbackSkipped++;
+              continue;
+            }
+          }
 
           await updateQueueState((state) => {
             const newItem = {
@@ -495,7 +544,8 @@ export class PaperclipAdapter {
 
         const qp = getQueueProcessor();
         if (qp) { void qp.processAllPending(); }
-        this.logger.info(`[Paperclip] Queued ${brief.issues.length} issue(s) for execution via queue-processor`);
+        const queued = brief.issues.length - fallbackSkipped;
+        this.logger.info(`[Paperclip] Queued ${queued} issue(s) for execution via queue-processor${fallbackSkipped > 0 ? ` (${fallbackSkipped} skipped — disabled/dormant)` : ""}`);
       } catch (err) {
         this.logger.warn(`[Paperclip] Failed to queue issues for execution: ${String(err)}`);
       }
@@ -639,6 +689,9 @@ export class PaperclipAdapter {
               runData = await this.fetchLatestRunData(local, project);
             }
 
+            // Run post-completion pipeline (evidence check, inbox push)
+            await this.handleRunCompletion(project, local, issue);
+
             if (this.onCompletionCallback) {
               this.onCompletionCallback(
                 project.projectId,
@@ -716,6 +769,118 @@ export class PaperclipAdapter {
     } catch (err) {
       this.logger.warn(`[Paperclip] Failed to fetch run data for ${issue.personaSlug}: ${String(err)}`);
       return null;
+    }
+  }
+
+  // ── Post-Completion Pipeline ────────────────────────────────────────
+
+  /**
+   * Run evidence checks, push to inbox, and broadcast notification
+   * when a Paperclip issue completes.
+   */
+  private async handleRunCompletion(
+    project: BridgeState["projects"][0],
+    localIssue: BridgeState["projects"][0]["issues"][0],
+    remoteIssue: PcIssue,
+  ): Promise<void> {
+    // 1. Try to read the agent's output (from inbox file or Proof doc)
+    let outputContent = "";
+    try {
+      const outputPath = path.join(DATA_DIR, "..", "memory", "inbox", `${localIssue.issueId}.md`);
+      outputContent = await fs.readFile(outputPath, "utf-8").catch(() => "");
+    } catch { /* no output file */ }
+
+    // Fallback: try reading the Proof doc
+    if (!outputContent && localIssue.proofDocSlug) {
+      try {
+        const { readProofDocument } = await import("../lib/proof-bridge.js");
+        const doc = await readProofDocument(localIssue.proofDocSlug);
+        if (doc?.content?.trim()) outputContent = doc.content;
+      } catch { /* proof read is best-effort */ }
+    }
+
+    // 2. Run evidence check
+    const taskType = this.inferTaskType(localIssue.personaSlug || localIssue.title);
+    const evidenceResult = checkEvidence(taskType, outputContent);
+    const artifacts = extractArtifacts(outputContent);
+
+    if (!evidenceResult.passed && outputContent.length > 0) {
+      this.logger.warn(
+        `[Paperclip] Evidence check failed for "${localIssue.title}": ${evidenceResult.reason}`,
+      );
+    }
+
+    // 3. Build summary
+    const summaryLines = outputContent
+      .split("\n")
+      .filter((l) => l.trim().length > 0)
+      .slice(0, 3);
+    let summary = summaryLines.join(" ").slice(0, 300) || `Issue completed: ${localIssue.title}`;
+    if (!evidenceResult.passed && outputContent.length > 0) {
+      summary = `[Evidence warning: ${evidenceResult.reason}] ${summary}`;
+    }
+
+    // 4. Push to universal inbox
+    try {
+      const { addInboxItem } = await import("./inbox.js");
+      await addInboxItem({
+        type: "agent-execution",
+        title: localIssue.title,
+        summary,
+        source: {
+          persona: localIssue.personaSlug,
+          queueItemId: localIssue.issueId,
+        },
+        proofDocSlug: localIssue.proofDocSlug,
+      });
+    } catch (err) {
+      this.logger.warn(`[Paperclip] Inbox push failed for "${localIssue.title}": ${String(err)}`);
+    }
+
+    this.logger.info(
+      `[Paperclip] Completion pipeline done for "${localIssue.title}" — ` +
+      `evidence: ${evidenceResult.passed ? "PASSED" : "FAILED"}, ` +
+      `artifacts: ${artifacts.length}, status: ${remoteIssue.status}`,
+    );
+  }
+
+  // ── Public API (for RPC handlers) ──────────────────────────────────
+
+  /** Public proxy for RPC handlers that need Paperclip data */
+  async query<T = unknown>(method: string, apiPath: string): Promise<T> {
+    return this.api<T>(method, apiPath);
+  }
+
+  /** Get the Paperclip company ID for API calls */
+  getCompanyId(): string | null {
+    return this.state.companyId;
+  }
+
+  /** Look up the Paperclip agent ID for a given persona slug */
+  getAgentIdForSlug(slug: string): string | undefined {
+    return this.state.agents.find(a => a.personaSlug === slug)?.paperclipId;
+  }
+
+  // ── Cost Tracking ──────────────────────────────────────────────────
+
+  /** Fetch cost breakdown by agent from Paperclip */
+  async getCostsByAgent(): Promise<Array<{ agentName: string; personaSlug: string; totalCostCents: number }>> {
+    if (!this.state.companyId) return [];
+    try {
+      const costs = await this.api<Array<{ agentId: string; agentName: string; totalCostCents: number }>>(
+        "GET",
+        `/api/companies/${this.state.companyId}/costs/by-agent`,
+      );
+      return (Array.isArray(costs) ? costs : []).map(c => {
+        const agent = this.state.agents.find(a => a.paperclipId === c.agentId);
+        return {
+          agentName: c.agentName,
+          personaSlug: agent?.personaSlug ?? "unknown",
+          totalCostCents: c.totalCostCents,
+        };
+      });
+    } catch {
+      return [];
     }
   }
 

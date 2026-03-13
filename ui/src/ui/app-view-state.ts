@@ -358,6 +358,7 @@ export type AppViewState = {
   handleSwarmSelectProject: (projectId: string) => Promise<void>;
   handleSwarmSteer: (projectId: string, issueTitle: string, instructions: string) => Promise<void>;
   handleSwarmViewProofDoc: (docSlug: string) => Promise<void>;
+  handleSwarmViewRunLog: (queueItemId: string) => Promise<void>;
   handleOpenSupportChat: () => void;
   seedSessionWithAgentOutput: (taskTitle: string, output: string, agentPrompt?: string) => Promise<void>;
   // GodMode Options state

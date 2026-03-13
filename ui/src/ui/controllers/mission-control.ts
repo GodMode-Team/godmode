@@ -25,6 +25,9 @@ export type SwarmIssueNode = {
   personaName: string;
   proofDocSlug?: string;
   dependsOn?: string[];
+  outputPreview?: string;
+  cost?: { inputTokens: number; outputTokens: number };
+  queueItemId?: string;
 };
 
 export type SwarmProject = {

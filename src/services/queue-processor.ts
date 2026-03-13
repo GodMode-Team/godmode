@@ -22,6 +22,11 @@ import {
 } from "../lib/queue-state.js";
 import { resolvePersona, formatHandoff } from "../lib/agent-roster.js";
 import { resolveIdentityDir, getVaultPath, VAULT_FOLDERS } from "../lib/vault-paths.js";
+import {
+  checkEvidence as checkEvidenceShared,
+  extractArtifacts as extractArtifactsShared,
+  type EvidenceResult as SharedEvidenceResult,
+} from "../lib/evidence.js";
 
 // ── Prompt Templates ───────────────────────────────────────────────
 
@@ -103,6 +108,8 @@ function isPidAlive(pid: number): boolean {
 }
 
 // ── Evidence Verification Gates ─────────────────────────────────────
+// Delegates to shared evidence module (src/lib/evidence.ts).
+// Local wrappers preserve the string[] artifact format used downstream.
 
 type EvidenceResult = {
   passed: boolean;
@@ -110,115 +117,13 @@ type EvidenceResult = {
   hint: string;
 };
 
-/**
- * Check that agent output contains expected evidence for the task type.
- * This prevents agents from producing vague or empty responses.
- */
 function checkEvidence(taskType: QueueItemType, output: string): EvidenceResult {
-  if (!output || output.trim().length < 50) {
-    return {
-      passed: false,
-      reason: "Output too short (< 50 characters)",
-      hint: "a substantive response with details, findings, or deliverables",
-    };
-  }
-
-  switch (taskType) {
-    case "coding":
-      if (
-        /https?:\/\/github\.com\S+\/pull\/\d+/.test(output) ||
-        /```[\s\S]+```/.test(output) ||
-        /\.(ts|js|py|go|rs|java|tsx|jsx|css|html|md)\b/.test(output) ||
-        /diff --git/.test(output)
-      ) {
-        return { passed: true, reason: "", hint: "" };
-      }
-      return {
-        passed: false,
-        reason: "No code artifacts found (PR link, code block, or file paths)",
-        hint: "a PR link, code diff, or code blocks with file paths",
-      };
-
-    case "research":
-      if (/https?:\/\/\S+/.test(output)) {
-        return { passed: true, reason: "", hint: "" };
-      }
-      return {
-        passed: false,
-        reason: "No source URLs found in research output",
-        hint: "at least one source URL (https://...) to back up findings",
-      };
-
-    case "ops":
-      if (
-        /\$\s+\S+/.test(output) ||
-        /```(sh|bash|shell|zsh)?[\s\S]+```/.test(output) ||
-        /\b(completed|done|success|configured|installed|deployed|running)\b/i.test(output)
-      ) {
-        return { passed: true, reason: "", hint: "" };
-      }
-      return {
-        passed: false,
-        reason: "No command output or status confirmation found",
-        hint: "command output, terminal logs, or a status confirmation",
-      };
-
-    case "review":
-      if (
-        /\.(ts|js|py|go|rs|md|json|yaml|yml)\b/.test(output) &&
-        /\b(issue|finding|recommend|approve|reject|concern|bug|improvement)\b/i.test(output)
-      ) {
-        return { passed: true, reason: "", hint: "" };
-      }
-      return {
-        passed: false,
-        reason: "Missing file references or review verdict",
-        hint: "specific file paths and review findings/recommendations",
-      };
-
-    case "analysis":
-      if (
-        /\b(data|metric|statistic|number|percent|trend|comparison|chart)\b/i.test(output) &&
-        /\b(conclusion|finding|insight|recommend|result|summary)\b/i.test(output)
-      ) {
-        return { passed: true, reason: "", hint: "" };
-      }
-      return {
-        passed: false,
-        reason: "Missing data references or analytical conclusions",
-        hint: "data references and analytical conclusions/recommendations",
-      };
-
-    case "creative":
-    case "task":
-    case "url":
-    case "idea":
-    default:
-      return { passed: true, reason: "", hint: "" };
-  }
+  const result = checkEvidenceShared(taskType, output);
+  return { passed: result.passed, reason: result.reason, hint: result.hint };
 }
 
-/** Extract evidence artifacts (file paths, URLs, PR links) from agent output. */
 function extractArtifacts(content: string): string[] {
-  const artifacts: string[] = [];
-  const seen = new Set<string>();
-
-  for (const line of content.split("\n")) {
-    const prMatch = line.match(/https:\/\/github\.com\/[^\s)]+\/pull\/\d+/g);
-    if (prMatch) for (const m of prMatch) if (!seen.has(m)) { artifacts.push(m); seen.add(m); }
-
-    const urlMatch = line.match(/https?:\/\/[^\s)>]+/g);
-    if (urlMatch) for (const m of urlMatch) if (!seen.has(m)) { artifacts.push(m); seen.add(m); }
-
-    const pathMatch = line.match(/(?:^|\s)(\/[\w./-]+\.\w{1,10})\b/g);
-    if (pathMatch) for (const m of pathMatch) {
-      const cleaned = m.trim();
-      if (!seen.has(cleaned)) { artifacts.push(cleaned); seen.add(cleaned); }
-    }
-  }
-
-  return artifacts.slice(0, 20);
-
+  return extractArtifactsShared(content).map((a) => a.value);
 }
 
 // ── Queue Processor Class ──────────────────────────────────────────

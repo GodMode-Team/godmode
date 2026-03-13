@@ -375,6 +375,48 @@ export async function runGatewayStart(
           issueTitle,
           status,
         });
+
+        // Register Proof doc as a resource if the completed issue has one
+        void (async () => {
+          try {
+            const fullStatus = await paperclip.getStatus(projectId);
+            const issue = fullStatus?.issues.find(i => i.title === issueTitle);
+            if (!issue?.proofDocSlug) return;
+
+            const { readFile, writeFile, mkdir } = await import("node:fs/promises");
+            const { join } = await import("node:path");
+            const { randomUUID } = await import("node:crypto");
+
+            const RESOURCES_PATH = join(DATA_DIR, "resources.json");
+            let registry: { version: number; resources: any[] };
+            try {
+              const raw = await readFile(RESOURCES_PATH, "utf-8");
+              registry = JSON.parse(raw);
+            } catch {
+              registry = { version: 1, resources: [] };
+            }
+
+            if (registry.resources.some((r: any) => r.url === `proof://${issue.proofDocSlug}`)) return;
+
+            registry.resources.push({
+              id: randomUUID(),
+              title: issueTitle,
+              type: "doc",
+              url: `proof://${issue.proofDocSlug}`,
+              sessionKey: `paperclip:${projectId}`,
+              createdAt: new Date().toISOString(),
+              pinned: false,
+              summary: `Proof document for "${issueTitle}" — ${status}`,
+              tags: ["proof", "paperclip"],
+            });
+
+            await mkdir(join(DATA_DIR), { recursive: true });
+            await writeFile(RESOURCES_PATH, JSON.stringify(registry, null, 2) + "\n");
+            logger.info(`[GodMode][Paperclip] Registered Proof doc as resource: ${issue.proofDocSlug}`);
+          } catch (err) {
+            logger.warn(`[GodMode][Paperclip] Failed to register Proof doc resource: ${String(err)}`);
+          }
+        })();
       });
       serviceCleanup.push({ name: "paperclip", fn: () => paperclip.stop() });
       logger.info("[GodMode] Paperclip agent team started");

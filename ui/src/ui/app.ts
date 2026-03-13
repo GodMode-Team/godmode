@@ -1096,6 +1096,26 @@ export class GodModeApp extends LitElement {
     }
   }
 
+  async handleSwarmViewRunLog(queueItemId: string) {
+    if (!this.client || !this.connected) return;
+    try {
+      const result = await this.client.request<{ content?: string; title?: string; mimeType?: string }>(
+        "godmode.delegation.runLog",
+        { queueItemId },
+      );
+      if (result?.content) {
+        this.handleOpenSidebar(result.content, {
+          mimeType: result.mimeType ?? "text/markdown",
+          title: result.title ?? "Agent Logs",
+        });
+      } else {
+        this.showToast("No logs available", "error");
+      }
+    } catch {
+      this.showToast("Failed to load agent logs", "error");
+    }
+  }
+
   async handleMissionControlViewTaskFiles(itemId: string) {
     try {
       const result = await this.client?.request<{

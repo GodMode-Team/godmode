@@ -2320,6 +2320,7 @@ export function renderApp(state: AppViewState) {
                 onSelectSwarmProject: (projectId) => state.handleSwarmSelectProject(projectId),
                 onSteerSwarmAgent: (projectId, issueTitle, instructions) => state.handleSwarmSteer(projectId, issueTitle, instructions),
                 onViewProofDoc: (docSlug) => state.handleSwarmViewProofDoc(docSlug),
+                onViewRunLog: (queueItemId) => state.handleSwarmViewRunLog(queueItemId),
                 onAskAlly: () => { state.handleAllyToggle(); state.handleAllyDraftChange("What should I focus on next?"); },
                 allyName: state.assistantName,
               })
