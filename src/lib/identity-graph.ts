@@ -14,9 +14,8 @@
 // @ts-expect-error — better-sqlite3 has no bundled types; runtime import works fine
 import Database from "better-sqlite3";
 import { join } from "node:path";
-import { readFileSync } from "node:fs";
-import { homedir } from "node:os";
 import { DATA_DIR } from "../data-paths.js";
+import { resolveAnthropicKey, fetchWithTimeout } from "./anthropic-auth.js";
 
 // ── Singleton ────────────────────────────────────────────────────────
 
@@ -432,54 +431,4 @@ export async function seedFromVault(): Promise<void> {
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────
-
-function resolveAnthropicKey(): string | null {
-  const envKey = process.env.ANTHROPIC_API_KEY;
-  if (envKey) return envKey;
-
-  // Check Claude Code OAuth credentials (fresh tokens with refresh support)
-  try {
-    const credsPath = join(homedir(), ".claude", ".credentials.json");
-    const creds = JSON.parse(readFileSync(credsPath, "utf-8"));
-    const oauth = creds?.claudeAiOauth;
-    if (oauth?.accessToken) return oauth.accessToken;
-  } catch { /* not found */ }
-
-  // Check OpenClaw .env
-  try {
-    const oclawEnv = join(homedir(), ".openclaw", ".env");
-    const raw = readFileSync(oclawEnv, "utf-8");
-    for (const line of raw.split("\n")) {
-      if (line.startsWith("ANTHROPIC_API_KEY=")) {
-        const val = line.slice("ANTHROPIC_API_KEY=".length).trim();
-        if (val && !val.startsWith("#")) return val;
-      }
-    }
-  } catch { /* not found */ }
-
-  // Check OpenClaw OAuth profile (may be stale)
-  try {
-    const profilesPath = join(homedir(), ".openclaw", "auth-profiles.json");
-    const raw = JSON.parse(readFileSync(profilesPath, "utf-8")) as {
-      profiles?: Record<string, { token?: string }>;
-    };
-    const profile = raw.profiles?.["anthropic:oauth"];
-    if (profile?.token) return profile.token;
-  } catch { /* not found */ }
-
-  return null;
-}
-
-async function fetchWithTimeout(
-  url: string,
-  init: RequestInit,
-  timeoutMs: number,
-): Promise<Response> {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
-  try {
-    return await fetch(url, { ...init, signal: controller.signal });
-  } finally {
-    clearTimeout(timer);
-  }
-}
+// resolveAnthropicKey and fetchWithTimeout imported from ./anthropic-auth.js

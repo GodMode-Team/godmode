@@ -35,7 +35,7 @@ You talk to your ally. Your ally knows your life — goals, blind spots, pattern
 
 ## 1. Principles
 
-Seven non-negotiable architecture principles. Every PR, every session, every feature must pass all seven.
+Ten non-negotiable architecture principles. Every PR, every session, every feature must pass them all.
 
 ### P1: Context is king, less is more
 
@@ -74,6 +74,20 @@ Before writing TypeScript, ask: "Can this be a file?" Persona → markdown file.
 ### P9: Conduct, don't rebuild
 
 GodMode connects to your existing tools — it never replaces them. The user's CRM is HubSpot. Their contacts are Apple Contacts. Their files are in Google Drive. Their notes are in Obsidian. Their code is in GitHub. GodMode plugs into all of them through the ally and agents. The moment you build a contacts manager, file explorer, project board, or any feature that already exists in a tool the user already uses, you've lost. You're competing against products with hundreds of engineers. GodMode wins by orchestrating, not rebuilding.
+
+### P10: Absorb patterns, not tools
+
+When a new tool, framework, or research technique appears in the ecosystem, GodMode does NOT integrate the tool directly. Instead, it **absorbs the pattern** — the reusable principle — and encodes it as a file (skill card, persona, recipe) or a thin engine hook. The tool itself stays external. The pattern becomes native.
+
+**How absorption works:**
+1. New tool demonstrates a valuable pattern (e.g., MetaClaw's "session → skill distillation")
+2. GodMode identifies the core insight (conversations produce reusable knowledge)
+3. The pattern is implemented using existing primitives (heartbeat pipeline, markdown files, LLM extraction)
+4. The tool is never imported, forked, or depended upon
+
+**The Session Distiller is the canonical example:** MetaClaw showed that conversations can auto-generate reusable skill files. GodMode absorbed this as Pipeline 3 in vault-capture — when a session goes idle, Haiku extracts skill drafts, preferences, and entities. No Python proxy server, no new dependencies, no external runtime. Just a ~200-line TypeScript module that slots into the existing heartbeat.
+
+**This is how GodMode stays at the leading edge without accumulating mass.** Every new AI tool, framework, or paper is a potential pattern to absorb. MetaClaw → session distillation. Devin → agent delegation. Manus → browser orchestration. The pattern becomes a file or a hook. The tool stays external. GodMode compounds intelligence without compounding dependencies.
 
 ---
 
@@ -363,7 +377,7 @@ What must ship to close the gap between "works for Caleb's team" and "works for 
 
 ---
 
-## 9. The Anti-Fragile Loop
+## 9. The Anti-Fragile Loop (see also: P10 — Absorb patterns, not tools)
 
 ```
 New AI tool appears in ecosystem
@@ -374,14 +388,19 @@ New AI tool appears in ecosystem
        Yes
         │
         ▼
+  ABSORB THE PATTERN (P10)
+  What is the core insight?
+        │
+        ▼
   Can it be a file? ──Yes──► Persona / Skill / Recipe file
         │                        │
        No (rare)                 ▼
         │                 Drop into directory
         ▼                        │
-  Engine code                    ▼
-  (only if it serves        Ally discovers and
-   ally/context/orchestration)   starts using
+  Engine hook                    ▼
+  (thin, uses existing      Ally discovers and
+   primitives — heartbeat,   starts using
+   vault-capture, etc.)          │
         │                        │
         ▼                        ▼
   Trust feedback loop rates performance
@@ -391,7 +410,7 @@ New AI tool appears in ecosystem
   Low trust  → supervised or pruned
         │
         ▼
-  GodMode got stronger. Minimal code changed.
+  GodMode got stronger. Tool stayed external.
 ```
 
 ---

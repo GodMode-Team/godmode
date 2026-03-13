@@ -377,6 +377,16 @@ export const sessions = {
     return keys;
   },
 
+  /** Get session keys that have been idle for at least idleMs milliseconds. */
+  idleKeys(idleMs: number): string[] {
+    const cutoff = Date.now() - idleMs;
+    const keys: string[] = [];
+    for (const [key, ts] of sessionActivity) {
+      if (ts <= cutoff) keys.push(key);
+    }
+    return keys;
+  },
+
   /** Prune stale entries (call periodically). */
   prune(): void {
     const cutoff = Date.now() - 30 * 60 * 1000; // 30 min stale

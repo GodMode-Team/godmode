@@ -314,6 +314,13 @@ export async function handleBeforePromptBuild(
     }
   } catch { /* non-fatal */ }
 
+  // P2: Skill drafts pending review (session distiller)
+  let skillDraftCount = 0;
+  try {
+    const { countPendingDrafts } = await import("../lib/session-distiller.js");
+    skillDraftCount = countPendingDrafts();
+  } catch { /* non-fatal */ }
+
   // P2: Routing lessons
   let routingLessons: string | null = null;
   try {
@@ -425,6 +432,7 @@ export async function handleBeforePromptBuild(
     queueReview,
     actionItemsBlock,
     skillCard,
+    skillDraftCount,
     routingLessons,
     safetyNudges,
     contextPressure,
