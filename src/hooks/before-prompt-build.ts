@@ -391,6 +391,37 @@ export async function handleBeforePromptBuild(
     if (enforcerNudge) safetyNudges.push(enforcerNudge);
   } catch { /* non-fatal */ }
 
+  // P3: Tool-grounding gate — inject per-turn grounding instructions
+  // when the user message requires tool-backed verification.
+  if (currentUserMessage.length >= 3 && !lightMode) {
+    try {
+      const { generateGroundingInstruction, logGroundingEvent, TOOL_GROUNDING_DEFAULTS } =
+        await import("./tool-grounding-gate.js");
+      const guardrailState = await import("../services/guardrails.js").then(
+        (m) => m.readGuardrailsStateCached(),
+      );
+      const tgConfig = {
+        ...TOOL_GROUNDING_DEFAULTS,
+        ...((guardrailState as any).toolGrounding ?? {}),
+      };
+      const result = generateGroundingInstruction(currentUserMessage, tgConfig);
+      if (result) {
+        safetyNudges.push(result.instruction);
+        // Best-effort async logging — don't block context assembly
+        if (tgConfig.logViolations) {
+          void logGroundingEvent({
+            timestamp: new Date().toISOString(),
+            sessionKey: sessionKey ?? "unknown",
+            userMessage: currentUserMessage.slice(0, 200),
+            classification: result.classification.category,
+            requiredTools: result.classification.requiredTools,
+            injectedInstruction: true,
+          });
+        }
+      }
+    } catch { /* non-fatal — grounding gate failure should never break context */ }
+  }
+
   // Conditional: Team bootstrap, onboarding, private session
   try {
     const { handleTeamBootstrap } = await import("./team-bootstrap.js");
@@ -426,6 +457,23 @@ export async function handleBeforePromptBuild(
     const { getEscalationContext } = await import("../services/self-heal.js");
     const escalation = getEscalationContext();
     if (escalation) safetyNudges.push(escalation);
+  } catch { /* non-fatal */ }
+
+  // Restart awareness: if GodMode just restarted, tell the ally
+  try {
+    const { getLastRestart, clearLastRestart } = await import("../lib/restart-sentinel.js");
+    const restart = getLastRestart();
+    if (restart && restart.downtimeMs < 10 * 60 * 1000) {
+      const downtimeSec = Math.round(restart.downtimeMs / 1000);
+      safetyNudges.push(
+        `## System Restart\n` +
+        `GodMode just restarted (downtime: ~${downtimeSec}s, reason: ${restart.reason}). ` +
+        `${restart.previousSessions.length} session(s) were active before shutdown.\n` +
+        `OpenClaw handles message delivery recovery automatically.\n` +
+        `Check in with the user: "I just came back online — did I miss anything?"`,
+      );
+      clearLastRestart(); // One-shot injection
+    }
   } catch { /* non-fatal */ }
 
   // Turn-level errors: surface failures that happened since the last message

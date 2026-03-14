@@ -7,11 +7,14 @@
 
 import { existsSync, readFileSync, readdirSync, mkdirSync, copyFileSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
+import { homedir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { DATA_DIR, MEMORY_DIR } from "../data-paths.js";
 import { detectHostContext, safeBroadcast } from "../lib/host-context.js";
 import { killZombieGateways } from "../lib/zombie-guard.js";
 import { refreshLicenseOnStart } from "../lib/license.js";
+import { health, turnErrors, sessions } from "../lib/health-ledger.js";
+import { writeSentinel, consumeSentinel } from "../lib/restart-sentinel.js";
 
 type Logger = { warn: (msg: string) => void; info: (msg: string) => void; error: (msg: string) => void };
 type CleanupEntry = { name: string; fn: () => void | Promise<void> };
@@ -24,6 +27,75 @@ export async function runGatewayStart(
   methodCount = 0,
 ): Promise<void> {
   const logger: Logger = api.logger;
+
+  // ── Part A: Duplicate Plugin Guard ────────────────────────────────
+  // If another copy of GodMode is already loaded in this process, refuse
+  // to double-register. This prevents the catastrophic silent-death bug
+  // where duplicate plugins cause re-registration on every message.
+  const g = globalThis as any;
+  if (g.__godmodeInstanceId) {
+    logger.error(
+      `[GodMode] FATAL: Duplicate plugin detected! Instance already loaded from "${g.__godmodeInstanceId}". ` +
+      `This instance (from ${pluginRoot}) will NOT initialize. ` +
+      `Remove the duplicate: rm -rf ~/.openclaw/extensions/godmode/ and remove plugins.installs.godmode from openclaw.json.`,
+    );
+    health.signal("gateway.duplicate-blocked", false, {
+      existingId: g.__godmodeInstanceId,
+      thisRoot: pluginRoot,
+    });
+    turnErrors.capture(
+      "duplicate-plugin",
+      `Duplicate GodMode plugin blocked. Active: ${g.__godmodeInstanceId}, blocked: ${pluginRoot}. Remove the duplicate to fix.`,
+    );
+    return; // Do NOT initialize anything
+  }
+  g.__godmodeInstanceId = pluginRoot;
+
+  // ── Part C: Config Shield — detect stale npm duplicate ────────────
+  // Even if only one copy loaded, warn if the extensions dir still exists
+  // (it could cause a duplicate on the next restart/update).
+  try {
+    const home = homedir();
+    const extensionsGodmode = join(
+      process.env.OPENCLAW_STATE_DIR || join(home, ".openclaw"),
+      "extensions", "godmode",
+    );
+    if (existsSync(extensionsGodmode) && !pluginRoot.includes("extensions/godmode")) {
+      logger.warn(
+        `[GodMode] CONFIG WARNING: Stale npm duplicate exists at ${extensionsGodmode}. ` +
+        `Dev copy is active from ${pluginRoot}. Remove it: rm -rf ${extensionsGodmode} ` +
+        `and remove plugins.installs.godmode from openclaw.json to prevent duplicate loading.`,
+      );
+      health.signal("gateway.config-shield", false, {
+        warning: "stale-npm-duplicate",
+        npmPath: extensionsGodmode,
+        devPath: pluginRoot,
+      });
+      turnErrors.capture(
+        "config-shield",
+        `Stale GodMode npm copy at ${extensionsGodmode} may cause duplicates. Remove it.`,
+      );
+    }
+  } catch { /* non-fatal */ }
+
+  // ── Part B: Restart Sentinel — recover from previous shutdown ─────
+  try {
+    const restartInfo = consumeSentinel();
+    if (restartInfo) {
+      const downtimeSec = Math.round(restartInfo.downtimeMs / 1000);
+      logger.info(
+        `[GodMode] Recovered from restart (downtime: ${downtimeSec}s, ` +
+        `${restartInfo.previousSessions.length} session(s) were active, reason: ${restartInfo.reason})`,
+      );
+      health.signal("gateway.restart-recovery", true, {
+        downtimeMs: restartInfo.downtimeMs,
+        previousSessionCount: restartInfo.previousSessions.length,
+        reason: restartInfo.reason,
+      });
+    }
+  } catch { /* non-fatal */ }
+
+  health.signal("gateway.start", true, { pluginRoot, pid: process.pid });
 
   // Warm the allowed-paths cache so files.read works for workspace files
   try {
@@ -386,6 +458,16 @@ export async function runGatewayStop(
   serviceCleanup: CleanupEntry[],
   logger: Logger,
 ): Promise<void> {
+  // Write restart sentinel BEFORE cleanup so it captures live state
+  try {
+    const activeSessionKeys = sessions.activeKeys();
+    const serviceNames = serviceCleanup.map((s) => s.name);
+    writeSentinel(activeSessionKeys, serviceNames, "graceful");
+  } catch { /* non-fatal */ }
+
+  // Clear duplicate guard so a fresh instance can claim the slot
+  delete (globalThis as any).__godmodeInstanceId;
+
   logger.info(`[GodMode] Gateway stopping — cleaning up ${serviceCleanup.length} service(s)`);
   let cleaned = 0;
   for (const entry of serviceCleanup) {

@@ -609,37 +609,30 @@ class QueueProcessor {
       askTrustRating: !!personaSlug,
     });
 
-    // Push to universal inbox (skip for multi-issue projects — project-level inbox handles those)
+    // Push to universal inbox — every completed item gets an entry
     const projectId = completedItem?.meta?.projectId ?? completedItem?.meta?.paperclipProjectId;
-    const isMultiIssue = projectId
-      ? await this.isMultiIssueProject(projectId)
-      : false;
-
-    if (!isMultiIssue) {
-      try {
-        const { addInboxItem } = await import("./inbox.js");
-        await addInboxItem({
-          type: "agent-execution",
-          title: completedItem?.title ?? itemId,
-          summary: summary.slice(0, 300),
-          source: {
-            persona: personaSlug,
-            queueItemId: itemId,
-            taskId: completedItem?.sourceTaskId,
-          },
-          proofDocSlug: completedItem?.proofDocSlug,
-          outputPath: outPath,
-          sessionId: completedItem?.sessionId,
-        });
-      } catch (err) {
-        this.logger.warn(`[GodMode][Queue] Inbox push failed for ${itemId}: ${String(err)}`);
-      }
-    } else {
-      this.logger.info(`[GodMode][Queue] Skipping per-task inbox for ${itemId} — project-level inbox will handle`);
+    try {
+      const { addInboxItem } = await import("./inbox.js");
+      await addInboxItem({
+        type: "agent-execution",
+        title: completedItem?.title ?? itemId,
+        summary: summary.slice(0, 300),
+        source: {
+          persona: personaSlug,
+          queueItemId: itemId,
+          taskId: completedItem?.sourceTaskId,
+          projectId,
+        },
+        proofDocSlug: completedItem?.proofDocSlug,
+        outputPath: outPath,
+        sessionId: completedItem?.sessionId,
+      });
+    } catch (err) {
+      this.logger.warn(`[GodMode][Queue] Inbox push failed for ${itemId}: ${String(err)}`);
     }
 
     // Check for project-level completion (all sibling items in same project are terminal)
-    if (projectId && isMultiIssue) {
+    if (projectId && await this.isMultiIssueProject(projectId)) {
       void this.checkProjectCompletion(projectId);
     }
 
@@ -917,34 +910,9 @@ class QueueProcessor {
       didTransition = result === "transitioned";
     } catch { /* projects-state not available */ }
 
-    // No delegated project record (legacy Paperclip items) — fall back to per-item inbox
-    if (!hasProjectRecord) {
-      this.logger.info(`[GodMode][Queue] No delegated project record for ${projectId} — pushing per-item inbox entries`);
-      try {
-        const { addInboxItem } = await import("./inbox.js");
-        for (const qi of projectItems) {
-          if (qi.status === "failed") continue;
-          await addInboxItem({
-            type: "agent-execution",
-            title: qi.title,
-            summary: qi.result?.summary?.slice(0, 300) ?? `Completed by ${qi.personaHint ?? "agent"}`,
-            source: {
-              persona: qi.personaHint,
-              queueItemId: qi.id,
-              taskId: qi.sourceTaskId,
-            },
-            proofDocSlug: qi.proofDocSlug,
-            outputPath: qi.result?.outputPath,
-            sessionId: qi.sessionId,
-          });
-        }
-      } catch (err) {
-        this.logger.warn(`[GodMode][Queue] Legacy per-item inbox fallback failed: ${String(err)}`);
-      }
-      return;
-    }
-
-    // Guard: only one call creates the inbox item / session / broadcasts
+    // Per-item inbox entries are already created in handleItemCompleted.
+    // Here we only add the project-level completion summary.
+    if (!hasProjectRecord) return;
     if (!didTransition) return;
 
     // Get project metadata for notifications

@@ -67,10 +67,19 @@ export type GuardrailActivityEntry = {
   timestamp: string;
 };
 
+export type ToolGroundingConfig = {
+  enabled: boolean;
+  enforcement: "soft" | "hard";
+  categories: Record<string, boolean>;
+  tokenBudgetWarning: boolean;
+  logViolations: boolean;
+};
+
 export type GuardrailsState = {
   gates: Record<GuardrailGateId, GateConfig>;
   activity: GuardrailActivityEntry[];
   custom?: CustomGuardrail[];
+  toolGrounding?: ToolGroundingConfig;
   updatedAt: string;
 };
 
@@ -108,6 +117,21 @@ export const GATE_DEFAULTS: Record<GuardrailGateId, GateConfig> = {
   architectureGate: { enabled: true },
   deploymentGate: { enabled: true },
   destructiveWriteGate: { enabled: true },
+};
+
+/** Default config for the tool-grounding gate (top-level, not a gate). */
+export const TOOL_GROUNDING_STATE_DEFAULTS: ToolGroundingConfig = {
+  enabled: true,
+  enforcement: "soft",
+  categories: {
+    "person-lookup": true,
+    "status-check": true,
+    "codebase-question": true,
+    "factual-claim": true,
+    "external-lookup": true,
+  },
+  tokenBudgetWarning: false,
+  logViolations: true,
 };
 
 export const GATE_DESCRIPTORS: Record<GuardrailGateId, GateDescriptor> = {
@@ -334,6 +358,7 @@ function emptyState(): GuardrailsState {
     gates: { ...GATE_DEFAULTS },
     activity: [],
     custom: [...CUSTOM_DEFAULTS],
+    toolGrounding: { ...TOOL_GROUNDING_STATE_DEFAULTS },
     updatedAt: new Date().toISOString(),
   };
 }
@@ -359,6 +384,7 @@ export async function readGuardrailsState(): Promise<GuardrailsState> {
       gates: { ...GATE_DEFAULTS, ...(parsed.gates ?? {}) },
       activity: parsed.activity ?? [],
       custom,
+      toolGrounding: { ...TOOL_GROUNDING_STATE_DEFAULTS, ...((parsed as any).toolGrounding ?? {}) },
       updatedAt: parsed.updatedAt ?? new Date().toISOString(),
     };
   } catch {

@@ -37,6 +37,7 @@ export type InboxItem = {
     skill?: string;
     taskId?: string;
     queueItemId?: string;
+    projectId?: string;
   };
   proofDocSlug?: string;
   outputPath?: string;
