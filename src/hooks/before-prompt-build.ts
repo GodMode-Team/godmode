@@ -445,6 +445,23 @@ export async function handleBeforePromptBuild(
     if (escalation) safetyNudges.push(escalation);
   } catch { /* non-fatal */ }
 
+  // Restart awareness: if GodMode just restarted, tell the ally
+  try {
+    const { getLastRestart, clearLastRestart } = await import("../lib/restart-sentinel.js");
+    const restart = getLastRestart();
+    if (restart && restart.downtimeMs < 10 * 60 * 1000) {
+      const downtimeSec = Math.round(restart.downtimeMs / 1000);
+      safetyNudges.push(
+        `## System Restart\n` +
+        `GodMode just restarted (downtime: ~${downtimeSec}s, reason: ${restart.reason}). ` +
+        `${restart.previousSessions.length} session(s) were active before shutdown.\n` +
+        `OpenClaw handles message delivery recovery automatically.\n` +
+        `Check in with the user: "I just came back online — did I miss anything?"`,
+      );
+      clearLastRestart(); // One-shot injection
+    }
+  } catch { /* non-fatal */ }
+
   // Turn-level errors: surface failures that happened since the last message
   try {
     const { turnErrors } = await import("../lib/health-ledger.js");
