@@ -1127,7 +1127,8 @@ const DESTRUCTIVE_PATTERNS = [
   /DELETE\s+FROM\s+\S+\s*(?:;|$)/i,  // DELETE without WHERE
   /TRUNCATE\s+TABLE/i,
 
-  // Overwrite without backup
+  // Overwrite without backup — redirect truncation of code files
+  // NOTE: heredoc writes (cat > file << EOF) are excluded in the gate function below
   />\s+[^|]+\.(?:html|css|js|tsx?|json|md|yaml|yml)\b/,  // redirect overwrite of code files
 ];
 
@@ -1174,8 +1175,11 @@ export async function checkDestructiveWriteGate(
         : "";
   if (!command) return undefined;
 
+  // Heredoc writes (cat > file << EOF) are standard file creation, not destructive
+  const isHeredoc = /<<\s*'?\w+'?\s*$/.test(command.split("\n")[0]);
+
   const matches = DESTRUCTIVE_PATTERNS.some((p) => p.test(command));
-  if (matches) {
+  if (matches && !isHeredoc) {
     void logGateActivity(
       "destructiveWriteGate",
       "blocked",

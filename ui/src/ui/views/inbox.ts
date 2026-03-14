@@ -13,6 +13,10 @@ export type InboxViewItem = {
   status: string;
   score?: number;
   feedback?: string;
+  /** Project-completion fields */
+  projectId?: string;
+  deliverables?: Array<{ title: string; persona: string; proofDocSlug?: string; summary?: string }>;
+  coworkSessionId?: string;
 };
 
 export type InboxSectionProps = {
@@ -97,7 +101,51 @@ function renderScoreWidget(props: InboxSectionProps, item: InboxViewItem) {
   `;
 }
 
+function renderProjectCompletionCard(props: InboxSectionProps, item: InboxViewItem) {
+  const deliverables = item.deliverables ?? [];
+  return html`
+    <div class="inbox-card inbox-card-project">
+      <div class="inbox-card-header">
+        <span class="inbox-card-source" style="font-weight: 600;">Project Complete</span>
+        <span class="inbox-card-time">${timeAgo(item.createdAt)}</span>
+      </div>
+      <div class="inbox-card-title">${item.title}</div>
+      <div class="inbox-card-summary">${item.summary}</div>
+      ${deliverables.length > 0
+        ? html`
+            <div class="inbox-deliverables" style="margin: 8px 0; padding: 8px 0; border-top: 1px solid var(--border-subtle, #333);">
+              ${deliverables.map(
+                (d) => html`
+                  <div class="inbox-deliverable-row" style="display: flex; align-items: center; gap: 8px; padding: 4px 0; font-size: 13px;">
+                    <span style="opacity: 0.6;">${d.persona.replace(/-/g, " ")}</span>
+                    <span style="flex: 1;">${d.title}</span>
+                    ${d.proofDocSlug
+                      ? html`<button class="btn btn-sm" style="padding: 2px 8px; font-size: 11px;" @click=${() => props.onViewOutput(item.id)}>View</button>`
+                      : nothing}
+                  </div>
+                `,
+              )}
+            </div>
+          `
+        : nothing}
+      <div class="inbox-card-actions">
+        <button class="btn btn-sm btn-primary" @click=${() => props.onOpenChat(item.id)}>Review with Prosper</button>
+        ${item.proofDocSlug
+          ? html`<button class="btn btn-sm" @click=${() => props.onViewOutput(item.id)}>View Deliverables</button>`
+          : nothing}
+        <button class="btn btn-sm" @click=${() => props.onSetScoring(item.id, 7)}>Score</button>
+        <button class="btn btn-sm btn-ghost" @click=${() => props.onDismiss(item.id)}>Dismiss</button>
+      </div>
+      ${renderScoreWidget(props, item)}
+    </div>
+  `;
+}
+
 function renderInboxCard(props: InboxSectionProps, item: InboxViewItem) {
+  if (item.type === "project-completion") {
+    return renderProjectCompletionCard(props, item);
+  }
+
   const hasViewableOutput = Boolean(item.proofDocSlug || item.outputPath);
   const hasChat = Boolean(item.sessionId || item.source.taskId || item.source.queueItemId);
   return html`

@@ -1077,23 +1077,7 @@ export class GodModeApp extends LitElement {
   }
 
   async handleSwarmViewProofDoc(docSlug: string) {
-    if (!this.client || !this.connected) return;
-    try {
-      const result = await this.client.request<{ html?: string; title?: string }>(
-        "proof.get",
-        { slug: docSlug },
-      );
-      if (result?.html) {
-        this.handleOpenSidebar(result.html, {
-          mimeType: "text/html",
-          title: result.title ?? "Proof Document",
-        });
-      } else {
-        this.showToast("Document not found", "error");
-      }
-    } catch {
-      this.showToast("Failed to load Proof document", "error");
-    }
+    return this.handleOpenProofDoc(docSlug);
   }
 
   async handleSwarmViewRunLog(queueItemId: string) {
@@ -4011,6 +3995,18 @@ export class GodModeApp extends LitElement {
 
   handleInboxOpenChat(itemId: string) {
     const item = this.inboxItems?.find((i) => i.id === itemId);
+
+    // Project-completion items open the cowork session
+    if (item?.type === "project-completion" && (item as any).coworkSessionId) {
+      this.setSessionKey((item as any).coworkSessionId);
+      this.setTab("chat" as import("./navigation").Tab);
+      // Also open Proof doc in sidebar if available
+      if (item?.proofDocSlug) {
+        void this.handleOpenProofDoc(item.proofDocSlug);
+      }
+      return;
+    }
+
     if (item?.source.taskId) {
       void this.handleMissionControlOpenTaskSession(item.source.taskId);
       return;

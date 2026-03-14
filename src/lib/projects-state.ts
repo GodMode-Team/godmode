@@ -53,7 +53,7 @@ export interface ProjectsState {
 
 // ── File paths + lock config ─────────────────────────────────────
 
-export const PROJECTS_FILE = path.join(DATA_DIR, "projects.json");
+export const PROJECTS_FILE = path.join(DATA_DIR, "delegated-projects.json");
 
 const LOCK_OPTIONS = {
   retries: {

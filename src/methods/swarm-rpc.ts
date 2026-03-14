@@ -151,6 +151,38 @@ async function handleSwarmProjects({ respond }: { respond: Function }) {
     };
   });
 
+  // Discover legacy projects from queue items with paperclipProjectId that have no delegated record
+  const knownIds = new Set(projectsState.projects.map(p => p.projectId));
+  const legacyGroups = new Map<string, QueueItem[]>();
+  for (const qi of qs.items) {
+    const pid = qi.meta?.projectId ?? qi.meta?.paperclipProjectId;
+    if (pid && !knownIds.has(pid)) {
+      if (!legacyGroups.has(pid)) legacyGroups.set(pid, []);
+      legacyGroups.get(pid)!.push(qi);
+    }
+  }
+  for (const [pid, items] of legacyGroups) {
+    let completedCount = 0;
+    let failedCount = 0;
+    for (const qi of items) {
+      const s = mapQueueStatusToDisplay(qi.status);
+      if (s === "done" || s === "in_review") completedCount++;
+      if (s === "failed") failedCount++;
+    }
+    const allTerminal = items.every(qi => ["done", "review", "needs-review", "failed"].includes(qi.status));
+    const anyFailed = items.some(qi => qi.status === "failed");
+    projects.push({
+      projectId: pid,
+      title: items[0]?.workspaceId?.replace(/^project-/, "Project ") ?? items[0]?.title ?? "Legacy Project",
+      status: allTerminal ? (anyFailed ? "failed" : "completed") : "active",
+      issueCount: items.length,
+      completedCount,
+      failedCount,
+      createdAt: new Date(Math.min(...items.map(i => i.createdAt))).toISOString(),
+      proofWorkspace: items[0]?.workspaceId ?? "",
+    });
+  }
+
   return respond(true, { projects, running: true });
 }
 
@@ -162,67 +194,108 @@ async function handleSwarmStatus({ params, respond }: { params: Record<string, u
 
   const [projectsState, qs] = await Promise.all([readProjects(), readQueueState()]);
   const project = projectsState.projects.find(p => p.projectId === projectId);
-  if (!project) {
-    return respond(false, null, { code: "NOT_FOUND", message: `Project not found: ${projectId}` });
-  }
 
-  const { byIssueId, byTitle } = buildQueueLookups(qs.items);
-
+  // Build agents/issues from either delegated project record or queue items directly
   const agents: SwarmAgentState[] = [];
   const issues: SwarmIssueNode[] = [];
   const seenAgents = new Set<string>();
 
-  for (const issue of project.issues) {
-    const slug = issue.personaSlug;
-    const personaName = slugToName(slug);
-    const qi = findQueueItem(issue.issueId, issue.title, byIssueId, byTitle);
-    const displayStatus = qi ? mapQueueStatusToDisplay(qi.status) : "todo";
+  if (project) {
+    // Native delegated project — use issue records + queue cross-ref
+    const { byIssueId, byTitle } = buildQueueLookups(qs.items);
+    for (const issue of project.issues) {
+      const slug = issue.personaSlug;
+      const personaName = slugToName(slug);
+      const qi = findQueueItem(issue.issueId, issue.title, byIssueId, byTitle);
+      const displayStatus = qi ? mapQueueStatusToDisplay(qi.status) : "todo";
 
-    let outputPreview: string | undefined;
-    if (qi?.result?.summary) {
-      outputPreview = qi.result.summary.length > 200
-        ? qi.result.summary.slice(0, 200) + "..."
-        : qi.result.summary;
+      let outputPreview: string | undefined;
+      if (qi?.result?.summary) {
+        outputPreview = qi.result.summary.length > 200
+          ? qi.result.summary.slice(0, 200) + "..."
+          : qi.result.summary;
+      }
+
+      issues.push({
+        issueId: issue.issueId,
+        title: issue.title,
+        status: displayStatus,
+        assignee: slug,
+        personaName,
+        proofDocSlug: issue.proofDocSlug,
+        outputPreview,
+        queueItemId: qi?.id,
+      });
+
+      if (!seenAgents.has(slug)) {
+        seenAgents.add(slug);
+        const agentStatus = mapDisplayToAgentStatus(displayStatus);
+        agents.push({
+          id: slug, personaSlug: slug, personaName, role: "general",
+          status: agentStatus,
+          currentTask: agentStatus === "working" ? issue.title : undefined,
+          startedAt: qi?.startedAt, endedAt: qi?.completedAt,
+          proofDocSlug: issue.proofDocSlug,
+        });
+      }
+    }
+  } else {
+    // Legacy project — reconstruct from queue items with matching projectId
+    const projectItems = qs.items.filter(
+      (i) => (i.meta?.projectId ?? i.meta?.paperclipProjectId) === projectId,
+    );
+    if (projectItems.length === 0) {
+      return respond(false, null, { code: "NOT_FOUND", message: `Project not found: ${projectId}` });
     }
 
-    issues.push({
-      issueId: issue.issueId,
-      title: issue.title,
-      status: displayStatus,
-      assignee: slug,
-      personaName,
-      proofDocSlug: issue.proofDocSlug,
-      outputPreview,
-      queueItemId: qi?.id,
-    });
+    for (const qi of projectItems) {
+      const slug = qi.personaHint ?? "unassigned";
+      const personaName = slugToName(slug);
+      const displayStatus = mapQueueStatusToDisplay(qi.status);
+      const issueId = qi.meta?.issueId ?? qi.meta?.paperclipIssueId ?? qi.id;
 
-    if (!seenAgents.has(slug)) {
-      seenAgents.add(slug);
-      const agentStatus = mapDisplayToAgentStatus(displayStatus);
-      agents.push({
-        id: slug,
-        personaSlug: slug,
+      let outputPreview: string | undefined;
+      if (qi.result?.summary) {
+        outputPreview = qi.result.summary.length > 200
+          ? qi.result.summary.slice(0, 200) + "..."
+          : qi.result.summary;
+      }
+
+      issues.push({
+        issueId,
+        title: qi.title,
+        status: displayStatus,
+        assignee: slug,
         personaName,
-        role: "general",
-        status: agentStatus,
-        currentTask: agentStatus === "working" ? issue.title : undefined,
-        startedAt: qi?.startedAt,
-        endedAt: qi?.completedAt,
-        proofDocSlug: issue.proofDocSlug,
+        proofDocSlug: qi.proofDocSlug,
+        outputPreview,
+        queueItemId: qi.id,
       });
+
+      if (!seenAgents.has(slug)) {
+        seenAgents.add(slug);
+        const agentStatus = mapDisplayToAgentStatus(displayStatus);
+        agents.push({
+          id: slug, personaSlug: slug, personaName, role: "general",
+          status: agentStatus,
+          currentTask: agentStatus === "working" ? qi.title : undefined,
+          startedAt: qi.startedAt, endedAt: qi.completedAt,
+          proofDocSlug: qi.proofDocSlug,
+        });
+      }
     }
   }
 
   const allDone = issues.length > 0 && issues.every(i => i.status === "done" || i.status === "in_review");
   const anyFailed = issues.some(i => i.status === "failed");
   const anyInProgress = issues.some(i => i.status === "in_progress");
-  const projectStatus = allDone ? "completed" : anyFailed ? "at_risk" : anyInProgress ? "in_progress" : project.status;
+  const projectStatus = allDone ? "completed" : anyFailed ? "at_risk" : anyInProgress ? "in_progress" : project?.status ?? "active";
 
   const detail: SwarmProjectDetail = {
-    projectId: project.projectId,
-    title: project.title,
+    projectId,
+    title: project?.title ?? issues[0]?.title ?? "Legacy Project",
     status: projectStatus,
-    proofWorkspace: project.proofWorkspace,
+    proofWorkspace: project?.proofWorkspace ?? "",
     agents,
     issues,
   };
@@ -244,51 +317,57 @@ async function handleSwarmFeed({ params, respond }: { params: Record<string, unk
   const { byIssueId, byTitle } = buildQueueLookups(qs.items);
 
   const events: SwarmFeedEvent[] = [];
-  const projects = filterProjectId
+
+  // Helper to push events from a queue item
+  function pushEventsForItem(qi: QueueItem, pid: string) {
+    const slug = qi.personaHint ?? "unassigned";
+    const personaName = slugToName(slug);
+    const displayStatus = mapQueueStatusToDisplay(qi.status);
+
+    if (displayStatus === "done" || displayStatus === "in_review") {
+      events.push({
+        id: `${pid}-${qi.id}-done`, timestamp: qi.completedAt ?? Date.now(),
+        type: "agent_completed", summary: `${personaName} completed "${qi.title}"`,
+        projectId: pid, personaSlug: slug, personaName, issueTitle: qi.title,
+      });
+    } else if (displayStatus === "in_progress" || displayStatus === "todo") {
+      events.push({
+        id: `${pid}-${qi.id}-active`, timestamp: qi.startedAt ?? qi.createdAt ?? Date.now(),
+        type: "agent_started",
+        summary: `${personaName} ${displayStatus === "in_progress" ? "working on" : "assigned to"} "${qi.title}"`,
+        projectId: pid, personaSlug: slug, personaName, issueTitle: qi.title,
+      });
+    } else if (displayStatus === "failed") {
+      events.push({
+        id: `${pid}-${qi.id}-failed`, timestamp: qi.completedAt ?? Date.now(),
+        type: "agent_failed", summary: `${personaName} failed on "${qi.title}"`,
+        projectId: pid, personaSlug: slug, personaName, issueTitle: qi.title,
+      });
+    }
+  }
+
+  // Native delegated projects
+  const nativeProjects = filterProjectId
     ? projectsState.projects.filter(p => p.projectId === filterProjectId)
     : projectsState.projects;
 
-  for (const project of projects) {
+  for (const project of nativeProjects) {
     for (const issue of project.issues) {
-      const personaName = slugToName(issue.personaSlug);
       const qi = findQueueItem(issue.issueId, issue.title, byIssueId, byTitle);
-      const displayStatus = qi ? mapQueueStatusToDisplay(qi.status) : "todo";
-
-      if (displayStatus === "done" || displayStatus === "in_review") {
-        events.push({
-          id: `${project.projectId}-${issue.issueId}-done`,
-          timestamp: qi?.completedAt ?? Date.now(),
-          type: "agent_completed",
-          summary: `${personaName} completed "${issue.title}"`,
-          projectId: project.projectId,
-          personaSlug: issue.personaSlug,
-          personaName,
-          issueTitle: issue.title,
-        });
-      } else if (displayStatus === "in_progress" || displayStatus === "todo") {
-        events.push({
-          id: `${project.projectId}-${issue.issueId}-active`,
-          timestamp: qi?.startedAt ?? qi?.createdAt ?? Date.now(),
-          type: "agent_started",
-          summary: `${personaName} ${displayStatus === "in_progress" ? "working on" : "assigned to"} "${issue.title}"`,
-          projectId: project.projectId,
-          personaSlug: issue.personaSlug,
-          personaName,
-          issueTitle: issue.title,
-        });
-      } else if (displayStatus === "failed") {
-        events.push({
-          id: `${project.projectId}-${issue.issueId}-failed`,
-          timestamp: qi?.completedAt ?? Date.now(),
-          type: "agent_failed",
-          summary: `${personaName} failed on "${issue.title}"`,
-          projectId: project.projectId,
-          personaSlug: issue.personaSlug,
-          personaName,
-          issueTitle: issue.title,
-        });
-      }
+      if (qi) pushEventsForItem(qi, project.projectId);
     }
+  }
+
+  // Legacy projects (queue items with projectId not in delegated state)
+  const knownIds = new Set(projectsState.projects.map(p => p.projectId));
+  const seenLegacy = new Set<string>();
+  for (const qi of qs.items) {
+    const pid = qi.meta?.projectId ?? qi.meta?.paperclipProjectId;
+    if (!pid || knownIds.has(pid)) continue;
+    if (filterProjectId && pid !== filterProjectId) continue;
+    if (seenLegacy.has(qi.id)) continue;
+    seenLegacy.add(qi.id);
+    pushEventsForItem(qi, pid);
   }
 
   events.sort((a, b) => b.timestamp - a.timestamp);

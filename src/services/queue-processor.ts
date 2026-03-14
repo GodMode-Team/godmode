@@ -900,19 +900,49 @@ class QueueProcessor {
 
     // Mark project as completed in projects-state (idempotent — only fires once)
     let didTransition = false;
+    let hasProjectRecord = false;
     try {
       const { updateProjects } = await import("../lib/projects-state.js");
       const { result } = await updateProjects((ps) => {
         const project = ps.projects.find(p => p.projectId === projectId);
-        if (project && project.status === "active") {
+        if (!project) return "no-record" as const;
+        if (project.status === "active") {
           project.status = "completed";
           project.completedAt = Date.now();
-          return true; // we transitioned
+          return "transitioned" as const;
         }
-        return false;
+        return "already-done" as const;
       });
-      didTransition = result;
+      hasProjectRecord = result !== "no-record";
+      didTransition = result === "transitioned";
     } catch { /* projects-state not available */ }
+
+    // No delegated project record (legacy Paperclip items) — fall back to per-item inbox
+    if (!hasProjectRecord) {
+      this.logger.info(`[GodMode][Queue] No delegated project record for ${projectId} — pushing per-item inbox entries`);
+      try {
+        const { addInboxItem } = await import("./inbox.js");
+        for (const qi of projectItems) {
+          if (qi.status === "failed") continue;
+          await addInboxItem({
+            type: "agent-execution",
+            title: qi.title,
+            summary: qi.result?.summary?.slice(0, 300) ?? `Completed by ${qi.personaHint ?? "agent"}`,
+            source: {
+              persona: qi.personaHint,
+              queueItemId: qi.id,
+              taskId: qi.sourceTaskId,
+            },
+            proofDocSlug: qi.proofDocSlug,
+            outputPath: qi.result?.outputPath,
+            sessionId: qi.sessionId,
+          });
+        }
+      } catch (err) {
+        this.logger.warn(`[GodMode][Queue] Legacy per-item inbox fallback failed: ${String(err)}`);
+      }
+      return;
+    }
 
     // Guard: only one call creates the inbox item / session / broadcasts
     if (!didTransition) return;
