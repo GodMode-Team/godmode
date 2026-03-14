@@ -104,37 +104,39 @@ function renderScoreWidget(props: InboxSectionProps, item: InboxViewItem) {
 function renderProjectCompletionCard(props: InboxSectionProps, item: InboxViewItem) {
   const deliverables = item.deliverables ?? [];
   return html`
-    <div class="inbox-card inbox-card-project">
+    <div class="inbox-card inbox-card--project">
       <div class="inbox-card-header">
-        <span class="inbox-card-source" style="font-weight: 600;">Project Complete</span>
+        <span class="inbox-card-source">Project Complete</span>
         <span class="inbox-card-time">${timeAgo(item.createdAt)}</span>
       </div>
-      <div class="inbox-card-title">${item.title}</div>
-      <div class="inbox-card-summary">${item.summary}</div>
-      ${deliverables.length > 0
-        ? html`
-            <div class="inbox-deliverables" style="margin: 8px 0; padding: 8px 0; border-top: 1px solid var(--border-subtle, #333);">
-              ${deliverables.map(
-                (d) => html`
-                  <div class="inbox-deliverable-row" style="display: flex; align-items: center; gap: 8px; padding: 4px 0; font-size: 13px;">
-                    <span style="opacity: 0.6;">${d.persona.replace(/-/g, " ")}</span>
-                    <span style="flex: 1;">${d.title}</span>
-                    ${d.proofDocSlug
-                      ? html`<button class="btn btn-sm" style="padding: 2px 8px; font-size: 11px;" @click=${() => props.onViewOutput(item.id)}>View</button>`
-                      : nothing}
-                  </div>
-                `,
-              )}
-            </div>
-          `
-        : nothing}
-      <div class="inbox-card-actions">
-        <button class="btn btn-sm btn-primary" @click=${() => props.onOpenChat(item.id)}>Review with Prosper</button>
-        ${item.proofDocSlug
-          ? html`<button class="btn btn-sm" @click=${() => props.onViewOutput(item.id)}>View Deliverables</button>`
+      <div class="inbox-card-body">
+        <div class="inbox-card-title">${item.title}</div>
+        <div class="inbox-card-summary">${item.summary}</div>
+        ${deliverables.length > 0
+          ? html`
+              <div class="inbox-deliverables">
+                ${deliverables.map(
+                  (d) => html`
+                    <div class="inbox-deliverable-row">
+                      <span class="inbox-deliverable-persona">${d.persona.replace(/-/g, " ")}</span>
+                      <span class="inbox-deliverable-title">${d.title}</span>
+                      ${d.proofDocSlug
+                        ? html`<button class="btn btn--sm" @click=${() => props.onViewOutput(item.id)}>View</button>`
+                        : nothing}
+                    </div>
+                  `,
+                )}
+              </div>
+            `
           : nothing}
-        <button class="btn btn-sm" @click=${() => props.onSetScoring(item.id, 7)}>Score</button>
-        <button class="btn btn-sm btn-ghost" @click=${() => props.onDismiss(item.id)}>Dismiss</button>
+      </div>
+      <div class="inbox-card-actions">
+        <button class="btn btn--sm primary" @click=${() => props.onOpenChat(item.id)}>Review with Prosper</button>
+        ${item.proofDocSlug
+          ? html`<button class="btn btn--sm" @click=${() => props.onViewOutput(item.id)}>View Deliverables</button>`
+          : nothing}
+        <button class="btn btn--sm" @click=${() => props.onSetScoring(item.id, 7)}>Score</button>
+        <button class="btn btn--sm" @click=${() => props.onDismiss(item.id)}>Dismiss</button>
       </div>
       ${renderScoreWidget(props, item)}
     </div>
@@ -154,17 +156,19 @@ function renderInboxCard(props: InboxSectionProps, item: InboxViewItem) {
         <span class="inbox-card-source">${personaLabel(item)}</span>
         <span class="inbox-card-time">${timeAgo(item.createdAt)}</span>
       </div>
-      <div class="inbox-card-title">${item.title}</div>
-      <div class="inbox-card-summary">${item.summary.slice(0, 220)}${item.summary.length > 220 ? "..." : ""}</div>
+      <div class="inbox-card-body">
+        <div class="inbox-card-title">${item.title}</div>
+        <div class="inbox-card-summary">${item.summary.slice(0, 220)}${item.summary.length > 220 ? "…" : ""}</div>
+      </div>
       <div class="inbox-card-actions">
         ${hasViewableOutput
-          ? html`<button class="btn btn-sm" @click=${() => props.onViewOutput(item.id)}>View Output</button>`
+          ? html`<button class="btn btn--sm" @click=${() => props.onViewOutput(item.id)}>View Output</button>`
           : nothing}
         ${hasChat
-          ? html`<button class="btn btn-sm" @click=${() => props.onOpenChat(item.id)}>Open Chat</button>`
+          ? html`<button class="btn btn--sm" @click=${() => props.onOpenChat(item.id)}>Open Chat</button>`
           : nothing}
-        <button class="btn btn-sm btn-primary" @click=${() => props.onSetScoring(item.id, 7)}>Complete</button>
-        <button class="btn btn-sm btn-ghost" @click=${() => props.onDismiss(item.id)}>Dismiss</button>
+        <button class="btn btn--sm primary" @click=${() => props.onSetScoring(item.id, 7)}>Complete</button>
+        <button class="btn btn--sm" @click=${() => props.onDismiss(item.id)}>Dismiss</button>
       </div>
       ${renderScoreWidget(props, item)}
     </div>
@@ -176,7 +180,7 @@ export function renderInboxSection(props: InboxSectionProps) {
   const count = props.count ?? pendingItems.length;
 
   if (props.loading) {
-    return html`<div class="inbox-loading">Loading inbox...</div>`;
+    return html`<div class="inbox-loading">Loading inbox…</div>`;
   }
 
   if (count === 0) {
@@ -203,7 +207,7 @@ export function renderInboxSection(props: InboxSectionProps) {
           <span>INBOX</span>
           <span class="tab-badge" style="margin-left: 8px;">${count}</span>
         </div>
-        <button class="btn btn-sm" @click=${() => props.onMarkAll()}>Mark All Complete</button>
+        <button class="btn btn--sm" @click=${() => props.onMarkAll()}>Mark All Complete</button>
       </div>
       <div class="my-day-card-content">
         <div class="inbox-list">

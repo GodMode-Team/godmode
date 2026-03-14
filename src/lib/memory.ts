@@ -30,8 +30,8 @@ let initFailed = false;
 /** Retry queue for failed ingestions */
 const retryQueue: Array<{ messages: string; userId: string; attempts: number }> = [];
 const MAX_RETRY_ATTEMPTS = 3;
-const SEARCH_TIMEOUT_MS = 5_000;
-const INGEST_TIMEOUT_MS = 15_000;
+const SEARCH_TIMEOUT_MS = 12_000;
+const INGEST_TIMEOUT_MS = 20_000;
 
 /** Circuit breaker for memory search — backs off after consecutive failures */
 let consecutiveSearchFailures = 0;
@@ -240,10 +240,24 @@ export async function searchMemories(
 
   const start = Date.now();
   try {
-    const result: any = await withTimeout(
-      memoryInstance.search(query, { userId, limit }),
-      SEARCH_TIMEOUT_MS,
-    );
+    let result: any;
+    try {
+      result = await withTimeout(
+        memoryInstance.search(query, { userId, limit }),
+        SEARCH_TIMEOUT_MS,
+      );
+    } catch (firstErr) {
+      // Single retry on timeout — transient slowness shouldn't trip circuit breaker
+      if (String(firstErr).includes("Timeout")) {
+        console.warn("[GodMode Memory] Search timeout, retrying once...");
+        result = await withTimeout(
+          memoryInstance.search(query, { userId, limit }),
+          SEARCH_TIMEOUT_MS,
+        );
+      } else {
+        throw firstErr;
+      }
+    }
     if (!result?.results) {
       lastSearchFailed = true;
       consecutiveSearchFailures++;
