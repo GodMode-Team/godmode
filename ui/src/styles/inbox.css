@@ -1,0 +1,261 @@
+/* Inbox — Agent result cards */
+
+.inbox-header-actions {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.inbox-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.inbox-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+/* ── Card ──────────────────────────────────────────────────────── */
+
+.inbox-card {
+  background: var(--bg-elevated, var(--card));
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg, 10px);
+  overflow: hidden;
+  transition: border-color var(--duration-fast, 150ms) var(--ease-out, ease-out),
+              box-shadow var(--duration-fast, 150ms) var(--ease-out, ease-out);
+}
+
+.inbox-card:hover {
+  border-color: var(--border-strong, var(--border));
+  box-shadow: var(--shadow-sm, 0 1px 3px rgba(0,0,0,.15));
+}
+
+.inbox-card--project {
+  border-color: var(--accent-subtle, rgba(255, 107, 107, 0.25));
+}
+
+/* ── Header ────────────────────────────────────────────────────── */
+
+.inbox-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 16px;
+  background: var(--bg-accent, rgba(255,255,255,.03));
+  border-bottom: 1px solid var(--border);
+}
+
+.inbox-card-source {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--accent);
+}
+
+.inbox-card--project .inbox-card-source {
+  color: var(--accent);
+}
+
+.inbox-card-time {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+/* ── Body ──────────────────────────────────────────────────────── */
+
+.inbox-card-body {
+  padding: 14px 16px 10px;
+}
+
+.inbox-card-title {
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--text);
+  margin-bottom: 6px;
+}
+
+.inbox-card-summary {
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--muted);
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* ── Actions ───────────────────────────────────────────────────── */
+
+.inbox-card-actions {
+  display: flex;
+  gap: 6px;
+  padding: 10px 16px 14px;
+  flex-wrap: wrap;
+}
+
+/* ── Deliverables (project cards) ──────────────────────────────── */
+
+.inbox-deliverables {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+
+.inbox-deliverable-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+  font-size: 13px;
+}
+
+.inbox-deliverable-persona {
+  color: var(--muted);
+  font-size: 11px;
+  text-transform: capitalize;
+  min-width: 80px;
+}
+
+.inbox-deliverable-title {
+  flex: 1;
+  color: var(--text);
+}
+
+/* ── Scoring widget ────────────────────────────────────────────── */
+
+.inbox-scoring {
+  padding: 14px 16px 16px;
+  border-top: 1px solid var(--border);
+  background: var(--bg-accent, rgba(255,255,255,.02));
+}
+
+.inbox-score-label {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+  margin-bottom: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.inbox-score-value {
+  font-weight: 700;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--text);
+}
+
+.inbox-score-value.low {
+  color: var(--danger, #ef4444);
+}
+
+.inbox-score-value.high {
+  color: var(--success, #22c55e);
+}
+
+.inbox-score-row {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 12px;
+}
+
+.inbox-score-btn {
+  flex: 1;
+  padding: 6px 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm, 6px);
+  background: var(--bg-elevated, var(--card));
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 120ms ease-out;
+}
+
+.inbox-score-btn:hover {
+  border-color: var(--border-strong);
+  background: var(--bg-hover);
+}
+
+.inbox-score-btn.active {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--primary-foreground, #fff);
+  font-weight: 700;
+}
+
+.inbox-score-btn.low {
+  color: var(--danger, #ef4444);
+}
+
+.inbox-score-btn.low.active {
+  background: var(--danger, #ef4444);
+  border-color: var(--danger, #ef4444);
+  color: #fff;
+}
+
+.inbox-score-btn.high {
+  color: var(--success, #22c55e);
+}
+
+.inbox-score-btn.high.active {
+  background: var(--success, #22c55e);
+  border-color: var(--success, #22c55e);
+  color: #fff;
+}
+
+/* ── Feedback ──────────────────────────────────────────────────── */
+
+.inbox-feedback {
+  margin-bottom: 10px;
+}
+
+.inbox-feedback-input {
+  width: 100%;
+  min-height: 60px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm, 6px);
+  background: var(--bg, var(--card));
+  color: var(--text);
+  font-size: 12.5px;
+  font-family: inherit;
+  resize: vertical;
+}
+
+.inbox-feedback-input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-subtle, rgba(255, 107, 107, 0.15));
+}
+
+.inbox-score-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.inbox-score-submit {
+  flex: 1;
+}
+
+.inbox-score-submit:not(:disabled) {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--primary-foreground, #fff);
+}
+
+.inbox-score-cancel {
+  color: var(--muted);
+}

@@ -139,7 +139,7 @@ function stripSystemLines(text: string): string {
   }
 
   // Check for system event prefixes that should be stripped
-  const isSystemEvent = text.startsWith("System:") || text.startsWith("GatewayRestart:");
+  const isSystemEvent = text.startsWith("System:") || text.startsWith("GatewayRestart:") || text.startsWith("Sender (untrusted metadata)");
 
   // System events are at the start, separated from user text by \n\n
   // Find the first occurrence of \n\n which separates system block from user text

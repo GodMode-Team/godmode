@@ -1582,6 +1582,7 @@ export function renderApp(state: AppViewState) {
                   inboxScoringValue: state.inboxScoringValue,
                   inboxFeedbackText: state.inboxFeedbackText,
                   onInboxViewOutput: (itemId: string) => void state.handleInboxViewOutput(itemId),
+                  onInboxViewProof: (itemId: string) => void state.handleInboxViewProof(itemId),
                   onInboxOpenChat: (itemId: string) => state.handleInboxOpenChat(itemId),
                   onInboxDismiss: (itemId: string) => void state.handleInboxDismiss(itemId),
                   onInboxScore: (itemId: string, score: number, feedback?: string) =>

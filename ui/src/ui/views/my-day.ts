@@ -110,6 +110,7 @@ export type MyDayProps = {
   inboxScoringValue?: number;
   inboxFeedbackText?: string;
   onInboxViewOutput?: (itemId: string) => void;
+  onInboxViewProof?: (itemId: string) => void;
   onInboxOpenChat?: (itemId: string) => void;
   onInboxDismiss?: (itemId: string) => void;
   onInboxScore?: (itemId: string, score: number, feedback?: string) => void;
@@ -539,6 +540,7 @@ function renderInbox(props: MyDayProps) {
         scoringValue: props.inboxScoringValue,
         feedbackText: props.inboxFeedbackText,
         onViewOutput: (itemId: string) => props.onInboxViewOutput?.(itemId),
+        onViewProof: (itemId: string) => props.onInboxViewProof?.(itemId),
         onOpenChat: (itemId: string) => props.onInboxOpenChat?.(itemId),
         onDismiss: (itemId: string) => props.onInboxDismiss?.(itemId),
         onScore: (itemId: string, score: number, feedback?: string) => props.onInboxScore?.(itemId, score, feedback),

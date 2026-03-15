@@ -57,7 +57,8 @@
     "typecheck": "tsc --noEmit",
     "pack:check": "npm pack --dry-run",
     "prepublishOnly": "pnpm build && node scripts/verify-dist.mjs",
-    "preversion": "pnpm typecheck"
+    "preversion": "pnpm typecheck",
+    "postinstall": "bash patches/fix-imessage-native-vision.sh 2>/dev/null || true"
   },
   "dependencies": {
     "@noble/ed25519": "3.0.0",

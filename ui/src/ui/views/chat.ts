@@ -1199,6 +1199,31 @@ function messageHasImage(message: unknown): boolean {
   return false;
 }
 
+/**
+ * Returns true when an assistant message has ONLY toolCall/toolUse blocks
+ * (no text, no images). These messages produce empty bubbles in the UI
+ * and should be hidden when showThinking is off.
+ */
+function isToolCallOnlyMessage(message: unknown): boolean {
+  const m = message as Record<string, unknown>;
+  const content = m.content;
+  if (!Array.isArray(content) || content.length === 0) {
+    return false;
+  }
+  for (const block of content) {
+    if (typeof block !== "object" || block === null) {
+      continue;
+    }
+    const b = block as Record<string, unknown>;
+    const t = typeof b.type === "string" ? b.type : "";
+    // If there's any non-tool-call block, it's not tool-call-only
+    if (t !== "toolCall" && t !== "tool_use" && t !== "thinking") {
+      return false;
+    }
+  }
+  return true;
+}
+
 function buildChatItems(props: ChatProps): Array<ChatItem | MessageGroup> {
   const items: ChatItem[] = [];
   const history = Array.isArray(props.messages) ? props.messages : [];
@@ -1241,6 +1266,17 @@ function buildChatItems(props: ChatProps): Array<ChatItem | MessageGroup> {
       if (!messageHasImage(msg)) {
         continue;
       }
+    }
+
+    // Skip assistant messages that have ONLY tool calls (no text or images).
+    // These render as empty bubbles and create confusing empty groups when
+    // tool results are also hidden (showThinking=false).
+    if (
+      !props.showThinking &&
+      normalized.role.toLowerCase() === "assistant" &&
+      isToolCallOnlyMessage(msg)
+    ) {
+      continue;
     }
 
     items.push({

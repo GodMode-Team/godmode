@@ -684,6 +684,7 @@ export type AppViewState = {
   handleInboxDismiss: (itemId: string) => Promise<void>;
   handleInboxMarkAll: () => Promise<void>;
   handleInboxViewOutput: (itemId: string) => Promise<void>;
+  handleInboxViewProof: (itemId: string) => Promise<void>;
   handleInboxOpenChat: (itemId: string) => void;
   handleInboxSetScoring: (itemId: string | null, score?: number) => void;
   handleInboxFeedbackChange: (text: string) => void;

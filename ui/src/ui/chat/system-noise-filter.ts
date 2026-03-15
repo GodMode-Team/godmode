@@ -51,6 +51,12 @@ export function isSystemPromptNoise(msg: Record<string, unknown>): boolean {
   const t = extractText(msg).trim();
   if (!t) return false;
 
+  // ── System-context tag detection ─────────────────────────────────
+  // before_prompt_build wraps injected context in <system-context> tags.
+  // After the ultra-lean soul essence change, the inner text no longer
+  // contains the legacy multi-signal fingerprints, so detect the tag directly.
+  if (t.startsWith("<system-context") || t.startsWith("<godmode-context")) return true;
+
   // ── Exact prefixes ────────────────────────────────────────────────
 
   // Heartbeat prompts

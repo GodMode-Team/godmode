@@ -578,7 +578,7 @@ ${o?`**Command:** \`${o}\`
         </div>
       `)}
     </div>
-  `}function _m(e){return e.replace(/\[Files uploaded:[^\]]+\]\s*/g,"").trim()}function Cm(e){if(!e)return e;if(e.startsWith("System:")||e.startsWith("GatewayRestart:")){const i=e.indexOf(`
+  `}function _m(e){return e.replace(/\[Files uploaded:[^\]]+\]\s*/g,"").trim()}function Cm(e){if(!e)return e;if(e.startsWith("System:")||e.startsWith("GatewayRestart:")||e.startsWith("Sender (untrusted metadata)")){const i=e.indexOf(`
 
 `);return i!==-1?e.slice(i+2).trim():""}let a=e.split(`
 `).filter(i=>{const o=i.trim();return!o.startsWith("System:")&&!o.startsWith("GatewayRestart:")}).join(`
@@ -2391,7 +2391,7 @@ ${e.snapshot?JSON.stringify(e.snapshot,null,2):"No snapshot yet."}
       </div>
     </div>
   `}const qn=(e,t)=>{const n=e._$AN;if(n===void 0)return!1;for(const s of n)s._$AO?.(t,!1),qn(s,t);return!0},Qs=e=>{let t,n;do{if((t=e._$AM)===void 0)break;n=t._$AN,n.delete(e),e=t}while(n?.size===0)},Yu=e=>{for(let t;t=e._$AM;e=t){let n=t._$AN;if(n===void 0)t._$AN=n=new Set;else if(n.has(e))break;n.add(e),h$(t)}};function u$(e){this._$AN!==void 0?(Qs(this),this._$AM=e,Yu(this)):this._$AM=e}function p$(e,t=!1,n=0){const s=this._$AH,a=this._$AN;if(a!==void 0&&a.size!==0)if(t)if(Array.isArray(s))for(let i=n;i<s.length;i++)qn(s[i],!1),Qs(s[i]);else s!=null&&(qn(s,!1),Qs(s));else qn(this,e)}const h$=e=>{e.type==Qi.CHILD&&(e._$AP??=p$,e._$AQ??=u$)};class f$ extends Ji{constructor(){super(...arguments),this._$AN=void 0}_$AT(t,n,s){super._$AT(t,n,s),Yu(this),this.isConnected=t._$AU}_$AO(t,n=!0){t!==this.isConnected&&(this.isConnected=t,t?this.reconnected?.():this.disconnected?.()),n&&(qn(this,t),Qs(this))}setValue(t){if(Jb(this._$Ct))this._$Ct._$AI(t,this);else{const n=[...this._$Ct._$AH];n[this._$Ci]=t,this._$Ct._$AI(n,this,0)}}disconnected(){}reconnected(){}}const Za=new WeakMap,g$=Yi(class extends f${render(e){return p}update(e,[t]){const n=t!==this.G;return n&&this.G!==void 0&&this.rt(void 0),(n||this.lt!==this.ct)&&(this.G=t,this.ht=e.options?.host,this.rt(this.ct=e.element)),p}rt(e){if(this.isConnected||(e=void 0),typeof this.G=="function"){const t=this.ht??globalThis;let n=Za.get(t);n===void 0&&(n=new WeakMap,Za.set(t,n)),n.get(this.G)!==void 0&&this.G.call(this.ht,void 0),n.set(this.G,e),e!==void 0&&this.G.call(this.ht,e)}else this.G.value=e}get lt(){return typeof this.G=="function"?Za.get(this.ht??globalThis)?.get(this.G):this.G?.value}disconnected(){this.lt===this.ct&&this.rt(void 0)}reconnected(){this.rt(this.ct)}});function m$(e){return typeof e.content=="string"?e.content:typeof e.text=="string"?e.text:Array.isArray(e.content)?e.content.map(t=>typeof t.text=="string"?t.text:"").join(`
-`):""}const v$=["persistence protocol","core principles:","core behaviors","your role as ","be diligent first time","exhaust reasonable options","assume capability exists","elite executive assistant","consciousness context","working context","enforcement:","internal system context injected by godmode"];function y$(e){const t=typeof e.role=="string"?e.role.toLowerCase():"";if(t!=="user"&&t!=="system")return!1;const n=m$(e).trim();if(!n)return!1;if(n.startsWith("Read HEARTBEAT.md")||n.startsWith("Read CONSCIOUSNESS.md")||/^System:\s*\[\d{4}-\d{2}-\d{2}/.test(n)||n==="NO_REPLY"||n.startsWith(`NO_REPLY
+`):""}const v$=["persistence protocol","core principles:","core behaviors","your role as ","be diligent first time","exhaust reasonable options","assume capability exists","elite executive assistant","consciousness context","working context","enforcement:","internal system context injected by godmode"];function y$(e){const t=typeof e.role=="string"?e.role.toLowerCase():"";if(t!=="user"&&t!=="system")return!1;const n=m$(e).trim();if(!n)return!1;if(n.startsWith("<system-context")||n.startsWith("<godmode-context")||n.startsWith("Read HEARTBEAT.md")||n.startsWith("Read CONSCIOUSNESS.md")||/^System:\s*\[\d{4}-\d{2}-\d{2}/.test(n)||n==="NO_REPLY"||n.startsWith(`NO_REPLY
 `)||/^#\s*(?:🧠|\w+ Consciousness)/i.test(n)||n.startsWith("# WORKING.md")||n.startsWith("# MISTAKES.md")||/(?:VERIFIED|FIXED|NEW):\s/.test(n)&&/✅|🟡|☑/.test(n)&&n.length>300||/^###\s*(?:Onboarding Philosophy|Self-Surgery Problem|Open Architecture)/i.test(n)||/^\[GodMode Context:[^\]]*\]\s*$/.test(n)||/^You are resourceful and thorough\.\s*Your job is to GET THE JOB DONE/i.test(n)||/^##?\s*Persistence Protocol/i.test(n)||/^##?\s*Core (?:Behaviors|Principles)/i.test(n)||/^##?\s*Your Role as \w+/i.test(n)||/^##\s*Your Team\s*\(Agent Roster\)/i.test(n)&&n.indexOf(`
 
 ## `)===-1||/^\w+\s+\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(n)&&n.length>200||/^(?:ID\s+START\s+END\s+SUMMARY)/i.test(n))return!0;const s=n.toLowerCase();return v$.filter(a=>s.includes(a)).length>=2}const Il=25*1024*1024,Dl=50*1024*1024,Ml=20;function ei(e){return e<1024?`${e} B`:e<1024*1024?`${(e/1024).toFixed(1)} KB`:e<1024*1024*1024?`${(e/(1024*1024)).toFixed(1)} MB`:`${(e/(1024*1024*1024)).toFixed(1)} GB`}function Wo(e,t=0){const n=[],s=[];let a=t;const i=Array.from(e);for(const o of i){if(n.length>=Ml){s.push(`Maximum ${Ml} files allowed per upload`);break}if(o.size>Il){s.push(`"${o.name}" is too large (${ei(o.size)}). Max ${ei(Il)}. For larger files, mention the file path instead.`);continue}if(a+o.size>Dl){s.push(`Total upload size exceeds ${ei(Dl)} limit`);break}a+=o.size,n.push(o)}return{validFiles:n,errors:s}}const b$=new Set(["md","markdown","mdx"]),w$=new Set(["htm","html"]),$$=new Set(["avif","bmp","gif","heic","heif","jpeg","jpg","png","svg","svgz","webp"]);function Ju(e){const t=e.replaceAll("\\","/").trim();if(!t)return e;const n=t.split("/");return n[n.length-1]||t}function k$(e){if(!e)return null;const n=e.trim().toLowerCase().split(".").pop()??"";return n?b$.has(n)?"text/markdown":w$.has(n)?"text/html":$$.has(n)?n==="svg"||n==="svgz"?"image/svg+xml":n==="jpg"?"image/jpeg":`image/${n}`:n==="pdf"?"application/pdf":n==="json"||n==="json5"?"application/json":n==="txt"||n==="text"||n==="log"?"text/plain":null:null}function Xu(e){const t=e.mimeType?.split(";")[0]?.trim().toLowerCase()??"";if(t)return t;const n=e.content?.trim()??"";if(n.startsWith("data:image/")){const s=/^data:(image\/[^;]+);/i.exec(n);return s?.[1]?s[1].toLowerCase():"image/*"}return k$(e.filePath??null)??"text/markdown"}function S$(e){if(!e.startsWith("file://"))return null;let t=e.slice(7);return t.startsWith("/~/")&&(t="~"+t.slice(2)),decodeURIComponent(t)}function A$(e,t){if(!t)return;const s=e.target.closest("a");if(!s)return;const a=s.getAttribute("href");if(!a)return;const i=S$(a);i&&(e.preventDefault(),e.stopPropagation(),t(i))}function x$(e){if(e.error)return r`
@@ -2661,7 +2661,7 @@ ${e.snapshot?JSON.stringify(e.snapshot,null,2):"No snapshot yet."}
       ${e.loading?r`
               <div class="muted">Loading chat…</div>
             `:p}
-      ${fa(X$(e),w=>w.key,w=>{try{if(w.kind==="reading-indicator")return Pm(o,e.currentToolInfo);if(w.kind==="stream")return Lm(w.text,w.startedAt,e.onOpenSidebar,o,e.currentToolInfo);if(w.kind==="compaction-summary")return Om(w.message);if(w.kind==="group"){const $=e.resolveImageUrl?(c,g)=>e.resolveImageUrl(c,g):void 0;return Im(w,{onOpenSidebar:e.onOpenSidebar,onOpenFile:e.onOpenFile,onOpenProof:e.onOpenProof,onPushToDrive:e.onPushToDrive,onImageClick:e.onImageClick,resolveImageUrl:$,showReasoning:i,assistantName:e.assistantName,assistantAvatar:o.avatar,userName:e.userName,userAvatar:e.userAvatar})}return p}catch($){return console.error("[chat] item render error:",$,w.key),p}})}
+      ${fa(Z$(e),w=>w.key,w=>{try{if(w.kind==="reading-indicator")return Pm(o,e.currentToolInfo);if(w.kind==="stream")return Lm(w.text,w.startedAt,e.onOpenSidebar,o,e.currentToolInfo);if(w.kind==="compaction-summary")return Om(w.message);if(w.kind==="group"){const $=e.resolveImageUrl?(c,g)=>e.resolveImageUrl(c,g):void 0;return Im(w,{onOpenSidebar:e.onOpenSidebar,onOpenFile:e.onOpenFile,onOpenProof:e.onOpenProof,onPushToDrive:e.onPushToDrive,onImageClick:e.onImageClick,resolveImageUrl:$,showReasoning:i,assistantName:e.assistantName,assistantAvatar:o.avatar,userName:e.userName,userAvatar:e.userAvatar})}return p}catch($){return console.error("[chat] item render error:",$,w.key),p}})}
     </div>
   `;return r`
     <section 
@@ -2872,7 +2872,7 @@ ${e.snapshot?JSON.stringify(e.snapshot,null,2):"No snapshot yet."}
         </div>
       </div>
     </section>
-  `}const Fl=200;function Y$(e){const t=[];let n=null;for(const s of e){if(s.kind!=="message"){n&&(t.push(n),n=null),t.push(s);continue}const a=pd(s.message),i=co(a.role),o=a.timestamp||Date.now();!n||n.role!==i?(n&&t.push(n),n={kind:"group",key:`group:${i}:${s.key}`,role:i,messages:[{message:s.message,key:s.key}],timestamp:o,isStreaming:!1}):n.messages.push({message:s.message,key:s.key})}return n&&t.push(n),t}function J$(e){const n=e.content;if(!Array.isArray(n))return!1;for(const s of n){if(typeof s!="object"||s===null)continue;const a=s;if(a.type==="image")return!0;if(Array.isArray(a.content)){for(const i of a.content)if(!(typeof i!="object"||i===null)&&i.type==="image")return!0}}return!1}function X$(e){const t=[],n=Array.isArray(e.messages)?e.messages:[],s=Array.isArray(e.toolMessages)?e.toolMessages:[],a=Math.max(0,n.length-Fl);a>0&&t.push({kind:"message",key:"chat:history:notice",message:{role:"system",content:`Showing last ${Fl} messages (${a} hidden).`,timestamp:Date.now()}});for(let i=a;i<n.length;i++){const o=n[i];if(o._chatIdx=i,Fm(o)){t.push({kind:"compaction-summary",key:`compaction:${i}`,message:o});continue}if(y$(o))continue;const l=pd(o);!e.showThinking&&l.role.toLowerCase()==="toolresult"&&!J$(o)||t.push({kind:"message",key:Nl(o,i),message:o})}if(e.showThinking)for(let i=0;i<s.length;i++)t.push({kind:"message",key:Nl(s[i],i+n.length),message:s[i]});if(e.stream!==null){const i=`stream:${e.sessionKey}:${e.streamStartedAt??"live"}`;e.stream.trim().length>0?t.push({kind:"stream",key:i,text:e.stream,startedAt:e.streamStartedAt??Date.now()}):t.push({kind:"reading-indicator",key:i})}else if(e.isWorking){const i=`working:${e.sessionKey}`;t.push({kind:"reading-indicator",key:i})}else if(e.sending||e.canAbort){const i=`sending:${e.sessionKey}`;t.push({kind:"reading-indicator",key:i})}return Y$(t)}function Nl(e,t){const n=e,s=typeof n.toolCallId=="string"?n.toolCallId:"";if(s)return`tool:${s}`;const a=typeof n.id=="string"?n.id:"";if(a)return`msg:${a}`;const i=typeof n.messageId=="string"?n.messageId:"";if(i)return`msg:${i}`;const o=typeof n.timestamp=="number"?n.timestamp:null,l=typeof n.role=="string"?n.role:"unknown";if(o!=null){const d=typeof n.content=="string"?n.content.slice(0,32):"";return`msg:${l}:${o}:${d||t}`}return`msg:${l}:${t}`}function Z$(e,t=128){return new Promise((n,s)=>{const a=new Image;a.addEventListener("load",()=>{const i=document.createElement("canvas");i.width=t,i.height=t;const o=i.getContext("2d");if(!o){s(new Error("Could not get canvas context"));return}const l=Math.min(a.width,a.height),d=(a.width-l)/2,u=(a.height-l)/2;o.drawImage(a,d,u,l,l,0,0,t,t),n(i.toDataURL("image/png"))}),a.addEventListener("error",()=>s(new Error("Failed to load image"))),a.src=URL.createObjectURL(e)})}let en="",Un=null,_t=null,Bl=!1,lt=!1;function ek(e){Bl||(en=e.userName||"",Un=e.userAvatar||null,_t=e.userAvatar||null,Bl=!0,lt=!1)}function tk(e){ek(e);const t=d=>{en=d.target.value,lt=!0},n=async d=>{const h=d.target.files?.[0];if(h){if(!h.type.startsWith("image/")){alert("Please select an image file");return}if(h.size>5*1024*1024){alert("Image must be less than 5MB");return}try{const f=await Z$(h,128);Un=f,_t=f,lt=!0,document.dispatchEvent(new CustomEvent("user-settings-updated"))}catch(f){console.error("Failed to process image:",f),alert("Failed to process image")}}},s=()=>{Un=null,_t=null,lt=!0;const d=document.getElementById("user-avatar-input");d&&(d.value=""),document.dispatchEvent(new CustomEvent("user-settings-updated"))},a=()=>{e.onUpdate(en,Un||""),lt=!1;const d=document.querySelector(".user-settings__save");d&&(d.textContent="Saved!",setTimeout(()=>{d.textContent="Save"},1500))},i=()=>{en=e.userName||"",Un=e.userAvatar||null,_t=e.userAvatar||null,lt=!1,document.dispatchEvent(new CustomEvent("user-settings-updated"))},o=en||"You",l=_t?r`<img src="${_t}" alt="${o}" class="user-settings__avatar-img" />`:r`<span class="user-settings__avatar-initial">${o.charAt(0).toUpperCase()}</span>`;return r`
+  `}const Fl=200;function Y$(e){const t=[];let n=null;for(const s of e){if(s.kind!=="message"){n&&(t.push(n),n=null),t.push(s);continue}const a=pd(s.message),i=co(a.role),o=a.timestamp||Date.now();!n||n.role!==i?(n&&t.push(n),n={kind:"group",key:`group:${i}:${s.key}`,role:i,messages:[{message:s.message,key:s.key}],timestamp:o,isStreaming:!1}):n.messages.push({message:s.message,key:s.key})}return n&&t.push(n),t}function J$(e){const n=e.content;if(!Array.isArray(n))return!1;for(const s of n){if(typeof s!="object"||s===null)continue;const a=s;if(a.type==="image")return!0;if(Array.isArray(a.content)){for(const i of a.content)if(!(typeof i!="object"||i===null)&&i.type==="image")return!0}}return!1}function X$(e){const n=e.content;if(!Array.isArray(n)||n.length===0)return!1;for(const s of n){if(typeof s!="object"||s===null)continue;const a=s,i=typeof a.type=="string"?a.type:"";if(i!=="toolCall"&&i!=="tool_use"&&i!=="thinking")return!1}return!0}function Z$(e){const t=[],n=Array.isArray(e.messages)?e.messages:[],s=Array.isArray(e.toolMessages)?e.toolMessages:[],a=Math.max(0,n.length-Fl);a>0&&t.push({kind:"message",key:"chat:history:notice",message:{role:"system",content:`Showing last ${Fl} messages (${a} hidden).`,timestamp:Date.now()}});for(let i=a;i<n.length;i++){const o=n[i];if(o._chatIdx=i,Fm(o)){t.push({kind:"compaction-summary",key:`compaction:${i}`,message:o});continue}if(y$(o))continue;const l=pd(o);!e.showThinking&&l.role.toLowerCase()==="toolresult"&&!J$(o)||!e.showThinking&&l.role.toLowerCase()==="assistant"&&X$(o)||t.push({kind:"message",key:Nl(o,i),message:o})}if(e.showThinking)for(let i=0;i<s.length;i++)t.push({kind:"message",key:Nl(s[i],i+n.length),message:s[i]});if(e.stream!==null){const i=`stream:${e.sessionKey}:${e.streamStartedAt??"live"}`;e.stream.trim().length>0?t.push({kind:"stream",key:i,text:e.stream,startedAt:e.streamStartedAt??Date.now()}):t.push({kind:"reading-indicator",key:i})}else if(e.isWorking){const i=`working:${e.sessionKey}`;t.push({kind:"reading-indicator",key:i})}else if(e.sending||e.canAbort){const i=`sending:${e.sessionKey}`;t.push({kind:"reading-indicator",key:i})}return Y$(t)}function Nl(e,t){const n=e,s=typeof n.toolCallId=="string"?n.toolCallId:"";if(s)return`tool:${s}`;const a=typeof n.id=="string"?n.id:"";if(a)return`msg:${a}`;const i=typeof n.messageId=="string"?n.messageId:"";if(i)return`msg:${i}`;const o=typeof n.timestamp=="number"?n.timestamp:null,l=typeof n.role=="string"?n.role:"unknown";if(o!=null){const d=typeof n.content=="string"?n.content.slice(0,32):"";return`msg:${l}:${o}:${d||t}`}return`msg:${l}:${t}`}function ek(e,t=128){return new Promise((n,s)=>{const a=new Image;a.addEventListener("load",()=>{const i=document.createElement("canvas");i.width=t,i.height=t;const o=i.getContext("2d");if(!o){s(new Error("Could not get canvas context"));return}const l=Math.min(a.width,a.height),d=(a.width-l)/2,u=(a.height-l)/2;o.drawImage(a,d,u,l,l,0,0,t,t),n(i.toDataURL("image/png"))}),a.addEventListener("error",()=>s(new Error("Failed to load image"))),a.src=URL.createObjectURL(e)})}let en="",Un=null,_t=null,Bl=!1,lt=!1;function tk(e){Bl||(en=e.userName||"",Un=e.userAvatar||null,_t=e.userAvatar||null,Bl=!0,lt=!1)}function nk(e){tk(e);const t=d=>{en=d.target.value,lt=!0},n=async d=>{const h=d.target.files?.[0];if(h){if(!h.type.startsWith("image/")){alert("Please select an image file");return}if(h.size>5*1024*1024){alert("Image must be less than 5MB");return}try{const f=await ek(h,128);Un=f,_t=f,lt=!0,document.dispatchEvent(new CustomEvent("user-settings-updated"))}catch(f){console.error("Failed to process image:",f),alert("Failed to process image")}}},s=()=>{Un=null,_t=null,lt=!0;const d=document.getElementById("user-avatar-input");d&&(d.value=""),document.dispatchEvent(new CustomEvent("user-settings-updated"))},a=()=>{e.onUpdate(en,Un||""),lt=!1;const d=document.querySelector(".user-settings__save");d&&(d.textContent="Saved!",setTimeout(()=>{d.textContent="Save"},1500))},i=()=>{en=e.userName||"",Un=e.userAvatar||null,_t=e.userAvatar||null,lt=!1,document.dispatchEvent(new CustomEvent("user-settings-updated"))},o=en||"You",l=_t?r`<img src="${_t}" alt="${o}" class="user-settings__avatar-img" />`:r`<span class="user-settings__avatar-initial">${o.charAt(0).toUpperCase()}</span>`;return r`
     <div class="user-settings">
       <section class="config-section-card">
         <div class="config-section-card__header">
@@ -3163,7 +3163,7 @@ ${e.snapshot?JSON.stringify(e.snapshot,null,2):"No snapshot yet."}
       <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
       <polyline points="14 2 14 8 20 8"></polyline>
     </svg>
-  `},ti=[{key:"model",label:"AI Model"},{key:"env",label:"Environment"},{key:"update",label:"Updates"},{key:"agents",label:"Agents"},{key:"auth",label:"Authentication"},{key:"channels",label:"Channels"},{key:"messages",label:"Messages"},{key:"commands",label:"Commands"},{key:"hooks",label:"Hooks"},{key:"skills",label:"Skills"},{key:"tools",label:"Tools"},{key:"gateway",label:"Gateway"},{key:"wizard",label:"Setup Wizard"},{key:"user",label:"User"}],Ul=new Set(["user","model"]),zl="__all__";function Kl(e){return Mi[e]??Mi.default}function nk(e,t){const n=Ko[e];return n||{label:t?.title??nt(e),description:t?.description??""}}function sk(e){const{key:t,schema:n,uiHints:s}=e;if(!n||qe(n)!=="object"||!n.properties)return[];const a=Object.entries(n.properties).map(([i,o])=>{const l=Te([t,i],s),d=l?.label??o.title??nt(i),u=l?.help??o.description??"",h=l?.order??50;return{key:i,label:d,description:u,order:h}});return a.sort((i,o)=>i.order!==o.order?i.order-o.order:i.key.localeCompare(o.key)),a}function ak(e,t){if(!e||!t)return[];const n=[];function s(a,i,o){if(a===i)return;if(typeof a!=typeof i){n.push({path:o,from:a,to:i});return}if(typeof a!="object"||a===null||i===null){a!==i&&n.push({path:o,from:a,to:i});return}if(Array.isArray(a)&&Array.isArray(i)){JSON.stringify(a)!==JSON.stringify(i)&&n.push({path:o,from:a,to:i});return}const l=a,d=i,u=new Set([...Object.keys(l),...Object.keys(d)]);for(const h of u)s(l[h],d[h],o?`${o}.${h}`:h)}return s(e,t,""),n}function Wl(e,t=40){let n;try{n=JSON.stringify(e)??String(e)}catch{n=String(e)}return n.length<=t?n:n.slice(0,t-3)+"..."}const ql={anthropic:"#d97706",openai:"#10b981","openai-codex":"#10b981",xai:"#6366f1"};function ik(e){const t=[],n=e.models,s=e.agents,a=n?.providers;if(a&&typeof a=="object")for(const[o,l]of Object.entries(a)){const d=l;for(const u of d.models??[])t.push({id:`${o}/${u.id}`,name:u.name??u.id,provider:o,providerLabel:o.charAt(0).toUpperCase()+o.slice(1),reasoning:u.reasoning??!1,contextWindow:u.contextWindow??0})}const i=s?.defaults?.models;if(i&&typeof i=="object")for(const o of Object.keys(i)){if(t.some(d=>d.id===o))continue;const l=o.split("/");t.push({id:o,name:l.slice(1).join("/"),provider:l[0]??"unknown",providerLabel:(l[0]??"unknown").replace(/-/g," ").replace(/\b\w/g,d=>d.toUpperCase()),reasoning:!1,contextWindow:0})}return t}function ok(e){return e.startsWith("anthropic/")?["openai-codex/gpt-5.3-codex"]:["anthropic/claude-sonnet-4-6"]}function rk(e){const t=e.formValue;if(!t)return r`<div class="config-loading"><span>Loading config...</span></div>`;const n=t.agents,s=n?.defaults?.model?.primary??"",a=n?.defaults?.model?.fallbacks??[],i=ik(t),o=new Map;for(const d of i){const u=o.get(d.provider)??[];u.push(d),o.set(d.provider,u)}const l=e.saving||e.applying;return r`
+  `},ti=[{key:"model",label:"AI Model"},{key:"env",label:"Environment"},{key:"update",label:"Updates"},{key:"agents",label:"Agents"},{key:"auth",label:"Authentication"},{key:"channels",label:"Channels"},{key:"messages",label:"Messages"},{key:"commands",label:"Commands"},{key:"hooks",label:"Hooks"},{key:"skills",label:"Skills"},{key:"tools",label:"Tools"},{key:"gateway",label:"Gateway"},{key:"wizard",label:"Setup Wizard"},{key:"user",label:"User"}],Ul=new Set(["user","model"]),zl="__all__";function Kl(e){return Mi[e]??Mi.default}function sk(e,t){const n=Ko[e];return n||{label:t?.title??nt(e),description:t?.description??""}}function ak(e){const{key:t,schema:n,uiHints:s}=e;if(!n||qe(n)!=="object"||!n.properties)return[];const a=Object.entries(n.properties).map(([i,o])=>{const l=Te([t,i],s),d=l?.label??o.title??nt(i),u=l?.help??o.description??"",h=l?.order??50;return{key:i,label:d,description:u,order:h}});return a.sort((i,o)=>i.order!==o.order?i.order-o.order:i.key.localeCompare(o.key)),a}function ik(e,t){if(!e||!t)return[];const n=[];function s(a,i,o){if(a===i)return;if(typeof a!=typeof i){n.push({path:o,from:a,to:i});return}if(typeof a!="object"||a===null||i===null){a!==i&&n.push({path:o,from:a,to:i});return}if(Array.isArray(a)&&Array.isArray(i)){JSON.stringify(a)!==JSON.stringify(i)&&n.push({path:o,from:a,to:i});return}const l=a,d=i,u=new Set([...Object.keys(l),...Object.keys(d)]);for(const h of u)s(l[h],d[h],o?`${o}.${h}`:h)}return s(e,t,""),n}function Wl(e,t=40){let n;try{n=JSON.stringify(e)??String(e)}catch{n=String(e)}return n.length<=t?n:n.slice(0,t-3)+"..."}const ql={anthropic:"#d97706",openai:"#10b981","openai-codex":"#10b981",xai:"#6366f1"};function ok(e){const t=[],n=e.models,s=e.agents,a=n?.providers;if(a&&typeof a=="object")for(const[o,l]of Object.entries(a)){const d=l;for(const u of d.models??[])t.push({id:`${o}/${u.id}`,name:u.name??u.id,provider:o,providerLabel:o.charAt(0).toUpperCase()+o.slice(1),reasoning:u.reasoning??!1,contextWindow:u.contextWindow??0})}const i=s?.defaults?.models;if(i&&typeof i=="object")for(const o of Object.keys(i)){if(t.some(d=>d.id===o))continue;const l=o.split("/");t.push({id:o,name:l.slice(1).join("/"),provider:l[0]??"unknown",providerLabel:(l[0]??"unknown").replace(/-/g," ").replace(/\b\w/g,d=>d.toUpperCase()),reasoning:!1,contextWindow:0})}return t}function rk(e){return e.startsWith("anthropic/")?["openai-codex/gpt-5.3-codex"]:["anthropic/claude-sonnet-4-6"]}function lk(e){const t=e.formValue;if(!t)return r`<div class="config-loading"><span>Loading config...</span></div>`;const n=t.agents,s=n?.defaults?.model?.primary??"",a=n?.defaults?.model?.fallbacks??[],i=ok(t),o=new Map;for(const d of i){const u=o.get(d.provider)??[];u.push(d),o.set(d.provider,u)}const l=e.saving||e.applying;return r`
     <div class="model-picker">
       <div class="model-picker__current">
         <div class="model-picker__current-label">Active Model</div>
@@ -3185,7 +3185,7 @@ ${e.snapshot?JSON.stringify(e.snapshot,null,2):"No snapshot yet."}
                     class="model-card ${f?"model-card--active":""}"
                     style="--model-accent: ${m}"
                     ?disabled=${l}
-                    @click=${()=>{f||!e.onModelSwitch||e.onModelSwitch(h.id,ok(h.id))}}
+                    @click=${()=>{f||!e.onModelSwitch||e.onModelSwitch(h.id,rk(h.id))}}
                   >
                     <div class="model-card__body">
                       <div class="model-card__name">${h.name||h.id}</div>
@@ -3199,7 +3199,7 @@ ${e.snapshot?JSON.stringify(e.snapshot,null,2):"No snapshot yet."}
           </div>
         `)}
     </div>
-  `}function lk(e){const t=e.valid==null?"unknown":e.valid?"valid":"invalid",n=Hu(e.schema),s=n.schema?n.unsupportedPaths.length>0:!1,a=n.schema?.properties??{},i=ti.filter(E=>E.key in a&&!Ul.has(E.key)),o=new Set(ti.map(E=>E.key)),l=Object.keys(a).filter(E=>!o.has(E)).map(E=>({key:E,label:E.charAt(0).toUpperCase()+E.slice(1)})),d=ti.filter(E=>Ul.has(E.key)),u=[...i,...l,...d],h=e.activeSection&&n.schema&&qe(n.schema)==="object"?n.schema.properties?.[e.activeSection]:void 0,f=e.activeSection?nk(e.activeSection,h):null,m=e.activeSection?sk({key:e.activeSection,schema:h,uiHints:e.uiHints}):[],w=e.formMode==="form"&&!!e.activeSection&&m.length>0,$=e.activeSubsection===zl,c=e.searchQuery||$?null:e.activeSubsection??m[0]?.key??null,g=e.formMode==="form"?ak(e.originalValue,e.formValue):[],k=e.formMode==="raw"&&e.raw!==e.originalRaw,A=e.formMode==="form"?g.length>0:k,T=!!e.formValue&&!e.loading&&!!n.schema,x=e.connected&&!e.saving&&A&&(e.formMode==="raw"?!0:T),_=e.connected&&!e.applying&&!e.updating&&A&&(e.formMode==="raw"?!0:T),P=e.connected&&!e.applying&&!e.updating;return r`
+  `}function ck(e){const t=e.valid==null?"unknown":e.valid?"valid":"invalid",n=Hu(e.schema),s=n.schema?n.unsupportedPaths.length>0:!1,a=n.schema?.properties??{},i=ti.filter(E=>E.key in a&&!Ul.has(E.key)),o=new Set(ti.map(E=>E.key)),l=Object.keys(a).filter(E=>!o.has(E)).map(E=>({key:E,label:E.charAt(0).toUpperCase()+E.slice(1)})),d=ti.filter(E=>Ul.has(E.key)),u=[...i,...l,...d],h=e.activeSection&&n.schema&&qe(n.schema)==="object"?n.schema.properties?.[e.activeSection]:void 0,f=e.activeSection?sk(e.activeSection,h):null,m=e.activeSection?ak({key:e.activeSection,schema:h,uiHints:e.uiHints}):[],w=e.formMode==="form"&&!!e.activeSection&&m.length>0,$=e.activeSubsection===zl,c=e.searchQuery||$?null:e.activeSubsection??m[0]?.key??null,g=e.formMode==="form"?ik(e.originalValue,e.formValue):[],k=e.formMode==="raw"&&e.raw!==e.originalRaw,A=e.formMode==="form"?g.length>0:k,T=!!e.formValue&&!e.loading&&!!n.schema,x=e.connected&&!e.saving&&A&&(e.formMode==="raw"?!0:T),_=e.connected&&!e.applying&&!e.updating&&A&&(e.formMode==="raw"?!0:T),P=e.connected&&!e.applying&&!e.updating;return r`
     <div class="config-layout">
       <!-- Sidebar -->
       <aside class="config-sidebar">
@@ -3364,7 +3364,7 @@ ${e.snapshot?JSON.stringify(e.snapshot,null,2):"No snapshot yet."}
 
         <!-- Form content -->
         <div class="config-content">
-          ${e.activeSection==="model"?rk(e):e.activeSection==="user"?tk({userName:e.userName,userAvatar:e.userAvatar,onUpdate:e.onUserProfileUpdate}):e.formMode==="form"?r`
+          ${e.activeSection==="model"?lk(e):e.activeSection==="user"?nk({userName:e.userName,userAvatar:e.userAvatar,onUpdate:e.onUserProfileUpdate}):e.formMode==="form"?r`
                   ${e.schemaLoading?r`
                           <div class="config-loading">
                             <div class="config-loading__spinner"></div>
@@ -3392,7 +3392,7 @@ ${e.snapshot?JSON.stringify(e.snapshot,null,2):"No snapshot yet."}
             </div>`:p}
       </main>
     </div>
-  `}function ck(e){const t=e.host??"unknown",n=e.ip?`(${e.ip})`:"",s=e.mode??"",a=e.version??"";return`${t} ${n} ${s} ${a}`.trim()}function dk(e){const t=e.ts??null;return t?K(t):"n/a"}function Zu(e){return e?`${Jn(e)} (${K(e)})`:"n/a"}function uk(e){if(e.totalTokens==null)return"n/a";const t=e.totalTokens??0,n=e.contextTokens??0;return n?`${t} / ${n}`:String(t)}function pk(e){if(e==null)return"";try{return JSON.stringify(e,null,2)}catch{return String(e)}}function hk(e){const t=e.state??{},n=t.nextRunAtMs?Jn(t.nextRunAtMs):"n/a",s=t.lastRunAtMs?Jn(t.lastRunAtMs):"n/a";return`${t.lastStatus??"n/a"} · next ${n} · last ${s}`}function fk(e){const t=e.schedule;return t.kind==="at"?`At ${Jn(t.atMs)}`:t.kind==="every"?`Every ${Hi(t.everyMs)}`:`Cron ${t.expr}${t.tz?` (${t.tz})`:""}`}function gk(e){const t=e.payload;return t.kind==="systemEvent"?`System: ${t.text}`:`Agent: ${t.message}`}function mk(e){const t=["last",...e.channels.filter(Boolean)],n=e.form.channel?.trim();n&&!t.includes(n)&&t.push(n);const s=new Set;return t.filter(a=>s.has(a)?!1:(s.add(a),!0))}function vk(e,t){if(t==="last")return"last";const n=e.channelMeta?.find(s=>s.id===t);return n?.label?n.label:e.channelLabels?.[t]??t}function yk(e){const t=mk(e);return r`
+  `}function dk(e){const t=e.host??"unknown",n=e.ip?`(${e.ip})`:"",s=e.mode??"",a=e.version??"";return`${t} ${n} ${s} ${a}`.trim()}function uk(e){const t=e.ts??null;return t?K(t):"n/a"}function Zu(e){return e?`${Jn(e)} (${K(e)})`:"n/a"}function pk(e){if(e.totalTokens==null)return"n/a";const t=e.totalTokens??0,n=e.contextTokens??0;return n?`${t} / ${n}`:String(t)}function hk(e){if(e==null)return"";try{return JSON.stringify(e,null,2)}catch{return String(e)}}function fk(e){const t=e.state??{},n=t.nextRunAtMs?Jn(t.nextRunAtMs):"n/a",s=t.lastRunAtMs?Jn(t.lastRunAtMs):"n/a";return`${t.lastStatus??"n/a"} · next ${n} · last ${s}`}function gk(e){const t=e.schedule;return t.kind==="at"?`At ${Jn(t.atMs)}`:t.kind==="every"?`Every ${Hi(t.everyMs)}`:`Cron ${t.expr}${t.tz?` (${t.tz})`:""}`}function mk(e){const t=e.payload;return t.kind==="systemEvent"?`System: ${t.text}`:`Agent: ${t.message}`}function vk(e){const t=["last",...e.channels.filter(Boolean)],n=e.form.channel?.trim();n&&!t.includes(n)&&t.push(n);const s=new Set;return t.filter(a=>s.has(a)?!1:(s.add(a),!0))}function yk(e,t){if(t==="last")return"last";const n=e.channelMeta?.find(s=>s.id===t);return n?.label?n.label:e.channelLabels?.[t]??t}function bk(e){const t=vk(e);return r`
     <section class="grid grid-cols-2">
       <div class="card">
         <div class="card-title">Scheduler</div>
@@ -3467,7 +3467,7 @@ ${e.snapshot?JSON.stringify(e.snapshot,null,2):"No snapshot yet."}
             </select>
           </label>
         </div>
-        ${bk(e)}
+        ${wk(e)}
         <div class="form-grid" style="margin-top: 12px;">
           <label class="field">
             <span>Session</span>
@@ -3525,7 +3525,7 @@ ${e.snapshot?JSON.stringify(e.snapshot,null,2):"No snapshot yet."}
 	                    @change=${n=>e.onFormChange({channel:n.target.value})}
 	                  >
 	                    ${t.map(n=>r`<option value=${n}>
-                            ${vk(e,n)}
+                            ${yk(e,n)}
                           </option>`)}
                   </select>
                 </label>
@@ -3570,7 +3570,7 @@ ${e.snapshot?JSON.stringify(e.snapshot,null,2):"No snapshot yet."}
               <div class="muted" style="margin-top: 12px">No jobs yet.</div>
             `:r`
             <div class="list" style="margin-top: 12px;">
-              ${e.jobs.map(n=>wk(n,e))}
+              ${e.jobs.map(n=>$k(n,e))}
             </div>
           `}
     </section>
@@ -3584,11 +3584,11 @@ ${e.snapshot?JSON.stringify(e.snapshot,null,2):"No snapshot yet."}
                 <div class="muted" style="margin-top: 12px">No runs yet.</div>
               `:r`
               <div class="list" style="margin-top: 12px;">
-                ${e.runs.map(n=>$k(n))}
+                ${e.runs.map(n=>kk(n))}
               </div>
             `}
     </section>
-  `}function bk(e){const t=e.form;return t.scheduleKind==="at"?r`
+  `}function wk(e){const t=e.form;return t.scheduleKind==="at"?r`
       <label class="field" style="margin-top: 12px;">
         <span>Run at</span>
         <input
@@ -3635,12 +3635,12 @@ ${e.snapshot?JSON.stringify(e.snapshot,null,2):"No snapshot yet."}
         />
       </label>
     </div>
-  `}function wk(e,t){const s=`list-item list-item-clickable${t.runsJobId===e.id?" list-item-selected":""}`;return r`
+  `}function $k(e,t){const s=`list-item list-item-clickable${t.runsJobId===e.id?" list-item-selected":""}`;return r`
     <div class=${s} @click=${()=>t.onLoadRuns(e.id)}>
       <div class="list-main">
         <div class="list-title">${e.name}</div>
-        <div class="list-sub">${fk(e)}</div>
-        <div class="muted">${gk(e)}</div>
+        <div class="list-sub">${gk(e)}</div>
+        <div class="muted">${mk(e)}</div>
         ${e.agentId?r`<div class="muted">Agent: ${e.agentId}</div>`:p}
         <div class="chip-row" style="margin-top: 6px;">
           <span class="chip">${e.enabled?"enabled":"disabled"}</span>
@@ -3649,7 +3649,7 @@ ${e.snapshot?JSON.stringify(e.snapshot,null,2):"No snapshot yet."}
         </div>
       </div>
       <div class="list-meta">
-        <div>${hk(e)}</div>
+        <div>${fk(e)}</div>
         <div class="row" style="justify-content: flex-end; margin-top: 8px;">
           <button
             class="btn"
@@ -3682,7 +3682,7 @@ ${e.snapshot?JSON.stringify(e.snapshot,null,2):"No snapshot yet."}
         </div>
       </div>
     </div>
-  `}function $k(e){return r`
+  `}function kk(e){return r`
     <div class="list-item">
       <div class="list-main">
         <div class="list-title">${e.status}</div>
@@ -3694,7 +3694,7 @@ ${e.snapshot?JSON.stringify(e.snapshot,null,2):"No snapshot yet."}
         ${e.error?r`<div class="muted">${e.error}</div>`:p}
       </div>
     </div>
-  `}function kk(e){const n=(e.status&&typeof e.status=="object"?e.status.securityAudit:null)?.summary??null,s=n?.critical??0,a=n?.warn??0,i=n?.info??0,o=s>0?"danger":a>0?"warn":"success",l=s>0?`${s} critical`:a>0?`${a} warnings`:"No critical issues";return r`
+  `}function Sk(e){const n=(e.status&&typeof e.status=="object"?e.status.securityAudit:null)?.summary??null,s=n?.critical??0,a=n?.warn??0,i=n?.info??0,o=s>0?"danger":a>0?"warn":"success",l=s>0?`${s} critical`:a>0?`${a} warnings`:"No critical issues";return r`
     <section class="grid grid-cols-2">
       <div class="card">
         <div class="row" style="justify-content: space-between;">
@@ -3777,14 +3777,14 @@ ${e.snapshot?JSON.stringify(e.snapshot,null,2):"No snapshot yet."}
                       <div class="list-sub">${new Date(d.ts).toLocaleTimeString()}</div>
                     </div>
                     <div class="list-meta">
-                      <pre class="code-block">${pk(d.payload)}</pre>
+                      <pre class="code-block">${hk(d.payload)}</pre>
                     </div>
                   </div>
                 `)}
             </div>
           `}
     </section>
-  `}function Sk(e){const t=Math.max(0,e),n=Math.floor(t/1e3);if(n<60)return`${n}s`;const s=Math.floor(n/60);return s<60?`${s}m`:`${Math.floor(s/60)}h`}function kt(e,t){return t?r`<div class="exec-approval-meta-row"><span>${e}</span><span>${t}</span></div>`:p}function Ak(e){const t=e.execApprovalQueue[0];if(!t)return p;const n=t.request,s=t.expiresAtMs-Date.now(),a=s>0?`expires in ${Sk(s)}`:"expired",i=e.execApprovalQueue.length;return r`
+  `}function Ak(e){const t=Math.max(0,e),n=Math.floor(t/1e3);if(n<60)return`${n}s`;const s=Math.floor(n/60);return s<60?`${s}m`:`${Math.floor(s/60)}h`}function kt(e,t){return t?r`<div class="exec-approval-meta-row"><span>${e}</span><span>${t}</span></div>`:p}function xk(e){const t=e.execApprovalQueue[0];if(!t)return p;const n=t.request,s=t.expiresAtMs-Date.now(),a=s>0?`expires in ${Ak(s)}`:"expired",i=e.execApprovalQueue.length;return r`
     <div class="exec-approval-overlay" role="dialog" aria-live="polite">
       <div class="exec-approval-card">
         <div class="exec-approval-header">
@@ -3830,7 +3830,7 @@ ${e.snapshot?JSON.stringify(e.snapshot,null,2):"No snapshot yet."}
         </div>
       </div>
     </div>
-  `}function xk(e){const{pendingGatewayUrl:t}=e;return t?r`
+  `}function Tk(e){const{pendingGatewayUrl:t}=e;return t?r`
     <div class="exec-approval-overlay" role="dialog" aria-modal="true" aria-live="polite">
       <div class="exec-approval-card">
         <div class="exec-approval-header">
@@ -3859,7 +3859,7 @@ ${e.snapshot?JSON.stringify(e.snapshot,null,2):"No snapshot yet."}
         </div>
       </div>
     </div>
-  `:p}function Tk(e){if(!e.gatewayRestartPending)return p;const t=e.sessionsResult?.sessions?.length??0,n=t===1?"1 active session":`${t} active sessions`;return r`
+  `:p}function _k(e){if(!e.gatewayRestartPending)return p;const t=e.sessionsResult?.sessions?.length??0,n=t===1?"1 active session":`${t} active sessions`;return r`
     <div class="exec-approval-overlay" role="dialog" aria-modal="true" aria-live="polite">
       <div class="exec-approval-card">
         <div class="exec-approval-header">
@@ -3889,7 +3889,7 @@ ${e.snapshot?JSON.stringify(e.snapshot,null,2):"No snapshot yet."}
         </div>
       </div>
     </div>
-  `}function _k(e){return r`
+  `}function Ck(e){return r`
     <section class="card">
       <div class="row" style="justify-content: space-between;">
         <div>
@@ -3909,14 +3909,14 @@ ${e.snapshot?JSON.stringify(e.snapshot,null,2):"No snapshot yet."}
       <div class="list" style="margin-top: 16px;">
         ${e.entries.length===0?r`
                 <div class="muted">No instances reported yet.</div>
-              `:e.entries.map(t=>Ck(t))}
+              `:e.entries.map(t=>Rk(t))}
       </div>
     </section>
-  `}function Ck(e){const t=e.lastInputSeconds!=null?`${e.lastInputSeconds}s ago`:"n/a",n=e.mode??"unknown",s=Array.isArray(e.roles)?e.roles.filter(Boolean):[],a=Array.isArray(e.scopes)?e.scopes.filter(Boolean):[],i=a.length>0?a.length>3?`${a.length} scopes`:`scopes: ${a.join(", ")}`:null;return r`
+  `}function Rk(e){const t=e.lastInputSeconds!=null?`${e.lastInputSeconds}s ago`:"n/a",n=e.mode??"unknown",s=Array.isArray(e.roles)?e.roles.filter(Boolean):[],a=Array.isArray(e.scopes)?e.scopes.filter(Boolean):[],i=a.length>0?a.length>3?`${a.length} scopes`:`scopes: ${a.join(", ")}`:null;return r`
     <div class="list-item">
       <div class="list-main">
         <div class="list-title">${e.host??"unknown host"}</div>
-        <div class="list-sub">${ck(e)}</div>
+        <div class="list-sub">${dk(e)}</div>
         <div class="chip-row">
           <span class="chip">${n}</span>
           ${s.map(o=>r`<span class="chip">${o}</span>`)}
@@ -3928,12 +3928,12 @@ ${e.snapshot?JSON.stringify(e.snapshot,null,2):"No snapshot yet."}
         </div>
       </div>
       <div class="list-meta">
-        <div>${dk(e)}</div>
+        <div>${uk(e)}</div>
         <div class="muted">Last input ${t}</div>
         <div class="muted">Reason ${e.reason??""}</div>
       </div>
     </div>
-  `}const jl=["trace","debug","info","warn","error","fatal"];function Rk(e){if(!e)return"";const t=new Date(e);return Number.isNaN(t.getTime())?e:t.toLocaleTimeString()}function Ek(e,t){return t?[e.message,e.subsystem,e.raw].filter(Boolean).join(" ").toLowerCase().includes(t):!0}function Pk(e){const t=e.filterText.trim().toLowerCase(),n=jl.some(i=>!e.levelFilters[i]),s=e.entries.filter(i=>i.level&&!e.levelFilters[i.level]?!1:Ek(i,t)),a=t||n?"filtered":"visible";return r`
+  `}const jl=["trace","debug","info","warn","error","fatal"];function Ek(e){if(!e)return"";const t=new Date(e);return Number.isNaN(t.getTime())?e:t.toLocaleTimeString()}function Pk(e,t){return t?[e.message,e.subsystem,e.raw].filter(Boolean).join(" ").toLowerCase().includes(t):!0}function Lk(e){const t=e.filterText.trim().toLowerCase(),n=jl.some(i=>!e.levelFilters[i]),s=e.entries.filter(i=>i.level&&!e.levelFilters[i.level]?!1:Pk(i,t)),a=t||n?"filtered":"visible";return r`
     <section class="card">
       <div class="row" style="justify-content: space-between;">
         <div>
@@ -3997,7 +3997,7 @@ ${e.snapshot?JSON.stringify(e.snapshot,null,2):"No snapshot yet."}
                 <div class="muted" style="padding: 12px">No log entries.</div>
               `:s.map(i=>r`
                 <div class="log-row">
-                  <div class="log-time mono">${Rk(i.time)}</div>
+                  <div class="log-time mono">${Ek(i.time)}</div>
                   <div class="log-level ${i.level??""}">${i.level??""}</div>
                   <div class="log-subsystem mono">${i.subsystem??""}</div>
                   <div class="log-message mono">${i.message??i.raw}</div>
@@ -4005,8 +4005,8 @@ ${e.snapshot?JSON.stringify(e.snapshot,null,2):"No snapshot yet."}
               `)}
       </div>
     </section>
-  `}const Lk=/(^~\/|^\/|^\.\.?\/|[\\/])/;function Vl(e){const t=e.trim();if(!t)return null;const n=t.replace(/^["']|["']$/g,"").trim();return!n||/^[a-z][a-z0-9+.-]*:\/\//i.test(n)||/[*?<>|]/.test(n)||n.includes("\0")||n.includes(`
-`)||n.includes("\r")||!Lk.test(n)&&!/\.[a-z0-9]{1,12}$/i.test(n)?null:n}function Ik(e){const t=e instanceof Element?e:e instanceof Node?e.parentElement:null;if(!t)return null;const n=t.closest("a");if(n){const a=n.getAttribute("href")??"";let i=a;if(a.includes("%"))try{i=decodeURIComponent(a)}catch{i=a}return Vl(i)}const s=t.closest("code");return!s||s.closest("pre")?null:Vl(s.textContent??"")}function Dk(e){const n=new DOMParser().parseFromString(`<div>${e}</div>`,"text/html").body.firstElementChild;if(!n)return"";const a=Ke(n,{listDepth:0,orderedIndex:[]});return Ok(a)}function Oi(e,t){if(e.nodeType===Node.TEXT_NODE)return e.textContent??"";if(e.nodeType!==Node.ELEMENT_NODE)return"";const n=e;switch(n.tagName.toLowerCase()){case"h1":return`# ${Je(n,t)}
+  `}const Ik=/(^~\/|^\/|^\.\.?\/|[\\/])/;function Vl(e){const t=e.trim();if(!t)return null;const n=t.replace(/^["']|["']$/g,"").trim();return!n||/^[a-z][a-z0-9+.-]*:\/\//i.test(n)||/[*?<>|]/.test(n)||n.includes("\0")||n.includes(`
+`)||n.includes("\r")||!Ik.test(n)&&!/\.[a-z0-9]{1,12}$/i.test(n)?null:n}function Dk(e){const t=e instanceof Element?e:e instanceof Node?e.parentElement:null;if(!t)return null;const n=t.closest("a");if(n){const a=n.getAttribute("href")??"";let i=a;if(a.includes("%"))try{i=decodeURIComponent(a)}catch{i=a}return Vl(i)}const s=t.closest("code");return!s||s.closest("pre")?null:Vl(s.textContent??"")}function Mk(e){const n=new DOMParser().parseFromString(`<div>${e}</div>`,"text/html").body.firstElementChild;if(!n)return"";const a=Ke(n,{listDepth:0,orderedIndex:[]});return Fk(a)}function Oi(e,t){if(e.nodeType===Node.TEXT_NODE)return e.textContent??"";if(e.nodeType!==Node.ELEMENT_NODE)return"";const n=e;switch(n.tagName.toLowerCase()){case"h1":return`# ${Je(n,t)}
 
 `;case"h2":return`## ${Je(n,t)}
 
@@ -4031,21 +4031,21 @@ ${i}
 `).map(o=>`> ${o}`).join(`
 `)+`
 
-`;case"ul":return Hl(n,t,!1);case"ol":return Hl(n,t,!0);case"li":return ep(n,t);case"input":return n.getAttribute("type")==="checkbox"?n.checked?"[x]":"[ ]":"";case"table":return Mk(n,t);case"div":case"span":case"section":case"article":case"main":case"header":case"footer":case"nav":case"aside":case"figure":case"figcaption":case"details":case"summary":return Ke(n,t);default:return Ke(n,t)}}function Ke(e,t){let n="";for(const s of Array.from(e.childNodes))n+=Oi(s,t);return n}function Je(e,t){return Ke(e,t).replace(/\n+/g," ").trim()}function Hl(e,t,n){const s=Array.from(e.children).filter(o=>o.tagName.toLowerCase()==="li"),a="  ".repeat(t.listDepth);let i="";for(let o=0;o<s.length;o++){const l=s[o],d={listDepth:t.listDepth+1,orderedIndex:[...t.orderedIndex,o+1]},u=n?`${o+1}. `:"- ",h=ep(l,d);i+=`${a}${u}${h}
+`;case"ul":return Hl(n,t,!1);case"ol":return Hl(n,t,!0);case"li":return ep(n,t);case"input":return n.getAttribute("type")==="checkbox"?n.checked?"[x]":"[ ]":"";case"table":return Ok(n,t);case"div":case"span":case"section":case"article":case"main":case"header":case"footer":case"nav":case"aside":case"figure":case"figcaption":case"details":case"summary":return Ke(n,t);default:return Ke(n,t)}}function Ke(e,t){let n="";for(const s of Array.from(e.childNodes))n+=Oi(s,t);return n}function Je(e,t){return Ke(e,t).replace(/\n+/g," ").trim()}function Hl(e,t,n){const s=Array.from(e.children).filter(o=>o.tagName.toLowerCase()==="li"),a="  ".repeat(t.listDepth);let i="";for(let o=0;o<s.length;o++){const l=s[o],d={listDepth:t.listDepth+1,orderedIndex:[...t.orderedIndex,o+1]},u=n?`${o+1}. `:"- ",h=ep(l,d);i+=`${a}${u}${h}
 `}return t.listDepth===0&&(i+=`
 `),i}function ep(e,t){let n="";for(const s of Array.from(e.childNodes)){const a=s.tagName?.toLowerCase();a==="ul"||a==="ol"?n+=`
-`+Oi(s,t):n+=Oi(s,t)}return n.trim()}function Mk(e,t){const n=[],s=e.querySelector("thead tr"),a=e.querySelectorAll("tbody tr");if(s){const u=Array.from(s.querySelectorAll("th, td")).map(h=>Je(h,t));n.push(u)}for(const u of Array.from(a)){const h=Array.from(u.querySelectorAll("td, th")).map(f=>Je(f,t));n.push(h)}if(n.length===0){const u=e.querySelectorAll("tr");for(const h of Array.from(u)){const f=Array.from(h.querySelectorAll("td, th")).map(m=>Je(m,t));n.push(f)}}if(n.length===0)return"";const i=Math.max(...n.map(u=>u.length)),o=[];for(let u=0;u<i;u++)o[u]=Math.max(3,...n.map(h=>(h[u]??"").length));let l="";const d=u=>`| ${o.map((f,m)=>(u[m]??"").padEnd(f)).join(" | ")} |`;l+=d(n[0])+`
+`+Oi(s,t):n+=Oi(s,t)}return n.trim()}function Ok(e,t){const n=[],s=e.querySelector("thead tr"),a=e.querySelectorAll("tbody tr");if(s){const u=Array.from(s.querySelectorAll("th, td")).map(h=>Je(h,t));n.push(u)}for(const u of Array.from(a)){const h=Array.from(u.querySelectorAll("td, th")).map(f=>Je(f,t));n.push(h)}if(n.length===0){const u=e.querySelectorAll("tr");for(const h of Array.from(u)){const f=Array.from(h.querySelectorAll("td, th")).map(m=>Je(m,t));n.push(f)}}if(n.length===0)return"";const i=Math.max(...n.map(u=>u.length)),o=[];for(let u=0;u<i;u++)o[u]=Math.max(3,...n.map(h=>(h[u]??"").length));let l="";const d=u=>`| ${o.map((f,m)=>(u[m]??"").padEnd(f)).join(" | ")} |`;l+=d(n[0])+`
 `,l+=`| ${o.map(u=>"-".repeat(u)).join(" | ")} |
 `;for(let u=1;u<n.length;u++)l+=d(n[u])+`
 `;return l+`
-`}function Ok(e){let t=e;return t=t.replace(/\u00a0/g," "),t=t.replace(/\n{3,}/g,`
+`}function Fk(e){let t=e;return t=t.replace(/\u00a0/g," "),t=t.replace(/\n{3,}/g,`
 
 `),t=t.trim(),t&&!t.endsWith(`
 `)&&(t+=`
-`),t}function Fk(e){return e.includes(`
+`),t}function Nk(e){return e.includes(`
 `)&&e.indexOf(`
 `)<e.length-1?e:e.replace(/\\n/g,`
-`)}function Nk(e){const t=new Date(e),s=new Date().getTime()-t.getTime(),a=Math.floor(s/(1e3*60));if(a<1)return"Just now";if(a<60)return`${a}m ago`;const i=Math.floor(a/60);return i<24?`${i}h ago`:t.toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"})}function Bk(e){const t="VAULT",n=encodeURIComponent(`01-Daily/${e}`);return`obsidian://open?vault=${t}&file=${n}`}let jn=null,hn=null;function Gl(e,t,n=1500){jn&&clearTimeout(jn),jn=setTimeout(()=>{e!==hn&&(hn=e,t(e))},n)}function Uk(e,t){jn&&clearTimeout(jn),e!==hn&&(hn=e,t(e))}function ni(e){for(const t of e.querySelectorAll('input[type="checkbox"]')){const n=t;n.checked?n.setAttribute("checked",""):n.removeAttribute("checked")}return Dk(e.innerHTML)}function zk(e){const{data:t,loading:n,error:s,onRefresh:a,onGenerate:i,onOpenInObsidian:o,onSaveBrief:l,onToggleCheckbox:d,onOpenFile:u}=e;if(n)return r`
+`)}function Bk(e){const t=new Date(e),s=new Date().getTime()-t.getTime(),a=Math.floor(s/(1e3*60));if(a<1)return"Just now";if(a<60)return`${a}m ago`;const i=Math.floor(a/60);return i<24?`${i}h ago`:t.toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"})}function Uk(e){const t="VAULT",n=encodeURIComponent(`01-Daily/${e}`);return`obsidian://open?vault=${t}&file=${n}`}let jn=null,hn=null;function Gl(e,t,n=1500){jn&&clearTimeout(jn),jn=setTimeout(()=>{e!==hn&&(hn=e,t(e))},n)}function zk(e,t){jn&&clearTimeout(jn),e!==hn&&(hn=e,t(e))}function ni(e){for(const t of e.querySelectorAll('input[type="checkbox"]')){const n=t;n.checked?n.setAttribute("checked",""):n.removeAttribute("checked")}return Mk(e.innerHTML)}function Kk(e){const{data:t,loading:n,error:s,onRefresh:a,onGenerate:i,onOpenInObsidian:o,onSaveBrief:l,onToggleCheckbox:d,onOpenFile:u}=e;if(n)return r`
       <div class="my-day-card brief-section">
         <div class="my-day-card-header">
           <div class="my-day-card-title">
@@ -4094,7 +4094,7 @@ ${i}
           </div>
         </div>
       </div>
-    `;hn===null&&(hn=t.content);const h=g=>{const k=g.currentTarget;if(l){const A=ni(k);Gl(A,l)}},f=g=>{if((g.ctrlKey||g.metaKey)&&g.key==="s"){g.preventDefault();const k=g.currentTarget;if(l){const A=ni(k);Uk(A,l)}}if((g.ctrlKey||g.metaKey)&&g.key==="l"){g.preventDefault();const k=window.getSelection();if(!k||k.rangeCount===0)return;const A=k.focusNode,T=A instanceof HTMLElement?A.closest("li"):A?.parentElement?.closest("li");if(T){const x=T.querySelector('input[type="checkbox"]');if(x)x.nextSibling?.nodeType===Node.TEXT_NODE&&x.nextSibling.textContent===" "&&x.nextSibling.remove(),x.remove();else{const P=document.createElement("input");P.type="checkbox",T.insertBefore(document.createTextNode(" "),T.firstChild),T.insertBefore(P,T.firstChild)}const _=g.currentTarget;if(l){const P=ni(_);Gl(P,l)}}}if(g.key==="Enter"&&!g.shiftKey){const k=window.getSelection();if(!k||k.rangeCount===0)return;const A=k.focusNode,T=A instanceof HTMLElement?A.closest("li"):A?.parentElement?.closest("li");T&&T.querySelector('input[type="checkbox"]')&&setTimeout(()=>{const x=window.getSelection();if(!x||x.rangeCount===0)return;const _=x.focusNode,P=_ instanceof HTMLElement?_.closest("li"):_?.parentElement?.closest("li");if(P&&P!==T&&!P.querySelector('input[type="checkbox"]')){const E=document.createElement("input");E.type="checkbox",P.insertBefore(E,P.firstChild),P.insertBefore(document.createTextNode(" "),E.nextSibling);const Z=document.createRange();Z.setStartAfter(E.nextSibling),Z.collapse(!0),x.removeAllRanges(),x.addRange(Z)}},0)}},m=g=>{const k=g.target;if(k.tagName==="INPUT"&&k.getAttribute("type")==="checkbox"){const x=k,_=g.currentTarget;if(d&&_){const E=Array.from(_.querySelectorAll('input[type="checkbox"]')).indexOf(x);E>=0&&d(E,x.checked)}return}const A=Ik(g.target);if(A&&u){g.preventDefault(),u(A);return}const T=k.closest?.("a")??k.parentElement?.closest("a");if(T){const x=T.getAttribute("href")??"";/^https?:\/\//i.test(x)&&(g.preventDefault(),window.open(x,"_blank","noopener,noreferrer"))}},w=kg(Fk(t.content)),$=t.summary.readiness!=null?r`<span class="brief-readiness" title="Readiness Score${t.summary.readinessMode?` — ${t.summary.readinessMode}`:""}">
+    `;hn===null&&(hn=t.content);const h=g=>{const k=g.currentTarget;if(l){const A=ni(k);Gl(A,l)}},f=g=>{if((g.ctrlKey||g.metaKey)&&g.key==="s"){g.preventDefault();const k=g.currentTarget;if(l){const A=ni(k);zk(A,l)}}if((g.ctrlKey||g.metaKey)&&g.key==="l"){g.preventDefault();const k=window.getSelection();if(!k||k.rangeCount===0)return;const A=k.focusNode,T=A instanceof HTMLElement?A.closest("li"):A?.parentElement?.closest("li");if(T){const x=T.querySelector('input[type="checkbox"]');if(x)x.nextSibling?.nodeType===Node.TEXT_NODE&&x.nextSibling.textContent===" "&&x.nextSibling.remove(),x.remove();else{const P=document.createElement("input");P.type="checkbox",T.insertBefore(document.createTextNode(" "),T.firstChild),T.insertBefore(P,T.firstChild)}const _=g.currentTarget;if(l){const P=ni(_);Gl(P,l)}}}if(g.key==="Enter"&&!g.shiftKey){const k=window.getSelection();if(!k||k.rangeCount===0)return;const A=k.focusNode,T=A instanceof HTMLElement?A.closest("li"):A?.parentElement?.closest("li");T&&T.querySelector('input[type="checkbox"]')&&setTimeout(()=>{const x=window.getSelection();if(!x||x.rangeCount===0)return;const _=x.focusNode,P=_ instanceof HTMLElement?_.closest("li"):_?.parentElement?.closest("li");if(P&&P!==T&&!P.querySelector('input[type="checkbox"]')){const E=document.createElement("input");E.type="checkbox",P.insertBefore(E,P.firstChild),P.insertBefore(document.createTextNode(" "),E.nextSibling);const Z=document.createRange();Z.setStartAfter(E.nextSibling),Z.collapse(!0),x.removeAllRanges(),x.addRange(Z)}},0)}},m=g=>{const k=g.target;if(k.tagName==="INPUT"&&k.getAttribute("type")==="checkbox"){const x=k,_=g.currentTarget;if(d&&_){const E=Array.from(_.querySelectorAll('input[type="checkbox"]')).indexOf(x);E>=0&&d(E,x.checked)}return}const A=Dk(g.target);if(A&&u){g.preventDefault(),u(A);return}const T=k.closest?.("a")??k.parentElement?.closest("a");if(T){const x=T.getAttribute("href")??"";/^https?:\/\//i.test(x)&&(g.preventDefault(),window.open(x,"_blank","noopener,noreferrer"))}},w=kg(Nk(t.content)),$=t.summary.readiness!=null?r`<span class="brief-readiness" title="Readiness Score${t.summary.readinessMode?` — ${t.summary.readinessMode}`:""}">
         <span class="readiness-score">${t.summary.readiness}</span>
         <span class="readiness-label">Readiness</span>
       </span>`:p,c=t.summary.tasks.total>0?r`<span class="brief-task-progress" title="${t.summary.tasks.completed}/${t.summary.tasks.total} tasks done">
@@ -4109,10 +4109,10 @@ ${i}
           ${c}
         </div>
         <div class="brief-header-actions">
-          <span class="brief-updated">${Nk(t.updatedAt)}</span>
+          <span class="brief-updated">${Bk(t.updatedAt)}</span>
           ${o?r`
                 <a
-                  href="${Bk(t.date)}"
+                  href="${Uk(t.date)}"
                   class="brief-obsidian-link"
                   title="Open in Obsidian"
                   @click=${g=>{g.preventDefault(),o()}}
@@ -4141,8 +4141,12 @@ ${i}
         </div>
       </div>
     </div>
-  `}function tp(e){const t=Date.now()-new Date(e).getTime(),n=Math.floor(t/6e4);if(n<1)return"just now";if(n<60)return`${n}m ago`;const s=Math.floor(n/60);return s<24?`${s}h ago`:`${Math.floor(s/24)}d ago`}function Kk(e){return e.source.persona?e.source.persona.replace(/-/g," ").replace(/\b\w/g,t=>t.toUpperCase()):e.source.skill?e.source.skill:e.type==="agent-execution"?"Agent":"Skill"}function np(e,t){if(e.scoringId!==t.id)return p;const n=e.scoringValue??7,s=e.feedbackText??"",a=n<=4,i=n>=9;return r`
+  `}function tp(e){const t=Date.now()-new Date(e).getTime(),n=Math.floor(t/6e4);if(n<1)return"just now";if(n<60)return`${n}m ago`;const s=Math.floor(n/60);return s<24?`${s}h ago`:`${Math.floor(s/24)}d ago`}function Wk(e){return e.source.persona?e.source.persona.replace(/-/g," ").replace(/\b\w/g,t=>t.toUpperCase()):e.source.skill?e.source.skill:e.type==="agent-execution"?"Agent":"Skill"}function qk(e){return e<=2?"Poor":e<=4?"Below expectations":e<=6?"Okay":e<=8?"Good":"Excellent"}function np(e,t){if(e.scoringId!==t.id)return p;const n=e.scoringValue??7,s=e.feedbackText??"",a=n<=4,i=n<=4||n>=9;return r`
     <div class="inbox-scoring">
+      <div class="inbox-score-label">
+        Rate this output
+        <span class="inbox-score-value ${n<=4?"low":n>=9?"high":""}">${n}/10 — ${qk(n)}</span>
+      </div>
       <div class="inbox-score-row">
         ${[1,2,3,4,5,6,7,8,9,10].map(o=>r`
             <button
@@ -4151,11 +4155,12 @@ ${i}
             >${o}</button>
           `)}
       </div>
-      ${a||i?r`
+      ${i?r`
             <div class="inbox-feedback">
               <textarea
                 class="inbox-feedback-input"
-                placeholder=${a?"What went wrong? (required)":"What was great? (optional)"}
+                rows="3"
+                placeholder=${a?"What went wrong? This feedback improves the agent. (required)":"What made this great? (optional)"}
                 .value=${s}
                 @input=${o=>e.onFeedbackChange(o.target.value)}
               ></textarea>
@@ -4163,60 +4168,65 @@ ${i}
           `:p}
       <div class="inbox-score-actions">
         <button
-          class="btn inbox-score-submit"
+          class="btn btn--sm inbox-score-submit"
           ?disabled=${a&&!s.trim()}
           @click=${()=>e.onScore(t.id,n,s.trim()||void 0)}
-        >Complete (${n}/10)</button>
+        >Submit ${n}/10</button>
         <button
-          class="btn inbox-score-cancel"
+          class="btn btn--sm inbox-score-cancel"
           @click=${()=>e.onSetScoring(null)}
         >Cancel</button>
       </div>
     </div>
-  `}function Wk(e,t){const n=t.deliverables??[];return r`
-    <div class="inbox-card inbox-card-project">
+  `}function jk(e,t){const n=t.deliverables??[];return r`
+    <div class="inbox-card inbox-card--project">
       <div class="inbox-card-header">
-        <span class="inbox-card-source" style="font-weight: 600;">Project Complete</span>
+        <span class="inbox-card-source">Project Complete</span>
         <span class="inbox-card-time">${tp(t.createdAt)}</span>
       </div>
-      <div class="inbox-card-title">${t.title}</div>
-      <div class="inbox-card-summary">${t.summary}</div>
-      ${n.length>0?r`
-            <div class="inbox-deliverables" style="margin: 8px 0; padding: 8px 0; border-top: 1px solid var(--border-subtle, #333);">
-              ${n.map(s=>r`
-                  <div class="inbox-deliverable-row" style="display: flex; align-items: center; gap: 8px; padding: 4px 0; font-size: 13px;">
-                    <span style="opacity: 0.6;">${s.persona.replace(/-/g," ")}</span>
-                    <span style="flex: 1;">${s.title}</span>
-                    ${s.proofDocSlug?r`<button class="btn btn-sm" style="padding: 2px 8px; font-size: 11px;" @click=${()=>e.onViewOutput(t.id)}>View</button>`:p}
-                  </div>
-                `)}
-            </div>
-          `:p}
+      <div class="inbox-card-body">
+        <div class="inbox-card-title">${t.title}</div>
+        <div class="inbox-card-summary">${t.summary}</div>
+        ${n.length>0?r`
+              <div class="inbox-deliverables">
+                ${n.map(s=>r`
+                    <div class="inbox-deliverable-row">
+                      <span class="inbox-deliverable-persona">${s.persona.replace(/-/g," ")}</span>
+                      <span class="inbox-deliverable-title">${s.title}</span>
+                      ${s.proofDocSlug?r`<button class="btn btn--sm" @click=${()=>e.onViewOutput(t.id)}>View</button>`:p}
+                    </div>
+                  `)}
+              </div>
+            `:p}
+      </div>
       <div class="inbox-card-actions">
-        <button class="btn btn-sm btn-primary" @click=${()=>e.onOpenChat(t.id)}>Review with Prosper</button>
-        ${t.proofDocSlug?r`<button class="btn btn-sm" @click=${()=>e.onViewOutput(t.id)}>View Deliverables</button>`:p}
-        <button class="btn btn-sm" @click=${()=>e.onSetScoring(t.id,7)}>Score</button>
-        <button class="btn btn-sm btn-ghost" @click=${()=>e.onDismiss(t.id)}>Dismiss</button>
+        <button class="btn btn--sm primary" @click=${()=>e.onOpenChat(t.id)}>Review with Prosper</button>
+        ${t.proofDocSlug?r`<button class="btn btn--sm" @click=${()=>e.onViewOutput(t.id)}>View Deliverables</button>`:p}
+        <button class="btn btn--sm" @click=${()=>e.onSetScoring(t.id,7)}>Score</button>
+        <button class="btn btn--sm" @click=${()=>e.onDismiss(t.id)}>Dismiss</button>
       </div>
       ${np(e,t)}
     </div>
-  `}function qk(e,t){if(t.type==="project-completion")return Wk(e,t);const n=!!(t.proofDocSlug||t.outputPath),s=!!(t.sessionId||t.source.taskId||t.source.queueItemId);return r`
+  `}function Vk(e,t){if(t.type==="project-completion")return jk(e,t);const n=!!(t.sessionId||t.source.taskId||t.source.queueItemId);return r`
     <div class="inbox-card">
       <div class="inbox-card-header">
-        <span class="inbox-card-source">${Kk(t)}</span>
+        <span class="inbox-card-source">${Wk(t)}</span>
         <span class="inbox-card-time">${tp(t.createdAt)}</span>
       </div>
-      <div class="inbox-card-title">${t.title}</div>
-      <div class="inbox-card-summary">${t.summary.slice(0,220)}${t.summary.length>220?"...":""}</div>
+      <div class="inbox-card-body">
+        <div class="inbox-card-title">${t.title}</div>
+        <div class="inbox-card-summary">${t.summary.slice(0,220)}${t.summary.length>220?"…":""}</div>
+      </div>
       <div class="inbox-card-actions">
-        ${n?r`<button class="btn btn-sm" @click=${()=>e.onViewOutput(t.id)}>View Output</button>`:p}
-        ${s?r`<button class="btn btn-sm" @click=${()=>e.onOpenChat(t.id)}>Open Chat</button>`:p}
-        <button class="btn btn-sm btn-primary" @click=${()=>e.onSetScoring(t.id,7)}>Complete</button>
-        <button class="btn btn-sm btn-ghost" @click=${()=>e.onDismiss(t.id)}>Dismiss</button>
+        ${t.outputPath?r`<button class="btn btn--sm" @click=${()=>e.onViewOutput(t.id)}>View Output</button>`:p}
+        ${t.proofDocSlug?r`<button class="btn btn--sm" @click=${()=>e.onViewProof(t.id)}>Proof</button>`:p}
+        ${n?r`<button class="btn btn--sm" @click=${()=>e.onOpenChat(t.id)}>Open Chat</button>`:p}
+        <button class="btn btn--sm primary" @click=${()=>e.onSetScoring(t.id,7)}>Complete</button>
+        <button class="btn btn--sm" @click=${()=>e.onDismiss(t.id)}>Dismiss</button>
       </div>
       ${np(e,t)}
     </div>
-  `}function jk(e){const t=e.items.filter(s=>s.status==="pending"),n=e.count??t.length;return e.loading?r`<div class="inbox-loading">Loading inbox...</div>`:n===0?r`
+  `}function Hk(e){const t=e.sortOrder??"newest",n=e.items.filter(a=>a.status==="pending").sort((a,i)=>{const o=new Date(i.createdAt).getTime()-new Date(a.createdAt).getTime();return t==="oldest"?-o:o}),s=e.count??n.length;return e.loading?r`<div class="inbox-loading">Loading inbox…</div>`:s===0?r`
       <div class="my-day-card">
         <div class="my-day-card-header">
           <div class="my-day-card-title">
@@ -4234,13 +4244,16 @@ ${i}
         <div class="my-day-card-title">
           <span class="my-day-card-icon">&#x1F4E5;</span>
           <span>INBOX</span>
-          <span class="tab-badge" style="margin-left: 8px;">${n}</span>
+          <span class="tab-badge" style="margin-left: 8px;">${s}</span>
         </div>
-        <button class="btn btn-sm" @click=${()=>e.onMarkAll()}>Mark All Complete</button>
+        <div class="inbox-header-actions">
+          <button class="btn btn--sm" @click=${()=>e.onSortToggle?.()}>${t==="newest"?"Newest first":"Oldest first"}</button>
+          <button class="btn btn--sm" @click=${()=>e.onMarkAll()}>Mark All Complete</button>
+        </div>
       </div>
       <div class="my-day-card-content">
         <div class="inbox-list">
-          ${t.map(s=>qk(e,s))}
+          ${n.map(a=>Vk(e,a))}
         </div>
       </div>
     </div>
@@ -4369,7 +4382,7 @@ ${i}
                   title="Start working on this task"
                 >Start</button>`:p}
     </div>
-  `}function Vk(e,t){return e.trim()?t.toLowerCase().includes(e.trim().toLowerCase()):!0}function Jl(e,t){if(!e.trim())return t;const n=e.trim().toLowerCase();return t.filter(s=>s.name.toLowerCase().includes(n)||s.path.toLowerCase().includes(n)||s.type.toLowerCase().includes(n)||(s.searchText??"").toLowerCase().includes(n))}function Xl(e,t){if(!e.trim())return t;const n=e.trim().toLowerCase();return t.filter(s=>s.title.toLowerCase().includes(n)||s.key.toLowerCase().includes(n))}function lp(e,t){if(!e.trim())return t;const n=e.trim().toLowerCase();return t.reduce((s,a)=>{if(a.type==="file")(a.name.toLowerCase().includes(n)||a.path.toLowerCase().includes(n))&&s.push(a);else{const i=lp(e,a.children??[]);i.length>0&&s.push({...a,children:i})}return s},[])}function cp(e){let t=0;for(const n of e)n.type==="file"?t++:n.children&&(t+=cp(n.children));return t}const Hk=10;function Gk(e){if(!e.searchText)return null;const t=e.searchText.trim();if(!t)return null;const n=t.match(/#+ (.+?)(?:\s#|$)/);return n?n[1].trim().slice(0,120):(t.startsWith("---")?t.replace(/^---.*?---\s*/s,""):t).slice(0,120)||null}function Qk(e,t=Hk){return[...e].sort((n,s)=>s.modified.getTime()-n.modified.getTime()).slice(0,t)}function dp(e,t,n){if(e.type==="file"){const o=n.pinnedPaths.has(e.path);return r`
+  `}function Gk(e,t){return e.trim()?t.toLowerCase().includes(e.trim().toLowerCase()):!0}function Jl(e,t){if(!e.trim())return t;const n=e.trim().toLowerCase();return t.filter(s=>s.name.toLowerCase().includes(n)||s.path.toLowerCase().includes(n)||s.type.toLowerCase().includes(n)||(s.searchText??"").toLowerCase().includes(n))}function Xl(e,t){if(!e.trim())return t;const n=e.trim().toLowerCase();return t.filter(s=>s.title.toLowerCase().includes(n)||s.key.toLowerCase().includes(n))}function lp(e,t){if(!e.trim())return t;const n=e.trim().toLowerCase();return t.reduce((s,a)=>{if(a.type==="file")(a.name.toLowerCase().includes(n)||a.path.toLowerCase().includes(n))&&s.push(a);else{const i=lp(e,a.children??[]);i.length>0&&s.push({...a,children:i})}return s},[])}function cp(e){let t=0;for(const n of e)n.type==="file"?t++:n.children&&(t+=cp(n.children));return t}const Qk=10;function Yk(e){if(!e.searchText)return null;const t=e.searchText.trim();if(!t)return null;const n=t.match(/#+ (.+?)(?:\s#|$)/);return n?n[1].trim().slice(0,120):(t.startsWith("---")?t.replace(/^---.*?---\s*/s,""):t).slice(0,120)||null}function Jk(e,t=Qk){return[...e].sort((n,s)=>s.modified.getTime()-n.modified.getTime()).slice(0,t)}function dp(e,t,n){if(e.type==="file"){const o=n.pinnedPaths.has(e.path);return r`
       <div class="ws-folder-file-row" style="padding-left: ${12+t*16}px">
         <button
           class="ws-folder-file"
@@ -4406,7 +4419,7 @@ ${i}
             </div>
           `:p}
     </div>
-  `}function Yk(e,t,n){return r`
+  `}function Xk(e,t,n){return r`
     <div class="workspace-card-wrapper">
       <button
         class="workspace-card"
@@ -4447,7 +4460,7 @@ ${i}
         ${s?"Unpin":"Pin"}
       </button>
     </div>
-  `}function Jk(e){const{workspaceId:t,entry:n,pinned:s,onOpen:a,onPinToggle:i}=e,o=Gk(n);return r`
+  `}function Zk(e){const{workspaceId:t,entry:n,pinned:s,onOpen:a,onPinToggle:i}=e,o=Yk(n);return r`
     <div class="ws-list-row">
       <button class="ws-list-main" @click=${()=>a?.(n)}>
         <span class="ws-list-icon">${jo(n.type)}</span>
@@ -4463,7 +4476,7 @@ ${i}
         ${s?"Unpin":"Pin"}
       </button>
     </div>
-  `}function Xk(e,t){return r`
+  `}function e0(e,t){return r`
     <div class="workspace-breadcrumbs">
       ${e.map((n,s)=>r`
           ${s>0?r`<span class="breadcrumb-sep">/</span>`:p}
@@ -4473,13 +4486,13 @@ ${i}
           >${n.name}</button>
         `)}
     </div>
-  `}function Zk(e){const{browseEntries:t,breadcrumbs:n,browseSearchQuery:s,browseSearchResults:a,onBrowseFolder:i,onBrowseSearch:o,onBrowseBack:l,onCreateFolder:d,onItemClick:u}=e,h=a??t??[];return r`
+  `}function t0(e){const{browseEntries:t,breadcrumbs:n,browseSearchQuery:s,browseSearchResults:a,onBrowseFolder:i,onBrowseSearch:o,onBrowseBack:l,onCreateFolder:d,onItemClick:u}=e,h=a??t??[];return r`
     <div class="workspace-browser">
       <div class="workspace-browser-toolbar">
         <button class="workspace-browse-back" @click=${()=>l?.()}>
           &larr; Back
         </button>
-        ${n?Xk(n,f=>i?.(f)):p}
+        ${n?e0(n,f=>i?.(f)):p}
         <input
           type="text"
           class="workspace-browse-search"
@@ -4506,7 +4519,7 @@ ${i}
             `)}
       </div>
     </div>
-  `}function e0(e){const{workspace:t,itemSearchQuery:n,expandedFolders:s=new Set,showCompletedTasks:a=!1,onItemSearch:i,onBack:o,onItemClick:l,onSessionClick:d,onPinToggle:u,onPinSessionToggle:h,onToggleFolder:f,onToggleTaskComplete:m,onCreateTask:w,onToggleCompletedTasks:$,onStartTask:c,editingTaskId:g,onEditTask:k,onUpdateTask:A,onBatchPushToDrive:T}=e,x=Jl(n,t.pinned).toSorted((B,Oe)=>Oe.modified.getTime()-B.modified.getTime()),_=Xl(n,t.pinnedSessions),P=Jl(n,t.outputs).filter(B=>!t.pinned.some(Oe=>Oe.path===B.path)),E=(t.folderTree?.length??0)>0,Z=E?lp(n,t.folderTree):[],Y=Xl(n,t.sessions),I=new Set(t.pinnedSessions.map(B=>B.key)),M=new Set(t.pinned.map(B=>B.path)),N=n.trim().length>0,U=x.length>0||_.length>0,O=Y.length>0||t.sessions.length===0||N,ie=Qk(t.outputs),$e=ie.length>0&&!N,J={expandedFolders:s,pinnedPaths:M,workspaceId:t.id,onToggleFolder:f,onItemClick:l,onPinToggle:u};return r`
+  `}function n0(e){const{workspace:t,itemSearchQuery:n,expandedFolders:s=new Set,showCompletedTasks:a=!1,onItemSearch:i,onBack:o,onItemClick:l,onSessionClick:d,onPinToggle:u,onPinSessionToggle:h,onToggleFolder:f,onToggleTaskComplete:m,onCreateTask:w,onToggleCompletedTasks:$,onStartTask:c,editingTaskId:g,onEditTask:k,onUpdateTask:A,onBatchPushToDrive:T}=e,x=Jl(n,t.pinned).toSorted((B,Oe)=>Oe.modified.getTime()-B.modified.getTime()),_=Xl(n,t.pinnedSessions),P=Jl(n,t.outputs).filter(B=>!t.pinned.some(Oe=>Oe.path===B.path)),E=(t.folderTree?.length??0)>0,Z=E?lp(n,t.folderTree):[],Y=Xl(n,t.sessions),I=new Set(t.pinnedSessions.map(B=>B.key)),M=new Set(t.pinned.map(B=>B.path)),N=n.trim().length>0,U=x.length>0||_.length>0,O=Y.length>0||t.sessions.length===0||N,ie=Jk(t.outputs),$e=ie.length>0&&!N,J={expandedFolders:s,pinnedPaths:M,workspaceId:t.id,onToggleFolder:f,onItemClick:l,onPinToggle:u};return r`
     <div class="workspaces-container">
       <div class="workspaces-header">
         <div class="workspaces-title">
@@ -4533,7 +4546,7 @@ ${i}
       </div>
 
       <div class="workspace-content">
-        ${e.browsePath!=null?Zk(e):p}
+        ${e.browsePath!=null?t0(e):p}
 
         ${U?r`
                 <section class="ws-section">
@@ -4563,7 +4576,7 @@ ${i}
                 </section>
               `:p}
 
-        ${t0({tasks:t.tasks??[],workspaceName:t.name,showCompleted:a,onToggleTaskComplete:m,onCreateTask:w,onToggleCompletedTasks:$,onStartTask:c,editingTaskId:g,onEditTask:k,onUpdateTask:A})}
+        ${s0({tasks:t.tasks??[],workspaceName:t.name,showCompleted:a,onToggleTaskComplete:m,onCreateTask:w,onToggleCompletedTasks:$,onStartTask:c,editingTaskId:g,onEditTask:k,onUpdateTask:A})}
 
         ${$e?r`
               <section class="ws-section">
@@ -4572,7 +4585,7 @@ ${i}
                   <span>${ie.length}</span>
                 </div>
                 <div class="ws-list">
-                  ${ie.map(B=>Jk({workspaceId:t.id,entry:B,pinned:M.has(B.path),onOpen:l,onPinToggle:u}))}
+                  ${ie.map(B=>Zk({workspaceId:t.id,entry:B,pinned:M.has(B.path),onOpen:l,onPinToggle:u}))}
                 </div>
               </section>
             `:p}
@@ -4636,7 +4649,7 @@ ${i}
             `:p}
       </div>
     </div>
-  `}function t0(e){const{tasks:t,workspaceName:n,showCompleted:s,onToggleTaskComplete:a,onCreateTask:i,onToggleCompletedTasks:o,onStartTask:l,editingTaskId:d,onEditTask:u,onUpdateTask:h}=e,f=Ys(t.filter(w=>w.status==="pending")),m=Ys(t.filter(w=>w.status==="complete"));return r`
+  `}function s0(e){const{tasks:t,workspaceName:n,showCompleted:s,onToggleTaskComplete:a,onCreateTask:i,onToggleCompletedTasks:o,onStartTask:l,editingTaskId:d,onEditTask:u,onUpdateTask:h}=e,f=Ys(t.filter(w=>w.status==="pending")),m=Ys(t.filter(w=>w.status==="complete"));return r`
     <section class="ws-section">
       <div class="ws-section__header">
         <h3>Tasks</h3>
@@ -4666,7 +4679,7 @@ ${i}
             </form>
           `:p}
     </section>
-  `}function n0(e){const{connected:t,workspaces:n,selectedWorkspace:s,searchQuery:a,itemSearchQuery:i,expandedFolders:o,loading:l,createLoading:d,error:u,allTasks:h=[],taskFilter:f="outstanding",taskSort:m="due",taskSearch:w="",showCompletedTasks:$=!1,editingTaskId:c,workspaceNames:g=[],onSearch:k,onItemSearch:A,onSelectWorkspace:T,onBack:x,onItemClick:_,onSessionClick:P,onPinToggle:E,onPinSessionToggle:Z,onCreateWorkspace:Y,onDeleteWorkspace:I,onToggleFolder:M,onTeamSetup:N,onToggleTaskComplete:U,onCreateTask:O,onSetTaskFilter:ie,onSetTaskSort:$e,onSetTaskSearch:J,onToggleCompletedTasks:B,onStartTask:Oe,onEditTask:mn,onUpdateTask:X}=e,Wt=n.filter(V=>Vk(a,`${V.name} ${V.path} ${V.type}`));return s?e0({workspace:s,itemSearchQuery:i??"",expandedFolders:o,showCompletedTasks:$,onItemSearch:A,onBack:x,onItemClick:_,onSessionClick:P,onPinToggle:E,onPinSessionToggle:Z,onToggleFolder:M,onToggleTaskComplete:U,onCreateTask:O,onToggleCompletedTasks:B,onStartTask:Oe,editingTaskId:c,onEditTask:mn,onUpdateTask:X,browsePath:e.browsePath,browseEntries:e.browseEntries,breadcrumbs:e.breadcrumbs,browseSearchQuery:e.browseSearchQuery,browseSearchResults:e.browseSearchResults,onBrowseFolder:e.onBrowseFolder,onBrowseSearch:e.onBrowseSearch,onBrowseBack:e.onBrowseBack,onCreateFolder:e.onCreateFolder,onBatchPushToDrive:e.onBatchPushToDrive}):r`
+  `}function a0(e){const{connected:t,workspaces:n,selectedWorkspace:s,searchQuery:a,itemSearchQuery:i,expandedFolders:o,loading:l,createLoading:d,error:u,allTasks:h=[],taskFilter:f="outstanding",taskSort:m="due",taskSearch:w="",showCompletedTasks:$=!1,editingTaskId:c,workspaceNames:g=[],onSearch:k,onItemSearch:A,onSelectWorkspace:T,onBack:x,onItemClick:_,onSessionClick:P,onPinToggle:E,onPinSessionToggle:Z,onCreateWorkspace:Y,onDeleteWorkspace:I,onToggleFolder:M,onTeamSetup:N,onToggleTaskComplete:U,onCreateTask:O,onSetTaskFilter:ie,onSetTaskSort:$e,onSetTaskSearch:J,onToggleCompletedTasks:B,onStartTask:Oe,onEditTask:mn,onUpdateTask:X}=e,Wt=n.filter(V=>Gk(a,`${V.name} ${V.path} ${V.type}`));return s?n0({workspace:s,itemSearchQuery:i??"",expandedFolders:o,showCompletedTasks:$,onItemSearch:A,onBack:x,onItemClick:_,onSessionClick:P,onPinToggle:E,onPinSessionToggle:Z,onToggleFolder:M,onToggleTaskComplete:U,onCreateTask:O,onToggleCompletedTasks:B,onStartTask:Oe,editingTaskId:c,onEditTask:mn,onUpdateTask:X,browsePath:e.browsePath,browseEntries:e.browseEntries,breadcrumbs:e.breadcrumbs,browseSearchQuery:e.browseSearchQuery,browseSearchResults:e.browseSearchResults,onBrowseFolder:e.onBrowseFolder,onBrowseSearch:e.onBrowseSearch,onBrowseBack:e.onBrowseBack,onCreateFolder:e.onCreateFolder,onBatchPushToDrive:e.onBatchPushToDrive}):r`
     <div class="workspaces-container">
       <div class="workspaces-toolbar">
         <form
@@ -4729,14 +4742,14 @@ ${i}
                             <span>${t?"No workspaces yet":"Connect to gateway to see workspaces"}</span>
                             ${t?r`<span class="workspaces-empty-hint">Workspaces organize your projects. Ask your ally to create one, or start a focused session in chat.</span>`:p}
                           </div>
-                        `:Wt.map(V=>Yk(V,T,I))}
+                        `:Wt.map(V=>Xk(V,T,I))}
                 </div>
 
-                ${s0({tasks:h,taskFilter:f,taskSort:m,taskSearch:w,onToggleTaskComplete:U,onSetTaskFilter:ie,onSetTaskSort:$e,onSetTaskSearch:J,onCreateTask:O,workspaceNames:g,onStartTask:Oe,editingTaskId:c,onEditTask:mn,onUpdateTask:X})}
+                ${i0({tasks:h,taskFilter:f,taskSort:m,taskSearch:w,onToggleTaskComplete:U,onSetTaskFilter:ie,onSetTaskSort:$e,onSetTaskSearch:J,onCreateTask:O,workspaceNames:g,onStartTask:Oe,editingTaskId:c,onEditTask:mn,onUpdateTask:X})}
               </div>
             `}
     </div>
-  `}function s0(e){const{tasks:t,taskFilter:n,taskSort:s="due",taskSearch:a="",onToggleTaskComplete:i,onSetTaskFilter:o,onSetTaskSort:l,onSetTaskSearch:d,onCreateTask:u,workspaceNames:h=[],onStartTask:f,editingTaskId:m,onEditTask:w,onUpdateTask:$}=e;if(t.length===0&&!u)return r``;let c;if(n==="outstanding")c=t.filter(k=>k.status==="pending");else if(n==="today"){const k=ce();c=t.filter(A=>A.status==="pending"&&A.dueDate!=null&&A.dueDate<=k)}else n==="complete"?c=t.filter(k=>k.status==="complete"):c=t;if(a){const k=a.toLowerCase();c=c.filter(A=>A.title.toLowerCase().includes(k)||A.project?.toLowerCase().includes(k))}const g=Ys(c,s);return r`
+  `}function i0(e){const{tasks:t,taskFilter:n,taskSort:s="due",taskSearch:a="",onToggleTaskComplete:i,onSetTaskFilter:o,onSetTaskSort:l,onSetTaskSearch:d,onCreateTask:u,workspaceNames:h=[],onStartTask:f,editingTaskId:m,onEditTask:w,onUpdateTask:$}=e;if(t.length===0&&!u)return r``;let c;if(n==="outstanding")c=t.filter(k=>k.status==="pending");else if(n==="today"){const k=ce();c=t.filter(A=>A.status==="pending"&&A.dueDate!=null&&A.dueDate<=k)}else n==="complete"?c=t.filter(k=>k.status==="complete"):c=t;if(a){const k=a.toLowerCase();c=c.filter(A=>A.title.toLowerCase().includes(k)||A.project?.toLowerCase().includes(k))}const g=Ys(c,s);return r`
     <div class="ws-all-tasks-section">
       <section class="ws-section">
         <div class="ws-section__header">
@@ -4803,12 +4816,12 @@ ${i}
         </div>
       </section>
     </div>
-  `}function a0(e){return e===ce()}function i0(e){const t=new Date(e+"T12:00:00");return o0(t)}function o0(e){const t=["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"],n=["January","February","March","April","May","June","July","August","September","October","November","December"],s=t[e.getDay()],a=n[e.getMonth()],i=e.getDate();return`${s}, ${a} ${i}`}function r0(e){return r`
+  `}function o0(e){return e===ce()}function r0(e){const t=new Date(e+"T12:00:00");return l0(t)}function l0(e){const t=["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"],n=["January","February","March","April","May","June","July","August","September","October","November","December"],s=t[e.getDay()],a=n[e.getMonth()],i=e.getDate();return`${s}, ${a} ${i}`}function c0(e){return r`
     <form class="ws-task-create-form" @submit=${t=>{t.preventDefault();const s=t.currentTarget.querySelector("input"),a=s.value.trim();a&&(e(a),s.value="")}}>
       <input type="text" class="ws-task-create-input" placeholder="Add a task for today..." />
       <button type="submit" class="ws-task-create-btn">Add</button>
     </form>
-  `}function l0(e){const t=Ys(e.todayTasks??[],"due"),n=t.filter(a=>a.status==="pending"),s=t.filter(a=>a.status==="complete");return r`
+  `}function d0(e){const t=Ys(e.todayTasks??[],"due"),n=t.filter(a=>a.status==="pending"),s=t.filter(a=>a.status==="complete");return r`
     <div class="my-day-card today-tasks-panel">
       <div class="my-day-card-header">
         <div class="my-day-card-title">
@@ -4821,7 +4834,7 @@ ${i}
       </div>
       <div class="my-day-card-content">
         ${e.todayTasksLoading?r`<div class="brief-loading"><div class="spinner"></div><span>Loading tasks...</span></div>`:r`
-              ${e.onCreateTask?r0(e.onCreateTask):p}
+              ${e.onCreateTask?c0(e.onCreateTask):p}
               <div class="today-tasks-list">
                 ${n.length===0&&s.length===0?r`<div class="today-tasks-empty">No tasks for today. Add one above or drop tasks in your daily brief.</div>`:n.map(a=>Fi(a,e.onToggleTaskComplete,e.onStartTask,e.editingTaskId,e.onEditTask,e.onUpdateTask,e.onViewTaskOutput))}
               </div>
@@ -4836,7 +4849,7 @@ ${i}
             `}
       </div>
     </div>
-  `}function c0(e){const t=ce(),n=e.selectedDate??t,s=a0(n),a=i0(n),i=e.viewMode??"brief";return r`
+  `}function u0(e){const t=ce(),n=e.selectedDate??t,s=o0(n),a=r0(n),i=e.viewMode??"brief";return r`
     <div class="my-day-toolbar">
       <div class="today-date-nav">
         ${e.onDatePrev?r`<button class="today-date-btn" @click=${e.onDatePrev} title="Previous day">&#x2039;</button>`:p}
@@ -4859,11 +4872,11 @@ ${i}
         ${e.onRefresh?r`<button class="my-day-refresh-btn" @click=${e.onRefresh} title="Refresh / Generate Brief">&#x21BB;</button>`:null}
       </div>
     </div>
-  `}function d0(e){return r`
+  `}function p0(e){return r`
     <div class="my-day-brief-full">
-      ${jk({items:e.inboxItems??[],loading:e.inboxLoading,count:e.inboxCount,scoringId:e.inboxScoringId,scoringValue:e.inboxScoringValue,feedbackText:e.inboxFeedbackText,onViewOutput:t=>e.onInboxViewOutput?.(t),onOpenChat:t=>e.onInboxOpenChat?.(t),onDismiss:t=>e.onInboxDismiss?.(t),onScore:(t,n,s)=>e.onInboxScore?.(t,n,s),onSetScoring:(t,n)=>e.onInboxSetScoring?.(t,n),onFeedbackChange:t=>e.onInboxFeedbackChange?.(t),onMarkAll:()=>e.onInboxMarkAll?.()})}
+      ${Hk({items:e.inboxItems??[],loading:e.inboxLoading,count:e.inboxCount,scoringId:e.inboxScoringId,scoringValue:e.inboxScoringValue,feedbackText:e.inboxFeedbackText,onViewOutput:t=>e.onInboxViewOutput?.(t),onViewProof:t=>e.onInboxViewProof?.(t),onOpenChat:t=>e.onInboxOpenChat?.(t),onDismiss:t=>e.onInboxDismiss?.(t),onScore:(t,n,s)=>e.onInboxScore?.(t,n,s),onSetScoring:(t,n)=>e.onInboxSetScoring?.(t,n),onFeedbackChange:t=>e.onInboxFeedbackChange?.(t),onMarkAll:()=>e.onInboxMarkAll?.()})}
     </div>
-  `}function u0(e){const t=ce();e.selectedDate;const n=e.viewMode??"brief";if(e.loading)return r`
+  `}function h0(e){const t=ce();e.selectedDate;const n=e.viewMode??"brief";if(e.loading)return r`
       <div class="my-day-container">
         <div class="my-day-loading">
           <div class="spinner"></div>
@@ -4881,13 +4894,13 @@ ${i}
     `;const s={connected:e.connected,data:e.dailyBrief??null,loading:e.dailyBriefLoading,error:e.dailyBriefError,onRefresh:e.onBriefRefresh,onGenerate:e.onBriefGenerate,onOpenInObsidian:e.onBriefOpenInObsidian,onSaveBrief:e.onBriefSave,onToggleCheckbox:e.onBriefToggleCheckbox,onOpenFile:e.onOpenFile};return r`
     <div class="my-day-container">
       ${n==="brief"?r`<div class="my-day-brief-full">
-            ${zk(s)}
-          </div>`:n==="tasks"?r`<div class="my-day-brief-full">${l0(e)}</div>`:d0(e)}
+            ${Kk(s)}
+          </div>`:n==="tasks"?r`<div class="my-day-brief-full">${d0(e)}</div>`:p0(e)}
     </div>
-  `}function p0(e){const t=y0(e),n=A0(e);return r`
-    ${T0(n)}
-    ${x0(t)}
-    ${h0(e)}
+  `}function f0(e){const t=w0(e),n=T0(e);return r`
+    ${C0(n)}
+    ${_0(t)}
+    ${g0(e)}
     <section class="card">
       <div class="row" style="justify-content: space-between;">
         <div>
@@ -4901,10 +4914,10 @@ ${i}
       <div class="list" style="margin-top: 16px;">
         ${e.nodes.length===0?r`
                 <div class="muted">No nodes found.</div>
-              `:e.nodes.map(s=>O0(s))}
+              `:e.nodes.map(s=>N0(s))}
       </div>
     </section>
-  `}function h0(e){const t=e.devicesList??{pending:[],paired:[]},n=Array.isArray(t.pending)?t.pending:[],s=Array.isArray(t.paired)?t.paired:[];return r`
+  `}function g0(e){const t=e.devicesList??{pending:[],paired:[]},n=Array.isArray(t.pending)?t.pending:[],s=Array.isArray(t.paired)?t.paired:[];return r`
     <section class="card">
       <div class="row" style="justify-content: space-between;">
         <div>
@@ -4919,18 +4932,18 @@ ${i}
       <div class="list" style="margin-top: 16px;">
         ${n.length>0?r`
               <div class="muted" style="margin-bottom: 8px;">Pending</div>
-              ${n.map(a=>f0(a,e))}
+              ${n.map(a=>m0(a,e))}
             `:p}
         ${s.length>0?r`
               <div class="muted" style="margin-top: 12px; margin-bottom: 8px;">Paired</div>
-              ${s.map(a=>g0(a,e))}
+              ${s.map(a=>v0(a,e))}
             `:p}
         ${n.length===0&&s.length===0?r`
                 <div class="muted">No paired devices.</div>
               `:p}
       </div>
     </section>
-  `}function f0(e,t){const n=e.displayName?.trim()||e.deviceId,s=typeof e.ts=="number"?K(e.ts):"n/a",a=e.role?.trim()?`role: ${e.role}`:"role: -",i=e.isRepair?" · repair":"",o=e.remoteIp?` · ${e.remoteIp}`:"";return r`
+  `}function m0(e,t){const n=e.displayName?.trim()||e.deviceId,s=typeof e.ts=="number"?K(e.ts):"n/a",a=e.role?.trim()?`role: ${e.role}`:"role: -",i=e.isRepair?" · repair":"",o=e.remoteIp?` · ${e.remoteIp}`:"";return r`
     <div class="list-item">
       <div class="list-main">
         <div class="list-title">${n}</div>
@@ -4950,7 +4963,7 @@ ${i}
         </div>
       </div>
     </div>
-  `}function g0(e,t){const n=e.displayName?.trim()||e.deviceId,s=e.remoteIp?` · ${e.remoteIp}`:"",a=`roles: ${ci(e.roles)}`,i=`scopes: ${ci(e.scopes)}`,o=Array.isArray(e.tokens)?e.tokens:[];return r`
+  `}function v0(e,t){const n=e.displayName?.trim()||e.deviceId,s=e.remoteIp?` · ${e.remoteIp}`:"",a=`roles: ${ci(e.roles)}`,i=`scopes: ${ci(e.scopes)}`,o=Array.isArray(e.tokens)?e.tokens:[];return r`
     <div class="list-item">
       <div class="list-main">
         <div class="list-title">${n}</div>
@@ -4961,12 +4974,12 @@ ${i}
               `:r`
               <div class="muted" style="margin-top: 10px;">Tokens</div>
               <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 6px;">
-                ${o.map(l=>m0(e.deviceId,l,t))}
+                ${o.map(l=>y0(e.deviceId,l,t))}
               </div>
             `}
       </div>
     </div>
-  `}function m0(e,t,n){const s=t.revokedAtMs?"revoked":"active",a=`scopes: ${ci(t.scopes)}`,i=K(t.rotatedAtMs??t.createdAtMs??t.lastUsedAtMs??null);return r`
+  `}function y0(e,t,n){const s=t.revokedAtMs?"revoked":"active",a=`scopes: ${ci(t.scopes)}`,i=K(t.rotatedAtMs??t.createdAtMs??t.lastUsedAtMs??null);return r`
     <div class="row" style="justify-content: space-between; gap: 8px;">
       <div class="list-sub">${t.role} · ${s} · ${a} · ${i}</div>
       <div class="row" style="justify-content: flex-end; gap: 6px; flex-wrap: wrap;">
@@ -4986,7 +4999,7 @@ ${i}
             `}
       </div>
     </div>
-  `}const pt="__defaults__",Zl=[{value:"deny",label:"Deny"},{value:"allowlist",label:"Allowlist"},{value:"full",label:"Full"}],v0=[{value:"off",label:"Off"},{value:"on-miss",label:"On miss"},{value:"always",label:"Always"}];function y0(e){const t=e.configForm,n=I0(e.nodes),{defaultBinding:s,agents:a}=M0(t),i=!!t,o=e.configSaving||e.configFormMode==="raw";return{ready:i,disabled:o,configDirty:e.configDirty,configLoading:e.configLoading,configSaving:e.configSaving,defaultBinding:s,agents:a,nodes:n,onBindDefault:e.onBindDefault,onBindAgent:e.onBindAgent,onSave:e.onSaveBindings,onLoadConfig:e.onLoadConfig,formMode:e.configFormMode}}function ec(e){return e==="allowlist"||e==="full"||e==="deny"?e:"deny"}function b0(e){return e==="always"||e==="off"||e==="on-miss"?e:"on-miss"}function w0(e){const t=e?.defaults??{};return{security:ec(t.security),ask:b0(t.ask),askFallback:ec(t.askFallback??"deny"),autoAllowSkills:!!(t.autoAllowSkills??!1)}}function $0(e){const t=e?.agents??{},n=Array.isArray(t.list)?t.list:[],s=[];return n.forEach(a=>{if(!a||typeof a!="object")return;const i=a,o=typeof i.id=="string"?i.id.trim():"";if(!o)return;const l=typeof i.name=="string"?i.name.trim():void 0,d=i.default===!0;s.push({id:o,name:l||void 0,isDefault:d})}),s}function k0(e,t){const n=$0(e),s=Object.keys(t?.agents??{}),a=new Map;n.forEach(o=>a.set(o.id,o)),s.forEach(o=>{a.has(o)||a.set(o,{id:o})});const i=Array.from(a.values());return i.length===0&&i.push({id:"main",isDefault:!0}),i.sort((o,l)=>{if(o.isDefault&&!l.isDefault)return-1;if(!o.isDefault&&l.isDefault)return 1;const d=o.name?.trim()?o.name:o.id,u=l.name?.trim()?l.name:l.id;return d.localeCompare(u)}),i}function S0(e,t){return e===pt?pt:e&&t.some(n=>n.id===e)?e:pt}function A0(e){const t=e.execApprovalsForm??e.execApprovalsSnapshot?.file??null,n=!!t,s=w0(t),a=k0(e.configForm,t),i=D0(e.nodes),o=e.execApprovalsTarget;let l=o==="node"&&e.execApprovalsTargetNodeId?e.execApprovalsTargetNodeId:null;o==="node"&&l&&!i.some(f=>f.id===l)&&(l=null);const d=S0(e.execApprovalsSelectedAgent,a),u=d!==pt?(t?.agents??{})[d]??null:null,h=Array.isArray(u?.allowlist)?u.allowlist??[]:[];return{ready:n,disabled:e.execApprovalsSaving||e.execApprovalsLoading,dirty:e.execApprovalsDirty,loading:e.execApprovalsLoading,saving:e.execApprovalsSaving,form:t,defaults:s,selectedScope:d,selectedAgent:u,agents:a,allowlist:h,target:o,targetNodeId:l,targetNodes:i,onSelectScope:e.onExecApprovalsSelectAgent,onSelectTarget:e.onExecApprovalsTargetChange,onPatch:e.onExecApprovalsPatch,onRemove:e.onExecApprovalsRemove,onLoad:e.onLoadExecApprovals,onSave:e.onSaveExecApprovals}}function x0(e){const t=e.nodes.length>0,n=e.defaultBinding??"";return r`
+  `}const pt="__defaults__",Zl=[{value:"deny",label:"Deny"},{value:"allowlist",label:"Allowlist"},{value:"full",label:"Full"}],b0=[{value:"off",label:"Off"},{value:"on-miss",label:"On miss"},{value:"always",label:"Always"}];function w0(e){const t=e.configForm,n=M0(e.nodes),{defaultBinding:s,agents:a}=F0(t),i=!!t,o=e.configSaving||e.configFormMode==="raw";return{ready:i,disabled:o,configDirty:e.configDirty,configLoading:e.configLoading,configSaving:e.configSaving,defaultBinding:s,agents:a,nodes:n,onBindDefault:e.onBindDefault,onBindAgent:e.onBindAgent,onSave:e.onSaveBindings,onLoadConfig:e.onLoadConfig,formMode:e.configFormMode}}function ec(e){return e==="allowlist"||e==="full"||e==="deny"?e:"deny"}function $0(e){return e==="always"||e==="off"||e==="on-miss"?e:"on-miss"}function k0(e){const t=e?.defaults??{};return{security:ec(t.security),ask:$0(t.ask),askFallback:ec(t.askFallback??"deny"),autoAllowSkills:!!(t.autoAllowSkills??!1)}}function S0(e){const t=e?.agents??{},n=Array.isArray(t.list)?t.list:[],s=[];return n.forEach(a=>{if(!a||typeof a!="object")return;const i=a,o=typeof i.id=="string"?i.id.trim():"";if(!o)return;const l=typeof i.name=="string"?i.name.trim():void 0,d=i.default===!0;s.push({id:o,name:l||void 0,isDefault:d})}),s}function A0(e,t){const n=S0(e),s=Object.keys(t?.agents??{}),a=new Map;n.forEach(o=>a.set(o.id,o)),s.forEach(o=>{a.has(o)||a.set(o,{id:o})});const i=Array.from(a.values());return i.length===0&&i.push({id:"main",isDefault:!0}),i.sort((o,l)=>{if(o.isDefault&&!l.isDefault)return-1;if(!o.isDefault&&l.isDefault)return 1;const d=o.name?.trim()?o.name:o.id,u=l.name?.trim()?l.name:l.id;return d.localeCompare(u)}),i}function x0(e,t){return e===pt?pt:e&&t.some(n=>n.id===e)?e:pt}function T0(e){const t=e.execApprovalsForm??e.execApprovalsSnapshot?.file??null,n=!!t,s=k0(t),a=A0(e.configForm,t),i=O0(e.nodes),o=e.execApprovalsTarget;let l=o==="node"&&e.execApprovalsTargetNodeId?e.execApprovalsTargetNodeId:null;o==="node"&&l&&!i.some(f=>f.id===l)&&(l=null);const d=x0(e.execApprovalsSelectedAgent,a),u=d!==pt?(t?.agents??{})[d]??null:null,h=Array.isArray(u?.allowlist)?u.allowlist??[]:[];return{ready:n,disabled:e.execApprovalsSaving||e.execApprovalsLoading,dirty:e.execApprovalsDirty,loading:e.execApprovalsLoading,saving:e.execApprovalsSaving,form:t,defaults:s,selectedScope:d,selectedAgent:u,agents:a,allowlist:h,target:o,targetNodeId:l,targetNodes:i,onSelectScope:e.onExecApprovalsSelectAgent,onSelectTarget:e.onExecApprovalsTargetChange,onPatch:e.onExecApprovalsPatch,onRemove:e.onExecApprovalsRemove,onLoad:e.onLoadExecApprovals,onSave:e.onSaveExecApprovals}}function _0(e){const t=e.nodes.length>0,n=e.defaultBinding??"";return r`
     <section class="card">
       <div class="row" style="justify-content: space-between; align-items: center;">
         <div>
@@ -5041,7 +5054,7 @@ ${i}
 
               ${e.agents.length===0?r`
                       <div class="muted">No agents found.</div>
-                    `:e.agents.map(s=>L0(s,e))}
+                    `:e.agents.map(s=>D0(s,e))}
             </div>
           `:r`<div class="row" style="margin-top: 12px; gap: 12px;">
             <div class="muted">Load config to edit bindings.</div>
@@ -5050,7 +5063,7 @@ ${i}
             </button>
           </div>`}
     </section>
-  `}function T0(e){const t=e.ready,n=e.target!=="node"||!!e.targetNodeId;return r`
+  `}function C0(e){const t=e.ready,n=e.target!=="node"||!!e.targetNodeId;return r`
     <section class="card">
       <div class="row" style="justify-content: space-between; align-items: center;">
         <div>
@@ -5068,12 +5081,12 @@ ${i}
         </button>
       </div>
 
-      ${_0(e)}
+      ${R0(e)}
 
       ${t?r`
-            ${C0(e)}
-            ${R0(e)}
-            ${e.selectedScope===pt?p:E0(e)}
+            ${E0(e)}
+            ${P0(e)}
+            ${e.selectedScope===pt?p:L0(e)}
           `:r`<div class="row" style="margin-top: 12px; gap: 12px;">
             <div class="muted">Load exec approvals to edit allowlists.</div>
             <button class="btn" ?disabled=${e.loading||!n} @click=${e.onLoad}>
@@ -5081,7 +5094,7 @@ ${i}
             </button>
           </div>`}
     </section>
-  `}function _0(e){const t=e.targetNodes.length>0,n=e.targetNodeId??"";return r`
+  `}function R0(e){const t=e.targetNodes.length>0,n=e.targetNodeId??"";return r`
     <div class="list" style="margin-top: 12px;">
       <div class="list-item">
         <div class="list-main">
@@ -5124,7 +5137,7 @@ ${i}
               <div class="muted">No nodes advertise exec approvals yet.</div>
             `:p}
     </div>
-  `}function C0(e){return r`
+  `}function E0(e){return r`
     <div class="row" style="margin-top: 12px; gap: 8px; flex-wrap: wrap;">
       <span class="label">Scope</span>
       <div class="row" style="gap: 8px; flex-wrap: wrap;">
@@ -5144,7 +5157,7 @@ ${i}
           `})}
       </div>
     </div>
-  `}function R0(e){const t=e.selectedScope===pt,n=e.defaults,s=e.selectedAgent??{},a=t?["defaults"]:["agents",e.selectedScope],i=typeof s.security=="string"?s.security:void 0,o=typeof s.ask=="string"?s.ask:void 0,l=typeof s.askFallback=="string"?s.askFallback:void 0,d=t?n.security:i??"__default__",u=t?n.ask:o??"__default__",h=t?n.askFallback:l??"__default__",f=typeof s.autoAllowSkills=="boolean"?s.autoAllowSkills:void 0,m=f??n.autoAllowSkills,w=f==null;return r`
+  `}function P0(e){const t=e.selectedScope===pt,n=e.defaults,s=e.selectedAgent??{},a=t?["defaults"]:["agents",e.selectedScope],i=typeof s.security=="string"?s.security:void 0,o=typeof s.ask=="string"?s.ask:void 0,l=typeof s.askFallback=="string"?s.askFallback:void 0,d=t?n.security:i??"__default__",u=t?n.ask:o??"__default__",h=t?n.askFallback:l??"__default__",f=typeof s.autoAllowSkills=="boolean"?s.autoAllowSkills:void 0,m=f??n.autoAllowSkills,w=f==null;return r`
     <div class="list" style="margin-top: 16px;">
       <div class="list-item">
         <div class="list-main">
@@ -5191,7 +5204,7 @@ ${i}
               ${t?p:r`<option value="__default__" ?selected=${u==="__default__"}>
                     Use default (${n.ask})
                   </option>`}
-              ${v0.map($=>r`<option
+              ${b0.map($=>r`<option
                     value=${$.value}
                     ?selected=${u===$.value}
                   >
@@ -5257,7 +5270,7 @@ ${i}
         </div>
       </div>
     </div>
-  `}function E0(e){const t=["agents",e.selectedScope,"allowlist"],n=e.allowlist;return r`
+  `}function L0(e){const t=["agents",e.selectedScope,"allowlist"],n=e.allowlist;return r`
     <div class="row" style="margin-top: 18px; justify-content: space-between;">
       <div>
         <div class="card-title">Allowlist</div>
@@ -5274,9 +5287,9 @@ ${i}
     <div class="list" style="margin-top: 12px;">
       ${n.length===0?r`
               <div class="muted">No allowlist entries yet.</div>
-            `:n.map((s,a)=>P0(e,s,a))}
+            `:n.map((s,a)=>I0(e,s,a))}
     </div>
-  `}function P0(e,t,n){const s=t.lastUsedAt?K(t.lastUsedAt):"never",a=t.lastUsedCommand?Xn(t.lastUsedCommand,120):null,i=t.lastResolvedPath?Xn(t.lastResolvedPath,120):null;return r`
+  `}function I0(e,t,n){const s=t.lastUsedAt?K(t.lastUsedAt):"never",a=t.lastUsedCommand?Xn(t.lastUsedCommand,120):null,i=t.lastResolvedPath?Xn(t.lastResolvedPath,120):null;return r`
     <div class="list-item">
       <div class="list-main">
         <div class="list-title">${t.pattern?.trim()?t.pattern:"New pattern"}</div>
@@ -5303,7 +5316,7 @@ ${i}
         </button>
       </div>
     </div>
-  `}function L0(e,t){const n=e.binding??"__default__",s=e.name?.trim()?`${e.name} (${e.id})`:e.id,a=t.nodes.length>0;return r`
+  `}function D0(e,t){const n=e.binding??"__default__",s=e.name?.trim()?`${e.name} (${e.id})`:e.id,a=t.nodes.length>0;return r`
     <div class="list-item">
       <div class="list-main">
         <div class="list-title">${s}</div>
@@ -5332,7 +5345,7 @@ ${i}
         </label>
       </div>
     </div>
-  `}function I0(e){const t=[];for(const n of e){if(!(Array.isArray(n.commands)?n.commands:[]).some(l=>String(l)==="system.run"))continue;const i=typeof n.nodeId=="string"?n.nodeId.trim():"";if(!i)continue;const o=typeof n.displayName=="string"&&n.displayName.trim()?n.displayName.trim():i;t.push({id:i,label:o===i?i:`${o} · ${i}`})}return t.sort((n,s)=>n.label.localeCompare(s.label)),t}function D0(e){const t=[];for(const n of e){if(!(Array.isArray(n.commands)?n.commands:[]).some(l=>String(l)==="system.execApprovals.get"||String(l)==="system.execApprovals.set"))continue;const i=typeof n.nodeId=="string"?n.nodeId.trim():"";if(!i)continue;const o=typeof n.displayName=="string"&&n.displayName.trim()?n.displayName.trim():i;t.push({id:i,label:o===i?i:`${o} · ${i}`})}return t.sort((n,s)=>n.label.localeCompare(s.label)),t}function M0(e){const t={id:"main",name:void 0,index:0,isDefault:!0,binding:null};if(!e||typeof e!="object")return{defaultBinding:null,agents:[t]};const s=(e.tools??{}).exec??{},a=typeof s.node=="string"&&s.node.trim()?s.node.trim():null,i=e.agents??{},o=Array.isArray(i.list)?i.list:[];if(o.length===0)return{defaultBinding:a,agents:[t]};const l=[];return o.forEach((d,u)=>{if(!d||typeof d!="object")return;const h=d,f=typeof h.id=="string"?h.id.trim():"";if(!f)return;const m=typeof h.name=="string"?h.name.trim():void 0,w=h.default===!0,c=(h.tools??{}).exec??{},g=typeof c.node=="string"&&c.node.trim()?c.node.trim():null;l.push({id:f,name:m||void 0,index:u,isDefault:w,binding:g})}),l.length===0&&l.push(t),{defaultBinding:a,agents:l}}function O0(e){const t=!!e.connected,n=!!e.paired,s=typeof e.displayName=="string"&&e.displayName.trim()||(typeof e.nodeId=="string"?e.nodeId:"unknown"),a=Array.isArray(e.caps)?e.caps:[],i=Array.isArray(e.commands)?e.commands:[];return r`
+  `}function M0(e){const t=[];for(const n of e){if(!(Array.isArray(n.commands)?n.commands:[]).some(l=>String(l)==="system.run"))continue;const i=typeof n.nodeId=="string"?n.nodeId.trim():"";if(!i)continue;const o=typeof n.displayName=="string"&&n.displayName.trim()?n.displayName.trim():i;t.push({id:i,label:o===i?i:`${o} · ${i}`})}return t.sort((n,s)=>n.label.localeCompare(s.label)),t}function O0(e){const t=[];for(const n of e){if(!(Array.isArray(n.commands)?n.commands:[]).some(l=>String(l)==="system.execApprovals.get"||String(l)==="system.execApprovals.set"))continue;const i=typeof n.nodeId=="string"?n.nodeId.trim():"";if(!i)continue;const o=typeof n.displayName=="string"&&n.displayName.trim()?n.displayName.trim():i;t.push({id:i,label:o===i?i:`${o} · ${i}`})}return t.sort((n,s)=>n.label.localeCompare(s.label)),t}function F0(e){const t={id:"main",name:void 0,index:0,isDefault:!0,binding:null};if(!e||typeof e!="object")return{defaultBinding:null,agents:[t]};const s=(e.tools??{}).exec??{},a=typeof s.node=="string"&&s.node.trim()?s.node.trim():null,i=e.agents??{},o=Array.isArray(i.list)?i.list:[];if(o.length===0)return{defaultBinding:a,agents:[t]};const l=[];return o.forEach((d,u)=>{if(!d||typeof d!="object")return;const h=d,f=typeof h.id=="string"?h.id.trim():"";if(!f)return;const m=typeof h.name=="string"?h.name.trim():void 0,w=h.default===!0,c=(h.tools??{}).exec??{},g=typeof c.node=="string"&&c.node.trim()?c.node.trim():null;l.push({id:f,name:m||void 0,index:u,isDefault:w,binding:g})}),l.length===0&&l.push(t),{defaultBinding:a,agents:l}}function N0(e){const t=!!e.connected,n=!!e.paired,s=typeof e.displayName=="string"&&e.displayName.trim()||(typeof e.nodeId=="string"?e.nodeId:"unknown"),a=Array.isArray(e.caps)?e.caps:[],i=Array.isArray(e.commands)?e.commands:[];return r`
     <div class="list-item">
       <div class="list-main">
         <div class="list-title">${s}</div>
@@ -5351,7 +5364,7 @@ ${i}
         </div>
       </div>
     </div>
-  `}function F0(e){const t=e.hello?.snapshot,n=t?.uptimeMs?Hi(t.uptimeMs):"n/a",s=t?.policy?.tickIntervalMs?`${t.policy.tickIntervalMs}ms`:"n/a",a=(()=>{if(e.connected||!e.lastError)return null;const o=e.lastError.toLowerCase();if(!(o.includes("unauthorized")||o.includes("connect failed")))return null;const d=!!e.settings.token.trim(),u=!!e.password.trim();return!d&&!u?r`
+  `}function B0(e){const t=e.hello?.snapshot,n=t?.uptimeMs?Hi(t.uptimeMs):"n/a",s=t?.policy?.tickIntervalMs?`${t.policy.tickIntervalMs}ms`:"n/a",a=(()=>{if(e.connected||!e.lastError)return null;const o=e.lastError.toLowerCase();if(!(o.includes("unauthorized")||o.includes("connect failed")))return null;const d=!!e.settings.token.trim(),u=!!e.password.trim();return!d&&!u?r`
         <div class="muted" style="margin-top: 8px">
           This gateway requires auth. Add a token or password, then click Connect.
           <div style="margin-top: 6px">
@@ -5618,20 +5631,20 @@ ${i}
         </div>
       </div>
     </section>
-  `}const N0=["","off","minimal","low","medium","high"],B0=["","off","on"],U0=[{value:"",label:"inherit"},{value:"off",label:"off (explicit)"},{value:"on",label:"on"}],z0=["","off","on","stream"];function K0(e){if(!e)return"";const t=e.trim().toLowerCase();return t==="z.ai"||t==="z-ai"?"zai":t}function up(e){return K0(e)==="zai"}function W0(e){return up(e)?B0:N0}function q0(e,t){return!t||!e||e==="off"?e:"on"}function j0(e,t){return e?t&&e==="on"?"low":e:null}function V0(e){switch(e){case"idle-7d":return"Idle > 7 days";case"task-complete":return"Task completed";case"manual":return"Manual";default:return e}}function H0(){return r`<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+  `}const U0=["","off","minimal","low","medium","high"],z0=["","off","on"],K0=[{value:"",label:"inherit"},{value:"off",label:"off (explicit)"},{value:"on",label:"on"}],W0=["","off","on","stream"];function q0(e){if(!e)return"";const t=e.trim().toLowerCase();return t==="z.ai"||t==="z-ai"?"zai":t}function up(e){return q0(e)==="zai"}function j0(e){return up(e)?z0:U0}function V0(e,t){return!t||!e||e==="off"?e:"on"}function H0(e,t){return e?t&&e==="on"?"low":e:null}function G0(e){switch(e){case"idle-7d":return"Idle > 7 days";case"task-complete":return"Task completed";case"manual":return"Manual";default:return e}}function Q0(){return r`<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
     <rect x="2" y="3" width="20" height="5" rx="1"/>
     <path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8"/>
     <path d="M10 12h4"/>
-  </svg>`}function G0(){return r`<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+  </svg>`}function Y0(){return r`<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
     <polyline points="9 14 4 9 9 4"/>
     <path d="M20 20v-7a4 4 0 0 0-4-4H4"/>
-  </svg>`}function Q0(e){return r`<svg
+  </svg>`}function J0(e){return r`<svg
     width="12" height="12" viewBox="0 0 24 24" fill="none"
     stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
     style="transition: transform 150ms ease; transform: rotate(${e?"90deg":"0deg"});"
   >
     <polyline points="9 18 15 12 9 6"/>
-  </svg>`}function Y0(e){const t=e.result?.sessions??[],n=new Set(e.archivedSessions.map(i=>i.sessionKey)),s=t.filter(i=>!n.has(i.key)),a=e.archivedSessions.length;return r`
+  </svg>`}function X0(e){const t=e.result?.sessions??[],n=new Set(e.archivedSessions.map(i=>i.sessionKey)),s=t.filter(i=>!n.has(i.key)),a=e.archivedSessions.length;return r`
     <section class="card">
       <div class="row" style="justify-content: space-between;">
         <div>
@@ -5706,19 +5719,19 @@ ${i}
         </div>
         ${s.length===0?r`
                 <div class="muted">No active sessions found.</div>
-              `:s.map(i=>X0(i,e.basePath,e.onPatch,e.onDelete,e.onArchive,e.loading))}
+              `:s.map(i=>eS(i,e.basePath,e.onPatch,e.onDelete,e.onArchive,e.loading))}
       </div>
     </section>
 
-    ${J0(e,a)}
-  `}function J0(e,t){return t===0&&!e.archivedSessionsLoading?p:r`
+    ${Z0(e,a)}
+  `}function Z0(e,t){return t===0&&!e.archivedSessionsLoading?p:r`
     <section class="card archived-section">
       <div
         class="archived-section__header"
         @click=${e.onToggleArchived}
       >
         <div class="row" style="gap: 8px; align-items: center;">
-          ${Q0(e.archivedSessionsExpanded)}
+          ${J0(e.archivedSessionsExpanded)}
           <span class="archived-section__title">Archived</span>
           ${t>0?r`<span class="archived-badge">${t}</span>`:p}
         </div>
@@ -5736,11 +5749,11 @@ ${i}
                   <div>Linked Task</div>
                   <div>Actions</div>
                 </div>
-                ${e.archivedSessionsLoading?r`<div class="muted" style="padding: 12px;">Loading...</div>`:e.archivedSessions.length===0?r`<div class="muted" style="padding: 12px;">No archived sessions.</div>`:e.archivedSessions.map(n=>Z0(n,e.onUnarchive,e.loading))}
+                ${e.archivedSessionsLoading?r`<div class="muted" style="padding: 12px;">Loading...</div>`:e.archivedSessions.length===0?r`<div class="muted" style="padding: 12px;">No archived sessions.</div>`:e.archivedSessions.map(n=>tS(n,e.onUnarchive,e.loading))}
               </div>
             `:p}
     </section>
-  `}function X0(e,t,n,s,a,i){const o=e.updatedAt?K(e.updatedAt):"n/a",l=e.thinkingLevel??"",d=up(e.modelProvider),u=q0(l,d),h=W0(e.modelProvider),f=e.verboseLevel??"",m=e.reasoningLevel??"",w=e.displayName??e.key,$=e.kind!=="global",c=$?`${Vi("chat",t)}?session=${encodeURIComponent(e.key)}`:null;return r`
+  `}function eS(e,t,n,s,a,i){const o=e.updatedAt?K(e.updatedAt):"n/a",l=e.thinkingLevel??"",d=up(e.modelProvider),u=V0(l,d),h=j0(e.modelProvider),f=e.verboseLevel??"",m=e.reasoningLevel??"",w=e.displayName??e.key,$=e.kind!=="global",c=$?`${Vi("chat",t)}?session=${encodeURIComponent(e.key)}`:null;return r`
     <div class="table-row">
       <div class="mono">${$?r`<a href=${c} class="session-link">${w}</a>`:w}</div>
       <div>
@@ -5753,12 +5766,12 @@ ${i}
       </div>
       <div>${e.kind}</div>
       <div>${o}</div>
-      <div>${uk(e)}</div>
+      <div>${pk(e)}</div>
       <div>
         <select
           .value=${u}
           ?disabled=${i}
-          @change=${g=>{const k=g.target.value;n(e.key,{thinkingLevel:j0(k,d)})}}
+          @change=${g=>{const k=g.target.value;n(e.key,{thinkingLevel:H0(k,d)})}}
         >
           ${h.map(g=>r`<option value=${g}>${g||"inherit"}</option>`)}
         </select>
@@ -5769,7 +5782,7 @@ ${i}
           ?disabled=${i}
           @change=${g=>{const k=g.target.value;n(e.key,{verboseLevel:k||null})}}
         >
-          ${U0.map(g=>r`<option value=${g.value}>${g.label}</option>`)}
+          ${K0.map(g=>r`<option value=${g.value}>${g.label}</option>`)}
         </select>
       </div>
       <div>
@@ -5778,7 +5791,7 @@ ${i}
           ?disabled=${i}
           @change=${g=>{const k=g.target.value;n(e.key,{reasoningLevel:k||null})}}
         >
-          ${z0.map(g=>r`<option value=${g}>${g||"inherit"}</option>`)}
+          ${W0.map(g=>r`<option value=${g}>${g||"inherit"}</option>`)}
         </select>
       </div>
       <div class="row" style="gap: 4px;">
@@ -5788,18 +5801,18 @@ ${i}
           @click=${()=>a(e.key)}
           title="Archive this session"
         >
-          ${H0()}
+          ${Q0()}
         </button>
         <button class="btn danger btn--sm" ?disabled=${i} @click=${()=>s(e.key)}>
           Delete
         </button>
       </div>
     </div>
-  `}function Z0(e,t,n){const s=K(Date.parse(e.archivedAt));return r`
+  `}function tS(e,t,n){const s=K(Date.parse(e.archivedAt));return r`
     <div class="archived-table__row">
       <div class="mono" style="opacity: 0.7;">${e.sessionKey}</div>
       <div>${s}</div>
-      <div>${V0(e.reason)}</div>
+      <div>${G0(e.reason)}</div>
       <div class="mono" style="font-size: 11px; opacity: 0.6;">
         ${e.linkedTaskId?e.linkedTaskId.slice(0,8):"--"}
       </div>
@@ -5810,11 +5823,11 @@ ${i}
           @click=${()=>t(e.sessionKey)}
           title="Restore this session"
         >
-          ${G0()}
+          ${Y0()}
         </button>
       </div>
     </div>
-  `}function eS(e){return r`<div class="muted" style="padding: 16px;">ClawHub has been retired.</div>`}function tS(e){const t=e.subTab==="godmode",n=t||e.subTab==="my-skills";return r`
+  `}function nS(e){return r`<div class="muted" style="padding: 16px;">ClawHub has been retired.</div>`}function sS(e){const t=e.subTab==="godmode",n=t||e.subTab==="my-skills";return r`
     <section class="card">
       <div class="row" style="justify-content: space-between; align-items: center;">
         <div class="chip-row" style="gap: 0;">
@@ -5848,11 +5861,11 @@ ${i}
             </button>`:p}
       </div>
 
-      ${t?nS(e):p}
-      ${e.subTab==="my-skills"?iS(e):p}
-      ${e.subTab==="clawhub"?r`<div style="margin-top: 16px;">${eS(e.clawhub)}</div>`:p}
+      ${t?aS(e):p}
+      ${e.subTab==="my-skills"?rS(e):p}
+      ${e.subTab==="clawhub"?r`<div style="margin-top: 16px;">${nS(e.clawhub)}</div>`:p}
     </section>
-  `}function nS(e){const t=e.godmodeSkills,n=e.godmodeSkillsLoading,s=e.filter.trim().toLowerCase();if(n&&!t)return r`<div class="muted" style="margin-top: 16px;">Loading GodMode skills...</div>`;if(!t||t.total===0)return r`<div class="muted" style="margin-top: 16px;">No GodMode skills found.</div>`;const a=[...t.skills.map(o=>({...o,_kind:"skill"})),...t.cards.map(o=>({...o,_kind:"card"}))],i=s?a.filter(o=>[o.slug,o.name,o.body.slice(0,200)].join(" ").toLowerCase().includes(s)):a;return r`
+  `}function aS(e){const t=e.godmodeSkills,n=e.godmodeSkillsLoading,s=e.filter.trim().toLowerCase();if(n&&!t)return r`<div class="muted" style="margin-top: 16px;">Loading GodMode skills...</div>`;if(!t||t.total===0)return r`<div class="muted" style="margin-top: 16px;">No GodMode skills found.</div>`;const a=[...t.skills.map(o=>({...o,_kind:"skill"})),...t.cards.map(o=>({...o,_kind:"card"}))],i=s?a.filter(o=>[o.slug,o.name,o.body.slice(0,200)].join(" ").toLowerCase().includes(s)):a;return r`
     <div class="filters" style="margin-top: 14px;">
       <label class="field" style="flex: 1;">
         <span>Filter</span>
@@ -5866,9 +5879,9 @@ ${i}
     </div>
 
     ${i.length===0?r`<div class="muted" style="margin-top: 16px;">No matches.</div>`:r`<div class="list" style="margin-top: 16px;">
-          ${i.map(o=>o._kind==="skill"?sS(o,e.expandedSkills.has(o.slug),e.onToggleExpand):aS(o,e.expandedSkills.has(o.slug),e.onToggleExpand))}
+          ${i.map(o=>o._kind==="skill"?iS(o,e.expandedSkills.has(o.slug),e.onToggleExpand):oS(o,e.expandedSkills.has(o.slug),e.onToggleExpand))}
         </div>`}
-  `}function sS(e,t,n){const s=e.body.split(`
+  `}function iS(e,t,n){const s=e.body.split(`
 `).find(i=>i.trim().length>0)??"",a=!!e.schedule;return r`
     <div
       class="list-item"
@@ -5924,7 +5937,7 @@ ${i}
             `:p}
       </div>
     </div>
-  `}function aS(e,t,n){return r`
+  `}function oS(e,t,n){return r`
     <div
       class="list-item"
       style="cursor: pointer;"
@@ -5970,7 +5983,7 @@ ${i}
             `:p}
       </div>
     </div>
-  `}function iS(e){const t=e.report?.skills??[],n=e.filter.trim().toLowerCase(),s=n?t.filter(a=>[a.name,a.description,a.source].join(" ").toLowerCase().includes(n)):t;return r`
+  `}function rS(e){const t=e.report?.skills??[],n=e.filter.trim().toLowerCase(),s=n?t.filter(a=>[a.name,a.description,a.source].join(" ").toLowerCase().includes(n)):t;return r`
     <div class="filters" style="margin-top: 14px;">
       <label class="field" style="flex: 1;">
         <span>Filter</span>
@@ -5986,9 +5999,9 @@ ${i}
     ${e.error?r`<div class="callout danger" style="margin-top: 12px;">${e.error}</div>`:p}
 
     ${s.length===0?r`<div class="muted" style="margin-top: 16px">No integrations found.</div>`:r`<div class="list" style="margin-top: 16px;">
-            ${s.map(a=>oS(a,e))}
+            ${s.map(a=>lS(a,e))}
           </div>`}
-  `}function oS(e,t){const n=t.busyKey===e.skillKey,s=t.edits[e.skillKey]??"",a=t.messages[e.skillKey]??null,i=e.install.length>0&&e.missing.bins.length>0,o=[...e.missing.bins.map(d=>`bin:${d}`),...e.missing.env.map(d=>`env:${d}`),...e.missing.config.map(d=>`config:${d}`),...e.missing.os.map(d=>`os:${d}`)],l=[];return e.disabled&&l.push("disabled"),e.blockedByAllowlist&&l.push("blocked by allowlist"),r`
+  `}function lS(e,t){const n=t.busyKey===e.skillKey,s=t.edits[e.skillKey]??"",a=t.messages[e.skillKey]??null,i=e.install.length>0&&e.missing.bins.length>0,o=[...e.missing.bins.map(d=>`bin:${d}`),...e.missing.env.map(d=>`env:${d}`),...e.missing.config.map(d=>`config:${d}`),...e.missing.os.map(d=>`os:${d}`)],l=[];return e.disabled&&l.push("disabled"),e.blockedByAllowlist&&l.push("blocked by allowlist"),r`
     <div class="list-item">
       <div class="list-main">
         <div class="list-title">
@@ -6058,7 +6071,7 @@ ${i}
             `:p}
       </div>
     </div>
-  `}function rS(e){switch(e){case"claude":return"chip-ok";case"codex":return"chip-warn";case"gemini":return"chip-info";default:return""}}function lS(e){const t=e.filter.trim().toLowerCase(),n=t?e.roster.filter(i=>[i.slug,i.name,i.category,i.mission??"",...i.taskTypes].join(" ").toLowerCase().includes(t)):e.roster,s=new Map;for(const i of n){const o=i.category||"_default";s.has(o)||s.set(o,[]),s.get(o).push(i)}const a=[...s.keys()].sort((i,o)=>i==="_default"?1:o==="_default"?-1:i.localeCompare(o));return r`
+  `}function cS(e){switch(e){case"claude":return"chip-ok";case"codex":return"chip-warn";case"gemini":return"chip-info";default:return""}}function dS(e){const t=e.filter.trim().toLowerCase(),n=t?e.roster.filter(i=>[i.slug,i.name,i.category,i.mission??"",...i.taskTypes].join(" ").toLowerCase().includes(t)):e.roster,s=new Map;for(const i of n){const o=i.category||"_default";s.has(o)||s.set(o,[]),s.get(o).push(i)}const a=[...s.keys()].sort((i,o)=>i==="_default"?1:o==="_default"?-1:i.localeCompare(o));return r`
     <section class="card">
       <div class="row" style="justify-content: space-between; align-items: center;">
         <div class="muted">${n.length} agent${n.length!==1?"s":""}</div>
@@ -6096,12 +6109,12 @@ ${i}
               ${l}
             </div>
             <div class="list">
-              ${o.map(d=>cS(d,e.expandedAgents.has(d.slug),e.onToggleExpand))}
+              ${o.map(d=>uS(d,e.expandedAgents.has(d.slug),e.onToggleExpand))}
             </div>
           </div>
         `})}
     </section>
-  `}function pp(e){return e.replace(/[-_]/g," ").replace(/\b\w/g,t=>t.toUpperCase())}function cS(e,t,n){return r`
+  `}function pp(e){return e.replace(/[-_]/g," ").replace(/\b\w/g,t=>t.toUpperCase())}function uS(e,t,n){return r`
     <div
       class="list-item"
       style="cursor: pointer;"
@@ -6114,7 +6127,7 @@ ${i}
             \u25B6
           </span>
           <div class="list-title" style="flex: 1;">${e.name}</div>
-          ${e.engine?r`<span class="chip ${rS(e.engine)}" style="font-size: 11px;">${e.engine}</span>`:p}
+          ${e.engine?r`<span class="chip ${cS(e.engine)}" style="font-size: 11px;">${e.engine}</span>`:p}
         </div>
         ${e.mission?r`<div class="list-sub" style="margin-left: 18px;">${Xn(e.mission,120)}</div>`:p}
         <div class="chip-row" style="margin-top: 6px; margin-left: 18px;">
@@ -6151,7 +6164,7 @@ ${i}
             `:p}
       </div>
     </div>
-  `}function hp(){return{open:!1,images:[],currentIndex:0}}function dS(e,t,n){return{open:!0,images:t,currentIndex:n}}function uS(){return hp()}function pS(e,t){const n=e.currentIndex+t;return n<0||n>=e.images.length?e:{...e,currentIndex:n}}const hS=r`<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>`,fS=r`<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>`,gS=r`<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"/></svg>`;function mS(e,t){if(!e.open||e.images.length===0)return p;const n=e.images[e.currentIndex];if(!n)return p;const s=e.images.length>1,a=e.currentIndex>0,i=e.currentIndex<e.images.length-1;return r`
+  `}function hp(){return{open:!1,images:[],currentIndex:0}}function pS(e,t,n){return{open:!0,images:t,currentIndex:n}}function hS(){return hp()}function fS(e,t){const n=e.currentIndex+t;return n<0||n>=e.images.length?e:{...e,currentIndex:n}}const gS=r`<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>`,mS=r`<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>`,vS=r`<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"/></svg>`;function yS(e,t){if(!e.open||e.images.length===0)return p;const n=e.images[e.currentIndex];if(!n)return p;const s=e.images.length>1,a=e.currentIndex>0,i=e.currentIndex<e.images.length-1;return r`
     <div
       class="lightbox-overlay"
       @click=${o=>{o.target.classList.contains("lightbox-overlay")&&t.onClose()}}
@@ -6159,10 +6172,10 @@ ${i}
       tabindex="0"
     >
       <button class="lightbox-close" @click=${t.onClose} aria-label="Close image viewer">
-        ${hS}
+        ${gS}
       </button>
 
-      ${s&&a?r`<button class="lightbox-nav lightbox-nav--prev" @click=${()=>t.onNav(-1)} aria-label="Previous image">${fS}</button>`:p}
+      ${s&&a?r`<button class="lightbox-nav lightbox-nav--prev" @click=${()=>t.onNav(-1)} aria-label="Previous image">${mS}</button>`:p}
 
       <img
         class="lightbox-image"
@@ -6172,11 +6185,11 @@ ${i}
         @error=${o=>{o.target.classList.add("lightbox-image--broken")}}
       />
 
-      ${s&&i?r`<button class="lightbox-nav lightbox-nav--next" @click=${()=>t.onNav(1)} aria-label="Next image">${gS}</button>`:p}
+      ${s&&i?r`<button class="lightbox-nav lightbox-nav--next" @click=${()=>t.onNav(1)} aria-label="Next image">${vS}</button>`:p}
 
       ${s?r`<div class="lightbox-counter">${e.currentIndex+1} / ${e.images.length}</div>`:p}
     </div>
-  `}const vS=e=>{switch(e){case"success":return r`
+  `}const bS=e=>{switch(e){case"success":return r`
         <svg
           width="16"
           height="16"
@@ -6232,11 +6245,11 @@ ${i}
           <circle cx="8" cy="8" r="7" />
           <path d="M8 11V8M8 5h.01" />
         </svg>
-      `}};function yS({toasts:e,onDismiss:t}){return e.length===0?null:r`
+      `}};function wS({toasts:e,onDismiss:t}){return e.length===0?null:r`
     <div class="toast-container">
       ${fa(e,n=>n.id,n=>r`
           <div class="toast toast--${n.type}">
-            <div class="toast__icon">${vS(n.type)}</div>
+            <div class="toast__icon">${bS(n.type)}</div>
             <div class="toast__body">
               <div class="toast__message">${n.message}</div>
               ${n.action?r`${n.action.url?r`<a
@@ -6261,7 +6274,7 @@ ${i}
           </div>
         `)}
     </div>
-  `}const tc=[{key:"focusPulse.enabled",icon:"☀️",name:"Focus Pulse",description:"Morning priority ritual + persistent focus widget in the topbar. Silent 30-min pulse checks compare your activity against your plan.",default:!0}];function bS(e,t){return r`
+  `}const tc=[{key:"focusPulse.enabled",icon:"☀️",name:"Focus Pulse",description:"Morning priority ritual + persistent focus widget in the topbar. Silent 30-min pulse checks compare your activity against your plan.",default:!0}];function $S(e,t){return r`
     <button
       class="options-toggle ${e?"options-toggle--on":""}"
       role="switch"
@@ -6272,25 +6285,25 @@ ${i}
         <span class="options-toggle-thumb"></span>
       </span>
     </button>
-  `}function wS(e,t,n){const a=!!(t?.[e.key]??e.default);return r`
+  `}function kS(e,t,n){const a=!!(t?.[e.key]??e.default);return r`
     <div class="options-card card">
       <div class="options-card-header">
         <div class="options-card-info">
           <span class="options-card-icon">${e.icon}</span>
           <span class="options-card-name">${e.name}</span>
         </div>
-        ${bS(a,()=>n(e.key,!a))}
+        ${$S(a,()=>n(e.key,!a))}
       </div>
       <div class="options-card-description">${e.description}</div>
     </div>
-  `}function $S(e){const{connected:t,loading:n,options:s,onToggle:a,onOpenWizard:i}=e;return t?n&&!s?r`
+  `}function SS(e){const{connected:t,loading:n,options:s,onToggle:a,onOpenWizard:i}=e;return t?n&&!s?r`
       <section class="tab-body options-section">
         <div class="options-loading">Loading options...</div>
       </section>
     `:r`
     <section class="tab-body options-section">
       <div class="options-grid">
-        ${tc.map(o=>wS(o,s,a))}
+        ${tc.map(o=>kS(o,s,a))}
       </div>
       ${tc.length===0?r`<div class="options-empty">
             No configurable features yet.
@@ -6320,7 +6333,7 @@ ${i}
       <section class="tab-body options-section">
         <div class="options-empty">Not connected to gateway.</div>
       </section>
-    `}const nc=["America/New_York","America/Chicago","America/Denver","America/Los_Angeles","America/Anchorage","Pacific/Honolulu","Europe/London","Europe/Paris","Europe/Berlin","Asia/Tokyo","Asia/Shanghai","Asia/Kolkata","Australia/Sydney","Pacific/Auckland"],kS=["Direct and concise -- no fluff, just answers","Detailed explanations -- walk me through the reasoning","Casual and conversational -- like talking to a friend","Structured with bullet points -- organized and scannable","Technical and precise -- specifics matter"],SS=[{value:"sonnet",label:"Sonnet (fast, balanced)"},{value:"opus",label:"Opus (deep reasoning)"},{value:"haiku",label:"Haiku (quick, lightweight)"}],ai=["Never send emails without explicit approval","Never delete or overwrite files without backup","Always search memory before guessing","Never share private information externally"],sc=[{label:"Name",question:"What should I call you?"},{label:"Timezone",question:"What timezone are you in?"},{label:"Focus",question:"What are you building or focused on?"},{label:"Projects",question:"What are your top projects? (1-3)"},{label:"Style",question:"How do you like to communicate?"},{label:"Rules",question:"What rules must the AI always follow?"},{label:"People",question:"Who are the key people in your work/life?"},{label:"Model",question:"What AI model do you prefer?"}];function ac(e){const n=Math.min(Number(e),8);return r`
+    `}const nc=["America/New_York","America/Chicago","America/Denver","America/Los_Angeles","America/Anchorage","Pacific/Honolulu","Europe/London","Europe/Paris","Europe/Berlin","Asia/Tokyo","Asia/Shanghai","Asia/Kolkata","Australia/Sydney","Pacific/Auckland"],AS=["Direct and concise -- no fluff, just answers","Detailed explanations -- walk me through the reasoning","Casual and conversational -- like talking to a friend","Structured with bullet points -- organized and scannable","Technical and precise -- specifics matter"],xS=[{value:"sonnet",label:"Sonnet (fast, balanced)"},{value:"opus",label:"Opus (deep reasoning)"},{value:"haiku",label:"Haiku (quick, lightweight)"}],ai=["Never send emails without explicit approval","Never delete or overwrite files without backup","Always search memory before guessing","Never share private information externally"],sc=[{label:"Name",question:"What should I call you?"},{label:"Timezone",question:"What timezone are you in?"},{label:"Focus",question:"What are you building or focused on?"},{label:"Projects",question:"What are your top projects? (1-3)"},{label:"Style",question:"How do you like to communicate?"},{label:"Rules",question:"What rules must the AI always follow?"},{label:"People",question:"Who are the key people in your work/life?"},{label:"Model",question:"What AI model do you prefer?"}];function ac(e){const n=Math.min(Number(e),8);return r`
     <div class="wizard-progress">
       <div class="wizard-progress-dots">
         ${Array.from({length:8},(s,a)=>r`
@@ -6331,11 +6344,11 @@ ${i}
         ${n<8?`Step ${n+1} of 8`:"Review"}
       </div>
     </div>
-  `}function AS(e){if(e>=sc.length)return r`${p}`;const t=sc[e];return r`
+  `}function TS(e){if(e>=sc.length)return r`${p}`;const t=sc[e];return r`
     <div class="wizard-step-header">
       <h2 class="wizard-question">${t.question}</h2>
     </div>
-  `}function xS(e,t,n,s){return r`
+  `}function _S(e,t,n,s){return r`
     <div class="wizard-nav">
       ${e>0?r`
             <button
@@ -6349,7 +6362,7 @@ ${i}
         @click=${()=>{s?(t.onStepChange(8),t.onPreview()):t.onStepChange(e+1)}}
       >${s?"Review":"Continue"}</button>
     </div>
-  `}function fp(){return r`<p class="wizard-skip-hint">Press Enter to use the default and continue</p>`}function TS(e,t){function n(a){const i=a.target.value;t.onAnswerChange("name",i)}function s(a){a.key==="Enter"&&(a.preventDefault(),t.onStepChange(1))}return r`
+  `}function fp(){return r`<p class="wizard-skip-hint">Press Enter to use the default and continue</p>`}function CS(e,t){function n(a){const i=a.target.value;t.onAnswerChange("name",i)}function s(a){a.key==="Enter"&&(a.preventDefault(),t.onStepChange(1))}return r`
     <div class="wizard-field">
       <input
         type="text"
@@ -6361,7 +6374,7 @@ ${i}
         autofocus
       />
     </div>
-  `}function _S(e,t){const n=Intl.DateTimeFormat().resolvedOptions().timeZone;return r`
+  `}function RS(e,t){const n=Intl.DateTimeFormat().resolvedOptions().timeZone;return r`
     <div class="wizard-field">
       <div class="wizard-detected">
         Detected: <strong>${n}</strong>
@@ -6380,7 +6393,7 @@ ${i}
       </select>
       ${fp()}
     </div>
-  `}function CS(e,t){function n(a){t.onAnswerChange("focus",a.target.value)}function s(a){a.key==="Enter"&&(a.preventDefault(),t.onStepChange(3))}return r`
+  `}function ES(e,t){function n(a){t.onAnswerChange("focus",a.target.value)}function s(a){a.key==="Enter"&&(a.preventDefault(),t.onStepChange(3))}return r`
     <div class="wizard-field">
       <input
         type="text"
@@ -6392,7 +6405,7 @@ ${i}
         autofocus
       />
     </div>
-  `}function RS(e,t){function n(){const i=document.querySelector(".wizard-project-input");if(!i)return;const o=i.value.trim();o&&e.projects.length<5&&(t.onAnswerChange("projects",[...e.projects,o]),i.value="",i.focus())}function s(i){const o=e.projects.filter((l,d)=>d!==i);t.onAnswerChange("projects",o)}function a(i){i.key==="Enter"&&(i.preventDefault(),i.target.value.trim()?n():e.projects.length>0&&t.onStepChange(4))}return r`
+  `}function PS(e,t){function n(){const i=document.querySelector(".wizard-project-input");if(!i)return;const o=i.value.trim();o&&e.projects.length<5&&(t.onAnswerChange("projects",[...e.projects,o]),i.value="",i.focus())}function s(i){const o=e.projects.filter((l,d)=>d!==i);t.onAnswerChange("projects",o)}function a(i){i.key==="Enter"&&(i.preventDefault(),i.target.value.trim()?n():e.projects.length>0&&t.onStepChange(4))}return r`
     <div class="wizard-field">
       <div class="wizard-tag-list">
         ${e.projects.map((i,o)=>r`
@@ -6414,10 +6427,10 @@ ${i}
       </div>
       ${e.projects.length===0?r`<p class="wizard-hint">Add 1-3 projects, or skip to continue</p>`:p}
     </div>
-  `}function ES(e,t){return r`
+  `}function LS(e,t){return r`
     <div class="wizard-field">
       <div class="wizard-radio-list">
-        ${kS.map(n=>r`
+        ${AS.map(n=>r`
             <label class="wizard-radio ${e.commStyle===n?"wizard-radio--selected":""}">
               <input
                 type="radio"
@@ -6440,7 +6453,7 @@ ${i}
         />
       </div>
     </div>
-  `}function PS(e,t){const n=e.hardRules.length>0?e.hardRules:[];function s(o){n.includes(o)?t.onAnswerChange("hardRules",n.filter(l=>l!==o)):t.onAnswerChange("hardRules",[...n,o])}function a(){const o=document.querySelector(".wizard-rule-input");if(!o)return;const l=o.value.trim();l&&(t.onAnswerChange("hardRules",[...n,l]),o.value="",o.focus())}function i(o){o.key==="Enter"&&(o.preventDefault(),o.target.value.trim()&&a())}return r`
+  `}function IS(e,t){const n=e.hardRules.length>0?e.hardRules:[];function s(o){n.includes(o)?t.onAnswerChange("hardRules",n.filter(l=>l!==o)):t.onAnswerChange("hardRules",[...n,o])}function a(){const o=document.querySelector(".wizard-rule-input");if(!o)return;const l=o.value.trim();l&&(t.onAnswerChange("hardRules",[...n,l]),o.value="",o.focus())}function i(o){o.key==="Enter"&&(o.preventDefault(),o.target.value.trim()&&a())}return r`
     <div class="wizard-field">
       <p class="wizard-hint">Select common rules or add your own:</p>
       <div class="wizard-checkbox-list">
@@ -6475,7 +6488,7 @@ ${i}
             </div>
           `:p}
     </div>
-  `}function LS(e,t){function n(){const i=document.querySelector(".wizard-person-input");if(!i)return;const o=i.value.trim();o&&e.keyPeople.length<10&&(t.onAnswerChange("keyPeople",[...e.keyPeople,o]),i.value="",i.focus())}function s(i){t.onAnswerChange("keyPeople",e.keyPeople.filter((o,l)=>l!==i))}function a(i){i.key==="Enter"&&(i.preventDefault(),i.target.value.trim()?n():e.keyPeople.length>0&&t.onStepChange(7))}return r`
+  `}function DS(e,t){function n(){const i=document.querySelector(".wizard-person-input");if(!i)return;const o=i.value.trim();o&&e.keyPeople.length<10&&(t.onAnswerChange("keyPeople",[...e.keyPeople,o]),i.value="",i.focus())}function s(i){t.onAnswerChange("keyPeople",e.keyPeople.filter((o,l)=>l!==i))}function a(i){i.key==="Enter"&&(i.preventDefault(),i.target.value.trim()?n():e.keyPeople.length>0&&t.onStepChange(7))}return r`
     <div class="wizard-field">
       <div class="wizard-tag-list">
         ${e.keyPeople.map((i,o)=>r`
@@ -6497,10 +6510,10 @@ ${i}
       </div>
       <p class="wizard-hint">Co-founders, family, key collaborators. You can add more later.</p>
     </div>
-  `}function IS(e,t){return r`
+  `}function MS(e,t){return r`
     <div class="wizard-field">
       <div class="wizard-radio-list">
-        ${SS.map(n=>r`
+        ${xS.map(n=>r`
             <label class="wizard-radio ${e.defaultModel===n.value?"wizard-radio--selected":""}">
               <input
                 type="radio"
@@ -6515,7 +6528,7 @@ ${i}
       </div>
       ${fp()}
     </div>
-  `}function ii(e){return e==null?"not set":typeof e=="string"?e:typeof e=="boolean"||typeof e=="number"?String(e):(Array.isArray(e),JSON.stringify(e))}function DS(e,t){const{answers:n,preview:s,diff:a,fileSelections:i,configSelections:o,generating:l}=e,d=s?.some(h=>h.exists)??!1,u=a&&(a.changes.length>0||a.additions.length>0);return r`
+  `}function ii(e){return e==null?"not set":typeof e=="string"?e:typeof e=="boolean"||typeof e=="number"?String(e):(Array.isArray(e),JSON.stringify(e))}function OS(e,t){const{answers:n,preview:s,diff:a,fileSelections:i,configSelections:o,generating:l}=e,d=s?.some(h=>h.exists)??!1,u=a&&(a.changes.length>0||a.additions.length>0);return r`
     <div class="wizard-review">
       <h2 class="wizard-review-title">Ready to generate your workspace</h2>
 
@@ -6633,7 +6646,7 @@ ${i}
 
       ${e.error?r`<div class="wizard-error">${e.error}</div>`:p}
     </div>
-  `}function MS(e,t){const n=e.result;return n?r`
+  `}function FS(e,t){const n=e.result;return n?r`
     <div class="wizard-success">
       <div class="wizard-success-icon">
         <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="var(--ok, #22c55e)" stroke-width="2">
@@ -6665,28 +6678,28 @@ ${i}
         Start Using GodMode
       </button>
     </div>
-  `:r`${p}`}function gp(){return{name:"",timezone:Intl.DateTimeFormat().resolvedOptions().timeZone,focus:"",projects:[],commStyle:"Direct and concise -- no fluff, just answers",hardRules:[],keyPeople:[],defaultModel:"sonnet"}}function OS(){return{step:0,answers:gp(),preview:null,diff:null,fileSelections:{},configSelections:{},generating:!1,result:null,error:null}}function mp(e,t){const{step:n,answers:s}=e;if(n===9)return r`
+  `:r`${p}`}function gp(){return{name:"",timezone:Intl.DateTimeFormat().resolvedOptions().timeZone,focus:"",projects:[],commStyle:"Direct and concise -- no fluff, just answers",hardRules:[],keyPeople:[],defaultModel:"sonnet"}}function NS(){return{step:0,answers:gp(),preview:null,diff:null,fileSelections:{},configSelections:{},generating:!1,result:null,error:null}}function mp(e,t){const{step:n,answers:s}=e;if(n===9)return r`
       <div class="wizard-fullscreen">
-        ${MS(e,t)}
+        ${FS(e,t)}
       </div>
     `;if(n===8)return r`
       <div class="wizard-fullscreen">
         <div class="wizard-container">
           ${ac(n)}
-          ${DS(e,t)}
+          ${OS(e,t)}
         </div>
       </div>
-    `;const a=(()=>{switch(n){case 0:return s.name.trim().length>0;case 1:return!0;case 2:return!0;case 3:return!0;case 4:return s.commStyle.trim().length>0;case 5:return!0;case 6:return!0;case 7:return!0;default:return!1}})(),i=n===7,o=(()=>{switch(n){case 0:return TS(s,t);case 1:return _S(s,t);case 2:return CS(s,t);case 3:return RS(s,t);case 4:return ES(s,t);case 5:return PS(s,t);case 6:return LS(s,t);case 7:return IS(s,t);default:return r`${p}`}})();return r`
+    `;const a=(()=>{switch(n){case 0:return s.name.trim().length>0;case 1:return!0;case 2:return!0;case 3:return!0;case 4:return s.commStyle.trim().length>0;case 5:return!0;case 6:return!0;case 7:return!0;default:return!1}})(),i=n===7,o=(()=>{switch(n){case 0:return CS(s,t);case 1:return RS(s,t);case 2:return ES(s,t);case 3:return PS(s,t);case 4:return LS(s,t);case 5:return IS(s,t);case 6:return DS(s,t);case 7:return MS(s,t);default:return r`${p}`}})();return r`
     <div class="wizard-fullscreen">
       <div class="wizard-container">
         <div class="wizard-glow"></div>
         ${ac(n)}
-        ${AS(n)}
+        ${TS(n)}
         ${o}
-        ${xS(n,t,a,i)}
+        ${_S(n,t,a,i)}
       </div>
     </div>
-  `}const FS=Object.freeze(Object.defineProperty({__proto__:null,emptyWizardAnswers:gp,emptyWizardState:OS,renderOnboardingWizard:mp},Symbol.toStringTag,{value:"Module"}));function gn(e){return e===null?"none":e>=8?"high":e>=5?"medium":"low"}function ds(e){return{high:"trust-score--high",medium:"trust-score--medium",low:"trust-score--low",none:"trust-score--none"}[e]}function NS(e){return{improving:"Improving",declining:"Declining",stable:"Stable",new:"New"}[e]??"New"}function BS(e){return{improving:"trust-trend--up",declining:"trust-trend--down",stable:"trust-trend--stable",new:"trust-trend--new"}[e]??"trust-trend--new"}function US(e){return{improving:"↑",declining:"↓",stable:"→",new:"•"}[e]??"•"}function zS(e){const t=Date.now()-Date.parse(e),n=Math.floor(t/6e4);if(n<1)return"just now";if(n<60)return`${n}m ago`;const s=Math.floor(n/60);if(s<24)return`${s}h ago`;const a=Math.floor(s/24);return a<7?`${a}d ago`:new Date(e).toLocaleDateString()}function KS(e){const t=e.overallScore,n=gn(t);return r`
+  `}const BS=Object.freeze(Object.defineProperty({__proto__:null,emptyWizardAnswers:gp,emptyWizardState:NS,renderOnboardingWizard:mp},Symbol.toStringTag,{value:"Module"}));function gn(e){return e===null?"none":e>=8?"high":e>=5?"medium":"low"}function ds(e){return{high:"trust-score--high",medium:"trust-score--medium",low:"trust-score--low",none:"trust-score--none"}[e]}function US(e){return{improving:"Improving",declining:"Declining",stable:"Stable",new:"New"}[e]??"New"}function zS(e){return{improving:"trust-trend--up",declining:"trust-trend--down",stable:"trust-trend--stable",new:"trust-trend--new"}[e]??"trust-trend--new"}function KS(e){return{improving:"↑",declining:"↓",stable:"→",new:"•"}[e]??"•"}function WS(e){const t=Date.now()-Date.parse(e),n=Math.floor(t/6e4);if(n<1)return"just now";if(n<60)return`${n}m ago`;const s=Math.floor(n/60);if(s<24)return`${s}h ago`;const a=Math.floor(s/24);return a<7?`${a}d ago`:new Date(e).toLocaleDateString()}function qS(e){const t=e.overallScore,n=gn(t);return r`
     <div class="trust-overall">
       <div class="trust-overall-score ${ds(n)}">
         <span class="trust-overall-number">${t!==null?t.toFixed(1):"--"}</span>
@@ -6700,14 +6713,14 @@ ${i}
         </span>
       </div>
     </div>
-  `}function WS(e,t){const s=Math.min(100,Math.max(0,(e??t)/10*100)),a=gn(e??(t>0?t:null));return r`
+  `}function jS(e,t){const s=Math.min(100,Math.max(0,(e??t)/10*100)),a=gn(e??(t>0?t:null));return r`
     <div class="trust-progress">
       <div
         class="trust-progress-fill ${ds(a)}"
         style="width: ${s}%"
       ></div>
     </div>
-  `}function qS(e,t){const s=e.trustScore!==null?e.trustScore.toFixed(1):e.avgRating>0?e.avgRating.toFixed(1):"--",a=gn(e.trustScore??(e.avgRating>0?e.avgRating:null)),i=e.count<10?10-e.count:0;return r`
+  `}function VS(e,t){const s=e.trustScore!==null?e.trustScore.toFixed(1):e.avgRating>0?e.avgRating.toFixed(1):"--",a=gn(e.trustScore??(e.avgRating>0?e.avgRating:null)),i=e.count<10?10-e.count:0;return r`
     <div class="trust-card">
       <div class="trust-card-header">
         <span class="trust-card-name">${e.workflow}</span>
@@ -6721,12 +6734,12 @@ ${i}
       <div class="trust-card-score-row">
         <span class="trust-card-score ${ds(a)}">${s}</span>
         <span class="trust-card-score-label">/10</span>
-        <span class="trust-trend ${BS(e.trend)}">
-          ${US(e.trend)} ${NS(e.trend)}
+        <span class="trust-trend ${zS(e.trend)}">
+          ${KS(e.trend)} ${US(e.trend)}
         </span>
       </div>
 
-      ${WS(e.trustScore,e.avgRating)}
+      ${jS(e.trustScore,e.avgRating)}
 
       <div class="trust-card-meta">
         <span class="trust-card-count">${e.count} rating${e.count!==1?"s":""}</span>
@@ -6741,18 +6754,18 @@ ${i}
             </div>
           `:p}
     </div>
-  `}function jS(){return[{workflow:"Code Reviews",avgRating:8.2,count:14,trustScore:8.2,needsFeedback:!1,trend:"improving",recentNotes:[],recentFeedback:[]},{workflow:"Email Drafts",avgRating:6.5,count:11,trustScore:6.5,needsFeedback:!0,trend:"stable",recentNotes:[],recentFeedback:["Be more concise","Match my tone"]},{workflow:"Research",avgRating:7.8,count:3,trustScore:null,needsFeedback:!1,trend:"new",recentNotes:[],recentFeedback:[]}]}function VS(){const e=jS();return{workflows:e.map(t=>t.workflow),summaries:e,ratings:[],total:0,overallScore:7.6,totalRatings:28,totalUses:28}}function HS(e){const t=gn(e.rating);return r`
+  `}function HS(){return[{workflow:"Code Reviews",avgRating:8.2,count:14,trustScore:8.2,needsFeedback:!1,trend:"improving",recentNotes:[],recentFeedback:[]},{workflow:"Email Drafts",avgRating:6.5,count:11,trustScore:6.5,needsFeedback:!0,trend:"stable",recentNotes:[],recentFeedback:["Be more concise","Match my tone"]},{workflow:"Research",avgRating:7.8,count:3,trustScore:null,needsFeedback:!1,trend:"new",recentNotes:[],recentFeedback:[]}]}function GS(){const e=HS();return{workflows:e.map(t=>t.workflow),summaries:e,ratings:[],total:0,overallScore:7.6,totalRatings:28,totalUses:28}}function QS(e){const t=gn(e.rating);return r`
     <div class="trust-rating-row">
       <span class="trust-rating-score ${ds(t)}">${e.rating}</span>
       <span class="trust-rating-workflow">${e.workflow}</span>
       ${e.note?r`<span class="trust-rating-note">${e.note}</span>`:p}
-      <span class="trust-rating-time">${zS(e.timestamp)}</span>
+      <span class="trust-rating-time">${WS(e.timestamp)}</span>
     </div>
-  `}function GS(){return r`
+  `}function YS(){return r`
     <div class="trust-sample-banner">
       Sample data — use skills and rate them to build your real trust profile.
     </div>
-  `}function QS(e){const t=e.connected,n=e.guardrailsData,s=e.consciousnessStatus,a=e.data?.todayRating??null,i=e.updateStatus??null,o=i?.openclawUpdateAvailable||i?.pluginUpdateAvailable;if(!t)return{level:"alert",icon:"⚠️",text:"Gateway disconnected",detail:"Reconnect to restore full functionality."};if(o){const d=[];return i.openclawUpdateAvailable&&i.openclawLatest&&d.push(`OpenClaw ${i.openclawVersion} → ${i.openclawLatest}`),i.pluginUpdateAvailable&&i.pluginLatest&&d.push(`GodMode ${i.pluginVersion} → ${i.pluginLatest}`),{level:"warn",icon:"🔄",text:"Update available",detail:d.join(", ")+". Visit Overview to update."}}if(s==="error")return{level:"warn",icon:"🧠",text:"Consciousness sync needs attention",detail:"Your system is running but the last sync encountered an error."};if(n){const d=n.gates.filter(h=>h.enabled).length,u=n.gates.length;if(d<u)return{level:"warn",icon:"🛡",text:`${u-d} security gate${u-d!==1?"s":""} disabled`,detail:"Your system is running with reduced safety coverage."}}const l=i&&!o?" Up to date.":"";return a?a.rating>=8?{level:"ok",icon:"✨",text:`Rated ${a.rating}/10 today — GodMode is running great.`,detail:`All systems secure and building trust daily.${l}`}:a.rating>=5?{level:"ok",icon:"💪",text:`Rated ${a.rating}/10 today — working to improve.`,detail:`Your feedback is being applied. All systems secure.${l}`}:{level:"warn",icon:"💬",text:`Rated ${a.rating}/10 today — your feedback matters.`,detail:`We're using your input to get better. All systems secure.${l}`}:{level:"ok",icon:"✅",text:"Your GodMode is safe, secure, and building trust daily.",detail:`All systems healthy.${l} Rate your day below to help improve.`}}function YS(e){const{level:t,icon:n,text:s,detail:a}=QS(e);return r`
+  `}function JS(e){const t=e.connected,n=e.guardrailsData,s=e.consciousnessStatus,a=e.data?.todayRating??null,i=e.updateStatus??null,o=i?.openclawUpdateAvailable||i?.pluginUpdateAvailable;if(!t)return{level:"alert",icon:"⚠️",text:"Gateway disconnected",detail:"Reconnect to restore full functionality."};if(o){const d=[];return i.openclawUpdateAvailable&&i.openclawLatest&&d.push(`OpenClaw ${i.openclawVersion} → ${i.openclawLatest}`),i.pluginUpdateAvailable&&i.pluginLatest&&d.push(`GodMode ${i.pluginVersion} → ${i.pluginLatest}`),{level:"warn",icon:"🔄",text:"Update available",detail:d.join(", ")+". Visit Overview to update."}}if(s==="error")return{level:"warn",icon:"🧠",text:"Consciousness sync needs attention",detail:"Your system is running but the last sync encountered an error."};if(n){const d=n.gates.filter(h=>h.enabled).length,u=n.gates.length;if(d<u)return{level:"warn",icon:"🛡",text:`${u-d} security gate${u-d!==1?"s":""} disabled`,detail:"Your system is running with reduced safety coverage."}}const l=i&&!o?" Up to date.":"";return a?a.rating>=8?{level:"ok",icon:"✨",text:`Rated ${a.rating}/10 today — GodMode is running great.`,detail:`All systems secure and building trust daily.${l}`}:a.rating>=5?{level:"ok",icon:"💪",text:`Rated ${a.rating}/10 today — working to improve.`,detail:`Your feedback is being applied. All systems secure.${l}`}:{level:"warn",icon:"💬",text:`Rated ${a.rating}/10 today — your feedback matters.`,detail:`We're using your input to get better. All systems secure.${l}`}:{level:"ok",icon:"✅",text:"Your GodMode is safe, secure, and building trust daily.",detail:`All systems healthy.${l} Rate your day below to help improve.`}}function XS(e){const{level:t,icon:n,text:s,detail:a}=JS(e);return r`
     <div class="trust-hero trust-hero--${t}">
       <span class="trust-hero-icon">${n}</span>
       <div class="trust-hero-body">
@@ -6760,7 +6773,7 @@ ${i}
         <div class="trust-hero-detail">${a}</div>
       </div>
     </div>
-  `}function JS(e){return e<=4?"trust-daily-button--low":e<=7?"trust-daily-button--med":"trust-daily-button--high"}function ic(e){const t=[];for(let n=0;n<7;n++)t.push(e[n]??null);return r`
+  `}function ZS(e){return e<=4?"trust-daily-button--low":e<=7?"trust-daily-button--med":"trust-daily-button--high"}function ic(e){const t=[];for(let n=0;n<7;n++)t.push(e[n]??null);return r`
     <div class="trust-daily-trend">
       ${t.map(n=>{if(!n)return r`<div class="trust-daily-trend-dot trust-daily-trend-dot--empty"></div>`;const s=Math.max(4,n.rating/10*28),a=gn(n.rating);return r`
           <div
@@ -6770,7 +6783,7 @@ ${i}
           ></div>
         `})}
     </div>
-  `}function XS(e){const t=e.data,n=t?.todayRating??null,s=t?.recentDaily??[],a=t?.dailyStreak??0,i=t?.dailyAverage??null;if(!e.onDailyRate)return p;if(n){const o=gn(n.rating),l=n.rating<7&&!n.note;return r`
+  `}function e1(e){const t=e.data,n=t?.todayRating??null,s=t?.recentDaily??[],a=t?.dailyStreak??0,i=t?.dailyAverage??null;if(!e.onDailyRate)return p;if(n){const o=gn(n.rating),l=n.rating<7&&!n.note;return r`
       <div class="trust-daily">
         <div class="trust-daily-header">
           <span class="trust-daily-prompt">Today's Rating</span>
@@ -6814,7 +6827,7 @@ ${i}
       <div class="trust-daily-buttons">
         ${[1,2,3,4,5,6,7,8,9,10].map(o=>r`
             <button
-              class="trust-daily-button ${JS(o)}"
+              class="trust-daily-button ${ZS(o)}"
               type="button"
               title="${o}/10"
               @click=${()=>e.onDailyRate(o)}
@@ -6828,7 +6841,7 @@ ${i}
             </div>
           `:p}
     </div>
-  `}function ZS(e){if(!e)return r`
+  `}function t1(e){if(!e)return r`
       <div class="trust-health-card">
         <div class="trust-health-card-header">
           <span class="trust-health-card-icon">\u{1F6E1}</span>
@@ -6870,7 +6883,7 @@ ${i}
             <div class="trust-health-activity">No activity in last 24h</div>
           `}
     </div>
-  `}function e1(e){return!e||e==="idle"?"Idle":e==="loading"?"Syncing...":e==="ok"?"Synced":"Error"}function t1(e){return!e||e==="idle"?"trust-health-dot--idle":e==="loading"?"trust-health-dot--warn":e==="ok"?"trust-health-dot--ok":"trust-health-dot--error"}function n1(e){const t=e.connected,n=e.consciousnessStatus,s=e.sessionsCount,a=e.gatewayUptimeMs,l=(t?1:0)+(n==="ok"||n==="idle"?1:0)===2&&t;return r`
+  `}function n1(e){return!e||e==="idle"?"Idle":e==="loading"?"Syncing...":e==="ok"?"Synced":"Error"}function s1(e){return!e||e==="idle"?"trust-health-dot--idle":e==="loading"?"trust-health-dot--warn":e==="ok"?"trust-health-dot--ok":"trust-health-dot--error"}function a1(e){const t=e.connected,n=e.consciousnessStatus,s=e.sessionsCount,a=e.gatewayUptimeMs,l=(t?1:0)+(n==="ok"||n==="idle"?1:0)===2&&t;return r`
     <div class="trust-health-card">
       <div class="trust-health-card-header">
         <span class="trust-health-card-icon">\u{1F4E1}</span>
@@ -6885,9 +6898,9 @@ ${i}
       </div>
 
       <div class="trust-health-row">
-        <span class="trust-health-dot ${t1(n)}"></span>
+        <span class="trust-health-dot ${s1(n)}"></span>
         <span class="trust-health-label">Consciousness</span>
-        <span class="trust-health-value">${e1(n)}</span>
+        <span class="trust-health-value">${n1(n)}</span>
       </div>
 
       ${s!=null?r`
@@ -6906,15 +6919,15 @@ ${i}
             </div>
           `:p}
     </div>
-  `}function s1(e){return r`
+  `}function i1(e){return r`
     <div class="trust-health">
       <h3 class="trust-health-title">System Health</h3>
       <div class="trust-health-grid">
-        ${ZS(e.guardrailsData)}
-        ${n1(e)}
+        ${t1(e.guardrailsData)}
+        ${a1(e)}
       </div>
     </div>
-  `}function a1(e){const{connected:t,loading:n,data:s,onRemoveWorkflow:a,onRefresh:i}=e;if(!t)return r`
+  `}function o1(e){const{connected:t,loading:n,data:s,onRemoveWorkflow:a,onRefresh:i}=e;if(!t)return r`
       <section class="tab-body trust-section">
         <div class="trust-disconnected">Not connected to gateway.</div>
       </section>
@@ -6922,32 +6935,32 @@ ${i}
       <section class="tab-body trust-section">
         <div class="trust-loading">Loading trust tracker...</div>
       </section>
-    `;const l=!(s?.summaries??[]).some(f=>f.count>0),d=l?VS():s,u=d.summaries,h=l?[]:s?.ratings??[];return r`
+    `;const l=!(s?.summaries??[]).some(f=>f.count>0),d=l?GS():s,u=d.summaries,h=l?[]:s?.ratings??[];return r`
     <section class="tab-body trust-section">
-      ${YS(e)}
-
-      ${l?GS():p}
-
       ${XS(e)}
 
-      ${KS(d)}
+      ${l?YS():p}
+
+      ${e1(e)}
+
+      ${qS(d)}
 
       <div class="trust-workflows-grid">
-        ${u.map(f=>qS(f,l?null:a))}
+        ${u.map(f=>VS(f,l?null:a))}
       </div>
 
-      ${s1(e)}
+      ${i1(e)}
 
       ${h.length>0?r`
             <div class="trust-history">
               <h3 class="trust-history-title">Recent Ratings</h3>
               <div class="trust-history-list">
-                ${h.slice(0,20).map(HS)}
+                ${h.slice(0,20).map(QS)}
               </div>
             </div>
           `:p}
     </section>
-  `}function i1(e){const t=Date.now()-Date.parse(e),n=Math.floor(t/6e4);if(n<1)return"just now";if(n<60)return`${n}m ago`;const s=Math.floor(n/60);if(s<24)return`${s}h ago`;const a=Math.floor(s/24);return a<7?`${a}d ago`:new Date(e).toLocaleDateString()}function o1(e){return{fired:"guardrails-badge--fired",blocked:"guardrails-badge--blocked",cleaned:"guardrails-badge--cleaned"}[e]??""}function vp(e,t){return r`
+  `}function r1(e){const t=Date.now()-Date.parse(e),n=Math.floor(t/6e4);if(n<1)return"just now";if(n<60)return`${n}m ago`;const s=Math.floor(n/60);if(s<24)return`${s}h ago`;const a=Math.floor(s/24);return a<7?`${a}d ago`:new Date(e).toLocaleDateString()}function l1(e){return{fired:"guardrails-badge--fired",blocked:"guardrails-badge--blocked",cleaned:"guardrails-badge--cleaned"}[e]??""}function vp(e,t){return r`
     <button
       class="options-toggle ${e?"options-toggle--on":""}"
       role="switch"
@@ -6958,7 +6971,7 @@ ${i}
         <span class="options-toggle-thumb"></span>
       </span>
     </button>
-  `}function r1(e,t,n,s){const a=e.thresholds?.[t]??0;return r`
+  `}function c1(e,t,n,s){const a=e.thresholds?.[t]??0;return r`
     <div class="guardrails-threshold">
       <label class="guardrails-threshold-label">${n}</label>
       <input
@@ -6970,7 +6983,7 @@ ${i}
         @change=${i=>{const o=Number(i.target.value);!Number.isNaN(o)&&o>0&&s(e.id,t,o)}}
       />
     </div>
-  `}function l1(e,t,n){const s=e.thresholdLabels?Object.keys(e.thresholdLabels):[];return r`
+  `}function d1(e,t,n){const s=e.thresholdLabels?Object.keys(e.thresholdLabels):[];return r`
     <div class="guardrails-card card ${e.enabled?"":"guardrails-card--disabled"}">
       <div class="guardrails-card-header">
         <div class="guardrails-card-info">
@@ -6983,11 +6996,11 @@ ${i}
       <div class="guardrails-card-description">${e.description}</div>
       ${s.length>0?r`
             <div class="guardrails-thresholds">
-              ${s.map(a=>r1(e,a,e.thresholdLabels[a],n))}
+              ${s.map(a=>c1(e,a,e.thresholdLabels[a],n))}
             </div>
           `:p}
     </div>
-  `}function c1(e,t,n){const s=e.action==="redirect"?"↪":"🚫",a=e.action==="redirect"?"redirect":"block";return r`
+  `}function u1(e,t,n){const s=e.action==="redirect"?"↪":"🚫",a=e.action==="redirect"?"redirect":"block";return r`
     <div class="guardrails-card card guardrails-custom-card ${e.enabled?"":"guardrails-card--disabled"}">
       <div class="guardrails-card-header">
         <div class="guardrails-card-info">
@@ -7006,14 +7019,14 @@ ${i}
         ${e.trigger.patterns.map(i=>r`<span class="guardrails-pattern-tag">${i}</span>`)}
       </div>
     </div>
-  `}function d1(e){return r`
+  `}function p1(e){return r`
     <div class="guardrails-activity-row">
-      <span class="guardrails-badge ${o1(e.action)}">${e.action}</span>
+      <span class="guardrails-badge ${l1(e.action)}">${e.action}</span>
       <span class="guardrails-activity-gate">${e.gateId}</span>
       <span class="guardrails-activity-detail">${e.detail}</span>
-      <span class="guardrails-activity-time">${i1(e.timestamp)}</span>
+      <span class="guardrails-activity-time">${r1(e.timestamp)}</span>
     </div>
-  `}function u1(e){const{connected:t,loading:n,data:s,onToggle:a,onThresholdChange:i,onCustomToggle:o,onCustomDelete:l,onToggleAddForm:d,onOpenAllyChat:u}=e;if(!t)return r`
+  `}function h1(e){const{connected:t,loading:n,data:s,onToggle:a,onThresholdChange:i,onCustomToggle:o,onCustomDelete:l,onToggleAddForm:d,onOpenAllyChat:u}=e;if(!t)return r`
       <section class="tab-body guardrails-section">
         <div class="guardrails-empty">Not connected to gateway.</div>
       </section>
@@ -7028,7 +7041,7 @@ ${i}
           <h2 class="guardrails-col-heading">Safety Gates</h2>
           <p class="guardrails-col-subtitle">${w}/${h.length} active — prevent runaway loops, bad searches, and lazy responses.</p>
           <div class="guardrails-grid">
-            ${h.map(g=>l1(g,a,i))}
+            ${h.map(g=>d1(g,a,i))}
           </div>
         </div>
 
@@ -7044,7 +7057,7 @@ ${i}
 
             ${m.length>0?r`
                   <div class="guardrails-custom-grid">
-                    ${m.map(g=>c1(g,o,l))}
+                    ${m.map(g=>u1(g,o,l))}
                   </div>
                 `:r`
                   <div class="guardrails-custom-empty">
@@ -7057,19 +7070,19 @@ ${i}
             <h3 class="guardrails-history-title">Recent Activity</h3>
             ${f.length>0?r`
                   <div class="guardrails-history-list">
-                    ${f.slice(0,30).map(d1)}
+                    ${f.slice(0,30).map(p1)}
                   </div>
                 `:r`<div class="guardrails-no-activity">No gate activity recorded yet.</div>`}
           </div>
         </div>
       </div>
     </section>
-  `}const p1={coding:"Builder",research:"Researcher",analysis:"Analyst",creative:"Creative",review:"Reviewer",ops:"Ops",task:"Agent",url:"Reader",idea:"Explorer"};function yp(e){const t=Date.now()-e,n=Math.floor(t/6e4);if(n<1)return"just now";if(n<60)return`${n}m ago`;const s=Math.floor(n/60);return s<24?`${s}h ago`:`${Math.floor(s/24)}d ago`}function h1(e){switch(e){case"started":return"▶️";case"completed":return"✅";case"failed":return"❌";case"queued":return"⏳";case"stage":return"🔄";default:return"📋"}}function oc(e){switch(e){case"coding":return"mc-type-badge mc-type-badge--coding";case"subagent":return"mc-type-badge mc-type-badge--subagent";case"swarm":return"mc-type-badge mc-type-badge--swarm";case"queue":return"mc-type-badge mc-type-badge--queue";default:return"mc-type-badge"}}function rc(e){return`mc-agent-card mc-agent-card--${e}`}function f1(e){const t=[];return e.activeNow>0&&t.push(`${e.activeNow} agent${e.activeNow>1?"s":""} working`),e.queueReview>0&&t.push(`${e.queueReview} need${e.queueReview>1?"":"s"} your attention`),e.completedToday>0&&t.push(`${e.completedToday} done today`),t.length===0&&(t.push("Nothing running"),e.completedToday>0&&t.push(`${e.completedToday} completed today`)),r`
+  `}const f1={coding:"Builder",research:"Researcher",analysis:"Analyst",creative:"Creative",review:"Reviewer",ops:"Ops",task:"Agent",url:"Reader",idea:"Explorer"};function yp(e){const t=Date.now()-e,n=Math.floor(t/6e4);if(n<1)return"just now";if(n<60)return`${n}m ago`;const s=Math.floor(n/60);return s<24?`${s}h ago`:`${Math.floor(s/24)}d ago`}function g1(e){switch(e){case"started":return"▶️";case"completed":return"✅";case"failed":return"❌";case"queued":return"⏳";case"stage":return"🔄";default:return"📋"}}function oc(e){switch(e){case"coding":return"mc-type-badge mc-type-badge--coding";case"subagent":return"mc-type-badge mc-type-badge--subagent";case"swarm":return"mc-type-badge mc-type-badge--swarm";case"queue":return"mc-type-badge mc-type-badge--queue";default:return"mc-type-badge"}}function rc(e){return`mc-agent-card mc-agent-card--${e}`}function m1(e){const t=[];return e.activeNow>0&&t.push(`${e.activeNow} agent${e.activeNow>1?"s":""} working`),e.queueReview>0&&t.push(`${e.queueReview} need${e.queueReview>1?"":"s"} your attention`),e.completedToday>0&&t.push(`${e.completedToday} done today`),t.length===0&&(t.push("Nothing running"),e.completedToday>0&&t.push(`${e.completedToday} completed today`)),r`
     <div class="mc-status-line">
       ${e.activeNow>0?r`<span class="mc-active-dot"></span>`:p}
       <span>${t.join(" · ")}</span>
     </div>
-  `}function g1(e){return r`
+  `}function v1(e){return r`
     <div class="mc-stats-banner">
       <div class="mc-stat-card">
         <div class="mc-stat-value">
@@ -7094,7 +7107,7 @@ ${i}
         <div class="mc-stat-label">Queue${e.queueReview>0?` (${e.queueReview} review)`:""}</div>
       </div>
     </div>
-  `}function m1(e){return e.swarmStages?r`
+  `}function y1(e){return e.swarmStages?r`
     <div class="mc-pipeline">
       ${["design","build","qc"].map((n,s)=>{const i=e.swarmStages?.[n]?.status??"pending";return r`
           ${s>0?r`<span class="mc-pipeline-arrow">\u2192</span>`:p}
@@ -7134,7 +7147,7 @@ ${i}
         ${e.branch?r`<span class="mc-agent-card-model">${e.branch}</span>`:p}
         ${e.error&&e.status!=="failed"?r`<span style="color: var(--danger, #ef4444)">${e.error}</span>`:p}
       </div>
-      ${e.type==="swarm"?m1(e):p}
+      ${e.type==="swarm"?y1(e):p}
       ${e.status==="failed"?r`
         <div class="mc-agent-card-actions">
           <button class="mc-detail-btn" @click=${i=>{i.stopPropagation(),t.onViewDetail(e)}}>View Error</button>
@@ -7151,7 +7164,7 @@ ${i}
     <div class="mc-agents-grid">
       ${s.map(a=>bp(a,t,n))}
     </div>
-  `}function v1(e,t,n,s,a){const i=e.filter(o=>o.isReview===!0);return i.length===0?p:r`
+  `}function b1(e,t,n,s,a){const i=e.filter(o=>o.isReview===!0);return i.length===0?p:r`
     <div style="margin-bottom: 1.5rem">
       <h3 class="mc-section-title">Ready for Review</h3>
       <div class="mc-agents-grid">
@@ -7171,7 +7184,7 @@ ${i}
         `)}
       </div>
     </div>
-  `}function y1(e,t){const n=e.filter(s=>s.status==="pending");return n.length===0?p:r`
+  `}function w1(e,t){const n=e.filter(s=>s.status==="pending");return n.length===0?p:r`
     <div style="margin-bottom: 1.5rem">
       <h3 class="mc-section-title">Queued (${n.length})</h3>
       <div class="mc-agents-grid">
@@ -7179,7 +7192,7 @@ ${i}
           <div class="mc-agent-card mc-agent-card--queued">
             <div class="mc-agent-card-header">
               <div class="mc-agent-card-info">
-                <span class="mc-type-badge mc-type-badge--queue">${p1[s.type]??s.type}</span>
+                <span class="mc-type-badge mc-type-badge--queue">${f1[s.type]??s.type}</span>
                 <span class="mc-agent-card-task">${s.title}</span>
               </div>
               ${t?r`<button class="mc-open-session-btn" @click=${()=>t(s.id)}>Start</button>`:p}
@@ -7189,7 +7202,7 @@ ${i}
         `)}
       </div>
     </div>
-  `}function b1(e,t,n){const s=e.filter(a=>a.isReview===!0||a.status==="failed");return s.length===0?r`
+  `}function $1(e,t,n){const s=e.filter(a=>a.isReview===!0||a.status==="failed");return s.length===0?r`
       <div class="mc-attention-section">
         <div class="mc-attention-empty">
           Nothing needs you right now.
@@ -7217,16 +7230,16 @@ ${i}
         `)}
       </div>
     </div>
-  `}function w1(e){const t=e.filter(n=>n.status==="pending");return t.length===0?p:r`<div class="mc-queue-depth-text">${t.length} more queued</div>`}function $1(e,t="Ally"){return e?r`
+  `}function k1(e){const t=e.filter(n=>n.status==="pending");return t.length===0?p:r`<div class="mc-queue-depth-text">${t.length} more queued</div>`}function S1(e,t="Ally"){return e?r`
     <div class="mc-idle-cta">
       <p>${t} is idle.</p>
       <button class="mc-open-session-btn" @click=${e}>Ask ${t} what to work on</button>
     </div>
-  `:p}function k1(e,t){const n=(e.type==="failed"||e.type==="completed")&&e.agentRef;return r`
+  `:p}function A1(e,t){const n=(e.type==="failed"||e.type==="completed")&&e.agentRef;return r`
     <div class="mc-feed-item ${n?"mc-feed-item--clickable":""}"
          @click=${n?()=>t?.(e.agentRef):p}>
       <span class="mc-feed-time">${yp(e.timestamp)}</span>
-      <span class="mc-feed-icon">${h1(e.type)}</span>
+      <span class="mc-feed-icon">${g1(e.type)}</span>
       <span class="mc-feed-text">${e.summary}</span>
       ${e.prUrl&&!n?r`<a class="mc-feed-link" href="${e.prUrl}" target="_blank">View PR</a>`:p}
     </div>
@@ -7248,18 +7261,18 @@ ${i}
         <h3 class="mc-section-title">Activity Feed</h3>
       `}
       <div class="mc-feed-list">
-        ${a.map(o=>k1(o,n))}
+        ${a.map(o=>A1(o,n))}
       </div>
       ${i?r`<button class="mc-show-more-btn" @click=${()=>{}}>Show all ${e.length} events</button>`:p}
     </div>
-  `}function S1(e,t){const s=e.filter(i=>i.status==="done"||i.status==="failed").filter(i=>!i.isReview);if(s.length===0)return p;const a=s.slice(0,10);return r`
+  `}function x1(e,t){const s=e.filter(i=>i.status==="done"||i.status==="failed").filter(i=>!i.isReview);if(s.length===0)return p;const a=s.slice(0,10);return r`
     <div style="margin-bottom: 1.5rem">
       <h3 class="mc-section-title">Recent Completed</h3>
       <div class="mc-agents-grid">
         ${a.map(i=>bp(i,t))}
       </div>
     </div>
-  `}function wp(e){return e.split(" ").map(t=>t[0]??"").join("").slice(0,2).toUpperCase()}function A1(e){switch(e){case"done":case"in_review":return"mc-swarm-node--done";case"in_progress":return"mc-swarm-node--active";case"failed":case"cancelled":return"mc-swarm-node--failed";default:return"mc-swarm-node--pending"}}function x1(e,t,n){return e.length<=1?p:r`
+  `}function wp(e){return e.split(" ").map(t=>t[0]??"").join("").slice(0,2).toUpperCase()}function T1(e){switch(e){case"done":case"in_review":return"mc-swarm-node--done";case"in_progress":return"mc-swarm-node--active";case"failed":case"cancelled":return"mc-swarm-node--failed";default:return"mc-swarm-node--pending"}}function _1(e,t,n){return e.length<=1?p:r`
     <div class="mc-swarm-switcher">
       ${e.map(s=>r`
         <button
@@ -7270,21 +7283,21 @@ ${i}
         </button>
       `)}
     </div>
-  `}function T1(e){switch(e){case"in_progress":case"processing":return"🔄";case"done":case"in_review":return"✅";case"failed":case"cancelled":return"❌";case"todo":case"pending":return"⏳";default:return"○"}}function _1(e){switch(e){case"in_progress":return"Running";case"in_review":return"Review";case"done":return"Completed";case"failed":return"Failed";case"cancelled":return"Cancelled";case"todo":return"Queued";case"pending":return"Pending";default:return e.replace(/_/g," ")}}function C1(e,t,n,s){return!e.issues||e.issues.length===0?p:r`
+  `}function C1(e){switch(e){case"in_progress":case"processing":return"🔄";case"done":case"in_review":return"✅";case"failed":case"cancelled":return"❌";case"todo":case"pending":return"⏳";default:return"○"}}function R1(e){switch(e){case"in_progress":return"Running";case"in_review":return"Review";case"done":return"Completed";case"failed":return"Failed";case"cancelled":return"Cancelled";case"todo":return"Queued";case"pending":return"Pending";default:return e.replace(/_/g," ")}}function E1(e,t,n,s){return!e.issues||e.issues.length===0?p:r`
     <div class="mc-swarm-org">
       <h3 class="mc-section-title">Pipeline</h3>
       <div class="mc-swarm-graph">
         ${e.issues.map((a,i)=>r`
           ${i>0?r`<div class="mc-swarm-connector"></div>`:p}
-          <div class="mc-swarm-node ${A1(a.status)}"
+          <div class="mc-swarm-node ${T1(a.status)}"
                @click=${()=>{sn===a.title?sn=null:(sn=a.title,e.projectId)}}>
             <div class="mc-swarm-node-avatar">${wp(a.personaName)}</div>
             <div class="mc-swarm-node-info">
               <div class="mc-swarm-node-persona">${a.personaName}</div>
               <div class="mc-swarm-node-task">${a.title}</div>
               <div class="mc-swarm-node-status">
-                <span class="mc-swarm-status-icon">${T1(a.status)}</span>
-                ${_1(a.status)}
+                <span class="mc-swarm-status-icon">${C1(a.status)}</span>
+                ${R1(a.status)}
               </div>
               ${a.cost?r`
                 <div class="mc-swarm-node-cost">${((a.cost.inputTokens+a.cost.outputTokens)/1e3).toFixed(1)}k tok</div>
@@ -7302,11 +7315,11 @@ ${i}
           ${(a.status==="done"||a.status==="in_review")&&a.outputPreview?r`
             <div class="mc-swarm-output-preview">${a.outputPreview}</div>
           `:p}
-          ${sn===a.title?R1(e.projectId,a.title,t):p}
+          ${sn===a.title?P1(e.projectId,a.title,t):p}
         `)}
       </div>
     </div>
-  `}let sn=null,rt="";function R1(e,t,n){return r`
+  `}let sn=null,rt="";function P1(e,t,n){return r`
     <div class="mc-steer-panel">
       <div class="mc-steer-label">Steer: ${t}</div>
       <div class="mc-steer-row">
@@ -7321,7 +7334,7 @@ ${i}
         <button class="mc-steer-send" @click=${()=>{rt.trim()&&(n?.(e,t,rt.trim()),rt="",sn=null)}}>Send</button>
       </div>
     </div>
-  `}function E1(e){return e.length===0?p:r`
+  `}function L1(e){return e.length===0?p:r`
     <div class="mc-swarm-agents">
       <h3 class="mc-section-title">Team</h3>
       <div class="mc-swarm-agents-grid">
@@ -7352,7 +7365,7 @@ ${i}
           `})}
       </div>
     </div>
-  `}function P1(e){if(!e.tokenSpend&&!e.agents.some(n=>n.tokenSpend!=null))return p;const t=e.agents.reduce((n,s)=>n+(s.tokenSpend??0),0)||e.tokenSpend||0;return t===0?p:r`
+  `}function I1(e){if(!e.tokenSpend&&!e.agents.some(n=>n.tokenSpend!=null))return p;const t=e.agents.reduce((n,s)=>n+(s.tokenSpend??0),0)||e.tokenSpend||0;return t===0?p:r`
     <div class="mc-swarm-budget">
       <h3 class="mc-section-title">Budget</h3>
       <div class="mc-swarm-budget-total">${(t/1e3).toFixed(1)}k tokens</div>
@@ -7363,20 +7376,20 @@ ${i}
         </div>
       `)}
     </div>
-  `}function L1(e){switch(e){case"agent_started":return"▶️";case"agent_completed":return"✅";case"agent_failed":return"❌";case"handoff":return"🤝";case"steering":return"🎯";case"project_completed":return"🎉";case"project_failed":return"🚨";default:return"📋"}}function I1(e){return e.length===0?p:r`
+  `}function D1(e){switch(e){case"agent_started":return"▶️";case"agent_completed":return"✅";case"agent_failed":return"❌";case"handoff":return"🤝";case"steering":return"🎯";case"project_completed":return"🎉";case"project_failed":return"🚨";default:return"📋"}}function M1(e){return e.length===0?p:r`
     <div class="mc-feed">
       <h3 class="mc-section-title">Team Activity</h3>
       <div class="mc-feed-list">
         ${e.slice(0,30).map(t=>r`
           <div class="mc-feed-item">
             <span class="mc-feed-time">${yp(t.timestamp)}</span>
-            <span class="mc-feed-icon">${L1(t.type)}</span>
+            <span class="mc-feed-icon">${D1(t.type)}</span>
             <span class="mc-feed-text">${t.summary}</span>
           </div>
         `)}
       </div>
     </div>
-  `}function D1(e,t){const n=e.issues.filter(s=>(s.status==="done"||s.status==="in_review")&&s.proofDocSlug);return n.length===0?p:r`
+  `}function O1(e,t){const n=e.issues.filter(s=>(s.status==="done"||s.status==="in_review")&&s.proofDocSlug);return n.length===0?p:r`
     <div style="margin-bottom: 1.5rem">
       <h3 class="mc-section-title">Deliverables (${n.length})</h3>
       <div class="mc-swarm-deliverables">
@@ -7401,18 +7414,18 @@ ${i}
         ${e.running?r`<span class="mc-active-dot"></span>`:p}
       </div>
 
-      ${x1(e.projects,e.selectedProjectId,t.onSelectSwarmProject)}
+      ${_1(e.projects,e.selectedProjectId,t.onSelectSwarmProject)}
 
       ${e.detail?r`
-        ${C1(e.detail,t.onSteerSwarmAgent,t.onViewProofDoc,t.onViewRunLog)}
-        ${E1(e.detail.agents)}
-        ${P1(e.detail)}
-        ${D1(e.detail,t.onViewProofDoc)}
+        ${E1(e.detail,t.onSteerSwarmAgent,t.onViewProofDoc,t.onViewRunLog)}
+        ${L1(e.detail.agents)}
+        ${I1(e.detail)}
+        ${O1(e.detail,t.onViewProofDoc)}
       `:p}
 
-      ${I1(e.feed)}
+      ${M1(e.feed)}
     </div>
-  `}function M1(e){if(!e.connected)return r`<div class="mc-section"><div class="mc-empty">Not connected to gateway.</div></div>`;if(e.loading&&!e.data)return r`<div class="mc-section"><div class="mc-loading">Loading agent data...</div></div>`;if(e.error&&!e.data)return r`
+  `}function F1(e){if(!e.connected)return r`<div class="mc-section"><div class="mc-empty">Not connected to gateway.</div></div>`;if(e.loading&&!e.data)return r`<div class="mc-section"><div class="mc-loading">Loading agent data...</div></div>`;if(e.error&&!e.data)return r`
       <div class="mc-section">
         <div class="mc-empty" style="color: var(--danger, #ef4444)">
           ${e.error}
@@ -7429,7 +7442,7 @@ ${i}
         </button>
       </div>
 
-      ${e.fullControl?g1(t.stats):f1(t.stats)}
+      ${e.fullControl?v1(t.stats):m1(t.stats)}
 
       ${e.fullControl?r`
         ${t.swarm?dc(t.swarm,e):p}
@@ -7438,42 +7451,42 @@ ${i}
             <h3 class="mc-section-title">Active Agents</h3>
             ${lc(t.agents,n)}
 
-            ${v1(t.agents,e.onApproveItem,e.onViewDetail,e.onOpenTaskSession,e.onViewTaskFiles)}
+            ${b1(t.agents,e.onApproveItem,e.onViewDetail,e.onOpenTaskSession,e.onViewTaskFiles)}
 
-            ${y1(t.queueItems,e.onStartQueueItem)}
+            ${w1(t.queueItems,e.onStartQueueItem)}
 
             ${cc(t.activityFeed,!1,e.onViewDetail)}
           </div>
 
           <div class="mc-col-side">
-            ${S1(t.agents,n)}
+            ${x1(t.agents,n)}
           </div>
         </div>
       `:r`
         <div>
           ${t.swarm?dc(t.swarm,e):p}
 
-          ${b1(t.agents,n,e.onApproveItem)}
+          ${$1(t.agents,n,e.onApproveItem)}
 
           ${t.stats.activeNow>0||t.agents.some(s=>s.status==="active"||s.status==="queued")?r`
             <h3 class="mc-section-title">Active</h3>
             ${lc(t.agents,n,!0)}
           `:p}
 
-          ${w1(t.queueItems)}
+          ${k1(t.queueItems)}
 
-          ${t.stats.activeNow===0&&t.stats.queueDepth===0?$1(e.onAskAlly,e.allyName):p}
+          ${t.stats.activeNow===0&&t.stats.queueDepth===0?S1(e.onAskAlly,e.allyName):p}
 
           ${cc(t.activityFeed,!1,e.onViewDetail,!0)}
         </div>
       `}
     </div>
-  `}function O1(e,t){if(e?.label)return e.label;if(e?.displayName)return e.displayName;const n=Ie.get(t);if(n)return n;if(t.includes("webchat")){const a=t.match(/webchat[:-](\d+)/);return a?`Chat ${a[1]}`:"Chat"}if(t.includes("main"))return"MAIN";const s=t.split(/[:-]/);return s[s.length-1]||t}function F1(e){return e?e>=1e3?`${(e/1e3).toFixed(1)}k`:String(e):"0"}function N1(e){const t=e,n=String(t.role??"");if(n!=="user"&&n!=="assistant")return p;const s=typeof t.content=="string"?t.content:Array.isArray(t.content)?t.content.filter(i=>i.type==="text").map(i=>String(i.text??"")).join(" "):"";if(!s.trim())return p;const a=s.slice(0,300);return r`
+  `}function N1(e,t){if(e?.label)return e.label;if(e?.displayName)return e.displayName;const n=Ie.get(t);if(n)return n;if(t.includes("webchat")){const a=t.match(/webchat[:-](\d+)/);return a?`Chat ${a[1]}`:"Chat"}if(t.includes("main"))return"MAIN";const s=t.split(/[:-]/);return s[s.length-1]||t}function B1(e){return e?e>=1e3?`${(e/1e3).toFixed(1)}k`:String(e):"0"}function U1(e){const t=e,n=String(t.role??"");if(n!=="user"&&n!=="assistant")return p;const s=typeof t.content=="string"?t.content:Array.isArray(t.content)?t.content.filter(i=>i.type==="text").map(i=>String(i.text??"")).join(" "):"";if(!s.trim())return p;const a=s.slice(0,300);return r`
     <div class="parallel-col__msg parallel-col__msg--${n}">
       <span class="parallel-col__msg-role">${n==="user"?"You":"AI"}</span>
       <span class="parallel-col__msg-text">${a}${s.length>300?"...":""}</span>
     </div>
-  `}function B1(e){return r`
+  `}function z1(e){return r`
     <div
       class="parallel-col parallel-col--empty"
       @dragover=${t=>{t.preventDefault(),t.dataTransfer&&(t.dataTransfer.dropEffect="move"),t.currentTarget.classList.add("parallel-col--dragover")}}
@@ -7491,7 +7504,7 @@ ${i}
         <span class="parallel-col__drop-text">Drag a session here</span>
       </div>
     </div>
-  `}function U1(e,t,n){const{state:s,onAssignLane:a,onSendInLane:i}=n,o=s.sessionsResult?.sessions??[],l=De(o,t),d=l?.key??t,u=s.workingSessions.has(t)||s.workingSessions.has(d),h=O1(l,t),f=zs.get(t)??zs.get(d),m=l?.model??"",w=l?.totalTokens??0,$=s.settings.tabLastViewed[d]??s.settings.tabLastViewed[t]??0,c=l?.updatedAt??0,g=!u&&c>$,A=t===s.sessionKey?s.chatMessages:We.get(t)??We.get(d)??[],T=x=>{x instanceof HTMLElement&&x.dispatchEvent(new CustomEvent("lane-viewed",{detail:{sessionKey:d},bubbles:!0,composed:!0}))};return r`
+  `}function K1(e,t,n){const{state:s,onAssignLane:a,onSendInLane:i}=n,o=s.sessionsResult?.sessions??[],l=De(o,t),d=l?.key??t,u=s.workingSessions.has(t)||s.workingSessions.has(d),h=N1(l,t),f=zs.get(t)??zs.get(d),m=l?.model??"",w=l?.totalTokens??0,$=s.settings.tabLastViewed[d]??s.settings.tabLastViewed[t]??0,c=l?.updatedAt??0,g=!u&&c>$,A=t===s.sessionKey?s.chatMessages:We.get(t)??We.get(d)??[],T=x=>{x instanceof HTMLElement&&x.dispatchEvent(new CustomEvent("lane-viewed",{detail:{sessionKey:d},bubbles:!0,composed:!0}))};return r`
     <div
       class="parallel-col parallel-col--filled ${u?"parallel-col--working":""} ${g?"parallel-col--ready":""}"
       @pointerdown=${x=>T(x.currentTarget)}
@@ -7533,13 +7546,13 @@ ${i}
         <div class="parallel-col__meta">
           ${m?r`<span class="parallel-col__model">${m}</span>`:p}
           <span class="parallel-col__turns">${f!=null?`${f} turns`:"--"}</span>
-          <span class="parallel-col__tokens">${F1(w)} tokens</span>
+          <span class="parallel-col__tokens">${B1(w)} tokens</span>
         </div>
       </div>
 
       <!-- Messages -->
       <div class="parallel-col__messages">
-        ${A.length>0?A.slice(-120).map(N1):r`<div class="parallel-col__empty">No messages yet</div>`}
+        ${A.length>0?A.slice(-120).map(U1):r`<div class="parallel-col__empty">No messages yet</div>`}
       </div>
 
       <!-- Compose -->
@@ -7553,16 +7566,16 @@ ${i}
         />
       </div>
     </div>
-  `}function z1(e){const t=e.state.settings.parallelLanes;return r`
+  `}function W1(e){const t=e.state.settings.parallelLanes;return r`
     <div
       class="parallel-columns"
       @lane-drop=${n=>{e.onAssignLane(n.detail.laneIndex,n.detail.sessionKey)}}
       @lane-reorder=${n=>{e.onReorderLanes(n.detail.fromIndex,n.detail.toIndex)}}
       @lane-viewed=${n=>{e.onLaneViewed(n.detail.sessionKey)}}
     >
-      ${t.map((n,s)=>n?U1(s,n,e):B1(s))}
+      ${t.map((n,s)=>n?K1(s,n,e):z1(s))}
     </div>
-  `}const K1=20;function $p(e){switch(e.split(".").pop()?.toLowerCase()){case"md":return"📝";case"html":return"🌐";case"json":case"yaml":case"yml":case"toml":return"⚙️";case"ts":case"js":case"py":case"sh":case"rs":case"go":return"💻";case"css":return"🎨";default:return"📄"}}function kp(e,t=K1){const n=[];function s(a){for(const i of a){if(n.length>=t)return;const o=i;o.type==="file"?n.push(o):o.type==="directory"&&o.children&&s(o.children)}}return s(e),n}const W1=8;function q1(e){return kp(e,500).filter(n=>n.modifiedAt!=null).sort((n,s)=>(s.modifiedAt??0)-(n.modifiedAt??0)).slice(0,W1)}function Sp(e){const n=Date.now()-e,s=Math.floor(n/6e4);if(s<1)return"just now";if(s<60)return`${s}m ago`;const a=Math.floor(s/60);if(a<24)return`${a}h ago`;const i=Math.floor(a/24);return i<30?`${i}d ago`:`${Math.floor(i/30)}mo ago`}function j1(e,t){if(!e||e.length===0)return p;const n=q1(e);return n.length===0?p:r`
+  `}const q1=20;function $p(e){switch(e.split(".").pop()?.toLowerCase()){case"md":return"📝";case"html":return"🌐";case"json":case"yaml":case"yml":case"toml":return"⚙️";case"ts":case"js":case"py":case"sh":case"rs":case"go":return"💻";case"css":return"🎨";default:return"📄"}}function kp(e,t=q1){const n=[];function s(a){for(const i of a){if(n.length>=t)return;const o=i;o.type==="file"?n.push(o):o.type==="directory"&&o.children&&s(o.children)}}return s(e),n}const j1=8;function V1(e){return kp(e,500).filter(n=>n.modifiedAt!=null).sort((n,s)=>(s.modifiedAt??0)-(n.modifiedAt??0)).slice(0,j1)}function Sp(e){const n=Date.now()-e,s=Math.floor(n/6e4);if(s<1)return"just now";if(s<60)return`${s}m ago`;const a=Math.floor(s/60);if(a<24)return`${a}h ago`;const i=Math.floor(a/24);return i<30?`${i}d ago`:`${Math.floor(i/30)}mo ago`}function H1(e,t){if(!e||e.length===0)return p;const n=V1(e);return n.length===0?p:r`
     <div class="work-section">
       <div class="work-section-label">Recent</div>
       <div class="work-file-list">
@@ -7578,7 +7591,7 @@ ${i}
         `)}
       </div>
     </div>
-  `}function V1(e,t){if(!e||e.length===0)return p;const n=kp(e);return n.length===0?p:r`
+  `}function G1(e,t){if(!e||e.length===0)return p;const n=kp(e);return n.length===0?p:r`
     <div class="work-file-list">
       ${n.map(s=>r`
         <button
@@ -7592,7 +7605,7 @@ ${i}
       `)}
       ${e.length>n.length?r`<div class="work-file-overflow">+${e.length-n.length} more files</div>`:p}
     </div>
-  `}function H1(e,t,n,s,a,i,o,l){return r`
+  `}function Q1(e,t,n,s,a,i,o,l){return r`
     <div class="my-day-card work-project ${t?"expanded":""}">
       <button class="my-day-card-header" @click=${a} style="cursor: pointer; width: 100%; border: none; background: none; text-align: left;">
         <div class="my-day-card-title">
@@ -7612,16 +7625,16 @@ ${i}
                         Loading...
                       </div>
                     `:p}
-              ${n.length>0?j1(n,o):p}
+              ${n.length>0?H1(n,o):p}
               ${n.length>0?r`
                     <div class="work-section">
                       <div class="work-section-label">Files</div>
-                      ${V1(n,o)}
+                      ${G1(n,o)}
                     </div>
                   `:e.outputs.length>0?r`
                       <div class="work-section">
                         <div class="work-section-label">Files & Outputs</div>
-                        ${G1(e.outputs)}
+                        ${Y1(e.outputs)}
                       </div>
                     `:p}
               ${e.people.length>0?r`
@@ -7664,7 +7677,7 @@ ${i}
             </div>
           `:p}
     </div>
-  `}function G1(e){const t=e.reduce((s,a)=>{const i=a.type||"other";return s[i]||(s[i]=[]),s[i].push(a),s},{}),n={document:"📄",template:"📋",report:"📊",presentation:"📽️",spreadsheet:"📈",code:"💻",image:"🖼️",video:"🎬",audio:"🎵",archive:"📦",pdf:"📕",markdown:"📝"};return r`
+  `}function Y1(e){const t=e.reduce((s,a)=>{const i=a.type||"other";return s[i]||(s[i]=[]),s[i].push(a),s},{}),n={document:"📄",template:"📋",report:"📊",presentation:"📽️",spreadsheet:"📈",code:"💻",image:"🖼️",video:"🎬",audio:"🎵",archive:"📦",pdf:"📕",markdown:"📝"};return r`
     <div class="work-file-tree">
       ${Object.entries(t).map(([s,a])=>r`
         <div class="work-folder">
@@ -7680,7 +7693,7 @@ ${i}
         `)}
       `)}
     </div>
-  `}const Q1={html_report:"📊",plan:"📋",analysis:"🔍",code:"💻",doc:"📝",data:"📦",image:"🖼️",script:"⚙️"},Y1=[{key:"all",label:"All"},{key:"pinned",label:"Pinned"},{key:"html_report",label:"Reports"},{key:"plan",label:"Plans"},{key:"code",label:"Code"},{key:"recent",label:"Recent"}];function J1(e,t){switch(t){case"pinned":return e.filter(n=>n.pinned);case"html_report":case"plan":case"code":return e.filter(n=>n.type===t);case"recent":{const n=Date.now()-6048e5;return e.filter(s=>new Date(s.createdAt).getTime()>n)}default:return e}}function X1(e,t,n,s){const a=Q1[e.type]||"📄",i=new Date(e.createdAt),o=Sp(i.getTime());return r`
+  `}const J1={html_report:"📊",plan:"📋",analysis:"🔍",code:"💻",doc:"📝",data:"📦",image:"🖼️",script:"⚙️"},X1=[{key:"all",label:"All"},{key:"pinned",label:"Pinned"},{key:"html_report",label:"Reports"},{key:"plan",label:"Plans"},{key:"code",label:"Code"},{key:"recent",label:"Recent"}];function Z1(e,t){switch(t){case"pinned":return e.filter(n=>n.pinned);case"html_report":case"plan":case"code":return e.filter(n=>n.type===t);case"recent":{const n=Date.now()-6048e5;return e.filter(s=>new Date(s.createdAt).getTime()>n)}default:return e}}function e2(e,t,n,s){const a=J1[e.type]||"📄",i=new Date(e.createdAt),o=Sp(i.getTime());return r`
     <div class="resource-card">
       <button
         class="resource-card-main"
@@ -7709,12 +7722,12 @@ ${i}
         >×</button>
       </div>
     </div>
-  `}function Z1(e){const{resources:t=[],resourcesLoading:n,resourceFilter:s="all",onResourceFilterChange:a,onResourceClick:i,onResourcePin:o,onResourceDelete:l}=e,d=J1(t,s);return d.sort((u,h)=>u.pinned!==h.pinned?u.pinned?-1:1:h.createdAt.localeCompare(u.createdAt)),r`
+  `}function t2(e){const{resources:t=[],resourcesLoading:n,resourceFilter:s="all",onResourceFilterChange:a,onResourceClick:i,onResourcePin:o,onResourceDelete:l}=e,d=Z1(t,s);return d.sort((u,h)=>u.pinned!==h.pinned?u.pinned?-1:1:h.createdAt.localeCompare(u.createdAt)),r`
     <div class="work-workspaces-section">
       <h2 class="work-section-title">Resources</h2>
 
       <div class="resource-filter-strip">
-        ${Y1.map(u=>r`
+        ${X1.map(u=>r`
             <button
               class="resource-filter-btn${s===u.key?" active":""}"
               @click=${()=>a?.(u.key)}
@@ -7732,10 +7745,10 @@ ${i}
                 </div>
               </div>
             </div>`:r`<div class="resource-grid">
-              ${d.map(u=>X1(u,i,o,l))}
+              ${d.map(u=>e2(u,i,o,l))}
             </div>`}
     </div>
-  `}function e2(e){const{projects:t,loading:n,error:s,expandedProjects:a=new Set,projectFiles:i={},detailLoading:o=new Set,onRefresh:l,onToggleProject:d,onPersonClick:u,onFileClick:h,onSkillClick:f}=e;if(n)return r`
+  `}function n2(e){const{projects:t,loading:n,error:s,expandedProjects:a=new Set,projectFiles:i={},detailLoading:o=new Set,onRefresh:l,onToggleProject:d,onPersonClick:u,onFileClick:h,onSkillClick:f}=e;if(n)return r`
       <div class="my-day-container">
         <div class="my-day-loading">
           <div class="spinner"></div>
@@ -7761,7 +7774,7 @@ ${i}
       </div>
 
       <!-- Resources Section -->
-      ${Z1(e)}
+      ${t2(e)}
 
       <!-- Workspaces Section -->
       <div class="work-workspaces-section">
@@ -7776,7 +7789,7 @@ ${i}
                     </div>
                   </div>
                 `:p}
-          ${m.map($=>H1($,a.has($.id),i[$.id]??[],o.has($.id),()=>d?.($.id),u,h,f))}
+          ${m.map($=>Q1($,a.has($.id),i[$.id]??[],o.has($.id),()=>d?.($.id),u,h,f))}
           ${w.length>0?r`
                 <div style="margin-top: 16px; color: var(--mc-text-muted); font-size: 12px;">
                   ${w.length} archived project${w.length!==1?"s":""}
@@ -7785,7 +7798,7 @@ ${i}
         </div>
       </div>
     </div>
-  `}function tt(e){if(!e)return"";try{return K(new Date(e).getTime())}catch{return""}}function fn(e){return r`<div class="second-brain-md-body">${Se(be(e))}</div>`}function t2(e){const{identity:t}=e;return!t||t.files.length===0?r`
+  `}function tt(e){if(!e)return"";try{return K(new Date(e).getTime())}catch{return""}}function fn(e){return r`<div class="second-brain-md-body">${Se(be(e))}</div>`}function s2(e){const{identity:t}=e;return!t||t.files.length===0?r`
       <div class="second-brain-panel">
         <div class="second-brain-empty-block">
           <div class="second-brain-empty-icon">\u{1F464}</div>
@@ -7842,7 +7855,7 @@ ${i}
         </div>
       `:p}
     </div>
-  `}function n2(e){const{memoryBank:t,selectedEntry:n,searchQuery:s,browsingFolder:a,folderEntries:i,folderName:o}=e;if(n)return r`
+  `}function a2(e){const{memoryBank:t,selectedEntry:n,searchQuery:s,browsingFolder:a,folderEntries:i,folderName:o}=e;if(n)return r`
       <div class="second-brain-panel">
         <button class="second-brain-back-btn" @click=${()=>e.onBack()}>
           \u{2190} Back
@@ -7929,7 +7942,7 @@ ${i}
       </div>
       ${e.updatedAt?r`<div class="second-brain-entry-meta">${tt(e.updatedAt)}</div>`:p}
     </div>
-  `}function s2(e){const{aiPacket:t,syncing:n}=e,s=t?.snapshot??t?.consciousness??null,a=t?.snapshot?"Awareness Snapshot":"CONSCIOUSNESS.md";return r`
+  `}function i2(e){const{aiPacket:t,syncing:n}=e,s=t?.snapshot??t?.consciousness??null,a=t?.snapshot?"Awareness Snapshot":"CONSCIOUSNESS.md";return r`
     <div class="second-brain-panel">
       <div class="second-brain-sync-bar">
         <div class="second-brain-sync-info">
@@ -7978,7 +7991,7 @@ ${i}
         </div>
       `:p}
     </div>
-  `}const uc={connected:{dot:"●",label:"Connected",cls:"second-brain-source--connected"},available:{dot:"○",label:"Available",cls:"second-brain-source--available"}};function a2(e){const{sourcesData:t}=e;if(!t||t.sources.length===0)return va("No sources detected","Connect data sources to build your context universe.");const n=t.sources.filter(a=>a.status==="connected"),s=t.sources.filter(a=>a.status==="available");return r`
+  `}const uc={connected:{dot:"●",label:"Connected",cls:"second-brain-source--connected"},available:{dot:"○",label:"Available",cls:"second-brain-source--available"}};function o2(e){const{sourcesData:t}=e;if(!t||t.sources.length===0)return va("No sources detected","Connect data sources to build your context universe.");const n=t.sources.filter(a=>a.status==="connected"),s=t.sources.filter(a=>a.status==="available");return r`
     <div class="second-brain-panel">
       <div class="second-brain-sources-summary">
         <span class="second-brain-sources-count">${t.connectedCount}</span>
@@ -8039,7 +8052,7 @@ ${i}
       </div>
       ${e.updatedAt?r`<div class="second-brain-entry-meta">${tt(e.updatedAt)}</div>`:p}
     </div>
-  `}function i2(e){const{researchData:t,selectedEntry:n,searchQuery:s,browsingFolder:a,folderEntries:i,folderName:o}=e;if(n)return r`
+  `}function r2(e){const{researchData:t,selectedEntry:n,searchQuery:s,browsingFolder:a,folderEntries:i,folderName:o}=e;if(n)return r`
       <div class="second-brain-panel">
         <button class="second-brain-back-btn" @click=${()=>e.onBack()}>
           \u{2190} Back
@@ -8111,7 +8124,7 @@ ${i}
           </div>
         `})}
     </div>
-  `}function o2(e){return e<1024?`${e}B`:e<1024*1024?`${(e/1024).toFixed(1)}K`:`${(e/(1024*1024)).toFixed(1)}M`}function r2(e){return r`
+  `}function l2(e){return e<1024?`${e}B`:e<1024*1024?`${(e/1024).toFixed(1)}K`:`${(e/(1024*1024)).toFixed(1)}M`}function c2(e){return r`
     <div class="sb-files-container">
       <div class="sb-files-search-bar">
         <input
@@ -8123,9 +8136,9 @@ ${i}
         />
       </div>
 
-      ${e.fileSearchResults?l2(e):e.fileTreeLoading?r`<div class="sb-files-loading">Loading file tree...</div>`:e.fileTree?Ap(e.fileTree,e):r`<div class="sb-files-empty">No files found</div>`}
+      ${e.fileSearchResults?d2(e):e.fileTreeLoading?r`<div class="sb-files-loading">Loading file tree...</div>`:e.fileTree?Ap(e.fileTree,e):r`<div class="sb-files-empty">No files found</div>`}
     </div>
-  `}function l2(e){const t=e.fileSearchResults??[];return t.length===0?r`<div class="sb-files-empty">No results found</div>`:r`
+  `}function d2(e){const t=e.fileSearchResults??[];return t.length===0?r`<div class="sb-files-empty">No results found</div>`:r`
     <div class="sb-files-results">
       ${t.map(n=>r`
           <button
@@ -8159,7 +8172,7 @@ ${i}
           >
             <span class="sb-file-icon">\u{1F4C4}</span>
             <span class="sb-file-name">${s.name}</span>
-            ${s.size!=null?r`<span class="sb-tree-size">${o2(s.size)}</span>`:p}
+            ${s.size!=null?r`<span class="sb-tree-size">${l2(s.size)}</span>`:p}
           </button>
         `)}
     </div>
@@ -8169,7 +8182,7 @@ ${i}
       <div class="second-brain-empty-title">${e}</div>
       <div class="second-brain-empty-hint">${t}</div>
     </div>
-  `}function c2(e){if(!e)return p;if(!e.available)return r`
+  `}function u2(e){if(!e)return p;if(!e.available)return r`
       <div class="vault-health-bar vault-health-disconnected">
         <span class="vault-health-status">\u26A0\uFE0F Vault not connected</span>
         <span class="vault-health-detail">Using local storage. Set OBSIDIAN_VAULT_PATH to connect your Obsidian vault.</span>
@@ -8186,9 +8199,9 @@ ${i}
       </span>
       ${s}
     </div>
-  `}function d2(e){let t=0;const n=[];return e.identity&&e.identity.files.length>0?t+=20:n.push("Create USER.md to help your ally know you"),e.vaultHealth?.available??!1?t+=20:n.push("Connect your Obsidian vault for long-term memory"),e.memoryBank&&e.memoryBank.totalEntries>0?t+=20:n.push("Teach your ally — chat naturally and it remembers"),e.sourcesData&&e.sourcesData.connectedCount>0?t+=20:n.push("Connect a data source (calendar, Oura, etc.)"),e.vaultHealth?.stats&&e.vaultHealth.stats.dailyCount>=7?t+=20:n.push("Keep using the morning brief — it compounds"),{score:t,tips:n}}function u2(e){const{subtab:t,loading:n,vaultHealth:s}=e,a=d2(e);return r`
+  `}function p2(e){let t=0;const n=[];return e.identity&&e.identity.files.length>0?t+=20:n.push("Create USER.md to help your ally know you"),e.vaultHealth?.available??!1?t+=20:n.push("Connect your Obsidian vault for long-term memory"),e.memoryBank&&e.memoryBank.totalEntries>0?t+=20:n.push("Teach your ally — chat naturally and it remembers"),e.sourcesData&&e.sourcesData.connectedCount>0?t+=20:n.push("Connect a data source (calendar, Oura, etc.)"),e.vaultHealth?.stats&&e.vaultHealth.stats.dailyCount>=7?t+=20:n.push("Keep using the morning brief — it compounds"),{score:t,tips:n}}function h2(e){const{subtab:t,loading:n,vaultHealth:s}=e,a=p2(e);return r`
     <section class="second-brain-container">
-      ${c2(s)}
+      ${u2(s)}
       ${a.score<100?r`
         <div class="sb-health-score">
           <div class="sb-health-score-bar">
@@ -8251,9 +8264,9 @@ ${i}
         </button>
       </div>
 
-      ${t==="intel"?p2(e):n?r`<div class="second-brain-loading"><div class="second-brain-loading-spinner"></div>Loading...</div>`:t==="identity"?t2(e):t==="memory-bank"?n2(e):t==="ai-packet"?s2(e):t==="sources"?a2(e):t==="resources"?h2(e):t==="files"?r2(e):i2(e)}
+      ${t==="intel"?f2(e):n?r`<div class="second-brain-loading"><div class="second-brain-loading-spinner"></div>Loading...</div>`:t==="identity"?s2(e):t==="memory-bank"?a2(e):t==="ai-packet"?i2(e):t==="sources"?o2(e):t==="resources"?g2(e):t==="files"?c2(e):r2(e)}
     </section>
-  `}function p2(e){const t=e.vaultHealth?.available??!1,n=(e.vaultHealth?.stats?.dailyCount??0)>=3,s=(e.sourcesData?.connectedCount??0)>0;return r`
+  `}function f2(e){const t=e.vaultHealth?.available??!1,n=(e.vaultHealth?.stats?.dailyCount??0)>=3,s=(e.sourcesData?.connectedCount??0)>0;return r`
     <div class="second-brain-panel">
       <div class="second-brain-card">
         <div class="second-brain-card-header">
@@ -8285,7 +8298,7 @@ ${i}
         </p>
       </div>
     </div>
-  `}function h2(e){const{communityResources:t,communityResourceAddFormOpen:n}=e;return r`
+  `}function g2(e){const{communityResources:t,communityResourceAddFormOpen:n}=e;return r`
     <div class="second-brain-panel">
       <div class="second-brain-research-toolbar">
         <div style="flex:1">
@@ -8304,7 +8317,7 @@ ${i}
         </button>
       </div>
 
-      ${n?g2(e):p}
+      ${n?v2(e):p}
 
       ${!t||t.resources.length===0?va("No community resources yet","Add GitHub repos, awesome-lists, and tools for your AI agents to discover and reference."):r`
           <div class="second-brain-section">
@@ -8313,12 +8326,12 @@ ${i}
               <span class="second-brain-section-count">${t.count}</span>
             </div>
             <div class="second-brain-entry-list">
-              ${t.resources.map(s=>f2(s,e))}
+              ${t.resources.map(s=>m2(s,e))}
             </div>
           </div>
         `}
     </div>
-  `}function f2(e,t){return r`
+  `}function m2(e,t){return r`
     <div class="second-brain-entry">
       <div class="second-brain-entry-icon">\u{1F517}</div>
       <div class="second-brain-entry-body">
@@ -8338,7 +8351,7 @@ ${i}
         @click=${n=>{n.stopPropagation(),t.onCommunityResourceRemove(e.id)}}
       >Remove</button>
     </div>
-  `}function g2(e){const t=e.communityResourceAddForm??{url:"",label:"",description:"",tags:""};return r`
+  `}function v2(e){const t=e.communityResourceAddForm??{url:"",label:"",description:"",tags:""};return r`
     <div class="second-brain-research-form">
       <div class="second-brain-research-form-row">
         <label class="second-brain-research-form-label">URL *</label>
@@ -8386,7 +8399,7 @@ ${i}
         @click=${()=>e.onCommunityResourceAdd()}
       >Add Resource</button>
     </div>
-  `}const Ni={all:{icon:"📊",label:"All"},productivity:{icon:"📋",label:"Productivity"},personal:{icon:"🧑",label:"Personal"},business:{icon:"💼",label:"Business"},system:{icon:"⚙️",label:"System"},custom:{icon:"✨",label:"Custom"}},m2=[{id:"morning-overview",name:"Morning Overview",category:"productivity",description:"Tasks, calendar, priorities, and focus score",prompt:"Create a morning overview dashboard that shows my top priorities, today's calendar events, active queue items, and readiness score. Use clean CSS grid layout."},{id:"weekly-impact",name:"Weekly Impact",category:"productivity",description:"What you accomplished this week",prompt:"Create a weekly impact dashboard showing tasks completed vs created this week, agent task outcomes, trust score changes, and top 3 wins. Use CSS bar charts."},{id:"agent-activity",name:"Agent Activity",category:"system",description:"Queue throughput, personas, and trust scores",prompt:"Create an agent activity dashboard showing queue stats (pending, processing, completed, failed), most active personas, cron skill execution log, and trust scores by workflow."},{id:"health-energy",name:"Health & Energy",category:"personal",description:"Sleep, readiness, and activity from Oura",prompt:"Create a health and energy dashboard showing last night's sleep score, 7-day sleep trend, today's readiness score, activity level, and HRV trend. Pull from Oura integration."},{id:"goals-tracker",name:"Goals Tracker",category:"personal",description:"Active goals with progress bars",prompt:"Create a goals tracker dashboard showing my active goals as cards with progress bars, grouped by area (health, career, finance, personal), with overall completion percentage."},{id:"content-performance",name:"Content Performance",category:"business",description:"Social posts and content pipeline",prompt:"Create a content performance dashboard showing recent content pieces, content pipeline status, engagement metrics from X intelligence, and a content calendar for the next 7 days."}];function v2(e){return e==="global"?r`<span class="dashboard-card-scope">Global</span>`:r`<span class="dashboard-card-scope">${e}</span>`}function xp(e){return Date.now()-new Date(e).getTime()>1440*60*1e3}function Tp(e){const t=(e.title+" "+(e.description??"")).toLowerCase();return t.includes("health")||t.includes("sleep")||t.includes("oura")||t.includes("energy")||t.includes("goal")?"personal":t.includes("agent")||t.includes("queue")||t.includes("trust")||t.includes("skill")?"system":t.includes("revenue")||t.includes("business")||t.includes("content")||t.includes("metric")?"business":t.includes("task")||t.includes("calendar")||t.includes("morning")||t.includes("impact")||t.includes("weekly")?"productivity":"custom"}function fc(e,t){const n=Ni[e.category]??Ni.custom;return r`
+  `}const Ni={all:{icon:"📊",label:"All"},productivity:{icon:"📋",label:"Productivity"},personal:{icon:"🧑",label:"Personal"},business:{icon:"💼",label:"Business"},system:{icon:"⚙️",label:"System"},custom:{icon:"✨",label:"Custom"}},y2=[{id:"morning-overview",name:"Morning Overview",category:"productivity",description:"Tasks, calendar, priorities, and focus score",prompt:"Create a morning overview dashboard that shows my top priorities, today's calendar events, active queue items, and readiness score. Use clean CSS grid layout."},{id:"weekly-impact",name:"Weekly Impact",category:"productivity",description:"What you accomplished this week",prompt:"Create a weekly impact dashboard showing tasks completed vs created this week, agent task outcomes, trust score changes, and top 3 wins. Use CSS bar charts."},{id:"agent-activity",name:"Agent Activity",category:"system",description:"Queue throughput, personas, and trust scores",prompt:"Create an agent activity dashboard showing queue stats (pending, processing, completed, failed), most active personas, cron skill execution log, and trust scores by workflow."},{id:"health-energy",name:"Health & Energy",category:"personal",description:"Sleep, readiness, and activity from Oura",prompt:"Create a health and energy dashboard showing last night's sleep score, 7-day sleep trend, today's readiness score, activity level, and HRV trend. Pull from Oura integration."},{id:"goals-tracker",name:"Goals Tracker",category:"personal",description:"Active goals with progress bars",prompt:"Create a goals tracker dashboard showing my active goals as cards with progress bars, grouped by area (health, career, finance, personal), with overall completion percentage."},{id:"content-performance",name:"Content Performance",category:"business",description:"Social posts and content pipeline",prompt:"Create a content performance dashboard showing recent content pieces, content pipeline status, engagement metrics from X intelligence, and a content calendar for the next 7 days."}];function b2(e){return e==="global"?r`<span class="dashboard-card-scope">Global</span>`:r`<span class="dashboard-card-scope">${e}</span>`}function xp(e){return Date.now()-new Date(e).getTime()>1440*60*1e3}function Tp(e){const t=(e.title+" "+(e.description??"")).toLowerCase();return t.includes("health")||t.includes("sleep")||t.includes("oura")||t.includes("energy")||t.includes("goal")?"personal":t.includes("agent")||t.includes("queue")||t.includes("trust")||t.includes("skill")?"system":t.includes("revenue")||t.includes("business")||t.includes("content")||t.includes("metric")?"business":t.includes("task")||t.includes("calendar")||t.includes("morning")||t.includes("impact")||t.includes("weekly")?"productivity":"custom"}function fc(e,t){const n=Ni[e.category]??Ni.custom;return r`
     <div class="dashboard-card dashboard-card--template">
       <button
         class="dashboard-card-main"
@@ -8400,7 +8413,7 @@ ${i}
         </div>
       </button>
     </div>
-  `}function y2(e,t,n,s){const a=xp(e.updatedAt);return r`
+  `}function w2(e,t,n,s){const a=xp(e.updatedAt);return r`
     <div class="dashboard-card ${e.pinned?"dashboard-card--pinned":""}">
       <button
         class="dashboard-card-main"
@@ -8412,7 +8425,7 @@ ${i}
         </div>
         ${e.description?r`<div class="dashboard-card-desc">${e.description}</div>`:p}
         <div class="dashboard-card-meta">
-          ${v2(e.scope)}
+          ${b2(e.scope)}
           <span>${K(new Date(e.updatedAt).getTime())}</span>
           ${a?r`<span class="dashboard-card-stale" title="Last updated over 24 hours ago">\u{1F7E1} Stale</span>`:p}
         </div>
@@ -8430,7 +8443,7 @@ ${i}
         >&times;</button>
       </div>
     </div>
-  `}function b2(e){const{activeDashboardHtml:t,activeDashboardManifest:n,isWorking:s}=e;if(!t||!n)return p;const a=xp(n.updatedAt);return r`
+  `}function $2(e){const{activeDashboardHtml:t,activeDashboardManifest:n,isWorking:s}=e;if(!t||!n)return p;const a=xp(n.updatedAt);return r`
     <section class="dashboards-container">
       <div class="dashboards-active-header">
         <button
@@ -8459,7 +8472,7 @@ ${i}
         </div>
       </div>
     </section>
-  `}function w2(e,t,n){const s={all:t.length};for(const a of t){const i=Tp(a);s[i]=(s[i]??0)+1}return r`
+  `}function k2(e,t,n){const s={all:t.length};for(const a of t){const i=Tp(a);s[i]=(s[i]??0)+1}return r`
     <div class="dashboards-category-bar">
       ${Object.entries(Ni).map(([a,i])=>r`
         <button
@@ -8471,7 +8484,7 @@ ${i}
         </button>
       `)}
     </div>
-  `}function $2(e){const{loading:t,dashboards:n}=e,s=e.categoryFilter??"all",a=e.templates??m2,o=[...s==="all"?n??[]:(n??[]).filter(u=>Tp(u)===s)].sort((u,h)=>u.pinned&&!h.pinned?-1:!u.pinned&&h.pinned?1:new Date(h.updatedAt).getTime()-new Date(u.updatedAt).getTime()),l=s==="all"?a:a.filter(u=>u.category===s),d=(n??[]).length>0;return r`
+  `}function S2(e){const{loading:t,dashboards:n}=e,s=e.categoryFilter??"all",a=e.templates??y2,o=[...s==="all"?n??[]:(n??[]).filter(u=>Tp(u)===s)].sort((u,h)=>u.pinned&&!h.pinned?-1:!u.pinned&&h.pinned?1:new Date(h.updatedAt).getTime()-new Date(u.updatedAt).getTime()),l=s==="all"?a:a.filter(u=>u.category===s),d=(n??[]).length>0;return r`
     <section class="dashboards-container">
       <div class="dashboards-toolbar">
         <span class="dashboards-count">${(n??[]).length} dashboard${(n??[]).length===1?"":"s"}</span>
@@ -8481,7 +8494,7 @@ ${i}
         >+ Create via Chat</button>
       </div>
 
-      ${d&&e.onCategoryFilter?w2(s,n??[],e.onCategoryFilter):p}
+      ${d&&e.onCategoryFilter?k2(s,n??[],e.onCategoryFilter):p}
 
       ${t?r`<div class="dashboards-loading"><div class="spinner"></div> Loading dashboards...</div>`:o.length===0&&!d?r`
               <div class="dashboards-empty">
@@ -8500,7 +8513,7 @@ ${i}
               </div>
             `:r`
               <div class="dashboards-grid">
-                ${o.map(u=>y2(u,e.onSelectDashboard,e.onDeleteDashboard,e.onTogglePin))}
+                ${o.map(u=>w2(u,e.onSelectDashboard,e.onDeleteDashboard,e.onTogglePin))}
               </div>
               ${l.length>0?r`
                 <div class="dashboards-templates-section">
@@ -8512,7 +8525,7 @@ ${i}
               `:p}
             `}
     </section>
-  `}function k2(e){return e.error?r`
+  `}function A2(e){return e.error?r`
       <section class="dashboards-container">
         <div class="dashboards-error">
           <span class="error-icon">\u26A0</span>
@@ -8520,7 +8533,7 @@ ${i}
           <button class="retry-button" @click=${()=>e.onRefresh()}>Retry</button>
         </div>
       </section>
-    `:e.activeDashboardHtml&&e.activeDashboardManifest?b2(e):$2(e)}const S2={0:"Assessment",1:"Interview",2:"Second Brain",3:"Workflow Audit",4:"Configuration",5:"First Win",6:"Ready"},A2=[{id:"slack",name:"Slack",icon:"#",desc:"Team messaging"},{id:"google-calendar",name:"Google Calendar",icon:"Cal",desc:"Events & scheduling"},{id:"clickup",name:"ClickUp",icon:"CU",desc:"Project management"},{id:"github",name:"GitHub",icon:"GH",desc:"Code & repos"},{id:"obsidian",name:"Obsidian",icon:"Ob",desc:"Notes & knowledge"},{id:"notion",name:"Notion",icon:"N",desc:"Docs & wikis"},{id:"linear",name:"Linear",icon:"Li",desc:"Issue tracking"},{id:"apple-reminders",name:"Apple Reminders",icon:"AR",desc:"Tasks (macOS)"},{id:"email",name:"Email",icon:"@",desc:"Gmail / Outlook"},{id:"things-mac",name:"Things",icon:"Th",desc:"Task manager (macOS)"}];function x2(e){return r`
+    `:e.activeDashboardHtml&&e.activeDashboardManifest?$2(e):S2(e)}const x2={0:"Assessment",1:"Interview",2:"Second Brain",3:"Workflow Audit",4:"Configuration",5:"First Win",6:"Ready"},T2=[{id:"slack",name:"Slack",icon:"#",desc:"Team messaging"},{id:"google-calendar",name:"Google Calendar",icon:"Cal",desc:"Events & scheduling"},{id:"clickup",name:"ClickUp",icon:"CU",desc:"Project management"},{id:"github",name:"GitHub",icon:"GH",desc:"Code & repos"},{id:"obsidian",name:"Obsidian",icon:"Ob",desc:"Notes & knowledge"},{id:"notion",name:"Notion",icon:"N",desc:"Docs & wikis"},{id:"linear",name:"Linear",icon:"Li",desc:"Issue tracking"},{id:"apple-reminders",name:"Apple Reminders",icon:"AR",desc:"Tasks (macOS)"},{id:"email",name:"Email",icon:"@",desc:"Gmail / Outlook"},{id:"things-mac",name:"Things",icon:"Th",desc:"Task manager (macOS)"}];function _2(e){return r`
 		<div class="onboarding-progress">
 			<div class="onboarding-progress-bar">
 				${[2,3,4,5].map(n=>r`
@@ -8528,20 +8541,20 @@ ${i}
 							class="onboarding-progress-step ${e>=n?"completed":""} ${e===n?"active":""}"
 						>
 							<div class="onboarding-progress-dot"></div>
-							<span class="onboarding-progress-label">${S2[n]}</span>
+							<span class="onboarding-progress-label">${x2[n]}</span>
 						</div>
 					`)}
 			</div>
 			<div class="onboarding-progress-fill" style="width: ${(e-2)/4*100}%"></div>
 		</div>
-	`}function T2(e,t){return r`
+	`}function C2(e,t){return r`
 		<div class="onboarding-tools-overlay">
 			<div class="onboarding-tools-header">
 				<h3>Connect Your Tools</h3>
 				<p>Tap a tool to connect it. The agent will help with setup.</p>
 			</div>
 			<div class="onboarding-tools-grid">
-				${A2.map(n=>{const a=e.find(i=>i.id===n.id)?.status??"pending";return r`
+				${T2.map(n=>{const a=e.find(i=>i.id===n.id)?.status??"pending";return r`
 						<div class="onboarding-tool-card ${a}" data-tool-id="${n.id}">
 							<div class="onboarding-tool-icon">${n.icon}</div>
 							<div class="onboarding-tool-name">${n.name}</div>
@@ -8554,7 +8567,7 @@ ${i}
 			</div>
 			<button class="onboarding-skip-btn" @click=${t}>Skip for now</button>
 		</div>
-	`}function _2(e){return e.length?r`
+	`}function R2(e){return e.length?r`
 		<div class="onboarding-audit-overlay">
 			<h3>GodMode Audit Results</h3>
 			<div class="onboarding-audit-cards">
@@ -8568,7 +8581,7 @@ ${i}
 					`)}
 			</div>
 		</div>
-	`:r`${p}`}function C2(e){const t=e>=70?"#38a169":e>=40?"#d69e2e":"#e53e3e",n=e>=70?"Good":e>=40?"Needs Work":"Getting Started";return r`
+	`:r`${p}`}function E2(e){const t=e>=70?"#38a169":e>=40?"#d69e2e":"#e53e3e",n=e>=70?"Good":e>=40?"Needs Work":"Getting Started";return r`
 		<div class="onboarding-health-gauge">
 			<div class="health-score" style="color: ${t}">
 				<span class="health-number">${e}</span>
@@ -8576,9 +8589,9 @@ ${i}
 			</div>
 			<div class="health-label" style="color: ${t}">${n}</div>
 		</div>
-	`}function R2(e){return r`
+	`}function P2(e){return r`
 		<div class="onboarding-assessment">
-			${C2(e.healthScore)}
+			${E2(e.healthScore)}
 			<div class="assessment-checklist">
 				<div class="assessment-item ${e.configExists?"ok":"gap"}">
 					<span class="assessment-icon">${e.configExists?"✅":"❌"}</span>
@@ -8616,14 +8629,14 @@ ${i}
 					`)}
 			</div>
 		</div>
-	`}function E2(e,t){return r`
+	`}function L2(e,t){return r`
 		<div class="onboarding-fullscreen">
 			<div class="onboarding-welcome">
 				<div class="onboarding-welcome-glow"></div>
 				<h1 class="onboarding-title">Welcome to GodMode</h1>
 				${t?r`
 						<p class="onboarding-subtitle">Here's where your setup stands today:</p>
-						${R2(t)}
+						${P2(t)}
 						<p class="onboarding-subtitle">Let's get you to 100. It takes about 15 minutes.</p>
 					`:r`
 						<div class="onboarding-value-cards">
@@ -8655,7 +8668,7 @@ ${i}
 				</button>
 			</div>
 		</div>
-	`}function P2(e){let t="",n="",s="";const a=["rocket","lightning","fire","star","brain","crown","diamond","target","compass","mountain"],i={rocket:"🚀",lightning:"⚡",fire:"🔥",star:"⭐",brain:"🧠",crown:"👑",diamond:"💎",target:"🎯",compass:"🧭",mountain:"⛰️"};function o(l){l.preventDefault();const d=l.target,u=new FormData(d);t=u.get("name")?.trim()??"",n=u.get("mission")?.trim()??"",s=u.get("emoji")?.trim()||"🚀",t&&e({name:t,mission:n,emoji:s})}return r`
+	`}function I2(e){let t="",n="",s="";const a=["rocket","lightning","fire","star","brain","crown","diamond","target","compass","mountain"],i={rocket:"🚀",lightning:"⚡",fire:"🔥",star:"⭐",brain:"🧠",crown:"👑",diamond:"💎",target:"🎯",compass:"🧭",mountain:"⛰️"};function o(l){l.preventDefault();const d=l.target,u=new FormData(d);t=u.get("name")?.trim()??"",n=u.get("mission")?.trim()??"",s=u.get("emoji")?.trim()||"🚀",t&&e({name:t,mission:n,emoji:s})}return r`
 		<div class="onboarding-fullscreen">
 			<div class="onboarding-identity">
 				<h2 class="onboarding-identity-title">Who are you?</h2>
@@ -8703,11 +8716,11 @@ ${i}
 				</form>
 			</div>
 		</div>
-	`}function L2(e){const{phase:t,tools:n,auditFindings:s,onSkipPhase:a}=e;return r`
-		${x2(t)}
-		${t===3?T2(n,a):p}
-		${t===4&&s.length>0?_2(s):p}
-	`}function I2(e,t,n){return e?r`
+	`}function D2(e){const{phase:t,tools:n,auditFindings:s,onSkipPhase:a}=e;return r`
+		${_2(t)}
+		${t===3?C2(n,a):p}
+		${t===4&&s.length>0?R2(s):p}
+	`}function M2(e,t,n){return e?r`
 		<div class="onboarding-fullscreen onboarding-summary">
 			<div class="onboarding-summary-content">
 				<div class="onboarding-summary-emoji">${t?.emoji??"🚀"}</div>
@@ -8740,7 +8753,7 @@ ${i}
 				</button>
 			</div>
 		</div>
-	`:r`${p}`}function D2(e){let t=!1;function n(s){if(s.preventDefault(),t)return;const a=s.target,i=a.querySelector('[name="name"]')?.value?.trim()??"";if(!i){a.querySelector('[name="name"]')?.focus();return}t=!0,e.onQuickSetup(i)}return r`
+	`:r`${p}`}function O2(e){let t=!1;function n(s){if(s.preventDefault(),t)return;const a=s.target,i=a.querySelector('[name="name"]')?.value?.trim()??"";if(!i){a.querySelector('[name="name"]')?.focus();return}t=!0,e.onQuickSetup(i)}return r`
     <div class="setup-quick">
       <div class="setup-quick__header">
         <span class="setup-quick__icon">\u26A1</span>
@@ -8767,7 +8780,7 @@ ${i}
         </button>
       </form>
     </div>
-  `}function M2(e){return e>=100?"GodMode fully loaded":e>=75?"Your ally is learning...":e>=50?"Building momentum...":e>=25?"Getting started...":"Power up your ally"}function O2(e){const n=2*Math.PI*54,s=n-e/100*n;return r`
+  `}function F2(e){return e>=100?"GodMode fully loaded":e>=75?"Your ally is learning...":e>=50?"Building momentum...":e>=25?"Getting started...":"Power up your ally"}function N2(e){const n=2*Math.PI*54,s=n-e/100*n;return r`
     <div class="setup-ring">
       <svg class="setup-ring__svg" viewBox="0 0 120 120" width="120" height="120">
         <circle class="setup-ring__bg" cx="60" cy="60" r="${54}" fill="none" stroke="var(--gm-border, #333)" stroke-width="8" />
@@ -8783,9 +8796,9 @@ ${i}
         />
         <text x="60" y="64" text-anchor="middle" fill="var(--gm-text, #fff)" font-size="22" font-weight="bold">${e}%</text>
       </svg>
-      <span class="setup-ring__label">${M2(e)}</span>
+      <span class="setup-ring__label">${F2(e)}</span>
     </div>
-  `}function F2(e,t){const n=`setup-card--${e.status}`;return r`
+  `}function B2(e,t){const n=`setup-card--${e.status}`;return r`
     <div class="setup-card ${n}">
       <div class="setup-card__header">
         <span class="setup-card__icon">${e.icon}</span>
@@ -8799,12 +8812,12 @@ ${i}
       ${e.status==="available"&&e.action?r`<button class="setup-card__btn" @click=${()=>t(e.id)}>${e.action}</button>`:p}
       ${e.status==="active"?r`<span class="setup-card__active-check">\u2705</span>`:p}
     </div>
-  `}function N2(e){const{capabilities:t,capabilitiesLoading:n,onHideSetup:s,onOpenWizard:a,onCapabilityAction:i}=e;if(n&&!t)return r`<div class="setup-loading">Loading capabilities...</div>`;if(!t)return r`<div class="setup-loading">Couldn't load capabilities. Is the gateway running?</div>`;const{capabilities:o,percentComplete:l}=t;return r`
+  `}function U2(e){const{capabilities:t,capabilitiesLoading:n,onHideSetup:s,onOpenWizard:a,onCapabilityAction:i}=e;if(n&&!t)return r`<div class="setup-loading">Loading capabilities...</div>`;if(!t)return r`<div class="setup-loading">Couldn't load capabilities. Is the gateway running?</div>`;const{capabilities:o,percentComplete:l}=t;return r`
     <div class="setup-capabilities">
-      ${O2(l)}
+      ${N2(l)}
 
       <div class="setup-cards">
-        ${o.map(d=>F2(d,i))}
+        ${o.map(d=>B2(d,i))}
       </div>
 
       <div class="setup-actions">
@@ -8823,10 +8836,10 @@ ${i}
         </button>
       </div>
     </div>
-  `}function B2(e){return e.connected?r`
+  `}function z2(e){return e.connected?r`
     <section class="tab-body setup-section">
-      ${e.quickSetupDone?p:D2(e)}
-      ${N2(e)}
+      ${e.quickSetupDone?p:O2(e)}
+      ${U2(e)}
     </section>
   `:r`
       <section class="tab-body setup-section">
@@ -8930,7 +8943,7 @@ ${i}
                           </button>
                         `:r`
                           <div class="integration-guide">
-                            <div class="guide-steps">${U2(s.steps)}</div>
+                            <div class="guide-steps">${K2(s.steps)}</div>
 
                             ${s.envVars.length>0?r`
                                   <div class="guide-inputs">
@@ -8987,8 +9000,8 @@ ${i}
             </div>
           `:p}
     </div>
-  `}function U2(e){const t=e.split(`
-`),n=[];for(const s of t)s.startsWith("```")||(s.match(/^\d+\./)?n.push(r`<p class="guide-step">${vc(s)}</p>`):s.trim()&&n.push(r`<p>${vc(s)}</p>`));return r`${n}`}function z2(e){return e.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#039;")}function vc(e){let t=z2(e);return t=t.replace(/\[([^\]]+)\]\(([^)]+)\)/g,(n,s,a)=>{const i=a.trim().toLowerCase();return i.startsWith("javascript:")||i.startsWith("data:")||i.startsWith("vbscript:")?s:`<a href="${a}" target="_blank" rel="noopener">${s}</a>`}),t=t.replace(/`([^`]+)`/g,"<code>$1</code>"),t=t.replace(/\*\*([^*]+)\*\*/g,"<strong>$1</strong>"),r`<span>${Se(t)}</span>`}const K2=/^data:/i,W2=/^https?:\/\//i;function q2(e){const t=e.agentsList?.agents??[],s=Fc(e.sessionKey)?.agentId??e.agentsList?.defaultId??"main",i=t.find(l=>l.id===s)?.identity,o=i?.avatarUrl??i?.avatar;if(o)return K2.test(o)||W2.test(o)?o:i?.avatarUrl}function yc(e,t){const n=e.dynamicSlots[t];return n?r`
+  `}function K2(e){const t=e.split(`
+`),n=[];for(const s of t)s.startsWith("```")||(s.match(/^\d+\./)?n.push(r`<p class="guide-step">${vc(s)}</p>`):s.trim()&&n.push(r`<p>${vc(s)}</p>`));return r`${n}`}function W2(e){return e.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#039;")}function vc(e){let t=W2(e);return t=t.replace(/\[([^\]]+)\]\(([^)]+)\)/g,(n,s,a)=>{const i=a.trim().toLowerCase();return i.startsWith("javascript:")||i.startsWith("data:")||i.startsWith("vbscript:")?s:`<a href="${a}" target="_blank" rel="noopener">${s}</a>`}),t=t.replace(/`([^`]+)`/g,"<code>$1</code>"),t=t.replace(/\*\*([^*]+)\*\*/g,"<strong>$1</strong>"),r`<span>${Se(t)}</span>`}const q2=/^data:/i,j2=/^https?:\/\//i;function V2(e){const t=e.agentsList?.agents??[],s=Fc(e.sessionKey)?.agentId??e.agentsList?.defaultId??"main",i=t.find(l=>l.id===s)?.identity,o=i?.avatarUrl??i?.avatar;if(o)return q2.test(o)||j2.test(o)?o:i?.avatarUrl}function yc(e,t){const n=e.dynamicSlots[t];return n?r`
     <div class="dynamic-slot">
       <div class="dynamic-slot__toolbar">
         <span class="dynamic-slot__label">Custom view</span>
@@ -9000,7 +9013,7 @@ ${i}
       </div>
       <div class="dynamic-slot__content">${Se(od(n))}</div>
     </div>
-  `:p}function bc(e){const t=e.trim();if(!t)return t;const n=t.split(/\s+/);if(n.length>=2&&n.length%2===0){const l=n.length/2,d=n.slice(0,l).join(" "),u=n.slice(l).join(" ");if(d.toLowerCase()===u.toLowerCase())return d}const s=t.replace(/\s+/g," ").toLowerCase(),a=Math.floor(s.length/2),i=s.slice(0,a).trim(),o=s.slice(a).trim();return i&&i===o?t.slice(0,Math.ceil(t.length/2)).trim():t}function Bi(e,t){const n=t?.sessionId?.trim();return n?`session:${n}`:`key:${e.trim().toLowerCase()}`}function wc(e){if(e===Q)return!0;const t=e.toLowerCase();return!!(t==="agent:main:main"||t.endsWith(":main"))}function j2(e){const t=e.sessionsResult?.sessions,n=[...new Set(e.settings.openTabs.map(l=>l.trim()).filter(Boolean))].filter(l=>!wc(l)),s=De(t,e.sessionKey),a=Bi(e.sessionKey,s),i=new Map;for(const l of n){const d=De(t,l),u=Bi(l,d);if(!i.has(u)){i.set(u,l);continue}l===e.sessionKey&&i.set(u,l)}const o=[...i.values()];if(o.length===0){const l=e.sessionKey.trim()||"main";wc(l)||o.push(l)}return{tabKeys:o,activeIdentity:a}}function V2(e){const t=e.onboardingActive&&e.onboarding,n=e.onboardingPhase??0,s=e.onboardingData;if(t&&n===0)return E2(()=>{e.handleOnboardingStart?.()},s?.assessment);if(t&&n===1)return P2(c=>{e.handleOnboardingIdentitySubmit?.(c)});if(t&&n===6)return I2(s?.summary??null,s?.identity??null,()=>{e.handleOnboardingComplete?.()});if(e.wizardActive&&e.wizardState)return mp(e.wizardState,{onStepChange:c=>{e.handleWizardStepChange?.(c)},onAnswerChange:(c,g)=>{e.handleWizardAnswerChange?.(c,g)},onPreview:()=>{e.handleWizardPreview?.()},onGenerate:()=>{e.handleWizardGenerate?.()},onClose:()=>{e.handleWizardClose?.()},onFileToggle:(c,g)=>{e.handleWizardFileToggle?.(c,g)},onConfigToggle:(c,g)=>{e.handleWizardConfigToggle?.(c,g)}});const a=e.presenceEntries.length,i=e.sessionsResult?.count??null,o=e.cronStatus?.nextWakeAtMs??null,l=e.connected?null:"Disconnected from gateway.",d=e.tab==="chat",u=d&&(e.settings.chatFocusMode||e.onboarding||t&&n>=2),h=e.onboarding?!1:e.settings.chatShowThinking,f=q2(e),m=e.chatAvatarUrl??f??null,{tabKeys:w,activeIdentity:$}=j2(e);return r`
+  `:p}function bc(e){const t=e.trim();if(!t)return t;const n=t.split(/\s+/);if(n.length>=2&&n.length%2===0){const l=n.length/2,d=n.slice(0,l).join(" "),u=n.slice(l).join(" ");if(d.toLowerCase()===u.toLowerCase())return d}const s=t.replace(/\s+/g," ").toLowerCase(),a=Math.floor(s.length/2),i=s.slice(0,a).trim(),o=s.slice(a).trim();return i&&i===o?t.slice(0,Math.ceil(t.length/2)).trim():t}function Bi(e,t){const n=t?.sessionId?.trim();return n?`session:${n}`:`key:${e.trim().toLowerCase()}`}function wc(e){if(e===Q)return!0;const t=e.toLowerCase();return!!(t==="agent:main:main"||t.endsWith(":main"))}function H2(e){const t=e.sessionsResult?.sessions,n=[...new Set(e.settings.openTabs.map(l=>l.trim()).filter(Boolean))].filter(l=>!wc(l)),s=De(t,e.sessionKey),a=Bi(e.sessionKey,s),i=new Map;for(const l of n){const d=De(t,l),u=Bi(l,d);if(!i.has(u)){i.set(u,l);continue}l===e.sessionKey&&i.set(u,l)}const o=[...i.values()];if(o.length===0){const l=e.sessionKey.trim()||"main";wc(l)||o.push(l)}return{tabKeys:o,activeIdentity:a}}function G2(e){const t=e.onboardingActive&&e.onboarding,n=e.onboardingPhase??0,s=e.onboardingData;if(t&&n===0)return L2(()=>{e.handleOnboardingStart?.()},s?.assessment);if(t&&n===1)return I2(c=>{e.handleOnboardingIdentitySubmit?.(c)});if(t&&n===6)return M2(s?.summary??null,s?.identity??null,()=>{e.handleOnboardingComplete?.()});if(e.wizardActive&&e.wizardState)return mp(e.wizardState,{onStepChange:c=>{e.handleWizardStepChange?.(c)},onAnswerChange:(c,g)=>{e.handleWizardAnswerChange?.(c,g)},onPreview:()=>{e.handleWizardPreview?.()},onGenerate:()=>{e.handleWizardGenerate?.()},onClose:()=>{e.handleWizardClose?.()},onFileToggle:(c,g)=>{e.handleWizardFileToggle?.(c,g)},onConfigToggle:(c,g)=>{e.handleWizardConfigToggle?.(c,g)}});const a=e.presenceEntries.length,i=e.sessionsResult?.count??null,o=e.cronStatus?.nextWakeAtMs??null,l=e.connected?null:"Disconnected from gateway.",d=e.tab==="chat",u=d&&(e.settings.chatFocusMode||e.onboarding||t&&n>=2),h=e.onboarding?!1:e.settings.chatShowThinking,f=V2(e),m=e.chatAvatarUrl??f??null,{tabKeys:w,activeIdentity:$}=H2(e);return r`
     <div class="shell ${d?"shell--chat":""} ${u?"shell--chat-focus":""} ${e.settings.navCollapsed?"shell--nav-collapsed":""} ${e.onboarding?"shell--onboarding":""}">
       <header class="topbar">
         <div class="topbar-left">
@@ -9196,7 +9209,7 @@ ${i}
                   Reconnecting${e.reconnectAttempt>1?` (attempt ${e.reconnectAttempt})`:""}...
                 </div>`:e.lastError?r`<div class="pill ${e.lastError.startsWith("✓")?"success":"danger"}">${e.lastError}</div>`:p}
             ${d?Bu(e):p}
-            ${(e.tab==="today"||e.tab==="my-day")&&!e.dynamicSlots.today?c0({connected:e.connected,onRefresh:()=>e.handleMyDayRefresh(),selectedDate:e.todaySelectedDate,onDatePrev:()=>e.handleDatePrev(),onDateNext:()=>e.handleDateNext(),onDateToday:()=>e.handleDateToday(),viewMode:e.todayViewMode??"brief",onViewModeChange:c=>e.handleTodayViewModeChange(c),focusPulseActive:!1,onStartMorningSet:()=>e.handleFocusPulseStartMorning(),inboxItems:e.inboxItems??[],inboxCount:e.inboxCount??0,onEveningCapture:()=>{e.setTab("chat"),e.handleSendChat(`Let's do my evening capture. Walk me through these:
+            ${(e.tab==="today"||e.tab==="my-day")&&!e.dynamicSlots.today?u0({connected:e.connected,onRefresh:()=>e.handleMyDayRefresh(),selectedDate:e.todaySelectedDate,onDatePrev:()=>e.handleDatePrev(),onDateNext:()=>e.handleDateNext(),onDateToday:()=>e.handleDateToday(),viewMode:e.todayViewMode??"brief",onViewModeChange:c=>e.handleTodayViewModeChange(c),focusPulseActive:!1,onStartMorningSet:()=>e.handleFocusPulseStartMorning(),inboxItems:e.inboxItems??[],inboxCount:e.inboxCount??0,onEveningCapture:()=>{e.setTab("chat"),e.handleSendChat(`Let's do my evening capture. Walk me through these:
 1. What went well today?
 2. What didn't get done?
 3. What should tomorrow's brief prioritize?
@@ -9218,39 +9231,39 @@ ${i}
             </button>`:p}
 
         ${e.tab==="setup"?r`
-                ${B2({connected:e.connected,quickSetupDone:e.setupQuickDone??!1,capabilities:e.setupCapabilities??null,capabilitiesLoading:e.setupCapabilitiesLoading??!1,onQuickSetup:c=>e.handleQuickSetup?.(c),onHideSetup:()=>e.handleHideSetup?.(),onOpenWizard:()=>e.handleWizardOpen?.(),onNavigate:c=>e.setTab(c),onRunAssessment:()=>e.handleRunAssessment?.(),onOpenSupportChat:()=>e.handleOpenSupportChat(),onCapabilityAction:c=>e.handleCapabilityAction?.(c)})}
+                ${z2({connected:e.connected,quickSetupDone:e.setupQuickDone??!1,capabilities:e.setupCapabilities??null,capabilitiesLoading:e.setupCapabilitiesLoading??!1,onQuickSetup:c=>e.handleQuickSetup?.(c),onHideSetup:()=>e.handleHideSetup?.(),onOpenWizard:()=>e.handleWizardOpen?.(),onNavigate:c=>e.setTab(c),onRunAssessment:()=>e.handleRunAssessment?.(),onOpenSupportChat:()=>e.handleOpenSupportChat(),onCapabilityAction:c=>e.handleCapabilityAction?.(c)})}
                 ${e.setupQuickDone?gc({connected:e.connected,integrations:e.onboardingIntegrations??null,coreProgress:e.onboardingCoreProgress??null,expandedCard:e.onboardingExpandedCard??null,loadingGuide:e.onboardingLoadingGuide??null,activeGuide:e.onboardingActiveGuide??null,testingId:e.onboardingTestingId??null,testResult:e.onboardingTestResult??null,configValues:e.onboardingConfigValues??{},onLoadIntegrations:()=>e.handleLoadIntegrations(),onExpandCard:c=>e.handleExpandCard(c),onLoadGuide:c=>e.handleLoadGuide(c),onTestIntegration:c=>e.handleTestIntegration(c),onConfigureIntegration:(c,g)=>e.handleConfigureIntegration(c,g),onUpdateConfigValue:(c,g)=>e.handleUpdateConfigValue(c,g),onSkipIntegration:c=>e.handleSkipIntegration(c),onNavigate:c=>e.setTab(c),onMarkComplete:()=>e.handleMarkOnboardingComplete?.(),onOpenSupportChat:()=>e.handleOpenSupportChat()}):p}
               `:p}
 
         ${e.tab==="onboarding"?gc({connected:e.connected,integrations:e.onboardingIntegrations??null,coreProgress:e.onboardingCoreProgress??null,expandedCard:e.onboardingExpandedCard??null,loadingGuide:e.onboardingLoadingGuide??null,activeGuide:e.onboardingActiveGuide??null,testingId:e.onboardingTestingId??null,testResult:e.onboardingTestResult??null,configValues:e.onboardingConfigValues??{},onLoadIntegrations:()=>e.handleLoadIntegrations(),onExpandCard:c=>e.handleExpandCard(c),onLoadGuide:c=>e.handleLoadGuide(c),onTestIntegration:c=>e.handleTestIntegration(c),onConfigureIntegration:(c,g)=>e.handleConfigureIntegration(c,g),onUpdateConfigValue:(c,g)=>e.handleUpdateConfigValue(c,g),onSkipIntegration:c=>e.handleSkipIntegration(c),onNavigate:c=>e.setTab(c),onMarkComplete:()=>e.handleMarkOnboardingComplete?.(),onOpenSupportChat:()=>e.handleOpenSupportChat()}):p}
 
-        ${e.tab==="overview"?F0({connected:e.connected,hello:e.hello,settings:e.settings,password:e.password,lastError:e.lastError,presenceCount:a,sessionsCount:i,cronEnabled:e.cronStatus?.enabled??null,cronNext:o,lastChannelsRefresh:e.channelsLastSuccess,updateStatus:e.updateStatus,updateLoading:e.updateLoading,updateError:e.updateError,updateLastChecked:e.updateLastChecked,updateRunning:e.updateRunning,onSettingsChange:c=>e.applySettings(c),onPasswordChange:c=>e.password=c,onSessionKeyChange:c=>{ke(e),e.sessionKey=c,Ee(e,c),e.resetToolStream(),e.applySettings({...e.settings,sessionKey:c,lastActiveSessionKey:c}),e.loadAssistantIdentity(),e.loadSessionResources()},onConnect:()=>e.connect(),onRefresh:()=>e.loadOverview(),onCheckUpdates:()=>eu(e),onUpdateNow:()=>{kr(e)},pluginUpdateRunning:e.pluginUpdateRunning,onUpdatePlugin:()=>{vh(e)}}):p}
+        ${e.tab==="overview"?B0({connected:e.connected,hello:e.hello,settings:e.settings,password:e.password,lastError:e.lastError,presenceCount:a,sessionsCount:i,cronEnabled:e.cronStatus?.enabled??null,cronNext:o,lastChannelsRefresh:e.channelsLastSuccess,updateStatus:e.updateStatus,updateLoading:e.updateLoading,updateError:e.updateError,updateLastChecked:e.updateLastChecked,updateRunning:e.updateRunning,onSettingsChange:c=>e.applySettings(c),onPasswordChange:c=>e.password=c,onSessionKeyChange:c=>{ke(e),e.sessionKey=c,Ee(e,c),e.resetToolStream(),e.applySettings({...e.settings,sessionKey:c,lastActiveSessionKey:c}),e.loadAssistantIdentity(),e.loadSessionResources()},onConnect:()=>e.connect(),onRefresh:()=>e.loadOverview(),onCheckUpdates:()=>eu(e),onUpdateNow:()=>{kr(e)},pluginUpdateRunning:e.pluginUpdateRunning,onUpdatePlugin:()=>{vh(e)}}):p}
 
-        ${e.tab==="workspaces"?n0({connected:e.connected,workspaces:e.workspaces??[],selectedWorkspace:e.selectedWorkspace??null,searchQuery:e.workspacesSearchQuery??"",itemSearchQuery:e.workspaceItemSearchQuery??"",expandedFolders:e.workspaceExpandedFolders??new Set,loading:e.workspacesLoading??!1,createLoading:e.workspacesCreateLoading??!1,error:e.workspacesError??null,onSearch:c=>e.workspacesSearchQuery=c,onItemSearch:c=>e.workspaceItemSearchQuery=c,onCreateWorkspace:async c=>{e.workspacesCreateLoading=!0;try{const{createWorkspace:g,selectWorkspace:k}=await R(async()=>{const{createWorkspace:T,selectWorkspace:x}=await Promise.resolve().then(()=>he);return{createWorkspace:T,selectWorkspace:x}},void 0,import.meta.url),A=await g(e,c);return A?(e.workspaceItemSearchQuery="",await k(e,A),e.showToast(`Created workspace: ${A.name}`,"success"),!0):(e.showToast("Failed to create workspace","error"),!1)}finally{e.workspacesCreateLoading=!1}},onDeleteWorkspace:async c=>{const{deleteWorkspace:g,loadAllTasksWithQueueStatus:k}=await R(async()=>{const{deleteWorkspace:T,loadAllTasksWithQueueStatus:x}=await Promise.resolve().then(()=>he);return{deleteWorkspace:T,loadAllTasksWithQueueStatus:x}},void 0,import.meta.url);if(!await g(e,c.id)){e.showToast(`Failed to delete ${c.name}`,"error");return}e.showToast(`Deleted workspace: ${c.name}`,"success"),e.allTasks=await k(e)},onSelectWorkspace:async c=>{e.workspaceItemSearchQuery="";const{selectWorkspace:g}=await R(async()=>{const{selectWorkspace:k}=await Promise.resolve().then(()=>he);return{selectWorkspace:k}},void 0,import.meta.url);await g(e,c)},onBack:()=>{e.selectedWorkspace=null,e.workspaceItemSearchQuery=""},onItemClick:async c=>{const{readWorkspaceFile:g}=await R(async()=>{const{readWorkspaceFile:T}=await Promise.resolve().then(()=>he);return{readWorkspaceFile:T}},void 0,import.meta.url),k=e.selectedWorkspace?.id,A=await g(e,c.path,k);if(!A){e.showToast(`Failed to open ${c.name}`,"error");return}e.handleOpenSidebar(A.content,{mimeType:A.mime,filePath:c.path,title:c.name})},onSessionClick:async c=>{if(!c.key)return;const g=c.key;ke(e),e.sessionKey=g,Ee(e,g),e.chatLoading=!0,e.chatStream=null,e.chatStreamStartedAt=null,e.chatRunId=null,e.resetToolStream(),e.resetChatScroll();const k=e.settings.openTabs.includes(g)?e.settings.openTabs:[...e.settings.openTabs,g];e.applySettings({...e.settings,openTabs:k,sessionKey:g,lastActiveSessionKey:g,tabLastViewed:{...e.settings.tabLastViewed,[g]:Date.now()}}),e.setTab("chat"),e.loadAssistantIdentity(),ye(e,g,!0),se(e),e.loadSessionResources()},onPinToggle:async(c,g,k)=>{const{toggleWorkspacePin:A}=await R(async()=>{const{toggleWorkspacePin:x}=await Promise.resolve().then(()=>he);return{toggleWorkspacePin:x}},void 0,import.meta.url);await A(e,c,g,k)||e.showToast("Failed to update pin","error")},onPinSessionToggle:async(c,g,k)=>{const{toggleWorkspaceSessionPin:A}=await R(async()=>{const{toggleWorkspaceSessionPin:x}=await Promise.resolve().then(()=>he);return{toggleWorkspaceSessionPin:x}},void 0,import.meta.url);await A(e,c,g,k)||e.showToast("Failed to update session pin","error")},onToggleFolder:c=>{R(async()=>{const{toggleWorkspaceFolder:g}=await Promise.resolve().then(()=>he);return{toggleWorkspaceFolder:g}},void 0,import.meta.url).then(({toggleWorkspaceFolder:g})=>{e.workspaceExpandedFolders=g(e.workspaceExpandedFolders??new Set,c),e.requestUpdate()})},onTeamSetup:async()=>{let c="I want to set up a Team Workspace so my team can collaborate. Please walk me through it step by step, keeping it simple.";try{const g=await e.client?.request("workspaces.teamSetupPrompt",{});g?.prompt&&(c=g.prompt)}catch{}e.handleStartChatWithPrompt(c)},allTasks:e.allTasks??[],taskFilter:e.taskFilter??"outstanding",taskSort:e.taskSort??"due",taskSearch:e.taskSearch??"",showCompletedTasks:e.showCompletedTasks??!1,onToggleTaskComplete:async(c,g)=>{const{toggleTaskComplete:k,loadAllTasksWithQueueStatus:A,getWorkspace:T}=await R(async()=>{const{toggleTaskComplete:_,loadAllTasksWithQueueStatus:P,getWorkspace:E}=await Promise.resolve().then(()=>he);return{toggleTaskComplete:_,loadAllTasksWithQueueStatus:P,getWorkspace:E}},void 0,import.meta.url);if(!await k(e,c,g)){e.showToast("Failed to update task","error");return}if(e.allTasks=await A(e),e.selectedWorkspace){const _=await T(e,e.selectedWorkspace.id);_&&(e.selectedWorkspace=_)}},onCreateTask:async(c,g)=>{const{createTask:k,loadAllTasksWithQueueStatus:A,getWorkspace:T}=await R(async()=>{const{createTask:_,loadAllTasksWithQueueStatus:P,getWorkspace:E}=await Promise.resolve().then(()=>he);return{createTask:_,loadAllTasksWithQueueStatus:P,getWorkspace:E}},void 0,import.meta.url),x=await k(e,c,g);if(!x){e.showToast("Failed to create task","error");return}if(e.showToast(`Task created: ${x.title}`,"success"),e.allTasks=await A(e),e.selectedWorkspace){const _=await T(e,e.selectedWorkspace.id);_&&(e.selectedWorkspace=_)}},onSetTaskFilter:c=>{e.taskFilter=c},onSetTaskSort:c=>{e.taskSort=c},onSetTaskSearch:c=>{e.taskSearch=c},onToggleCompletedTasks:()=>{e.showCompletedTasks=!(e.showCompletedTasks??!1)},editingTaskId:e.editingTaskId??null,workspaceNames:(e.workspaces??[]).map(c=>c.name),onStartTask:async c=>{const{startTask:g,loadAllTasksWithQueueStatus:k}=await R(async()=>{const{startTask:_,loadAllTasksWithQueueStatus:P}=await Promise.resolve().then(()=>he);return{startTask:_,loadAllTasksWithQueueStatus:P}},void 0,import.meta.url),A=await g(e,c);if(!A?.sessionId){e.showToast("Failed to open session for task","error");return}ke(e);const T=A.sessionId;A.task?.title&&Ie.set(T,A.task.title);const x=e.settings.openTabs.includes(T)?e.settings.openTabs:[...e.settings.openTabs,T];if(e.applySettings({...e.settings,openTabs:x,sessionKey:T,lastActiveSessionKey:T,tabLastViewed:{...e.settings.tabLastViewed,[T]:Date.now()}}),e.sessionKey=T,e.setTab("chat"),A.created&&!A.queueOutput){const _=e.allTasks??[],P=e.selectedWorkspace?.tasks??[],E=[..._,...P].find(Y=>Y.id===c),Z=E?.project?` (project: ${E.project})`:"";e.chatMessage=`Let's work on: ${E?.title??"this task"}${Z}`}else e.chatMessage="";e.chatMessages=[],e.chatStream=null,e.chatStreamStartedAt=null,e.chatRunId=null,e.resetToolStream(),e.resetChatScroll(),e.loadAssistantIdentity(),ye(e,T,!0),await se(e),e.loadSessionResources(),A.queueOutput&&e.chatMessages.length===0&&e.seedSessionWithAgentOutput(A.task?.title??"this task",A.queueOutput,A.agentPrompt??void 0),e.allTasks=await k(e),e.requestUpdate()},onEditTask:c=>{e.editingTaskId=c},onUpdateTask:async(c,g)=>{const{updateTask:k,loadAllTasksWithQueueStatus:A,getWorkspace:T}=await R(async()=>{const{updateTask:_,loadAllTasksWithQueueStatus:P,getWorkspace:E}=await Promise.resolve().then(()=>he);return{updateTask:_,loadAllTasksWithQueueStatus:P,getWorkspace:E}},void 0,import.meta.url);if(!await k(e,c,g)){e.showToast("Failed to update task","error");return}if(e.editingTaskId=null,e.allTasks=await A(e),e.selectedWorkspace){const _=await T(e,e.selectedWorkspace.id);_&&(e.selectedWorkspace=_)}},browsePath:e.workspaceBrowsePath??null,browseEntries:e.workspaceBrowseEntries??null,breadcrumbs:e.workspaceBreadcrumbs??null,browseSearchQuery:e.workspaceBrowseSearchQuery??"",browseSearchResults:e.workspaceBrowseSearchResults??null,onBrowseFolder:c=>e.handleWorkspaceBrowse(c),onBrowseSearch:c=>e.handleWorkspaceBrowseSearch(c),onBrowseBack:()=>e.handleWorkspaceBrowseBack(),onCreateFolder:c=>e.handleWorkspaceCreateFolder(c),onBatchPushToDrive:c=>e.handleBatchPushToDrive(c)}):p}
+        ${e.tab==="workspaces"?a0({connected:e.connected,workspaces:e.workspaces??[],selectedWorkspace:e.selectedWorkspace??null,searchQuery:e.workspacesSearchQuery??"",itemSearchQuery:e.workspaceItemSearchQuery??"",expandedFolders:e.workspaceExpandedFolders??new Set,loading:e.workspacesLoading??!1,createLoading:e.workspacesCreateLoading??!1,error:e.workspacesError??null,onSearch:c=>e.workspacesSearchQuery=c,onItemSearch:c=>e.workspaceItemSearchQuery=c,onCreateWorkspace:async c=>{e.workspacesCreateLoading=!0;try{const{createWorkspace:g,selectWorkspace:k}=await R(async()=>{const{createWorkspace:T,selectWorkspace:x}=await Promise.resolve().then(()=>he);return{createWorkspace:T,selectWorkspace:x}},void 0,import.meta.url),A=await g(e,c);return A?(e.workspaceItemSearchQuery="",await k(e,A),e.showToast(`Created workspace: ${A.name}`,"success"),!0):(e.showToast("Failed to create workspace","error"),!1)}finally{e.workspacesCreateLoading=!1}},onDeleteWorkspace:async c=>{const{deleteWorkspace:g,loadAllTasksWithQueueStatus:k}=await R(async()=>{const{deleteWorkspace:T,loadAllTasksWithQueueStatus:x}=await Promise.resolve().then(()=>he);return{deleteWorkspace:T,loadAllTasksWithQueueStatus:x}},void 0,import.meta.url);if(!await g(e,c.id)){e.showToast(`Failed to delete ${c.name}`,"error");return}e.showToast(`Deleted workspace: ${c.name}`,"success"),e.allTasks=await k(e)},onSelectWorkspace:async c=>{e.workspaceItemSearchQuery="";const{selectWorkspace:g}=await R(async()=>{const{selectWorkspace:k}=await Promise.resolve().then(()=>he);return{selectWorkspace:k}},void 0,import.meta.url);await g(e,c)},onBack:()=>{e.selectedWorkspace=null,e.workspaceItemSearchQuery=""},onItemClick:async c=>{const{readWorkspaceFile:g}=await R(async()=>{const{readWorkspaceFile:T}=await Promise.resolve().then(()=>he);return{readWorkspaceFile:T}},void 0,import.meta.url),k=e.selectedWorkspace?.id,A=await g(e,c.path,k);if(!A){e.showToast(`Failed to open ${c.name}`,"error");return}e.handleOpenSidebar(A.content,{mimeType:A.mime,filePath:c.path,title:c.name})},onSessionClick:async c=>{if(!c.key)return;const g=c.key;ke(e),e.sessionKey=g,Ee(e,g),e.chatLoading=!0,e.chatStream=null,e.chatStreamStartedAt=null,e.chatRunId=null,e.resetToolStream(),e.resetChatScroll();const k=e.settings.openTabs.includes(g)?e.settings.openTabs:[...e.settings.openTabs,g];e.applySettings({...e.settings,openTabs:k,sessionKey:g,lastActiveSessionKey:g,tabLastViewed:{...e.settings.tabLastViewed,[g]:Date.now()}}),e.setTab("chat"),e.loadAssistantIdentity(),ye(e,g,!0),se(e),e.loadSessionResources()},onPinToggle:async(c,g,k)=>{const{toggleWorkspacePin:A}=await R(async()=>{const{toggleWorkspacePin:x}=await Promise.resolve().then(()=>he);return{toggleWorkspacePin:x}},void 0,import.meta.url);await A(e,c,g,k)||e.showToast("Failed to update pin","error")},onPinSessionToggle:async(c,g,k)=>{const{toggleWorkspaceSessionPin:A}=await R(async()=>{const{toggleWorkspaceSessionPin:x}=await Promise.resolve().then(()=>he);return{toggleWorkspaceSessionPin:x}},void 0,import.meta.url);await A(e,c,g,k)||e.showToast("Failed to update session pin","error")},onToggleFolder:c=>{R(async()=>{const{toggleWorkspaceFolder:g}=await Promise.resolve().then(()=>he);return{toggleWorkspaceFolder:g}},void 0,import.meta.url).then(({toggleWorkspaceFolder:g})=>{e.workspaceExpandedFolders=g(e.workspaceExpandedFolders??new Set,c),e.requestUpdate()})},onTeamSetup:async()=>{let c="I want to set up a Team Workspace so my team can collaborate. Please walk me through it step by step, keeping it simple.";try{const g=await e.client?.request("workspaces.teamSetupPrompt",{});g?.prompt&&(c=g.prompt)}catch{}e.handleStartChatWithPrompt(c)},allTasks:e.allTasks??[],taskFilter:e.taskFilter??"outstanding",taskSort:e.taskSort??"due",taskSearch:e.taskSearch??"",showCompletedTasks:e.showCompletedTasks??!1,onToggleTaskComplete:async(c,g)=>{const{toggleTaskComplete:k,loadAllTasksWithQueueStatus:A,getWorkspace:T}=await R(async()=>{const{toggleTaskComplete:_,loadAllTasksWithQueueStatus:P,getWorkspace:E}=await Promise.resolve().then(()=>he);return{toggleTaskComplete:_,loadAllTasksWithQueueStatus:P,getWorkspace:E}},void 0,import.meta.url);if(!await k(e,c,g)){e.showToast("Failed to update task","error");return}if(e.allTasks=await A(e),e.selectedWorkspace){const _=await T(e,e.selectedWorkspace.id);_&&(e.selectedWorkspace=_)}},onCreateTask:async(c,g)=>{const{createTask:k,loadAllTasksWithQueueStatus:A,getWorkspace:T}=await R(async()=>{const{createTask:_,loadAllTasksWithQueueStatus:P,getWorkspace:E}=await Promise.resolve().then(()=>he);return{createTask:_,loadAllTasksWithQueueStatus:P,getWorkspace:E}},void 0,import.meta.url),x=await k(e,c,g);if(!x){e.showToast("Failed to create task","error");return}if(e.showToast(`Task created: ${x.title}`,"success"),e.allTasks=await A(e),e.selectedWorkspace){const _=await T(e,e.selectedWorkspace.id);_&&(e.selectedWorkspace=_)}},onSetTaskFilter:c=>{e.taskFilter=c},onSetTaskSort:c=>{e.taskSort=c},onSetTaskSearch:c=>{e.taskSearch=c},onToggleCompletedTasks:()=>{e.showCompletedTasks=!(e.showCompletedTasks??!1)},editingTaskId:e.editingTaskId??null,workspaceNames:(e.workspaces??[]).map(c=>c.name),onStartTask:async c=>{const{startTask:g,loadAllTasksWithQueueStatus:k}=await R(async()=>{const{startTask:_,loadAllTasksWithQueueStatus:P}=await Promise.resolve().then(()=>he);return{startTask:_,loadAllTasksWithQueueStatus:P}},void 0,import.meta.url),A=await g(e,c);if(!A?.sessionId){e.showToast("Failed to open session for task","error");return}ke(e);const T=A.sessionId;A.task?.title&&Ie.set(T,A.task.title);const x=e.settings.openTabs.includes(T)?e.settings.openTabs:[...e.settings.openTabs,T];if(e.applySettings({...e.settings,openTabs:x,sessionKey:T,lastActiveSessionKey:T,tabLastViewed:{...e.settings.tabLastViewed,[T]:Date.now()}}),e.sessionKey=T,e.setTab("chat"),A.created&&!A.queueOutput){const _=e.allTasks??[],P=e.selectedWorkspace?.tasks??[],E=[..._,...P].find(Y=>Y.id===c),Z=E?.project?` (project: ${E.project})`:"";e.chatMessage=`Let's work on: ${E?.title??"this task"}${Z}`}else e.chatMessage="";e.chatMessages=[],e.chatStream=null,e.chatStreamStartedAt=null,e.chatRunId=null,e.resetToolStream(),e.resetChatScroll(),e.loadAssistantIdentity(),ye(e,T,!0),await se(e),e.loadSessionResources(),A.queueOutput&&e.chatMessages.length===0&&e.seedSessionWithAgentOutput(A.task?.title??"this task",A.queueOutput,A.agentPrompt??void 0),e.allTasks=await k(e),e.requestUpdate()},onEditTask:c=>{e.editingTaskId=c},onUpdateTask:async(c,g)=>{const{updateTask:k,loadAllTasksWithQueueStatus:A,getWorkspace:T}=await R(async()=>{const{updateTask:_,loadAllTasksWithQueueStatus:P,getWorkspace:E}=await Promise.resolve().then(()=>he);return{updateTask:_,loadAllTasksWithQueueStatus:P,getWorkspace:E}},void 0,import.meta.url);if(!await k(e,c,g)){e.showToast("Failed to update task","error");return}if(e.editingTaskId=null,e.allTasks=await A(e),e.selectedWorkspace){const _=await T(e,e.selectedWorkspace.id);_&&(e.selectedWorkspace=_)}},browsePath:e.workspaceBrowsePath??null,browseEntries:e.workspaceBrowseEntries??null,breadcrumbs:e.workspaceBreadcrumbs??null,browseSearchQuery:e.workspaceBrowseSearchQuery??"",browseSearchResults:e.workspaceBrowseSearchResults??null,onBrowseFolder:c=>e.handleWorkspaceBrowse(c),onBrowseSearch:c=>e.handleWorkspaceBrowseSearch(c),onBrowseBack:()=>e.handleWorkspaceBrowseBack(),onCreateFolder:c=>e.handleWorkspaceCreateFolder(c),onBatchPushToDrive:c=>e.handleBatchPushToDrive(c)}):p}
 
-        ${e.tab==="today"||e.tab==="my-day"?e.dynamicSlots.today?yc(e,"today"):u0({connected:e.connected,loading:e.myDayLoading??!1,error:e.myDayError??null,onRefresh:()=>e.handleMyDayRefresh(),dailyBrief:e.dailyBrief??null,dailyBriefLoading:e.dailyBriefLoading??!1,dailyBriefError:e.dailyBriefError??null,onBriefRefresh:()=>e.handleDailyBriefRefresh(),onBriefGenerate:()=>e.handleDailyBriefGenerate(),onBriefOpenInObsidian:()=>e.handleDailyBriefOpenInObsidian(),onBriefSave:c=>e.handleBriefSave(c),onBriefToggleCheckbox:(c,g)=>e.handleBriefToggleCheckbox(c,g),onOpenFile:c=>{e.handleOpenFile(c)},selectedDate:e.todaySelectedDate,onDatePrev:()=>e.handleDatePrev(),onDateNext:()=>e.handleDateNext(),onDateToday:()=>e.handleDateToday(),viewMode:e.todayViewMode??"brief",onViewModeChange:c=>e.handleTodayViewModeChange(c),agentLog:e.agentLog??null,agentLogLoading:e.agentLogLoading??!1,agentLogError:e.agentLogError??null,onAgentLogRefresh:()=>e.handleMyDayRefresh(),focusPulseActive:!1,onStartMorningSet:()=>e.handleFocusPulseStartMorning(),todayTasks:e.todayTasks??[],todayTasksLoading:e.todayTasksLoading??!1,onToggleTaskComplete:(c,g)=>e.handleMyDayTaskStatusChange(c,g==="complete"?"pending":"complete"),onStartTask:c=>e.handleTodayStartTask(c),onViewTaskOutput:c=>e.handleTodayViewTaskOutput(c),onCreateTask:c=>e.handleTodayCreateTask(c),onEditTask:c=>e.handleTodayEditTask(c),onUpdateTask:(c,g)=>e.handleTodayUpdateTask(c,g),editingTaskId:e.todayEditingTaskId,showCompletedTasks:e.todayShowCompleted,onToggleCompletedTasks:()=>e.handleTodayToggleCompleted(),decisionCards:(e.todayQueueResults??[]).length>0?{items:e.todayQueueResults,onApprove:c=>e.handleDecisionApprove(c),onReject:c=>e.handleDecisionReject(c),onDismiss:c=>e.handleDecisionDismiss(c),onViewOutput:(c,g)=>e.handleDecisionViewOutput(c,g),onOpenChat:c=>e.handleDecisionOpenChat(c),onMarkComplete:c=>e.handleDecisionMarkComplete(c),onRate:(c,g,k)=>e.handleDecisionRate(c,g,k),onFeedback:(c,g,k)=>e.handleDecisionFeedback(c,g,k)}:void 0,inboxItems:e.inboxItems??[],inboxLoading:e.inboxLoading??!1,inboxCount:e.inboxCount??0,inboxScoringId:e.inboxScoringId??null,inboxScoringValue:e.inboxScoringValue,inboxFeedbackText:e.inboxFeedbackText,onInboxViewOutput:c=>{e.handleInboxViewOutput(c)},onInboxOpenChat:c=>e.handleInboxOpenChat(c),onInboxDismiss:c=>{e.handleInboxDismiss(c)},onInboxScore:(c,g,k)=>{e.handleInboxScore(c,g,k)},onInboxSetScoring:(c,g)=>e.handleInboxSetScoring(c,g),onInboxFeedbackChange:c=>e.handleInboxFeedbackChange(c),onInboxMarkAll:()=>{e.handleInboxMarkAll()},onEveningCapture:()=>{e.setTab("chat"),e.handleSendChat(`Let's do my evening capture. Walk me through these:
+        ${e.tab==="today"||e.tab==="my-day"?e.dynamicSlots.today?yc(e,"today"):h0({connected:e.connected,loading:e.myDayLoading??!1,error:e.myDayError??null,onRefresh:()=>e.handleMyDayRefresh(),dailyBrief:e.dailyBrief??null,dailyBriefLoading:e.dailyBriefLoading??!1,dailyBriefError:e.dailyBriefError??null,onBriefRefresh:()=>e.handleDailyBriefRefresh(),onBriefGenerate:()=>e.handleDailyBriefGenerate(),onBriefOpenInObsidian:()=>e.handleDailyBriefOpenInObsidian(),onBriefSave:c=>e.handleBriefSave(c),onBriefToggleCheckbox:(c,g)=>e.handleBriefToggleCheckbox(c,g),onOpenFile:c=>{e.handleOpenFile(c)},selectedDate:e.todaySelectedDate,onDatePrev:()=>e.handleDatePrev(),onDateNext:()=>e.handleDateNext(),onDateToday:()=>e.handleDateToday(),viewMode:e.todayViewMode??"brief",onViewModeChange:c=>e.handleTodayViewModeChange(c),agentLog:e.agentLog??null,agentLogLoading:e.agentLogLoading??!1,agentLogError:e.agentLogError??null,onAgentLogRefresh:()=>e.handleMyDayRefresh(),focusPulseActive:!1,onStartMorningSet:()=>e.handleFocusPulseStartMorning(),todayTasks:e.todayTasks??[],todayTasksLoading:e.todayTasksLoading??!1,onToggleTaskComplete:(c,g)=>e.handleMyDayTaskStatusChange(c,g==="complete"?"pending":"complete"),onStartTask:c=>e.handleTodayStartTask(c),onViewTaskOutput:c=>e.handleTodayViewTaskOutput(c),onCreateTask:c=>e.handleTodayCreateTask(c),onEditTask:c=>e.handleTodayEditTask(c),onUpdateTask:(c,g)=>e.handleTodayUpdateTask(c,g),editingTaskId:e.todayEditingTaskId,showCompletedTasks:e.todayShowCompleted,onToggleCompletedTasks:()=>e.handleTodayToggleCompleted(),decisionCards:(e.todayQueueResults??[]).length>0?{items:e.todayQueueResults,onApprove:c=>e.handleDecisionApprove(c),onReject:c=>e.handleDecisionReject(c),onDismiss:c=>e.handleDecisionDismiss(c),onViewOutput:(c,g)=>e.handleDecisionViewOutput(c,g),onOpenChat:c=>e.handleDecisionOpenChat(c),onMarkComplete:c=>e.handleDecisionMarkComplete(c),onRate:(c,g,k)=>e.handleDecisionRate(c,g,k),onFeedback:(c,g,k)=>e.handleDecisionFeedback(c,g,k)}:void 0,inboxItems:e.inboxItems??[],inboxLoading:e.inboxLoading??!1,inboxCount:e.inboxCount??0,inboxScoringId:e.inboxScoringId??null,inboxScoringValue:e.inboxScoringValue,inboxFeedbackText:e.inboxFeedbackText,onInboxViewOutput:c=>{e.handleInboxViewOutput(c)},onInboxViewProof:c=>{e.handleInboxViewProof(c)},onInboxOpenChat:c=>e.handleInboxOpenChat(c),onInboxDismiss:c=>{e.handleInboxDismiss(c)},onInboxScore:(c,g,k)=>{e.handleInboxScore(c,g,k)},onInboxSetScoring:(c,g)=>e.handleInboxSetScoring(c,g),onInboxFeedbackChange:c=>e.handleInboxFeedbackChange(c),onInboxMarkAll:()=>{e.handleInboxMarkAll()},onEveningCapture:()=>{e.setTab("chat"),e.handleSendChat(`Let's do my evening capture. Walk me through these:
 1. What went well today?
 2. What didn't get done?
 3. What should tomorrow's brief prioritize?
 4. Ask me for an overall GodMode score (1-10) for today and any feedback. Submit it with the daily rating tool.`)}}):p}
 
-        ${e.tab==="work"?e.dynamicSlots.work?yc(e,"work"):e2({connected:e.connected,projects:e.workProjects??[],loading:e.workLoading??!1,error:e.workError??null,expandedProjects:e.workExpandedProjects,projectFiles:e.workProjectFiles??{},detailLoading:e.workDetailLoading??new Set,onRefresh:()=>e.handleWorkRefresh(),onToggleProject:c=>e.handleWorkToggleProject(c),onPersonClick:c=>e.handleWorkPersonClick(c),onFileClick:c=>e.handleWorkFileClick(c),onSkillClick:(c,g)=>e.handleWorkSkillClick(c,g),resources:e.workResources??[],resourcesLoading:e.workResourcesLoading??!1,resourceFilter:e.workResourceFilter??"all",onResourceFilterChange:c=>e.handleResourceFilterChange(c),onResourceClick:c=>e.handleResourceClick(c),onResourcePin:(c,g)=>e.handleResourcePin(c,g),onResourceDelete:c=>e.handleResourceDelete(c)}):p}
+        ${e.tab==="work"?e.dynamicSlots.work?yc(e,"work"):n2({connected:e.connected,projects:e.workProjects??[],loading:e.workLoading??!1,error:e.workError??null,expandedProjects:e.workExpandedProjects,projectFiles:e.workProjectFiles??{},detailLoading:e.workDetailLoading??new Set,onRefresh:()=>e.handleWorkRefresh(),onToggleProject:c=>e.handleWorkToggleProject(c),onPersonClick:c=>e.handleWorkPersonClick(c),onFileClick:c=>e.handleWorkFileClick(c),onSkillClick:(c,g)=>e.handleWorkSkillClick(c,g),resources:e.workResources??[],resourcesLoading:e.workResourcesLoading??!1,resourceFilter:e.workResourceFilter??"all",onResourceFilterChange:c=>e.handleResourceFilterChange(c),onResourceClick:c=>e.handleResourceClick(c),onResourcePin:(c,g)=>e.handleResourcePin(c,g),onResourceDelete:c=>e.handleResourceDelete(c)}):p}
 
         ${e.tab==="channels"?t$({connected:e.connected,loading:e.channelsLoading,snapshot:e.channelsSnapshot,lastError:e.channelsError,lastSuccessAt:e.channelsLastSuccess,whatsappMessage:e.whatsappLoginMessage,whatsappQrDataUrl:e.whatsappLoginQrDataUrl,whatsappConnected:e.whatsappLoginConnected,whatsappBusy:e.whatsappBusy,configSchema:e.configSchema,configSchemaLoading:e.configSchemaLoading,configForm:e.configForm,configUiHints:e.configUiHints,configSaving:e.configSaving,configFormDirty:e.configFormDirty,nostrProfileFormState:e.nostrProfileFormState,nostrProfileAccountId:e.nostrProfileAccountId,onRefresh:c=>Me(e,c),onWhatsAppStart:c=>e.handleWhatsAppStart(c),onWhatsAppWait:()=>e.handleWhatsAppWait(),onWhatsAppLogout:()=>e.handleWhatsAppLogout(),onConfigPatch:(c,g)=>tn(e,c,g),onConfigSave:()=>e.handleChannelConfigSave(),onConfigReload:()=>e.handleChannelConfigReload(),onNostrProfileEdit:(c,g)=>e.handleNostrProfileEdit(c,g),onNostrProfileCancel:()=>e.handleNostrProfileCancel(),onNostrProfileFieldChange:(c,g)=>e.handleNostrProfileFieldChange(c,g),onNostrProfileSave:()=>e.handleNostrProfileSave(),onNostrProfileImport:()=>e.handleNostrProfileImport(),onNostrProfileToggleAdvanced:()=>e.handleNostrProfileToggleAdvanced()}):p}
 
-        ${e.tab==="instances"?_k({loading:e.presenceLoading,entries:e.presenceEntries,lastError:e.presenceError,statusMessage:e.presenceStatus,onRefresh:()=>Po(e)}):p}
+        ${e.tab==="instances"?Ck({loading:e.presenceLoading,entries:e.presenceEntries,lastError:e.presenceError,statusMessage:e.presenceStatus,onRefresh:()=>Po(e)}):p}
 
-        ${e.tab==="sessions"?Y0({loading:e.sessionsLoading,result:e.sessionsResult,error:e.sessionsError,activeMinutes:e.sessionsFilterActive,limit:e.sessionsFilterLimit,includeGlobal:e.sessionsIncludeGlobal,includeUnknown:e.sessionsIncludeUnknown,basePath:e.basePath,archivedSessions:e.archivedSessions,archivedSessionsLoading:e.archivedSessionsLoading,archivedSessionsExpanded:e.archivedSessionsExpanded,onFiltersChange:c=>{e.sessionsFilterActive=c.activeMinutes,e.sessionsFilterLimit=c.limit,e.sessionsIncludeGlobal=c.includeGlobal,e.sessionsIncludeUnknown=c.includeUnknown},onRefresh:()=>{te(e),Ft(e)},onPatch:async(c,g)=>{const k=await Es(e,c,g);if(k.ok&&k.canonicalKey!==c&&e.settings.openTabs.includes(c)){const A=e.settings.openTabs.map(x=>x===c?k.canonicalKey:x),T=c===e.sessionKey;e.applySettings({...e.settings,openTabs:A,tabLastViewed:{...e.settings.tabLastViewed,[k.canonicalKey]:e.settings.tabLastViewed[c]??Date.now()},...T?{sessionKey:k.canonicalKey,lastActiveSessionKey:k.canonicalKey}:{}}),T&&(e.sessionKey=k.canonicalKey,ye(e,k.canonicalKey,!0))}},onDelete:c=>Gd(e,c),onArchive:c=>Qd(e,c),onUnarchive:c=>Yd(e,c),onToggleArchived:()=>{e.archivedSessionsExpanded=!e.archivedSessionsExpanded,e.archivedSessionsExpanded&&e.archivedSessions.length===0&&Ft(e)},onAutoArchive:()=>Jd(e)}):p}
+        ${e.tab==="sessions"?X0({loading:e.sessionsLoading,result:e.sessionsResult,error:e.sessionsError,activeMinutes:e.sessionsFilterActive,limit:e.sessionsFilterLimit,includeGlobal:e.sessionsIncludeGlobal,includeUnknown:e.sessionsIncludeUnknown,basePath:e.basePath,archivedSessions:e.archivedSessions,archivedSessionsLoading:e.archivedSessionsLoading,archivedSessionsExpanded:e.archivedSessionsExpanded,onFiltersChange:c=>{e.sessionsFilterActive=c.activeMinutes,e.sessionsFilterLimit=c.limit,e.sessionsIncludeGlobal=c.includeGlobal,e.sessionsIncludeUnknown=c.includeUnknown},onRefresh:()=>{te(e),Ft(e)},onPatch:async(c,g)=>{const k=await Es(e,c,g);if(k.ok&&k.canonicalKey!==c&&e.settings.openTabs.includes(c)){const A=e.settings.openTabs.map(x=>x===c?k.canonicalKey:x),T=c===e.sessionKey;e.applySettings({...e.settings,openTabs:A,tabLastViewed:{...e.settings.tabLastViewed,[k.canonicalKey]:e.settings.tabLastViewed[c]??Date.now()},...T?{sessionKey:k.canonicalKey,lastActiveSessionKey:k.canonicalKey}:{}}),T&&(e.sessionKey=k.canonicalKey,ye(e,k.canonicalKey,!0))}},onDelete:c=>Gd(e,c),onArchive:c=>Qd(e,c),onUnarchive:c=>Yd(e,c),onToggleArchived:()=>{e.archivedSessionsExpanded=!e.archivedSessionsExpanded,e.archivedSessionsExpanded&&e.archivedSessions.length===0&&Ft(e)},onAutoArchive:()=>Jd(e)}):p}
 
-        ${e.tab==="cron"?yk({loading:e.cronLoading,status:e.cronStatus,jobs:e.cronJobs,error:e.cronError,busy:e.cronBusy,form:e.cronForm,channels:e.channelsSnapshot?.channelMeta?.length?e.channelsSnapshot.channelMeta.map(c=>c.id):e.channelsSnapshot?.channelOrder??[],channelLabels:e.channelsSnapshot?.channelLabels??{},channelMeta:e.channelsSnapshot?.channelMeta??[],runsJobId:e.cronRunsJobId,runs:e.cronRuns,onFormChange:c=>e.cronForm={...e.cronForm,...c},onRefresh:()=>e.loadCron(),onAdd:()=>Ly(e),onToggle:(c,g)=>Iy(e,c,g),onRun:c=>Dy(e,c),onRemove:c=>My(e,c),onLoadRuns:c=>hu(e,c)}):p}
+        ${e.tab==="cron"?bk({loading:e.cronLoading,status:e.cronStatus,jobs:e.cronJobs,error:e.cronError,busy:e.cronBusy,form:e.cronForm,channels:e.channelsSnapshot?.channelMeta?.length?e.channelsSnapshot.channelMeta.map(c=>c.id):e.channelsSnapshot?.channelOrder??[],channelLabels:e.channelsSnapshot?.channelLabels??{},channelMeta:e.channelsSnapshot?.channelMeta??[],runsJobId:e.cronRunsJobId,runs:e.cronRuns,onFormChange:c=>e.cronForm={...e.cronForm,...c},onRefresh:()=>e.loadCron(),onAdd:()=>Ly(e),onToggle:(c,g)=>Iy(e,c,g),onRun:c=>Dy(e,c),onRemove:c=>My(e,c),onLoadRuns:c=>hu(e,c)}):p}
 
-        ${e.tab==="skills"?tS({loading:e.skillsLoading,report:e.skillsReport,error:e.skillsError,filter:e.skillsFilter,edits:e.skillEdits,messages:e.skillMessages,busyKey:e.skillsBusyKey,subTab:e.skillsSubTab,godmodeSkills:e.godmodeSkills??null,godmodeSkillsLoading:e.godmodeSkillsLoading??!1,expandedSkills:e.expandedSkills??new Set,onFilterChange:c=>e.skillsFilter=c,onRefresh:()=>{os(e,{clearMessages:!0}),Ei(e)},onToggle:(c,g)=>nb(e,c,g),onEdit:(c,g)=>tb(e,c,g),onSaveKey:c=>sb(e,c),onInstall:(c,g,k)=>ab(e,c,g,k),onSubTabChange:c=>{e.skillsSubTab=c,c==="godmode"&&!e.godmodeSkills&&Ei(e),c==="clawhub"&&e.clawhubExploreItems},onToggleExpand:c=>{const g=new Set(e.expandedSkills);g.has(c)?g.delete(c):g.add(c),e.expandedSkills=g},clawhub:{loading:e.clawhubLoading,error:e.clawhubError,query:e.clawhubQuery,results:e.clawhubResults,exploreItems:e.clawhubExploreItems,exploreSort:e.clawhubExploreSort,detailSlug:e.clawhubDetailSlug,detail:e.clawhubDetail,importing:e.clawhubImporting,message:e.clawhubMessage,onSearch:c=>{e.clawhubQuery=c},onExplore:c=>void 0,onDetail:c=>void 0,onCloseDetail:()=>void 0,onImport:c=>kl(),onImportAndPersonalize:async c=>{if(!await kl())return;const k=await fw();k&&(Mo(e,"chat"),ga(e),e.chatMessage=k)}}}):p}
+        ${e.tab==="skills"?sS({loading:e.skillsLoading,report:e.skillsReport,error:e.skillsError,filter:e.skillsFilter,edits:e.skillEdits,messages:e.skillMessages,busyKey:e.skillsBusyKey,subTab:e.skillsSubTab,godmodeSkills:e.godmodeSkills??null,godmodeSkillsLoading:e.godmodeSkillsLoading??!1,expandedSkills:e.expandedSkills??new Set,onFilterChange:c=>e.skillsFilter=c,onRefresh:()=>{os(e,{clearMessages:!0}),Ei(e)},onToggle:(c,g)=>nb(e,c,g),onEdit:(c,g)=>tb(e,c,g),onSaveKey:c=>sb(e,c),onInstall:(c,g,k)=>ab(e,c,g,k),onSubTabChange:c=>{e.skillsSubTab=c,c==="godmode"&&!e.godmodeSkills&&Ei(e),c==="clawhub"&&e.clawhubExploreItems},onToggleExpand:c=>{const g=new Set(e.expandedSkills);g.has(c)?g.delete(c):g.add(c),e.expandedSkills=g},clawhub:{loading:e.clawhubLoading,error:e.clawhubError,query:e.clawhubQuery,results:e.clawhubResults,exploreItems:e.clawhubExploreItems,exploreSort:e.clawhubExploreSort,detailSlug:e.clawhubDetailSlug,detail:e.clawhubDetail,importing:e.clawhubImporting,message:e.clawhubMessage,onSearch:c=>{e.clawhubQuery=c},onExplore:c=>void 0,onDetail:c=>void 0,onCloseDetail:()=>void 0,onImport:c=>kl(),onImportAndPersonalize:async c=>{if(!await kl())return;const k=await fw();k&&(Mo(e,"chat"),ga(e),e.chatMessage=k)}}}):p}
 
-        ${e.tab==="agents"?lS({loading:e.rosterLoading,error:e.rosterError,roster:e.rosterData??[],filter:e.rosterFilter??"",expandedAgents:e.expandedAgents??new Set,onFilterChange:c=>e.rosterFilter=c,onRefresh:()=>$d(e),onToggleExpand:c=>{const g=new Set(e.expandedAgents);g.has(c)?g.delete(c):g.add(c),e.expandedAgents=g}}):p}
+        ${e.tab==="agents"?dS({loading:e.rosterLoading,error:e.rosterError,roster:e.rosterData??[],filter:e.rosterFilter??"",expandedAgents:e.expandedAgents??new Set,onFilterChange:c=>e.rosterFilter=c,onRefresh:()=>$d(e),onToggleExpand:c=>{const g=new Set(e.expandedAgents);g.has(c)?g.delete(c):g.add(c),e.expandedAgents=g}}):p}
 
-        ${e.tab==="nodes"?p0({loading:e.nodesLoading,nodes:e.nodes,devicesLoading:e.devicesLoading,devicesError:e.devicesError,devicesList:e.devicesList,configForm:e.configForm??e.configSnapshot?.config,configLoading:e.configLoading,configSaving:e.configSaving,configDirty:e.configFormDirty,configFormMode:e.configFormMode,execApprovalsLoading:e.execApprovalsLoading,execApprovalsSaving:e.execApprovalsSaving,execApprovalsDirty:e.execApprovalsDirty,execApprovalsSnapshot:e.execApprovalsSnapshot,execApprovalsForm:e.execApprovalsForm,execApprovalsSelectedAgent:e.execApprovalsSelectedAgent,execApprovalsTarget:e.execApprovalsTarget,execApprovalsTargetNodeId:e.execApprovalsTargetNodeId,onRefresh:()=>oa(e),onDevicesRefresh:()=>gt(e),onDeviceApprove:c=>wv(e,c),onDeviceReject:c=>$v(e,c),onDeviceRotate:(c,g,k)=>kv(e,{deviceId:c,role:g,scopes:k}),onDeviceRevoke:(c,g)=>Sv(e,{deviceId:c,role:g}),onLoadConfig:()=>Xe(e),onLoadExecApprovals:()=>{const c=e.execApprovalsTarget==="node"&&e.execApprovalsTargetNodeId?{kind:"node",nodeId:e.execApprovalsTargetNodeId}:{kind:"gateway"};return Eo(e,c)},onBindDefault:c=>{c?tn(e,["tools","exec","node"],c):Sr(e,["tools","exec","node"])},onBindAgent:(c,g)=>{const k=["agents","list",c,"tools","exec","node"];g?tn(e,k,g):Sr(e,k)},onSaveBindings:()=>Ms(e),onExecApprovalsTargetChange:(c,g)=>{e.execApprovalsTarget=c,e.execApprovalsTargetNodeId=g,e.execApprovalsSnapshot=null,e.execApprovalsForm=null,e.execApprovalsDirty=!1,e.execApprovalsSelectedAgent=null},onExecApprovalsSelectAgent:c=>{e.execApprovalsSelectedAgent=c},onExecApprovalsPatch:(c,g)=>jy(e,c,g),onExecApprovalsRemove:c=>Vy(e,c),onSaveExecApprovals:()=>{const c=e.execApprovalsTarget==="node"&&e.execApprovalsTargetNodeId?{kind:"node",nodeId:e.execApprovalsTargetNodeId}:{kind:"gateway"};return qy(e,c)}}):p}
+        ${e.tab==="nodes"?f0({loading:e.nodesLoading,nodes:e.nodes,devicesLoading:e.devicesLoading,devicesError:e.devicesError,devicesList:e.devicesList,configForm:e.configForm??e.configSnapshot?.config,configLoading:e.configLoading,configSaving:e.configSaving,configDirty:e.configFormDirty,configFormMode:e.configFormMode,execApprovalsLoading:e.execApprovalsLoading,execApprovalsSaving:e.execApprovalsSaving,execApprovalsDirty:e.execApprovalsDirty,execApprovalsSnapshot:e.execApprovalsSnapshot,execApprovalsForm:e.execApprovalsForm,execApprovalsSelectedAgent:e.execApprovalsSelectedAgent,execApprovalsTarget:e.execApprovalsTarget,execApprovalsTargetNodeId:e.execApprovalsTargetNodeId,onRefresh:()=>oa(e),onDevicesRefresh:()=>gt(e),onDeviceApprove:c=>wv(e,c),onDeviceReject:c=>$v(e,c),onDeviceRotate:(c,g,k)=>kv(e,{deviceId:c,role:g,scopes:k}),onDeviceRevoke:(c,g)=>Sv(e,{deviceId:c,role:g}),onLoadConfig:()=>Xe(e),onLoadExecApprovals:()=>{const c=e.execApprovalsTarget==="node"&&e.execApprovalsTargetNodeId?{kind:"node",nodeId:e.execApprovalsTargetNodeId}:{kind:"gateway"};return Eo(e,c)},onBindDefault:c=>{c?tn(e,["tools","exec","node"],c):Sr(e,["tools","exec","node"])},onBindAgent:(c,g)=>{const k=["agents","list",c,"tools","exec","node"];g?tn(e,k,g):Sr(e,k)},onSaveBindings:()=>Ms(e),onExecApprovalsTargetChange:(c,g)=>{e.execApprovalsTarget=c,e.execApprovalsTargetNodeId=g,e.execApprovalsSnapshot=null,e.execApprovalsForm=null,e.execApprovalsDirty=!1,e.execApprovalsSelectedAgent=null},onExecApprovalsSelectAgent:c=>{e.execApprovalsSelectedAgent=c},onExecApprovalsPatch:(c,g)=>jy(e,c,g),onExecApprovalsRemove:c=>Vy(e,c),onSaveExecApprovals:()=>{const c=e.execApprovalsTarget==="node"&&e.execApprovalsTargetNodeId?{kind:"node",nodeId:e.execApprovalsTargetNodeId}:{kind:"gateway"};return qy(e,c)}}):p}
 
-        ${t&&n>=2&&n<=5&&e.tab==="chat"?L2({phase:n,identity:s?.identity??null,tools:s?.tools??[],auditFindings:s?.audit?.findings??[],summary:s?.summary??null,onSkipPhase:()=>e.handleOnboardingSkipPhase?.()}):e.tab==="chat"&&e.workspaceNeedsSetup&&!e.chatMessages?.length&&!t?r`
+        ${t&&n>=2&&n<=5&&e.tab==="chat"?D2({phase:n,identity:s?.identity??null,tools:s?.tools??[],auditFindings:s?.audit?.findings??[],summary:s?.summary??null,onSkipPhase:()=>e.handleOnboardingSkipPhase?.()}):e.tab==="chat"&&e.workspaceNeedsSetup&&!e.chatMessages?.length&&!t?r`
                   <div class="workspace-welcome-banner">
                     <div class="welcome-content">
                       <div class="welcome-title">Welcome to GodMode</div>
@@ -9274,32 +9287,32 @@ ${i}
                   </div>
                 `:p}
 
-        ${e.tab==="chat"&&e.settings.chatParallelView?z1({state:e,onAssignLane:(c,g)=>{const k=g?De(e.sessionsResult?.sessions,g)?.key??g:null,A=[...e.settings.parallelLanes];A[c]=k,e.applySettings({...e.settings,parallelLanes:A}),k&&e.client&&po(e.client,k).then(()=>{e.applySettings({...e.settings})})},onReorderLanes:(c,g)=>{if(c===g||c<0||g<0||c>=e.settings.parallelLanes.length||g>=e.settings.parallelLanes.length)return;const k=[...e.settings.parallelLanes],[A]=k.splice(c,1);k.splice(g,0,A),e.applySettings({...e.settings,parallelLanes:k})},onLaneViewed:c=>{const g=De(e.sessionsResult?.sessions,c)?.key??c,k=Date.now(),T=De(e.sessionsResult?.sessions,g)?.updatedAt??0,x=Math.max(e.settings.tabLastViewed[c]??0,e.settings.tabLastViewed[g]??0);T>0&&x>=T||e.applySettings({...e.settings,tabLastViewed:{...e.settings.tabLastViewed,[c]:k,[g]:k}})},onSendInLane:(c,g)=>{c!==e.sessionKey?(ke(e),e.sessionKey=c,Ee(e,c),e.chatLoading=!0,e.chatMessages=[],e.chatStream=null,e.chatStreamStartedAt=null,e.chatRunId=null,e.resetToolStream(),e.applySettings({...e.settings,sessionKey:c,lastActiveSessionKey:c}),e.loadAssistantIdentity(),ye(e,c,!0),se(e).then(()=>{e.loadSessionResources(),e.chatMessage=g,e.handleSendChat(g)})):(e.chatMessage=g,e.handleSendChat(g))}}):p}
+        ${e.tab==="chat"&&e.settings.chatParallelView?W1({state:e,onAssignLane:(c,g)=>{const k=g?De(e.sessionsResult?.sessions,g)?.key??g:null,A=[...e.settings.parallelLanes];A[c]=k,e.applySettings({...e.settings,parallelLanes:A}),k&&e.client&&po(e.client,k).then(()=>{e.applySettings({...e.settings})})},onReorderLanes:(c,g)=>{if(c===g||c<0||g<0||c>=e.settings.parallelLanes.length||g>=e.settings.parallelLanes.length)return;const k=[...e.settings.parallelLanes],[A]=k.splice(c,1);k.splice(g,0,A),e.applySettings({...e.settings,parallelLanes:k})},onLaneViewed:c=>{const g=De(e.sessionsResult?.sessions,c)?.key??c,k=Date.now(),T=De(e.sessionsResult?.sessions,g)?.updatedAt??0,x=Math.max(e.settings.tabLastViewed[c]??0,e.settings.tabLastViewed[g]??0);T>0&&x>=T||e.applySettings({...e.settings,tabLastViewed:{...e.settings.tabLastViewed,[c]:k,[g]:k}})},onSendInLane:(c,g)=>{c!==e.sessionKey?(ke(e),e.sessionKey=c,Ee(e,c),e.chatLoading=!0,e.chatMessages=[],e.chatStream=null,e.chatStreamStartedAt=null,e.chatRunId=null,e.resetToolStream(),e.applySettings({...e.settings,sessionKey:c,lastActiveSessionKey:c}),e.loadAssistantIdentity(),ye(e,c,!0),se(e).then(()=>{e.loadSessionResources(),e.chatMessage=g,e.handleSendChat(g)})):(e.chatMessage=g,e.handleSendChat(g))}}):p}
 
         ${e.tab==="chat"&&!e.settings.chatParallelView?Q$({basePath:e.basePath,sessionKey:e.sessionKey,onSessionKeyChange:c=>{ke(e),e.sessionKey=c,Ee(e,c),e.chatLoading=!0,e.chatMessages=[],e.chatAttachments=[],e.chatStream=null,e.chatStreamStartedAt=null,e.chatRunId=null,e.chatQueue=[],e.resetToolStream(),e.resetChatScroll(),e.applySettings({...e.settings,sessionKey:c,lastActiveSessionKey:c}),e.loadAssistantIdentity(),se(e),Gs(e),e.loadSessionResources(),js(e)},thinkingLevel:e.chatThinkingLevel,showThinking:h,loading:e.chatLoading,sending:e.chatSending,sendingSessionKey:e.chatSendingSessionKey,compactionStatus:e.compactionStatus,assistantAvatarUrl:m,messages:e.chatMessages,toolMessages:e.chatToolMessages,stream:e.chatStream,streamStartedAt:e.chatStreamStartedAt,draft:e.chatMessage,queue:e.chatQueue,connected:e.connected,canSend:e.connected,disabledReason:l,error:e.lastError,sessions:e.sessionsResult,focusMode:u,onRefresh:()=>(e.resetToolStream(),e.loadSessionResources(),js(e),Promise.all([se(e),Gs(e)])),onToggleFocusMode:()=>{e.onboarding||e.applySettings({...e.settings,chatFocusMode:!e.settings.chatFocusMode})},onChatScroll:c=>e.handleChatScroll(c),onDraftChange:c=>e.chatMessage=c,attachments:e.chatAttachments,onAttachmentsChange:c=>e.chatAttachments=c,showToast:(c,g)=>e.showToast(c,g),onSend:c=>e.handleSendChat(void 0,{queue:c}),canAbort:!!e.chatRunId,onAbort:()=>{e.handleAbortChat()},onCompact:()=>{e.handleCompactChat()},pendingRetry:e.pendingRetry,onRetry:()=>{e.handleRetryMessage()},onClearRetry:()=>e.handleClearRetry(),onQueueRemove:c=>e.removeQueuedMessage(c),onNewSession:()=>e.handleSendChat("/new",{restoreDraft:!0}),onConsciousnessFlush:()=>{e.handleConsciousnessFlush()},consciousnessStatus:e.consciousnessStatus,sidebarOpen:e.sidebarOpen,sidebarContent:e.sidebarContent,sidebarError:e.sidebarError,sidebarMimeType:e.sidebarMimeType,sidebarFilePath:e.sidebarFilePath,sidebarTitle:e.sidebarTitle,sidebarMode:e.sidebarMode,sidebarProofSlug:e.sidebarProofSlug,sidebarProofUrl:e.sidebarProofUrl,sidebarProofHtml:e.sidebarProofHtml,splitRatio:e.splitRatio,onOpenSidebar:(c,g)=>e.handleOpenSidebar(c,g),onMessageLinkClick:c=>e.handleOpenMessageFileLink(c),onCloseSidebar:()=>e.handleCloseSidebar(),onOpenProof:c=>{e.handleOpenProofDoc(c)},onOpenFile:c=>e.handleOpenFile(c),onSplitRatioChange:c=>e.handleSplitRatioChange(c),onPushToDrive:(c,g)=>e.handlePushToDrive(c,g),driveAccounts:e.driveAccounts,showDrivePicker:e.showDrivePicker,driveUploading:e.driveUploading,onToggleDrivePicker:()=>e.handleToggleDrivePicker(),onImageClick:(c,g,k)=>e.handleImageClick(c,g,k),resolveImageUrl:(c,g)=>Gv(e.sessionKey,c,g),assistantName:e.assistantName,assistantAvatar:e.assistantAvatar,userName:e.userName,userAvatar:e.userAvatar,currentToolName:e.currentToolName,currentToolInfo:e.currentToolInfo,privateMode:e.chatPrivateMode,onTogglePrivateMode:()=>e.handlePrivateModeToggle(),isWorking:e.workingSessions.has(e.sessionKey),showScrollButton:!e.chatUserNearBottom,showNewMessages:e.chatNewMessagesBelow,onScrollToBottom:()=>{const c=document.querySelector(".chat-thread");c&&(c.scrollTo({top:c.scrollHeight,behavior:"smooth"}),e.chatUserNearBottom=!0,e.chatNewMessagesBelow=!1)},allyPanelOpen:e.allyPanelOpen??!1,allyProps:e.allyPanelOpen?{allyName:e.assistantName,allyAvatar:e.assistantAvatar??null,open:!0,messages:e.allyMessages??[],stream:e.allyStream??null,draft:e.allyDraft??"",sending:e.allySending??!1,isWorking:e.allyWorking??!1,unreadCount:0,connected:e.connected,compact:!0,attachments:e.allyAttachments??[],onToggle:()=>e.handleAllyToggle(),onDraftChange:c=>e.handleAllyDraftChange(c),onSend:()=>e.handleAllySend(),onOpenFullChat:()=>e.handleAllyOpenFull(),onAttachmentsChange:c=>e.handleAllyAttachmentsChange(c),onAction:(c,g,k,A)=>e.handleAllyAction(c,g,k,A)}:null,sessionResources:e.sessionResources,sessionResourcesCollapsed:e.sessionResourcesCollapsed,onToggleSessionResources:()=>e.handleToggleSessionResources(),onSessionResourceClick:c=>e.handleSessionResourceClick(c),onViewAllResources:()=>e.handleViewAllResources()}):p}
 
-        ${e.tab==="options"?$S({connected:e.connected,loading:e.godmodeOptionsLoading,options:e.godmodeOptions,onToggle:(c,g)=>e.handleOptionToggle(c,g),onOpenWizard:e.handleWizardOpen?()=>e.handleWizardOpen?.():void 0}):p}
+        ${e.tab==="options"?SS({connected:e.connected,loading:e.godmodeOptionsLoading,options:e.godmodeOptions,onToggle:(c,g)=>e.handleOptionToggle(c,g),onOpenWizard:e.handleWizardOpen?()=>e.handleWizardOpen?.():void 0}):p}
 
-        ${e.tab==="guardrails"?u1({connected:e.connected,loading:e.guardrailsLoading,data:e.guardrailsData,showAddForm:e.guardrailsShowAddForm,onToggle:(c,g)=>e.handleGuardrailToggle(c,g),onThresholdChange:(c,g,k)=>e.handleGuardrailThresholdChange(c,g,k),onCustomToggle:(c,g)=>e.handleCustomGuardrailToggle(c,g),onCustomDelete:c=>e.handleCustomGuardrailDelete(c),onToggleAddForm:()=>e.handleToggleGuardrailAddForm(),onOpenAllyChat:c=>{e.handleAllyToggle(),c&&e.handleAllyDraftChange(c)}}):p}
+        ${e.tab==="guardrails"?h1({connected:e.connected,loading:e.guardrailsLoading,data:e.guardrailsData,showAddForm:e.guardrailsShowAddForm,onToggle:(c,g)=>e.handleGuardrailToggle(c,g),onThresholdChange:(c,g,k)=>e.handleGuardrailThresholdChange(c,g,k),onCustomToggle:(c,g)=>e.handleCustomGuardrailToggle(c,g),onCustomDelete:c=>e.handleCustomGuardrailDelete(c),onToggleAddForm:()=>e.handleToggleGuardrailAddForm(),onOpenAllyChat:c=>{e.handleAllyToggle(),c&&e.handleAllyDraftChange(c)}}):p}
 
-        ${e.tab==="mission-control"?M1({connected:e.connected,loading:e.missionControlLoading,error:e.missionControlError,data:e.missionControlData??null,fullControl:e.missionControlFullControl,onToggleFullControl:()=>e.handleMissionControlToggleFullControl(),onRefresh:()=>e.handleMissionControlRefresh(),onCancelTask:c=>e.handleMissionControlCancelTask(c),onApproveItem:c=>e.handleMissionControlApproveItem(c),onRetryItem:c=>e.handleMissionControlRetryItem(c),onViewDetail:c=>e.handleMissionControlViewDetail(c),onOpenSession:c=>e.handleMissionControlOpenSession(c),onOpenTaskSession:c=>e.handleMissionControlOpenTaskSession(c),onStartQueueItem:c=>e.handleMissionControlStartQueueItem(c),onViewTaskFiles:c=>e.handleMissionControlViewTaskFiles(c),onSelectSwarmProject:c=>e.handleSwarmSelectProject(c),onSteerSwarmAgent:(c,g,k)=>e.handleSwarmSteer(c,g,k),onViewProofDoc:c=>e.handleSwarmViewProofDoc(c),onViewRunLog:c=>e.handleSwarmViewRunLog(c),onAskAlly:()=>{e.handleAllyToggle(),e.handleAllyDraftChange("What should I focus on next?")},allyName:e.assistantName}):p}
+        ${e.tab==="mission-control"?F1({connected:e.connected,loading:e.missionControlLoading,error:e.missionControlError,data:e.missionControlData??null,fullControl:e.missionControlFullControl,onToggleFullControl:()=>e.handleMissionControlToggleFullControl(),onRefresh:()=>e.handleMissionControlRefresh(),onCancelTask:c=>e.handleMissionControlCancelTask(c),onApproveItem:c=>e.handleMissionControlApproveItem(c),onRetryItem:c=>e.handleMissionControlRetryItem(c),onViewDetail:c=>e.handleMissionControlViewDetail(c),onOpenSession:c=>e.handleMissionControlOpenSession(c),onOpenTaskSession:c=>e.handleMissionControlOpenTaskSession(c),onStartQueueItem:c=>e.handleMissionControlStartQueueItem(c),onViewTaskFiles:c=>e.handleMissionControlViewTaskFiles(c),onSelectSwarmProject:c=>e.handleSwarmSelectProject(c),onSteerSwarmAgent:(c,g,k)=>e.handleSwarmSteer(c,g,k),onViewProofDoc:c=>e.handleSwarmViewProofDoc(c),onViewRunLog:c=>e.handleSwarmViewRunLog(c),onAskAlly:()=>{e.handleAllyToggle(),e.handleAllyDraftChange("What should I focus on next?")},allyName:e.assistantName}):p}
 
-        ${e.tab==="trust"?a1({connected:e.connected,loading:e.trustTrackerLoading,data:e.trustTrackerData,onAddWorkflow:c=>e.handleTrustAddWorkflow(c),onRemoveWorkflow:c=>e.handleTrustRemoveWorkflow(c),onRefresh:()=>e.handleTrustLoad(),guardrailsData:e.guardrailsData,consciousnessStatus:e.consciousnessStatus,sessionsCount:i,gatewayUptimeMs:e.hello?.snapshot?.uptimeMs??null,onDailyRate:(c,g)=>e.handleDailyRate(c,g),updateStatus:e.updateStatus?{openclawUpdateAvailable:e.updateStatus.openclawUpdateAvailable,pluginUpdateAvailable:e.updateStatus.pluginUpdateAvailable,openclawVersion:e.updateStatus.openclawVersion,pluginVersion:e.updateStatus.pluginVersion,openclawLatest:e.updateStatus.openclawLatest,pluginLatest:e.updateStatus.pluginLatest}:null}):p}
+        ${e.tab==="trust"?o1({connected:e.connected,loading:e.trustTrackerLoading,data:e.trustTrackerData,onAddWorkflow:c=>e.handleTrustAddWorkflow(c),onRemoveWorkflow:c=>e.handleTrustRemoveWorkflow(c),onRefresh:()=>e.handleTrustLoad(),guardrailsData:e.guardrailsData,consciousnessStatus:e.consciousnessStatus,sessionsCount:i,gatewayUptimeMs:e.hello?.snapshot?.uptimeMs??null,onDailyRate:(c,g)=>e.handleDailyRate(c,g),updateStatus:e.updateStatus?{openclawUpdateAvailable:e.updateStatus.openclawUpdateAvailable,pluginUpdateAvailable:e.updateStatus.pluginUpdateAvailable,openclawVersion:e.updateStatus.openclawVersion,pluginVersion:e.updateStatus.pluginVersion,openclawLatest:e.updateStatus.openclawLatest,pluginLatest:e.updateStatus.pluginLatest}:null}):p}
 
-        ${e.tab==="second-brain"?u2({connected:e.connected,loading:e.secondBrainLoading??!1,error:e.secondBrainError??null,subtab:e.secondBrainSubtab??"identity",identity:e.secondBrainIdentity??null,memoryBank:e.secondBrainMemoryBank??null,aiPacket:e.secondBrainAiPacket??null,sourcesData:e.secondBrainSourcesData??null,selectedEntry:e.secondBrainSelectedEntry??null,searchQuery:e.secondBrainSearchQuery??"",syncing:e.secondBrainSyncing??!1,browsingFolder:e.secondBrainBrowsingFolder??null,folderEntries:e.secondBrainFolderEntries??null,folderName:e.secondBrainFolderName??null,onSubtabChange:c=>e.handleSecondBrainSubtabChange(c),onSelectEntry:c=>e.handleSecondBrainSelectEntry(c),onOpenInBrowser:c=>e.handleSecondBrainOpenInBrowser(c),onBrowseFolder:c=>e.handleSecondBrainBrowseFolder(c),onBack:()=>e.handleSecondBrainBack(),onSearch:c=>e.handleSecondBrainSearch(c),onSync:()=>e.handleSecondBrainSync(),onRefresh:()=>e.handleSecondBrainRefresh(),onOpenSidebar:(c,g)=>e.handleOpenSidebar(c,g),researchData:e.secondBrainResearchData??null,researchAddFormOpen:e.secondBrainResearchAddFormOpen??!1,researchAddForm:e.secondBrainResearchAddForm,researchCategories:e.secondBrainResearchCategories??[],onResearchAddFormToggle:()=>e.handleResearchAddFormToggle(),onResearchAddFormChange:(c,g)=>e.handleResearchAddFormChange(c,g),onResearchAddSubmit:()=>e.handleResearchAddSubmit(),onSaveViaChat:()=>e.handleResearchSaveViaChat(),communityResources:e.secondBrainCommunityResources??null,communityResourceAddFormOpen:e.secondBrainCommunityResourceAddFormOpen??!1,communityResourceAddForm:e.secondBrainCommunityResourceAddForm,onCommunityResourceAdd:()=>e.handleCommunityResourceAdd(),onCommunityResourceRemove:c=>e.handleCommunityResourceRemove(c),onCommunityResourceAddFormToggle:()=>e.handleCommunityResourceAddFormToggle(),onCommunityResourceAddFormChange:(c,g)=>e.handleCommunityResourceAddFormChange(c,g),onAddSource:()=>e.handleAddSource(),fileTree:e.secondBrainFileTree??null,fileTreeLoading:e.secondBrainFileTreeLoading??!1,fileSearchQuery:e.secondBrainFileSearchQuery??"",fileSearchResults:e.secondBrainFileSearchResults??null,onFileTreeRefresh:()=>e.handleSecondBrainFileTreeRefresh(),onFileSearch:c=>e.handleSecondBrainFileSearch(c),onFileSelect:c=>e.handleSecondBrainFileSelect(c),intelProps:(e.secondBrainSubtab??"identity")==="intel"?{insights:e.intelInsights??[],discoveries:e.intelDiscoveries??[],patterns:e.intelPatterns??null,status:e.intelStatus??null,loading:e.intelLoading??!1,error:e.intelError??null,onDismiss:c=>e.handleIntelDismiss(c),onAct:c=>e.handleIntelAct(c),onRefresh:()=>e.handleIntelRefresh()}:void 0,vaultHealth:e.secondBrainVaultHealth??null}):p}
+        ${e.tab==="second-brain"?h2({connected:e.connected,loading:e.secondBrainLoading??!1,error:e.secondBrainError??null,subtab:e.secondBrainSubtab??"identity",identity:e.secondBrainIdentity??null,memoryBank:e.secondBrainMemoryBank??null,aiPacket:e.secondBrainAiPacket??null,sourcesData:e.secondBrainSourcesData??null,selectedEntry:e.secondBrainSelectedEntry??null,searchQuery:e.secondBrainSearchQuery??"",syncing:e.secondBrainSyncing??!1,browsingFolder:e.secondBrainBrowsingFolder??null,folderEntries:e.secondBrainFolderEntries??null,folderName:e.secondBrainFolderName??null,onSubtabChange:c=>e.handleSecondBrainSubtabChange(c),onSelectEntry:c=>e.handleSecondBrainSelectEntry(c),onOpenInBrowser:c=>e.handleSecondBrainOpenInBrowser(c),onBrowseFolder:c=>e.handleSecondBrainBrowseFolder(c),onBack:()=>e.handleSecondBrainBack(),onSearch:c=>e.handleSecondBrainSearch(c),onSync:()=>e.handleSecondBrainSync(),onRefresh:()=>e.handleSecondBrainRefresh(),onOpenSidebar:(c,g)=>e.handleOpenSidebar(c,g),researchData:e.secondBrainResearchData??null,researchAddFormOpen:e.secondBrainResearchAddFormOpen??!1,researchAddForm:e.secondBrainResearchAddForm,researchCategories:e.secondBrainResearchCategories??[],onResearchAddFormToggle:()=>e.handleResearchAddFormToggle(),onResearchAddFormChange:(c,g)=>e.handleResearchAddFormChange(c,g),onResearchAddSubmit:()=>e.handleResearchAddSubmit(),onSaveViaChat:()=>e.handleResearchSaveViaChat(),communityResources:e.secondBrainCommunityResources??null,communityResourceAddFormOpen:e.secondBrainCommunityResourceAddFormOpen??!1,communityResourceAddForm:e.secondBrainCommunityResourceAddForm,onCommunityResourceAdd:()=>e.handleCommunityResourceAdd(),onCommunityResourceRemove:c=>e.handleCommunityResourceRemove(c),onCommunityResourceAddFormToggle:()=>e.handleCommunityResourceAddFormToggle(),onCommunityResourceAddFormChange:(c,g)=>e.handleCommunityResourceAddFormChange(c,g),onAddSource:()=>e.handleAddSource(),fileTree:e.secondBrainFileTree??null,fileTreeLoading:e.secondBrainFileTreeLoading??!1,fileSearchQuery:e.secondBrainFileSearchQuery??"",fileSearchResults:e.secondBrainFileSearchResults??null,onFileTreeRefresh:()=>e.handleSecondBrainFileTreeRefresh(),onFileSearch:c=>e.handleSecondBrainFileSearch(c),onFileSelect:c=>e.handleSecondBrainFileSelect(c),intelProps:(e.secondBrainSubtab??"identity")==="intel"?{insights:e.intelInsights??[],discoveries:e.intelDiscoveries??[],patterns:e.intelPatterns??null,status:e.intelStatus??null,loading:e.intelLoading??!1,error:e.intelError??null,onDismiss:c=>e.handleIntelDismiss(c),onAct:c=>e.handleIntelAct(c),onRefresh:()=>e.handleIntelRefresh()}:void 0,vaultHealth:e.secondBrainVaultHealth??null}):p}
 
-        ${e.tab==="dashboards"?e.dynamicSlots.dashboards?r`<div class="dynamic-slot">${Se(od(e.dynamicSlots.dashboards))}</div>`:k2({connected:e.connected,loading:e.dashboardsLoading??!1,error:e.dashboardsError??null,dashboards:e.dashboardsList,activeDashboardId:e.activeDashboardId??null,activeDashboardHtml:e.activeDashboardHtml??null,activeDashboardManifest:e.activeDashboardManifest??null,isWorking:e.activeDashboardManifest?.sessionId?e.workingSessions.has(e.activeDashboardManifest.sessionId):!1,onSelectDashboard:c=>e.handleDashboardSelect(c),onDeleteDashboard:c=>e.handleDashboardDelete(c),onCreateViaChat:c=>e.handleDashboardCreateViaChat(c),onTogglePin:c=>e.handleDashboardTogglePin(c),categoryFilter:e.dashboardCategoryFilter??null,onCategoryFilter:c=>e.handleDashboardCategoryFilter(c),onBack:()=>e.handleDashboardBack(),onRefresh:()=>e.handleDashboardsRefresh(),onOpenSession:c=>e.handleDashboardOpenSession(c)}):p}
+        ${e.tab==="dashboards"?e.dynamicSlots.dashboards?r`<div class="dynamic-slot">${Se(od(e.dynamicSlots.dashboards))}</div>`:A2({connected:e.connected,loading:e.dashboardsLoading??!1,error:e.dashboardsError??null,dashboards:e.dashboardsList,activeDashboardId:e.activeDashboardId??null,activeDashboardHtml:e.activeDashboardHtml??null,activeDashboardManifest:e.activeDashboardManifest??null,isWorking:e.activeDashboardManifest?.sessionId?e.workingSessions.has(e.activeDashboardManifest.sessionId):!1,onSelectDashboard:c=>e.handleDashboardSelect(c),onDeleteDashboard:c=>e.handleDashboardDelete(c),onCreateViaChat:c=>e.handleDashboardCreateViaChat(c),onTogglePin:c=>e.handleDashboardTogglePin(c),categoryFilter:e.dashboardCategoryFilter??null,onCategoryFilter:c=>e.handleDashboardCategoryFilter(c),onBack:()=>e.handleDashboardBack(),onRefresh:()=>e.handleDashboardsRefresh(),onOpenSession:c=>e.handleDashboardOpenSession(c)}):p}
 
-        ${e.tab==="config"?lk({raw:e.configRaw,originalRaw:e.configRawOriginal,valid:e.configValid,issues:e.configIssues,loading:e.configLoading,saving:e.configSaving,applying:e.configApplying,updating:e.updateRunning,connected:e.connected,schema:e.configSchema,schemaLoading:e.configSchemaLoading,uiHints:e.configUiHints,formMode:e.configFormMode,formValue:e.configForm,originalValue:e.configFormOriginal,searchQuery:e.configSearchQuery,activeSection:e.configActiveSection,activeSubsection:e.configActiveSubsection,onRawChange:c=>{e.configRaw=c},onFormModeChange:c=>e.configFormMode=c,onFormPatch:(c,g)=>tn(e,c,g),onSearchChange:c=>e.configSearchQuery=c,onSectionChange:c=>{e.configActiveSection=c,e.configActiveSubsection=null},onSubsectionChange:c=>e.configActiveSubsection=c,onReload:()=>Xe(e),onSave:()=>Ms(e),onApply:()=>mh(e),onUpdate:()=>kr(e),userName:e.userName||"",userAvatar:e.userAvatar,onUserProfileUpdate:(c,g)=>e.handleUpdateUserProfile(c,g),onModelSwitch:(c,g)=>yh(e,c,g)}):p}
+        ${e.tab==="config"?ck({raw:e.configRaw,originalRaw:e.configRawOriginal,valid:e.configValid,issues:e.configIssues,loading:e.configLoading,saving:e.configSaving,applying:e.configApplying,updating:e.updateRunning,connected:e.connected,schema:e.configSchema,schemaLoading:e.configSchemaLoading,uiHints:e.configUiHints,formMode:e.configFormMode,formValue:e.configForm,originalValue:e.configFormOriginal,searchQuery:e.configSearchQuery,activeSection:e.configActiveSection,activeSubsection:e.configActiveSubsection,onRawChange:c=>{e.configRaw=c},onFormModeChange:c=>e.configFormMode=c,onFormPatch:(c,g)=>tn(e,c,g),onSearchChange:c=>e.configSearchQuery=c,onSectionChange:c=>{e.configActiveSection=c,e.configActiveSubsection=null},onSubsectionChange:c=>e.configActiveSubsection=c,onReload:()=>Xe(e),onSave:()=>Ms(e),onApply:()=>mh(e),onUpdate:()=>kr(e),userName:e.userName||"",userAvatar:e.userAvatar,onUserProfileUpdate:(c,g)=>e.handleUpdateUserProfile(c,g),onModelSwitch:(c,g)=>yh(e,c,g)}):p}
 
-        ${e.tab==="debug"?kk({loading:e.debugLoading,status:e.debugStatus,health:e.debugHealth,models:e.debugModels,heartbeat:e.debugHeartbeat,eventLog:e.eventLog,callMethod:e.debugCallMethod,callParams:e.debugCallParams,callResult:e.debugCallResult,callError:e.debugCallError,onCallMethodChange:c=>e.debugCallMethod=c,onCallParamsChange:c=>e.debugCallParams=c,onRefresh:()=>ra(e),onCall:()=>py(e)}):p}
+        ${e.tab==="debug"?Sk({loading:e.debugLoading,status:e.debugStatus,health:e.debugHealth,models:e.debugModels,heartbeat:e.debugHeartbeat,eventLog:e.eventLog,callMethod:e.debugCallMethod,callParams:e.debugCallParams,callResult:e.debugCallResult,callError:e.debugCallError,onCallMethodChange:c=>e.debugCallMethod=c,onCallParamsChange:c=>e.debugCallParams=c,onRefresh:()=>ra(e),onCall:()=>py(e)}):p}
 
-        ${e.tab==="logs"?Pk({loading:e.logsLoading,error:e.logsError,file:e.logsFile,entries:e.logsEntries,filterText:e.logsFilterText,levelFilters:e.logsLevelFilters,autoFollow:e.logsAutoFollow,truncated:e.logsTruncated,onFilterTextChange:c=>e.logsFilterText=c,onLevelToggle:(c,g)=>{e.logsLevelFilters={...e.logsLevelFilters,[c]:g}},onToggleAutoFollow:c=>e.logsAutoFollow=c,onRefresh:()=>ko(e,{reset:!0}),onExport:(c,g)=>e.exportLogs(c,g),onScroll:c=>e.handleLogsScroll(c)}):p}
+        ${e.tab==="logs"?Lk({loading:e.logsLoading,error:e.logsError,file:e.logsFile,entries:e.logsEntries,filterText:e.logsFilterText,levelFilters:e.logsLevelFilters,autoFollow:e.logsAutoFollow,truncated:e.logsTruncated,onFilterTextChange:c=>e.logsFilterText=c,onLevelToggle:(c,g)=>{e.logsLevelFilters={...e.logsLevelFilters,[c]:g}},onToggleAutoFollow:c=>e.logsAutoFollow=c,onRefresh:()=>ko(e,{reset:!0}),onExport:(c,g)=>e.exportLogs(c,g),onScroll:c=>e.handleLogsScroll(c)}):p}
       </main>
       ${e.tab!=="chat"?_w({allyName:e.assistantName,allyAvatar:e.assistantAvatar??null,open:e.allyPanelOpen??!1,messages:e.allyMessages??[],stream:e.allyStream??null,draft:e.allyDraft??"",sending:e.allySending??!1,isWorking:e.allyWorking??!1,unreadCount:e.allyUnread??0,connected:e.connected,compact:!1,attachments:e.allyAttachments??[],onToggle:()=>e.handleAllyToggle(),onDraftChange:c=>e.handleAllyDraftChange(c),onSend:()=>e.handleAllySend(),onOpenFullChat:()=>e.handleAllyOpenFull(),onAttachmentsChange:c=>e.handleAllyAttachmentsChange(c),onAction:(c,g,k,A)=>e.handleAllyAction(c,g,k,A)}):p}
-      ${Ak(e)}
       ${xk(e)}
       ${Tk(e)}
+      ${_k(e)}
       ${e.sidebarOpen&&e.tab!=="chat"?r`
             <div class="global-document-viewer">
               <div class="global-document-viewer__overlay" @click=${()=>e.handleCloseSidebar()}></div>
@@ -9308,25 +9321,25 @@ ${i}
               </div>
             </div>
           `:p}
-      ${yS({toasts:e.toasts,onDismiss:c=>e.dismissToast(c)})}
-      ${mS(e.lightbox,{onClose:()=>e.handleLightboxClose(),onNav:c=>e.handleLightboxNav(c)})}
+      ${wS({toasts:e.toasts,onDismiss:c=>e.dismissToast(c)})}
+      ${yS(e.lightbox,{onClose:()=>e.handleLightboxClose(),onNav:c=>e.handleLightboxNav(c)})}
     </div>
-  `}async function H2(e){}async function G2(e){}async function Q2(e,t){}async function Y2(e){}async function J2(e){}async function X2(e){}async function Vo(e){if(!(!e.client||!e.connected)){e.trustTrackerLoading=!0;try{const[t,n]=await Promise.all([e.client.request("trust.dashboard",{}),e.client.request("trust.history",{limit:50})]);e.trustTrackerData={workflows:t.workflows,summaries:t.summaries,ratings:n.ratings,total:n.total,overallScore:t.overallScore,totalRatings:t.totalRatings,totalUses:t.totalUses,todayRating:t.todayRating??null,dailyAverage:t.dailyAverage??null,dailyStreak:t.dailyStreak??0,recentDaily:t.recentDaily??[]}}catch{e.trustTrackerData=null}finally{e.trustTrackerLoading=!1}}}async function _p(e,t){if(!(!e.client||!e.connected))try{await e.client.request("trust.workflows.set",{workflows:t}),e.showToast("Workflows updated","success",2e3),await Vo(e)}catch(n){e.showToast("Failed to update workflows","error"),console.error("[TrustTracker] setWorkflows error:",n)}}async function Z2(e,t){const n=e.trustTrackerData?.workflows??[];if(n.length>=5){e.showToast("Maximum 5 workflows allowed","error");return}if(n.includes(t.trim())){e.showToast("Workflow already tracked","error");return}await _p(e,[...n,t.trim()])}async function eA(e,t){const n=e.trustTrackerData?.workflows??[];await _p(e,n.filter(s=>s!==t))}async function tA(e,t,n){if(!(!e.client||!e.connected))try{await e.client.request("trust.dailyRate",{rating:t,...n?{note:n}:{}}),e.showToast(`Rated ${t}/10 today`,"success",2e3),await Vo(e)}catch(s){e.showToast("Failed to submit daily rating","error"),console.error("[TrustTracker] dailyRate error:",s)}}const nA=6e4,$c=15,kc=new Set;let Ls=null;async function Sc(e){if(!(!e.client||!e.connected))try{const t=new Date,n=new Date(t.getTime()+$c*6e4+6e4),s=await e.client.request("calendar.events.range",{startDate:t.toISOString(),endDate:n.toISOString()});for(const a of s.events??[]){if(kc.has(a.id))continue;const i=new Date(a.startTime),o=Math.round((i.getTime()-t.getTime())/6e4);if(o>0&&o<=$c){kc.add(a.id);const l=i.toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"}),d=a.location?` @ ${a.location}`:"",u=`${a.title} starts in ${o} min (${l})${d}`;e.showToast(u,"warning",0)}}}catch(t){console.warn("[MeetingNotify] Poll error:",t)}}function sA(e){Cp(),Sc(e),Ls=setInterval(()=>{Sc(e)},nA)}function Cp(){Ls&&(clearInterval(Ls),Ls=null)}let aA=0;function iA(e,t="info",n=3e3,s){return{id:`toast-${Date.now()}-${aA++}`,message:e,type:t,duration:n,createdAt:Date.now(),action:s}}function oA(e,t){return e.filter(n=>n.id!==t)}function rA(e,t){return[...e,t]}var lA=Object.defineProperty,cA=Object.getOwnPropertyDescriptor,y=(e,t,n,s)=>{for(var a=s>1?void 0:s?cA(t,n):t,i=e.length-1,o;i>=0;i--)(o=e[i])&&(a=(s?o(t,n,a):o(a))||a);return s&&a&&lA(t,n,a),a};function li(){return Um()}function As(){return Km()}function dA(){if(!window.location.search)return!1;const t=new URLSearchParams(window.location.search).get("onboarding");if(!t)return!1;const n=t.trim().toLowerCase();return n==="1"||n==="true"||n==="yes"||n==="on"}function uA(e,t){let n=e.trim();if(!n)return null;if(n.startsWith("Read HEARTBEAT.md")||n.startsWith("Read CONSCIOUSNESS.md")||/^System:\s*\[\d{4}-\d{2}-\d{2}/.test(n)||n==="NO_REPLY"||n.startsWith(`NO_REPLY
+  `}async function Q2(e){}async function Y2(e){}async function J2(e,t){}async function X2(e){}async function Z2(e){}async function eA(e){}async function Vo(e){if(!(!e.client||!e.connected)){e.trustTrackerLoading=!0;try{const[t,n]=await Promise.all([e.client.request("trust.dashboard",{}),e.client.request("trust.history",{limit:50})]);e.trustTrackerData={workflows:t.workflows,summaries:t.summaries,ratings:n.ratings,total:n.total,overallScore:t.overallScore,totalRatings:t.totalRatings,totalUses:t.totalUses,todayRating:t.todayRating??null,dailyAverage:t.dailyAverage??null,dailyStreak:t.dailyStreak??0,recentDaily:t.recentDaily??[]}}catch{e.trustTrackerData=null}finally{e.trustTrackerLoading=!1}}}async function _p(e,t){if(!(!e.client||!e.connected))try{await e.client.request("trust.workflows.set",{workflows:t}),e.showToast("Workflows updated","success",2e3),await Vo(e)}catch(n){e.showToast("Failed to update workflows","error"),console.error("[TrustTracker] setWorkflows error:",n)}}async function tA(e,t){const n=e.trustTrackerData?.workflows??[];if(n.length>=5){e.showToast("Maximum 5 workflows allowed","error");return}if(n.includes(t.trim())){e.showToast("Workflow already tracked","error");return}await _p(e,[...n,t.trim()])}async function nA(e,t){const n=e.trustTrackerData?.workflows??[];await _p(e,n.filter(s=>s!==t))}async function sA(e,t,n){if(!(!e.client||!e.connected))try{await e.client.request("trust.dailyRate",{rating:t,...n?{note:n}:{}}),e.showToast(`Rated ${t}/10 today`,"success",2e3),await Vo(e)}catch(s){e.showToast("Failed to submit daily rating","error"),console.error("[TrustTracker] dailyRate error:",s)}}const aA=6e4,$c=15,kc=new Set;let Ls=null;async function Sc(e){if(!(!e.client||!e.connected))try{const t=new Date,n=new Date(t.getTime()+$c*6e4+6e4),s=await e.client.request("calendar.events.range",{startDate:t.toISOString(),endDate:n.toISOString()});for(const a of s.events??[]){if(kc.has(a.id))continue;const i=new Date(a.startTime),o=Math.round((i.getTime()-t.getTime())/6e4);if(o>0&&o<=$c){kc.add(a.id);const l=i.toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"}),d=a.location?` @ ${a.location}`:"",u=`${a.title} starts in ${o} min (${l})${d}`;e.showToast(u,"warning",0)}}}catch(t){console.warn("[MeetingNotify] Poll error:",t)}}function iA(e){Cp(),Sc(e),Ls=setInterval(()=>{Sc(e)},aA)}function Cp(){Ls&&(clearInterval(Ls),Ls=null)}let oA=0;function rA(e,t="info",n=3e3,s){return{id:`toast-${Date.now()}-${oA++}`,message:e,type:t,duration:n,createdAt:Date.now(),action:s}}function lA(e,t){return e.filter(n=>n.id!==t)}function cA(e,t){return[...e,t]}var dA=Object.defineProperty,uA=Object.getOwnPropertyDescriptor,y=(e,t,n,s)=>{for(var a=s>1?void 0:s?uA(t,n):t,i=e.length-1,o;i>=0;i--)(o=e[i])&&(a=(s?o(t,n,a):o(a))||a);return s&&a&&dA(t,n,a),a};function li(){return Um()}function As(){return Km()}function pA(){if(!window.location.search)return!1;const t=new URLSearchParams(window.location.search).get("onboarding");if(!t)return!1;const n=t.trim().toLowerCase();return n==="1"||n==="true"||n==="yes"||n==="on"}function hA(e,t){let n=e.trim();if(!n)return null;if(n.startsWith("Read HEARTBEAT.md")||n.startsWith("Read CONSCIOUSNESS.md")||/^System:\s*\[\d{4}-\d{2}-\d{2}/.test(n)||n==="NO_REPLY"||n.startsWith(`NO_REPLY
 `)||/^#\s*(?:🧠|\w+ Consciousness)/i.test(n)||n.startsWith("# WORKING.md")||n.startsWith("# MISTAKES.md"))return console.debug("[Ally] Filtered message:",t,n.substring(0,100)),null;if(/(?:VERIFIED|FIXED|NEW):\s/.test(n)&&/✅|🟡|☑/.test(n)&&n.length>300)return console.debug("[Ally] Filtered message (verification dump):",t,n.substring(0,100)),null;if(/^###\s*(?:Onboarding Philosophy|Self-Surgery Problem|Open Architecture)/i.test(n))return console.debug("[Ally] Filtered message (system block):",t,n.substring(0,100)),null;if(/^\[GodMode Context:[^\]]*\]\s*$/.test(n))return console.debug("[Ally] Filtered message:",t,n.substring(0,100)),null;if(n=n.replace(/^(?:HEARTBEAT_OK|CONSCIOUSNESS_OK)\s*/i,"").trim(),n=n.replace(/^Deep work window is yours\.\s*/i,"").trim(),!n)return null;if(/^\w+\s+\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(n)&&n.length>200||/^##\s*Your Team\s*\(Agent Roster\)/i.test(n)&&n.indexOf(`
 
-## `)===-1)return console.debug("[Ally] Filtered message:",t,n.substring(0,100)),null;if(/^##?\s*Persistence Protocol/i.test(n)||/^You are resourceful and thorough\.\s*Your job is to GET THE JOB DONE/i.test(n)||/^##?\s*Core (?:Behaviors|Principles)/i.test(n)||/^##?\s*Your Role as \w+/i.test(n))return console.debug("[Ally] Filtered message (persona leak):",t,n.substring(0,100)),null;const s=n.toLowerCase();if(["persistence protocol","core principles:","core behaviors","your role as ","be diligent first time","exhaust reasonable options","assume capability exists","elite executive assistant","consciousness context","working context","enforcement:","internal system context injected by godmode"].filter(o=>s.includes(o)).length>=2)return console.debug("[Ally] Filtered message (multi-signal system leak):",t,n.substring(0,100)),null;if(/^(?:ID\s+START\s+END\s+SUMMARY)/i.test(n))return console.debug("[Ally] Filtered message:",t,n.substring(0,100)),null;const i=n.match(/\b[\w.-]+\.(?:json\b|db\b|html\b|log\b|flag\b|jsonl\b|bak\b|css\b|js\b|ts\b|md\b|txt\b)/gi);return i&&i.length>=8&&i.join(" ").length>n.length*.4?(console.debug("[Ally] Filtered message (file listing dump):",t,n.substring(0,100)),null):n}const Ac=new Set(["chat","today","workspaces","work","data","overview","channels","instances","sessions","cron","skills","nodes","config","debug","logs","my-day"]),pA=["path","filePath","file","workspacePath"];let v=class extends an{constructor(){super(...arguments),this.settings=Ib(),this.password="",this.tab="chat",this.onboarding=dA(),this.connected=!1,this.reconnecting=!1,this.reconnectAttempt=0,this.theme=this.settings.theme??"system",this.themeResolved="dark",this.hello=null,this.lastError=null,this.eventLog=[],this.toolStreamSyncTimer=null,this.sidebarCloseTimer=null,this.sessionPickerClickOutsideHandler=null,this.sessionSearchClickOutsideHandler=null,this.assistantName=li().name,this.assistantAvatar=li().avatar,this.assistantAgentId=li().agentId??null,this.userName=As().name,this.userAvatar=As().avatar,this.sessionKey=this.settings.sessionKey,this.sessionPickerOpen=!1,this.sessionPickerPosition=null,this.sessionPickerSearch="",this.sessionSearchOpen=!1,this.sessionSearchPosition=null,this.sessionSearchQuery="",this.sessionSearchResults=[],this.sessionSearchLoading=!1,this.profilePopoverOpen=!1,this.profileEditName="",this.profileEditAvatar="",this.editingTabKey=null,this.chatLoading=!1,this.chatSending=!1,this.chatSendingSessionKey=null,this.chatMessage="",this.chatDrafts={},this.chatMessages=[],this.chatToolMessages=[],this.chatStream=null,this.chatStreamStartedAt=null,this.chatRunId=null,this.currentToolName=null,this.currentToolInfo=null,this.workingSessions=new Set,this.compactionStatus=null,this.chatAvatarUrl=null,this.chatThinkingLevel=null,this.chatQueue=[],this.chatAttachments=[],this.pendingRetry=null,this.autoRetryAfterCompact=!1,this.sidebarOpen=!1,this.sidebarContent=null,this.sidebarError=null,this.sidebarMimeType=null,this.sidebarFilePath=null,this.sidebarTitle=null,this.sidebarMode="resource",this.sidebarProofSlug=null,this.sidebarProofUrl=null,this.sidebarProofHtml=null,this.splitRatio=this.settings.splitRatio,this.lightbox=hp(),this.driveAccounts=[],this.showDrivePicker=!1,this.driveUploading=!1,this.updateStatus=null,this.updateLoading=!1,this.updateError=null,this.updateLastChecked=null,this.updatePollInterval=null,this.nodesLoading=!1,this.nodes=[],this.devicesLoading=!1,this.devicesError=null,this.devicesList=null,this.execApprovalsLoading=!1,this.execApprovalsSaving=!1,this.execApprovalsDirty=!1,this.execApprovalsSnapshot=null,this.execApprovalsForm=null,this.execApprovalsSelectedAgent=null,this.execApprovalsTarget="gateway",this.execApprovalsTargetNodeId=null,this.execApprovalQueue=[],this.execApprovalBusy=!1,this.execApprovalError=null,this.pendingGatewayUrl=null,this.gatewayRestartPending=!1,this.gatewayRestartBusy=!1,this.configLoading=!1,this.configRaw=`{
+## `)===-1)return console.debug("[Ally] Filtered message:",t,n.substring(0,100)),null;if(/^##?\s*Persistence Protocol/i.test(n)||/^You are resourceful and thorough\.\s*Your job is to GET THE JOB DONE/i.test(n)||/^##?\s*Core (?:Behaviors|Principles)/i.test(n)||/^##?\s*Your Role as \w+/i.test(n))return console.debug("[Ally] Filtered message (persona leak):",t,n.substring(0,100)),null;const s=n.toLowerCase();if(["persistence protocol","core principles:","core behaviors","your role as ","be diligent first time","exhaust reasonable options","assume capability exists","elite executive assistant","consciousness context","working context","enforcement:","internal system context injected by godmode"].filter(o=>s.includes(o)).length>=2)return console.debug("[Ally] Filtered message (multi-signal system leak):",t,n.substring(0,100)),null;if(/^(?:ID\s+START\s+END\s+SUMMARY)/i.test(n))return console.debug("[Ally] Filtered message:",t,n.substring(0,100)),null;const i=n.match(/\b[\w.-]+\.(?:json\b|db\b|html\b|log\b|flag\b|jsonl\b|bak\b|css\b|js\b|ts\b|md\b|txt\b)/gi);return i&&i.length>=8&&i.join(" ").length>n.length*.4?(console.debug("[Ally] Filtered message (file listing dump):",t,n.substring(0,100)),null):n}const Ac=new Set(["chat","today","workspaces","work","data","overview","channels","instances","sessions","cron","skills","nodes","config","debug","logs","my-day"]),fA=["path","filePath","file","workspacePath"];let v=class extends an{constructor(){super(...arguments),this.settings=Ib(),this.password="",this.tab="chat",this.onboarding=pA(),this.connected=!1,this.reconnecting=!1,this.reconnectAttempt=0,this.theme=this.settings.theme??"system",this.themeResolved="dark",this.hello=null,this.lastError=null,this.eventLog=[],this.toolStreamSyncTimer=null,this.sidebarCloseTimer=null,this.sessionPickerClickOutsideHandler=null,this.sessionSearchClickOutsideHandler=null,this.assistantName=li().name,this.assistantAvatar=li().avatar,this.assistantAgentId=li().agentId??null,this.userName=As().name,this.userAvatar=As().avatar,this.sessionKey=this.settings.sessionKey,this.sessionPickerOpen=!1,this.sessionPickerPosition=null,this.sessionPickerSearch="",this.sessionSearchOpen=!1,this.sessionSearchPosition=null,this.sessionSearchQuery="",this.sessionSearchResults=[],this.sessionSearchLoading=!1,this.profilePopoverOpen=!1,this.profileEditName="",this.profileEditAvatar="",this.editingTabKey=null,this.chatLoading=!1,this.chatSending=!1,this.chatSendingSessionKey=null,this.chatMessage="",this.chatDrafts={},this.chatMessages=[],this.chatToolMessages=[],this.chatStream=null,this.chatStreamStartedAt=null,this.chatRunId=null,this.currentToolName=null,this.currentToolInfo=null,this.workingSessions=new Set,this.compactionStatus=null,this.chatAvatarUrl=null,this.chatThinkingLevel=null,this.chatQueue=[],this.chatAttachments=[],this.pendingRetry=null,this.autoRetryAfterCompact=!1,this.sidebarOpen=!1,this.sidebarContent=null,this.sidebarError=null,this.sidebarMimeType=null,this.sidebarFilePath=null,this.sidebarTitle=null,this.sidebarMode="resource",this.sidebarProofSlug=null,this.sidebarProofUrl=null,this.sidebarProofHtml=null,this.splitRatio=this.settings.splitRatio,this.lightbox=hp(),this.driveAccounts=[],this.showDrivePicker=!1,this.driveUploading=!1,this.updateStatus=null,this.updateLoading=!1,this.updateError=null,this.updateLastChecked=null,this.updatePollInterval=null,this.nodesLoading=!1,this.nodes=[],this.devicesLoading=!1,this.devicesError=null,this.devicesList=null,this.execApprovalsLoading=!1,this.execApprovalsSaving=!1,this.execApprovalsDirty=!1,this.execApprovalsSnapshot=null,this.execApprovalsForm=null,this.execApprovalsSelectedAgent=null,this.execApprovalsTarget="gateway",this.execApprovalsTargetNodeId=null,this.execApprovalQueue=[],this.execApprovalBusy=!1,this.execApprovalError=null,this.pendingGatewayUrl=null,this.gatewayRestartPending=!1,this.gatewayRestartBusy=!1,this.configLoading=!1,this.configRaw=`{
 }
-`,this.configRawOriginal="",this.configValid=null,this.configIssues=[],this.configSaving=!1,this.configApplying=!1,this.updateRunning=!1,this.applySessionKey=this.settings.lastActiveSessionKey,this.configSnapshot=null,this.configSchema=null,this.configSchemaVersion=null,this.configSchemaLoading=!1,this.configUiHints={},this.configForm=null,this.configFormOriginal=null,this.configFormDirty=!1,this.configFormMode="form",this.configSearchQuery="",this.configActiveSection=null,this.configActiveSubsection=null,this.channelsLoading=!1,this.channelsSnapshot=null,this.channelsError=null,this.channelsLastSuccess=null,this.whatsappLoginMessage=null,this.whatsappLoginQrDataUrl=null,this.whatsappLoginConnected=null,this.whatsappBusy=!1,this.nostrProfileFormState=null,this.nostrProfileAccountId=null,this.presenceLoading=!1,this.presenceEntries=[],this.presenceError=null,this.presenceStatus=null,this.agentsLoading=!1,this.agentsList=null,this.agentsError=null,this.sessionsLoading=!1,this.sessionsResult=null,this.sessionsError=null,this.sessionsFilterActive="",this.sessionsFilterLimit="120",this.sessionsIncludeGlobal=!0,this.sessionsIncludeUnknown=!1,this.archivedSessions=[],this.archivedSessionsLoading=!1,this.archivedSessionsExpanded=!1,this.cronLoading=!1,this.cronJobs=[],this.cronStatus=null,this.cronError=null,this.cronForm={...Qb},this.cronRunsJobId=null,this.cronRuns=[],this.cronBusy=!1,this.workspaceNeedsSetup=!1,this.onboardingPhase=0,this.onboardingData=null,this.onboardingActive=!1,this.wizardActive=!1,this.wizardState=null,this.showSetupTab=!1,this.setupCapabilities=null,this.setupCapabilitiesLoading=!1,this.setupQuickDone=!1,this.onboardingIntegrations=null,this.onboardingCoreProgress=null,this.onboardingExpandedCard=null,this.onboardingLoadingGuide=null,this.onboardingActiveGuide=null,this.onboardingTestingId=null,this.onboardingTestResult=null,this.onboardingConfigValues={},this.onboardingProgress=null,this.selectedWorkspace=null,this.workspacesSearchQuery="",this.workspaceItemSearchQuery="",this.workspacesLoading=!1,this.workspacesCreateLoading=!1,this.workspacesError=null,this.workspaceExpandedFolders=new Set,this.editingTaskId=null,this.workspaceBrowsePath=null,this.workspaceBrowseEntries=null,this.workspaceBreadcrumbs=null,this.workspaceBrowseSearchQuery="",this.workspaceBrowseSearchResults=null,this.myDayLoading=!1,this.myDayError=null,this.todaySelectedDate=ce(),this.todayViewMode="brief",this.dailyBriefLoading=!1,this.dailyBriefError=null,this.agentLogLoading=!1,this.agentLogError=null,this.briefNotes={},this.todayTasks=[],this.todayTasksLoading=!1,this.todayEditingTaskId=null,this.todayShowCompleted=!1,this.allyPanelOpen=!1,this.allyMessages=[],this.allyStream=null,this.allyDraft="",this.allyUnread=0,this.allySending=!1,this.allyWorking=!1,this.allyAttachments=[],this.todayQueueResults=[],this.inboxItems=[],this.inboxLoading=!1,this.inboxCount=0,this.inboxScoringId=null,this.inboxScoringValue=void 0,this.inboxFeedbackText=void 0,this.chatPrivateMode=!1,this.privateSessions=new Map,this._privateSessionTimer=null,this.dynamicSlots={},this.workLoading=!1,this.workError=null,this.workExpandedProjects=new Set,this.workProjectFiles={},this.workDetailLoading=new Set,this.workResourcesLoading=!1,this.workResourceFilter="all",this.sessionResources=[],this.sessionResourcesCollapsed=!1,this.skillsLoading=!1,this.skillsReport=null,this.skillsError=null,this.skillsFilter="",this.skillEdits={},this.skillsBusyKey=null,this.skillMessages={},this.skillsSubTab="godmode",this.godmodeSkills=null,this.godmodeSkillsLoading=!1,this.expandedSkills=new Set,this.rosterData=[],this.rosterLoading=!1,this.rosterError=null,this.rosterFilter="",this.expandedAgents=new Set,this.debugLoading=!1,this.debugStatus=null,this.debugHealth=null,this.debugModels=[],this.debugHeartbeat=null,this.debugCallMethod="",this.debugCallParams="{}",this.debugCallResult=null,this.debugCallError=null,this.logsLoading=!1,this.logsError=null,this.logsFile=null,this.logsEntries=[],this.logsFilterText="",this.logsLevelFilters={...Gb},this.logsAutoFollow=!0,this.logsTruncated=!1,this.logsCursor=null,this.logsLastFetchAt=null,this.logsLimit=500,this.logsMaxBytes=25e4,this.logsAtBottom=!0,this.toasts=[],this.client=null,this.chatScrollFrame=null,this.chatScrollTimeout=null,this.chatHasAutoScrolled=!1,this.chatUserNearBottom=!0,this.chatIsAutoScrolling=!1,this.chatNewMessagesBelow=!1,this.consciousnessStatus="idle",this.focusPulseData=null,this.trustTrackerData=null,this.trustTrackerLoading=!1,this.guardrailsData=null,this.guardrailsLoading=!1,this.guardrailsShowAddForm=!1,this.missionControlData=null,this.missionControlLoading=!1,this.missionControlError=null,this.missionControlFullControl=(()=>{try{return localStorage.getItem("godmode.mc.fullControl")==="1"}catch{return!0}})(),this.missionControlPollInterval=null,this.godmodeOptions=null,this.godmodeOptionsLoading=!1,this.dashboardsLoading=!1,this.dashboardsError=null,this.activeDashboardId=null,this.activeDashboardHtml=null,this.activeDashboardManifest=null,this.dashboardPreviousSessionKey=null,this.dashboardChatOpen=!1,this.dashboardCategoryFilter=null,this.secondBrainSubtab="identity",this.secondBrainLoading=!1,this.secondBrainError=null,this.secondBrainIdentity=null,this.secondBrainMemoryBank=null,this.secondBrainAiPacket=null,this.secondBrainSourcesData=null,this.secondBrainResearchData=null,this.secondBrainResearchAddFormOpen=!1,this.secondBrainResearchAddForm={title:"",url:"",category:"",tags:"",notes:""},this.secondBrainResearchCategories=[],this.secondBrainSelectedEntry=null,this.secondBrainSearchQuery="",this.secondBrainSyncing=!1,this.secondBrainBrowsingFolder=null,this.secondBrainFolderEntries=null,this.secondBrainFolderName=null,this.secondBrainFileTree=null,this.secondBrainFileTreeLoading=!1,this.secondBrainFileSearchQuery="",this.secondBrainFileSearchResults=null,this.nodesPollInterval=null,this.logsPollInterval=null,this.debugPollInterval=null,this.logsScrollFrame=null,this.toolStreamById=new Map,this.toolStreamOrder=[],this.refreshSessionsAfterChat=!1,this.basePath="",this.popStateHandler=()=>Lu(this),this.keydownHandler=()=>{},this.themeMedia=null,this.themeMediaHandler=null,this.topbarObserver=null}createRenderRoot(){return this}connectedCallback(){if(super.connectedCallback(),this.settings.userName)this.userName=this.settings.userName;else{const t=As();this.userName=t.name}if(this.settings.userAvatar)this.userAvatar=this.settings.userAvatar;else{const t=As();this.userAvatar=t.avatar}cw(this);const e=ce();this.todaySelectedDate!==e&&(this.todaySelectedDate=e),sA(this),this._restorePrivateSessions()}firstUpdated(){dw(this)}disconnectedCallback(){Cp(),this._stopPrivateSessionTimer(),uw(this),super.disconnectedCallback()}updated(e){hw(this,e)}connect(){$o(this)}handleChatScroll(e){Mh(this,e)}handleLogsScroll(e){Oh(this,e)}exportLogs(e,t){Fh(e,t)}resetToolStream(){Gi(this),this.sessionResources=[]}resetChatScroll(){Bc(this)}async loadAssistantIdentity(){await Ad(this)}applySettings(e){Ze(this,e)}setTab(e){Mo(this,e)}setTheme(e,t){Tu(this,e,t)}async loadOverview(){await No(this)}async loadCron(){await ha(this)}async handleAbortChat(){await Bo(this)}async handleConsciousnessFlush(){if(!(!this.client||this.consciousnessStatus==="loading")){this.consciousnessStatus="loading";try{await this.client.request("godmode.consciousness.flush",{}),this.consciousnessStatus="ok"}catch{this.consciousnessStatus="error"}setTimeout(()=>{this.consciousnessStatus!=="loading"&&(this.consciousnessStatus="idle")},3e3)}}async loadFocusPulse(){await H2()}async handleFocusPulseStartMorning(){await G2(),this.setTab("chat");const e="Let's do my morning set. Check my daily note for today's Win The Day items, review my calendar, and then walk me through a proposed plan for the day. Ask me clarifying questions before finalizing anything. Suggest which tasks you can handle vs what I should do myself. Do NOT call the morning_set tool or kick off any agents until I explicitly approve the plan.",{createNewSession:t}=await R(async()=>{const{createNewSession:n}=await Promise.resolve().then(()=>ot);return{createNewSession:n}},void 0,import.meta.url);t(this),this.handleSendChat(e)}async handleFocusPulseSetFocus(e){await Q2()}async handleFocusPulseComplete(){await Y2()}async handleFocusPulsePulseCheck(){await J2()}async handleFocusPulseEndDay(){await X2()}async handleTrustLoad(){await Vo(this)}async handleTrustAddWorkflow(e){await Z2(this,e)}async handleTrustRemoveWorkflow(e){await eA(this,e)}async handleDailyRate(e,t){await tA(this,e,t)}async handleGuardrailsLoad(){const{loadGuardrails:e}=await R(async()=>{const{loadGuardrails:t}=await Promise.resolve().then(()=>Xt);return{loadGuardrails:t}},void 0,import.meta.url);await e(this)}async handleGuardrailToggle(e,t){const{toggleGuardrail:n}=await R(async()=>{const{toggleGuardrail:s}=await Promise.resolve().then(()=>Xt);return{toggleGuardrail:s}},void 0,import.meta.url);await n(this,e,t)}async handleGuardrailThresholdChange(e,t,n){const{updateGuardrailThreshold:s}=await R(async()=>{const{updateGuardrailThreshold:a}=await Promise.resolve().then(()=>Xt);return{updateGuardrailThreshold:a}},void 0,import.meta.url);await s(this,e,t,n)}async handleCustomGuardrailToggle(e,t){const{toggleCustomGuardrail:n}=await R(async()=>{const{toggleCustomGuardrail:s}=await Promise.resolve().then(()=>Xt);return{toggleCustomGuardrail:s}},void 0,import.meta.url);await n(this,e,t)}async handleCustomGuardrailDelete(e){const{deleteCustomGuardrail:t}=await R(async()=>{const{deleteCustomGuardrail:n}=await Promise.resolve().then(()=>Xt);return{deleteCustomGuardrail:n}},void 0,import.meta.url);await t(this,e)}async handleCustomGuardrailAdd(e){const{addCustomGuardrailFromUI:t}=await R(async()=>{const{addCustomGuardrailFromUI:n}=await Promise.resolve().then(()=>Xt);return{addCustomGuardrailFromUI:n}},void 0,import.meta.url);await t(this,e),this.guardrailsShowAddForm=!1}handleToggleGuardrailAddForm(){this.guardrailsShowAddForm=!this.guardrailsShowAddForm}handleMissionControlToggleFullControl(){this.missionControlFullControl=!this.missionControlFullControl;try{localStorage.setItem("godmode.mc.fullControl",this.missionControlFullControl?"1":"0")}catch{}}async handleMissionControlRefresh(){const{loadMissionControl:e}=await R(async()=>{const{loadMissionControl:t}=await Promise.resolve().then(()=>it);return{loadMissionControl:t}},void 0,import.meta.url);await e(this)}async handleMissionControlCancelTask(e){const{cancelCodingTask:t}=await R(async()=>{const{cancelCodingTask:n}=await Promise.resolve().then(()=>it);return{cancelCodingTask:n}},void 0,import.meta.url);await t(this,e)}async handleMissionControlApproveItem(e){const{approveCodingTask:t,approveQueueItem:n}=await R(async()=>{const{approveCodingTask:a,approveQueueItem:i}=await Promise.resolve().then(()=>it);return{approveCodingTask:a,approveQueueItem:i}},void 0,import.meta.url);await t(this,e)||await n(this,e)}async handleMissionControlRetryItem(e){const{retryQueueItem:t}=await R(async()=>{const{retryQueueItem:n}=await Promise.resolve().then(()=>it);return{retryQueueItem:n}},void 0,import.meta.url);await t(this,e)}async handleMissionControlViewDetail(e){const{loadAgentDetail:t}=await R(async()=>{const{loadAgentDetail:s}=await Promise.resolve().then(()=>it);return{loadAgentDetail:s}},void 0,import.meta.url),n=await t(this,e);this.handleOpenSidebar(n.content,{mimeType:n.mimeType,title:n.title})}async handleMissionControlOpenSession(e){const t=this.settings.openTabs.includes(e)?this.settings.openTabs:[...this.settings.openTabs,e];this.applySettings({...this.settings,openTabs:t,sessionKey:e,lastActiveSessionKey:e,tabLastViewed:{...this.settings.tabLastViewed,[e]:Date.now()}}),this.sessionKey=e,this.setTab("chat"),this.chatMessages=[],this.chatStream=null,this.chatStreamStartedAt=null,this.chatRunId=null,this.resetToolStream(),this.resetChatScroll(),this.loadAssistantIdentity();const{loadChatHistory:n}=await R(async()=>{const{loadChatHistory:s}=await Promise.resolve().then(()=>Ye);return{loadChatHistory:s}},void 0,import.meta.url);await n(this),this.loadSessionResources()}async handleMissionControlOpenTaskSession(e){if(!(!this.client||!this.connected))try{const t=await this.client.request("tasks.openSession",{taskId:e});if(t?.sessionId){if(t.task?.title){const{autoTitleCache:n}=await R(async()=>{const{autoTitleCache:s}=await Promise.resolve().then(()=>Pn);return{autoTitleCache:s}},void 0,import.meta.url);n.set(t.sessionId,t.task.title)}await this.handleMissionControlOpenSession(t.sessionId),t.queueOutput&&this.chatMessages.length===0&&await this.seedSessionWithAgentOutput(t.task?.title??"task",t.queueOutput,t.agentPrompt??void 0)}}catch(t){console.error("[MissionControl] Failed to open task session:",t),this.showToast("Failed to open session","error")}}async handleMissionControlStartQueueItem(e){await this.handleMissionControlOpenTaskSession(e)}async handleSwarmSelectProject(e){const{selectSwarmProject:t}=await R(async()=>{const{selectSwarmProject:n}=await Promise.resolve().then(()=>it);return{selectSwarmProject:n}},void 0,import.meta.url);await t(this,e)}async handleSwarmSteer(e,t,n){const{steerSwarmAgent:s}=await R(async()=>{const{steerSwarmAgent:a}=await Promise.resolve().then(()=>it);return{steerSwarmAgent:a}},void 0,import.meta.url);await s(this,e,t,n)}async handleSwarmViewProofDoc(e){return this.handleOpenProofDoc(e)}async handleSwarmViewRunLog(e){if(!(!this.client||!this.connected))try{const t=await this.client.request("godmode.delegation.runLog",{queueItemId:e});t?.content?this.handleOpenSidebar(t.content,{mimeType:t.mimeType??"text/markdown",title:t.title??"Agent Logs"}):this.showToast("No logs available","error")}catch{this.showToast("Failed to load agent logs","error")}}async handleMissionControlViewTaskFiles(e){try{const n=(await this.client?.request("queue.taskFiles",{itemId:e}))?.files??[];if(n.length===0){this.showToast("No files found for this task","info");return}const a=`## Task Files
+`,this.configRawOriginal="",this.configValid=null,this.configIssues=[],this.configSaving=!1,this.configApplying=!1,this.updateRunning=!1,this.applySessionKey=this.settings.lastActiveSessionKey,this.configSnapshot=null,this.configSchema=null,this.configSchemaVersion=null,this.configSchemaLoading=!1,this.configUiHints={},this.configForm=null,this.configFormOriginal=null,this.configFormDirty=!1,this.configFormMode="form",this.configSearchQuery="",this.configActiveSection=null,this.configActiveSubsection=null,this.channelsLoading=!1,this.channelsSnapshot=null,this.channelsError=null,this.channelsLastSuccess=null,this.whatsappLoginMessage=null,this.whatsappLoginQrDataUrl=null,this.whatsappLoginConnected=null,this.whatsappBusy=!1,this.nostrProfileFormState=null,this.nostrProfileAccountId=null,this.presenceLoading=!1,this.presenceEntries=[],this.presenceError=null,this.presenceStatus=null,this.agentsLoading=!1,this.agentsList=null,this.agentsError=null,this.sessionsLoading=!1,this.sessionsResult=null,this.sessionsError=null,this.sessionsFilterActive="",this.sessionsFilterLimit="120",this.sessionsIncludeGlobal=!0,this.sessionsIncludeUnknown=!1,this.archivedSessions=[],this.archivedSessionsLoading=!1,this.archivedSessionsExpanded=!1,this.cronLoading=!1,this.cronJobs=[],this.cronStatus=null,this.cronError=null,this.cronForm={...Qb},this.cronRunsJobId=null,this.cronRuns=[],this.cronBusy=!1,this.workspaceNeedsSetup=!1,this.onboardingPhase=0,this.onboardingData=null,this.onboardingActive=!1,this.wizardActive=!1,this.wizardState=null,this.showSetupTab=!1,this.setupCapabilities=null,this.setupCapabilitiesLoading=!1,this.setupQuickDone=!1,this.onboardingIntegrations=null,this.onboardingCoreProgress=null,this.onboardingExpandedCard=null,this.onboardingLoadingGuide=null,this.onboardingActiveGuide=null,this.onboardingTestingId=null,this.onboardingTestResult=null,this.onboardingConfigValues={},this.onboardingProgress=null,this.selectedWorkspace=null,this.workspacesSearchQuery="",this.workspaceItemSearchQuery="",this.workspacesLoading=!1,this.workspacesCreateLoading=!1,this.workspacesError=null,this.workspaceExpandedFolders=new Set,this.editingTaskId=null,this.workspaceBrowsePath=null,this.workspaceBrowseEntries=null,this.workspaceBreadcrumbs=null,this.workspaceBrowseSearchQuery="",this.workspaceBrowseSearchResults=null,this.myDayLoading=!1,this.myDayError=null,this.todaySelectedDate=ce(),this.todayViewMode="brief",this.dailyBriefLoading=!1,this.dailyBriefError=null,this.agentLogLoading=!1,this.agentLogError=null,this.briefNotes={},this.todayTasks=[],this.todayTasksLoading=!1,this.todayEditingTaskId=null,this.todayShowCompleted=!1,this.allyPanelOpen=!1,this.allyMessages=[],this.allyStream=null,this.allyDraft="",this.allyUnread=0,this.allySending=!1,this.allyWorking=!1,this.allyAttachments=[],this.todayQueueResults=[],this.inboxItems=[],this.inboxLoading=!1,this.inboxCount=0,this.inboxScoringId=null,this.inboxScoringValue=void 0,this.inboxFeedbackText=void 0,this.chatPrivateMode=!1,this.privateSessions=new Map,this._privateSessionTimer=null,this.dynamicSlots={},this.workLoading=!1,this.workError=null,this.workExpandedProjects=new Set,this.workProjectFiles={},this.workDetailLoading=new Set,this.workResourcesLoading=!1,this.workResourceFilter="all",this.sessionResources=[],this.sessionResourcesCollapsed=!1,this.skillsLoading=!1,this.skillsReport=null,this.skillsError=null,this.skillsFilter="",this.skillEdits={},this.skillsBusyKey=null,this.skillMessages={},this.skillsSubTab="godmode",this.godmodeSkills=null,this.godmodeSkillsLoading=!1,this.expandedSkills=new Set,this.rosterData=[],this.rosterLoading=!1,this.rosterError=null,this.rosterFilter="",this.expandedAgents=new Set,this.debugLoading=!1,this.debugStatus=null,this.debugHealth=null,this.debugModels=[],this.debugHeartbeat=null,this.debugCallMethod="",this.debugCallParams="{}",this.debugCallResult=null,this.debugCallError=null,this.logsLoading=!1,this.logsError=null,this.logsFile=null,this.logsEntries=[],this.logsFilterText="",this.logsLevelFilters={...Gb},this.logsAutoFollow=!0,this.logsTruncated=!1,this.logsCursor=null,this.logsLastFetchAt=null,this.logsLimit=500,this.logsMaxBytes=25e4,this.logsAtBottom=!0,this.toasts=[],this.client=null,this.chatScrollFrame=null,this.chatScrollTimeout=null,this.chatHasAutoScrolled=!1,this.chatUserNearBottom=!0,this.chatIsAutoScrolling=!1,this.chatNewMessagesBelow=!1,this.consciousnessStatus="idle",this.focusPulseData=null,this.trustTrackerData=null,this.trustTrackerLoading=!1,this.guardrailsData=null,this.guardrailsLoading=!1,this.guardrailsShowAddForm=!1,this.missionControlData=null,this.missionControlLoading=!1,this.missionControlError=null,this.missionControlFullControl=(()=>{try{return localStorage.getItem("godmode.mc.fullControl")==="1"}catch{return!0}})(),this.missionControlPollInterval=null,this.godmodeOptions=null,this.godmodeOptionsLoading=!1,this.dashboardsLoading=!1,this.dashboardsError=null,this.activeDashboardId=null,this.activeDashboardHtml=null,this.activeDashboardManifest=null,this.dashboardPreviousSessionKey=null,this.dashboardChatOpen=!1,this.dashboardCategoryFilter=null,this.secondBrainSubtab="identity",this.secondBrainLoading=!1,this.secondBrainError=null,this.secondBrainIdentity=null,this.secondBrainMemoryBank=null,this.secondBrainAiPacket=null,this.secondBrainSourcesData=null,this.secondBrainResearchData=null,this.secondBrainResearchAddFormOpen=!1,this.secondBrainResearchAddForm={title:"",url:"",category:"",tags:"",notes:""},this.secondBrainResearchCategories=[],this.secondBrainSelectedEntry=null,this.secondBrainSearchQuery="",this.secondBrainSyncing=!1,this.secondBrainBrowsingFolder=null,this.secondBrainFolderEntries=null,this.secondBrainFolderName=null,this.secondBrainFileTree=null,this.secondBrainFileTreeLoading=!1,this.secondBrainFileSearchQuery="",this.secondBrainFileSearchResults=null,this.nodesPollInterval=null,this.logsPollInterval=null,this.debugPollInterval=null,this.logsScrollFrame=null,this.toolStreamById=new Map,this.toolStreamOrder=[],this.refreshSessionsAfterChat=!1,this.basePath="",this.popStateHandler=()=>Lu(this),this.keydownHandler=()=>{},this.themeMedia=null,this.themeMediaHandler=null,this.topbarObserver=null}createRenderRoot(){return this}connectedCallback(){if(super.connectedCallback(),this.settings.userName)this.userName=this.settings.userName;else{const t=As();this.userName=t.name}if(this.settings.userAvatar)this.userAvatar=this.settings.userAvatar;else{const t=As();this.userAvatar=t.avatar}cw(this);const e=ce();this.todaySelectedDate!==e&&(this.todaySelectedDate=e),iA(this),this._restorePrivateSessions()}firstUpdated(){dw(this)}disconnectedCallback(){Cp(),this._stopPrivateSessionTimer(),uw(this),super.disconnectedCallback()}updated(e){hw(this,e)}connect(){$o(this)}handleChatScroll(e){Mh(this,e)}handleLogsScroll(e){Oh(this,e)}exportLogs(e,t){Fh(e,t)}resetToolStream(){Gi(this),this.sessionResources=[]}resetChatScroll(){Bc(this)}async loadAssistantIdentity(){await Ad(this)}applySettings(e){Ze(this,e)}setTab(e){Mo(this,e)}setTheme(e,t){Tu(this,e,t)}async loadOverview(){await No(this)}async loadCron(){await ha(this)}async handleAbortChat(){await Bo(this)}async handleConsciousnessFlush(){if(!(!this.client||this.consciousnessStatus==="loading")){this.consciousnessStatus="loading";try{await this.client.request("godmode.consciousness.flush",{}),this.consciousnessStatus="ok"}catch{this.consciousnessStatus="error"}setTimeout(()=>{this.consciousnessStatus!=="loading"&&(this.consciousnessStatus="idle")},3e3)}}async loadFocusPulse(){await Q2()}async handleFocusPulseStartMorning(){await Y2(),this.setTab("chat");const e="Let's do my morning set. Check my daily note for today's Win The Day items, review my calendar, and then walk me through a proposed plan for the day. Ask me clarifying questions before finalizing anything. Suggest which tasks you can handle vs what I should do myself. Do NOT call the morning_set tool or kick off any agents until I explicitly approve the plan.",{createNewSession:t}=await R(async()=>{const{createNewSession:n}=await Promise.resolve().then(()=>ot);return{createNewSession:n}},void 0,import.meta.url);t(this),this.handleSendChat(e)}async handleFocusPulseSetFocus(e){await J2()}async handleFocusPulseComplete(){await X2()}async handleFocusPulsePulseCheck(){await Z2()}async handleFocusPulseEndDay(){await eA()}async handleTrustLoad(){await Vo(this)}async handleTrustAddWorkflow(e){await tA(this,e)}async handleTrustRemoveWorkflow(e){await nA(this,e)}async handleDailyRate(e,t){await sA(this,e,t)}async handleGuardrailsLoad(){const{loadGuardrails:e}=await R(async()=>{const{loadGuardrails:t}=await Promise.resolve().then(()=>Xt);return{loadGuardrails:t}},void 0,import.meta.url);await e(this)}async handleGuardrailToggle(e,t){const{toggleGuardrail:n}=await R(async()=>{const{toggleGuardrail:s}=await Promise.resolve().then(()=>Xt);return{toggleGuardrail:s}},void 0,import.meta.url);await n(this,e,t)}async handleGuardrailThresholdChange(e,t,n){const{updateGuardrailThreshold:s}=await R(async()=>{const{updateGuardrailThreshold:a}=await Promise.resolve().then(()=>Xt);return{updateGuardrailThreshold:a}},void 0,import.meta.url);await s(this,e,t,n)}async handleCustomGuardrailToggle(e,t){const{toggleCustomGuardrail:n}=await R(async()=>{const{toggleCustomGuardrail:s}=await Promise.resolve().then(()=>Xt);return{toggleCustomGuardrail:s}},void 0,import.meta.url);await n(this,e,t)}async handleCustomGuardrailDelete(e){const{deleteCustomGuardrail:t}=await R(async()=>{const{deleteCustomGuardrail:n}=await Promise.resolve().then(()=>Xt);return{deleteCustomGuardrail:n}},void 0,import.meta.url);await t(this,e)}async handleCustomGuardrailAdd(e){const{addCustomGuardrailFromUI:t}=await R(async()=>{const{addCustomGuardrailFromUI:n}=await Promise.resolve().then(()=>Xt);return{addCustomGuardrailFromUI:n}},void 0,import.meta.url);await t(this,e),this.guardrailsShowAddForm=!1}handleToggleGuardrailAddForm(){this.guardrailsShowAddForm=!this.guardrailsShowAddForm}handleMissionControlToggleFullControl(){this.missionControlFullControl=!this.missionControlFullControl;try{localStorage.setItem("godmode.mc.fullControl",this.missionControlFullControl?"1":"0")}catch{}}async handleMissionControlRefresh(){const{loadMissionControl:e}=await R(async()=>{const{loadMissionControl:t}=await Promise.resolve().then(()=>it);return{loadMissionControl:t}},void 0,import.meta.url);await e(this)}async handleMissionControlCancelTask(e){const{cancelCodingTask:t}=await R(async()=>{const{cancelCodingTask:n}=await Promise.resolve().then(()=>it);return{cancelCodingTask:n}},void 0,import.meta.url);await t(this,e)}async handleMissionControlApproveItem(e){const{approveCodingTask:t,approveQueueItem:n}=await R(async()=>{const{approveCodingTask:a,approveQueueItem:i}=await Promise.resolve().then(()=>it);return{approveCodingTask:a,approveQueueItem:i}},void 0,import.meta.url);await t(this,e)||await n(this,e)}async handleMissionControlRetryItem(e){const{retryQueueItem:t}=await R(async()=>{const{retryQueueItem:n}=await Promise.resolve().then(()=>it);return{retryQueueItem:n}},void 0,import.meta.url);await t(this,e)}async handleMissionControlViewDetail(e){const{loadAgentDetail:t}=await R(async()=>{const{loadAgentDetail:s}=await Promise.resolve().then(()=>it);return{loadAgentDetail:s}},void 0,import.meta.url),n=await t(this,e);this.handleOpenSidebar(n.content,{mimeType:n.mimeType,title:n.title})}async handleMissionControlOpenSession(e){const t=this.settings.openTabs.includes(e)?this.settings.openTabs:[...this.settings.openTabs,e];this.applySettings({...this.settings,openTabs:t,sessionKey:e,lastActiveSessionKey:e,tabLastViewed:{...this.settings.tabLastViewed,[e]:Date.now()}}),this.sessionKey=e,this.setTab("chat"),this.chatMessages=[],this.chatStream=null,this.chatStreamStartedAt=null,this.chatRunId=null,this.resetToolStream(),this.resetChatScroll(),this.loadAssistantIdentity();const{loadChatHistory:n}=await R(async()=>{const{loadChatHistory:s}=await Promise.resolve().then(()=>Ye);return{loadChatHistory:s}},void 0,import.meta.url);await n(this),this.loadSessionResources()}async handleMissionControlOpenTaskSession(e){if(!(!this.client||!this.connected))try{const t=await this.client.request("tasks.openSession",{taskId:e});if(t?.sessionId){if(t.task?.title){const{autoTitleCache:n}=await R(async()=>{const{autoTitleCache:s}=await Promise.resolve().then(()=>Pn);return{autoTitleCache:s}},void 0,import.meta.url);n.set(t.sessionId,t.task.title)}await this.handleMissionControlOpenSession(t.sessionId),t.queueOutput&&this.chatMessages.length===0&&await this.seedSessionWithAgentOutput(t.task?.title??"task",t.queueOutput,t.agentPrompt??void 0)}}catch(t){console.error("[MissionControl] Failed to open task session:",t),this.showToast("Failed to open session","error")}}async handleMissionControlStartQueueItem(e){await this.handleMissionControlOpenTaskSession(e)}async handleSwarmSelectProject(e){const{selectSwarmProject:t}=await R(async()=>{const{selectSwarmProject:n}=await Promise.resolve().then(()=>it);return{selectSwarmProject:n}},void 0,import.meta.url);await t(this,e)}async handleSwarmSteer(e,t,n){const{steerSwarmAgent:s}=await R(async()=>{const{steerSwarmAgent:a}=await Promise.resolve().then(()=>it);return{steerSwarmAgent:a}},void 0,import.meta.url);await s(this,e,t,n)}async handleSwarmViewProofDoc(e){return this.handleOpenProofDoc(e)}async handleSwarmViewRunLog(e){if(!(!this.client||!this.connected))try{const t=await this.client.request("godmode.delegation.runLog",{queueItemId:e});t?.content?this.handleOpenSidebar(t.content,{mimeType:t.mimeType??"text/markdown",title:t.title??"Agent Logs"}):this.showToast("No logs available","error")}catch{this.showToast("Failed to load agent logs","error")}}async handleMissionControlViewTaskFiles(e){try{const n=(await this.client?.request("queue.taskFiles",{itemId:e}))?.files??[];if(n.length===0){this.showToast("No files found for this task","info");return}const a=`## Task Files
 
 ${n.map(i=>`- **${i.name}** (${i.type}, ${(i.size/1024).toFixed(1)} KB)
   \`${i.path}\``).join(`
 
 `)}`;this.handleOpenSidebar(a,{title:"Task Files"})}catch(t){console.error("Failed to load task files:",t),this.showToast("Failed to load task files","error")}}async handleAllyAction(e,t,n,s){if(e==="navigate"&&t)this.setTab(t);else if(e==="rpc"&&n&&this.client)try{await this.client.request(n,s??{}),this.showToast("Done","success",2e3)}catch(a){console.error("[Ally] Action RPC failed:",a),this.showToast("Action failed","error")}}handleAllyToggle(){this.allyPanelOpen=!this.allyPanelOpen,this.allyPanelOpen&&(this.allyUnread=0,this._loadAllyHistory().then(()=>{this._scrollAllyToBottom(),requestAnimationFrame(()=>this._scrollAllyToBottom())}))}handleAllyDraftChange(e){this.allyDraft=e}handleAllyAttachmentsChange(e){this.allyAttachments=e}async handleAllySend(){const e=this.allyDraft.trim(),t=this.allyAttachments;if(!e&&t.length===0||this.allySending)return;const n=qh(this);let s=e?`${n}
 
-${e}`:n;this.allyDraft="",this.allyAttachments=[],this.allySending=!0,this.allyMessages=[...this.allyMessages,{role:"user",content:e||"(image)",timestamp:Date.now()}];try{let a;if(t.length>0){const d=[];for(const u of t){if(!u.dataUrl)continue;const h=u.dataUrl.match(/^data:([^;]+);base64,(.+)$/);if(!h)continue;const[,f,m]=h;f.startsWith("image/")&&d.push({type:"image",mimeType:f,content:m,fileName:u.fileName})}if(d.length>0){a=d;try{await this.client?.request("images.cache",{images:d.map(u=>({data:u.content,mimeType:u.mimeType,fileName:u.fileName})),sessionKey:Q})}catch{}}}const i=`ally-${Date.now()}-${Math.random().toString(36).slice(2,8)}`;try{await this.client?.request("sessions.patch",{key:Q,lastChannel:"webchat"})}catch{}await this.client?.request("agent",{sessionKey:Q,message:s,deliver:!1,channel:"webchat",idempotencyKey:i,attachments:a}),this.allyWorking=!0;const o=this.allyMessages[this.allyMessages.length-1]?.content,l=setInterval(async()=>{if(!this.allyWorking){clearInterval(l);return}try{await this._loadAllyHistory();const d=this.allyMessages[this.allyMessages.length-1];d&&d.role==="assistant"&&d.content!==o&&(this.allyWorking=!1,this.allyStream=null,clearInterval(l),this._scrollAllyToBottom())}catch{}},5e3);setTimeout(()=>clearInterval(l),12e4)}catch(a){const i=a instanceof Error?a.message:String(a);console.error("[Ally] Failed to send ally message:",i),this.allyMessages=[...this.allyMessages,{role:"assistant",content:`*Send failed: ${i}*`,timestamp:Date.now()}]}finally{this.allySending=!1}}handleAllyOpenFull(){this.allyPanelOpen=!1,this.setTab("chat"),this.applySettings({...this.settings,sessionKey:Q,lastActiveSessionKey:Q,tabLastViewed:{...this.settings.tabLastViewed,[Q]:Date.now()}}),this.sessionKey=Q,this.chatMessages=[],this.chatStream=null,this.chatStreamStartedAt=null,this.chatRunId=null,this.resetToolStream(),this.resetChatScroll(),this.loadAssistantIdentity(),R(async()=>{const{loadChatHistory:e}=await Promise.resolve().then(()=>Ye);return{loadChatHistory:e}},void 0,import.meta.url).then(({loadChatHistory:e})=>e(this)),this.loadSessionResources()}_scrollAllyToBottom(){this.updateComplete.then(()=>{requestAnimationFrame(()=>{const e=this.renderRoot?.querySelector?.(".ally-panel, .ally-inline")??document.querySelector(".ally-panel, .ally-inline");if(!e)return;const t=e.querySelector(".ally-panel__messages");t&&(t.scrollTop=t.scrollHeight)})})}async _loadAllyHistory(){try{const e=await this.client?.request("chat.history",{sessionKey:Q,limit:100});if(e?.messages){const{extractText:t,formatApiError:n}=await R(async()=>{const{extractText:a,formatApiError:i}=await Promise.resolve().then(()=>Jg);return{extractText:a,formatApiError:i}},void 0,import.meta.url);this.allyMessages=e.messages.map(a=>{const i=a.role??"assistant",o=i.toLowerCase();if(o==="tool"||o==="toolresult"||o==="tool_result"||o==="function"||o==="system")return null;const l=a;if(l.toolCallId||l.tool_call_id||l.toolName||l.tool_name)return null;if(Array.isArray(a.content)){const f=a.content;if(!f.some(w=>{const $=(typeof w.type=="string"?w.type:"").toLowerCase();return($==="text"||$==="")&&typeof w.text=="string"&&w.text.trim().length>0})&&f.some($=>{const c=(typeof $.type=="string"?$.type:"").toLowerCase();return c==="tool_use"||c==="tool_result"||c==="toolresult"||c==="tooluse"}))return null}let d=t(a);if(!d)return null;const u=n(d);if(u&&(d=u),d=d.replace(/^\[GodMode Context:[^\]]*\]\s*/i,"").trim(),!d)return null;const h=uA(d,i);return h?{role:o==="user"?"user":"assistant",content:h,timestamp:a.timestamp}:null}).filter(a=>a!==null);const s=[];for(const a of this.allyMessages){const i=s[s.length-1];i&&i.role===a.role&&i.content===a.content||s.push(a)}this.allyMessages=s}}catch{}}async handleDecisionApprove(e){if(!(!this.client||!this.connected))try{await this.client.request("queue.approve",{id:e}),this.todayQueueResults=this.todayQueueResults.filter(t=>t.id!==e)}catch(t){console.error("[DecisionCard] Approve failed:",t),this.showToast("Failed to approve","error")}}async handleDecisionReject(e){if(!(!this.client||!this.connected))try{await this.client.request("queue.reject",{id:e}),this.todayQueueResults=this.todayQueueResults.filter(t=>t.id!==e)}catch(t){console.error("[DecisionCard] Reject failed:",t),this.showToast("Failed to reject","error")}}async handleDecisionDismiss(e){if(!(!this.client||!this.connected))try{await this.client.request("queue.remove",{id:e}),this.todayQueueResults=this.todayQueueResults.filter(t=>t.id!==e)}catch(t){console.error("[DecisionCard] Dismiss failed:",t),this.showToast("Failed to dismiss","error")}}async handleDecisionMarkComplete(e){if(!(!this.client||!this.connected))try{const t=this.todayQueueResults?.find(n=>n.id===e);t?.sourceTaskId&&await this.client.request("tasks.update",{id:t.sourceTaskId,status:"complete"}),await this.client.request("queue.remove",{id:e}),this.todayQueueResults=this.todayQueueResults.filter(n=>n.id!==e),this.showToast("Task marked complete","success")}catch(t){console.error("[DecisionCard] Mark complete failed:",t),this.showToast("Failed to mark complete","error")}}async handleDecisionRate(e,t,n){if(!(!this.client||!this.connected))try{await this.client.request("trust.rate",{workflow:t,rating:n});const s=n<7;this.todayQueueResults=this.todayQueueResults.map(a=>a.id===e?{...a,userRating:n,feedbackPending:s}:a),s?this.showToast(`Rated ${t} ${n}/10 — what could be better?`,"info"):(this.todayQueueResults?.find(i=>i.id===e)?.source==="cron"&&(await this.client.request("queue.remove",{id:e}),this.todayQueueResults=this.todayQueueResults.filter(i=>i.id!==e)),this.showToast(`Rated ${t} ${n}/10`,"success"))}catch(s){console.error("[DecisionCard] Rate failed:",s),this.showToast("Failed to submit rating","error")}}async handleDecisionFeedback(e,t,n){if(!(!this.client||!this.connected))try{n&&(await this.client.request("trust.feedback",{workflow:t,feedback:n}),this.showToast(`Feedback saved for ${t} — will apply next time`,"success")),this.todayQueueResults?.find(a=>a.id===e)?.source==="cron"&&await this.client.request("queue.remove",{id:e}),this.todayQueueResults=this.todayQueueResults.map(a=>a.id===e?{...a,feedbackPending:!1}:a).filter(a=>!(a.id===e&&a.source==="cron"))}catch(s){console.error("[DecisionCard] Feedback failed:",s),this.showToast("Failed to save feedback","error")}}async handleDecisionViewOutput(e,t){if(!this.client||!this.connected){this.showToast("Not connected to gateway","error");return}try{const n=await this.client.request("queue.readOutput",{path:t}),s=t.split("/").pop()??"Agent Output";this.handleOpenSidebar(n.content,{mimeType:"text/markdown",filePath:t,title:s})}catch(n){console.error("[DecisionCard] View output failed:",n),this.handleOpenFile(t)}}async handleDecisionOpenChat(e){const t=this.todayQueueResults?.find(a=>a.id===e);if(!t)return;if(t.sourceTaskId){await this.handleMissionControlOpenTaskSession(t.sourceTaskId);return}const{createNewSession:n}=await R(async()=>{const{createNewSession:a}=await Promise.resolve().then(()=>ot);return{createNewSession:a}},void 0,import.meta.url);n(this),this.setTab("chat");const{autoTitleCache:s}=await R(async()=>{const{autoTitleCache:a}=await Promise.resolve().then(()=>Pn);return{autoTitleCache:a}},void 0,import.meta.url);if(s.set(this.sessionKey,t.title),t.outputPath&&this.client&&this.connected)try{const a=await this.client.request("queue.readOutput",{path:t.outputPath});a?.content&&await this.seedSessionWithAgentOutput(t.title,a.content)}catch{await this.seedSessionWithAgentOutput(t.title,t.summary)}else t.summary&&await this.seedSessionWithAgentOutput(t.title,t.summary)}async handleTodayOpenChatToEdit(e){try{const t=this.todayQueueResults?.find(s=>s.id===e),n=t?.outputPath;if(n&&this.client&&this.connected)try{const s=await this.client.request("queue.readOutput",{path:n});this.handleOpenSidebar(s.content,{mimeType:"text/markdown",filePath:n,title:t?.title??n.split("/").pop()??"Agent Output"})}catch{await this.handleOpenFile(n)}this.allyPanelOpen=!0,this.allyUnread=0,this.tab!=="chat"&&this.setTab("chat")}catch(t){console.error("Open chat to edit failed:",t)}}async seedSessionWithAgentOutput(e,t,n){if(!this.client||!this.connected)return;this.handleOpenSidebar(t,{title:`Agent Output: ${e}`,filePath:null,mimeType:null});const s=t.match(/## Summary\n([\s\S]*?)(?=\n## |$)/),a=s?s[1].trim().split(`
+${e}`:n;this.allyDraft="",this.allyAttachments=[],this.allySending=!0,this.allyMessages=[...this.allyMessages,{role:"user",content:e||"(image)",timestamp:Date.now()}];try{let a;if(t.length>0){const d=[];for(const u of t){if(!u.dataUrl)continue;const h=u.dataUrl.match(/^data:([^;]+);base64,(.+)$/);if(!h)continue;const[,f,m]=h;f.startsWith("image/")&&d.push({type:"image",mimeType:f,content:m,fileName:u.fileName})}if(d.length>0){a=d;try{await this.client?.request("images.cache",{images:d.map(u=>({data:u.content,mimeType:u.mimeType,fileName:u.fileName})),sessionKey:Q})}catch{}}}const i=`ally-${Date.now()}-${Math.random().toString(36).slice(2,8)}`;try{await this.client?.request("sessions.patch",{key:Q,lastChannel:"webchat"})}catch{}await this.client?.request("agent",{sessionKey:Q,message:s,deliver:!1,channel:"webchat",idempotencyKey:i,attachments:a}),this.allyWorking=!0;const o=this.allyMessages[this.allyMessages.length-1]?.content,l=setInterval(async()=>{if(!this.allyWorking){clearInterval(l);return}try{await this._loadAllyHistory();const d=this.allyMessages[this.allyMessages.length-1];d&&d.role==="assistant"&&d.content!==o&&(this.allyWorking=!1,this.allyStream=null,clearInterval(l),this._scrollAllyToBottom())}catch{}},5e3);setTimeout(()=>clearInterval(l),12e4)}catch(a){const i=a instanceof Error?a.message:String(a);console.error("[Ally] Failed to send ally message:",i),this.allyMessages=[...this.allyMessages,{role:"assistant",content:`*Send failed: ${i}*`,timestamp:Date.now()}]}finally{this.allySending=!1}}handleAllyOpenFull(){this.allyPanelOpen=!1,this.setTab("chat"),this.applySettings({...this.settings,sessionKey:Q,lastActiveSessionKey:Q,tabLastViewed:{...this.settings.tabLastViewed,[Q]:Date.now()}}),this.sessionKey=Q,this.chatMessages=[],this.chatStream=null,this.chatStreamStartedAt=null,this.chatRunId=null,this.resetToolStream(),this.resetChatScroll(),this.loadAssistantIdentity(),R(async()=>{const{loadChatHistory:e}=await Promise.resolve().then(()=>Ye);return{loadChatHistory:e}},void 0,import.meta.url).then(({loadChatHistory:e})=>e(this)),this.loadSessionResources()}_scrollAllyToBottom(){this.updateComplete.then(()=>{requestAnimationFrame(()=>{const e=this.renderRoot?.querySelector?.(".ally-panel, .ally-inline")??document.querySelector(".ally-panel, .ally-inline");if(!e)return;const t=e.querySelector(".ally-panel__messages");t&&(t.scrollTop=t.scrollHeight)})})}async _loadAllyHistory(){try{const e=await this.client?.request("chat.history",{sessionKey:Q,limit:100});if(e?.messages){const{extractText:t,formatApiError:n}=await R(async()=>{const{extractText:a,formatApiError:i}=await Promise.resolve().then(()=>Jg);return{extractText:a,formatApiError:i}},void 0,import.meta.url);this.allyMessages=e.messages.map(a=>{const i=a.role??"assistant",o=i.toLowerCase();if(o==="tool"||o==="toolresult"||o==="tool_result"||o==="function"||o==="system")return null;const l=a;if(l.toolCallId||l.tool_call_id||l.toolName||l.tool_name)return null;if(Array.isArray(a.content)){const f=a.content;if(!f.some(w=>{const $=(typeof w.type=="string"?w.type:"").toLowerCase();return($==="text"||$==="")&&typeof w.text=="string"&&w.text.trim().length>0})&&f.some($=>{const c=(typeof $.type=="string"?$.type:"").toLowerCase();return c==="tool_use"||c==="tool_result"||c==="toolresult"||c==="tooluse"}))return null}let d=t(a);if(!d)return null;const u=n(d);if(u&&(d=u),d=d.replace(/^\[GodMode Context:[^\]]*\]\s*/i,"").trim(),!d)return null;const h=hA(d,i);return h?{role:o==="user"?"user":"assistant",content:h,timestamp:a.timestamp}:null}).filter(a=>a!==null);const s=[];for(const a of this.allyMessages){const i=s[s.length-1];i&&i.role===a.role&&i.content===a.content||s.push(a)}this.allyMessages=s}}catch{}}async handleDecisionApprove(e){if(!(!this.client||!this.connected))try{await this.client.request("queue.approve",{id:e}),this.todayQueueResults=this.todayQueueResults.filter(t=>t.id!==e)}catch(t){console.error("[DecisionCard] Approve failed:",t),this.showToast("Failed to approve","error")}}async handleDecisionReject(e){if(!(!this.client||!this.connected))try{await this.client.request("queue.reject",{id:e}),this.todayQueueResults=this.todayQueueResults.filter(t=>t.id!==e)}catch(t){console.error("[DecisionCard] Reject failed:",t),this.showToast("Failed to reject","error")}}async handleDecisionDismiss(e){if(!(!this.client||!this.connected))try{await this.client.request("queue.remove",{id:e}),this.todayQueueResults=this.todayQueueResults.filter(t=>t.id!==e)}catch(t){console.error("[DecisionCard] Dismiss failed:",t),this.showToast("Failed to dismiss","error")}}async handleDecisionMarkComplete(e){if(!(!this.client||!this.connected))try{const t=this.todayQueueResults?.find(n=>n.id===e);t?.sourceTaskId&&await this.client.request("tasks.update",{id:t.sourceTaskId,status:"complete"}),await this.client.request("queue.remove",{id:e}),this.todayQueueResults=this.todayQueueResults.filter(n=>n.id!==e),this.showToast("Task marked complete","success")}catch(t){console.error("[DecisionCard] Mark complete failed:",t),this.showToast("Failed to mark complete","error")}}async handleDecisionRate(e,t,n){if(!(!this.client||!this.connected))try{await this.client.request("trust.rate",{workflow:t,rating:n});const s=n<7;this.todayQueueResults=this.todayQueueResults.map(a=>a.id===e?{...a,userRating:n,feedbackPending:s}:a),s?this.showToast(`Rated ${t} ${n}/10 — what could be better?`,"info"):(this.todayQueueResults?.find(i=>i.id===e)?.source==="cron"&&(await this.client.request("queue.remove",{id:e}),this.todayQueueResults=this.todayQueueResults.filter(i=>i.id!==e)),this.showToast(`Rated ${t} ${n}/10`,"success"))}catch(s){console.error("[DecisionCard] Rate failed:",s),this.showToast("Failed to submit rating","error")}}async handleDecisionFeedback(e,t,n){if(!(!this.client||!this.connected))try{n&&(await this.client.request("trust.feedback",{workflow:t,feedback:n}),this.showToast(`Feedback saved for ${t} — will apply next time`,"success")),this.todayQueueResults?.find(a=>a.id===e)?.source==="cron"&&await this.client.request("queue.remove",{id:e}),this.todayQueueResults=this.todayQueueResults.map(a=>a.id===e?{...a,feedbackPending:!1}:a).filter(a=>!(a.id===e&&a.source==="cron"))}catch(s){console.error("[DecisionCard] Feedback failed:",s),this.showToast("Failed to save feedback","error")}}async handleDecisionViewOutput(e,t){if(!this.client||!this.connected){this.showToast("Not connected to gateway","error");return}try{const n=await this.client.request("queue.readOutput",{path:t}),s=t.split("/").pop()??"Agent Output";this.handleOpenSidebar(n.content,{mimeType:"text/markdown",filePath:t,title:s})}catch(n){console.error("[DecisionCard] View output failed:",n),this.handleOpenFile(t)}}async handleDecisionOpenChat(e){const t=this.todayQueueResults?.find(a=>a.id===e);if(!t)return;if(t.sourceTaskId){await this.handleMissionControlOpenTaskSession(t.sourceTaskId);return}const{createNewSession:n}=await R(async()=>{const{createNewSession:a}=await Promise.resolve().then(()=>ot);return{createNewSession:a}},void 0,import.meta.url);n(this),this.setTab("chat");const{autoTitleCache:s}=await R(async()=>{const{autoTitleCache:a}=await Promise.resolve().then(()=>Pn);return{autoTitleCache:a}},void 0,import.meta.url);if(s.set(this.sessionKey,t.title),t.outputPath&&this.client&&this.connected)try{const a=await this.client.request("queue.readOutput",{path:t.outputPath});a?.content&&await this.seedSessionWithAgentOutput(t.title,a.content)}catch{await this.seedSessionWithAgentOutput(t.title,t.summary)}else t.summary&&await this.seedSessionWithAgentOutput(t.title,t.summary)}async handleTodayOpenChatToEdit(e){try{const t=this.todayQueueResults?.find(s=>s.id===e),n=t?.outputPath;if(n&&this.client&&this.connected)try{const s=await this.client.request("queue.readOutput",{path:n});this.handleOpenSidebar(s.content,{mimeType:"text/markdown",filePath:n,title:t?.title??n.split("/").pop()??"Agent Output"})}catch{await this.handleOpenFile(n)}this.allyPanelOpen=!0,this.allyUnread=0,this.tab!=="chat"&&this.setTab("chat")}catch(t){console.error("Open chat to edit failed:",t)}}async seedSessionWithAgentOutput(e,t,n){if(!this.client||!this.connected)return;this.handleOpenSidebar(t,{title:`Agent Output: ${e}`,filePath:null,mimeType:null});const s=t.match(/## Summary\n([\s\S]*?)(?=\n## |$)/),a=s?s[1].trim().split(`
 `).slice(0,3).join(`
 `):"Output available in sidebar.",i=[`Agent completed **${e}**.`,"",a,"","Full output is in the sidebar. What would you like to do?"].join(`
-`);try{const{sendChatMessage:o}=await R(async()=>{const{sendChatMessage:l}=await Promise.resolve().then(()=>Ye);return{sendChatMessage:l}},void 0,import.meta.url);await o(this,i)}catch(o){console.error("[Session] Failed to seed session with agent output:",o)}}async handleMissionControlAddToQueue(e,t){if(!(!this.client||!this.connected))try{await this.client.request("queue.add",{type:e,title:t,priority:"normal"}),this.showToast("Added to queue","success",2e3);const{loadMissionControl:n}=await R(async()=>{const{loadMissionControl:s}=await Promise.resolve().then(()=>it);return{loadMissionControl:s}},void 0,import.meta.url);await n(this)}catch{this.showToast("Failed to add to queue","error")}}async handleDashboardsRefresh(){const{loadDashboards:e}=await R(async()=>{const{loadDashboards:t}=await import("./dashboards-CrT3s0NG.js");return{loadDashboards:t}},[],import.meta.url);await e(this)}async handleDashboardSelect(e){const{loadDashboard:t}=await R(async()=>{const{loadDashboard:n}=await import("./dashboards-CrT3s0NG.js");return{loadDashboard:n}},[],import.meta.url);if(await t(this,e),this.client&&this.connected)try{const n=await this.client.request("dashboards.openSession",{dashboardId:e});if(n?.sessionId){this.dashboardPreviousSessionKey=this.sessionKey;const s=n.sessionId,{autoTitleCache:a}=await R(async()=>{const{autoTitleCache:l}=await Promise.resolve().then(()=>Pn);return{autoTitleCache:l}},void 0,import.meta.url);a.set(s,n.manifest.title),this.activeDashboardManifest&&(this.activeDashboardManifest={...this.activeDashboardManifest,sessionId:s});const{saveDraft:i}=await R(async()=>{const{saveDraft:l}=await Promise.resolve().then(()=>Qa);return{saveDraft:l}},void 0,import.meta.url);i(this),this.sessionKey=s,this.chatMessages=[],this.chatStream=null,this.chatStreamStartedAt=null,this.chatRunId=null,this.resetToolStream();const{loadChatHistory:o}=await R(async()=>{const{loadChatHistory:l}=await Promise.resolve().then(()=>Ye);return{loadChatHistory:l}},void 0,import.meta.url);await o(this),this.loadSessionResources(),this.dashboardChatOpen=!0}}catch(n){console.error("[Dashboards] Failed to init session on select:",n)}}async handleDashboardDelete(e){const{deleteDashboard:t}=await R(async()=>{const{deleteDashboard:n}=await import("./dashboards-CrT3s0NG.js");return{deleteDashboard:n}},[],import.meta.url);await t(this,e)}async handleDashboardTogglePin(e){const{toggleDashboardPin:t}=await R(async()=>{const{toggleDashboardPin:n}=await import("./dashboards-CrT3s0NG.js");return{toggleDashboardPin:n}},[],import.meta.url);await t(this,e)}async handleDashboardCreateViaChat(e){this.setTab("chat");const{createNewSession:t}=await R(async()=>{const{createNewSession:n}=await Promise.resolve().then(()=>ot);return{createNewSession:n}},void 0,import.meta.url);t(this),this.handleSendChat(e??"I want to create a custom dashboard. Ask me what data I want to see and design it for me. You can use any of GodMode's data — tasks, calendar, focus pulse, goals, trust scores, agent activity, queue status, coding tasks, workspace stats, and more.")}handleDashboardCategoryFilter(e){this.dashboardCategoryFilter=e}handleDashboardBack(){if(this.activeDashboardId=null,this.activeDashboardHtml=null,this.activeDashboardManifest=null,this.dashboardChatOpen=!1,this.dashboardPreviousSessionKey){const e=this.dashboardPreviousSessionKey;this.dashboardPreviousSessionKey=null,R(async()=>{const{saveDraft:t}=await Promise.resolve().then(()=>Qa);return{saveDraft:t}},void 0,import.meta.url).then(({saveDraft:t})=>{t(this),this.sessionKey=e,R(async()=>{const{loadChatHistory:n}=await Promise.resolve().then(()=>Ye);return{loadChatHistory:n}},void 0,import.meta.url).then(({loadChatHistory:n})=>{n(this)})})}}async handleDashboardOpenSession(e){const t=this.activeDashboardManifest?.sessionId;if(!t){this.showToast("No session for this dashboard","error");return}this.dashboardPreviousSessionKey=null,this.activeDashboardId=null,this.activeDashboardHtml=null,this.activeDashboardManifest=null,this.dashboardChatOpen=!1;const n=this.settings.openTabs.includes(t)?this.settings.openTabs:[...this.settings.openTabs,t];this.applySettings({...this.settings,openTabs:n,sessionKey:t,lastActiveSessionKey:t,tabLastViewed:{...this.settings.tabLastViewed,[t]:Date.now()}}),this.setTab("chat");const{syncUrlWithSessionKey:s}=await R(async()=>{const{syncUrlWithSessionKey:a}=await Promise.resolve().then(()=>Wb);return{syncUrlWithSessionKey:a}},void 0,import.meta.url);s(this,t,!0)}async handleOptionsLoad(){const{loadOptions:e}=await R(async()=>{const{loadOptions:t}=await import("./options-QuHclvvX.js");return{loadOptions:t}},[],import.meta.url);await e(this)}async handleOptionToggle(e,t){const{saveOption:n}=await R(async()=>{const{saveOption:s}=await import("./options-QuHclvvX.js");return{saveOption:s}},[],import.meta.url);await n(this,e,t)}async handleSecondBrainRefresh(){const{loadSecondBrain:e}=await R(async()=>{const{loadSecondBrain:t}=await import("./second-brain-ghSM5E6X.js");return{loadSecondBrain:t}},[],import.meta.url);await e(this)}handleSecondBrainSubtabChange(e){this.secondBrainSubtab=e,this.secondBrainLoading=!1,this.secondBrainSelectedEntry=null,this.secondBrainSearchQuery="",this.secondBrainError=null,this.secondBrainBrowsingFolder=null,this.secondBrainFolderEntries=null,this.secondBrainFolderName=null,e==="intel"?this.handleIntelLoad().catch(t=>{console.error("[Intel] Load after subtab change failed:",t),this.intelError=t instanceof Error?t.message:"Failed to load intel data"}):e==="files"?this.handleSecondBrainFileTreeRefresh().catch(t=>{console.error("[SecondBrain] File tree load after subtab change failed:",t)}):this.handleSecondBrainRefresh().catch(t=>{console.error("[SecondBrain] Refresh after subtab change failed:",t),this.secondBrainError=t instanceof Error?t.message:"Failed to load data",this.secondBrainLoading=!1})}async handleSecondBrainSelectEntry(e){if(e.endsWith(".html")||e.endsWith(".htm")){try{const s=await this.client.request("secondBrain.memoryBankEntry",{path:e});s?.content&&this.handleOpenSidebar(s.content,{mimeType:"text/html",filePath:e,title:s.name||e.split("/").pop()||"File"})}catch(s){console.error("[SecondBrain] Failed to open HTML file:",s)}return}const{loadSecondBrainEntry:n}=await R(async()=>{const{loadSecondBrainEntry:s}=await import("./second-brain-ghSM5E6X.js");return{loadSecondBrainEntry:s}},[],import.meta.url);await n(this,e)}async handleSecondBrainOpenInBrowser(e){try{if(e.startsWith("http://")||e.startsWith("https://")||e.startsWith("/")){window.open(e,"_blank","noopener,noreferrer");return}const t=await this.client.request("secondBrain.memoryBankEntry",{path:e});if(t?.content){const n=new Blob([t.content],{type:"text/html"}),s=URL.createObjectURL(n);window.open(s,"_blank","noopener,noreferrer")}}catch(t){console.error("[SecondBrain] Failed to open in browser:",t)}}async handleSecondBrainBrowseFolder(e){const{browseFolder:t}=await R(async()=>{const{browseFolder:n}=await import("./second-brain-ghSM5E6X.js");return{browseFolder:n}},[],import.meta.url);await t(this,e)}handleSecondBrainBack(){this.secondBrainSelectedEntry?this.secondBrainSelectedEntry=null:this.secondBrainBrowsingFolder&&(this.secondBrainBrowsingFolder=null,this.secondBrainFolderEntries=null,this.secondBrainFolderName=null)}handleSecondBrainSearch(e){this.secondBrainSearchQuery=e}async handleSecondBrainSync(){const{syncSecondBrain:e}=await R(async()=>{const{syncSecondBrain:t}=await import("./second-brain-ghSM5E6X.js");return{syncSecondBrain:t}},[],import.meta.url);await e(this)}async handleSecondBrainFileTreeRefresh(){if(!(!this.client||!this.connected)){this.secondBrainFileTreeLoading=!0;try{const e=await this.client.request("secondBrain.fileTree",{depth:4});this.secondBrainFileTree=e.tree??[]}catch(e){console.error("[SecondBrain] fileTree failed:",e)}finally{this.secondBrainFileTreeLoading=!1}}}handleSecondBrainFileSearch(e){if(this.secondBrainFileSearchQuery=e,!e.trim()){this.secondBrainFileSearchResults=null;return}this._doSecondBrainFileSearch(e)}async _doSecondBrainFileSearch(e){if(!(!this.client||!this.connected))try{const t=await this.client.request("secondBrain.search",{query:e,limit:50});this.secondBrainFileSearchQuery===e&&(this.secondBrainFileSearchResults=t.results??[])}catch(t){console.error("[SecondBrain] search failed:",t)}}async handleSecondBrainFileSelect(e){if(!(!this.client||!this.connected))try{const t=await this.client.request("secondBrain.memoryBankEntry",{path:e});if(t?.content){const n=e.endsWith(".html")||e.endsWith(".htm");this.handleOpenSidebar(t.content,{mimeType:n?"text/html":"text/markdown",filePath:e,title:t.name||e.split("/").pop()||"File"})}}catch(t){console.error("[SecondBrain] Failed to open file:",t),this.showToast("Failed to open file","error")}}handleResearchAddFormToggle(){this.secondBrainResearchAddFormOpen=!this.secondBrainResearchAddFormOpen,this.secondBrainResearchAddFormOpen&&(this.secondBrainResearchAddForm={title:"",url:"",category:"",tags:"",notes:""})}handleResearchAddFormChange(e,t){this.secondBrainResearchAddForm={...this.secondBrainResearchAddForm,[e]:t}}async handleResearchAddSubmit(){const{addResearch:e}=await R(async()=>{const{addResearch:t}=await import("./second-brain-ghSM5E6X.js");return{addResearch:t}},[],import.meta.url);await e(this)}async handleResearchSaveViaChat(){this.setTab("chat");const{createNewSession:e}=await R(async()=>{const{createNewSession:t}=await Promise.resolve().then(()=>ot);return{createNewSession:t}},void 0,import.meta.url);e(this),this.handleSendChat("I want to save some research. I'll paste links, bookmarks, or notes — please organize them into ~/godmode/memory/research/ with proper frontmatter (title, url, category, tags, date). Ask me what I'd like to save.")}async handleAddSource(){this.setTab("chat");const{createNewSession:e}=await R(async()=>{const{createNewSession:t}=await Promise.resolve().then(()=>ot);return{createNewSession:t}},void 0,import.meta.url);e(this),this.handleSendChat("I want to add a new data source to my Second Brain. Help me figure out what I need — whether it's an API integration, a local file sync, or a new skill. Ask me what source I'd like to connect.")}async handleCommunityResourceAdd(){const{addCommunityResource:e}=await R(async()=>{const{addCommunityResource:t}=await import("./second-brain-ghSM5E6X.js");return{addCommunityResource:t}},[],import.meta.url);await e(this)}async handleCommunityResourceRemove(e){const{removeCommunityResource:t}=await R(async()=>{const{removeCommunityResource:n}=await import("./second-brain-ghSM5E6X.js");return{removeCommunityResource:n}},[],import.meta.url);await t(this,e)}handleCommunityResourceAddFormToggle(){this.secondBrainCommunityResourceAddFormOpen=!this.secondBrainCommunityResourceAddFormOpen,this.secondBrainCommunityResourceAddFormOpen&&(this.secondBrainCommunityResourceAddForm={url:"",label:"",description:"",tags:""})}handleCommunityResourceAddFormChange(e,t){this.secondBrainCommunityResourceAddForm={...this.secondBrainCommunityResourceAddForm,[e]:t}}removeQueuedMessage(e){Ou(this,e)}async handleSendChat(e,t){const n=this.sessionsResult?.sessions?.find(s=>s.key===this.sessionKey);if(n){const s=n.totalTokens??0,a=n.contextTokens??this.sessionsResult?.defaults?.contextTokens??2e5;if((a>0?s/a:0)>=.9&&!this.compactionStatus?.active){const o=(e??this.chatMessage).trim(),l=e==null?[...this.chatAttachments??[]]:[];if(o||l.length>0){this.pendingRetry={message:o,attachments:l,timestamp:Date.now()},this.autoRetryAfterCompact=!0,this.chatMessages=[...this.chatMessages,{role:"user",content:[{type:"text",text:o}],timestamp:Date.now()}],e==null&&(this.chatMessage="",this.chatAttachments=[]),this.showToast("Context near limit — auto-compacting...","info",3e3),this.handleCompactChat();return}}}await Fu(this,e,t)}handleToggleSessionPicker(){this.sessionPickerOpen=!this.sessionPickerOpen}handleToggleSessionSearch(e){if(!this.sessionSearchOpen&&e){const n=e.currentTarget.getBoundingClientRect();this.sessionSearchPosition={top:n.bottom+8,right:window.innerWidth-n.right}}this.sessionSearchOpen=!this.sessionSearchOpen,this.sessionSearchOpen||(this.sessionSearchQuery="",this.sessionSearchResults=[])}async handleSessionSearchQuery(e){if(this.sessionSearchQuery=e,!e.trim()){this.sessionSearchResults=[];return}if(this.client){this.sessionSearchLoading=!0;try{const t=await this.client.request("sessions.searchContent",{query:e.trim(),limit:20});this.sessionSearchResults=t.results}catch(t){console.error("Session search failed:",t),this.sessionSearchResults=[]}finally{this.sessionSearchLoading=!1}}}handleSelectSession(e){this.sessionPickerOpen=!1,this.sessionSearchOpen=!1,this.sessionSearchQuery="",this.sessionSearchResults=[]}async handleWhatsAppStart(e){await kh(this,e)}async handleWhatsAppWait(){await Sh(this)}async handleWhatsAppLogout(){await Ah(this)}async handleChannelConfigSave(){await xh(this)}async handleChannelConfigReload(){await Th(this)}async handleCompactChat(){if(!this.connected){this.showToast("Cannot compact: not connected","error");return}if(!this.sessionKey){this.showToast("Cannot compact: no active session","error");return}this.compactionStatus={active:!0,startedAt:Date.now(),completedAt:null};try{await this.handleSendChat("/compact")}catch(e){this.compactionStatus=null,console.error("Compaction failed:",e),this.showToast("Compaction failed","error")}}injectCompactionSummary(e,t){const n={role:"system",content:e,timestamp:Date.now(),isCompactionSummary:!0,keptMessages:t};this.chatMessages=[n,...this.chatMessages]}async handleRetryMessage(){const e={client:this.client,connected:this.connected,sessionKey:this.sessionKey,chatLoading:this.chatLoading,chatMessages:this.chatMessages,chatThinkingLevel:this.chatThinkingLevel,chatSending:this.chatSending,chatSendingSessionKey:this.chatSendingSessionKey,chatMessage:this.chatMessage,chatAttachments:this.chatAttachments,chatRunId:this.chatRunId,chatStream:this.chatStream,chatStreamStartedAt:this.chatStreamStartedAt,lastError:this.lastError,pendingRetry:this.pendingRetry},t=await _d(e);this.chatSending=e.chatSending,this.chatSendingSessionKey=e.chatSendingSessionKey,this.chatRunId=e.chatRunId,this.chatStream=e.chatStream,this.chatStreamStartedAt=e.chatStreamStartedAt,this.lastError=e.lastError,this.pendingRetry=e.pendingRetry??null,this.chatMessages=e.chatMessages,t&&this.showToast("Message resent","success",2e3)}handleClearRetry(){this.pendingRetry=null}handleNostrProfileEdit(e,t){Ch(this,e,t)}handleNostrProfileCancel(){Rh(this)}handleNostrProfileFieldChange(e,t){Eh(this,e,t)}async handleNostrProfileSave(){await Lh(this)}async handleNostrProfileImport(){await Ih(this)}handleNostrProfileToggleAdvanced(){Ph(this)}async handleExecApprovalDecision(e){const t=this.execApprovalQueue[0];if(!(!t||!this.client||this.execApprovalBusy)){this.execApprovalBusy=!0,this.execApprovalError=null;try{await this.client.request("exec.approval.resolve",{id:t.id,decision:e}),this.execApprovalQueue=this.execApprovalQueue.filter(n=>n.id!==t.id)}catch(n){this.execApprovalError=`Exec approval failed: ${String(n)}`}finally{this.execApprovalBusy=!1}}}handleGatewayUrlConfirm(){const e=this.pendingGatewayUrl;e&&(this.pendingGatewayUrl=null,Ze(this,{...this.settings,gatewayUrl:e}),this.connect())}handleGatewayUrlCancel(){this.pendingGatewayUrl=null}handleGatewayRestartClick(){this.gatewayRestartPending=!0}async handleGatewayRestartConfirm(){if(!(!this.client||this.gatewayRestartBusy)){this.gatewayRestartBusy=!0;try{await this.client.request("godmode.gateway.restart")}catch{}finally{this.gatewayRestartBusy=!1,this.gatewayRestartPending=!1}}}handleGatewayRestartCancel(){this.gatewayRestartPending=!1}handleOpenSidebar(e,t={}){this.sidebarCloseTimer!=null&&(window.clearTimeout(this.sidebarCloseTimer),this.sidebarCloseTimer=null),this.sidebarContent=e,this.sidebarError=null,this.sidebarMimeType=t.mimeType?.trim()||null,this.sidebarFilePath=t.filePath?.trim()||null,this.sidebarTitle=t.title?.trim()||null,this.sidebarMode="resource",this.sidebarProofSlug=null,this.sidebarProofUrl=null,this.sidebarOpen=!0}handleCloseSidebar(){this.sidebarOpen=!1,this.showDrivePicker=!1,this.sidebarCloseTimer!=null&&window.clearTimeout(this.sidebarCloseTimer),this.sidebarCloseTimer=window.setTimeout(()=>{this.sidebarOpen||(this.sidebarContent=null,this.sidebarError=null,this.sidebarMimeType=null,this.sidebarFilePath=null,this.sidebarTitle=null,this.sidebarMode="resource",this.sidebarProofSlug=null,this.sidebarProofUrl=null,this.sidebarCloseTimer=null)},200)}async handleOpenFile(e){if(!this.client||!this.connected){this.showToast("Not connected to gateway","error");return}try{const t=await this.client.request("files.read",{path:e}),n=e.split(".").pop()?.toLowerCase()??"",s=t.contentType??t.mime??(n==="md"?"text/markdown":null),a=e.split("/").pop()??e;this.handleOpenSidebar(t.content,{mimeType:s,filePath:e,title:a}),t.truncated&&this.showToast(`Opened truncated file: ${e}`,"warning")}catch(t){console.error("[Chat] Failed to open file:",t),this.showToast(`Failed to open file: ${e}`,"error")}}async handleToggleDrivePicker(){if(this.showDrivePicker){this.showDrivePicker=!1;return}if(this.driveAccounts.length===0)try{const e=await this.client?.request("files.listDriveAccounts",{});this.driveAccounts=e?.accounts??[]}catch{this.driveAccounts=[]}this.showDrivePicker=!0}async handlePushToDrive(e,t){if(!this.driveUploading){if(this.showDrivePicker=!1,this._pendingBatchPaths&&this._pendingBatchPaths.length>0){const n=this._pendingBatchPaths;this._pendingBatchPaths=void 0,await this._executeBatchDrive(n,t);return}this.driveUploading=!0;try{const n={filePath:e};t&&(n.account=t);const s=await this.client?.request("files.pushToDrive",n),a=t?` to ${t.split("@")[0]}`:"",i=s?.message??`Uploaded${a} to Google Drive`,o=s?.driveUrl;this.showToast(i,"success",o?8e3:5e3,o?{label:"View in Drive",url:o}:void 0)}catch(n){console.error("Push to Drive failed:",n);const s=n instanceof Error?n.message:typeof n=="object"&&n!==null&&"message"in n?String(n.message):"Unknown error";s.includes("GOG_NOT_FOUND")||s.includes("gog CLI not found")?this.showToast("Google Drive not configured. Install gog CLI: npm install -g gog-cli, then run: gog auth add <email> --services drive","warning",1e4):s.includes("GOG_AUTH")||s.includes("auth")&&s.includes("expired")?this.showToast("Google Drive auth expired. Re-authenticate: gog auth add <email> --services drive","warning",8e3):this.showToast(`Drive upload failed: ${s}`,"error",8e3)}finally{this.driveUploading=!1}}}async handleBatchPushToDrive(e){if(this.driveUploading||e.length===0)return;if(!this.driveAccounts||this.driveAccounts.length===0)try{const n=await this.client?.request("files.listDriveAccounts");this.driveAccounts=n?.accounts??[]}catch{}if(this.driveAccounts&&this.driveAccounts.length>1){this._pendingBatchPaths=e,this.showDrivePicker=!0;return}const t=this.driveAccounts?.[0]?.email;await this._executeBatchDrive(e,t)}async _executeBatchDrive(e,t){this.driveUploading=!0,this.showToast(`Uploading ${e.length} files to Drive...`,"info",0);try{const n={filePaths:e};t&&(n.account=t);const s=await this.client?.request("files.batchPushToDrive",n);this.dismissAllToasts();const a=s?.results?.filter(o=>o.success).length??0,i=s?.results?.length??e.length;a===i?this.showToast(`Uploaded ${a} files to Google Drive`,"success",5e3):this.showToast(`Uploaded ${a}/${i} files (${i-a} failed)`,"warning",8e3)}catch(n){this.dismissAllToasts();const s=n instanceof Error?n.message:"Unknown error";this.showToast(`Batch Drive upload failed: ${s}`,"error",8e3)}finally{this.driveUploading=!1,this._pendingBatchPaths=void 0}}handleSplitRatioChange(e){const t=Math.max(.4,Math.min(.7,e));this.splitRatio=t,this.applySettings({...this.settings,splitRatio:t})}handleImageClick(e,t,n){this.lightbox=dS(e,t,n)}handleLightboxClose(){this.lightbox=uS()}handleLightboxNav(e){this.lightbox=pS(this.lightbox,e)}normalizeWorkspacePathCandidate(e,t={}){let n=e.trim();if(!n||n.startsWith("#"))return null;for(;n.startsWith("./");)n=n.slice(2);if(n=n.replaceAll("\\","/"),!t.allowAbsolute)for(;n.startsWith("/");)n=n.slice(1);return!n||n.includes("\0")?null:n}isAbsoluteFilesystemPath(e){return e.startsWith("/")||e.startsWith("~/")||/^[a-z]:[\\/]/i.test(e)}inferMimeTypeFromPath(e){if(!e)return null;const t=e.trim().toLowerCase();if(!t)return null;const n=t.split(".").pop()??"";return n?n==="md"||n==="markdown"||n==="mdx"?"text/markdown":n==="html"||n==="htm"?"text/html":n==="json"||n==="json5"?"application/json":n==="txt"||n==="text"||n==="log"?"text/plain":n==="svg"||n==="svgz"?"image/svg+xml":n==="avif"||n==="bmp"||n==="gif"||n==="heic"||n==="heif"||n==="jpeg"||n==="jpg"||n==="png"||n==="webp"?`image/${n==="jpg"?"jpeg":n}`:null:null}sidebarTitleForPath(e){const t=e.replaceAll("\\","/").trim();if(!t)return"Document";const n=t.split("/");return n[n.length-1]||t}async listWorkspaceIdsForPathResolution(){const e=[],t=new Set,n=s=>{if(typeof s!="string")return;const a=s.trim();!a||t.has(a)||(t.add(a),e.push(a))};n(this.selectedWorkspace?.id);for(const s of this.workspaces??[])n(s.id);if(e.length>0||!this.client||!this.connected)return e;try{const s=await this.client.request("workspaces.list",{});for(const a of s.workspaces??[])n(a.id)}catch{}return e}async openWorkspaceRelativeFileInViewer(e){if(!this.client||!this.connected)return!1;const t=await this.listWorkspaceIdsForPathResolution();for(const n of t)try{const s=await this.client.request("workspaces.readFile",{workspaceId:n,filePath:e});if(typeof s.content!="string")continue;return this.handleOpenSidebar(s.content,{mimeType:s.contentType??s.mime??this.inferMimeTypeFromPath(e),filePath:s.path??e,title:this.sidebarTitleForPath(e)}),!0}catch{}return!1}extractWorkspacePathCandidatesFromHref(e){const t=e.trim();if(!t)return[];const n=[],s=t.toLowerCase();if(s.startsWith("mailto:")||s.startsWith("tel:")||s.startsWith("javascript:")||s.startsWith("data:"))return[];if(t.startsWith("file://")){let u=t.slice(7);u.startsWith("/~/")&&(u="~"+u.slice(2));try{u=decodeURIComponent(u)}catch{}n.push(u);const h=[],f=new Set;for(const m of n){const w=this.normalizeWorkspacePathCandidate(m,{allowAbsolute:!0});!w||f.has(w)||(f.add(w),h.push(w))}return h}const a=/^[a-z][a-z0-9+.-]*:/i.test(t),i=/^[a-z]:[\\/]/i.test(t);(!a||i)&&n.push(t);let o=null;try{o=new URL(t,window.location.href)}catch{o=null}if(o&&/^https?:$/.test(o.protocol)&&o.origin===window.location.origin){for(const $ of pA){const c=o.searchParams.get($);c&&n.push(c)}const h=(t.split("#")[0]??"").split("?")[0]??"";h.length>0&&!h.startsWith("/")&&!h.includes("://")&&n.push(h);let m=o.pathname;this.basePath&&m.startsWith(`${this.basePath}/`)?m=m.slice(this.basePath.length):this.basePath&&m===this.basePath&&(m="");const w=m.startsWith("/")?m.slice(1):m;if(w){n.push(w);const $=w.indexOf("/");if($>0){const c=w.slice(0,$).toLowerCase();Ac.has(c)&&n.push(w.slice($+1))}}if(m.startsWith("/")&&w){const $=w.split("/")[0]?.toLowerCase()??"";Ac.has($)||n.push(m)}}const l=[],d=new Set;for(const u of n){let h=u;try{h=decodeURIComponent(u)}catch{}const f=this.normalizeWorkspacePathCandidate(h,{allowAbsolute:!0});!f||d.has(f)||(d.add(f),l.push(f))}return l}async openWorkspaceFileInViewer(e){if(!this.client||!this.connected)return!1;const t=this.isAbsoluteFilesystemPath(e);if(!t&&await this.openWorkspaceRelativeFileInViewer(e))return!0;try{const n=await this.client.request("workspaces.readFile",{path:e});if(typeof n.content=="string")return this.handleOpenSidebar(n.content,{mimeType:n.contentType??n.mime??this.inferMimeTypeFromPath(e),filePath:n.path??e,title:this.sidebarTitleForPath(e)}),!0}catch{}if(!t)return!1;try{const n=await this.client.request("files.read",{path:e,maxSize:1e6});return typeof n.content!="string"?!1:(this.handleOpenSidebar(n.content,{mimeType:this.inferMimeTypeFromPath(e),filePath:e,title:this.sidebarTitleForPath(e)}),!0)}catch{return!1}}async handleOpenMessageFileLink(e){const t=this.extractWorkspacePathCandidatesFromHref(e);if(t.length===0)return!1;for(const n of t)if(await this.openWorkspaceFileInViewer(n))return!0;return!1}showToast(e,t="info",n=5e3,s){const a=iA(e,t,n,s);this.toasts=rA(this.toasts,a),n>0&&window.setTimeout(()=>{this.dismissToast(a.id)},n)}dismissToast(e){this.toasts=oA(this.toasts,e)}dismissAllToasts(){this.toasts=[]}async handleMyDayRefresh(){await Vs(this),this._loadDecisionCards()}_loadDecisionCards(){R(()=>Promise.resolve().then(()=>Nn),void 0,import.meta.url).then(async e=>{this.todayQueueResults=await e.loadTodayQueueResults(this)}).catch(()=>{})}async loadTodayQueueResults(){this._loadDecisionCards()}async handleMyDayTaskStatusChange(e,t){if(!(!this.client||!this.connected))try{await this.client.request("tasks.update",{id:e,status:t,completedAt:t==="complete"?new Date().toISOString():null});const{loadTodayTasksWithQueueStatus:n}=await R(async()=>{const{loadTodayTasksWithQueueStatus:s}=await Promise.resolve().then(()=>Nn);return{loadTodayTasksWithQueueStatus:s}},void 0,import.meta.url);await n(this)}catch(n){console.error("[MyDay] Failed to update task status:",n)}}async handleTodayCreateTask(e){if(!(!this.client||!this.connected))try{await this.client.request("tasks.create",{title:e,dueDate:ce(),priority:"medium",source:"chat"});const{loadTodayTasksWithQueueStatus:t}=await R(async()=>{const{loadTodayTasksWithQueueStatus:n}=await Promise.resolve().then(()=>Nn);return{loadTodayTasksWithQueueStatus:n}},void 0,import.meta.url);await t(this)}catch(t){console.error("[MyDay] Failed to create task:",t),this.showToast("Failed to create task","error")}}handleTodayEditTask(e){this.todayEditingTaskId=e}async handleTodayUpdateTask(e,t){if(!(!this.client||!this.connected))try{await this.client.request("tasks.update",{id:e,...t}),this.todayEditingTaskId=null;const{loadTodayTasksWithQueueStatus:n}=await R(async()=>{const{loadTodayTasksWithQueueStatus:s}=await Promise.resolve().then(()=>Nn);return{loadTodayTasksWithQueueStatus:s}},void 0,import.meta.url);await n(this)}catch(n){console.error("[MyDay] Failed to update task:",n),this.showToast("Failed to update task","error")}}handleTodayToggleCompleted(){this.todayShowCompleted=!this.todayShowCompleted}async handleTodayViewTaskOutput(e){if(!(!this.client||!this.connected))try{const n=(await this.client.request("queue.list",{limit:100}))?.items?.find(i=>i.sourceTaskId===e);if(!n?.result?.outputPath){this.showToast("No output available for this task","info");return}const s=await this.client.request("queue.readOutput",{path:n.result.outputPath}),a=n.result.outputPath.split("/").pop()??"Agent Output";this.handleOpenSidebar(s.content,{mimeType:"text/markdown",filePath:n.result.outputPath,title:a})}catch(t){console.error("[Tasks] View output failed:",t),this.showToast("Failed to load agent output","error")}}async handleTodayStartTask(e){if(!(!this.client||!this.connected))try{const t=await this.client.request("tasks.openSession",{taskId:e}),n=t?.sessionId??t?.sessionKey;if(n){if(t.task?.title){const{autoTitleCache:i}=await R(async()=>{const{autoTitleCache:l}=await Promise.resolve().then(()=>Pn);return{autoTitleCache:l}},void 0,import.meta.url);i.set(n,t.task.title);const{hostPatchSession:o}=await R(async()=>{const{hostPatchSession:l}=await Promise.resolve().then(()=>Hv);return{hostPatchSession:l}},void 0,import.meta.url);o(this.client,n,t.task.title)}this.setTab("chat"),this.sessionKey=n;const s=this.settings.openTabs.includes(n)?this.settings.openTabs:[...this.settings.openTabs,n];this.applySettings({...this.settings,sessionKey:n,lastActiveSessionKey:n,openTabs:s}),this.chatMessages=[],this.chatStream=null,this.chatStreamStartedAt=null,this.chatRunId=null,this.resetToolStream(),this.resetChatScroll(),this.loadAssistantIdentity();const{loadChatHistory:a}=await R(async()=>{const{loadChatHistory:i}=await Promise.resolve().then(()=>Ye);return{loadChatHistory:i}},void 0,import.meta.url);await a(this),this.loadSessionResources(),t.queueOutput&&this.chatMessages.length===0&&this.seedSessionWithAgentOutput(t.task?.title??"this task",t.queueOutput,t.agentPrompt??void 0),this.requestUpdate()}}catch(t){console.error("[MyDay] Failed to open session for task:",t),this.showToast("Failed to open session for task","error")}}handleDatePrev(){const e=new Date(this.todaySelectedDate+"T12:00:00");e.setDate(e.getDate()-1),this.todaySelectedDate=ce(e),Fn(this)}handleDateNext(){const e=new Date(this.todaySelectedDate+"T12:00:00");e.setDate(e.getDate()+1);const t=ce(),n=ce(e);n>t||(this.todaySelectedDate=n,Fn(this))}handleDateToday(){this.todaySelectedDate=ce(),Vs(this)}async handleDailyBriefRefresh(){await Fn(this)}async handleDailyBriefGenerate(){if(!(!this.client||!this.connected)){this.dailyBriefLoading=!0;try{await this.client.request("dailyBrief.generate",{}),await Fn(this)}catch(e){this.dailyBriefError=e instanceof Error?e.message:"Failed to generate brief"}finally{this.dailyBriefLoading=!1}}}handleDailyBriefOpenInObsidian(){const e=this.dailyBrief?.date;yu(e)}async loadBriefNotes(){if(!this.client||!this.connected)return;const e=this.todaySelectedDate;try{const t=await this.client.request("briefNotes.get",{date:e});this.briefNotes=t.notes??{}}catch(t){console.error("[BriefNotes] Load error:",t),this.briefNotes={}}}async handleBriefNoteSave(e,t){if(!this.client||!this.connected)return;const n=this.todaySelectedDate;try{const s=await this.client.request("briefNotes.update",{date:n,section:e,text:t});this.briefNotes=s.notes??{}}catch(s){console.error("[BriefNotes] Save error:",s),this.showToast("Failed to save note","error")}}handleTodayViewModeChange(e){this.todayViewMode=e}handlePrivateModeToggle(){if(this.chatPrivateMode){const e=this.sessionKey;this.chatPrivateMode=!1,this._destroyPrivateSession(e),this.showToast("Private session destroyed","info",2e3);return}this.chatPrivateMode=!0,this.setTab("chat"),R(async()=>{const{createNewSession:e}=await Promise.resolve().then(()=>ot);return{createNewSession:e}},void 0,import.meta.url).then(({createNewSession:e})=>{e(this);const t=Date.now()+1440*60*1e3;this.privateSessions=new Map(this.privateSessions).set(this.sessionKey,t),this._persistPrivateSessions(),this._startPrivateSessionTimer(),this.client&&this.connected&&this.client.request("session.setPrivate",{sessionKey:this.sessionKey,enabled:!0}).catch(()=>{}),this.chatMessages=[{role:"assistant",content:`This is a **private session**. Nothing will be saved to memory or logs.
+`);try{const{sendChatMessage:o}=await R(async()=>{const{sendChatMessage:l}=await Promise.resolve().then(()=>Ye);return{sendChatMessage:l}},void 0,import.meta.url);await o(this,i)}catch(o){console.error("[Session] Failed to seed session with agent output:",o)}}async handleMissionControlAddToQueue(e,t){if(!(!this.client||!this.connected))try{await this.client.request("queue.add",{type:e,title:t,priority:"normal"}),this.showToast("Added to queue","success",2e3);const{loadMissionControl:n}=await R(async()=>{const{loadMissionControl:s}=await Promise.resolve().then(()=>it);return{loadMissionControl:s}},void 0,import.meta.url);await n(this)}catch{this.showToast("Failed to add to queue","error")}}async handleDashboardsRefresh(){const{loadDashboards:e}=await R(async()=>{const{loadDashboards:t}=await import("./dashboards-CrT3s0NG.js");return{loadDashboards:t}},[],import.meta.url);await e(this)}async handleDashboardSelect(e){const{loadDashboard:t}=await R(async()=>{const{loadDashboard:n}=await import("./dashboards-CrT3s0NG.js");return{loadDashboard:n}},[],import.meta.url);if(await t(this,e),this.client&&this.connected)try{const n=await this.client.request("dashboards.openSession",{dashboardId:e});if(n?.sessionId){this.dashboardPreviousSessionKey=this.sessionKey;const s=n.sessionId,{autoTitleCache:a}=await R(async()=>{const{autoTitleCache:l}=await Promise.resolve().then(()=>Pn);return{autoTitleCache:l}},void 0,import.meta.url);a.set(s,n.manifest.title),this.activeDashboardManifest&&(this.activeDashboardManifest={...this.activeDashboardManifest,sessionId:s});const{saveDraft:i}=await R(async()=>{const{saveDraft:l}=await Promise.resolve().then(()=>Qa);return{saveDraft:l}},void 0,import.meta.url);i(this),this.sessionKey=s,this.chatMessages=[],this.chatStream=null,this.chatStreamStartedAt=null,this.chatRunId=null,this.resetToolStream();const{loadChatHistory:o}=await R(async()=>{const{loadChatHistory:l}=await Promise.resolve().then(()=>Ye);return{loadChatHistory:l}},void 0,import.meta.url);await o(this),this.loadSessionResources(),this.dashboardChatOpen=!0}}catch(n){console.error("[Dashboards] Failed to init session on select:",n)}}async handleDashboardDelete(e){const{deleteDashboard:t}=await R(async()=>{const{deleteDashboard:n}=await import("./dashboards-CrT3s0NG.js");return{deleteDashboard:n}},[],import.meta.url);await t(this,e)}async handleDashboardTogglePin(e){const{toggleDashboardPin:t}=await R(async()=>{const{toggleDashboardPin:n}=await import("./dashboards-CrT3s0NG.js");return{toggleDashboardPin:n}},[],import.meta.url);await t(this,e)}async handleDashboardCreateViaChat(e){this.setTab("chat");const{createNewSession:t}=await R(async()=>{const{createNewSession:n}=await Promise.resolve().then(()=>ot);return{createNewSession:n}},void 0,import.meta.url);t(this),this.handleSendChat(e??"I want to create a custom dashboard. Ask me what data I want to see and design it for me. You can use any of GodMode's data — tasks, calendar, focus pulse, goals, trust scores, agent activity, queue status, coding tasks, workspace stats, and more.")}handleDashboardCategoryFilter(e){this.dashboardCategoryFilter=e}handleDashboardBack(){if(this.activeDashboardId=null,this.activeDashboardHtml=null,this.activeDashboardManifest=null,this.dashboardChatOpen=!1,this.dashboardPreviousSessionKey){const e=this.dashboardPreviousSessionKey;this.dashboardPreviousSessionKey=null,R(async()=>{const{saveDraft:t}=await Promise.resolve().then(()=>Qa);return{saveDraft:t}},void 0,import.meta.url).then(({saveDraft:t})=>{t(this),this.sessionKey=e,R(async()=>{const{loadChatHistory:n}=await Promise.resolve().then(()=>Ye);return{loadChatHistory:n}},void 0,import.meta.url).then(({loadChatHistory:n})=>{n(this)})})}}async handleDashboardOpenSession(e){const t=this.activeDashboardManifest?.sessionId;if(!t){this.showToast("No session for this dashboard","error");return}this.dashboardPreviousSessionKey=null,this.activeDashboardId=null,this.activeDashboardHtml=null,this.activeDashboardManifest=null,this.dashboardChatOpen=!1;const n=this.settings.openTabs.includes(t)?this.settings.openTabs:[...this.settings.openTabs,t];this.applySettings({...this.settings,openTabs:n,sessionKey:t,lastActiveSessionKey:t,tabLastViewed:{...this.settings.tabLastViewed,[t]:Date.now()}}),this.setTab("chat");const{syncUrlWithSessionKey:s}=await R(async()=>{const{syncUrlWithSessionKey:a}=await Promise.resolve().then(()=>Wb);return{syncUrlWithSessionKey:a}},void 0,import.meta.url);s(this,t,!0)}async handleOptionsLoad(){const{loadOptions:e}=await R(async()=>{const{loadOptions:t}=await import("./options-QuHclvvX.js");return{loadOptions:t}},[],import.meta.url);await e(this)}async handleOptionToggle(e,t){const{saveOption:n}=await R(async()=>{const{saveOption:s}=await import("./options-QuHclvvX.js");return{saveOption:s}},[],import.meta.url);await n(this,e,t)}async handleSecondBrainRefresh(){const{loadSecondBrain:e}=await R(async()=>{const{loadSecondBrain:t}=await import("./second-brain-ghSM5E6X.js");return{loadSecondBrain:t}},[],import.meta.url);await e(this)}handleSecondBrainSubtabChange(e){this.secondBrainSubtab=e,this.secondBrainLoading=!1,this.secondBrainSelectedEntry=null,this.secondBrainSearchQuery="",this.secondBrainError=null,this.secondBrainBrowsingFolder=null,this.secondBrainFolderEntries=null,this.secondBrainFolderName=null,e==="intel"?this.handleIntelLoad().catch(t=>{console.error("[Intel] Load after subtab change failed:",t),this.intelError=t instanceof Error?t.message:"Failed to load intel data"}):e==="files"?this.handleSecondBrainFileTreeRefresh().catch(t=>{console.error("[SecondBrain] File tree load after subtab change failed:",t)}):this.handleSecondBrainRefresh().catch(t=>{console.error("[SecondBrain] Refresh after subtab change failed:",t),this.secondBrainError=t instanceof Error?t.message:"Failed to load data",this.secondBrainLoading=!1})}async handleSecondBrainSelectEntry(e){if(e.endsWith(".html")||e.endsWith(".htm")){try{const s=await this.client.request("secondBrain.memoryBankEntry",{path:e});s?.content&&this.handleOpenSidebar(s.content,{mimeType:"text/html",filePath:e,title:s.name||e.split("/").pop()||"File"})}catch(s){console.error("[SecondBrain] Failed to open HTML file:",s)}return}const{loadSecondBrainEntry:n}=await R(async()=>{const{loadSecondBrainEntry:s}=await import("./second-brain-ghSM5E6X.js");return{loadSecondBrainEntry:s}},[],import.meta.url);await n(this,e)}async handleSecondBrainOpenInBrowser(e){try{if(e.startsWith("http://")||e.startsWith("https://")||e.startsWith("/")){window.open(e,"_blank","noopener,noreferrer");return}const t=await this.client.request("secondBrain.memoryBankEntry",{path:e});if(t?.content){const n=new Blob([t.content],{type:"text/html"}),s=URL.createObjectURL(n);window.open(s,"_blank","noopener,noreferrer")}}catch(t){console.error("[SecondBrain] Failed to open in browser:",t)}}async handleSecondBrainBrowseFolder(e){const{browseFolder:t}=await R(async()=>{const{browseFolder:n}=await import("./second-brain-ghSM5E6X.js");return{browseFolder:n}},[],import.meta.url);await t(this,e)}handleSecondBrainBack(){this.secondBrainSelectedEntry?this.secondBrainSelectedEntry=null:this.secondBrainBrowsingFolder&&(this.secondBrainBrowsingFolder=null,this.secondBrainFolderEntries=null,this.secondBrainFolderName=null)}handleSecondBrainSearch(e){this.secondBrainSearchQuery=e}async handleSecondBrainSync(){const{syncSecondBrain:e}=await R(async()=>{const{syncSecondBrain:t}=await import("./second-brain-ghSM5E6X.js");return{syncSecondBrain:t}},[],import.meta.url);await e(this)}async handleSecondBrainFileTreeRefresh(){if(!(!this.client||!this.connected)){this.secondBrainFileTreeLoading=!0;try{const e=await this.client.request("secondBrain.fileTree",{depth:4});this.secondBrainFileTree=e.tree??[]}catch(e){console.error("[SecondBrain] fileTree failed:",e)}finally{this.secondBrainFileTreeLoading=!1}}}handleSecondBrainFileSearch(e){if(this.secondBrainFileSearchQuery=e,!e.trim()){this.secondBrainFileSearchResults=null;return}this._doSecondBrainFileSearch(e)}async _doSecondBrainFileSearch(e){if(!(!this.client||!this.connected))try{const t=await this.client.request("secondBrain.search",{query:e,limit:50});this.secondBrainFileSearchQuery===e&&(this.secondBrainFileSearchResults=t.results??[])}catch(t){console.error("[SecondBrain] search failed:",t)}}async handleSecondBrainFileSelect(e){if(!(!this.client||!this.connected))try{const t=await this.client.request("secondBrain.memoryBankEntry",{path:e});if(t?.content){const n=e.endsWith(".html")||e.endsWith(".htm");this.handleOpenSidebar(t.content,{mimeType:n?"text/html":"text/markdown",filePath:e,title:t.name||e.split("/").pop()||"File"})}}catch(t){console.error("[SecondBrain] Failed to open file:",t),this.showToast("Failed to open file","error")}}handleResearchAddFormToggle(){this.secondBrainResearchAddFormOpen=!this.secondBrainResearchAddFormOpen,this.secondBrainResearchAddFormOpen&&(this.secondBrainResearchAddForm={title:"",url:"",category:"",tags:"",notes:""})}handleResearchAddFormChange(e,t){this.secondBrainResearchAddForm={...this.secondBrainResearchAddForm,[e]:t}}async handleResearchAddSubmit(){const{addResearch:e}=await R(async()=>{const{addResearch:t}=await import("./second-brain-ghSM5E6X.js");return{addResearch:t}},[],import.meta.url);await e(this)}async handleResearchSaveViaChat(){this.setTab("chat");const{createNewSession:e}=await R(async()=>{const{createNewSession:t}=await Promise.resolve().then(()=>ot);return{createNewSession:t}},void 0,import.meta.url);e(this),this.handleSendChat("I want to save some research. I'll paste links, bookmarks, or notes — please organize them into ~/godmode/memory/research/ with proper frontmatter (title, url, category, tags, date). Ask me what I'd like to save.")}async handleAddSource(){this.setTab("chat");const{createNewSession:e}=await R(async()=>{const{createNewSession:t}=await Promise.resolve().then(()=>ot);return{createNewSession:t}},void 0,import.meta.url);e(this),this.handleSendChat("I want to add a new data source to my Second Brain. Help me figure out what I need — whether it's an API integration, a local file sync, or a new skill. Ask me what source I'd like to connect.")}async handleCommunityResourceAdd(){const{addCommunityResource:e}=await R(async()=>{const{addCommunityResource:t}=await import("./second-brain-ghSM5E6X.js");return{addCommunityResource:t}},[],import.meta.url);await e(this)}async handleCommunityResourceRemove(e){const{removeCommunityResource:t}=await R(async()=>{const{removeCommunityResource:n}=await import("./second-brain-ghSM5E6X.js");return{removeCommunityResource:n}},[],import.meta.url);await t(this,e)}handleCommunityResourceAddFormToggle(){this.secondBrainCommunityResourceAddFormOpen=!this.secondBrainCommunityResourceAddFormOpen,this.secondBrainCommunityResourceAddFormOpen&&(this.secondBrainCommunityResourceAddForm={url:"",label:"",description:"",tags:""})}handleCommunityResourceAddFormChange(e,t){this.secondBrainCommunityResourceAddForm={...this.secondBrainCommunityResourceAddForm,[e]:t}}removeQueuedMessage(e){Ou(this,e)}async handleSendChat(e,t){const n=this.sessionsResult?.sessions?.find(s=>s.key===this.sessionKey);if(n){const s=n.totalTokens??0,a=n.contextTokens??this.sessionsResult?.defaults?.contextTokens??2e5;if((a>0?s/a:0)>=.9&&!this.compactionStatus?.active){const o=(e??this.chatMessage).trim(),l=e==null?[...this.chatAttachments??[]]:[];if(o||l.length>0){this.pendingRetry={message:o,attachments:l,timestamp:Date.now()},this.autoRetryAfterCompact=!0,this.chatMessages=[...this.chatMessages,{role:"user",content:[{type:"text",text:o}],timestamp:Date.now()}],e==null&&(this.chatMessage="",this.chatAttachments=[]),this.showToast("Context near limit — auto-compacting...","info",3e3),this.handleCompactChat();return}}}await Fu(this,e,t)}handleToggleSessionPicker(){this.sessionPickerOpen=!this.sessionPickerOpen}handleToggleSessionSearch(e){if(!this.sessionSearchOpen&&e){const n=e.currentTarget.getBoundingClientRect();this.sessionSearchPosition={top:n.bottom+8,right:window.innerWidth-n.right}}this.sessionSearchOpen=!this.sessionSearchOpen,this.sessionSearchOpen||(this.sessionSearchQuery="",this.sessionSearchResults=[])}async handleSessionSearchQuery(e){if(this.sessionSearchQuery=e,!e.trim()){this.sessionSearchResults=[];return}if(this.client){this.sessionSearchLoading=!0;try{const t=await this.client.request("sessions.searchContent",{query:e.trim(),limit:20});this.sessionSearchResults=t.results}catch(t){console.error("Session search failed:",t),this.sessionSearchResults=[]}finally{this.sessionSearchLoading=!1}}}handleSelectSession(e){this.sessionPickerOpen=!1,this.sessionSearchOpen=!1,this.sessionSearchQuery="",this.sessionSearchResults=[]}async handleWhatsAppStart(e){await kh(this,e)}async handleWhatsAppWait(){await Sh(this)}async handleWhatsAppLogout(){await Ah(this)}async handleChannelConfigSave(){await xh(this)}async handleChannelConfigReload(){await Th(this)}async handleCompactChat(){if(!this.connected){this.showToast("Cannot compact: not connected","error");return}if(!this.sessionKey){this.showToast("Cannot compact: no active session","error");return}this.compactionStatus={active:!0,startedAt:Date.now(),completedAt:null};try{await this.handleSendChat("/compact")}catch(e){this.compactionStatus=null,console.error("Compaction failed:",e),this.showToast("Compaction failed","error")}}injectCompactionSummary(e,t){const n={role:"system",content:e,timestamp:Date.now(),isCompactionSummary:!0,keptMessages:t};this.chatMessages=[n,...this.chatMessages]}async handleRetryMessage(){const e={client:this.client,connected:this.connected,sessionKey:this.sessionKey,chatLoading:this.chatLoading,chatMessages:this.chatMessages,chatThinkingLevel:this.chatThinkingLevel,chatSending:this.chatSending,chatSendingSessionKey:this.chatSendingSessionKey,chatMessage:this.chatMessage,chatAttachments:this.chatAttachments,chatRunId:this.chatRunId,chatStream:this.chatStream,chatStreamStartedAt:this.chatStreamStartedAt,lastError:this.lastError,pendingRetry:this.pendingRetry},t=await _d(e);this.chatSending=e.chatSending,this.chatSendingSessionKey=e.chatSendingSessionKey,this.chatRunId=e.chatRunId,this.chatStream=e.chatStream,this.chatStreamStartedAt=e.chatStreamStartedAt,this.lastError=e.lastError,this.pendingRetry=e.pendingRetry??null,this.chatMessages=e.chatMessages,t&&this.showToast("Message resent","success",2e3)}handleClearRetry(){this.pendingRetry=null}handleNostrProfileEdit(e,t){Ch(this,e,t)}handleNostrProfileCancel(){Rh(this)}handleNostrProfileFieldChange(e,t){Eh(this,e,t)}async handleNostrProfileSave(){await Lh(this)}async handleNostrProfileImport(){await Ih(this)}handleNostrProfileToggleAdvanced(){Ph(this)}async handleExecApprovalDecision(e){const t=this.execApprovalQueue[0];if(!(!t||!this.client||this.execApprovalBusy)){this.execApprovalBusy=!0,this.execApprovalError=null;try{await this.client.request("exec.approval.resolve",{id:t.id,decision:e}),this.execApprovalQueue=this.execApprovalQueue.filter(n=>n.id!==t.id)}catch(n){this.execApprovalError=`Exec approval failed: ${String(n)}`}finally{this.execApprovalBusy=!1}}}handleGatewayUrlConfirm(){const e=this.pendingGatewayUrl;e&&(this.pendingGatewayUrl=null,Ze(this,{...this.settings,gatewayUrl:e}),this.connect())}handleGatewayUrlCancel(){this.pendingGatewayUrl=null}handleGatewayRestartClick(){this.gatewayRestartPending=!0}async handleGatewayRestartConfirm(){if(!(!this.client||this.gatewayRestartBusy)){this.gatewayRestartBusy=!0;try{await this.client.request("godmode.gateway.restart")}catch{}finally{this.gatewayRestartBusy=!1,this.gatewayRestartPending=!1}}}handleGatewayRestartCancel(){this.gatewayRestartPending=!1}handleOpenSidebar(e,t={}){this.sidebarCloseTimer!=null&&(window.clearTimeout(this.sidebarCloseTimer),this.sidebarCloseTimer=null),this.sidebarContent=e,this.sidebarError=null,this.sidebarMimeType=t.mimeType?.trim()||null,this.sidebarFilePath=t.filePath?.trim()||null,this.sidebarTitle=t.title?.trim()||null,this.sidebarMode="resource",this.sidebarProofSlug=null,this.sidebarProofUrl=null,this.sidebarOpen=!0}handleCloseSidebar(){this.sidebarOpen=!1,this.showDrivePicker=!1,this.sidebarCloseTimer!=null&&window.clearTimeout(this.sidebarCloseTimer),this.sidebarCloseTimer=window.setTimeout(()=>{this.sidebarOpen||(this.sidebarContent=null,this.sidebarError=null,this.sidebarMimeType=null,this.sidebarFilePath=null,this.sidebarTitle=null,this.sidebarMode="resource",this.sidebarProofSlug=null,this.sidebarProofUrl=null,this.sidebarCloseTimer=null)},200)}async handleOpenFile(e){if(!this.client||!this.connected){this.showToast("Not connected to gateway","error");return}try{const t=await this.client.request("files.read",{path:e}),n=e.split(".").pop()?.toLowerCase()??"",s=t.contentType??t.mime??(n==="md"?"text/markdown":null),a=e.split("/").pop()??e;this.handleOpenSidebar(t.content,{mimeType:s,filePath:e,title:a}),t.truncated&&this.showToast(`Opened truncated file: ${e}`,"warning")}catch(t){console.error("[Chat] Failed to open file:",t),this.showToast(`Failed to open file: ${e}`,"error")}}async handleToggleDrivePicker(){if(this.showDrivePicker){this.showDrivePicker=!1;return}if(this.driveAccounts.length===0)try{const e=await this.client?.request("files.listDriveAccounts",{});this.driveAccounts=e?.accounts??[]}catch{this.driveAccounts=[]}this.showDrivePicker=!0}async handlePushToDrive(e,t){if(!this.driveUploading){if(this.showDrivePicker=!1,this._pendingBatchPaths&&this._pendingBatchPaths.length>0){const n=this._pendingBatchPaths;this._pendingBatchPaths=void 0,await this._executeBatchDrive(n,t);return}this.driveUploading=!0;try{const n={filePath:e};t&&(n.account=t);const s=await this.client?.request("files.pushToDrive",n),a=t?` to ${t.split("@")[0]}`:"",i=s?.message??`Uploaded${a} to Google Drive`,o=s?.driveUrl;this.showToast(i,"success",o?8e3:5e3,o?{label:"View in Drive",url:o}:void 0)}catch(n){console.error("Push to Drive failed:",n);const s=n instanceof Error?n.message:typeof n=="object"&&n!==null&&"message"in n?String(n.message):"Unknown error";s.includes("GOG_NOT_FOUND")||s.includes("gog CLI not found")?this.showToast("Google Drive not configured. Install gog CLI: npm install -g gog-cli, then run: gog auth add <email> --services drive","warning",1e4):s.includes("GOG_AUTH")||s.includes("auth")&&s.includes("expired")?this.showToast("Google Drive auth expired. Re-authenticate: gog auth add <email> --services drive","warning",8e3):this.showToast(`Drive upload failed: ${s}`,"error",8e3)}finally{this.driveUploading=!1}}}async handleBatchPushToDrive(e){if(this.driveUploading||e.length===0)return;if(!this.driveAccounts||this.driveAccounts.length===0)try{const n=await this.client?.request("files.listDriveAccounts");this.driveAccounts=n?.accounts??[]}catch{}if(this.driveAccounts&&this.driveAccounts.length>1){this._pendingBatchPaths=e,this.showDrivePicker=!0;return}const t=this.driveAccounts?.[0]?.email;await this._executeBatchDrive(e,t)}async _executeBatchDrive(e,t){this.driveUploading=!0,this.showToast(`Uploading ${e.length} files to Drive...`,"info",0);try{const n={filePaths:e};t&&(n.account=t);const s=await this.client?.request("files.batchPushToDrive",n);this.dismissAllToasts();const a=s?.results?.filter(o=>o.success).length??0,i=s?.results?.length??e.length;a===i?this.showToast(`Uploaded ${a} files to Google Drive`,"success",5e3):this.showToast(`Uploaded ${a}/${i} files (${i-a} failed)`,"warning",8e3)}catch(n){this.dismissAllToasts();const s=n instanceof Error?n.message:"Unknown error";this.showToast(`Batch Drive upload failed: ${s}`,"error",8e3)}finally{this.driveUploading=!1,this._pendingBatchPaths=void 0}}handleSplitRatioChange(e){const t=Math.max(.4,Math.min(.7,e));this.splitRatio=t,this.applySettings({...this.settings,splitRatio:t})}handleImageClick(e,t,n){this.lightbox=pS(e,t,n)}handleLightboxClose(){this.lightbox=hS()}handleLightboxNav(e){this.lightbox=fS(this.lightbox,e)}normalizeWorkspacePathCandidate(e,t={}){let n=e.trim();if(!n||n.startsWith("#"))return null;for(;n.startsWith("./");)n=n.slice(2);if(n=n.replaceAll("\\","/"),!t.allowAbsolute)for(;n.startsWith("/");)n=n.slice(1);return!n||n.includes("\0")?null:n}isAbsoluteFilesystemPath(e){return e.startsWith("/")||e.startsWith("~/")||/^[a-z]:[\\/]/i.test(e)}inferMimeTypeFromPath(e){if(!e)return null;const t=e.trim().toLowerCase();if(!t)return null;const n=t.split(".").pop()??"";return n?n==="md"||n==="markdown"||n==="mdx"?"text/markdown":n==="html"||n==="htm"?"text/html":n==="json"||n==="json5"?"application/json":n==="txt"||n==="text"||n==="log"?"text/plain":n==="svg"||n==="svgz"?"image/svg+xml":n==="avif"||n==="bmp"||n==="gif"||n==="heic"||n==="heif"||n==="jpeg"||n==="jpg"||n==="png"||n==="webp"?`image/${n==="jpg"?"jpeg":n}`:null:null}sidebarTitleForPath(e){const t=e.replaceAll("\\","/").trim();if(!t)return"Document";const n=t.split("/");return n[n.length-1]||t}async listWorkspaceIdsForPathResolution(){const e=[],t=new Set,n=s=>{if(typeof s!="string")return;const a=s.trim();!a||t.has(a)||(t.add(a),e.push(a))};n(this.selectedWorkspace?.id);for(const s of this.workspaces??[])n(s.id);if(e.length>0||!this.client||!this.connected)return e;try{const s=await this.client.request("workspaces.list",{});for(const a of s.workspaces??[])n(a.id)}catch{}return e}async openWorkspaceRelativeFileInViewer(e){if(!this.client||!this.connected)return!1;const t=await this.listWorkspaceIdsForPathResolution();for(const n of t)try{const s=await this.client.request("workspaces.readFile",{workspaceId:n,filePath:e});if(typeof s.content!="string")continue;return this.handleOpenSidebar(s.content,{mimeType:s.contentType??s.mime??this.inferMimeTypeFromPath(e),filePath:s.path??e,title:this.sidebarTitleForPath(e)}),!0}catch{}return!1}extractWorkspacePathCandidatesFromHref(e){const t=e.trim();if(!t)return[];const n=[],s=t.toLowerCase();if(s.startsWith("mailto:")||s.startsWith("tel:")||s.startsWith("javascript:")||s.startsWith("data:"))return[];if(t.startsWith("file://")){let u=t.slice(7);u.startsWith("/~/")&&(u="~"+u.slice(2));try{u=decodeURIComponent(u)}catch{}n.push(u);const h=[],f=new Set;for(const m of n){const w=this.normalizeWorkspacePathCandidate(m,{allowAbsolute:!0});!w||f.has(w)||(f.add(w),h.push(w))}return h}const a=/^[a-z][a-z0-9+.-]*:/i.test(t),i=/^[a-z]:[\\/]/i.test(t);(!a||i)&&n.push(t);let o=null;try{o=new URL(t,window.location.href)}catch{o=null}if(o&&/^https?:$/.test(o.protocol)&&o.origin===window.location.origin){for(const $ of fA){const c=o.searchParams.get($);c&&n.push(c)}const h=(t.split("#")[0]??"").split("?")[0]??"";h.length>0&&!h.startsWith("/")&&!h.includes("://")&&n.push(h);let m=o.pathname;this.basePath&&m.startsWith(`${this.basePath}/`)?m=m.slice(this.basePath.length):this.basePath&&m===this.basePath&&(m="");const w=m.startsWith("/")?m.slice(1):m;if(w){n.push(w);const $=w.indexOf("/");if($>0){const c=w.slice(0,$).toLowerCase();Ac.has(c)&&n.push(w.slice($+1))}}if(m.startsWith("/")&&w){const $=w.split("/")[0]?.toLowerCase()??"";Ac.has($)||n.push(m)}}const l=[],d=new Set;for(const u of n){let h=u;try{h=decodeURIComponent(u)}catch{}const f=this.normalizeWorkspacePathCandidate(h,{allowAbsolute:!0});!f||d.has(f)||(d.add(f),l.push(f))}return l}async openWorkspaceFileInViewer(e){if(!this.client||!this.connected)return!1;const t=this.isAbsoluteFilesystemPath(e);if(!t&&await this.openWorkspaceRelativeFileInViewer(e))return!0;try{const n=await this.client.request("workspaces.readFile",{path:e});if(typeof n.content=="string")return this.handleOpenSidebar(n.content,{mimeType:n.contentType??n.mime??this.inferMimeTypeFromPath(e),filePath:n.path??e,title:this.sidebarTitleForPath(e)}),!0}catch{}if(!t)return!1;try{const n=await this.client.request("files.read",{path:e,maxSize:1e6});return typeof n.content!="string"?!1:(this.handleOpenSidebar(n.content,{mimeType:this.inferMimeTypeFromPath(e),filePath:e,title:this.sidebarTitleForPath(e)}),!0)}catch{return!1}}async handleOpenMessageFileLink(e){const t=this.extractWorkspacePathCandidatesFromHref(e);if(t.length===0)return!1;for(const n of t)if(await this.openWorkspaceFileInViewer(n))return!0;return!1}showToast(e,t="info",n=5e3,s){const a=rA(e,t,n,s);this.toasts=cA(this.toasts,a),n>0&&window.setTimeout(()=>{this.dismissToast(a.id)},n)}dismissToast(e){this.toasts=lA(this.toasts,e)}dismissAllToasts(){this.toasts=[]}async handleMyDayRefresh(){await Vs(this),this._loadDecisionCards()}_loadDecisionCards(){R(()=>Promise.resolve().then(()=>Nn),void 0,import.meta.url).then(async e=>{this.todayQueueResults=await e.loadTodayQueueResults(this)}).catch(()=>{})}async loadTodayQueueResults(){this._loadDecisionCards()}async handleMyDayTaskStatusChange(e,t){if(!(!this.client||!this.connected))try{await this.client.request("tasks.update",{id:e,status:t,completedAt:t==="complete"?new Date().toISOString():null});const{loadTodayTasksWithQueueStatus:n}=await R(async()=>{const{loadTodayTasksWithQueueStatus:s}=await Promise.resolve().then(()=>Nn);return{loadTodayTasksWithQueueStatus:s}},void 0,import.meta.url);await n(this)}catch(n){console.error("[MyDay] Failed to update task status:",n)}}async handleTodayCreateTask(e){if(!(!this.client||!this.connected))try{await this.client.request("tasks.create",{title:e,dueDate:ce(),priority:"medium",source:"chat"});const{loadTodayTasksWithQueueStatus:t}=await R(async()=>{const{loadTodayTasksWithQueueStatus:n}=await Promise.resolve().then(()=>Nn);return{loadTodayTasksWithQueueStatus:n}},void 0,import.meta.url);await t(this)}catch(t){console.error("[MyDay] Failed to create task:",t),this.showToast("Failed to create task","error")}}handleTodayEditTask(e){this.todayEditingTaskId=e}async handleTodayUpdateTask(e,t){if(!(!this.client||!this.connected))try{await this.client.request("tasks.update",{id:e,...t}),this.todayEditingTaskId=null;const{loadTodayTasksWithQueueStatus:n}=await R(async()=>{const{loadTodayTasksWithQueueStatus:s}=await Promise.resolve().then(()=>Nn);return{loadTodayTasksWithQueueStatus:s}},void 0,import.meta.url);await n(this)}catch(n){console.error("[MyDay] Failed to update task:",n),this.showToast("Failed to update task","error")}}handleTodayToggleCompleted(){this.todayShowCompleted=!this.todayShowCompleted}async handleTodayViewTaskOutput(e){if(!(!this.client||!this.connected))try{const n=(await this.client.request("queue.list",{limit:100}))?.items?.find(i=>i.sourceTaskId===e);if(!n?.result?.outputPath){this.showToast("No output available for this task","info");return}const s=await this.client.request("queue.readOutput",{path:n.result.outputPath}),a=n.result.outputPath.split("/").pop()??"Agent Output";this.handleOpenSidebar(s.content,{mimeType:"text/markdown",filePath:n.result.outputPath,title:a})}catch(t){console.error("[Tasks] View output failed:",t),this.showToast("Failed to load agent output","error")}}async handleTodayStartTask(e){if(!(!this.client||!this.connected))try{const t=await this.client.request("tasks.openSession",{taskId:e}),n=t?.sessionId??t?.sessionKey;if(n){if(t.task?.title){const{autoTitleCache:i}=await R(async()=>{const{autoTitleCache:l}=await Promise.resolve().then(()=>Pn);return{autoTitleCache:l}},void 0,import.meta.url);i.set(n,t.task.title);const{hostPatchSession:o}=await R(async()=>{const{hostPatchSession:l}=await Promise.resolve().then(()=>Hv);return{hostPatchSession:l}},void 0,import.meta.url);o(this.client,n,t.task.title)}this.setTab("chat"),this.sessionKey=n;const s=this.settings.openTabs.includes(n)?this.settings.openTabs:[...this.settings.openTabs,n];this.applySettings({...this.settings,sessionKey:n,lastActiveSessionKey:n,openTabs:s}),this.chatMessages=[],this.chatStream=null,this.chatStreamStartedAt=null,this.chatRunId=null,this.resetToolStream(),this.resetChatScroll(),this.loadAssistantIdentity();const{loadChatHistory:a}=await R(async()=>{const{loadChatHistory:i}=await Promise.resolve().then(()=>Ye);return{loadChatHistory:i}},void 0,import.meta.url);await a(this),this.loadSessionResources(),t.queueOutput&&this.chatMessages.length===0&&this.seedSessionWithAgentOutput(t.task?.title??"this task",t.queueOutput,t.agentPrompt??void 0),this.requestUpdate()}}catch(t){console.error("[MyDay] Failed to open session for task:",t),this.showToast("Failed to open session for task","error")}}handleDatePrev(){const e=new Date(this.todaySelectedDate+"T12:00:00");e.setDate(e.getDate()-1),this.todaySelectedDate=ce(e),Fn(this)}handleDateNext(){const e=new Date(this.todaySelectedDate+"T12:00:00");e.setDate(e.getDate()+1);const t=ce(),n=ce(e);n>t||(this.todaySelectedDate=n,Fn(this))}handleDateToday(){this.todaySelectedDate=ce(),Vs(this)}async handleDailyBriefRefresh(){await Fn(this)}async handleDailyBriefGenerate(){if(!(!this.client||!this.connected)){this.dailyBriefLoading=!0;try{await this.client.request("dailyBrief.generate",{}),await Fn(this)}catch(e){this.dailyBriefError=e instanceof Error?e.message:"Failed to generate brief"}finally{this.dailyBriefLoading=!1}}}handleDailyBriefOpenInObsidian(){const e=this.dailyBrief?.date;yu(e)}async loadBriefNotes(){if(!this.client||!this.connected)return;const e=this.todaySelectedDate;try{const t=await this.client.request("briefNotes.get",{date:e});this.briefNotes=t.notes??{}}catch(t){console.error("[BriefNotes] Load error:",t),this.briefNotes={}}}async handleBriefNoteSave(e,t){if(!this.client||!this.connected)return;const n=this.todaySelectedDate;try{const s=await this.client.request("briefNotes.update",{date:n,section:e,text:t});this.briefNotes=s.notes??{}}catch(s){console.error("[BriefNotes] Save error:",s),this.showToast("Failed to save note","error")}}handleTodayViewModeChange(e){this.todayViewMode=e}handlePrivateModeToggle(){if(this.chatPrivateMode){const e=this.sessionKey;this.chatPrivateMode=!1,this._destroyPrivateSession(e),this.showToast("Private session destroyed","info",2e3);return}this.chatPrivateMode=!0,this.setTab("chat"),R(async()=>{const{createNewSession:e}=await Promise.resolve().then(()=>ot);return{createNewSession:e}},void 0,import.meta.url).then(({createNewSession:e})=>{e(this);const t=Date.now()+1440*60*1e3;this.privateSessions=new Map(this.privateSessions).set(this.sessionKey,t),this._persistPrivateSessions(),this._startPrivateSessionTimer(),this.client&&this.connected&&this.client.request("session.setPrivate",{sessionKey:this.sessionKey,enabled:!0}).catch(()=>{}),this.chatMessages=[{role:"assistant",content:`This is a **private session**. Nothing will be saved to memory or logs.
 
 This session self-destructs when you close it or in **24 hours** — whichever comes first.`,timestamp:Date.now()}],this.requestUpdate()}),this.showToast("Private session created — 24h countdown started","info",3e3)}async _destroyPrivateSession(e){const t=new Map(this.privateSessions);if(t.delete(e),this.privateSessions=t,this._persistPrivateSessions(),this.sessionKey===e){this.chatPrivateMode=!1;const n=this.settings.openTabs.filter(a=>a!==e),s=n[0]||Q;this.applySettings({...this.settings,openTabs:n,sessionKey:s,lastActiveSessionKey:s}),this.sessionKey=s,(await R(async()=>{const{loadChatHistory:a}=await Promise.resolve().then(()=>Ye);return{loadChatHistory:a}},void 0,import.meta.url)).loadChatHistory(this)}else this.applySettings({...this.settings,openTabs:this.settings.openTabs.filter(n=>n!==e)});this.client&&this.connected&&(this.client.request("session.setPrivate",{sessionKey:e,enabled:!1}).catch(()=>{}),this.client.request("sessions.delete",{key:e,deleteTranscript:!0}).catch(()=>{})),this.privateSessions.size===0&&this._stopPrivateSessionTimer()}_persistPrivateSessions(){const e=Array.from(this.privateSessions.entries());e.length===0?localStorage.removeItem("godmode.privateSessions"):localStorage.setItem("godmode.privateSessions",JSON.stringify(e))}_restorePrivateSessions(){try{const e=localStorage.getItem("godmode.privateSessions");if(!e)return;const t=JSON.parse(e),n=Date.now(),s=t.filter(([,a])=>a>n);if(this.privateSessions=new Map(s),s.length!==t.length){const a=t.filter(([,i])=>i<=n);for(const[i]of a)this._destroyPrivateSession(i)}this.privateSessions.size>0&&(this.privateSessions.has(this.sessionKey)&&(this.chatPrivateMode=!0),this._startPrivateSessionTimer()),this._persistPrivateSessions()}catch{localStorage.removeItem("godmode.privateSessions")}}_startPrivateSessionTimer(){this._privateSessionTimer||(this._privateSessionTimer=setInterval(()=>{const e=Date.now();for(const[t,n]of this.privateSessions)n<=e&&(this._destroyPrivateSession(t),this.showToast("Private session expired and was destroyed","info",3e3));this.privateSessions.size>0&&this.requestUpdate()},3e4))}_stopPrivateSessionTimer(){this._privateSessionTimer&&(clearInterval(this._privateSessionTimer),this._privateSessionTimer=null)}async handleBriefSave(e){if(!this.client||!this.connected)return;const t=this.dailyBrief?.date||this.todaySelectedDate;try{await this.client.request("dailyBrief.update",{date:t,content:e}),this.dailyBrief&&(this.dailyBrief={...this.dailyBrief,updatedAt:new Date().toISOString()})}catch(n){console.error("[DailyBrief] Save error:",n),this.showToast("Failed to save brief","error")}}async handleBriefToggleCheckbox(e,t){if(!this.client||!this.connected)return;const n=this.dailyBrief?.date||this.todaySelectedDate;try{await this.client.request("dailyBrief.toggleCheckbox",{date:n,index:e,checked:t}),this.dailyBrief&&(this.dailyBrief={...this.dailyBrief,updatedAt:new Date().toISOString()})}catch(s){console.error("[DailyBrief] Checkbox toggle error:",s),this.showToast("Failed to toggle checkbox","error")}}async handleWorkRefresh(){await Promise.all([bu(this),wu(this)])}async handleResourcePin(e,t){await ob(this,e,t)}async handleResourceDelete(e){await rb(this,e)}handleResourceFilterChange(e){this.workResourceFilter=e}handleResourceClick(e){e.path?this.handleWorkFileClick(e.path):e.url&&window.open(e.url,"_blank","noopener,noreferrer")}async loadSessionResources(){if(!(!this.client||!this.connected))try{const e=await this.client.request("resources.list",{sessionKey:this.sessionKey,limit:20});this.sessionResources=e.resources??[]}catch(e){console.warn("[SessionResources] load failed:",e),this.sessionResources=[]}}handleSessionResourceClick(e){e.path?this.handleOpenFile(e.path):e.url&&window.open(e.url,"_blank","noopener,noreferrer")}handleToggleSessionResources(){this.sessionResourcesCollapsed=!this.sessionResourcesCollapsed}handleViewAllResources(){this.setTab("work")}handleWorkToggleProject(e){const t=new Set(this.workExpandedProjects);t.has(e)?t.delete(e):(t.add(e),this.workProjectFiles[e]||ib(this,e)),this.workExpandedProjects=t}async handleWorkFileClick(e){if(!this.client||!this.connected){this.showToast("Not connected to gateway","error");return}try{const t=await this.client.request("workspaces.readFile",{path:e});if(!t.content){this.showToast(t.error??"Failed to read file","error");return}this.handleOpenSidebar(t.content,{mimeType:t.contentType??t.mime??this.inferMimeTypeFromPath(e),filePath:t.path??e,title:this.sidebarTitleForPath(e)})}catch(t){console.error("[Work] Failed to read file:",t),this.showToast(`Failed to open: ${e}`,"error")}}handleWorkSkillClick(e,t){this.handleStartChatWithPrompt(`Tell me about the "${e}" skill and how it's used in the ${t} project.`)}handlePeopleImport(e){const t=e==="apple"?"Import my contacts from Apple Contacts and organize them into categories.":"Import my contacts from Google Contacts and organize them into categories.";this.handleStartChatWithPrompt(t)}async handleWorkspacesRefresh(){await ua(this)}async handleWorkspaceBrowse(e){if(!this.selectedWorkspace)return;const{browseWorkspaceFolder:t}=await R(async()=>{const{browseWorkspaceFolder:s}=await Promise.resolve().then(()=>he);return{browseWorkspaceFolder:s}},void 0,import.meta.url),n=await t(this,this.selectedWorkspace.id,e);n&&(this.workspaceBrowsePath=e,this.workspaceBrowseEntries=n.entries,this.workspaceBreadcrumbs=n.breadcrumbs)}async handleWorkspaceBrowseSearch(e){if(this.workspaceBrowseSearchQuery=e,!e.trim()||!this.selectedWorkspace){this.workspaceBrowseSearchResults=null;return}const{searchWorkspaceFiles:t}=await R(async()=>{const{searchWorkspaceFiles:n}=await Promise.resolve().then(()=>he);return{searchWorkspaceFiles:n}},void 0,import.meta.url);this.workspaceBrowseSearchResults=await t(this,this.selectedWorkspace.id,e)}handleWorkspaceBrowseBack(){this.workspaceBrowsePath=null,this.workspaceBrowseEntries=null,this.workspaceBreadcrumbs=null,this.workspaceBrowseSearchQuery="",this.workspaceBrowseSearchResults=null}async handleWorkspaceCreateFolder(e){if(!this.selectedWorkspace)return;const{createWorkspaceFolder:t}=await R(async()=>{const{createWorkspaceFolder:s}=await Promise.resolve().then(()=>he);return{createWorkspaceFolder:s}},void 0,import.meta.url),n=await t(this,this.selectedWorkspace.id,e);n&&this.workspaceBrowsePath&&await this.handleWorkspaceBrowse(this.workspaceBrowsePath),n&&this.showToast("Folder created","success",2e3)}handleOnboardingStart(){this.onboardingPhase=1,this.onboardingData&&(this.onboardingData={...this.onboardingData,phase:1}),this.client?.request("onboarding.update",{phase:1,completePhase:0})}async handleOnboardingIdentitySubmit(e){if(this.client)try{await this.client.request("onboarding.update",{phase:2,completePhase:1,identity:e}),this.onboardingPhase=2,this.onboardingData&&(this.onboardingData={...this.onboardingData,phase:2,identity:e}),this.userName=e.name,this.userAvatar=e.emoji,this.applySettings({...this.settings,userName:e.name,userAvatar:e.emoji}),this.setTab("chat"),R(async()=>{const{createNewSession:t}=await Promise.resolve().then(()=>ot);return{createNewSession:t}},void 0,import.meta.url).then(({createNewSession:t})=>{t(this);const n=`I just set up my GodMode identity. My name is ${e.name}${e.mission?` and my mission is: ${e.mission}`:""}. Let's set up my workspace.`;this.chatMessage=n,this.handleSendChat(n)})}catch(t){console.error("[Onboarding] Identity submit failed:",t),this.showToast("Failed to save identity","error")}}handleOnboardingSkipPhase(){if(!this.client)return;const e=Math.min(this.onboardingPhase+1,6);this.onboardingPhase=e,this.client.request("onboarding.update",{phase:e,completePhase:this.onboardingPhase})}handleOnboardingComplete(){this.onboardingActive=!1,this.onboardingPhase=6,this.onboardingData&&(this.onboardingData={...this.onboardingData,phase:6,completedAt:new Date().toISOString()}),this.client?.request("onboarding.complete",{summary:this.onboardingData?.summary??null}),this.showToast("Welcome to GodMode!","success",4e3)}handleStartChatWithPrompt(e){this.setTab("chat"),R(async()=>{const{createNewSession:t}=await Promise.resolve().then(()=>ot);return{createNewSession:t}},void 0,import.meta.url).then(({createNewSession:t})=>{t(this),this.chatMessage=e,this.requestUpdate()})}handleOpenSupportChat(){const e="agent:main:support";if(this.sessionKey===e){this.setTab("chat");return}R(async()=>{const{saveDraft:s}=await Promise.resolve().then(()=>Qa);return{saveDraft:s}},void 0,import.meta.url).then(({saveDraft:s})=>s(this));const n=this.settings.openTabs.includes(e)?this.settings.openTabs:[...this.settings.openTabs,e];this.applySettings({...this.settings,openTabs:n,sessionKey:e,lastActiveSessionKey:e,tabLastViewed:{...this.settings.tabLastViewed,[e]:Date.now()}}),this.sessionKey=e,this.setTab("chat"),this.chatMessages=[],this.chatStream=null,this.chatStreamStartedAt=null,this.chatRunId=null,this.resetToolStream(),this.resetChatScroll(),this.loadAssistantIdentity(),R(async()=>{const{autoTitleCache:s}=await Promise.resolve().then(()=>Pn);return{autoTitleCache:s}},void 0,import.meta.url).then(({autoTitleCache:s})=>{s.set(e,"Support")}),R(async()=>{const{loadChatHistory:s}=await Promise.resolve().then(()=>Ye);return{loadChatHistory:s}},void 0,import.meta.url).then(({loadChatHistory:s})=>{s(this).then(()=>{this.loadSessionResources(),this.chatMessages.length===0&&this.sessionKey===e&&(this.chatMessages=[{role:"assistant",content:`**Welcome to GodMode Support**
 
@@ -9337,4 +9350,4 @@ I have full access to your system diagnostics and GodMode knowledge base. I can 
 - Setup guidance
 - Escalation to the team if needed
 
-What can I help you with?`,timestamp:Date.now()}],this.requestUpdate())}).catch(a=>{console.error("[Support] Failed to load chat history:",a)})})}handleWizardOpen(){R(async()=>{const{emptyWizardState:e}=await Promise.resolve().then(()=>FS);return{emptyWizardState:e}},void 0,import.meta.url).then(({emptyWizardState:e})=>{this.wizardState=e(),this.wizardActive=!0,this.requestUpdate()})}handleWizardClose(){this.wizardActive=!1,this.wizardState=null,this.requestUpdate()}handleWizardStepChange(e){this.wizardState&&(this.wizardState={...this.wizardState,step:e},this.requestUpdate())}handleWizardAnswerChange(e,t){this.wizardState&&(this.wizardState={...this.wizardState,answers:{...this.wizardState.answers,[e]:t}},this.requestUpdate())}async handleWizardPreview(){if(!(!this.client||!this.wizardState))try{const[e,t]=await Promise.all([this.client.request("onboarding.wizard.preview",this.wizardState.answers),this.client.request("onboarding.wizard.diff",this.wizardState.answers).catch(()=>null)]),n={};for(const a of e.files??[])n[a.path]=a.wouldCreate;const s={};if(t){for(const a of t.additions)s[a.path]=!0;for(const a of t.changes)s[a.path]=!1}this.wizardState={...this.wizardState,preview:e.files??[],diff:t,fileSelections:n,configSelections:s},this.requestUpdate()}catch(e){console.error("[Wizard] Preview failed:",e)}}handleWizardFileToggle(e,t){this.wizardState&&(this.wizardState={...this.wizardState,fileSelections:{...this.wizardState.fileSelections,[e]:t}},this.requestUpdate())}handleWizardConfigToggle(e,t){this.wizardState&&(this.wizardState={...this.wizardState,configSelections:{...this.wizardState.configSelections,[e]:t}},this.requestUpdate())}async handleWizardGenerate(){if(!this.client||!this.wizardState)return;this.wizardState={...this.wizardState,generating:!0,error:null},this.requestUpdate();const e=[];for(const[n,s]of Object.entries(this.wizardState.fileSelections))s||e.push(n);const t=[];for(const[n,s]of Object.entries(this.wizardState.configSelections))s||t.push(n);try{const n=await this.client.request("onboarding.wizard.generate",{...this.wizardState.answers,skipFiles:e,skipKeys:t});this.wizardState={...this.wizardState,generating:!1,step:9,result:{filesCreated:n.filesCreated,filesSkipped:n.filesSkipped,configPatched:n.configPatched,workspacePath:n.workspacePath}},this.requestUpdate(),this.showToast("Memory system generated!","success",4e3)}catch(n){const s=n instanceof Error?n.message:"Failed to generate workspace";this.wizardState={...this.wizardState,generating:!1,error:s},this.requestUpdate(),this.showToast(s,"error")}}async handleQuickSetup(e){R(()=>import("./setup-CWjMtnE4.js"),[],import.meta.url).then(async({quickSetup:t})=>{await t(this,e)&&(this.setTab("chat"),R(async()=>{const{loadCapabilities:s}=await import("./setup-CWjMtnE4.js");return{loadCapabilities:s}},[],import.meta.url).then(({loadCapabilities:s})=>s(this)))})}handleLoadCapabilities(){R(async()=>{const{loadCapabilities:e}=await import("./setup-CWjMtnE4.js");return{loadCapabilities:e}},[],import.meta.url).then(({loadCapabilities:e})=>e(this))}handleCapabilityAction(e){R(async()=>{const{capabilityAction:t}=await import("./setup-CWjMtnE4.js");return{capabilityAction:t}},[],import.meta.url).then(({capabilityAction:t})=>t(this,e))}handleHideSetup(){R(async()=>{const{hideSetup:e}=await import("./setup-CWjMtnE4.js");return{hideSetup:e}},[],import.meta.url).then(({hideSetup:e})=>e(this))}handleRunAssessment(){this.client&&this.client.request("onboarding.assess",{}).then(()=>{this.handleLoadCapabilities()})}handleUpdateUserProfile(e,t){const n=e.trim().slice(0,50),s=t.trim();this.userName=n||"You",this.userAvatar=s||null,this.applySettings({...this.settings,userName:n,userAvatar:s})}async handleLoadIntegrations(){await(await R(()=>import("./onboarding-setup-eq3R6nNk.js"),[],import.meta.url)).loadIntegrations(this)}handleExpandCard(e){R(()=>import("./onboarding-setup-eq3R6nNk.js"),[],import.meta.url).then(t=>t.expandCard(this,e))}async handleLoadGuide(e){await(await R(()=>import("./onboarding-setup-eq3R6nNk.js"),[],import.meta.url)).loadGuide(this,e)}async handleTestIntegration(e){await(await R(()=>import("./onboarding-setup-eq3R6nNk.js"),[],import.meta.url)).testIntegration(this,e)}async handleConfigureIntegration(e,t){await(await R(()=>import("./onboarding-setup-eq3R6nNk.js"),[],import.meta.url)).configureIntegration(this,e,t)}handleUpdateConfigValue(e,t){this.onboardingConfigValues={...this.onboardingConfigValues,[e]:t}}handleSkipIntegration(e){R(()=>import("./onboarding-setup-eq3R6nNk.js"),[],import.meta.url).then(t=>t.skipIntegration(this,e))}async handleMarkOnboardingComplete(){if(!(!this.client||!this.connected))try{await this.client.request("onboarding.complete",{}),this.godmodeOptions&&(this.godmodeOptions={...this.godmodeOptions,"onboarding.complete":!0}),this.showSetupTab=!1,this.setTab("chat")}catch(e){console.error("[onboarding] Failed to mark complete:",e)}}async handleInboxRefresh(){if(!(!this.client||!this.connected)){this.inboxLoading=!0;try{const e=await this.client.request("inbox.list",{status:"pending",limit:50});this.inboxItems=e.items,this.inboxCount=e.pendingCount}catch(e){console.error("[Inbox] Failed to load:",e)}finally{this.inboxLoading=!1}}}async handleInboxScore(e,t,n){if(!(!this.client||!this.connected))try{await this.client.request("inbox.score",{itemId:e,score:t,feedback:n}),this.inboxScoringId=null,this.inboxScoringValue=void 0,this.inboxFeedbackText=void 0,await this.handleInboxRefresh()}catch(s){console.error("[Inbox] Score failed:",s)}}async handleInboxDismiss(e){if(!(!this.client||!this.connected))try{await this.client.request("inbox.dismiss",{itemId:e}),await this.handleInboxRefresh()}catch(t){console.error("[Inbox] Dismiss failed:",t)}}async handleInboxMarkAll(){if(!(!this.client||!this.connected))try{await this.client.request("inbox.markAllComplete",{}),await this.handleInboxRefresh()}catch(e){console.error("[Inbox] Mark all failed:",e)}}async handleInboxViewOutput(e){const t=this.inboxItems?.find(n=>n.id===e);if(t){if(t.proofDocSlug){this.handleOpenProofDoc(t.proofDocSlug);return}if(t.outputPath&&this.client)try{const n=await this.client.request("files.read",{path:t.outputPath,maxSize:5e5});n?.content&&this.handleOpenSidebar(n.content,{mimeType:"text/markdown",filePath:t.outputPath,title:t.title})}catch(n){console.error("[Inbox] Failed to load output:",n)}}}handleInboxOpenChat(e){const t=this.inboxItems?.find(n=>n.id===e);if(t?.type==="project-completion"&&t.coworkSessionId){this.setSessionKey(t.coworkSessionId),this.setTab("chat"),t?.proofDocSlug&&this.handleOpenProofDoc(t.proofDocSlug);return}if(t?.source.taskId){this.handleMissionControlOpenTaskSession(t.source.taskId);return}t?.sessionId&&(this.setSessionKey(t.sessionId),this.setTab("chat"))}handleInboxSetScoring(e,t){this.inboxScoringId=e,this.inboxScoringValue=t??7,this.inboxFeedbackText=""}handleInboxFeedbackChange(e){this.inboxFeedbackText=e}async handleOpenProofDoc(e){let t="Proof Document",n=null,s=null;if(this.client&&this.connected)try{const a=await this.client.request("proof.get",{slug:e});t=a.title?.trim()||t,n=a.filePath?.trim()||null,s=a.viewUrl?.trim()||null}catch(a){console.warn("[Proof] Failed to resolve document metadata:",a)}this.sidebarOpen=!0,this.sidebarMode="proof",this.sidebarProofSlug=e,this.sidebarProofUrl=s,this.sidebarProofHtml=null,this.sidebarFilePath=n,this.sidebarTitle=t}handleCloseProofDoc(){this.sidebarMode="resource",this.sidebarProofSlug=null,this.sidebarProofUrl=null,this.sidebarProofHtml=null,this.handleCloseSidebar()}render(){return V2(this)}};y([b()],v.prototype,"settings",2);y([b()],v.prototype,"password",2);y([b()],v.prototype,"tab",2);y([b()],v.prototype,"onboarding",2);y([b()],v.prototype,"connected",2);y([b()],v.prototype,"reconnecting",2);y([b()],v.prototype,"reconnectAttempt",2);y([b()],v.prototype,"theme",2);y([b()],v.prototype,"themeResolved",2);y([b()],v.prototype,"hello",2);y([b()],v.prototype,"lastError",2);y([b()],v.prototype,"eventLog",2);y([b()],v.prototype,"assistantName",2);y([b()],v.prototype,"assistantAvatar",2);y([b()],v.prototype,"assistantAgentId",2);y([b()],v.prototype,"userName",2);y([b()],v.prototype,"userAvatar",2);y([b()],v.prototype,"sessionKey",2);y([b()],v.prototype,"sessionPickerOpen",2);y([b()],v.prototype,"sessionPickerPosition",2);y([b()],v.prototype,"sessionPickerSearch",2);y([b()],v.prototype,"sessionSearchOpen",2);y([b()],v.prototype,"sessionSearchPosition",2);y([b()],v.prototype,"sessionSearchQuery",2);y([b()],v.prototype,"sessionSearchResults",2);y([b()],v.prototype,"sessionSearchLoading",2);y([b()],v.prototype,"profilePopoverOpen",2);y([b()],v.prototype,"profileEditName",2);y([b()],v.prototype,"profileEditAvatar",2);y([b()],v.prototype,"editingTabKey",2);y([b()],v.prototype,"chatLoading",2);y([b()],v.prototype,"chatSending",2);y([b()],v.prototype,"chatSendingSessionKey",2);y([b()],v.prototype,"chatMessage",2);y([b()],v.prototype,"chatDrafts",2);y([b()],v.prototype,"chatMessages",2);y([b()],v.prototype,"chatToolMessages",2);y([b()],v.prototype,"chatStream",2);y([b()],v.prototype,"chatStreamStartedAt",2);y([b()],v.prototype,"chatRunId",2);y([b()],v.prototype,"currentToolName",2);y([b()],v.prototype,"currentToolInfo",2);y([b()],v.prototype,"workingSessions",2);y([b()],v.prototype,"compactionStatus",2);y([b()],v.prototype,"chatAvatarUrl",2);y([b()],v.prototype,"chatThinkingLevel",2);y([b()],v.prototype,"chatQueue",2);y([b()],v.prototype,"chatAttachments",2);y([b()],v.prototype,"pendingRetry",2);y([b()],v.prototype,"autoRetryAfterCompact",2);y([b()],v.prototype,"sidebarOpen",2);y([b()],v.prototype,"sidebarContent",2);y([b()],v.prototype,"sidebarError",2);y([b()],v.prototype,"sidebarMimeType",2);y([b()],v.prototype,"sidebarFilePath",2);y([b()],v.prototype,"sidebarTitle",2);y([b()],v.prototype,"sidebarMode",2);y([b()],v.prototype,"sidebarProofSlug",2);y([b()],v.prototype,"sidebarProofUrl",2);y([b()],v.prototype,"sidebarProofHtml",2);y([b()],v.prototype,"splitRatio",2);y([b()],v.prototype,"lightbox",2);y([b()],v.prototype,"driveAccounts",2);y([b()],v.prototype,"showDrivePicker",2);y([b()],v.prototype,"driveUploading",2);y([b()],v.prototype,"updateStatus",2);y([b()],v.prototype,"updateLoading",2);y([b()],v.prototype,"updateError",2);y([b()],v.prototype,"updateLastChecked",2);y([b()],v.prototype,"nodesLoading",2);y([b()],v.prototype,"nodes",2);y([b()],v.prototype,"devicesLoading",2);y([b()],v.prototype,"devicesError",2);y([b()],v.prototype,"devicesList",2);y([b()],v.prototype,"execApprovalsLoading",2);y([b()],v.prototype,"execApprovalsSaving",2);y([b()],v.prototype,"execApprovalsDirty",2);y([b()],v.prototype,"execApprovalsSnapshot",2);y([b()],v.prototype,"execApprovalsForm",2);y([b()],v.prototype,"execApprovalsSelectedAgent",2);y([b()],v.prototype,"execApprovalsTarget",2);y([b()],v.prototype,"execApprovalsTargetNodeId",2);y([b()],v.prototype,"execApprovalQueue",2);y([b()],v.prototype,"execApprovalBusy",2);y([b()],v.prototype,"execApprovalError",2);y([b()],v.prototype,"pendingGatewayUrl",2);y([b()],v.prototype,"gatewayRestartPending",2);y([b()],v.prototype,"gatewayRestartBusy",2);y([b()],v.prototype,"configLoading",2);y([b()],v.prototype,"configRaw",2);y([b()],v.prototype,"configRawOriginal",2);y([b()],v.prototype,"configValid",2);y([b()],v.prototype,"configIssues",2);y([b()],v.prototype,"configSaving",2);y([b()],v.prototype,"configApplying",2);y([b()],v.prototype,"updateRunning",2);y([b()],v.prototype,"applySessionKey",2);y([b()],v.prototype,"configSnapshot",2);y([b()],v.prototype,"configSchema",2);y([b()],v.prototype,"configSchemaVersion",2);y([b()],v.prototype,"configSchemaLoading",2);y([b()],v.prototype,"configUiHints",2);y([b()],v.prototype,"configForm",2);y([b()],v.prototype,"configFormOriginal",2);y([b()],v.prototype,"configFormDirty",2);y([b()],v.prototype,"configFormMode",2);y([b()],v.prototype,"configSearchQuery",2);y([b()],v.prototype,"configActiveSection",2);y([b()],v.prototype,"configActiveSubsection",2);y([b()],v.prototype,"channelsLoading",2);y([b()],v.prototype,"channelsSnapshot",2);y([b()],v.prototype,"channelsError",2);y([b()],v.prototype,"channelsLastSuccess",2);y([b()],v.prototype,"whatsappLoginMessage",2);y([b()],v.prototype,"whatsappLoginQrDataUrl",2);y([b()],v.prototype,"whatsappLoginConnected",2);y([b()],v.prototype,"whatsappBusy",2);y([b()],v.prototype,"nostrProfileFormState",2);y([b()],v.prototype,"nostrProfileAccountId",2);y([b()],v.prototype,"presenceLoading",2);y([b()],v.prototype,"presenceEntries",2);y([b()],v.prototype,"presenceError",2);y([b()],v.prototype,"presenceStatus",2);y([b()],v.prototype,"agentsLoading",2);y([b()],v.prototype,"agentsList",2);y([b()],v.prototype,"agentsError",2);y([b()],v.prototype,"sessionsLoading",2);y([b()],v.prototype,"sessionsResult",2);y([b()],v.prototype,"sessionsError",2);y([b()],v.prototype,"sessionsFilterActive",2);y([b()],v.prototype,"sessionsFilterLimit",2);y([b()],v.prototype,"sessionsIncludeGlobal",2);y([b()],v.prototype,"sessionsIncludeUnknown",2);y([b()],v.prototype,"archivedSessions",2);y([b()],v.prototype,"archivedSessionsLoading",2);y([b()],v.prototype,"archivedSessionsExpanded",2);y([b()],v.prototype,"cronLoading",2);y([b()],v.prototype,"cronJobs",2);y([b()],v.prototype,"cronStatus",2);y([b()],v.prototype,"cronError",2);y([b()],v.prototype,"cronForm",2);y([b()],v.prototype,"cronRunsJobId",2);y([b()],v.prototype,"cronRuns",2);y([b()],v.prototype,"cronBusy",2);y([b()],v.prototype,"workspaceNeedsSetup",2);y([b()],v.prototype,"onboardingPhase",2);y([b()],v.prototype,"onboardingData",2);y([b()],v.prototype,"onboardingActive",2);y([b()],v.prototype,"wizardActive",2);y([b()],v.prototype,"wizardState",2);y([b()],v.prototype,"showSetupTab",2);y([b()],v.prototype,"setupCapabilities",2);y([b()],v.prototype,"setupCapabilitiesLoading",2);y([b()],v.prototype,"setupQuickDone",2);y([b()],v.prototype,"onboardingIntegrations",2);y([b()],v.prototype,"onboardingCoreProgress",2);y([b()],v.prototype,"onboardingExpandedCard",2);y([b()],v.prototype,"onboardingLoadingGuide",2);y([b()],v.prototype,"onboardingActiveGuide",2);y([b()],v.prototype,"onboardingTestingId",2);y([b()],v.prototype,"onboardingTestResult",2);y([b()],v.prototype,"onboardingConfigValues",2);y([b()],v.prototype,"onboardingProgress",2);y([b()],v.prototype,"workspaces",2);y([b()],v.prototype,"selectedWorkspace",2);y([b()],v.prototype,"workspacesSearchQuery",2);y([b()],v.prototype,"workspaceItemSearchQuery",2);y([b()],v.prototype,"workspacesLoading",2);y([b()],v.prototype,"workspacesCreateLoading",2);y([b()],v.prototype,"workspacesError",2);y([b()],v.prototype,"workspaceExpandedFolders",2);y([b()],v.prototype,"allTasks",2);y([b()],v.prototype,"taskFilter",2);y([b()],v.prototype,"taskSort",2);y([b()],v.prototype,"taskSearch",2);y([b()],v.prototype,"showCompletedTasks",2);y([b()],v.prototype,"editingTaskId",2);y([b()],v.prototype,"workspaceBrowsePath",2);y([b()],v.prototype,"workspaceBrowseEntries",2);y([b()],v.prototype,"workspaceBreadcrumbs",2);y([b()],v.prototype,"workspaceBrowseSearchQuery",2);y([b()],v.prototype,"workspaceBrowseSearchResults",2);y([b()],v.prototype,"myDayLoading",2);y([b()],v.prototype,"myDayError",2);y([b()],v.prototype,"todaySelectedDate",2);y([b()],v.prototype,"todayViewMode",2);y([b()],v.prototype,"dailyBrief",2);y([b()],v.prototype,"dailyBriefLoading",2);y([b()],v.prototype,"dailyBriefError",2);y([b()],v.prototype,"agentLog",2);y([b()],v.prototype,"agentLogLoading",2);y([b()],v.prototype,"agentLogError",2);y([b()],v.prototype,"briefNotes",2);y([b()],v.prototype,"todayTasks",2);y([b()],v.prototype,"todayTasksLoading",2);y([b()],v.prototype,"todayEditingTaskId",2);y([b()],v.prototype,"todayShowCompleted",2);y([b()],v.prototype,"allyPanelOpen",2);y([b()],v.prototype,"allyMessages",2);y([b()],v.prototype,"allyStream",2);y([b()],v.prototype,"allyDraft",2);y([b()],v.prototype,"allyUnread",2);y([b()],v.prototype,"allySending",2);y([b()],v.prototype,"allyWorking",2);y([b()],v.prototype,"allyAttachments",2);y([b()],v.prototype,"todayQueueResults",2);y([b()],v.prototype,"inboxItems",2);y([b()],v.prototype,"inboxLoading",2);y([b()],v.prototype,"inboxCount",2);y([b()],v.prototype,"inboxScoringId",2);y([b()],v.prototype,"inboxScoringValue",2);y([b()],v.prototype,"inboxFeedbackText",2);y([b()],v.prototype,"chatPrivateMode",2);y([b()],v.prototype,"privateSessions",2);y([b()],v.prototype,"dynamicSlots",2);y([b()],v.prototype,"workProjects",2);y([b()],v.prototype,"workLoading",2);y([b()],v.prototype,"workError",2);y([b()],v.prototype,"workExpandedProjects",2);y([b()],v.prototype,"workProjectFiles",2);y([b()],v.prototype,"workDetailLoading",2);y([b()],v.prototype,"workResources",2);y([b()],v.prototype,"workResourcesLoading",2);y([b()],v.prototype,"workResourceFilter",2);y([b()],v.prototype,"sessionResources",2);y([b()],v.prototype,"sessionResourcesCollapsed",2);y([b()],v.prototype,"skillsLoading",2);y([b()],v.prototype,"skillsReport",2);y([b()],v.prototype,"skillsError",2);y([b()],v.prototype,"skillsFilter",2);y([b()],v.prototype,"skillEdits",2);y([b()],v.prototype,"skillsBusyKey",2);y([b()],v.prototype,"skillMessages",2);y([b()],v.prototype,"skillsSubTab",2);y([b()],v.prototype,"godmodeSkills",2);y([b()],v.prototype,"godmodeSkillsLoading",2);y([b()],v.prototype,"expandedSkills",2);y([b()],v.prototype,"rosterData",2);y([b()],v.prototype,"rosterLoading",2);y([b()],v.prototype,"rosterError",2);y([b()],v.prototype,"rosterFilter",2);y([b()],v.prototype,"expandedAgents",2);y([b()],v.prototype,"debugLoading",2);y([b()],v.prototype,"debugStatus",2);y([b()],v.prototype,"debugHealth",2);y([b()],v.prototype,"debugModels",2);y([b()],v.prototype,"debugHeartbeat",2);y([b()],v.prototype,"debugCallMethod",2);y([b()],v.prototype,"debugCallParams",2);y([b()],v.prototype,"debugCallResult",2);y([b()],v.prototype,"debugCallError",2);y([b()],v.prototype,"logsLoading",2);y([b()],v.prototype,"logsError",2);y([b()],v.prototype,"logsFile",2);y([b()],v.prototype,"logsEntries",2);y([b()],v.prototype,"logsFilterText",2);y([b()],v.prototype,"logsLevelFilters",2);y([b()],v.prototype,"logsAutoFollow",2);y([b()],v.prototype,"logsTruncated",2);y([b()],v.prototype,"logsCursor",2);y([b()],v.prototype,"logsLastFetchAt",2);y([b()],v.prototype,"logsLimit",2);y([b()],v.prototype,"logsMaxBytes",2);y([b()],v.prototype,"logsAtBottom",2);y([b()],v.prototype,"toasts",2);y([b()],v.prototype,"chatUserNearBottom",2);y([b()],v.prototype,"chatNewMessagesBelow",2);y([b()],v.prototype,"consciousnessStatus",2);y([b()],v.prototype,"focusPulseData",2);y([b()],v.prototype,"trustTrackerData",2);y([b()],v.prototype,"trustTrackerLoading",2);y([b()],v.prototype,"guardrailsData",2);y([b()],v.prototype,"guardrailsLoading",2);y([b()],v.prototype,"guardrailsShowAddForm",2);y([b()],v.prototype,"missionControlData",2);y([b()],v.prototype,"missionControlLoading",2);y([b()],v.prototype,"missionControlError",2);y([b()],v.prototype,"missionControlFullControl",2);y([b()],v.prototype,"godmodeOptions",2);y([b()],v.prototype,"godmodeOptionsLoading",2);y([b()],v.prototype,"dashboardsList",2);y([b()],v.prototype,"dashboardsLoading",2);y([b()],v.prototype,"dashboardsError",2);y([b()],v.prototype,"activeDashboardId",2);y([b()],v.prototype,"activeDashboardHtml",2);y([b()],v.prototype,"activeDashboardManifest",2);y([b()],v.prototype,"dashboardChatOpen",2);y([b()],v.prototype,"dashboardCategoryFilter",2);y([b()],v.prototype,"secondBrainSubtab",2);y([b()],v.prototype,"secondBrainLoading",2);y([b()],v.prototype,"secondBrainError",2);y([b()],v.prototype,"secondBrainIdentity",2);y([b()],v.prototype,"secondBrainMemoryBank",2);y([b()],v.prototype,"secondBrainAiPacket",2);y([b()],v.prototype,"secondBrainSourcesData",2);y([b()],v.prototype,"secondBrainResearchData",2);y([b()],v.prototype,"secondBrainResearchAddFormOpen",2);y([b()],v.prototype,"secondBrainResearchAddForm",2);y([b()],v.prototype,"secondBrainResearchCategories",2);y([b()],v.prototype,"secondBrainSelectedEntry",2);y([b()],v.prototype,"secondBrainSearchQuery",2);y([b()],v.prototype,"secondBrainSyncing",2);y([b()],v.prototype,"secondBrainBrowsingFolder",2);y([b()],v.prototype,"secondBrainFolderEntries",2);y([b()],v.prototype,"secondBrainFolderName",2);y([b()],v.prototype,"secondBrainFileTree",2);y([b()],v.prototype,"secondBrainFileTreeLoading",2);y([b()],v.prototype,"secondBrainFileSearchQuery",2);y([b()],v.prototype,"secondBrainFileSearchResults",2);v=y([Pc("godmode-app")],v);
+What can I help you with?`,timestamp:Date.now()}],this.requestUpdate())}).catch(a=>{console.error("[Support] Failed to load chat history:",a)})})}handleWizardOpen(){R(async()=>{const{emptyWizardState:e}=await Promise.resolve().then(()=>BS);return{emptyWizardState:e}},void 0,import.meta.url).then(({emptyWizardState:e})=>{this.wizardState=e(),this.wizardActive=!0,this.requestUpdate()})}handleWizardClose(){this.wizardActive=!1,this.wizardState=null,this.requestUpdate()}handleWizardStepChange(e){this.wizardState&&(this.wizardState={...this.wizardState,step:e},this.requestUpdate())}handleWizardAnswerChange(e,t){this.wizardState&&(this.wizardState={...this.wizardState,answers:{...this.wizardState.answers,[e]:t}},this.requestUpdate())}async handleWizardPreview(){if(!(!this.client||!this.wizardState))try{const[e,t]=await Promise.all([this.client.request("onboarding.wizard.preview",this.wizardState.answers),this.client.request("onboarding.wizard.diff",this.wizardState.answers).catch(()=>null)]),n={};for(const a of e.files??[])n[a.path]=a.wouldCreate;const s={};if(t){for(const a of t.additions)s[a.path]=!0;for(const a of t.changes)s[a.path]=!1}this.wizardState={...this.wizardState,preview:e.files??[],diff:t,fileSelections:n,configSelections:s},this.requestUpdate()}catch(e){console.error("[Wizard] Preview failed:",e)}}handleWizardFileToggle(e,t){this.wizardState&&(this.wizardState={...this.wizardState,fileSelections:{...this.wizardState.fileSelections,[e]:t}},this.requestUpdate())}handleWizardConfigToggle(e,t){this.wizardState&&(this.wizardState={...this.wizardState,configSelections:{...this.wizardState.configSelections,[e]:t}},this.requestUpdate())}async handleWizardGenerate(){if(!this.client||!this.wizardState)return;this.wizardState={...this.wizardState,generating:!0,error:null},this.requestUpdate();const e=[];for(const[n,s]of Object.entries(this.wizardState.fileSelections))s||e.push(n);const t=[];for(const[n,s]of Object.entries(this.wizardState.configSelections))s||t.push(n);try{const n=await this.client.request("onboarding.wizard.generate",{...this.wizardState.answers,skipFiles:e,skipKeys:t});this.wizardState={...this.wizardState,generating:!1,step:9,result:{filesCreated:n.filesCreated,filesSkipped:n.filesSkipped,configPatched:n.configPatched,workspacePath:n.workspacePath}},this.requestUpdate(),this.showToast("Memory system generated!","success",4e3)}catch(n){const s=n instanceof Error?n.message:"Failed to generate workspace";this.wizardState={...this.wizardState,generating:!1,error:s},this.requestUpdate(),this.showToast(s,"error")}}async handleQuickSetup(e){R(()=>import("./setup-CWjMtnE4.js"),[],import.meta.url).then(async({quickSetup:t})=>{await t(this,e)&&(this.setTab("chat"),R(async()=>{const{loadCapabilities:s}=await import("./setup-CWjMtnE4.js");return{loadCapabilities:s}},[],import.meta.url).then(({loadCapabilities:s})=>s(this)))})}handleLoadCapabilities(){R(async()=>{const{loadCapabilities:e}=await import("./setup-CWjMtnE4.js");return{loadCapabilities:e}},[],import.meta.url).then(({loadCapabilities:e})=>e(this))}handleCapabilityAction(e){R(async()=>{const{capabilityAction:t}=await import("./setup-CWjMtnE4.js");return{capabilityAction:t}},[],import.meta.url).then(({capabilityAction:t})=>t(this,e))}handleHideSetup(){R(async()=>{const{hideSetup:e}=await import("./setup-CWjMtnE4.js");return{hideSetup:e}},[],import.meta.url).then(({hideSetup:e})=>e(this))}handleRunAssessment(){this.client&&this.client.request("onboarding.assess",{}).then(()=>{this.handleLoadCapabilities()})}handleUpdateUserProfile(e,t){const n=e.trim().slice(0,50),s=t.trim();this.userName=n||"You",this.userAvatar=s||null,this.applySettings({...this.settings,userName:n,userAvatar:s})}async handleLoadIntegrations(){await(await R(()=>import("./onboarding-setup-eq3R6nNk.js"),[],import.meta.url)).loadIntegrations(this)}handleExpandCard(e){R(()=>import("./onboarding-setup-eq3R6nNk.js"),[],import.meta.url).then(t=>t.expandCard(this,e))}async handleLoadGuide(e){await(await R(()=>import("./onboarding-setup-eq3R6nNk.js"),[],import.meta.url)).loadGuide(this,e)}async handleTestIntegration(e){await(await R(()=>import("./onboarding-setup-eq3R6nNk.js"),[],import.meta.url)).testIntegration(this,e)}async handleConfigureIntegration(e,t){await(await R(()=>import("./onboarding-setup-eq3R6nNk.js"),[],import.meta.url)).configureIntegration(this,e,t)}handleUpdateConfigValue(e,t){this.onboardingConfigValues={...this.onboardingConfigValues,[e]:t}}handleSkipIntegration(e){R(()=>import("./onboarding-setup-eq3R6nNk.js"),[],import.meta.url).then(t=>t.skipIntegration(this,e))}async handleMarkOnboardingComplete(){if(!(!this.client||!this.connected))try{await this.client.request("onboarding.complete",{}),this.godmodeOptions&&(this.godmodeOptions={...this.godmodeOptions,"onboarding.complete":!0}),this.showSetupTab=!1,this.setTab("chat")}catch(e){console.error("[onboarding] Failed to mark complete:",e)}}async handleInboxRefresh(){if(!(!this.client||!this.connected)){this.inboxLoading=!0;try{const e=await this.client.request("inbox.list",{status:"pending",limit:50});this.inboxItems=e.items,this.inboxCount=e.pendingCount}catch(e){console.error("[Inbox] Failed to load:",e)}finally{this.inboxLoading=!1}}}async handleInboxScore(e,t,n){if(!(!this.client||!this.connected))try{await this.client.request("inbox.score",{itemId:e,score:t,feedback:n}),this.inboxScoringId=null,this.inboxScoringValue=void 0,this.inboxFeedbackText=void 0,await this.handleInboxRefresh()}catch(s){console.error("[Inbox] Score failed:",s)}}async handleInboxDismiss(e){if(!(!this.client||!this.connected))try{await this.client.request("inbox.dismiss",{itemId:e}),await this.handleInboxRefresh()}catch(t){console.error("[Inbox] Dismiss failed:",t)}}async handleInboxMarkAll(){if(!(!this.client||!this.connected))try{await this.client.request("inbox.markAllComplete",{}),await this.handleInboxRefresh()}catch(e){console.error("[Inbox] Mark all failed:",e)}}async handleInboxViewOutput(e){const t=this.inboxItems?.find(n=>n.id===e);if(t){if(t.outputPath&&this.client)try{const n=await this.client.request("files.read",{path:t.outputPath,maxSize:5e5});if(n?.content){this.handleOpenSidebar(n.content,{mimeType:"text/markdown",filePath:t.outputPath,title:t.title});return}}catch(n){console.error("[Inbox] Failed to load output file:",n)}t.proofDocSlug&&this.handleOpenProofDoc(t.proofDocSlug)}}async handleInboxViewProof(e){const t=this.inboxItems?.find(n=>n.id===e);t?.proofDocSlug&&this.handleOpenProofDoc(t.proofDocSlug)}handleInboxOpenChat(e){const t=this.inboxItems?.find(n=>n.id===e);if(t?.type==="project-completion"&&t.coworkSessionId){this.setSessionKey(t.coworkSessionId),this.setTab("chat"),t?.proofDocSlug&&this.handleOpenProofDoc(t.proofDocSlug);return}if(t?.source.taskId){this.handleMissionControlOpenTaskSession(t.source.taskId);return}t?.sessionId&&(this.setSessionKey(t.sessionId),this.setTab("chat"))}handleInboxSetScoring(e,t){e!==this.inboxScoringId&&(this.inboxFeedbackText=""),this.inboxScoringId=e,this.inboxScoringValue=t??7}handleInboxFeedbackChange(e){this.inboxFeedbackText=e}async handleOpenProofDoc(e){let t="Proof Document",n=null,s=null;if(this.client&&this.connected)try{const a=await this.client.request("proof.get",{slug:e});t=a.title?.trim()||t,n=a.filePath?.trim()||null,s=a.viewUrl?.trim()||null}catch(a){console.warn("[Proof] Failed to resolve document metadata:",a)}this.sidebarOpen=!0,this.sidebarMode="proof",this.sidebarProofSlug=e,this.sidebarProofUrl=s,this.sidebarProofHtml=null,this.sidebarFilePath=n,this.sidebarTitle=t}handleCloseProofDoc(){this.sidebarMode="resource",this.sidebarProofSlug=null,this.sidebarProofUrl=null,this.sidebarProofHtml=null,this.handleCloseSidebar()}render(){return G2(this)}};y([b()],v.prototype,"settings",2);y([b()],v.prototype,"password",2);y([b()],v.prototype,"tab",2);y([b()],v.prototype,"onboarding",2);y([b()],v.prototype,"connected",2);y([b()],v.prototype,"reconnecting",2);y([b()],v.prototype,"reconnectAttempt",2);y([b()],v.prototype,"theme",2);y([b()],v.prototype,"themeResolved",2);y([b()],v.prototype,"hello",2);y([b()],v.prototype,"lastError",2);y([b()],v.prototype,"eventLog",2);y([b()],v.prototype,"assistantName",2);y([b()],v.prototype,"assistantAvatar",2);y([b()],v.prototype,"assistantAgentId",2);y([b()],v.prototype,"userName",2);y([b()],v.prototype,"userAvatar",2);y([b()],v.prototype,"sessionKey",2);y([b()],v.prototype,"sessionPickerOpen",2);y([b()],v.prototype,"sessionPickerPosition",2);y([b()],v.prototype,"sessionPickerSearch",2);y([b()],v.prototype,"sessionSearchOpen",2);y([b()],v.prototype,"sessionSearchPosition",2);y([b()],v.prototype,"sessionSearchQuery",2);y([b()],v.prototype,"sessionSearchResults",2);y([b()],v.prototype,"sessionSearchLoading",2);y([b()],v.prototype,"profilePopoverOpen",2);y([b()],v.prototype,"profileEditName",2);y([b()],v.prototype,"profileEditAvatar",2);y([b()],v.prototype,"editingTabKey",2);y([b()],v.prototype,"chatLoading",2);y([b()],v.prototype,"chatSending",2);y([b()],v.prototype,"chatSendingSessionKey",2);y([b()],v.prototype,"chatMessage",2);y([b()],v.prototype,"chatDrafts",2);y([b()],v.prototype,"chatMessages",2);y([b()],v.prototype,"chatToolMessages",2);y([b()],v.prototype,"chatStream",2);y([b()],v.prototype,"chatStreamStartedAt",2);y([b()],v.prototype,"chatRunId",2);y([b()],v.prototype,"currentToolName",2);y([b()],v.prototype,"currentToolInfo",2);y([b()],v.prototype,"workingSessions",2);y([b()],v.prototype,"compactionStatus",2);y([b()],v.prototype,"chatAvatarUrl",2);y([b()],v.prototype,"chatThinkingLevel",2);y([b()],v.prototype,"chatQueue",2);y([b()],v.prototype,"chatAttachments",2);y([b()],v.prototype,"pendingRetry",2);y([b()],v.prototype,"autoRetryAfterCompact",2);y([b()],v.prototype,"sidebarOpen",2);y([b()],v.prototype,"sidebarContent",2);y([b()],v.prototype,"sidebarError",2);y([b()],v.prototype,"sidebarMimeType",2);y([b()],v.prototype,"sidebarFilePath",2);y([b()],v.prototype,"sidebarTitle",2);y([b()],v.prototype,"sidebarMode",2);y([b()],v.prototype,"sidebarProofSlug",2);y([b()],v.prototype,"sidebarProofUrl",2);y([b()],v.prototype,"sidebarProofHtml",2);y([b()],v.prototype,"splitRatio",2);y([b()],v.prototype,"lightbox",2);y([b()],v.prototype,"driveAccounts",2);y([b()],v.prototype,"showDrivePicker",2);y([b()],v.prototype,"driveUploading",2);y([b()],v.prototype,"updateStatus",2);y([b()],v.prototype,"updateLoading",2);y([b()],v.prototype,"updateError",2);y([b()],v.prototype,"updateLastChecked",2);y([b()],v.prototype,"nodesLoading",2);y([b()],v.prototype,"nodes",2);y([b()],v.prototype,"devicesLoading",2);y([b()],v.prototype,"devicesError",2);y([b()],v.prototype,"devicesList",2);y([b()],v.prototype,"execApprovalsLoading",2);y([b()],v.prototype,"execApprovalsSaving",2);y([b()],v.prototype,"execApprovalsDirty",2);y([b()],v.prototype,"execApprovalsSnapshot",2);y([b()],v.prototype,"execApprovalsForm",2);y([b()],v.prototype,"execApprovalsSelectedAgent",2);y([b()],v.prototype,"execApprovalsTarget",2);y([b()],v.prototype,"execApprovalsTargetNodeId",2);y([b()],v.prototype,"execApprovalQueue",2);y([b()],v.prototype,"execApprovalBusy",2);y([b()],v.prototype,"execApprovalError",2);y([b()],v.prototype,"pendingGatewayUrl",2);y([b()],v.prototype,"gatewayRestartPending",2);y([b()],v.prototype,"gatewayRestartBusy",2);y([b()],v.prototype,"configLoading",2);y([b()],v.prototype,"configRaw",2);y([b()],v.prototype,"configRawOriginal",2);y([b()],v.prototype,"configValid",2);y([b()],v.prototype,"configIssues",2);y([b()],v.prototype,"configSaving",2);y([b()],v.prototype,"configApplying",2);y([b()],v.prototype,"updateRunning",2);y([b()],v.prototype,"applySessionKey",2);y([b()],v.prototype,"configSnapshot",2);y([b()],v.prototype,"configSchema",2);y([b()],v.prototype,"configSchemaVersion",2);y([b()],v.prototype,"configSchemaLoading",2);y([b()],v.prototype,"configUiHints",2);y([b()],v.prototype,"configForm",2);y([b()],v.prototype,"configFormOriginal",2);y([b()],v.prototype,"configFormDirty",2);y([b()],v.prototype,"configFormMode",2);y([b()],v.prototype,"configSearchQuery",2);y([b()],v.prototype,"configActiveSection",2);y([b()],v.prototype,"configActiveSubsection",2);y([b()],v.prototype,"channelsLoading",2);y([b()],v.prototype,"channelsSnapshot",2);y([b()],v.prototype,"channelsError",2);y([b()],v.prototype,"channelsLastSuccess",2);y([b()],v.prototype,"whatsappLoginMessage",2);y([b()],v.prototype,"whatsappLoginQrDataUrl",2);y([b()],v.prototype,"whatsappLoginConnected",2);y([b()],v.prototype,"whatsappBusy",2);y([b()],v.prototype,"nostrProfileFormState",2);y([b()],v.prototype,"nostrProfileAccountId",2);y([b()],v.prototype,"presenceLoading",2);y([b()],v.prototype,"presenceEntries",2);y([b()],v.prototype,"presenceError",2);y([b()],v.prototype,"presenceStatus",2);y([b()],v.prototype,"agentsLoading",2);y([b()],v.prototype,"agentsList",2);y([b()],v.prototype,"agentsError",2);y([b()],v.prototype,"sessionsLoading",2);y([b()],v.prototype,"sessionsResult",2);y([b()],v.prototype,"sessionsError",2);y([b()],v.prototype,"sessionsFilterActive",2);y([b()],v.prototype,"sessionsFilterLimit",2);y([b()],v.prototype,"sessionsIncludeGlobal",2);y([b()],v.prototype,"sessionsIncludeUnknown",2);y([b()],v.prototype,"archivedSessions",2);y([b()],v.prototype,"archivedSessionsLoading",2);y([b()],v.prototype,"archivedSessionsExpanded",2);y([b()],v.prototype,"cronLoading",2);y([b()],v.prototype,"cronJobs",2);y([b()],v.prototype,"cronStatus",2);y([b()],v.prototype,"cronError",2);y([b()],v.prototype,"cronForm",2);y([b()],v.prototype,"cronRunsJobId",2);y([b()],v.prototype,"cronRuns",2);y([b()],v.prototype,"cronBusy",2);y([b()],v.prototype,"workspaceNeedsSetup",2);y([b()],v.prototype,"onboardingPhase",2);y([b()],v.prototype,"onboardingData",2);y([b()],v.prototype,"onboardingActive",2);y([b()],v.prototype,"wizardActive",2);y([b()],v.prototype,"wizardState",2);y([b()],v.prototype,"showSetupTab",2);y([b()],v.prototype,"setupCapabilities",2);y([b()],v.prototype,"setupCapabilitiesLoading",2);y([b()],v.prototype,"setupQuickDone",2);y([b()],v.prototype,"onboardingIntegrations",2);y([b()],v.prototype,"onboardingCoreProgress",2);y([b()],v.prototype,"onboardingExpandedCard",2);y([b()],v.prototype,"onboardingLoadingGuide",2);y([b()],v.prototype,"onboardingActiveGuide",2);y([b()],v.prototype,"onboardingTestingId",2);y([b()],v.prototype,"onboardingTestResult",2);y([b()],v.prototype,"onboardingConfigValues",2);y([b()],v.prototype,"onboardingProgress",2);y([b()],v.prototype,"workspaces",2);y([b()],v.prototype,"selectedWorkspace",2);y([b()],v.prototype,"workspacesSearchQuery",2);y([b()],v.prototype,"workspaceItemSearchQuery",2);y([b()],v.prototype,"workspacesLoading",2);y([b()],v.prototype,"workspacesCreateLoading",2);y([b()],v.prototype,"workspacesError",2);y([b()],v.prototype,"workspaceExpandedFolders",2);y([b()],v.prototype,"allTasks",2);y([b()],v.prototype,"taskFilter",2);y([b()],v.prototype,"taskSort",2);y([b()],v.prototype,"taskSearch",2);y([b()],v.prototype,"showCompletedTasks",2);y([b()],v.prototype,"editingTaskId",2);y([b()],v.prototype,"workspaceBrowsePath",2);y([b()],v.prototype,"workspaceBrowseEntries",2);y([b()],v.prototype,"workspaceBreadcrumbs",2);y([b()],v.prototype,"workspaceBrowseSearchQuery",2);y([b()],v.prototype,"workspaceBrowseSearchResults",2);y([b()],v.prototype,"myDayLoading",2);y([b()],v.prototype,"myDayError",2);y([b()],v.prototype,"todaySelectedDate",2);y([b()],v.prototype,"todayViewMode",2);y([b()],v.prototype,"dailyBrief",2);y([b()],v.prototype,"dailyBriefLoading",2);y([b()],v.prototype,"dailyBriefError",2);y([b()],v.prototype,"agentLog",2);y([b()],v.prototype,"agentLogLoading",2);y([b()],v.prototype,"agentLogError",2);y([b()],v.prototype,"briefNotes",2);y([b()],v.prototype,"todayTasks",2);y([b()],v.prototype,"todayTasksLoading",2);y([b()],v.prototype,"todayEditingTaskId",2);y([b()],v.prototype,"todayShowCompleted",2);y([b()],v.prototype,"allyPanelOpen",2);y([b()],v.prototype,"allyMessages",2);y([b()],v.prototype,"allyStream",2);y([b()],v.prototype,"allyDraft",2);y([b()],v.prototype,"allyUnread",2);y([b()],v.prototype,"allySending",2);y([b()],v.prototype,"allyWorking",2);y([b()],v.prototype,"allyAttachments",2);y([b()],v.prototype,"todayQueueResults",2);y([b()],v.prototype,"inboxItems",2);y([b()],v.prototype,"inboxLoading",2);y([b()],v.prototype,"inboxCount",2);y([b()],v.prototype,"inboxScoringId",2);y([b()],v.prototype,"inboxScoringValue",2);y([b()],v.prototype,"inboxFeedbackText",2);y([b()],v.prototype,"chatPrivateMode",2);y([b()],v.prototype,"privateSessions",2);y([b()],v.prototype,"dynamicSlots",2);y([b()],v.prototype,"workProjects",2);y([b()],v.prototype,"workLoading",2);y([b()],v.prototype,"workError",2);y([b()],v.prototype,"workExpandedProjects",2);y([b()],v.prototype,"workProjectFiles",2);y([b()],v.prototype,"workDetailLoading",2);y([b()],v.prototype,"workResources",2);y([b()],v.prototype,"workResourcesLoading",2);y([b()],v.prototype,"workResourceFilter",2);y([b()],v.prototype,"sessionResources",2);y([b()],v.prototype,"sessionResourcesCollapsed",2);y([b()],v.prototype,"skillsLoading",2);y([b()],v.prototype,"skillsReport",2);y([b()],v.prototype,"skillsError",2);y([b()],v.prototype,"skillsFilter",2);y([b()],v.prototype,"skillEdits",2);y([b()],v.prototype,"skillsBusyKey",2);y([b()],v.prototype,"skillMessages",2);y([b()],v.prototype,"skillsSubTab",2);y([b()],v.prototype,"godmodeSkills",2);y([b()],v.prototype,"godmodeSkillsLoading",2);y([b()],v.prototype,"expandedSkills",2);y([b()],v.prototype,"rosterData",2);y([b()],v.prototype,"rosterLoading",2);y([b()],v.prototype,"rosterError",2);y([b()],v.prototype,"rosterFilter",2);y([b()],v.prototype,"expandedAgents",2);y([b()],v.prototype,"debugLoading",2);y([b()],v.prototype,"debugStatus",2);y([b()],v.prototype,"debugHealth",2);y([b()],v.prototype,"debugModels",2);y([b()],v.prototype,"debugHeartbeat",2);y([b()],v.prototype,"debugCallMethod",2);y([b()],v.prototype,"debugCallParams",2);y([b()],v.prototype,"debugCallResult",2);y([b()],v.prototype,"debugCallError",2);y([b()],v.prototype,"logsLoading",2);y([b()],v.prototype,"logsError",2);y([b()],v.prototype,"logsFile",2);y([b()],v.prototype,"logsEntries",2);y([b()],v.prototype,"logsFilterText",2);y([b()],v.prototype,"logsLevelFilters",2);y([b()],v.prototype,"logsAutoFollow",2);y([b()],v.prototype,"logsTruncated",2);y([b()],v.prototype,"logsCursor",2);y([b()],v.prototype,"logsLastFetchAt",2);y([b()],v.prototype,"logsLimit",2);y([b()],v.prototype,"logsMaxBytes",2);y([b()],v.prototype,"logsAtBottom",2);y([b()],v.prototype,"toasts",2);y([b()],v.prototype,"chatUserNearBottom",2);y([b()],v.prototype,"chatNewMessagesBelow",2);y([b()],v.prototype,"consciousnessStatus",2);y([b()],v.prototype,"focusPulseData",2);y([b()],v.prototype,"trustTrackerData",2);y([b()],v.prototype,"trustTrackerLoading",2);y([b()],v.prototype,"guardrailsData",2);y([b()],v.prototype,"guardrailsLoading",2);y([b()],v.prototype,"guardrailsShowAddForm",2);y([b()],v.prototype,"missionControlData",2);y([b()],v.prototype,"missionControlLoading",2);y([b()],v.prototype,"missionControlError",2);y([b()],v.prototype,"missionControlFullControl",2);y([b()],v.prototype,"godmodeOptions",2);y([b()],v.prototype,"godmodeOptionsLoading",2);y([b()],v.prototype,"dashboardsList",2);y([b()],v.prototype,"dashboardsLoading",2);y([b()],v.prototype,"dashboardsError",2);y([b()],v.prototype,"activeDashboardId",2);y([b()],v.prototype,"activeDashboardHtml",2);y([b()],v.prototype,"activeDashboardManifest",2);y([b()],v.prototype,"dashboardChatOpen",2);y([b()],v.prototype,"dashboardCategoryFilter",2);y([b()],v.prototype,"secondBrainSubtab",2);y([b()],v.prototype,"secondBrainLoading",2);y([b()],v.prototype,"secondBrainError",2);y([b()],v.prototype,"secondBrainIdentity",2);y([b()],v.prototype,"secondBrainMemoryBank",2);y([b()],v.prototype,"secondBrainAiPacket",2);y([b()],v.prototype,"secondBrainSourcesData",2);y([b()],v.prototype,"secondBrainResearchData",2);y([b()],v.prototype,"secondBrainResearchAddFormOpen",2);y([b()],v.prototype,"secondBrainResearchAddForm",2);y([b()],v.prototype,"secondBrainResearchCategories",2);y([b()],v.prototype,"secondBrainSelectedEntry",2);y([b()],v.prototype,"secondBrainSearchQuery",2);y([b()],v.prototype,"secondBrainSyncing",2);y([b()],v.prototype,"secondBrainBrowsingFolder",2);y([b()],v.prototype,"secondBrainFolderEntries",2);y([b()],v.prototype,"secondBrainFolderName",2);y([b()],v.prototype,"secondBrainFileTree",2);y([b()],v.prototype,"secondBrainFileTreeLoading",2);y([b()],v.prototype,"secondBrainFileSearchQuery",2);y([b()],v.prototype,"secondBrainFileSearchResults",2);v=y([Pc("godmode-app")],v);

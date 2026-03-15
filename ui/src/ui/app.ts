@@ -3967,13 +3967,7 @@ export class GodModeApp extends LitElement {
     const item = this.inboxItems?.find((i) => i.id === itemId);
     if (!item) return;
 
-    // If there's a Proof doc, open in Proof viewer
-    if (item.proofDocSlug) {
-      this.handleOpenProofDoc(item.proofDocSlug);
-      return;
-    }
-
-    // Otherwise open the output file in sidebar
+    // Prefer the actual output file (the deliverable) over the proof doc (a review/QA doc)
     if (item.outputPath && this.client) {
       try {
         const result = await this.client.request<{ content: string }>(
@@ -3986,11 +3980,23 @@ export class GodModeApp extends LitElement {
             filePath: item.outputPath,
             title: item.title,
           });
+          return;
         }
       } catch (err) {
-        console.error("[Inbox] Failed to load output:", err);
+        console.error("[Inbox] Failed to load output file:", err);
       }
     }
+
+    // Fall back to Proof doc if no output file
+    if (item.proofDocSlug) {
+      this.handleOpenProofDoc(item.proofDocSlug);
+    }
+  }
+
+  async handleInboxViewProof(itemId: string) {
+    const item = this.inboxItems?.find((i) => i.id === itemId);
+    if (!item?.proofDocSlug) return;
+    this.handleOpenProofDoc(item.proofDocSlug);
   }
 
   handleInboxOpenChat(itemId: string) {
@@ -4018,9 +4024,12 @@ export class GodModeApp extends LitElement {
   }
 
   handleInboxSetScoring(itemId: string | null, score?: number) {
+    // Only reset feedback when opening scoring for a different item
+    if (itemId !== this.inboxScoringId) {
+      this.inboxFeedbackText = "";
+    }
     this.inboxScoringId = itemId;
     this.inboxScoringValue = score ?? 7;
-    this.inboxFeedbackText = "";
   }
 
   handleInboxFeedbackChange(text: string) {

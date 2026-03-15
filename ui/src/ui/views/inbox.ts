@@ -19,19 +19,24 @@ export type InboxViewItem = {
   coworkSessionId?: string;
 };
 
+export type InboxSortOrder = "newest" | "oldest";
+
 export type InboxSectionProps = {
   items: InboxViewItem[];
   loading?: boolean;
   count?: number;
+  sortOrder?: InboxSortOrder;
   scoringId?: string | null;
   scoringValue?: number;
   feedbackText?: string;
   onViewOutput: (itemId: string) => void;
+  onViewProof: (itemId: string) => void;
   onOpenChat: (itemId: string) => void;
   onDismiss: (itemId: string) => void;
   onScore: (itemId: string, score: number, feedback?: string) => void;
   onSetScoring: (itemId: string | null, score?: number) => void;
   onFeedbackChange: (text: string) => void;
+  onSortToggle?: () => void;
   onMarkAll: () => void;
 };
 
@@ -54,16 +59,28 @@ function personaLabel(item: InboxViewItem): string {
   return item.type === "agent-execution" ? "Agent" : "Skill";
 }
 
+function scoreLabel(score: number): string {
+  if (score <= 2) return "Poor";
+  if (score <= 4) return "Below expectations";
+  if (score <= 6) return "Okay";
+  if (score <= 8) return "Good";
+  return "Excellent";
+}
+
 function renderScoreWidget(props: InboxSectionProps, item: InboxViewItem) {
   if (props.scoringId !== item.id) return nothing;
 
   const score = props.scoringValue ?? 7;
   const feedbackText = props.feedbackText ?? "";
   const needsFeedback = score <= 4;
-  const optionalFeedback = score >= 9;
+  const showFeedback = score <= 4 || score >= 9;
 
   return html`
     <div class="inbox-scoring">
+      <div class="inbox-score-label">
+        Rate this output
+        <span class="inbox-score-value ${score <= 4 ? "low" : score >= 9 ? "high" : ""}">${score}/10 — ${scoreLabel(score)}</span>
+      </div>
       <div class="inbox-score-row">
         ${[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(
           (n) => html`
@@ -74,12 +91,15 @@ function renderScoreWidget(props: InboxSectionProps, item: InboxViewItem) {
           `,
         )}
       </div>
-      ${needsFeedback || optionalFeedback
+      ${showFeedback
         ? html`
             <div class="inbox-feedback">
               <textarea
                 class="inbox-feedback-input"
-                placeholder=${needsFeedback ? "What went wrong? (required)" : "What was great? (optional)"}
+                rows="3"
+                placeholder=${needsFeedback
+                  ? "What went wrong? This feedback improves the agent. (required)"
+                  : "What made this great? (optional)"}
                 .value=${feedbackText}
                 @input=${(e: Event) => props.onFeedbackChange((e.target as HTMLTextAreaElement).value)}
               ></textarea>
@@ -88,12 +108,12 @@ function renderScoreWidget(props: InboxSectionProps, item: InboxViewItem) {
         : nothing}
       <div class="inbox-score-actions">
         <button
-          class="btn inbox-score-submit"
+          class="btn btn--sm inbox-score-submit"
           ?disabled=${needsFeedback && !feedbackText.trim()}
           @click=${() => props.onScore(item.id, score, feedbackText.trim() || undefined)}
-        >Complete (${score}/10)</button>
+        >Submit ${score}/10</button>
         <button
-          class="btn inbox-score-cancel"
+          class="btn btn--sm inbox-score-cancel"
           @click=${() => props.onSetScoring(null)}
         >Cancel</button>
       </div>
@@ -148,7 +168,6 @@ function renderInboxCard(props: InboxSectionProps, item: InboxViewItem) {
     return renderProjectCompletionCard(props, item);
   }
 
-  const hasViewableOutput = Boolean(item.proofDocSlug || item.outputPath);
   const hasChat = Boolean(item.sessionId || item.source.taskId || item.source.queueItemId);
   return html`
     <div class="inbox-card">
@@ -161,8 +180,11 @@ function renderInboxCard(props: InboxSectionProps, item: InboxViewItem) {
         <div class="inbox-card-summary">${item.summary.slice(0, 220)}${item.summary.length > 220 ? "…" : ""}</div>
       </div>
       <div class="inbox-card-actions">
-        ${hasViewableOutput
+        ${item.outputPath
           ? html`<button class="btn btn--sm" @click=${() => props.onViewOutput(item.id)}>View Output</button>`
+          : nothing}
+        ${item.proofDocSlug
+          ? html`<button class="btn btn--sm" @click=${() => props.onViewProof(item.id)}>Proof</button>`
           : nothing}
         ${hasChat
           ? html`<button class="btn btn--sm" @click=${() => props.onOpenChat(item.id)}>Open Chat</button>`
@@ -176,7 +198,13 @@ function renderInboxCard(props: InboxSectionProps, item: InboxViewItem) {
 }
 
 export function renderInboxSection(props: InboxSectionProps) {
-  const pendingItems = props.items.filter((item) => item.status === "pending");
+  const sortOrder = props.sortOrder ?? "newest";
+  const pendingItems = props.items
+    .filter((item) => item.status === "pending")
+    .sort((a, b) => {
+      const diff = new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      return sortOrder === "oldest" ? -diff : diff;
+    });
   const count = props.count ?? pendingItems.length;
 
   if (props.loading) {
@@ -207,7 +235,10 @@ export function renderInboxSection(props: InboxSectionProps) {
           <span>INBOX</span>
           <span class="tab-badge" style="margin-left: 8px;">${count}</span>
         </div>
-        <button class="btn btn--sm" @click=${() => props.onMarkAll()}>Mark All Complete</button>
+        <div class="inbox-header-actions">
+          <button class="btn btn--sm" @click=${() => props.onSortToggle?.()}>${sortOrder === "newest" ? "Newest first" : "Oldest first"}</button>
+          <button class="btn btn--sm" @click=${() => props.onMarkAll()}>Mark All Complete</button>
+        </div>
       </div>
       <div class="my-day-card-content">
         <div class="inbox-list">
