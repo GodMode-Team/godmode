@@ -173,50 +173,49 @@ export async function handleBeforePromptBuild(
     } catch { /* graph query failure is invisible */ }
   }
 
-  // P1: Schedule + meeting prep (skip in light mode — network call)
+  // ── P1: Operational context — TOOL HINTS, not pre-injected facts ──
+  // 2026-03-14: Architectural change. Instead of pre-computing schedule/tasks/priorities
+  // and injecting them as text (which lets the model parrot facts without tool calls),
+  // inject lightweight tool hints that force the model to call the tool itself.
+  //
+  // EXCEPTION: Meeting prep still pre-injects when a meeting is <2hrs away,
+  // because the model needs to proactively surface this without being asked.
+  // Overdue tasks still flag because they need urgent surfacing.
+
   let schedule: string | null = null;
   let meetingPrep: string | null = null;
+  let operationalCounts: string | null = null;
+  let overdueCount = 0;
+  let priorities: string | null = null;
+
   if (!lightMode) {
+    // Schedule: tool hint instead of pre-injected event list
+    schedule = "The user has calendar events today. Use `calendar.events.today` to check their schedule when relevant.";
+
+    // Meeting prep: still pre-inject for upcoming meetings (proactive surfacing)
     try {
       const { fetchCalendarEvents } = await import("../methods/brief-generator.js");
       const result = await fetchCalendarEvents();
-      if (result.events.length > 0) {
-        const lines = ["## Schedule"];
-        for (const e of result.events.slice(0, 5)) {
-          const time = new Date(e.startTime).toLocaleTimeString("en-US", {
-            hour: "numeric", minute: "2-digit", hour12: true,
-          });
-          lines.push(`- ${time}: ${e.title}`);
-        }
-        schedule = lines.join("\n");
-
-        const now = Date.now();
-        const upcoming = result.events.filter((e: any) => {
-          const start = new Date(e.startTime).getTime();
-          return start > now && start - now <= 2 * 60 * 60 * 1000;
+      const now = Date.now();
+      const upcoming = result.events.filter((e: any) => {
+        const start = new Date(e.startTime).getTime();
+        return start > now && start - now <= 2 * 60 * 60 * 1000;
+      });
+      if (upcoming.length > 0) {
+        const next = upcoming[0];
+        const time = new Date(next.startTime).toLocaleTimeString("en-US", {
+          hour: "numeric", minute: "2-digit", hour12: true,
         });
-        if (upcoming.length > 0) {
-          const next = upcoming[0];
-          const time = new Date(next.startTime).toLocaleTimeString("en-US", {
-            hour: "numeric", minute: "2-digit", hour12: true,
-          });
-          const parts = [`## Upcoming: **${next.title}** at ${time}`];
-          if (next.attendees && next.attendees.length > 0) {
-            parts.push(`Attendees: ${next.attendees.slice(0, 5).join(", ")}`);
-          }
-          parts.push("Offer meeting prep if not already discussed.");
-          meetingPrep = parts.join("\n");
+        const parts = [`## Upcoming: **${next.title}** at ${time}`];
+        if (next.attendees && next.attendees.length > 0) {
+          parts.push(`Attendees: ${next.attendees.slice(0, 5).join(", ")}`);
         }
-      } else {
-        schedule = "## Schedule: No meetings today";
+        parts.push("Offer meeting prep if not already discussed.");
+        meetingPrep = parts.join("\n");
       }
     } catch { /* calendar unavailable */ }
-  }
 
-  // P1: Task + queue counts (skip in light mode)
-  let operationalCounts: string | null = null;
-  let overdueCount = 0;
-  if (!lightMode) {
+    // Tasks: tool hint, but flag overdue count (urgent surfacing)
     try {
       const { localDateString: lds } = await import("../data-paths.js");
       const today = lds();
@@ -227,33 +226,19 @@ export async function handleBeforePromptBuild(
         (t: { dueDate?: string | null }) => t.dueDate != null && t.dueDate <= today,
       );
       overdueCount = overdue.length;
-      const parts = [`Tasks: ${pending.length} pending, ${overdue.length} overdue`];
-      if (overdue.length > 0) parts.push("Surface overdue tasks early.");
-      operationalCounts = parts.join(" | ");
-    } catch { /* tasks unavailable */ }
-  }
-
-  // P1: Priorities (skip in light mode)
-  let priorities: string | null = null;
-  if (!lightMode) {
-    try {
-      const { parseWinTheDay, getTodayDate } = await import("../methods/daily-brief.js");
-      const { getVaultPath, VAULT_FOLDERS } = await import("../lib/vault-paths.js");
-      const vault = getVaultPath();
-      if (vault) {
-        const briefPath = join(vault, VAULT_FOLDERS.daily, `${getTodayDate()}.md`);
-        const { readFile: rf } = await import("node:fs/promises");
-        const brief = await rf(briefPath, "utf-8");
-        const wtd = parseWinTheDay(brief);
-        if (wtd.length > 0) {
-          const items = wtd.slice(0, 3).map((item: { completed: boolean; title: string }) => {
-            const check = item.completed ? "[x]" : "[ ]";
-            return `- ${check} ${item.title}`;
-          });
-          priorities = "## Priorities\n" + items.join("\n");
-        }
+      if (overdueCount > 0) {
+        // Overdue = urgent, pre-inject the count to force surfacing
+        operationalCounts = `${overdueCount} OVERDUE task(s). Surface these early. Use \`tasks_list\` for details.`;
+      } else {
+        // Normal: tool hint only
+        operationalCounts = "Use `tasks_list` and `queue_check` when the user asks about tasks, priorities, or progress.";
       }
-    } catch { /* no brief */ }
+    } catch {
+      operationalCounts = "Use `tasks_list` and `queue_check` when the user asks about tasks, priorities, or progress.";
+    }
+
+    // Priorities: tool hint — the model should read the daily brief itself
+    priorities = null; // Removed: model will use tools to check priorities when asked
   }
 
   // P2: Cron failures (skip in light mode)
