@@ -945,6 +945,32 @@ function handleGatewayEventUnsafe(host: GatewayHost, evt: GatewayEventFrame) {
             startedAt: host.compactionStatus.startedAt ?? null,
             completedAt: Date.now(),
           };
+
+          // Auto-retry the pending message after compaction completes.
+          // handleSendChat saves the user's message to pendingRetry and sets
+          // autoRetryAfterCompact before triggering /compact. Now that
+          // compaction is done, resend the message automatically.
+          const retryHost = host as unknown as {
+            autoRetryAfterCompact?: boolean;
+            handleRetryMessage?: () => Promise<void>;
+            pendingRetry?: { message: string } | null;
+            showToast?: (msg: string, type: string, duration?: number) => void;
+            handleSendChat?: (msg: string) => Promise<void>;
+          };
+          if (retryHost.autoRetryAfterCompact && retryHost.pendingRetry) {
+            retryHost.autoRetryAfterCompact = false;
+            // Small delay to let loadChatHistoryAfterFinal finish first
+            setTimeout(() => {
+              void retryHost.handleRetryMessage?.();
+            }, 500);
+          } else {
+            // Server-triggered compaction (no pending user message).
+            // Auto-send a continuation so the conversation doesn't stall.
+            retryHost.showToast?.("Compaction complete — resuming...", "info", 2000);
+            setTimeout(() => {
+              void retryHost.handleSendChat?.("Continue where you left off.");
+            }, 800);
+          }
         }
       }
       // Clear compaction status on error/abort
@@ -962,6 +988,42 @@ function handleGatewayEventUnsafe(host: GatewayHost, evt: GatewayEventFrame) {
         void (host as any).loadSessionResources?.();
         // Auto-open Proof docs when a tool result contains a _sidebarAction
         autoOpenProofFromMessages(host as unknown as GodModeApp);
+
+        // Detect server-side compaction and auto-continue.
+        // The gateway injects a "Pre-compaction memory flush" user message
+        // that bypasses the UI's compaction flow. After the model processes
+        // it and the run ends, the conversation stalls. Detect this and
+        // auto-send a continuation so the user doesn't have to manually nudge.
+        const app = host as unknown as {
+          chatMessages?: unknown[];
+          handleSendChat?: (msg: string) => Promise<void>;
+          showToast?: (msg: string, type: string, duration?: number) => void;
+          compactionStatus?: { active?: boolean } | null;
+        };
+        if (!app.compactionStatus?.active) {
+          const msgs = Array.isArray(app.chatMessages) ? app.chatMessages : [];
+          // Find the last user message
+          const lastUserMsg = [...msgs].reverse().find(
+            (m: any) => typeof m === "object" && m !== null && (m as any).role === "user",
+          ) as Record<string, unknown> | undefined;
+          if (lastUserMsg) {
+            const content = lastUserMsg.content;
+            let text = "";
+            if (typeof content === "string") text = content;
+            else if (Array.isArray(content)) {
+              text = (content as any[])
+                .filter((b: any) => typeof b?.text === "string")
+                .map((b: any) => b.text)
+                .join(" ");
+            }
+            if (text.includes("Pre-compaction memory flush") || text.includes("pre-compaction memory flush")) {
+              app.showToast?.("Context compacted — resuming conversation...", "info", 2000);
+              setTimeout(() => {
+                void app.handleSendChat?.("Continue where you left off.");
+              }, 800);
+            }
+          }
+        }
       });
 
       // Auto-refresh dashboard when its session completes (agent may have updated it)
