@@ -14,8 +14,16 @@ import {
   getContextPressureLevel,
 } from "./safety-gates.js";
 import { isRecentlyOverloaded } from "./lifecycle-hooks.js";
-import { pendingAutoTitles, titledSessions } from "../lib/auto-title.js";
-import { isCronSessionKey } from "../lib/workspace-session-store.js";
+import { pendingAutoTitles, titledSessions, generateSessionTitle, evictTitledSessions } from "../lib/auto-title.js";
+import { lastReceivedMessage } from "./lifecycle-hooks.js";
+import {
+  isCronSessionKey,
+  loadConfig as loadSessionConfig,
+  loadCombinedSessionStoreForGateway,
+  updateSessionStore,
+  resolveAgentStorePath,
+} from "../lib/workspace-session-store.js";
+import { safeBroadcast } from "../lib/host-context.js";
 
 type Logger = { warn: (msg: string) => void; info: (msg: string) => void };
 
@@ -27,6 +35,8 @@ export async function handleBeforePromptBuild(
 ): Promise<{ prependContext: string } | undefined> {
   const logger: Logger = api.logger;
   const sessionKey = extractSessionKey(ctx);
+
+
 
   // Agent persona — always-on behavioral baseline
   let personaContext: string | null = null;
@@ -316,21 +326,66 @@ export async function handleBeforePromptBuild(
     isFirstTurn = userMsgCount <= 1;
   } catch { /* non-fatal */ }
 
-  // Auto-title: capture first user message for llm_output to consume.
-  // This MUST happen here (agent context) because message_received uses
-  // a different key format (message context: "imessage:+1..." vs agent
-  // context: "agent:main:imessage:+1..."), and llm_output uses agent keys.
-  // Only capture on the first turn to avoid overwriting with later messages.
+  // On the first turn, event.messages is empty — pull from lastReceivedMessage
+  // populated by message_received (which fires immediately before this hook).
+  if (!currentUserMessage && sessionKey && lastReceivedMessage) {
+    if (Date.now() - lastReceivedMessage.capturedAt < 5_000) {
+      currentUserMessage = lastReceivedMessage.content;
+    }
+  }
+
+  // Auto-title: generate title on the first turn using just the user message.
+  // Fire-and-forget — don't block prompt build.
   if (
     sessionKey &&
-    isFirstTurn &&
     currentUserMessage.length >= 10 &&
     !titledSessions.has(sessionKey) &&
     !pendingAutoTitles.has(sessionKey) &&
     !isCronSessionKey(sessionKey)
   ) {
+    // Mark as pending to prevent duplicate attempts
     pendingAutoTitles.set(sessionKey, { message: currentUserMessage, attempts: 0, capturedAt: Date.now() });
-    logger.info(`[GodMode][AutoTitle] Captured first message for "${sessionKey}" (${currentUserMessage.slice(0, 60)}...)`);
+
+    // Fire-and-forget — don't block prompt build
+    void (async () => {
+      try {
+        const cfg = await loadSessionConfig();
+        const { store } = await loadCombinedSessionStoreForGateway(cfg);
+        const normalizedKey = sessionKey.trim().toLowerCase();
+        const entry = store[normalizedKey];
+        if (entry) {
+          const existingTitle = (entry.displayName || entry.label || entry.subject || "").trim();
+          if (existingTitle) {
+            titledSessions.add(sessionKey);
+            pendingAutoTitles.delete(sessionKey);
+            return;
+          }
+        }
+        const title = await generateSessionTitle(currentUserMessage);
+        if (!title) {
+          titledSessions.add(sessionKey);
+          pendingAutoTitles.delete(sessionKey);
+          return;
+        }
+        const storePath = resolveAgentStorePath(sessionKey, cfg);
+        await updateSessionStore(storePath, (storeData) => {
+          const existing = storeData[normalizedKey] ?? {};
+          storeData[normalizedKey] = {
+            ...existing,
+            displayName: title,
+            updatedAt: Date.now(),
+          };
+        });
+        titledSessions.add(sessionKey);
+        pendingAutoTitles.delete(sessionKey);
+        evictTitledSessions();
+        logger.info(`[GodMode] Auto-titled "${sessionKey}" → "${title}"`);
+        safeBroadcast(api, "sessions:updated", { sessionKey, title });
+      } catch (err) {
+        logger.warn(`[GodMode] Auto-title error: ${String(err)}`);
+        pendingAutoTitles.delete(sessionKey);
+      }
+    })();
   }
 
   // P1.5: Action items extracted from user brain dumps

@@ -33,6 +33,13 @@ import {
 
 type Logger = { warn: (msg: string) => void; info: (msg: string) => void };
 
+// ── Auto-title first message buffer ──────────────────────────────────
+// message_received has the user's content but no sessionKey.
+// before_prompt_build has the sessionKey but no content on the first turn.
+// Since they fire sequentially in the same event loop tick (message_received
+// → before_prompt_build), we use a simple last-received buffer.
+export let lastReceivedMessage: { content: string; capturedAt: number } | null = null;
+
 // ── Dashboard save tracking ──────────────────────────────────────────
 // Track sessions where dashboards.save was called so we can auto-save
 // dashboard HTML if the ally forgets.
@@ -200,15 +207,10 @@ export async function handleMessageReceived(
       } catch { /* non-fatal */ }
     }
 
-    // Server-side auto-title: capture first user message
-    if (
-      sessionKey &&
-      !titledSessions.has(sessionKey) &&
-      !pendingAutoTitles.has(sessionKey) &&
-      !isCronSessionKey(sessionKey)
-    ) {
-      pendingAutoTitles.set(sessionKey, { message: content, attempts: 0, capturedAt: Date.now() });
-      logger.info(`[GodMode][AutoTitle] Captured first message for "${sessionKey}" (${content.slice(0, 60)}...)`);
+    // Auto-title: buffer the user message for before_prompt_build to pick up.
+    // message_received fires immediately before before_prompt_build in the same tick.
+    if (content.length >= 10) {
+      lastReceivedMessage = { content, capturedAt: Date.now() };
     }
   }
 }
@@ -454,6 +456,7 @@ export async function handleLlmOutputPressure(
 ): Promise<void> {
   const logger: Logger = api.logger;
   const sessionKey = extractSessionKey(ctx);
+
   try {
     const tier = await trackContextPressure(sessionKey, event.usage);
     if (tier === "critical" && sessionKey) {
@@ -490,46 +493,26 @@ export async function handleLlmOutputAutoTitle(
 ): Promise<void> {
   const logger: Logger = api.logger;
 
-  // File-based trace since logger.info may not appear in gateway.log for hooks
-  const _trace = async (msg: string) => {
-    try {
-      const { appendFile } = await import("node:fs/promises");
-      await appendFile(
-        (await import("node:path")).join((await import("node:os")).homedir(), "godmode", "data", "auto-title-trace.log"),
-        `${new Date().toISOString()} ${msg}\n`,
-      );
-    } catch { /* best-effort */ }
-  };
-
   const sessionKey = extractSessionKey(ctx);
-  void _trace(`llm_output fired — sessionKey=${sessionKey ?? "NONE"}, ctx.keys=${Object.keys(ctx || {}).join(",")}, pendingKeys=[${[...pendingAutoTitles.keys()].join(",")}]`);
-
   if (!sessionKey) return;
 
   const pending = pendingAutoTitles.get(sessionKey);
   if (!pending) return;
   if (titledSessions.has(sessionKey)) {
-    void _trace(`${sessionKey}: already titled — clearing pending`);
     pendingAutoTitles.delete(sessionKey);
     return;
   }
 
   // Expire stale entries (session never got a response)
   if (Date.now() - pending.capturedAt > PENDING_TTL_MS) {
-    void _trace(`${sessionKey}: expired — removing`);
     pendingAutoTitles.delete(sessionKey);
     return;
   }
 
   // Only proceed when we have actual assistant text.
-  // llm_output fires for every LLM call including tool-use rounds.
-  // Skip silently if no text yet — don't count toward attempts.
   const assistantText = (event as { assistantTexts?: string[] }).assistantTexts?.join("") ?? "";
-  if (assistantText.trim().length < 10) {
-    void _trace(`${sessionKey}: no text yet (len=${assistantText.length})`);
-    return;
-  }
-  void _trace(`${sessionKey}: HAS TEXT (len=${assistantText.length}) — generating title`);
+  if (assistantText.trim().length < 10) return;
+
   logger.info(`[GodMode][AutoTitle] llm_output: "${sessionKey}" has text (len=${assistantText.length}) — generating title`);
 
   // Consume the pending entry — one shot, no retries with later messages
