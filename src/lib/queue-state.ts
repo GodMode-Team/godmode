@@ -88,6 +88,8 @@ export type QueueItem = {
     /** True for auto-injected QA review stages — gated behind project work completion */
     isQAStage?: boolean;
   };
+  /** Epoch ms — if set, queue processor skips this item until Date.now() >= scheduledAt */
+  scheduledAt?: number;
   /** Structured handoff context from a predecessor agent */
   handoff?: {
     fromAgent: string;

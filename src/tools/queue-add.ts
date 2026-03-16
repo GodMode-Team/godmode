@@ -67,6 +67,12 @@ export function createQueueAddTool(_ctx: ToolContext): AnyAgentTool {
             "Which AI engine to use. Defaults to persona's engine or 'claude'. " +
             "Use 'codex' for complex backend/multi-file work, 'claude' for speed/frontend.",
         },
+        scheduled_at: {
+          type: "string",
+          description:
+            "ISO 8601 date/time to defer processing until (e.g. '2026-03-20T09:00'). " +
+            "If omitted, the task runs immediately. Use for 'do this Thursday' type requests.",
+        },
         confirmed: {
           type: "boolean",
           description:
@@ -88,6 +94,9 @@ export function createQueueAddTool(_ctx: ToolContext): AnyAgentTool {
       const successCriteria = params.success_criteria ? String(params.success_criteria) : undefined;
       const priority = (params.priority as "high" | "normal" | "low") || "normal";
       const engine = params.engine ? String(params.engine) : persona?.engine ?? "claude";
+      const scheduledAt = params.scheduled_at
+        ? new Date(String(params.scheduled_at)).getTime() || undefined
+        : undefined;
 
       // If not confirmed, return a scoped brief for the user to review
       if (!params.confirmed) {
@@ -108,6 +117,7 @@ export function createQueueAddTool(_ctx: ToolContext): AnyAgentTool {
             `**Task:** ${title}\n` +
             `**Type:** ${type} | **Persona:** ${personaName} | **Engine:** ${engine}\n` +
             `**Priority:** ${priority}\n` +
+            (scheduledAt ? `**Scheduled:** ${new Date(scheduledAt).toLocaleString()}\n` : "") +
             (description ? `**Details:** ${description}\n` : "") +
             `**Success Criteria:** ${successCriteria ?? "Not specified"}\n\n` +
             "Ask: 'Should I queue this for background processing?' " +
@@ -147,6 +157,7 @@ export function createQueueAddTool(_ctx: ToolContext): AnyAgentTool {
           sessionId: _ctx.sessionKey ?? undefined,
           personaHint: personaSlug ?? persona?.slug,
           engine: params.engine ? (String(params.engine) as "claude" | "codex" | "gemini") : undefined,
+          scheduledAt,
           handoff,
         };
         state.items.push(newItem);
@@ -168,7 +179,9 @@ export function createQueueAddTool(_ctx: ToolContext): AnyAgentTool {
           priority: item.priority,
           status: item.status,
         },
-        message: `Queued: "${item.title}" (${item.type}) — ID: ${item.id}. Processing will start shortly.`,
+        message: scheduledAt
+          ? `Scheduled: "${item.title}" (${item.type}) — ID: ${item.id}. Will run at ${new Date(scheduledAt).toLocaleString()}.`
+          : `Queued: "${item.title}" (${item.type}) — ID: ${item.id}. Processing will start shortly.`,
       });
     },
   } as AnyAgentTool;
