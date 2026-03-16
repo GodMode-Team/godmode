@@ -489,18 +489,34 @@ export async function handleLlmOutputAutoTitle(
   api: any,
 ): Promise<void> {
   const logger: Logger = api.logger;
+
+  // File-based trace since logger.info may not appear in gateway.log for hooks
+  const _trace = async (msg: string) => {
+    try {
+      const { appendFile } = await import("node:fs/promises");
+      await appendFile(
+        (await import("node:path")).join((await import("node:os")).homedir(), "godmode", "data", "auto-title-trace.log"),
+        `${new Date().toISOString()} ${msg}\n`,
+      );
+    } catch { /* best-effort */ }
+  };
+
   const sessionKey = extractSessionKey(ctx);
+  void _trace(`llm_output fired — sessionKey=${sessionKey ?? "NONE"}, ctx.keys=${Object.keys(ctx || {}).join(",")}, pendingKeys=[${[...pendingAutoTitles.keys()].join(",")}]`);
+
   if (!sessionKey) return;
 
   const pending = pendingAutoTitles.get(sessionKey);
   if (!pending) return;
   if (titledSessions.has(sessionKey)) {
+    void _trace(`${sessionKey}: already titled — clearing pending`);
     pendingAutoTitles.delete(sessionKey);
     return;
   }
 
   // Expire stale entries (session never got a response)
   if (Date.now() - pending.capturedAt > PENDING_TTL_MS) {
+    void _trace(`${sessionKey}: expired — removing`);
     pendingAutoTitles.delete(sessionKey);
     return;
   }
@@ -509,7 +525,12 @@ export async function handleLlmOutputAutoTitle(
   // llm_output fires for every LLM call including tool-use rounds.
   // Skip silently if no text yet — don't count toward attempts.
   const assistantText = (event as { assistantTexts?: string[] }).assistantTexts?.join("") ?? "";
-  if (assistantText.trim().length < 10) return;
+  if (assistantText.trim().length < 10) {
+    void _trace(`${sessionKey}: no text yet (len=${assistantText.length})`);
+    return;
+  }
+  void _trace(`${sessionKey}: HAS TEXT (len=${assistantText.length}) — generating title`);
+  logger.info(`[GodMode][AutoTitle] llm_output: "${sessionKey}" has text (len=${assistantText.length}) — generating title`);
 
   // Consume the pending entry — one shot, no retries with later messages
   pendingAutoTitles.delete(sessionKey);
