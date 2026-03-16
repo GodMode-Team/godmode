@@ -127,15 +127,26 @@ export async function handleBeforePromptBuild(
     logger.warn(`[GodMode] identity anchor error: ${String(err)}`);
   }
 
-  // Extract user's latest message for memory search + graph query
-  const _messages = event.messages ?? [];
-  const _lastUserMsg = [..._messages].reverse().find((m: any) => m.role === "user");
+  // Extract user's latest message for memory search + graph query.
+  // Prefer lastReceivedMessage (clean user input from message_received hook)
+  // over event.messages, which may contain system-context injected turns.
   let userQuery = "";
-  if (typeof _lastUserMsg?.content === "string") {
-    userQuery = _lastUserMsg.content;
-  } else if (Array.isArray(_lastUserMsg?.content)) {
-    const _textBlock = _lastUserMsg.content.find((b: any) => b.type === "text");
-    userQuery = typeof _textBlock?.text === "string" ? _textBlock.text : "";
+  if (lastReceivedMessage && Date.now() - lastReceivedMessage.capturedAt < 5_000) {
+    userQuery = lastReceivedMessage.content;
+  } else {
+    const _messages = event.messages ?? [];
+    const _lastUserMsg = [..._messages].reverse().find((m: any) => m.role === "user");
+    if (typeof _lastUserMsg?.content === "string") {
+      userQuery = _lastUserMsg.content;
+    } else if (Array.isArray(_lastUserMsg?.content)) {
+      const _textBlock = _lastUserMsg.content.find((b: any) => b.type === "text");
+      userQuery = typeof _textBlock?.text === "string" ? _textBlock.text : "";
+    }
+    // Strip system-context tags that may have been injected in prior turns
+    if (userQuery.includes("<system-context")) {
+      const stripped = userQuery.replace(/<system-context[\s\S]*?<\/system-context>/g, "").trim();
+      if (stripped.length >= 5) userQuery = stripped;
+    }
   }
 
   // ── Overload-aware lightweight mode ──
