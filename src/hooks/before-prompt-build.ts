@@ -14,6 +14,8 @@ import {
   getContextPressureLevel,
 } from "./safety-gates.js";
 import { isRecentlyOverloaded } from "./lifecycle-hooks.js";
+import { pendingAutoTitles, titledSessions } from "../lib/auto-title.js";
+import { isCronSessionKey } from "../lib/workspace-session-store.js";
 
 type Logger = { warn: (msg: string) => void; info: (msg: string) => void };
 
@@ -314,11 +316,22 @@ export async function handleBeforePromptBuild(
     isFirstTurn = userMsgCount <= 1;
   } catch { /* non-fatal */ }
 
-  // Auto-title capture removed from before_prompt_build — message_received
-  // is the single capture point. Having two capture points caused the second
-  // one to overwrite with later (irrelevant) messages when the first title
-  // attempt failed, producing garbage titles like "heartbeat" or random
-  // fragments from turn N instead of the actual session topic.
+  // Auto-title: capture first user message for llm_output to consume.
+  // This MUST happen here (agent context) because message_received uses
+  // a different key format (message context: "imessage:+1..." vs agent
+  // context: "agent:main:imessage:+1..."), and llm_output uses agent keys.
+  // Only capture on the first turn to avoid overwriting with later messages.
+  if (
+    sessionKey &&
+    isFirstTurn &&
+    currentUserMessage.length >= 10 &&
+    !titledSessions.has(sessionKey) &&
+    !pendingAutoTitles.has(sessionKey) &&
+    !isCronSessionKey(sessionKey)
+  ) {
+    pendingAutoTitles.set(sessionKey, { message: currentUserMessage, attempts: 0, capturedAt: Date.now() });
+    logger.info(`[GodMode][AutoTitle] Captured first message for "${sessionKey}" (${currentUserMessage.slice(0, 60)}...)`);
+  }
 
   // P1.5: Action items extracted from user brain dumps
   let actionItemsBlock: string | null = null;
