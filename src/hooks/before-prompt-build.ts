@@ -159,6 +159,22 @@ export async function handleBeforePromptBuild(
   }
 
   // P0: Mem0 proactive memory search (skip in light mode — it fires a Haiku API call)
+  // This is a best-effort pre-LLM search. For long messages (brain dumps),
+  // we truncate to keep it fast and cheap — the ally can use secondBrain.search
+  // for targeted queries after it reads the full message.
+  const PRE_LLM_QUERY_MAX = 300;
+  let memoryQuery = userQuery;
+  if (memoryQuery.length > PRE_LLM_QUERY_MAX) {
+    // Take first ~300 chars, cut at last sentence boundary if possible
+    const truncated = memoryQuery.slice(0, PRE_LLM_QUERY_MAX);
+    const lastSentence = Math.max(
+      truncated.lastIndexOf(". "),
+      truncated.lastIndexOf("? "),
+      truncated.lastIndexOf("! "),
+    );
+    memoryQuery = lastSentence > 50 ? truncated.slice(0, lastSentence + 1) : truncated;
+  }
+
   let memoryBlock: string | null = null;
   let memoryStatus: "ready" | "degraded" | "offline" = "offline";
   if (provenance?.kind !== "inter_session" && !lightMode) {
@@ -166,8 +182,8 @@ export async function handleBeforePromptBuild(
       const { isMemoryReady, searchMemories, formatMemoriesForContext, getMemoryStatus } = await import("../lib/memory.js");
       memoryStatus = getMemoryStatus();
       if (isMemoryReady()) {
-        if (userQuery.length >= 5) {
-          const memories = await searchMemories(userQuery, "caleb", 8);
+        if (memoryQuery.length >= 5) {
+          const memories = await searchMemories(memoryQuery, "caleb", 8);
           const formatted = formatMemoriesForContext(memories);
           if (formatted) memoryBlock = formatted;
           memoryStatus = getMemoryStatus();
