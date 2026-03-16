@@ -5,7 +5,8 @@ import { parseAgentSessionKey } from "../lib/session-key-utils.js";
 import { sanitizeHtmlFragment } from "./markdown";
 import { refreshChatAvatar, saveDraft, restoreDraft } from "./app-chat";
 import { findSessionByKey } from "./app-lifecycle";
-import { createNewSession, renderChatControls, renderTab, renderThemeToggle } from "./app-render.helpers";
+import { resetChatScroll, scheduleChatScroll } from "./app-scroll";
+import { createNewSession, renderChatControls, renderTab, renderThemeToggle, scrollActiveTabIntoView } from "./app-render.helpers";
 import { setTab, syncUrlWithSessionKey } from "./app-settings";
 import type { AppViewState } from "./app-view-state";
 import { loadChannels } from "./controllers/channels";
@@ -549,7 +550,10 @@ export function renderApp(state: AppViewState) {
                          },
                        });
                        void state.loadAssistantIdentity();
-                       void loadChatHistory(state);
+                       void loadChatHistory(state).then(() => {
+                         state.resetChatScroll();
+                         scheduleChatScroll(state as unknown as Parameters<typeof scheduleChatScroll>[0], true);
+                       });
                        void state.loadSessionResources();
                        void loadSessions(state);
                      }}
@@ -656,10 +660,15 @@ export function renderApp(state: AppViewState) {
                           });
                           void state.loadAssistantIdentity();
                           syncUrlWithSessionKey(state, key, true);
-                          void loadChatHistory(state);
+                          void loadChatHistory(state).then(() => {
+                            // Force scroll to bottom after messages are loaded
+                            state.resetChatScroll();
+                            scheduleChatScroll(state as unknown as Parameters<typeof scheduleChatScroll>[0], true);
+                          });
                           void state.loadSessionResources();
                           // Refresh sessions to get accurate context token counts
                           void loadSessions(state);
+                          scrollActiveTabIntoView();
                         }}
                         @dragend=${(e: DragEvent) => {
                           (e.target as HTMLElement).classList.remove("dragging");
@@ -931,7 +940,10 @@ export function renderApp(state: AppViewState) {
                                   });
                                   void state.loadAssistantIdentity();
                                   syncUrlWithSessionKey(state, key, true);
-                                  void loadChatHistory(state);
+                                  void loadChatHistory(state).then(() => {
+                                    state.resetChatScroll();
+                                    scheduleChatScroll(state as unknown as Parameters<typeof scheduleChatScroll>[0], true);
+                                  });
                                   void state.loadSessionResources();
                                   void loadSessions(state);
                                 }
@@ -1030,7 +1042,10 @@ export function renderApp(state: AppViewState) {
                                 state.sessionKey = fallbackKey;
                                 state.sessionResources = [];
                                 syncUrlWithSessionKey(state, fallbackKey, true);
-                                void loadChatHistory(state);
+                                void loadChatHistory(state).then(() => {
+                                  state.resetChatScroll();
+                                  scheduleChatScroll(state as unknown as Parameters<typeof scheduleChatScroll>[0], true);
+                                });
                                 void state.loadSessionResources();
                               }
                             }}
@@ -1316,7 +1331,10 @@ export function renderApp(state: AppViewState) {
                   state.setTab("chat" as Tab);
                   void state.loadAssistantIdentity();
                   syncUrlWithSessionKey(state, nextKey, true);
-                  void loadChatHistory(state);
+                  void loadChatHistory(state).then(() => {
+                    state.resetChatScroll();
+                    scheduleChatScroll(state as unknown as Parameters<typeof scheduleChatScroll>[0], true);
+                  });
                   void state.loadSessionResources();
                 },
                 onPinToggle: async (workspaceId, filePath, pinned) => {
@@ -2122,7 +2140,10 @@ export function renderApp(state: AppViewState) {
                     lastActiveSessionKey: next,
                   });
                   void state.loadAssistantIdentity();
-                  void loadChatHistory(state);
+                  void loadChatHistory(state).then(() => {
+                    state.resetChatScroll();
+                    scheduleChatScroll(state as unknown as Parameters<typeof scheduleChatScroll>[0], true);
+                  });
                   void refreshChatAvatar(state);
                   void state.loadSessionResources();
                   triggerImageResolve(state as unknown as import("./app").GodModeApp);

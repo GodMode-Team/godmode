@@ -1,6 +1,7 @@
 import { html, nothing } from "lit";
 import { repeat } from "lit/directives/repeat.js";
 import { saveDraft, restoreDraft, refreshChat } from "./app-chat";
+import { resetChatScroll, scheduleChatScroll } from "./app-scroll";
 import { syncUrlWithSessionKey } from "./app-settings";
 import type { AppViewState } from "./app-view-state";
 import { loadChatHistory } from "./controllers/chat";
@@ -11,6 +12,22 @@ import { emojiForTab, pathForTab, titleForTab, type Tab } from "./navigation";
 import type { ThemeMode } from "./theme";
 import type { ThemeTransitionContext } from "./theme-transition";
 import { generateUUID } from "./uuid.js";
+
+/** Scroll the active session tab into view after render. */
+export function scrollActiveTabIntoView(): void {
+  requestAnimationFrame(() => {
+    const active = document.querySelector(".session-tab--active");
+    active?.scrollIntoView({ behavior: "smooth", inline: "nearest", block: "nearest" });
+  });
+}
+
+/** Focus the chat textarea after render. */
+function focusChatInput(): void {
+  requestAnimationFrame(() => {
+    const textarea = document.querySelector<HTMLTextAreaElement>(".chat-compose__textarea");
+    textarea?.focus();
+  });
+}
 
 /**
  * Creates a new chat session and switches to it.
@@ -45,6 +62,9 @@ export function createNewSession(state: AppViewState): void {
   void state.loadAssistantIdentity();
   syncUrlWithSessionKey(state, newSessionKey, true);
   void loadChatHistory(state);
+  // Scroll new tab into view and focus chat input
+  scrollActiveTabIntoView();
+  focusChatInput();
 }
 
 export function renderTab(state: AppViewState, tab: Tab) {
@@ -405,7 +425,10 @@ function renderSessionSearchDropdown(state: AppViewState) {
     state.resetChatScroll();
     void state.loadAssistantIdentity();
     syncUrlWithSessionKey(state, key, true);
-    void loadChatHistory(state);
+    void loadChatHistory(state).then(() => {
+      resetChatScroll(state as unknown as Parameters<typeof resetChatScroll>[0]);
+      scheduleChatScroll(state as unknown as Parameters<typeof scheduleChatScroll>[0], true);
+    });
   };
 
   const renderSearchResult = (result: (typeof state.sessionSearchResults)[0]) => {
@@ -566,7 +589,10 @@ function renderSessionPickerDropdown(state: AppViewState) {
     state.resetChatScroll();
     void state.loadAssistantIdentity();
     syncUrlWithSessionKey(state, key, true);
-    void loadChatHistory(state);
+    void loadChatHistory(state).then(() => {
+      resetChatScroll(state as unknown as Parameters<typeof resetChatScroll>[0]);
+      scheduleChatScroll(state as unknown as Parameters<typeof scheduleChatScroll>[0], true);
+    });
   };
 
   const handleDeleteSession = async (e: Event, key: string) => {
