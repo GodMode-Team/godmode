@@ -14,6 +14,16 @@
     ],
     "PreToolUse": [
       {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "./scripts/hooks/branch-guard.sh",
+            "timeout": 3
+          }
+        ]
+      },
+      {
         "matcher": "Bash|Edit|Write",
         "hooks": [
           {

@@ -8,6 +8,8 @@ This repository is the standalone home for the GodMode OpenClaw plugin.
 
 **Read `HARNESS.md` for agent workflow rules** — branching, building, merging, handing off. Follow it.
 
+**Read `TEAM-WORKFLOW.md` for team collaboration rules** — slash commands (`/bug`, `/fix`, `/pr-review`, `/sync`), branch protection, and CI enforcement.
+
 ### What GodMode Is
 GodMode is a deeply contextual personal AI ally that manages a swarm of agents. The ally is 80% of the value (deep context, coworking in chat). Agent delegation is 20%. GodMode is the conductor, not the orchestra — it connects to the user's existing tools, never rebuilds them.
 
@@ -115,6 +117,16 @@ Nothing gets permanent context injection. New capabilities are files (personas, 
 - **One branch per task** (e.g., `feat/my-feature`, `fix/bug-name`).
 - **NEVER use `git stash`** — commit to your branch instead, even as WIP commits.
 - If you detect you're on `main`, create a branch immediately: `git checkout -b feat/<task-slug>`.
+- **Enforced by hook:** `scripts/hooks/branch-guard.sh` blocks Edit/Write on `main`.
+- **Enforced by GitHub:** Branch protection requires CI + 1 PR review before merge.
+
+## Team Slash Commands
+
+These commands are available to all team members via Claude Code:
+- `/bug <description>` — File a GitHub Issue from a bug report or screenshot.
+- `/fix <issue# or "next">` — Pick up an issue, create branch, fix, push, open PR.
+- `/pr-review [number]` — Review open PRs, approve, merge.
+- `/sync` — Pull latest main, rebuild, see what changed.
 
 ## AI Session Checklist
 
