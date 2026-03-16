@@ -4,6 +4,27 @@ This file tracks recent development changes so Atlas and other agents can quickl
 
 ---
 
+## v1.7.0 Release — Customer-Ready Patch (2026-03-16)
+
+### What Landed
+- **Native agent execution** — replaced Paperclip sidecar with native delegate-tool, evidence gates, project state tracking.
+- **Tool grounding gate** — deterministic tool enforcement, prevents hallucinated answers.
+- **Customer-ready cleanup** — removed ALL hardcoded personal references (13 items: caleb userId, Caleb in prompts, Prosper ally name, personal contacts, personal workspace templates, personal project examples).
+- **New utilities** — `getOwnerName()`, `getOwnerUserId()` in ally-identity.ts for dynamic owner resolution.
+- **13 bug fixes** — chat messages disappearing, auto-title pipeline, memory search targeting, memory query truncation, capability map injection, scheduled queue items, anti-empty-promise, compaction stall.
+- **Context injection overhaul** — P1 context now uses tool hints instead of pre-injected facts.
+- **UI polish** — inbox redesign, mission control, proof viewer.
+
+### Files Changed (68 across src + ui + assets)
+See `CHANGELOG.md` for the full itemized list.
+
+### Verification
+- `pnpm typecheck` — clean
+- `pnpm build` — clean
+- `pnpm ui:sync` — fallback snapshot refreshed
+
+---
+
 ## Proof Steering Safety Follow-up (2026-03-13)
 
 ### What Landed
