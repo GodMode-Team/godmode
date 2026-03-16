@@ -151,7 +151,7 @@ function renderProjectCompletionCard(props: InboxSectionProps, item: InboxViewIt
           : nothing}
       </div>
       <div class="inbox-card-actions">
-        <button class="btn btn--sm primary" @click=${() => props.onOpenChat(item.id)}>Review with Prosper</button>
+        <button class="btn btn--sm primary" @click=${() => props.onOpenChat(item.id)}>Review in Chat</button>
         ${item.proofDocSlug
           ? html`<button class="btn btn--sm" @click=${() => props.onViewOutput(item.id)}>View Deliverables</button>`
           : nothing}

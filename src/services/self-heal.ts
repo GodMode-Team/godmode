@@ -475,7 +475,8 @@ async function checkAndRepairMemory(logger: Logger): Promise<void> {
         // Trigger vault seeding if needed
         try {
           const { seedFromVault } = await import("../lib/memory.js");
-          void seedFromVault("caleb");
+          const { getOwnerUserId } = await import("../lib/ally-identity.js");
+          void seedFromVault(getOwnerUserId());
         } catch { /* non-fatal */ }
       } else {
         markOffline(id, "Re-init attempted but Mem0 still not ready");
@@ -605,13 +606,14 @@ async function verifyMemory(logger: Logger): Promise<boolean> {
     const canaryQuery = "GodMode canary test fact";
 
     // Ingest
-    await ingestConversation(canaryFact, "caleb");
+    const { getOwnerUserId } = await import("../lib/ally-identity.js");
+    await ingestConversation(canaryFact, getOwnerUserId());
 
     // Wait briefly for async processing
     await new Promise((r) => setTimeout(r, 2000));
 
     // Search
-    const results = await searchMemories(canaryQuery, "caleb", 3);
+    const results = await searchMemories(canaryQuery, getOwnerUserId(), 3);
     const found = results.some((r) =>
       r.memory.toLowerCase().includes("canary") || r.memory.toLowerCase().includes("verification"),
     );

@@ -98,7 +98,7 @@ export async function generateSessionTitle(
           "",
           "Examples:",
           "User: 'hows our memory working?' → Memory System Status",
-          "User: 'can you research community platforms for TRP?' → TRP Community Platforms",
+          "User: 'can you research community platforms for my project?' → Community Platform Research",
           "User: 'what tips could I give Scott about his ads?' → Scott Ad Strategy Tips",
           "User: 'build me a front intelligence dashboard' → Front Email Intelligence",
           "User: 'pink elephants running wild in the fields' → Pink Elephants",

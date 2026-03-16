@@ -1012,7 +1012,7 @@ class QueueProcessor {
       proofDocSlug,
       coworkSessionId,
       actions: [
-        { label: "Review with Prosper", action: "cowork", target: coworkSessionId },
+        { label: "Review in Chat", action: "cowork", target: coworkSessionId },
         { label: "View Deliverables", action: "navigate", target: "today" },
       ],
     });

@@ -398,7 +398,7 @@ export const sessions = {
 
 // ── Auto-File GitHub Issues ──────────────────────────────────────
 
-const GITHUB_REPO = "godmode-team/godmode";
+const GITHUB_REPO = process.env.GODMODE_GITHUB_REPO || "godmode-team/godmode";
 
 async function autoFileGitHubIssue(entry: RepairEntry, occurrences: number): Promise<void> {
   try {

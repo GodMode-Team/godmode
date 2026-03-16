@@ -183,7 +183,8 @@ export async function handleBeforePromptBuild(
       memoryStatus = getMemoryStatus();
       if (isMemoryReady()) {
         if (memoryQuery.length >= 5) {
-          const memories = await searchMemories(memoryQuery, "caleb", 8);
+          const { getOwnerUserId } = await import("../lib/ally-identity.js");
+          const memories = await searchMemories(memoryQuery, getOwnerUserId(), 8);
           const formatted = formatMemoriesForContext(memories);
           if (formatted) memoryBlock = formatted;
           memoryStatus = getMemoryStatus();

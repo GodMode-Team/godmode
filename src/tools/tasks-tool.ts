@@ -81,7 +81,7 @@ export function createTasksCreateTool(): AnyAgentTool {
         project: {
           type: "string",
           description:
-            "Workspace name (e.g. 'TRP', 'GodMode', 'Patient Autopilot'). " +
+            "Workspace name (e.g. 'My Project', 'GodMode', 'Agency Client'). " +
             "Auto-detected from title if not provided. Leave null if unclear.",
         },
       },

@@ -397,7 +397,8 @@ export async function handleMessageSending(
   try {
     const { isMemoryReady, ingestConversation } = await import("../lib/memory.js");
     if (isMemoryReady() && content.length > 20) {
-      void ingestConversation(content, "caleb");
+      const { getOwnerUserId } = await import("../lib/ally-identity.js");
+      void ingestConversation(content, getOwnerUserId());
     }
   } catch { /* invisible */ }
 

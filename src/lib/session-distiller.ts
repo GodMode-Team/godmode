@@ -22,6 +22,7 @@ import { join } from "node:path";
 import { DATA_DIR, MEMORY_DIR } from "../data-paths.js";
 import { resolveAnthropicKey, fetchWithTimeout } from "./anthropic-auth.js";
 import { health } from "./health-ledger.js";
+import { getOwnerName } from "./ally-identity.js";
 
 // ── Types ──────────────────────────────────────────────────────────────
 
@@ -105,7 +106,7 @@ Return ONLY valid JSON with this schema:
 Rules:
 - Skill drafts: Only extract patterns the user would want to REPEAT. Not one-off tasks.
 - Preferences: Only extract explicit corrections or style preferences the user stated.
-- Entities: Only clearly named entities with proper names. The user is "Caleb".
+- Entities: Only clearly named entities with proper names. The user is "${getOwnerName()}".
 - If a category has nothing worth extracting, return an empty array.
 - Max 3 skill drafts, 5 preferences, 10 entities per session.
 

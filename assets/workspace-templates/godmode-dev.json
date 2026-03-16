@@ -7,7 +7,7 @@
   "syncEnabled": true,
   "syncInterval": 300,
   "paths": {
-    "root": "~/Projects/godmode-plugin",
+    "root": "",
     "memory": "~/godmode/workspaces/godmode/memory",
     "skills": "~/godmode/workspaces/godmode/skills",
     "personas": "~/godmode/workspaces/godmode/agent-roster",

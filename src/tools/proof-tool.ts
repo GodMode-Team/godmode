@@ -17,6 +17,7 @@ import {
   shareProofDocument,
 } from "../lib/proof-bridge.js";
 import { isProofRunning } from "../services/proof-server.js";
+import { getAllyName } from "../lib/ally-identity.js";
 
 export function createProofEditorTool(): AnyAgentTool {
   return {
@@ -123,7 +124,7 @@ export function createProofEditorTool(): AnyAgentTool {
             if (!slug) return jsonResult({ error: "slug is required for suggest" });
             const text = String(params.comment ?? params.content ?? "");
             await addProofComment(slug, "ally", `[SUGGESTION] ${text}`);
-            await appendProofDocument(slug, `> Suggestion from Prosper: ${text}`, "ally", "Prosper");
+            await appendProofDocument(slug, `> Suggestion from ${getAllyName()}: ${text}`, "ally", getAllyName());
             return jsonResult({ suggested: true, slug });
           }
 

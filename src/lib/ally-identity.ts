@@ -65,4 +65,56 @@ export function getAllyNameLower(): string {
 export function clearAllyNameCache(): void {
   cachedName = null;
   cachedAt = 0;
+  cachedOwnerName = null;
+  cachedOwnerAt = 0;
+}
+
+// ── Owner identity resolution ───────────────────────────────────────────────
+// Reads from onboarding state (~/godmode/data/onboarding.json) or USER.md.
+// Falls back to "user" for Mem0 userId, "friend" for display name.
+
+let cachedOwnerName: string | null = null;
+let cachedOwnerAt = 0;
+
+/**
+ * Get the owner's display name for LLM prompts and UI.
+ * Reads from onboarding identity → interview → "friend" fallback.
+ */
+export function getOwnerName(): string {
+  if (cachedOwnerName && Date.now() - cachedOwnerAt < CACHE_TTL_MS) {
+    return cachedOwnerName;
+  }
+
+  try {
+    const dataDir = join(
+      process.env.GODMODE_ROOT || join(homedir(), "godmode"),
+      "data",
+    );
+    const raw = readFileSync(join(dataDir, "onboarding.json"), "utf-8");
+    const ob = JSON.parse(raw) as {
+      interview?: { name?: string };
+      identity?: { name?: string };
+    };
+    const name = ob.identity?.name || ob.interview?.name;
+    if (typeof name === "string" && name.trim()) {
+      cachedOwnerName = name.trim();
+      cachedOwnerAt = Date.now();
+      return cachedOwnerName;
+    }
+  } catch {
+    // Not onboarded yet or file unreadable
+  }
+
+  cachedOwnerName = "friend";
+  cachedOwnerAt = Date.now();
+  return cachedOwnerName;
+}
+
+/**
+ * Get a stable userId for Mem0. Uses lowercased owner name, falls back to "user".
+ * This ensures memories aren't all stored under a hardcoded name.
+ */
+export function getOwnerUserId(): string {
+  const name = getOwnerName();
+  return name === "friend" ? "user" : name.toLowerCase().replace(/\s+/g, "-");
 }

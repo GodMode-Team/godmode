@@ -75,24 +75,60 @@ export const TOOL_GROUNDING_DEFAULTS: ToolGroundingConfig = {
 // user message. First match wins (categories are ordered by specificity).
 // "conversation" is the fallback — no enforcement.
 
-/** Known person names from the owner's context (extend via config later). */
-const KNOWN_NAMES = [
-  "caleb", "melody", "eden", "edison", "titus", "gil", "adena", "ken",
-  "rachel", "rich", "michelle",
-];
+/** Known person names — populated from identity graph at runtime. */
+let KNOWN_NAMES: string[] = [];
+let namesLoadedAt = 0;
+
+function refreshKnownNames(): void {
+  // Refresh every 10 minutes
+  if (KNOWN_NAMES.length > 0 && Date.now() - namesLoadedAt < 10 * 60 * 1000) return;
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { getOwnerName } = require("../lib/ally-identity.js") as { getOwnerName: () => string };
+    const ownerName = getOwnerName().toLowerCase();
+    const names = new Set<string>();
+    if (ownerName !== "friend") names.add(ownerName);
+    // Try loading from identity graph entity cache
+    try {
+      const { existsSync, readFileSync } = require("node:fs") as typeof import("node:fs");
+      const { join } = require("node:path") as typeof import("node:path");
+      const dbPath = join(
+        process.env.GODMODE_ROOT || join(require("node:os").homedir(), "godmode"),
+        "data", "identity-graph.db",
+      );
+      if (existsSync(dbPath)) {
+        const Database = require("better-sqlite3");
+        const db = new Database(dbPath, { readonly: true });
+        const rows = db.prepare("SELECT name FROM entities WHERE kind = 'person' LIMIT 50").all() as { name: string }[];
+        for (const r of rows) {
+          const n = r.name.toLowerCase().split(/\s+/)[0]; // first name
+          if (n.length >= 2) names.add(n);
+        }
+        db.close();
+      }
+    } catch { /* identity graph not available yet */ }
+    KNOWN_NAMES = [...names];
+    namesLoadedAt = Date.now();
+  } catch {
+    KNOWN_NAMES = [];
+  }
+}
 
 /** Pattern: mentions a person by name */
-const PERSON_PATTERNS: RegExp[] = [
-  // Known names — word-boundary match to avoid false positives
-  ...KNOWN_NAMES.map((name) => new RegExp(`\\b${name}\\b`, "i")),
-  // Generic person-reference phrases
-  /\bwho is\b/i,
+function getPersonPatterns(): RegExp[] {
+  refreshKnownNames();
+  return [
+    // Known names — word-boundary match to avoid false positives
+    ...KNOWN_NAMES.map((name) => new RegExp(`\\b${name}\\b`, "i")),
+    // Generic person-reference phrases
+    /\bwho is\b/i,
   /\bwho was\b/i,
   /\btell me about\s+[A-Z][a-z]+/,
   /\bwhat did\s+[A-Z][a-z]+\s+(say|do|mention|want|ask|think)/,
   /\bwhat does\s+[A-Z][a-z]+\s+(do|want|need|think)/,
   /\bhave (?:you |we )?(heard|spoken|talked)\b.*\bfrom\s+[A-Z][a-z]+/,
-];
+  ];
+}
 
 /** Pattern: status/progress check */
 const STATUS_PATTERNS: RegExp[] = [
@@ -202,7 +238,7 @@ export function classifyQuery(userMessage: string): GroundingRequirement | null 
   }
 
   // Person lookup — highest priority after conversation escape
-  if (matchesAny(lower, PERSON_PATTERNS)) {
+  if (matchesAny(lower, getPersonPatterns())) {
     return {
       category: "person-lookup",
       requiredTools: ["memory_search"],

@@ -285,7 +285,8 @@ export async function runGatewayStart(
       logger.info("[GodMode] Mem0 memory initialized");
       void (async () => {
         try {
-          await seedFromVault("caleb");
+          const { getOwnerUserId } = await import("../lib/ally-identity.js");
+          await seedFromVault(getOwnerUserId());
           logger.info("[GodMode] Mem0 vault seeding complete");
         } catch (seedErr) {
           logger.warn(`[GodMode] Mem0 seeding failed (non-fatal): ${String(seedErr)}`);
