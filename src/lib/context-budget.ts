@@ -166,11 +166,10 @@ export function assembleContext(inputs: ContextInputs): string {
   const wantsSchedule = isFirst || isTimeRelevant(msg);
   const wantsOps = isFirst || isOpsRelevant(msg) || hasOverdue;
 
-  // Capability map — only on first turn or when routing lessons fire
-  // (routing lessons = ally made a mistake = needs the map refreshed)
-  if (isFirst || inputs.routingLessons) {
-    chunks.push(CAPABILITY_MAP);
-  }
+  // Capability map — always inject. The mandatory lookup chain is too
+  // important to gate on first-turn only; brain dumps and multi-topic
+  // messages on later turns still need the "exhaust tools before asking" rule.
+  chunks.push(CAPABILITY_MAP);
 
   // Under critical pressure, stop here
   if (pressure >= 0.9) {
