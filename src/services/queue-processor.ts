@@ -609,6 +609,18 @@ class QueueProcessor {
       askTrustRating: !!personaSlug,
     });
 
+    // Log impact entry for completed queue item
+    try {
+      const { logImpact } = await import("../methods/impact-ledger.js");
+      await logImpact({
+        workflow: completedItem?.type ?? "task",
+        source: "queue-complete",
+        note: completedItem?.title,
+      });
+    } catch (err) {
+      this.logger.warn(`[GodMode][Queue] Failed to log impact for ${itemId}: ${String(err)}`);
+    }
+
     // Push to universal inbox — every completed item gets an entry
     const projectId = completedItem?.meta?.projectId ?? completedItem?.meta?.paperclipProjectId;
     try {

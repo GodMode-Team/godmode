@@ -324,6 +324,14 @@ export const trustTrackerHandlers: GatewayRequestHandlers = {
     const trustScore = count >= SCORE_THRESHOLD ? Math.round(avg * 10) / 10 : null;
     const needsFeedback = trustScore !== null && trustScore < FEEDBACK_THRESHOLD;
 
+    // Log impact entry for this workflow execution
+    try {
+      const { logImpact } = await import("./impact-ledger.js");
+      await logImpact({ workflow: normalizedWorkflow, source: "trust-rate", sessionId });
+    } catch (err) {
+      console.error("[TrustTracker] Failed to log impact:", err);
+    }
+
     context?.broadcast?.("trust:update", { entry, workflows: state.workflows, trustScore });
     respond(true, {
       entry,

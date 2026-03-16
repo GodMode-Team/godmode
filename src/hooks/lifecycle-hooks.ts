@@ -33,6 +33,13 @@ import {
 
 type Logger = { warn: (msg: string) => void; info: (msg: string) => void };
 
+// ── Session impact tracking ──────────────────────────────────────────
+// Tracks when sessions start so we can log impact on session end.
+// Key: sessionKey, Value: { startedAt, messageCount }
+const _sessionTracker = new Map<string, { startedAt: number; messageCount: number }>();
+const SESSION_TRACKER_MAX = 200; // prevent unbounded growth
+const SESSION_MIN_MESSAGES = 2; // need at least a back-and-forth to count
+
 // ── Auto-title first message buffer ──────────────────────────────────
 // message_received has the user's content but no sessionKey.
 // before_prompt_build has the sessionKey but no content on the first turn.
@@ -165,12 +172,25 @@ export async function handleMessageReceived(
   const sessionKey = extractSessionKey(ctx);
   const content = event.content ?? "";
 
-  // Track session activity for restart gate
+  // Track session activity for restart gate + impact tracking
   if (sessionKey) {
     try {
       const { sessions } = await import("../lib/health-ledger.js");
       sessions.touch(sessionKey);
     } catch { /* non-fatal */ }
+
+    // Track session start time + message count for impact logging
+    const existing = _sessionTracker.get(sessionKey);
+    if (existing) {
+      existing.messageCount++;
+    } else {
+      // Evict oldest entries if map is full
+      if (_sessionTracker.size >= SESSION_TRACKER_MAX) {
+        const oldest = _sessionTracker.keys().next().value;
+        if (oldest) _sessionTracker.delete(oldest);
+      }
+      _sessionTracker.set(sessionKey, { startedAt: Date.now(), messageCount: 1 });
+    }
   }
 
   // Reset per-turn tool usage tracker
@@ -239,6 +259,38 @@ export async function handleBeforeReset(
     await handleTeamMemoryRoute(event, ctx);
   } catch (err) {
     logger.warn(`[GodMode] team memory route hook error: ${String(err)}`);
+  }
+
+  // Log impact for this chat session (fire and forget)
+  if (sessionKey) {
+    const tracked = _sessionTracker.get(sessionKey);
+    _sessionTracker.delete(sessionKey);
+
+    // Only log if there was a real conversation (not just a single message)
+    // and skip cron sessions (they're logged separately via queue-processor)
+    if (tracked && tracked.messageCount >= SESSION_MIN_MESSAGES && !sessionKey.includes(":cron:")) {
+      void (async () => {
+        try {
+          const { hasSessionImpact, logImpact } = await import("../methods/impact-ledger.js");
+
+          // Skip if this session already has an impact entry (e.g., from trust-rate or queue-complete)
+          if (await hasSessionImpact(sessionKey)) return;
+
+          const durationMin = Math.round((Date.now() - tracked.startedAt) / 60_000);
+          // Estimate value based on session duration — longer sessions = more value
+          // Use "chat session" default (10 min) as minimum, but scale up for longer sessions
+          const minutesOverride = Math.max(10, Math.min(durationMin, 120));
+
+          await logImpact({
+            workflow: "chat session",
+            source: "session",
+            sessionId: sessionKey,
+            note: `${tracked.messageCount} messages, ${durationMin}m duration`,
+            minutesOverride,
+          });
+        } catch { /* non-fatal */ }
+      })();
+    }
   }
 }
 

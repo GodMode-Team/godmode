@@ -1540,7 +1540,55 @@ async function generateDailyBrief(date?: string): Promise<GenerateResult> {
     ...carryForward.actionItems.map((t) => `- [ ] ${t}`),
   ].join("\n") || "All clear from yesterday.";
 
-  const impactRaw = carryForward.yesterdayImpact || "No impact report.";
+  // Build impact data from ledger + agent-log + yesterday's brief carry-forward
+  let impactRaw = carryForward.yesterdayImpact || "";
+  try {
+    const { getImpactSummary } = await import("./impact-ledger.js");
+
+    // Yesterday's impact (1 day back) — the primary "Yesterday's Impact" data
+    const yesterdayImpact = await getImpactSummary(1);
+    if (yesterdayImpact.count > 0) {
+      const hours = Math.round((yesterdayImpact.totalMinutes / 60) * 10) / 10;
+      const topWorkflows = Object.entries(yesterdayImpact.byWorkflow)
+        .sort(([, a], [, b]) => b.minutes - a.minutes)
+        .slice(0, 5)
+        .map(([name, stats]) => `${name}: ${Math.round(stats.minutes)}m saved ($${Math.round(stats.dollars)})`)
+        .join(", ");
+
+      // Count by source type for richer summary
+      const sessionCount = yesterdayImpact.count;
+      const yesterdayLine = `Yesterday: ${hours}h saved ($${Math.round(yesterdayImpact.totalDollars)}) across ${sessionCount} interactions. Breakdown: ${topWorkflows}`;
+      impactRaw = impactRaw ? `${impactRaw}\n\n${yesterdayLine}` : yesterdayLine;
+    }
+
+    // Weekly rollup for trend context
+    const weekImpact = await getImpactSummary(7);
+    if (weekImpact.count > 0) {
+      const hours = Math.round((weekImpact.totalMinutes / 60) * 10) / 10;
+      const weekLine = `This week: ${hours}h saved ($${Math.round(weekImpact.totalDollars)}) across ${weekImpact.count} interactions.`;
+      impactRaw = impactRaw ? `${impactRaw}\n${weekLine}` : weekLine;
+    }
+  } catch { /* impact ledger not available — non-fatal */ }
+
+  // Supplement with agent-log data for yesterday (completed items, session activity)
+  try {
+    const { readDailyLog } = await import("../lib/agent-log.js");
+    const yesterdayLog = await readDailyLog(yesterdayDate());
+    if (yesterdayLog?.content) {
+      // Extract key stats from the log markdown
+      const completedMatch = yesterdayLog.content.match(/Completed:\s*\*\*(\d+)\*\*/);
+      const errorsMatch = yesterdayLog.content.match(/Errors:\s*\*\*(\d+)\*\*/);
+      const completedCount = completedMatch ? Number(completedMatch[1]) : 0;
+      const errorCount = errorsMatch ? Number(errorsMatch[1]) : 0;
+
+      if (completedCount > 0 || errorCount > 0) {
+        const logLine = `Agent log: ${completedCount} completed items${errorCount > 0 ? `, ${errorCount} errors` : ""} yesterday.`;
+        impactRaw = impactRaw ? `${impactRaw}\n${logLine}` : logLine;
+      }
+    }
+  } catch { /* agent-log not available — non-fatal */ }
+
+  if (!impactRaw) impactRaw = "No impact report.";
   const xIntelRaw = xIntel.items.length > 0
     ? formatXIntelligence(xIntel.items, xIntel.error)
     : xIntel.error || "No X intel scan today.";

@@ -59,6 +59,7 @@ import { queueHandlers } from "./src/methods/queue.js";
 import { xIntelHandlers } from "./src/methods/x-intel.js";
 import { filesHandlers } from "./src/methods/files.js";
 import { dashboardsHandlers } from "./src/methods/dashboards.js";
+import { impactLedgerHandlers } from "./src/methods/impact-ledger.js";
 import { guardrailsHandlers } from "./src/methods/guardrails.js";
 import { imageCacheHandlers } from "./src/methods/image-cache.js";
 import { secondBrainHandlers } from "./src/methods/second-brain.js";
@@ -141,7 +142,7 @@ const godmodePlugin = {
       ...teamWorkspaceHandlers, ...teamCommsHandlers, ...teamCurationHandlers,
       ...optionsHandlers, ...trustTrackerHandlers, ...systemUpdateHandlers,
       ...guardrailsHandlers, ...imageCacheHandlers, ...secondBrainHandlers,
-      ...queueHandlers, ...dashboardsHandlers, ...supportHandlers,
+      ...queueHandlers, ...dashboardsHandlers, ...impactLedgerHandlers, ...supportHandlers,
       ...xIntelHandlers, ...filesHandlers, ...integrationsHandlers,
       ...fathomWebhookHandlers, ...authHandlers, ...sessionPrivacyHandlers,
       ...resourcesHandlers,

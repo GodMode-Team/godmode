@@ -654,6 +654,51 @@ const widgetData: GatewayRequestHandler = async ({ params, respond }) => {
           break;
         }
 
+        case "impact-summary": {
+          try {
+            const { getImpactSummary } = await import("./impact-ledger.js");
+            const [todaySummary, weekSummary, monthSummary, allTimeSummary] = await Promise.all([
+              getImpactSummary(1),
+              getImpactSummary(7),
+              getImpactSummary(30),
+              getImpactSummary(),
+            ]);
+
+            // Top workflows by time saved (all-time)
+            const topWorkflows = Object.entries(allTimeSummary.byWorkflow)
+              .sort(([, a], [, b]) => b.minutes - a.minutes)
+              .slice(0, 5)
+              .map(([name, stats]) => ({ name, ...stats }));
+
+            data[widgetId] = {
+              today: {
+                hours: Math.round((todaySummary.totalMinutes / 60) * 10) / 10,
+                dollars: todaySummary.totalDollars,
+                count: todaySummary.count,
+              },
+              week: {
+                hours: Math.round((weekSummary.totalMinutes / 60) * 10) / 10,
+                dollars: weekSummary.totalDollars,
+                count: weekSummary.count,
+              },
+              month: {
+                hours: Math.round((monthSummary.totalMinutes / 60) * 10) / 10,
+                dollars: monthSummary.totalDollars,
+                count: monthSummary.count,
+              },
+              allTime: {
+                hours: Math.round((allTimeSummary.totalMinutes / 60) * 10) / 10,
+                dollars: allTimeSummary.totalDollars,
+                count: allTimeSummary.count,
+              },
+              topWorkflows,
+            };
+          } catch {
+            data[widgetId] = null;
+          }
+          break;
+        }
+
         default: {
           data[widgetId] = null;
         }
