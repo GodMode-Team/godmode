@@ -344,7 +344,12 @@ check_node() {
   if has node; then
     NODE_VERSION="$(node --version 2>/dev/null || echo "v0")"
     NODE_MAJOR="$(echo "$NODE_VERSION" | sed 's/^v//' | cut -d. -f1)"
-    if [ "$NODE_MAJOR" -ge 22 ] 2>/dev/null; then
+    NODE_MINOR="$(echo "$NODE_VERSION" | sed 's/^v//' | cut -d. -f2)"
+    # Require Node 22.16+ (OpenClaw minimum as of 2026.3.13)
+    if [ "$NODE_MAJOR" -ge 23 ] 2>/dev/null; then
+      return 0
+    fi
+    if [ "$NODE_MAJOR" -eq 22 ] && [ "$NODE_MINOR" -ge 16 ] 2>/dev/null; then
       return 0
     fi
   fi
@@ -392,7 +397,25 @@ install_node() {
 }
 
 install_node_direct() {
-  NODE_VER="v22.14.0"
+  # Resolve latest Node 22 LTS version dynamically so we never install
+  # a version that's too old for OpenClaw's minimum requirement.
+  # Uses grep/sed to parse — no Node dependency needed.
+  NODE_VER=""
+  if has curl; then
+    NODE_VER="$(curl -fsSL 'https://nodejs.org/dist/index.json' 2>/dev/null \
+      | grep -o '"version":"v22\.[^"]*"' \
+      | head -1 \
+      | sed 's/"version":"//;s/"//' || true)"
+  elif has wget; then
+    NODE_VER="$(wget -qO- 'https://nodejs.org/dist/index.json' 2>/dev/null \
+      | grep -o '"version":"v22\.[^"]*"' \
+      | head -1 \
+      | sed 's/"version":"//;s/"//' || true)"
+  fi
+  # Fallback: if we can't resolve latest, use a known-good recent version
+  if [ -z "$NODE_VER" ]; then
+    NODE_VER="v22.16.0"
+  fi
 
   case "$PLATFORM" in
     macos)
