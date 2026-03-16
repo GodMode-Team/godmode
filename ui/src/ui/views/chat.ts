@@ -567,6 +567,18 @@ async function handleChatThreadLinkClick(event: MouseEvent, props: ChatProps) {
       return;
     }
 
+    // Proof links: intercept proofeditor.ai URLs and open in sidebar instead of browser.
+    if (props.onOpenProof) {
+      try {
+        const proofMatch = href.match(/(?:proofeditor\.ai|127\.0\.0\.1:\d+|localhost:\d+)\/d\/([a-zA-Z0-9_-]+)/);
+        if (proofMatch) {
+          event.preventDefault();
+          props.onOpenProof(proofMatch[1]);
+          return;
+        }
+      } catch { /* fall through */ }
+    }
+
     // External URLs: open synchronously via window.open BEFORE any await.
     // Calling window.open after an await breaks the user-gesture chain and
     // gets silently blocked by popup blockers / webview security.
@@ -884,6 +896,7 @@ export function renderChat(props: ChatProps) {
                             title: props.sidebarTitle ?? null,
                             viewUrl: props.sidebarProofUrl ?? null,
                             filePath: props.sidebarFilePath ?? null,
+                            fallbackMarkdown: props.sidebarProofHtml ?? null,
                             onClose: props.onCloseSidebar!,
                             onPushToDrive: props.onPushToDrive,
                           })
@@ -931,6 +944,7 @@ export function renderChat(props: ChatProps) {
                           title: props.sidebarTitle ?? null,
                           viewUrl: props.sidebarProofUrl ?? null,
                           filePath: props.sidebarFilePath ?? null,
+                          fallbackMarkdown: props.sidebarProofHtml ?? null,
                           onClose: props.onCloseSidebar!,
                           onPushToDrive: props.onPushToDrive,
                         })
@@ -1185,6 +1199,31 @@ function messageHasImage(message: unknown): boolean {
   return false;
 }
 
+/**
+ * Returns true when an assistant message has ONLY toolCall/toolUse blocks
+ * (no text, no images). These messages produce empty bubbles in the UI
+ * and should be hidden when showThinking is off.
+ */
+function isToolCallOnlyMessage(message: unknown): boolean {
+  const m = message as Record<string, unknown>;
+  const content = m.content;
+  if (!Array.isArray(content) || content.length === 0) {
+    return false;
+  }
+  for (const block of content) {
+    if (typeof block !== "object" || block === null) {
+      continue;
+    }
+    const b = block as Record<string, unknown>;
+    const t = typeof b.type === "string" ? b.type : "";
+    // If there's any non-tool-call block, it's not tool-call-only
+    if (t !== "toolCall" && t !== "tool_use" && t !== "thinking") {
+      return false;
+    }
+  }
+  return true;
+}
+
 function buildChatItems(props: ChatProps): Array<ChatItem | MessageGroup> {
   const items: ChatItem[] = [];
   const history = Array.isArray(props.messages) ? props.messages : [];
@@ -1227,6 +1266,17 @@ function buildChatItems(props: ChatProps): Array<ChatItem | MessageGroup> {
       if (!messageHasImage(msg)) {
         continue;
       }
+    }
+
+    // Skip assistant messages that have ONLY tool calls (no text or images).
+    // These render as empty bubbles and create confusing empty groups when
+    // tool results are also hidden (showThinking=false).
+    if (
+      !props.showThinking &&
+      normalized.role.toLowerCase() === "assistant" &&
+      isToolCallOnlyMessage(msg)
+    ) {
+      continue;
     }
 
     items.push({
@@ -1284,10 +1334,15 @@ function messageKey(message: unknown, index: number): string {
   if (messageId) {
     return `msg:${messageId}`;
   }
+  // Use timestamp + role as a stable key — avoid array index which shifts
+  // when new messages arrive, causing all group keys to change and
+  // triggering full DOM destruction via Lit's repeat directive.
   const timestamp = typeof m.timestamp === "number" ? m.timestamp : null;
   const role = typeof m.role === "string" ? m.role : "unknown";
   if (timestamp != null) {
-    return `msg:${role}:${timestamp}:${index}`;
+    // Include a content snippet for uniqueness when timestamps collide
+    const content = typeof m.content === "string" ? m.content.slice(0, 32) : "";
+    return `msg:${role}:${timestamp}:${content || index}`;
   }
   return `msg:${role}:${index}`;
 }

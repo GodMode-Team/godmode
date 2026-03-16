@@ -71,6 +71,20 @@ export function resolveStorePath(store?: string): string {
   return path.join(resolveStateDir(), "sessions", "sessions.json");
 }
 
+/**
+ * Resolve the correct session store path for a given session key.
+ * Agent sessions (key starts with "agent:<agentId>:") write to the
+ * agent-specific store; all others write to the default store.
+ */
+export function resolveAgentStorePath(sessionKey: string, cfg: OpenClawConfigLite): string {
+  const match = sessionKey.match(/^agent:([^:]+):/);
+  if (match) {
+    const agentId = match[1];
+    return path.join(resolveStateDir(), "agents", agentId, "sessions", "sessions.json");
+  }
+  return resolveStorePath(cfg.session?.store);
+}
+
 export async function loadConfig(): Promise<OpenClawConfigLite> {
   const cfgPath = resolveConfigPath();
   const parsed = await readJson5Object(cfgPath);

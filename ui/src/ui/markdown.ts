@@ -12,11 +12,11 @@ marked.setOptions({
 // Detects absolute file paths in markdown text (outside code blocks)
 // and wraps them in clickable links with a file:// scheme.
 
-const FILE_EXT_RE = /\.(html?|css|js|ts|tsx|jsx|json|md|txt|csv|py|sh|yaml|yml|xml|svg|png|jpe?g|gif|webp|pdf|log)$/i;
+const FILE_EXT_RE = /\.(html?|css|js|ts|tsx|jsx|json|md|txt|csv|py|sh|yaml|yml|xml|svg|png|jpe?g|gif|webp|pdf|log|mp4|mov|mkv|avi|webm|mp3|wav|aac|ogg|flac|zip|tar|gz|bz2|dmg|iso|doc|docx|xls|xlsx|ppt|pptx)$/i;
 
-// Match absolute paths like /Users/... or ~/... with a file extension.
+// Match absolute paths like /Users/... or ~/... with a file extension OR trailing slash (directory).
 // Negative lookbehind avoids matching paths already inside markdown links.
-const FILE_PATH_RE = /(?<![(\[`])(?:~\/|\/(?:Users|home|tmp|var|opt|etc|godmode)\/)[\w/.+@-]+\.\w+/g;
+const FILE_PATH_RE = /(?<![(\[`])(?:~\/|\/(?:Users|home|tmp|var|opt|etc|godmode)\/)[\w/.+@-]+(?:\.\w+|\/)(?=\s|[),;:!?]|$)/g;
 
 /**
  * Pre-process markdown to wrap bare file paths in clickable links.
@@ -29,12 +29,17 @@ export function linkifyFilePaths(markdown: string): string {
     // Odd indices are code blocks/inline code — skip them
     if (i % 2 !== 0) continue;
     parts[i] = parts[i].replace(FILE_PATH_RE, (match) => {
-      if (!FILE_EXT_RE.test(match)) return match;
+      const isDir = match.endsWith("/");
+      if (!isDir && !FILE_EXT_RE.test(match)) return match;
       // Expand ~ to a placeholder that the click handler resolves
       const href = match.startsWith("~/")
         ? `file:///~/${match.slice(2)}`
         : `file://${match}`;
-      const basename = match.split("/").pop() ?? match;
+      // For directories, use the last non-empty segment + /
+      const segments = match.replace(/\/+$/, "").split("/");
+      const basename = isDir
+        ? (segments.pop() ?? match) + "/"
+        : segments.pop() ?? match;
       return `[${basename}](${href})`;
     });
   }

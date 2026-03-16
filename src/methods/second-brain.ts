@@ -1095,9 +1095,11 @@ function cleanQmdSnippet(snippet: string): string {
 }
 
 /**
- * Run `qmd query` (hybrid search + reranking).
- * Falls back to `qmd search` (BM25) if the reranker crashes (GPU OOM).
- * Throws if qmd is not installed or both modes fail.
+ * Run `qmd search` (BM25 full-text) as the primary path.
+ * `qmd query` (hybrid + reranking) is disabled until the local embedding model
+ * context-size crash is resolved (embeddinggemma-300M chokes on long docs,
+ * causing native GPU OOM that eats the full 15s timeout before falling back).
+ * Throws if qmd is not installed.
  */
 async function runQmdSearch(
   query: string,
@@ -1107,18 +1109,10 @@ async function runQmdSearch(
   const baseArgs = ["-n", String(Math.min(limit, 50)), "--json"];
   if (collection) baseArgs.push("-c", collection);
 
-  try {
-    const { stdout } = await execFileAsync("qmd", ["query", query, ...baseArgs], {
-      timeout: 15_000,
-    });
-    return JSON.parse(stdout) as QmdJsonResult[];
-  } catch {
-    // Reranker OOM or process crash — fall back to BM25 full-text search
-    const { stdout } = await execFileAsync("qmd", ["search", query, ...baseArgs], {
-      timeout: 15_000,
-    });
-    return JSON.parse(stdout) as QmdJsonResult[];
-  }
+  const { stdout } = await execFileAsync("qmd", ["search", query, ...baseArgs], {
+    timeout: 10_000,
+  });
+  return JSON.parse(stdout) as QmdJsonResult[];
 }
 
 // ── Brain Search ─────────────────────────────────────────────────────

@@ -1,11 +1,13 @@
 /**
- * Delegation RPC methods — UI-facing endpoints for Paperclip team data.
+ * Delegation RPC methods — UI-facing endpoints for Mission Control.
  *
  * These provide the data contract the Mission Control UI consumes
- * to render org charts, agent cards, activity feeds, and steering.
+ * to render org charts, agent cards, activity feeds, and project status.
+ * Data comes from projects-state (grouping) + queue-state (execution).
  */
 
-import { getPaperclipAdapter, isPaperclipRunning } from "../services/paperclip-adapter.js";
+import { readProjects, clearProjects } from "../lib/projects-state.js";
+import { readQueueState, type QueueItem } from "../lib/queue-state.js";
 
 // ── Response types ────────────────────────────────────────────────
 
@@ -16,7 +18,7 @@ export interface SwarmAgentState {
   role: string;
   status: "idle" | "working" | "done" | "failed";
   currentTask?: string;
-  progress?: number; // 0-100
+  progress?: number;
   startedAt?: number;
   endedAt?: number;
   tokenSpend?: number;
@@ -32,6 +34,9 @@ export interface SwarmIssueNode {
   personaName: string;
   proofDocSlug?: string;
   dependsOn?: string[];
+  outputPreview?: string;
+  cost?: { inputTokens: number; outputTokens: number };
+  queueItemId?: string;
 }
 
 export interface SwarmProject {
@@ -66,105 +71,231 @@ export interface SwarmFeedEvent {
   issueTitle?: string;
 }
 
+// ── Helpers ───────────────────────────────────────────────────────
+
+function slugToName(slug: string): string {
+  return slug.replace(/-/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+}
+
+function mapQueueStatusToDisplay(queueStatus: string): string {
+  switch (queueStatus) {
+    case "processing": return "in_progress";
+    case "review": case "needs-review": return "in_review";
+    case "done": return "done";
+    case "failed": return "failed";
+    case "pending": return "todo";
+    default: return queueStatus;
+  }
+}
+
+function mapDisplayToAgentStatus(status: string): SwarmAgentState["status"] {
+  switch (status) {
+    case "in_progress": case "processing": return "working";
+    case "done": case "in_review": case "review": case "needs-review": return "done";
+    case "failed": case "cancelled": return "failed";
+    default: return "idle";
+  }
+}
+
+/** Find the queue item matching an issue (by issueId, with title fallback for compat) */
+function findQueueItem(
+  issueId: string,
+  issueTitle: string,
+  byIssueId: Map<string, QueueItem>,
+  byTitle: Map<string, QueueItem>,
+): QueueItem | undefined {
+  return byIssueId.get(issueId) ?? byTitle.get(issueTitle);
+}
+
+/** Build issueId→QueueItem and title→QueueItem lookup maps */
+function buildQueueLookups(items: QueueItem[]): {
+  byIssueId: Map<string, QueueItem>;
+  byTitle: Map<string, QueueItem>;
+} {
+  const byIssueId = new Map<string, QueueItem>();
+  const byTitle = new Map<string, QueueItem>();
+  for (const qi of items) {
+    const id = qi.meta?.issueId ?? qi.meta?.paperclipIssueId;
+    if (id) byIssueId.set(id, qi);
+    byTitle.set(qi.title, qi);
+  }
+  return { byIssueId, byTitle };
+}
+
 // ── RPC handlers ──────────────────────────────────────────────────
 
-/**
- * godmode.delegation.projects — List active/recent delegated projects.
- */
 async function handleSwarmProjects({ respond }: { respond: Function }) {
-  if (!isPaperclipRunning()) {
-    return respond(true, { projects: [], running: false });
-  }
+  const [projectsState, qs] = await Promise.all([readProjects(), readQueueState()]);
+  const { byIssueId, byTitle } = buildQueueLookups(qs.items);
 
-  const adapter = getPaperclipAdapter();
-  if (!adapter) {
-    return respond(true, { projects: [], running: false });
-  }
+  const projects: SwarmProject[] = projectsState.projects.map(p => {
+    let completedCount = 0;
+    let failedCount = 0;
 
-  const raw = adapter.listProjects();
-  const projects: SwarmProject[] = [];
+    for (const issue of p.issues) {
+      const qi = findQueueItem(issue.issueId, issue.title, byIssueId, byTitle);
+      const status = qi ? mapQueueStatusToDisplay(qi.status) : "todo";
+      if (status === "done" || status === "in_review") completedCount++;
+      if (status === "failed") failedCount++;
+    }
 
-  for (const p of raw) {
-    const status = await adapter.getStatus(p.projectId);
-    const completedCount = status?.issues.filter(i => i.status === "done").length ?? 0;
-    const failedCount = status?.issues.filter(i => i.status === "failed" || i.status === "cancelled").length ?? 0;
-
-    projects.push({
+    return {
       projectId: p.projectId,
       title: p.title,
-      status: status?.status ?? "unknown",
-      issueCount: p.issueCount,
+      status: p.status,
+      issueCount: p.issues.length,
       completedCount,
       failedCount,
-      createdAt: p.createdAt,
-      proofWorkspace: status?.proofWorkspace ?? "",
+      createdAt: new Date(p.createdAt).toISOString(),
+      proofWorkspace: p.proofWorkspace,
+    };
+  });
+
+  // Discover legacy projects from queue items with paperclipProjectId that have no delegated record
+  const knownIds = new Set(projectsState.projects.map(p => p.projectId));
+  const legacyGroups = new Map<string, QueueItem[]>();
+  for (const qi of qs.items) {
+    const pid = qi.meta?.projectId ?? qi.meta?.paperclipProjectId;
+    if (pid && !knownIds.has(pid)) {
+      if (!legacyGroups.has(pid)) legacyGroups.set(pid, []);
+      legacyGroups.get(pid)!.push(qi);
+    }
+  }
+  for (const [pid, items] of legacyGroups) {
+    let completedCount = 0;
+    let failedCount = 0;
+    for (const qi of items) {
+      const s = mapQueueStatusToDisplay(qi.status);
+      if (s === "done" || s === "in_review") completedCount++;
+      if (s === "failed") failedCount++;
+    }
+    const allTerminal = items.every(qi => ["done", "review", "needs-review", "failed"].includes(qi.status));
+    const anyFailed = items.some(qi => qi.status === "failed");
+    projects.push({
+      projectId: pid,
+      title: items[0]?.workspaceId?.replace(/^project-/, "Project ") ?? items[0]?.title ?? "Legacy Project",
+      status: allTerminal ? (anyFailed ? "failed" : "completed") : "active",
+      issueCount: items.length,
+      completedCount,
+      failedCount,
+      createdAt: new Date(Math.min(...items.map(i => i.createdAt))).toISOString(),
+      proofWorkspace: items[0]?.workspaceId ?? "",
     });
   }
 
   return respond(true, { projects, running: true });
 }
 
-/**
- * godmode.delegation.status — Detailed status for one project (org chart, agent states).
- */
 async function handleSwarmStatus({ params, respond }: { params: Record<string, unknown>; respond: Function }) {
   const projectId = params.projectId as string | undefined;
   if (!projectId) {
     return respond(false, null, { code: "INVALID_REQUEST", message: "Missing projectId" });
   }
 
-  if (!isPaperclipRunning()) {
-    return respond(false, null, { code: "UNAVAILABLE", message: "Agent team not running" });
-  }
+  const [projectsState, qs] = await Promise.all([readProjects(), readQueueState()]);
+  const project = projectsState.projects.find(p => p.projectId === projectId);
 
-  const adapter = getPaperclipAdapter();
-  if (!adapter) {
-    return respond(false, null, { code: "UNAVAILABLE", message: "Agent team not available" });
-  }
-
-  const status = await adapter.getStatus(projectId);
-  if (!status) {
-    return respond(false, null, { code: "NOT_FOUND", message: `Project not found: ${projectId}` });
-  }
-
-  // Map issues to agent states and issue nodes
+  // Build agents/issues from either delegated project record or queue items directly
   const agents: SwarmAgentState[] = [];
   const issues: SwarmIssueNode[] = [];
   const seenAgents = new Set<string>();
 
-  for (const issue of status.issues) {
-    const slug = issue.assignee;
-    const personaName = slug.replace(/-/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+  if (project) {
+    // Native delegated project — use issue records + queue cross-ref
+    const { byIssueId, byTitle } = buildQueueLookups(qs.items);
+    for (const issue of project.issues) {
+      const slug = issue.personaSlug;
+      const personaName = slugToName(slug);
+      const qi = findQueueItem(issue.issueId, issue.title, byIssueId, byTitle);
+      const displayStatus = qi ? mapQueueStatusToDisplay(qi.status) : "todo";
 
-    issues.push({
-      issueId: issue.title, // use title as fallback ID for UI
-      title: issue.title,
-      status: issue.status,
-      assignee: slug,
-      personaName,
-      proofDocSlug: issue.proofDocSlug,
-    });
+      let outputPreview: string | undefined;
+      if (qi?.result?.summary) {
+        outputPreview = qi.result.summary.length > 200
+          ? qi.result.summary.slice(0, 200) + "..."
+          : qi.result.summary;
+      }
 
-    if (!seenAgents.has(slug)) {
-      seenAgents.add(slug);
-      const agentStatus = mapIssueStatusToAgentStatus(issue.status);
-      agents.push({
-        id: slug,
-        personaSlug: slug,
+      issues.push({
+        issueId: issue.issueId,
+        title: issue.title,
+        status: displayStatus,
+        assignee: slug,
         personaName,
-        role: "general",
-        status: agentStatus,
-        currentTask: agentStatus === "working" ? issue.title : undefined,
         proofDocSlug: issue.proofDocSlug,
+        outputPreview,
+        queueItemId: qi?.id,
       });
+
+      if (!seenAgents.has(slug)) {
+        seenAgents.add(slug);
+        const agentStatus = mapDisplayToAgentStatus(displayStatus);
+        agents.push({
+          id: slug, personaSlug: slug, personaName, role: "general",
+          status: agentStatus,
+          currentTask: agentStatus === "working" ? issue.title : undefined,
+          startedAt: qi?.startedAt, endedAt: qi?.completedAt,
+          proofDocSlug: issue.proofDocSlug,
+        });
+      }
+    }
+  } else {
+    // Legacy project — reconstruct from queue items with matching projectId
+    const projectItems = qs.items.filter(
+      (i) => (i.meta?.projectId ?? i.meta?.paperclipProjectId) === projectId,
+    );
+    if (projectItems.length === 0) {
+      return respond(false, null, { code: "NOT_FOUND", message: `Project not found: ${projectId}` });
+    }
+
+    for (const qi of projectItems) {
+      const slug = qi.personaHint ?? "unassigned";
+      const personaName = slugToName(slug);
+      const displayStatus = mapQueueStatusToDisplay(qi.status);
+      const issueId = qi.meta?.issueId ?? qi.meta?.paperclipIssueId ?? qi.id;
+
+      let outputPreview: string | undefined;
+      if (qi.result?.summary) {
+        outputPreview = qi.result.summary.length > 200
+          ? qi.result.summary.slice(0, 200) + "..."
+          : qi.result.summary;
+      }
+
+      issues.push({
+        issueId,
+        title: qi.title,
+        status: displayStatus,
+        assignee: slug,
+        personaName,
+        proofDocSlug: qi.proofDocSlug,
+        outputPreview,
+        queueItemId: qi.id,
+      });
+
+      if (!seenAgents.has(slug)) {
+        seenAgents.add(slug);
+        const agentStatus = mapDisplayToAgentStatus(displayStatus);
+        agents.push({
+          id: slug, personaSlug: slug, personaName, role: "general",
+          status: agentStatus,
+          currentTask: agentStatus === "working" ? qi.title : undefined,
+          startedAt: qi.startedAt, endedAt: qi.completedAt,
+          proofDocSlug: qi.proofDocSlug,
+        });
+      }
     }
   }
 
+  const allDone = issues.length > 0 && issues.every(i => i.status === "done" || i.status === "in_review");
+  const anyFailed = issues.some(i => i.status === "failed");
+  const anyInProgress = issues.some(i => i.status === "in_progress");
+  const projectStatus = allDone ? "completed" : anyFailed ? "at_risk" : anyInProgress ? "in_progress" : project?.status ?? "active";
+
   const detail: SwarmProjectDetail = {
-    projectId: status.projectId,
-    title: status.title,
-    status: status.status,
-    proofWorkspace: status.proofWorkspace,
+    projectId,
+    title: project?.title ?? issues[0]?.title ?? "Legacy Project",
+    status: projectStatus,
+    proofWorkspace: project?.proofWorkspace ?? "",
     agents,
     issues,
   };
@@ -172,112 +303,146 @@ async function handleSwarmStatus({ params, respond }: { params: Record<string, u
   return respond(true, detail);
 }
 
-/**
- * godmode.delegation.steer — Send steering instruction to an agent on a project issue.
- */
-async function handleSwarmSteer({ params, respond }: { params: Record<string, unknown>; respond: Function }) {
-  const projectId = params.projectId as string | undefined;
-  const issueTitle = params.issueTitle as string | undefined;
-  const instructions = params.instructions as string | undefined;
-
-  if (!projectId || !issueTitle || !instructions) {
-    return respond(false, null, { code: "INVALID_REQUEST", message: "Missing projectId, issueTitle, or instructions" });
-  }
-
-  if (!isPaperclipRunning()) {
-    return respond(false, null, { code: "UNAVAILABLE", message: "Agent team not running" });
-  }
-
-  const adapter = getPaperclipAdapter();
-  if (!adapter) {
-    return respond(false, null, { code: "UNAVAILABLE", message: "Agent team not available" });
-  }
-
-  const ok = await adapter.steer(projectId, issueTitle, instructions);
-  if (ok) {
-    return respond(true, { success: true, message: `Steering sent for "${issueTitle}"` });
-  }
-  return respond(false, null, { code: "STEER_FAILED", message: "Failed to steer. Check projectId and issueTitle." });
+async function handleSwarmSteer({ respond }: { params: Record<string, unknown>; respond: Function }) {
+  return respond(false, null, {
+    code: "UNSUPPORTED",
+    message: "Steering is not supported for running CLI processes. Wait for completion and provide feedback in the review.",
+  });
 }
 
-/**
- * godmode.delegation.feed — Activity feed for a project (or all projects).
- */
 async function handleSwarmFeed({ params, respond }: { params: Record<string, unknown>; respond: Function }) {
-  const projectId = params.projectId as string | undefined;
+  const filterProjectId = params.projectId as string | undefined;
 
-  if (!isPaperclipRunning()) {
-    return respond(true, { events: [], running: false });
-  }
+  const [projectsState, qs] = await Promise.all([readProjects(), readQueueState()]);
+  const { byIssueId, byTitle } = buildQueueLookups(qs.items);
 
-  const adapter = getPaperclipAdapter();
-  if (!adapter) {
-    return respond(true, { events: [], running: false });
-  }
-
-  // Build feed from project status snapshots
   const events: SwarmFeedEvent[] = [];
-  const projectList = projectId
-    ? [{ projectId, title: "", issueCount: 0, createdAt: "" }]
-    : adapter.listProjects();
 
-  for (const p of projectList) {
-    const status = await adapter.getStatus(p.projectId);
-    if (!status) continue;
+  // Helper to push events from a queue item
+  function pushEventsForItem(qi: QueueItem, pid: string) {
+    const slug = qi.personaHint ?? "unassigned";
+    const personaName = slugToName(slug);
+    const displayStatus = mapQueueStatusToDisplay(qi.status);
 
-    for (const issue of status.issues) {
-      const personaName = issue.assignee.replace(/-/g, " ").replace(/\b\w/g, c => c.toUpperCase());
-
-      if (issue.status === "done") {
-        events.push({
-          id: `${p.projectId}-${issue.title}-done`,
-          timestamp: Date.now(), // TODO: use actual timestamps when available from adapter
-          type: "agent_completed",
-          summary: `${personaName} completed "${issue.title}"`,
-          projectId: p.projectId,
-          personaSlug: issue.assignee,
-          personaName,
-          issueTitle: issue.title,
-        });
-      } else if (issue.status === "in_progress" || issue.status === "todo") {
-        events.push({
-          id: `${p.projectId}-${issue.title}-active`,
-          timestamp: Date.now(),
-          type: issue.status === "in_progress" ? "agent_started" : "agent_started",
-          summary: `${personaName} ${issue.status === "in_progress" ? "working on" : "assigned to"} "${issue.title}"`,
-          projectId: p.projectId,
-          personaSlug: issue.assignee,
-          personaName,
-          issueTitle: issue.title,
-        });
-      } else if (issue.status === "failed" || issue.status === "cancelled") {
-        events.push({
-          id: `${p.projectId}-${issue.title}-failed`,
-          timestamp: Date.now(),
-          type: "agent_failed",
-          summary: `${personaName} failed on "${issue.title}"`,
-          projectId: p.projectId,
-          personaSlug: issue.assignee,
-          personaName,
-          issueTitle: issue.title,
-        });
-      }
+    if (displayStatus === "done" || displayStatus === "in_review") {
+      events.push({
+        id: `${pid}-${qi.id}-done`, timestamp: qi.completedAt ?? Date.now(),
+        type: "agent_completed", summary: `${personaName} completed "${qi.title}"`,
+        projectId: pid, personaSlug: slug, personaName, issueTitle: qi.title,
+      });
+    } else if (displayStatus === "in_progress" || displayStatus === "todo") {
+      events.push({
+        id: `${pid}-${qi.id}-active`, timestamp: qi.startedAt ?? qi.createdAt ?? Date.now(),
+        type: "agent_started",
+        summary: `${personaName} ${displayStatus === "in_progress" ? "working on" : "assigned to"} "${qi.title}"`,
+        projectId: pid, personaSlug: slug, personaName, issueTitle: qi.title,
+      });
+    } else if (displayStatus === "failed") {
+      events.push({
+        id: `${pid}-${qi.id}-failed`, timestamp: qi.completedAt ?? Date.now(),
+        type: "agent_failed", summary: `${personaName} failed on "${qi.title}"`,
+        projectId: pid, personaSlug: slug, personaName, issueTitle: qi.title,
+      });
     }
+  }
+
+  // Native delegated projects
+  const nativeProjects = filterProjectId
+    ? projectsState.projects.filter(p => p.projectId === filterProjectId)
+    : projectsState.projects;
+
+  for (const project of nativeProjects) {
+    for (const issue of project.issues) {
+      const qi = findQueueItem(issue.issueId, issue.title, byIssueId, byTitle);
+      if (qi) pushEventsForItem(qi, project.projectId);
+    }
+  }
+
+  // Legacy projects (queue items with projectId not in delegated state)
+  const knownIds = new Set(projectsState.projects.map(p => p.projectId));
+  const seenLegacy = new Set<string>();
+  for (const qi of qs.items) {
+    const pid = qi.meta?.projectId ?? qi.meta?.paperclipProjectId;
+    if (!pid || knownIds.has(pid)) continue;
+    if (filterProjectId && pid !== filterProjectId) continue;
+    if (seenLegacy.has(qi.id)) continue;
+    seenLegacy.add(qi.id);
+    pushEventsForItem(qi, pid);
   }
 
   events.sort((a, b) => b.timestamp - a.timestamp);
   return respond(true, { events: events.slice(0, 100), running: true });
 }
 
-// ── Helpers ───────────────────────────────────────────────────────
-
-function mapIssueStatusToAgentStatus(status: string): SwarmAgentState["status"] {
-  switch (status) {
-    case "in_progress": return "working";
-    case "done": case "in_review": return "done";
-    case "failed": case "cancelled": return "failed";
-    default: return "idle";
+async function handleSwarmRunLog({ params, respond }: { params: Record<string, unknown>; respond: Function }) {
+  const queueItemId = params.queueItemId as string | undefined;
+  if (!queueItemId) {
+    return respond(false, null, { code: "INVALID_REQUEST", message: "Missing queueItemId" });
   }
+
+  try {
+    const qs = await readQueueState();
+    const item = qs.items.find(i => i.id === queueItemId);
+    if (!item) {
+      return respond(false, null, { code: "NOT_FOUND", message: `Queue item not found: ${queueItemId}` });
+    }
+
+    const lines: string[] = [];
+    lines.push(`# ${item.title}`);
+    lines.push("");
+    lines.push(`**Status:** ${item.status}`);
+    lines.push(`**Persona:** ${item.personaHint ?? "unassigned"}`);
+    lines.push(`**Type:** ${item.type}`);
+    if (item.startedAt) lines.push(`**Started:** ${new Date(item.startedAt).toLocaleString()}`);
+    if (item.completedAt) lines.push(`**Completed:** ${new Date(item.completedAt).toLocaleString()}`);
+    lines.push("");
+
+    if (item.error) {
+      lines.push("## Error");
+      lines.push("```");
+      lines.push(item.error);
+      lines.push("```");
+      lines.push("");
+    }
+
+    if (item.result?.summary) {
+      lines.push("## Output Summary");
+      lines.push(item.result.summary);
+      lines.push("");
+    }
+
+    if (item.result?.outputPath) {
+      lines.push(`**Output file:** ${item.result.outputPath}`);
+      try {
+        const fs = await import("node:fs/promises");
+        const content = await fs.readFile(item.result.outputPath, "utf-8");
+        const preview = content.split("\n").slice(0, 100).join("\n");
+        lines.push("");
+        lines.push("## Output Content");
+        lines.push("```");
+        lines.push(preview);
+        if (content.split("\n").length > 100) lines.push("... (truncated)");
+        lines.push("```");
+      } catch { /* file not readable */ }
+    }
+
+    if (item.artifacts && item.artifacts.length > 0) {
+      lines.push("");
+      lines.push("## Artifacts");
+      for (const a of item.artifacts) {
+        lines.push(`- ${a}`);
+      }
+    }
+
+    return respond(true, { content: lines.join("\n"), title: item.title, mimeType: "text/markdown" });
+  } catch (err) {
+    return respond(false, null, { code: "INTERNAL_ERROR", message: String(err) });
+  }
+}
+
+async function handleSwarmClear({ respond }: { params: Record<string, unknown>; respond: Function }) {
+  await clearProjects();
+  return respond(true, { cleared: true, message: "All projects cleared from Mission Control" });
 }
 
 // ── Export handler map ────────────────────────────────────────────
@@ -287,4 +452,6 @@ export const delegationHandlers: Record<string, unknown> = {
   "godmode.delegation.status": handleSwarmStatus,
   "godmode.delegation.steer": handleSwarmSteer,
   "godmode.delegation.feed": handleSwarmFeed,
+  "godmode.delegation.runLog": handleSwarmRunLog,
+  "godmode.delegation.clear": handleSwarmClear,
 };

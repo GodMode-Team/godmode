@@ -305,7 +305,7 @@ export async function spawnCodeRepair(
 
 // ── GitHub Notifications ─────────────────────────────────────────────
 
-const GITHUB_REPO = "godmode-team/godmode";
+const GITHUB_REPO = process.env.GODMODE_GITHUB_REPO || "godmode-team/godmode";
 
 /**
  * File a GitHub issue when code repair is triggered.

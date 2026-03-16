@@ -53,7 +53,7 @@ import { createXReadTool } from "./src/tools/x-read.js";
 import { createSelfRepairTool } from "./src/tools/self-repair.js";
 import { createTasksCreateTool, createTasksListTool, createTasksUpdateTool } from "./src/tools/tasks-tool.js";
 import { createProofEditorTool } from "./src/tools/proof-tool.js";
-import { createDelegateTool } from "./src/tools/swarm-tool.js";
+import { createDelegateTool } from "./src/tools/delegate-tool.js";
 import { createQueueSteerTool } from "./src/tools/queue-steer.js";
 import { queueHandlers } from "./src/methods/queue.js";
 import { xIntelHandlers } from "./src/methods/x-intel.js";

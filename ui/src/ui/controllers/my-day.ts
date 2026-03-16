@@ -43,6 +43,9 @@ export type MyDayState = {
     status: string;
     score?: number;
     feedback?: string;
+    projectId?: string;
+    deliverables?: Array<{ title: string; persona: string; proofDocSlug?: string; summary?: string }>;
+    coworkSessionId?: string;
   }>;
   inboxLoading?: boolean;
   inboxCount?: number;

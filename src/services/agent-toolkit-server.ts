@@ -411,7 +411,8 @@ async function handleMemory(url: URL, res: http.ServerResponse): Promise<void> {
 
   try {
     const { searchMemories } = await import("../lib/memory.js");
-    const results = await searchMemories(query, "caleb", limit);
+    const { getOwnerUserId } = await import("../lib/ally-identity.js");
+    const results = await searchMemories(query, getOwnerUserId(), limit);
     json(res, 200, { results, query, total: results.length });
   } catch {
     json(res, 200, { results: [], status: "offline" });

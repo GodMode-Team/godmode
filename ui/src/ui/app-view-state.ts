@@ -358,6 +358,7 @@ export type AppViewState = {
   handleSwarmSelectProject: (projectId: string) => Promise<void>;
   handleSwarmSteer: (projectId: string, issueTitle: string, instructions: string) => Promise<void>;
   handleSwarmViewProofDoc: (docSlug: string) => Promise<void>;
+  handleSwarmViewRunLog: (queueItemId: string) => Promise<void>;
   handleOpenSupportChat: () => void;
   seedSessionWithAgentOutput: (taskTitle: string, output: string, agentPrompt?: string) => Promise<void>;
   // GodMode Options state
@@ -683,6 +684,7 @@ export type AppViewState = {
   handleInboxDismiss: (itemId: string) => Promise<void>;
   handleInboxMarkAll: () => Promise<void>;
   handleInboxViewOutput: (itemId: string) => Promise<void>;
+  handleInboxViewProof: (itemId: string) => Promise<void>;
   handleInboxOpenChat: (itemId: string) => void;
   handleInboxSetScoring: (itemId: string | null, score?: number) => void;
   handleInboxFeedbackChange: (text: string) => void;

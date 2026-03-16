@@ -53,6 +53,7 @@ export type MissionControlProps = {
   onSelectSwarmProject?: (projectId: string) => void;
   onSteerSwarmAgent?: (projectId: string, issueTitle: string, instructions: string) => void;
   onViewProofDoc?: (docSlug: string) => void;
+  onViewRunLog?: (queueItemId: string) => void;
 };
 
 // ===== Helpers =====
@@ -502,10 +503,34 @@ function renderSwarmProjectSwitcher(
   `;
 }
 
+function swarmIssueStatusIcon(status: string): string {
+  switch (status) {
+    case "in_progress": case "processing": return "\u{1F504}"; // spinning arrows
+    case "done": case "in_review": return "\u2705"; // checkmark
+    case "failed": case "cancelled": return "\u274C"; // X
+    case "todo": case "pending": return "\u23F3"; // hourglass
+    default: return "\u{25CB}"; // circle
+  }
+}
+
+function swarmIssueStatusLabel(status: string): string {
+  switch (status) {
+    case "in_progress": return "Running";
+    case "in_review": return "Review";
+    case "done": return "Completed";
+    case "failed": return "Failed";
+    case "cancelled": return "Cancelled";
+    case "todo": return "Queued";
+    case "pending": return "Pending";
+    default: return status.replace(/_/g, " ");
+  }
+}
+
 function renderSwarmOrgChart(
   detail: SwarmProjectDetail,
   onSteer?: (projectId: string, issueTitle: string, instructions: string) => void,
   onViewProofDoc?: (docSlug: string) => void,
+  onViewRunLog?: (queueItemId: string) => void,
 ) {
   if (!detail.issues || detail.issues.length === 0) return nothing;
 
@@ -528,14 +553,26 @@ function renderSwarmOrgChart(
             <div class="mc-swarm-node-info">
               <div class="mc-swarm-node-persona">${issue.personaName}</div>
               <div class="mc-swarm-node-task">${issue.title}</div>
-              <div class="mc-swarm-node-status">${issue.status.replace(/_/g, " ")}</div>
+              <div class="mc-swarm-node-status">
+                <span class="mc-swarm-status-icon">${swarmIssueStatusIcon(issue.status)}</span>
+                ${swarmIssueStatusLabel(issue.status)}
+              </div>
+              ${issue.cost ? html`
+                <div class="mc-swarm-node-cost">${((issue.cost.inputTokens + issue.cost.outputTokens) / 1000).toFixed(1)}k tok</div>
+              ` : nothing}
             </div>
             <div class="mc-swarm-node-actions">
               ${issue.proofDocSlug && onViewProofDoc ? html`
                 <button class="mc-detail-btn" @click=${(e: Event) => { e.stopPropagation(); onViewProofDoc(issue.proofDocSlug!); }}>Doc</button>
               ` : nothing}
+              ${issue.queueItemId && onViewRunLog ? html`
+                <button class="mc-detail-btn" @click=${(e: Event) => { e.stopPropagation(); onViewRunLog(issue.queueItemId!); }}>Logs</button>
+              ` : nothing}
             </div>
           </div>
+          ${(issue.status === "done" || issue.status === "in_review") && issue.outputPreview ? html`
+            <div class="mc-swarm-output-preview">${issue.outputPreview}</div>
+          ` : nothing}
           ${steeringTarget === issue.title ? renderSteeringInline(detail.projectId, issue.title, onSteer) : nothing}
         `)}
       </div>
@@ -711,17 +748,31 @@ function renderSwarmSection(
 ) {
   if (!swarm.running || swarm.projects.length === 0) return nothing;
 
+  // Show actual project name(s) instead of generic "Team Projects"
+  const selectedProject = swarm.projects.find(p => p.projectId === swarm.selectedProjectId);
+  const headerTitle = selectedProject
+    ? selectedProject.title
+    : swarm.projects.length === 1
+      ? swarm.projects[0].title
+      : `${swarm.projects.length} Team Projects`;
+
+  // Project-level progress summary
+  const progressText = selectedProject
+    ? `${selectedProject.completedCount}/${selectedProject.issueCount} tasks`
+    : "";
+
   return html`
     <div class="mc-swarm-section">
       <div class="mc-swarm-header">
-        <h2 class="mc-section-title" style="font-size:0.9375rem; margin:0">Team Projects</h2>
+        <h2 class="mc-section-title" style="font-size:0.9375rem; margin:0">${headerTitle}</h2>
+        ${progressText ? html`<span class="mc-swarm-progress-text">${progressText}</span>` : nothing}
         ${swarm.running ? html`<span class="mc-active-dot"></span>` : nothing}
       </div>
 
       ${renderSwarmProjectSwitcher(swarm.projects, swarm.selectedProjectId, props.onSelectSwarmProject)}
 
       ${swarm.detail ? html`
-        ${renderSwarmOrgChart(swarm.detail, props.onSteerSwarmAgent, props.onViewProofDoc)}
+        ${renderSwarmOrgChart(swarm.detail, props.onSteerSwarmAgent, props.onViewProofDoc, props.onViewRunLog)}
         ${renderSwarmAgentCards(swarm.detail.agents)}
         ${renderSwarmBudget(swarm.detail)}
         ${renderSwarmDeliverables(swarm.detail, props.onViewProofDoc)}

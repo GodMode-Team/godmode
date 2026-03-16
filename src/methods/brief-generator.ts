@@ -1026,7 +1026,7 @@ async function extractEveningReview(
 
   // Extract Evening Reflection / Evening Review section
   const reflectionMatch = content.match(
-    /##\s*(?:Evening\s*(?:Review|Reflection)|Caleb\s*Reflection)\s*\n([\s\S]*?)(?=\n##\s[^#]|\n---)/m,
+    /##\s*(?:Evening\s*(?:Review|Reflection)|\w+\s*Reflection)\s*\n([\s\S]*?)(?=\n##\s[^#]|\n---)/m,
   );
   const reflection = reflectionMatch?.[1]?.trim() || "";
 

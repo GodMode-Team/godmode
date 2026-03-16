@@ -46,7 +46,7 @@ export function evictTitledSessions(): void {
  */
 export async function generateSessionTitle(
   userMessage: string,
-  assistantResponse: string,
+  assistantResponse?: string,
 ): Promise<string | null> {
   try {
     const { resolveAnthropicAuth } = await import("../methods/brief-generator.js");
@@ -64,8 +64,8 @@ export async function generateSessionTitle(
       .replace(/\s+/g, " ")
       .trim();
 
-    // Strip system content from assistant response too (message_sending may include tags)
-    const cleanResponse = assistantResponse
+    // Strip system content from assistant response too (if provided)
+    const cleanResponse = (assistantResponse ?? "")
       .replace(/<system-context>[\s\S]*?<\/system-context>/g, "")
       .replace(/<system-reminder>[\s\S]*?<\/system-reminder>/g, "")
       .replace(/<[a-z][a-z_-]*>[\s\S]*?<\/[a-z][a-z_-]*>/g, "")
@@ -87,23 +87,29 @@ export async function generateSessionTitle(
         model: "claude-haiku-4-5-20251001",
         max_tokens: 20,
         system: [
-          "You are a conversation title generator. Given a user question and an AI response, output a short TOPIC LABEL for what this conversation is about.",
+          "You are a conversation title generator. Given a user's first message, output a short label for what this chat is about.",
           "Rules:",
           "- 2-5 words max",
-          "- Describe the TOPIC, not the answer (e.g. 'Memory System Health' not 'Pretty solid overall')",
-          "- No quotes, no punctuation, no prefixes",
+          "- Capture the SUBJECT the user is talking about, not a meta-description of the message type",
+          "- Use the user's own words/nouns when possible",
+          "- No quotes, no punctuation, no prefixes like 'Topic:' or 'Re:'",
           "- Title case",
           "- Output ONLY the label, nothing else",
           "",
           "Examples:",
           "User: 'hows our memory working?' → Memory System Status",
-          "User: 'can you research community platforms for TRP?' → TRP Community Platforms",
+          "User: 'can you research community platforms for my project?' → Community Platform Research",
           "User: 'what tips could I give Scott about his ads?' → Scott Ad Strategy Tips",
           "User: 'build me a front intelligence dashboard' → Front Email Intelligence",
+          "User: 'pink elephants running wild in the fields' → Pink Elephants",
+          "User: 'write me an entrepreneur joke' → Entrepreneur Joke",
+          "User: 'hey whats up' → Quick Chat",
         ].join("\n"),
         messages: [{
           role: "user",
-          content: `User message: ${userSnippet}\n\nAssistant response (first 300 chars): ${assistantSnippet}`,
+          content: assistantSnippet
+            ? `User message: ${userSnippet}\n\nAssistant response (first 300 chars): ${assistantSnippet}`
+            : `User message: ${userSnippet}`,
         }],
       }),
       signal: AbortSignal.timeout(8_000),
@@ -129,7 +135,7 @@ export async function generateSessionTitle(
       .trim();
 
     // Reject if it looks like it echoed the assistant response
-    if (assistantResponse.toLowerCase().startsWith(title.toLowerCase())) return null;
+    if (assistantResponse && assistantResponse.toLowerCase().startsWith(title.toLowerCase())) return null;
 
     // Reject internal system terms that shouldn't be session titles
     if (TITLE_BLOCKLIST.has(title.toLowerCase())) return null;

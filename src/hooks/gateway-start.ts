@@ -285,7 +285,8 @@ export async function runGatewayStart(
       logger.info("[GodMode] Mem0 memory initialized");
       void (async () => {
         try {
-          await seedFromVault("caleb");
+          const { getOwnerUserId } = await import("../lib/ally-identity.js");
+          await seedFromVault(getOwnerUserId());
           logger.info("[GodMode] Mem0 vault seeding complete");
         } catch (seedErr) {
           logger.warn(`[GodMode] Mem0 seeding failed (non-fatal): ${String(seedErr)}`);
@@ -416,32 +417,8 @@ export async function runGatewayStart(
     logger.warn(`[GodMode] Toolkit server failed to start: ${String(err)}`);
   }
 
-  // Paperclip agent team (sidecar)
-  try {
-    const { PaperclipAdapter } = await import("../services/paperclip-adapter.js");
-    const paperclip = new PaperclipAdapter(logger);
-    const started = await paperclip.init();
-    if (started) {
-      // Wire completion callback so Paperclip issue completions surface to ally
-      paperclip.onCompletion((projectId, issueTitle, status) => {
-        logger.info(`[GodMode][Paperclip] Issue completed: "${issueTitle}" (${status}) in project ${projectId}`);
-        safeBroadcast(api, "ally:notification", {
-          type: "paperclip-complete",
-          title: issueTitle,
-          summary: `Agent finished "${issueTitle}" — status: ${status}. Ready for review.`,
-          actions: [
-            { label: "Review", action: "navigate", target: "today" },
-          ],
-        });
-      });
-      serviceCleanup.push({ name: "paperclip", fn: () => paperclip.stop() });
-      logger.info("[GodMode] Paperclip agent team started");
-    } else {
-      logger.warn("[GodMode] Paperclip agent team unavailable");
-    }
-  } catch (err) {
-    logger.warn(`[GodMode] Paperclip failed to start: ${String(err)}`);
-  }
+  // Note: Paperclip sidecar removed — project tracking is native (projects-state.json).
+  // Completion pipeline runs in queue-processor directly.
 
   // Obsidian Sync
   try {

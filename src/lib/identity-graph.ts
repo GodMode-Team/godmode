@@ -15,6 +15,7 @@ import Database from "better-sqlite3";
 import { join } from "node:path";
 import { DATA_DIR } from "../data-paths.js";
 import { resolveAnthropicKey, fetchWithTimeout } from "./anthropic-auth.js";
+import { getOwnerName } from "./ally-identity.js";
 
 // ── Singleton ────────────────────────────────────────────────────────
 
@@ -154,7 +155,7 @@ Schema:
 Rules:
 - Only extract clearly stated entities with proper names, not generic references
 - Relationship types: works_at, knows, manages, client_of, cofounded, partner_of, reports_to, married_to, sibling_of, friend_of, invested_in, uses, member_of, involved_in, interested_in, lives_in, competitor_of
-- The user is "Caleb" — include relationships to Caleb when mentioned or implied
+- The user is "${getOwnerName()}" — include relationships to ${getOwnerName()} when mentioned or implied
 - Max 10 entities, 15 relationships
 - If no clear entities exist, return {"entities":[],"relationships":[]}
 

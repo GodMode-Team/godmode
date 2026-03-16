@@ -1077,22 +1077,26 @@ export class GodModeApp extends LitElement {
   }
 
   async handleSwarmViewProofDoc(docSlug: string) {
+    return this.handleOpenProofDoc(docSlug);
+  }
+
+  async handleSwarmViewRunLog(queueItemId: string) {
     if (!this.client || !this.connected) return;
     try {
-      const result = await this.client.request<{ html?: string; title?: string }>(
-        "proof.get",
-        { slug: docSlug },
+      const result = await this.client.request<{ content?: string; title?: string; mimeType?: string }>(
+        "godmode.delegation.runLog",
+        { queueItemId },
       );
-      if (result?.html) {
-        this.handleOpenSidebar(result.html, {
-          mimeType: "text/html",
-          title: result.title ?? "Proof Document",
+      if (result?.content) {
+        this.handleOpenSidebar(result.content, {
+          mimeType: result.mimeType ?? "text/markdown",
+          title: result.title ?? "Agent Logs",
         });
       } else {
-        this.showToast("Document not found", "error");
+        this.showToast("No logs available", "error");
       }
     } catch {
-      this.showToast("Failed to load Proof document", "error");
+      this.showToast("Failed to load agent logs", "error");
     }
   }
 
@@ -3963,13 +3967,7 @@ export class GodModeApp extends LitElement {
     const item = this.inboxItems?.find((i) => i.id === itemId);
     if (!item) return;
 
-    // If there's a Proof doc, open in Proof viewer
-    if (item.proofDocSlug) {
-      this.handleOpenProofDoc(item.proofDocSlug);
-      return;
-    }
-
-    // Otherwise open the output file in sidebar
+    // Prefer the actual output file (the deliverable) over the proof doc (a review/QA doc)
     if (item.outputPath && this.client) {
       try {
         const result = await this.client.request<{ content: string }>(
@@ -3982,15 +3980,39 @@ export class GodModeApp extends LitElement {
             filePath: item.outputPath,
             title: item.title,
           });
+          return;
         }
       } catch (err) {
-        console.error("[Inbox] Failed to load output:", err);
+        console.error("[Inbox] Failed to load output file:", err);
       }
     }
+
+    // Fall back to Proof doc if no output file
+    if (item.proofDocSlug) {
+      this.handleOpenProofDoc(item.proofDocSlug);
+    }
+  }
+
+  async handleInboxViewProof(itemId: string) {
+    const item = this.inboxItems?.find((i) => i.id === itemId);
+    if (!item?.proofDocSlug) return;
+    this.handleOpenProofDoc(item.proofDocSlug);
   }
 
   handleInboxOpenChat(itemId: string) {
     const item = this.inboxItems?.find((i) => i.id === itemId);
+
+    // Project-completion items open the cowork session
+    if (item?.type === "project-completion" && (item as any).coworkSessionId) {
+      this.setSessionKey((item as any).coworkSessionId);
+      this.setTab("chat" as import("./navigation").Tab);
+      // Also open Proof doc in sidebar if available
+      if (item?.proofDocSlug) {
+        void this.handleOpenProofDoc(item.proofDocSlug);
+      }
+      return;
+    }
+
     if (item?.source.taskId) {
       void this.handleMissionControlOpenTaskSession(item.source.taskId);
       return;
@@ -4002,9 +4024,12 @@ export class GodModeApp extends LitElement {
   }
 
   handleInboxSetScoring(itemId: string | null, score?: number) {
+    // Only reset feedback when opening scoring for a different item
+    if (itemId !== this.inboxScoringId) {
+      this.inboxFeedbackText = "";
+    }
     this.inboxScoringId = itemId;
     this.inboxScoringValue = score ?? 7;
-    this.inboxFeedbackText = "";
   }
 
   handleInboxFeedbackChange(text: string) {

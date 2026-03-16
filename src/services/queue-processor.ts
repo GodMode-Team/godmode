@@ -22,6 +22,11 @@ import {
 } from "../lib/queue-state.js";
 import { resolvePersona, formatHandoff } from "../lib/agent-roster.js";
 import { resolveIdentityDir, getVaultPath, VAULT_FOLDERS } from "../lib/vault-paths.js";
+import {
+  checkEvidence as checkEvidenceShared,
+  extractArtifacts as extractArtifactsShared,
+  type EvidenceResult as SharedEvidenceResult,
+} from "../lib/evidence.js";
 
 // ── Prompt Templates ───────────────────────────────────────────────
 
@@ -103,6 +108,8 @@ function isPidAlive(pid: number): boolean {
 }
 
 // ── Evidence Verification Gates ─────────────────────────────────────
+// Delegates to shared evidence module (src/lib/evidence.ts).
+// Local wrappers preserve the string[] artifact format used downstream.
 
 type EvidenceResult = {
   passed: boolean;
@@ -110,115 +117,13 @@ type EvidenceResult = {
   hint: string;
 };
 
-/**
- * Check that agent output contains expected evidence for the task type.
- * This prevents agents from producing vague or empty responses.
- */
 function checkEvidence(taskType: QueueItemType, output: string): EvidenceResult {
-  if (!output || output.trim().length < 50) {
-    return {
-      passed: false,
-      reason: "Output too short (< 50 characters)",
-      hint: "a substantive response with details, findings, or deliverables",
-    };
-  }
-
-  switch (taskType) {
-    case "coding":
-      if (
-        /https?:\/\/github\.com\S+\/pull\/\d+/.test(output) ||
-        /```[\s\S]+```/.test(output) ||
-        /\.(ts|js|py|go|rs|java|tsx|jsx|css|html|md)\b/.test(output) ||
-        /diff --git/.test(output)
-      ) {
-        return { passed: true, reason: "", hint: "" };
-      }
-      return {
-        passed: false,
-        reason: "No code artifacts found (PR link, code block, or file paths)",
-        hint: "a PR link, code diff, or code blocks with file paths",
-      };
-
-    case "research":
-      if (/https?:\/\/\S+/.test(output)) {
-        return { passed: true, reason: "", hint: "" };
-      }
-      return {
-        passed: false,
-        reason: "No source URLs found in research output",
-        hint: "at least one source URL (https://...) to back up findings",
-      };
-
-    case "ops":
-      if (
-        /\$\s+\S+/.test(output) ||
-        /```(sh|bash|shell|zsh)?[\s\S]+```/.test(output) ||
-        /\b(completed|done|success|configured|installed|deployed|running)\b/i.test(output)
-      ) {
-        return { passed: true, reason: "", hint: "" };
-      }
-      return {
-        passed: false,
-        reason: "No command output or status confirmation found",
-        hint: "command output, terminal logs, or a status confirmation",
-      };
-
-    case "review":
-      if (
-        /\.(ts|js|py|go|rs|md|json|yaml|yml)\b/.test(output) &&
-        /\b(issue|finding|recommend|approve|reject|concern|bug|improvement)\b/i.test(output)
-      ) {
-        return { passed: true, reason: "", hint: "" };
-      }
-      return {
-        passed: false,
-        reason: "Missing file references or review verdict",
-        hint: "specific file paths and review findings/recommendations",
-      };
-
-    case "analysis":
-      if (
-        /\b(data|metric|statistic|number|percent|trend|comparison|chart)\b/i.test(output) &&
-        /\b(conclusion|finding|insight|recommend|result|summary)\b/i.test(output)
-      ) {
-        return { passed: true, reason: "", hint: "" };
-      }
-      return {
-        passed: false,
-        reason: "Missing data references or analytical conclusions",
-        hint: "data references and analytical conclusions/recommendations",
-      };
-
-    case "creative":
-    case "task":
-    case "url":
-    case "idea":
-    default:
-      return { passed: true, reason: "", hint: "" };
-  }
+  const result = checkEvidenceShared(taskType, output);
+  return { passed: result.passed, reason: result.reason, hint: result.hint };
 }
 
-/** Extract evidence artifacts (file paths, URLs, PR links) from agent output. */
 function extractArtifacts(content: string): string[] {
-  const artifacts: string[] = [];
-  const seen = new Set<string>();
-
-  for (const line of content.split("\n")) {
-    const prMatch = line.match(/https:\/\/github\.com\/[^\s)]+\/pull\/\d+/g);
-    if (prMatch) for (const m of prMatch) if (!seen.has(m)) { artifacts.push(m); seen.add(m); }
-
-    const urlMatch = line.match(/https?:\/\/[^\s)>]+/g);
-    if (urlMatch) for (const m of urlMatch) if (!seen.has(m)) { artifacts.push(m); seen.add(m); }
-
-    const pathMatch = line.match(/(?:^|\s)(\/[\w./-]+\.\w{1,10})\b/g);
-    if (pathMatch) for (const m of pathMatch) {
-      const cleaned = m.trim();
-      if (!seen.has(cleaned)) { artifacts.push(cleaned); seen.add(cleaned); }
-    }
-  }
-
-  return artifacts.slice(0, 20);
-
+  return extractArtifactsShared(content).map((a) => a.value);
 }
 
 // ── Queue Processor Class ──────────────────────────────────────────
@@ -704,7 +609,8 @@ class QueueProcessor {
       askTrustRating: !!personaSlug,
     });
 
-    // Push to universal inbox (background agent work always goes to inbox)
+    // Push to universal inbox — every completed item gets an entry
+    const projectId = completedItem?.meta?.projectId ?? completedItem?.meta?.paperclipProjectId;
     try {
       const { addInboxItem } = await import("./inbox.js");
       await addInboxItem({
@@ -715,6 +621,7 @@ class QueueProcessor {
           persona: personaSlug,
           queueItemId: itemId,
           taskId: completedItem?.sourceTaskId,
+          projectId,
         },
         proofDocSlug: completedItem?.proofDocSlug,
         outputPath: outPath,
@@ -722,6 +629,11 @@ class QueueProcessor {
       });
     } catch (err) {
       this.logger.warn(`[GodMode][Queue] Inbox push failed for ${itemId}: ${String(err)}`);
+    }
+
+    // Check for project-level completion (all sibling items in same project are terminal)
+    if (projectId && await this.isMultiIssueProject(projectId)) {
+      void this.checkProjectCompletion(projectId);
     }
 
     // Notify Ally chat so the user sees a notification in real-time
@@ -955,6 +867,159 @@ class QueueProcessor {
     }
   }
 
+  // ── Helpers ──────────────────────────────────────────────────────
+
+  /** Check if a project has more than one queue item */
+  private async isMultiIssueProject(projectId: string): Promise<boolean> {
+    const state = await readQueueState();
+    const count = state.items.filter(
+      (i) => (i.meta?.projectId ?? i.meta?.paperclipProjectId) === projectId,
+    ).length;
+    return count > 1;
+  }
+
+  /** Check if all items in a project are terminal — if so, fire project completion */
+  private async checkProjectCompletion(projectId: string): Promise<void> {
+    const state = await readQueueState();
+    const projectItems = state.items.filter(
+      (i) => (i.meta?.projectId ?? i.meta?.paperclipProjectId) === projectId,
+    );
+    if (projectItems.length === 0) return;
+
+    const allTerminal = projectItems.every(
+      (qi) => qi.status === "done" || qi.status === "review" || qi.status === "needs-review" || qi.status === "failed",
+    );
+    if (!allTerminal) return;
+
+    // Mark project as completed in projects-state (idempotent — only fires once)
+    let didTransition = false;
+    let hasProjectRecord = false;
+    try {
+      const { updateProjects } = await import("../lib/projects-state.js");
+      const { result } = await updateProjects((ps) => {
+        const project = ps.projects.find(p => p.projectId === projectId);
+        if (!project) return "no-record" as const;
+        if (project.status === "active") {
+          project.status = "completed";
+          project.completedAt = Date.now();
+          return "transitioned" as const;
+        }
+        return "already-done" as const;
+      });
+      hasProjectRecord = result !== "no-record";
+      didTransition = result === "transitioned";
+    } catch { /* projects-state not available */ }
+
+    // Per-item inbox entries are already created in handleItemCompleted.
+    // Here we only add the project-level completion summary.
+    if (!hasProjectRecord) return;
+    if (!didTransition) return;
+
+    // Get project metadata for notifications
+    let projectTitle = "";
+    let proofDocSlug: string | undefined;
+    try {
+      const { getProject } = await import("../lib/projects-state.js");
+      const project = await getProject(projectId);
+      if (project) {
+        projectTitle = project.title;
+        proofDocSlug = project.issues.find(i => i.proofDocSlug)?.proofDocSlug;
+      }
+    } catch { /* best effort */ }
+
+    if (!projectTitle) {
+      projectTitle = projectItems[0]?.title ?? "Untitled Project";
+    }
+
+    this.logger.info(`[GodMode][Queue] Project "${projectTitle}" fully complete (${projectItems.length} tasks)`);
+
+    // Build deliverables list
+    const deliverables: Array<{ title: string; persona: string; proofDocSlug?: string; summary?: string }> = [];
+    for (const qi of projectItems) {
+      deliverables.push({
+        title: qi.title,
+        persona: qi.personaHint ?? "unassigned",
+        proofDocSlug: qi.proofDocSlug,
+        summary: qi.result?.summary?.slice(0, 200) ?? `Completed by ${qi.personaHint ?? "agent"}`,
+      });
+    }
+
+    // Create cowork session seeded with project context
+    let coworkSessionId: string | undefined;
+    try {
+      const { randomUUID } = await import("node:crypto");
+      const { readFile: _, writeFile, mkdir } = await import("node:fs/promises");
+      const { join } = await import("node:path");
+      coworkSessionId = randomUUID();
+      const sessionsDir = join(DATA_DIR, "sessions");
+      await mkdir(sessionsDir, { recursive: true });
+
+      const deliverablesList = deliverables
+        .map((d, i) => `${i + 1}. **${d.title}** (${d.persona}): ${d.summary}`)
+        .join("\n");
+
+      const seedMessage = [
+        `Project "${projectTitle}" is complete — all ${projectItems.length} deliverables are ready for review.`,
+        "",
+        "## Deliverables",
+        deliverablesList,
+        "",
+        proofDocSlug ? `Proof document: ${proofDocSlug}` : "",
+        "",
+        "Walk me through each deliverable. Highlight what's strong, flag anything that needs iteration, and let me score the overall project.",
+      ].filter(Boolean).join("\n");
+
+      const session = {
+        id: coworkSessionId,
+        title: `Review: ${projectTitle}`,
+        messages: [{ role: "user", content: seedMessage, ts: Date.now() }],
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        projectId,
+        proofDocSlug,
+      };
+      await writeFile(
+        join(sessionsDir, `${coworkSessionId}.json`),
+        JSON.stringify(session, null, 2) + "\n",
+      );
+    } catch (err) {
+      this.logger.warn(`[GodMode][Queue] Failed to create cowork session: ${String(err)}`);
+    }
+
+    // Create ONE project-level inbox item
+    try {
+      const { addInboxItem } = await import("./inbox.js");
+      await addInboxItem({
+        type: "project-completion",
+        title: `Project Complete: ${projectTitle}`,
+        summary: `All ${projectItems.length} tasks finished. Deliverables ready for review.`,
+        source: { queueItemId: projectId },
+        projectId,
+        proofDocSlug,
+        deliverables,
+        coworkSessionId,
+      });
+    } catch (err) {
+      this.logger.warn(`[GodMode][Queue] Project inbox push failed: ${String(err)}`);
+    }
+
+    // Broadcast notifications
+    this.broadcast("ally:notification", {
+      type: "project-complete",
+      title: projectTitle,
+      summary: `Project "${projectTitle}" is complete — ${projectItems.length} deliverables ready for review.`,
+      projectId,
+      proofDocSlug,
+      coworkSessionId,
+      actions: [
+        { label: "Review in Chat", action: "cowork", target: coworkSessionId },
+        { label: "View Deliverables", action: "navigate", target: "today" },
+      ],
+    });
+    this.broadcast("inbox:update", {});
+    this.broadcast("queue:update", { type: "project-complete", projectId });
+  }
+
   // ── Batch process all pending ──────────────────────────────────
 
   async processAllPending(): Promise<{ spawned: number; skipped: number }> {
@@ -967,8 +1032,9 @@ class QueueProcessor {
       low: 2,
     };
 
+    const now = Date.now();
     const pending = state.items
-      .filter((i) => i.status === "pending")
+      .filter((i) => i.status === "pending" && (!i.scheduledAt || i.scheduledAt <= now))
       .sort((a, b) => {
         const pa = priorityOrder[a.priority] ?? 1;
         const pb = priorityOrder[b.priority] ?? 1;
@@ -984,6 +1050,23 @@ class QueueProcessor {
       if (spawned >= slotsAvailable) {
         skipped++;
         continue;
+      }
+
+      // QA stages are gated — don't start until all other project items are terminal
+      const qaProjectId = item.meta?.projectId ?? item.meta?.paperclipProjectId;
+      if (item.meta?.isQAStage && qaProjectId) {
+        const projectItems = state.items.filter(
+          (qi) =>
+            (qi.meta?.projectId ?? qi.meta?.paperclipProjectId) === qaProjectId &&
+            !qi.meta?.isQAStage,
+        );
+        const allTerminal = projectItems.length > 0 && projectItems.every(
+          (qi) => qi.status === "done" || qi.status === "review" || qi.status === "needs-review" || qi.status === "failed",
+        );
+        if (!allTerminal) {
+          skipped++;
+          continue;
+        }
       }
 
       const result = await this.processItem(item);

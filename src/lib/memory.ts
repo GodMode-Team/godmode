@@ -30,8 +30,8 @@ let initFailed = false;
 /** Retry queue for failed ingestions */
 const retryQueue: Array<{ messages: string; userId: string; attempts: number }> = [];
 const MAX_RETRY_ATTEMPTS = 3;
-const SEARCH_TIMEOUT_MS = 5_000;
-const INGEST_TIMEOUT_MS = 15_000;
+const SEARCH_TIMEOUT_MS = 12_000;
+const INGEST_TIMEOUT_MS = 20_000;
 
 /** Circuit breaker for memory search — backs off after consecutive failures */
 let consecutiveSearchFailures = 0;
@@ -54,6 +54,21 @@ async function _doInit(): Promise<void> {
     // Dynamic import — mem0ai is an optional peer dependency.
     // If not installed, GodMode runs without enhanced memory.
     const { Memory } = await import("mem0ai/oss");
+
+    // Load API keys from ~/godmode/.env if not already in process.env
+    // The OC gateway only loads ~/.openclaw/.env, but Gemini key may live in ~/godmode/.env
+    if (!process.env.GEMINI_API_KEY && !process.env.GOOGLE_API_KEY) {
+      try {
+        const { readFileSync: rfs } = await import("node:fs");
+        const { join: pj } = await import("node:path");
+        const gdRoot = process.env.GODMODE_ROOT || pj(process.env.HOME || "", "godmode");
+        const raw = rfs(pj(gdRoot, ".env"), "utf-8");
+        for (const line of raw.split("\n")) {
+          const m = line.match(/^(GEMINI_API_KEY|GOOGLE_API_KEY)=(.+)/);
+          if (m && !process.env[m[1]]) process.env[m[1]] = m[2].trim();
+        }
+      } catch { /* no ~/godmode/.env — that's fine */ }
+    }
 
     // Determine embedding provider based on available API keys
     // Prefer Gemini (free tier, reliable) over OpenAI (paid, may hit quota)
@@ -240,10 +255,24 @@ export async function searchMemories(
 
   const start = Date.now();
   try {
-    const result: any = await withTimeout(
-      memoryInstance.search(query, { userId, limit }),
-      SEARCH_TIMEOUT_MS,
-    );
+    let result: any;
+    try {
+      result = await withTimeout(
+        memoryInstance.search(query, { userId, limit }),
+        SEARCH_TIMEOUT_MS,
+      );
+    } catch (firstErr) {
+      // Single retry on timeout — transient slowness shouldn't trip circuit breaker
+      if (String(firstErr).includes("Timeout")) {
+        console.warn("[GodMode Memory] Search timeout, retrying once...");
+        result = await withTimeout(
+          memoryInstance.search(query, { userId, limit }),
+          SEARCH_TIMEOUT_MS,
+        );
+      } else {
+        throw firstErr;
+      }
+    }
     if (!result?.results) {
       lastSearchFailed = true;
       consecutiveSearchFailures++;

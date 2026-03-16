@@ -180,6 +180,7 @@ export const proofHandlers: Record<string, Function> = {
     }
     try {
       const { readProofDocument, getProofViewUrl: bridgeViewUrl } = await import("../lib/proof-bridge.js");
+      // If the doc fetch succeeds, trust it — don't gate on /health which can be flaky
       const doc = await readProofDocument(slug);
       respond(true, {
         slug: doc.slug,
@@ -190,15 +191,24 @@ export const proofHandlers: Record<string, Function> = {
         filePath: doc.filePath,
       });
     } catch (err) {
-      // Fallback: return what we know from the token map
+      // Fallback: return what we know from the token map + local markdown mirror
       const token = getTokenForSlug(slug);
       if (token) {
         const tokens = loadTokens();
+        const filePath = getProofDocumentFilePath(slug);
+        let content: string | undefined;
+        try {
+          if (existsSync(filePath)) {
+            content = readFileSync(filePath, "utf-8");
+          }
+        } catch { /* non-fatal */ }
         respond(true, {
           slug,
           title: tokens[slug]?.title ?? slug,
-          viewUrl: getProofViewUrl(slug),
-          filePath: getProofDocumentFilePath(slug),
+          // Omit viewUrl — API is unreachable, iframe would be dead
+          filePath,
+          content: content ?? `# ${tokens[slug]?.title ?? slug}\n\n*This document was created but Proof is currently unavailable. Content will appear when Proof comes back online.*\n`,
+          localFallback: true,
         });
       } else {
         respond(false, null, { code: "NOT_FOUND", message: `Proof document not found: ${String(err)}` });

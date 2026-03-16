@@ -43,7 +43,9 @@ async function proofApiFetch<T>(
   };
   if (token) {
     headers["Authorization"] = `Bearer ${token}`;
-    headers["X-Agent-Id"] = "godmode-ally";
+    if (!headers["X-Agent-Id"]) {
+      headers["X-Agent-Id"] = "godmode-ally";
+    }
   }
 
   const url = `${PROOF_API}${path}`;

@@ -546,7 +546,7 @@ const setupFromTemplate: GatewayRequestHandler = async ({ params, respond }) => 
     respond(
       false,
       undefined,
-      errorShape(ErrorCodes.NOT_FOUND, `Template not found: ${template}. Available: godmode-dev, trp, patient-autopilot`),
+      errorShape(ErrorCodes.NOT_FOUND, `Template not found: ${template}. Available: godmode-dev`),
     );
     return;
   }
