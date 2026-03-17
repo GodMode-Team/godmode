@@ -703,26 +703,105 @@
   <div class="section">
     <div class="section-label">One-time setup</div>
     <h2>Getting Started</h2>
-    <div class="setup-block">
+
+    <p style="color: var(--text-muted); margin-bottom: 20px; font-size: 14px;">We run GodMode from GitHub source (not the npm package) so everyone stays synced to the latest fixes.</p>
+
+    <!-- Step 1: Prerequisites -->
+    <div class="setup-block" style="margin-bottom: 16px;">
       <div class="setup-header">
         <span class="setup-dot red"></span>
         <span class="setup-dot yellow"></span>
         <span class="setup-dot green"></span>
-        Terminal
+        Step 1 &mdash; Install Prerequisites
       </div>
       <div class="setup-code">
-        <span class="comment"># Prerequisites: Claude Code, GitHub CLI (gh), Node 22+, pnpm</span><br><br>
-        <span class="comment"># 1. Clone the repo</span><br>
+        <span class="comment"># Claude Code (if you don't have it yet)</span><br>
+        <span class="cmd">npm install -g</span> @anthropic-ai/claude-code<br><br>
+        <span class="comment"># GitHub CLI</span><br>
+        <span class="cmd">brew install</span> gh<br>
+        <span class="cmd">gh auth login</span><br><br>
+        <span class="comment"># pnpm (if you don't have it)</span><br>
+        <span class="cmd">npm install -g</span> pnpm<br><br>
+        <span class="comment"># Node 22+ (check with: node --version)</span><br>
+        <span class="comment"># If below v22, install via: brew install node@22</span><br>
+      </div>
+    </div>
+
+    <!-- Step 2: Clone & Build -->
+    <div class="setup-block" style="margin-bottom: 16px;">
+      <div class="setup-header">
+        <span class="setup-dot red"></span>
+        <span class="setup-dot yellow"></span>
+        <span class="setup-dot green"></span>
+        Step 2 &mdash; Clone &amp; Build
+      </div>
+      <div class="setup-code">
+        <span class="comment"># Clone the repo</span><br>
         <span class="cmd">git clone</span> https://github.com/GodMode-Team/godmode-plugin.git<br>
         <span class="cmd">cd</span> godmode-plugin<br><br>
-        <span class="comment"># 2. Install &amp; build</span><br>
+        <span class="comment"># Install dependencies &amp; build</span><br>
         <span class="cmd">pnpm install</span><br>
         <span class="cmd">pnpm build</span><br><br>
-        <span class="comment"># 3. Verify</span><br>
-        <span class="cmd">gh auth status</span> <span class="comment">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# should show your GitHub username</span><br>
-        <span class="cmd">pnpm typecheck</span> <span class="comment">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# should pass with no errors</span><br><br>
-        <span class="comment"># 4. Start working</span><br>
-        <span class="cmd">claude</span> <span class="comment">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# open Claude Code in this directory</span><br>
+        <span class="comment"># Verify everything works</span><br>
+        <span class="cmd">gh auth status</span> <span class="comment">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# should show your GitHub username</span><br>
+        <span class="cmd">pnpm typecheck</span> <span class="comment">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# should pass with no errors</span><br>
+      </div>
+    </div>
+
+    <!-- Step 3: Point OpenClaw at your clone -->
+    <div class="setup-block" style="margin-bottom: 16px;">
+      <div class="setup-header">
+        <span class="setup-dot red"></span>
+        <span class="setup-dot yellow"></span>
+        <span class="setup-dot green"></span>
+        Step 3 &mdash; Point OpenClaw at Your Clone
+      </div>
+      <div class="setup-code">
+        <span class="comment"># Open your OpenClaw config</span><br>
+        <span class="cmd">nano</span> ~/.openclaw/openclaw.json<br><br>
+        <span class="comment"># Find the "plugins" section and update "load.paths"</span><br>
+        <span class="comment"># to include the FULL path to your clone:</span><br><br>
+        <span style="color: var(--text-muted);">"plugins": {</span><br>
+        <span style="color: var(--text-muted);">&nbsp;&nbsp;"load": {</span><br>
+        <span style="color: var(--text-muted);">&nbsp;&nbsp;&nbsp;&nbsp;"paths": [</span><br>
+        <span style="color: var(--green);">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"<span style="color: var(--amber);">/full/path/to</span>/godmode-plugin"</span><br>
+        <span style="color: var(--text-muted);">&nbsp;&nbsp;&nbsp;&nbsp;]</span><br>
+        <span style="color: var(--text-muted);">&nbsp;&nbsp;}</span><br>
+        <span style="color: var(--text-muted);">}</span><br><br>
+        <span class="comment"># Example paths:</span><br>
+        <span class="comment"># macOS:   /Users/yourname/Projects/godmode-plugin</span><br>
+        <span class="comment"># Linux:   /home/yourname/Projects/godmode-plugin</span><br>
+        <span class="comment"># Windows: C:\\Users\\yourname\\Projects\\godmode-plugin</span><br><br>
+        <span class="comment"># Then restart your gateway to pick up the change</span><br>
+        <span class="cmd">openclaw gateway restart</span><br>
+      </div>
+    </div>
+
+    <!-- Step 4: Start working -->
+    <div class="setup-block" style="margin-bottom: 16px;">
+      <div class="setup-header">
+        <span class="setup-dot red"></span>
+        <span class="setup-dot yellow"></span>
+        <span class="setup-dot green"></span>
+        Step 4 &mdash; Start Working
+      </div>
+      <div class="setup-code">
+        <span class="comment"># Open Claude Code in the godmode-plugin directory</span><br>
+        <span class="cmd">cd</span> godmode-plugin<br>
+        <span class="cmd">claude</span><br><br>
+        <span class="comment"># You now have access to all 4 commands:</span><br>
+        <span style="color: var(--red);">/bug</span> <span class="comment"> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# report a bug</span><br>
+        <span style="color: var(--green);">/fix</span> <span class="comment"> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# fix an issue</span><br>
+        <span style="color: var(--blue);">/pr-review</span> <span class="comment"> # review PRs</span><br>
+        <span style="color: var(--amber);">/sync</span> <span class="comment"> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# pull latest &amp; rebuild</span><br>
+      </div>
+    </div>
+
+    <!-- Why GitHub, not npm -->
+    <div style="background: var(--accent-glow); border: 1px solid rgba(124, 92, 252, 0.25); border-radius: var(--radius); padding: 20px 24px; margin-top: 8px;">
+      <div style="font-size: 13px; font-weight: 600; color: var(--accent); margin-bottom: 8px;">Why GitHub source instead of npm?</div>
+      <div style="font-size: 13px; color: var(--text-muted); line-height: 1.6;">
+        The npm package (<code style="background: var(--surface); padding: 2px 6px; border-radius: 4px; font-size: 12px;">@godmode-team/godmode</code>) only updates when we publish a release. Running from GitHub source means every merged fix is one <code style="background: var(--surface); padding: 2px 6px; border-radius: 4px; font-size: 12px;">/sync</code> away. Since we're all developing the plugin now, source keeps us all on the same version at all times.
       </div>
     </div>
   </div>
