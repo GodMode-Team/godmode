@@ -1,7 +1,7 @@
 /**
  * http-handler.ts — HTTP route handler for GodMode endpoints.
  *
- * Serves the GodMode UI, health endpoint, artifact files, Fathom webhook,
+ * Serves the GodMode UI, health endpoint, artifact files, meeting webhook,
  * and legacy /reports/ redirect.
  */
 
@@ -9,7 +9,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { MEMORY_DIR } from "../data-paths.js";
-import { handleFathomWebhookHttp } from "../methods/fathom-webhook.js";
+import { handleMeetingWebhookHttp } from "../methods/meeting-webhook.js";
 import type { LicenseState } from "../lib/license.js";
 
 function requestPathname(url: string): string {
@@ -53,8 +53,8 @@ export function createGodmodeHttpHandler(deps: HttpHandlerDeps) {
       return true;
     }
 
-    // Fathom webhook endpoint
-    if (pathname === "/godmode/webhooks/fathom" && req.method === "POST") {
+    // Generic meeting webhook endpoint (works with Fathom, Otter, etc.)
+    if (pathname === "/godmode/webhooks/meeting" && req.method === "POST") {
       const chunks: Buffer[] = [];
       req.on("data", (c: Buffer) => chunks.push(c));
       req.on("end", () => {
@@ -65,8 +65,8 @@ export function createGodmodeHttpHandler(deps: HttpHandlerDeps) {
         for (const [k, v] of Object.entries(req.headers)) {
           hdrs[k] = Array.isArray(v) ? v[0] : v ?? "";
         }
-        handleFathomWebhookHttp(body, hdrs).catch((err) => {
-          console.error("[GodMode] Fathom webhook processing error:", err);
+        handleMeetingWebhookHttp(body, hdrs).catch((err) => {
+          console.error("[GodMode] Meeting webhook processing error:", err);
         });
       });
       return true;

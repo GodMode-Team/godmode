@@ -64,7 +64,6 @@ import { guardrailsHandlers } from "./src/methods/guardrails.js";
 import { imageCacheHandlers } from "./src/methods/image-cache.js";
 import { secondBrainHandlers } from "./src/methods/second-brain.js";
 import { supportHandlers } from "./src/methods/support.js";
-import { fathomWebhookHandlers } from "./src/methods/fathom-webhook.js";
 import { authHandlers } from "./src/methods/auth.js";
 import { sessionPrivacyHandlers } from "./src/methods/session-privacy.js";
 import { resourcesHandlers } from "./src/methods/resources.js";
@@ -144,7 +143,7 @@ const godmodePlugin = {
       ...guardrailsHandlers, ...imageCacheHandlers, ...secondBrainHandlers,
       ...queueHandlers, ...dashboardsHandlers, ...impactLedgerHandlers, ...supportHandlers,
       ...xIntelHandlers, ...filesHandlers, ...integrationsHandlers,
-      ...fathomWebhookHandlers, ...authHandlers, ...sessionPrivacyHandlers,
+      ...authHandlers, ...sessionPrivacyHandlers,
       ...resourcesHandlers,
       ...inboxHandlers,
       ...proofHandlers,

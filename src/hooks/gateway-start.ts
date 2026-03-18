@@ -432,16 +432,13 @@ export async function runGatewayStart(
     logger.warn(`[GodMode] Obsidian Sync failed to init: ${String(err)}`);
   }
 
-  // Fathom post-meeting processor
+  // Meeting webhook broadcast wiring
   try {
-    const { initFathomProcessor, startFathomProcessor, stopFathomProcessor, setBroadcast: setFathomBroadcast } = await import("../services/fathom-processor.js");
-    initFathomProcessor(logger);
-    setFathomBroadcast((event: string, data: unknown) => safeBroadcast(api, event, data));
-    startFathomProcessor();
-    serviceCleanup.push({ name: "fathom-processor", fn: () => { stopFathomProcessor(); } });
-    logger.info("[GodMode] Fathom post-meeting processor started");
+    const { setMeetingWebhookBroadcast } = await import("../methods/meeting-webhook.js");
+    setMeetingWebhookBroadcast((event: string, data: unknown) => safeBroadcast(api, event, data));
+    logger.info("[GodMode] Meeting webhook broadcast wired");
   } catch (err) {
-    logger.warn(`[GodMode] Fathom processor failed to start: ${String(err)}`);
+    logger.warn(`[GodMode] Meeting webhook broadcast wiring failed: ${String(err)}`);
   }
 
   // X/Twitter client
