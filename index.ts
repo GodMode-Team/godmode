@@ -55,6 +55,8 @@ import { createTasksCreateTool, createTasksListTool, createTasksUpdateTool } fro
 // REMOVED (v2 slim): proof-tool — not using Proof
 import { createDelegateTool } from "./src/tools/delegate-tool.js";
 import { createQueueSteerTool } from "./src/tools/queue-steer.js";
+import { createComposioExecuteTool } from "./src/tools/composio-tool.js";
+import { composioSetupHandlers } from "./src/methods/composio-setup.js";
 import { queueHandlers } from "./src/methods/queue.js";
 // REMOVED (v2 slim): x-intel — OC has x_read tool
 import { filesHandlers } from "./src/methods/files.js";
@@ -147,6 +149,7 @@ const godmodePlugin = {
       ...authHandlers, ...sessionPrivacyHandlers,
       ...resourcesHandlers,
       ...inboxHandlers,
+      ...composioSetupHandlers,
     };
 
     for (const [method, handler] of Object.entries(allHandlers)) {
@@ -404,6 +407,11 @@ const godmodePlugin = {
     api.on("gateway_start", async () => {
       api.logger.info("[GodMode] Gateway started — plugin active");
       await runGatewayStart(api, pluginVersion, pluginRoot, serviceCleanup, methodCount);
+
+      // Init Composio (non-blocking — logs status and continues)
+      import("./src/services/composio-client.js").then(({ init }) => {
+        init(process.env.COMPOSIO_API_KEY, api.logger).catch(() => {});
+      }).catch(() => {});
     });
 
     api.on("gateway_stop", async () => {
@@ -468,6 +476,7 @@ const godmodePlugin = {
     // REMOVED (v2 slim): createProofEditorTool
     api.registerTool(() => createQueueSteerTool());
     api.registerTool(() => createDelegateTool());
+    api.registerTool(() => createComposioExecuteTool());
 
     // ── 7. CLI commands ───────────────────────────────────────────
     api.registerCli(
