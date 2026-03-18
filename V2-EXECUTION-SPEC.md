@@ -166,28 +166,66 @@ Plugin must load in OpenClaw and serve the UI at /godmode with:
 
 ---
 
-## SESSION 2: Proof Sidebar Fix
+## SESSION 2: Proof Sidebar — Self-Hosted via Proof SDK
 
-**Goal:** Make Proof the co-working review surface for deliverables.
+**Goal:** Embed the open-source Proof SDK directly into GodMode. No external login. No hosted dependency. Full collaborative editing in the sidebar.
+
+### Why Proof SDK (not hosted Proof):
+
+- Hosted Proof requires Every login → dealbreaker for onboarding
+- Proof SDK is MIT-licensed, open source: https://github.com/EveryInc/proof-sdk
+- Includes: editor, collab server, SQLite store, agent HTTP bridge
+- Agent bridge has endpoints for comments, suggestions, rewrites, presence
+- Perfect for Prosper ↔ User ↔ Paperclip co-working surface
+
+### Architecture:
+
+```
+GodMode Plugin
+├── Proof SDK doc-server (runs locally, SQLite storage)
+├── Proof SDK doc-editor (embedded in sidebar as Lit component)
+├── Proof SDK agent-bridge (Prosper/Paperclip write to docs via API)
+└── Action buttons (Approve / Send Back / Edit)
+```
+
+### New Dependencies:
+
+```json
+"@proof-sdk/doc-editor": "latest",
+"@proof-sdk/doc-server": "latest", 
+"@proof-sdk/doc-store-sqlite": "latest",
+"@proof-sdk/agent-bridge": "latest"
+```
 
 ### Changes:
 
-1. **Make Proof editable** — user must be able to type in the sidebar
-2. **Add action buttons** at bottom of Proof sidebar:
+1. **Replace proof-viewer.ts** with embedded Proof SDK editor component
+   - No iframe, no external service — editor runs natively in sidebar
+   - User can type, edit, comment directly
+   - Full markdown editing with provenance tracking
+2. **Start Proof doc-server** as a GodMode background service
+   - SQLite storage at ~/godmode/data/proof.db
+   - Runs on localhost, no external network needed
+3. **Wire agent-bridge** for Prosper and Paperclip:
+   - POST /documents/:slug/bridge/comments — Prosper adds commentary
+   - POST /documents/:slug/bridge/suggestions — Prosper suggests edits
+   - POST /documents/:slug/bridge/rewrite — Prosper rewrites sections
+   - POST /documents/:slug/bridge/presence — shows "Prosper is editing..."
+4. **Add action buttons** at bottom of sidebar:
    - ✅ Approve (marks inbox item done)
-   - ↩️ Send Back (with comment)
-   - ✏️ Edit mode toggle
-3. **Auto-open Proof** when user opens an inbox-linked session
-4. **Auto-close Proof** when session is not linked to a deliverable
-5. **Contextual display** — show deliverable content from inbox item
+   - ↩️ Send Back (with comment, routes back to Paperclip)
+   - Shows agent presence ("Prosper is reviewing...")
+5. **Auto-open sidebar** when inbox item session starts
+6. **Auto-close** when no active deliverable
+7. **Optional: "Share to Proof"** button for external collaboration (uses hosted Proof API if user has account)
 
-### Files to modify:
+### Files to modify/create:
 
-- `ui/src/ui/views/proof-viewer.ts` — Add editing, action buttons
-- `ui/src/ui/views/chat.ts` — Auto-open Proof when session has deliverable
-- `ui/src/ui/views/inbox.ts` — Link inbox items to sessions
-- `ui/src/ui/controllers/proof-controller.ts` — Handle approve/reject actions
-- `src/methods/inbox.ts` or equivalent — Handle proof action RPC calls
+- `ui/src/ui/views/proof-viewer.ts` — Replace with Proof SDK editor embed
+- `src/services/proof-server.ts` — NEW: Start/manage local Proof doc-server
+- `src/methods/proof-bridge.ts` — Wire agent bridge for Prosper/Paperclip
+- `ui/src/ui/views/chat.ts` — Auto-open sidebar when session has deliverable
+- `ui/src/ui/views/inbox.ts` — Link inbox items to proof documents
 
 ---
 
