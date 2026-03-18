@@ -1019,16 +1019,71 @@ export async function checkArchitectureGate(
   return undefined;
 }
 
+// ── Approval Tracking (shared by deployment + any future approval gates) ──
+//
+// When a gate fires, it blocks and tells the ally to ask the user.
+// When the user says "approved"/"go ahead"/etc., detectApprovalPhrase()
+// records a blanket approval for that session (10-min TTL).
+// Subsequent retries within the same session pass through.
+
+/** sessionKey → timestamp of last blanket approval */
+const _blanketApprovals = new Map<string, number>();
+
+/** TTL for blanket approvals — 10 minutes */
+const BLANKET_APPROVAL_TTL_MS = 10 * 60 * 1000;
+
+/** Phrases that grant blanket approval for the current session */
+const APPROVAL_PHRASES = [
+  /\bapproved?\b/i,
+  /\bgo\s+ahead\b/i,
+  /\bdo\s+it\b/i,
+  /\byes,?\s*(do|go|run|push|send|execute|proceed|deploy|merge|ship)\b/i,
+  /\bproceed\b/i,
+  /\bship\s+it\b/i,
+  /\bgreen\s+light\b/i,
+  /\blgtm\b/i,
+  /\bok\b.*\b(do|go|run|push|send|execute|proceed|deploy|merge)\b/i,
+  /\bjust\s+(do|push|deploy|merge|send|ship)\b/i,
+];
+
+/**
+ * Call from message_received to detect user approval phrases.
+ * Grants a blanket approval for the session for BLANKET_APPROVAL_TTL_MS.
+ */
+export function detectApprovalPhrase(
+  sessionKey: string | undefined,
+  userMessage: string,
+): boolean {
+  if (!sessionKey || !userMessage) return false;
+  const matched = APPROVAL_PHRASES.some((p) => p.test(userMessage));
+  if (matched) {
+    _blanketApprovals.set(sessionKey, Date.now());
+    return true;
+  }
+  return false;
+}
+
+/** Check if user has granted approval for this session recently */
+function hasApproval(sessionKey: string | undefined): boolean {
+  if (!sessionKey) return false;
+  const ts = _blanketApprovals.get(sessionKey);
+  return !!ts && Date.now() - ts < BLANKET_APPROVAL_TTL_MS;
+}
+
 // ── Deployment Gate ────────────────────────────────────────────────
 //
-// Problem: Agents doing client work (websites, funnels, campaigns) must
-// NEVER deploy to production or push to main. All production changes
-// require human review via preview links.
-//
-// Rule: HARD BLOCK on production deploys, pushes to main/master, PR merges,
-// and force pushes. Agents create draft PRs with dev preview links instead.
+// Approach: APPROVAL GATE — first attempt blocks with instructions to
+// ask the user. After user says "approved"/"go ahead"/etc., retries
+// pass through. Force pushes are ALWAYS hard-blocked (no override).
 
-const DEPLOYMENT_PATTERNS = [
+/** Always hard-blocked — no approval can override these */
+const DEPLOYMENT_HARD_BLOCK_PATTERNS = [
+  /git\s+push\s+(?:--force|-f)\b/i,
+  /git\s+push\s+\S+\s+\+/,  // refspec force push (e.g., git push origin +branch)
+];
+
+/** Approval-gatable — blocked by default, user can approve in chat */
+const DEPLOYMENT_APPROVAL_PATTERNS = [
   // Production deploys
   /vercel\s+deploy\s+--prod/i,
   /vercel\s+promote/i,
@@ -1040,10 +1095,8 @@ const DEPLOYMENT_PATTERNS = [
   // Push to protected branches
   /git\s+push\s+(?:\S+\s+)?(?:main|master|production|prod)\b/i,
   /git\s+push\s+origin\s+(?:main|master|production|prod)\b/i,
-  /git\s+push\s+(?:--force|-f)\b/i,
-  /git\s+push\s+\S+\s+\+/,  // refspec force push (e.g., git push origin +branch)
 
-  // PR merges — agents don't merge their own PRs
+  // PR merges
   /gh\s+pr\s+merge/i,
   /git\s+merge\s+(?:\S+\s+)?(?:main|master|production)\b/i,
 
@@ -1051,25 +1104,27 @@ const DEPLOYMENT_PATTERNS = [
   /gh\s+release\s+create(?!.*--draft)/i,
 ];
 
-const DEPLOYMENT_BLOCK_MESSAGE = [
-  "\u{1F6A8} BLOCKED: Production deployment requires human approval.",
+const DEPLOYMENT_HARD_BLOCK_MESSAGE = [
+  "\u{1F6A8} BLOCKED: Force push is never allowed.",
   "",
-  "Instead:",
-  "1. Push your feature branch: `git push origin feat/your-branch`",
-  "2. Create a DRAFT PR: `gh pr create --draft`",
-  "3. Generate a dev preview link:",
-  "   - Vercel: `vercel deploy` (no --prod) \u2192 preview URL",
-  "   - Netlify: `netlify deploy` (no --prod) \u2192 draft URL",
-  "4. Include the preview link in the PR description",
-  "5. A human will review the preview, approve, and deploy.",
+  "Force pushes destroy history and cannot be undone safely.",
+  "Use a normal push or create a new commit instead.",
+].join("\n");
+
+const DEPLOYMENT_APPROVAL_MESSAGE = [
+  "\u{1F6A8} APPROVAL REQUIRED: This is a production/deploy action.",
   "",
-  "NEVER deploy to production. NEVER merge your own PR. NEVER push to main.",
-  "NEVER force push to any branch.",
+  "This would push to a protected branch, deploy to production, or merge a PR.",
+  "",
+  "You MUST:",
+  "1. Tell the user EXACTLY what you're about to do",
+  "2. Wait for them to say 'approved', 'go ahead', 'do it', or similar",
+  "3. Only then retry — it will go through after approval",
 ].join("\n");
 
 /**
  * Check if an exec command attempts a production deployment or push to main.
- * Returns a BLOCK reason string, or undefined if the command is safe.
+ * Force pushes: always hard-blocked. Other deploy actions: approval-gated.
  */
 export async function checkDeploymentGate(
   toolName: string,
@@ -1090,15 +1145,36 @@ export async function checkDeploymentGate(
         : "";
   if (!command) return undefined;
 
-  const matches = DEPLOYMENT_PATTERNS.some((p) => p.test(command));
-  if (matches) {
+  // Force push — always hard-blocked, no approval override
+  if (DEPLOYMENT_HARD_BLOCK_PATTERNS.some((p) => p.test(command))) {
     void logGateActivity(
       "deploymentGate",
       "blocked",
-      `Production deployment BLOCKED: ${command.slice(0, 120)}`,
+      `Force push HARD BLOCKED: ${command.slice(0, 120)}`,
       sessionKey,
     );
-    return DEPLOYMENT_BLOCK_MESSAGE;
+    return DEPLOYMENT_HARD_BLOCK_MESSAGE;
+  }
+
+  // Other deploy actions — approval-gated
+  if (DEPLOYMENT_APPROVAL_PATTERNS.some((p) => p.test(command))) {
+    if (hasApproval(sessionKey)) {
+      void logGateActivity(
+        "deploymentGate",
+        "fired",
+        `Deployment APPROVED (user granted): ${command.slice(0, 120)}`,
+        sessionKey,
+      );
+      return undefined;
+    }
+
+    void logGateActivity(
+      "deploymentGate",
+      "blocked",
+      `Deployment GATED (needs approval): ${command.slice(0, 120)}`,
+      sessionKey,
+    );
+    return DEPLOYMENT_APPROVAL_MESSAGE;
   }
 
   return undefined;

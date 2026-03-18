@@ -227,6 +227,17 @@ export async function handleMessageReceived(
       } catch { /* non-fatal */ }
     }
 
+    // Detect approval phrases ("go ahead", "approved", "do it", etc.)
+    // so deployment/client-facing gates allow retries after user grants approval.
+    if (sessionKey) {
+      try {
+        const { detectApprovalPhrase } = await import("./safety-gates.js");
+        if (detectApprovalPhrase(sessionKey, content)) {
+          logger.info(`[GodMode][SafetyGate] approval granted for session "${sessionKey}"`);
+        }
+      } catch { /* non-fatal */ }
+    }
+
     // Auto-title: buffer the user message for before_prompt_build to pick up.
     // message_received fires immediately before before_prompt_build in the same tick.
     if (content.length >= 10) {
