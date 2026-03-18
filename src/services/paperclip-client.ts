@@ -100,7 +100,7 @@ export async function initPaperclip(
   apiKey = key || process.env.PAPERCLIP_API_KEY || "";
   companyId = company || process.env.PAPERCLIP_COMPANY_ID || "";
 
-  if (!baseUrl || !apiKey) {
+  if (!baseUrl) {
     if (!initLogged) {
       console.log("[GodMode] Paperclip not configured — using local queue");
       initLogged = true;

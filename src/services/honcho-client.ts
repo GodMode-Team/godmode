@@ -58,7 +58,9 @@ async function getOrCreateSession(sessionKey: string): Promise<Session | null> {
   if (cached) return cached;
 
   try {
-    const session = await honcho.session(sessionKey);
+    // Honcho session IDs only allow [a-zA-Z0-9_-], so sanitize GodMode keys (e.g. "agent:main:webchat-xxx")
+    const safeKey = sessionKey.replace(/[^a-zA-Z0-9_-]/g, "-");
+    const session = await honcho.session(safeKey);
     // Evict oldest if cache is full
     if (sessionCache.size >= SESSION_CACHE_MAX) {
       const oldest = sessionCache.keys().next().value;
