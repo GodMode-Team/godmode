@@ -285,52 +285,21 @@ export function renderChatControls(state: AppViewState) {
       >
         ${icons.lock}
       </button>
-      <!-- Parallel sessions toggle -->
-      <button
-        class="chat-toolbar__btn ${state.settings.chatParallelView ? "active" : ""}"
-        @click=${() =>
-          state.applySettings({
-            ...state.settings,
-            chatParallelView: !state.settings.chatParallelView,
-          })}
-        aria-pressed=${state.settings.chatParallelView}
-        title=${state.settings.chatParallelView
-            ? "Exit parallel sessions view"
-            : "Parallel sessions view"}
-      >
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <rect x="3" y="3" width="7" height="18" rx="1"></rect>
-          <rect x="14" y="3" width="7" height="18" rx="1"></rect>
-        </svg>
-      </button>
       <!-- Sidebar toggle -->
       <button
         class="chat-toolbar__btn ${state.sidebarOpen ? "active" : ""}"
         @click=${() => {
           if (state.sidebarOpen) {
             state.handleCloseSidebar();
-          } else if (state.sidebarContent || state.sidebarProofSlug) {
+          } else if (state.sidebarContent) {
             // Re-open with existing content
             state.sidebarOpen = true;
           } else {
-            // Scan recent messages for a proof doc to open
-            const msgs = (state as any).chatMessages as Array<Record<string, unknown>> | undefined;
-            if (msgs?.length) {
-              for (const msg of msgs.slice(-10).reverse()) {
-                const content = Array.isArray(msg.content) ? msg.content : [];
-                for (const block of content as Array<Record<string, unknown>>) {
-                  const text = typeof block.text === "string" ? block.text : typeof block.content === "string" ? block.content : null;
-                  if (!text) continue;
-                  try {
-                    const parsed = JSON.parse(text) as { _sidebarAction?: { type?: string; slug?: string } };
-                    if (parsed._sidebarAction?.type === "proof" && parsed._sidebarAction.slug) {
-                      void (state as any).handleOpenProofDoc(parsed._sidebarAction.slug);
-                      return;
-                    }
-                  } catch { /* not JSON */ }
-                }
-              }
-            }
+            // Open sidebar with empty state — user can click files to populate it
+            state.handleOpenSidebar("_No file selected._\n\nClick any file reference in the chat to open it here.", {
+              title: "Sidebar",
+              mimeType: "text/markdown",
+            });
           }
         }}
         title=${state.sidebarOpen ? "Close sidebar panel" : "Open sidebar panel"}
@@ -339,19 +308,6 @@ export function renderChatControls(state: AppViewState) {
           <rect x="3" y="3" width="18" height="18" rx="2"></rect>
           <path d="M15 3v18"></path>
         </svg>
-      </button>
-      <span class="chat-toolbar__separator"></span>
-      <!-- Compact chat button -->
-      <button
-        class="chat-toolbar__btn"
-        ?disabled=${!state.connected}
-        @click=${() => {
-          // Trigger manual compaction
-          void state.handleCompactChat();
-        }}
-        title="Compact chat context"
-      >
-        ${icons.minimize}
       </button>
     </div>
   `;

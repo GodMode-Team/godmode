@@ -704,7 +704,6 @@ export function renderChat(props: ChatProps) {
 
   const splitRatio = props.splitRatio ?? 0.6;
   const sidebarOpen = Boolean(props.sidebarOpen && props.onCloseSidebar);
-  const consciousnessIconSrc = resolveConsciousnessIconSrc(props.basePath);
   const thread = html`
     <div
       class="chat-thread"
@@ -1054,42 +1053,6 @@ export function renderChat(props: ChatProps) {
               >
                 ${icons.paperclip}
               </button>
-
-              ${props.onTogglePrivateMode
-                ? html`
-                  <button
-                    class="chat-compose__toolbar-btn ${props.privateMode ? "private-mode--active" : ""}"
-                    type="button"
-                    @click=${props.onTogglePrivateMode}
-                    title=${props.privateMode
-                      ? "Private mode ON — this session won't be saved to memory or vault. Click to disable."
-                      : "Enable private mode — prevents this session from being saved"}
-                    aria-label=${props.privateMode ? "Disable private mode" : "Enable private mode"}
-                  >
-                    ${props.privateMode ? icons.lock : icons.lockOpen}
-                  </button>
-                `
-                : nothing
-              }
-
-              ${props.onConsciousnessFlush
-                ? html`
-                  <button
-                    class="chat-compose__toolbar-btn consciousness-btn ${props.consciousnessStatus === "ok" ? "consciousness-btn--ok" : ""} ${props.consciousnessStatus === "error" ? "consciousness-btn--error" : ""}"
-                    type="button"
-                    ?disabled=${props.consciousnessStatus === "loading"}
-                    @click=${props.onConsciousnessFlush}
-                    title="Sync consciousness — refreshes your agent's live context (⌘⇧H)"
-                    aria-label="Sync consciousness"
-                  >
-                    ${props.consciousnessStatus === "loading"
-                      ? icons.loader
-                      : html`<img src=${consciousnessIconSrc} width="18" height="18" alt="" style="display:block;opacity:0.9;" />`
-                    }
-                  </button>
-                `
-                : nothing
-              }
 
               <button
                 class="chat-compose__send-btn"

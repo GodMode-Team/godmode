@@ -1905,8 +1905,6 @@ export function renderApp(state: AppViewState) {
                 onClearRetry: () => state.handleClearRetry(),
                 onQueueRemove: (id) => state.removeQueuedMessage(id),
                 onNewSession: () => state.handleSendChat("/new", { restoreDraft: true }),
-                onConsciousnessFlush: () => void state.handleConsciousnessFlush(),
-                consciousnessStatus: state.consciousnessStatus,
                 // Sidebar props for tool output viewing
                 sidebarOpen: state.sidebarOpen,
                 sidebarContent: state.sidebarContent,

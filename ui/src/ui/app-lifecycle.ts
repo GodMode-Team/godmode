@@ -126,13 +126,6 @@ export function handleConnected(host: LifecycleHost) {
       return;
     }
 
-    // Cmd+Shift+H: Consciousness flush
-    if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === "h") {
-      e.preventDefault();
-      void (host as unknown as { handleConsciousnessFlush: () => Promise<void> }).handleConsciousnessFlush();
-      return;
-    }
-
     // Ctrl+1-9: Tab switching (no other modifiers)
     if (!e.ctrlKey) {
       return;
