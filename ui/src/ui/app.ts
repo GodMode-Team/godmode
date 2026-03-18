@@ -3384,17 +3384,48 @@ export class GodModeApp extends LitElement {
     if (!this.client || !this.connected) return;
     try {
       const result = await this.client.request<{
-        resources: Array<{ id: string; title: string; type: string; path?: string; url?: string; sessionKey: string }>;
+        resources: Array<{ id: string; title: string; type: string; path?: string; url?: string; sessionKey: string; proofSlug?: string }>;
       }>("resources.list", { sessionKey: this.sessionKey, limit: 20 });
-      this.sessionResources = result.resources ?? [];
+      const resources = result.resources ?? [];
+
+      // Also scan chat messages for proof docs not in the registry
+      const proofSlugs = new Set(resources.filter(r => r.proofSlug).map(r => r.proofSlug));
+      if (this.chatMessages?.length) {
+        for (const msg of this.chatMessages) {
+          const m = msg as Record<string, unknown>;
+          const content = Array.isArray(m.content) ? m.content : [];
+          for (const block of content as Array<Record<string, unknown>>) {
+            const text = typeof block.text === "string" ? block.text : typeof block.content === "string" ? block.content : null;
+            if (!text) continue;
+            try {
+              const parsed = JSON.parse(text) as { _sidebarAction?: { type?: string; slug?: string }; title?: string; filePath?: string };
+              if (parsed._sidebarAction?.type === "proof" && parsed._sidebarAction.slug && !proofSlugs.has(parsed._sidebarAction.slug)) {
+                proofSlugs.add(parsed._sidebarAction.slug);
+                resources.unshift({
+                  id: `proof:${parsed._sidebarAction.slug}`,
+                  title: parsed.title ?? "Proof Document",
+                  type: "doc",
+                  path: parsed.filePath,
+                  sessionKey: this.sessionKey,
+                  proofSlug: parsed._sidebarAction.slug,
+                });
+              }
+            } catch { /* not JSON */ }
+          }
+        }
+      }
+
+      this.sessionResources = resources;
     } catch (err) {
       console.warn("[SessionResources] load failed:", err);
       this.sessionResources = [];
     }
   }
 
-  handleSessionResourceClick(resource: { path?: string; url?: string }) {
-    if (resource.path) {
+  handleSessionResourceClick(resource: { path?: string; url?: string; proofSlug?: string }) {
+    if ((resource as any).proofSlug) {
+      void this.handleOpenProofDoc((resource as any).proofSlug);
+    } else if (resource.path) {
       void this.handleOpenFile(resource.path);
     } else if (resource.url) {
       window.open(resource.url, "_blank", "noopener,noreferrer");
