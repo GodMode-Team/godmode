@@ -8,7 +8,7 @@
  * Endpoints:
  *   /health              — no auth
  *   /search              — wraps secondBrain.search (QMD/file walk)
- *   /memory              — wraps Mem0 searchMemories()
+ *   /memory              — file-based search over ~/godmode/memory/
  *   /skills              — wraps loadSkillCards()
  *   /skills/match        — wraps matchSkillCard()
  *   /awareness           — reads awareness-snapshot.md
@@ -409,13 +409,50 @@ async function handleMemory(url: URL, res: http.ServerResponse): Promise<void> {
     return;
   }
 
+  // File-based memory search over ~/godmode/memory/
+  // Replaces Mem0 searchMemories() which was deleted in v2 slim.
   try {
-    const { searchMemories } = await import("../lib/memory.js");
-    const { getOwnerUserId } = await import("../lib/ally-identity.js");
-    const results = await searchMemories(query, getOwnerUserId(), limit);
+    const { readdirSync, readFileSync: rfSync } = await import("node:fs");
+    const { join: pJoin, basename: pBase, extname: pExt } = await import("node:path");
+    const { MEMORY_DIR } = await import("../data-paths.js");
+
+    const q = query.toLowerCase();
+    type MemoryResult = { path: string; name: string; excerpt: string };
+    const results: MemoryResult[] = [];
+
+    function walkMemory(dirPath: string, depth: number) {
+      if (depth > 4 || results.length >= limit) return;
+      let entries: import("node:fs").Dirent[];
+      try { entries = readdirSync(dirPath, { withFileTypes: true }); } catch { return; }
+      for (const entry of entries) {
+        if (results.length >= limit) break;
+        const fullPath = pJoin(dirPath, entry.name);
+        if (entry.isDirectory() && !entry.name.startsWith(".")) {
+          walkMemory(fullPath, depth + 1);
+        } else if (entry.isFile() && /\.(md|txt|json)$/i.test(entry.name)) {
+          try {
+            const content = rfSync(fullPath, "utf-8");
+            if (content.toLowerCase().includes(q) || entry.name.toLowerCase().includes(q)) {
+              const lines = content.split("\n");
+              const matchLine = lines.findIndex((l) => l.toLowerCase().includes(q));
+              const excerpt = matchLine >= 0
+                ? lines.slice(Math.max(0, matchLine - 1), matchLine + 3).join("\n").slice(0, 300)
+                : lines.slice(0, 5).join("\n").slice(0, 300);
+              results.push({
+                path: fullPath,
+                name: pBase(fullPath, pExt(fullPath)),
+                excerpt,
+              });
+            }
+          } catch { /* skip unreadable files */ }
+        }
+      }
+    }
+
+    walkMemory(MEMORY_DIR, 0);
     json(res, 200, { results, query, total: results.length });
-  } catch {
-    json(res, 200, { results: [], status: "offline" });
+  } catch (err) {
+    json(res, 200, { results: [], status: "offline", error: String(err) });
   }
 }
 
