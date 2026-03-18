@@ -243,6 +243,14 @@ export async function handleMessageReceived(
     if (content.length >= 10) {
       lastReceivedMessage = { content, capturedAt: Date.now() };
     }
+
+    // Honcho: forward user message (fire and forget)
+    if (sessionKey) {
+      try {
+        const { forwardMessage } = await import("../services/honcho-client.js");
+        void forwardMessage("user", content, sessionKey);
+      } catch { /* invisible */ }
+    }
   }
 }
 
@@ -436,14 +444,13 @@ export async function handleMessageSending(
     return { cancel: true };
   }
 
-  // Mem0 ingestion (fire and forget)
-  try {
-    const { isMemoryReady, ingestConversation } = await import("../lib/memory.js");
-    if (isMemoryReady() && content.length > 20) {
-      const { getOwnerUserId } = await import("../lib/ally-identity.js");
-      void ingestConversation(content, getOwnerUserId());
-    }
-  } catch { /* invisible */ }
+  // Honcho: forward assistant message (fire and forget)
+  if (sessionKey) {
+    try {
+      const { forwardMessage } = await import("../services/honcho-client.js");
+      void forwardMessage("assistant", content, sessionKey);
+    } catch { /* invisible */ }
+  }
 
   // Identity graph extraction (fire and forget)
   try {

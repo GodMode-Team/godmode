@@ -16,7 +16,7 @@
 
 // ── Priority Tiers ───────────────────────────────────────────────────
 //
-// P0 (always): Soul essence, identity anchor, Mem0 results, routing guide
+// P0 (always): Soul essence, identity anchor, Honcho context, routing guide
 // P1 (normal): Schedule, task/queue counts, priorities, skill card
 // P2 (trim under pressure): Meeting prep, cron failures, queue review, routing lessons
 // P3 (first to drop): Safety nudges, conditional context
@@ -41,7 +41,7 @@ export interface ContextInputs {
   /** P0: User identity anchor (name, tz, style) — ~5 lines */
   identityAnchor: string | null;
 
-  /** P0: Mem0 search results relevant to this message — up to 15 lines */
+  /** P0: Honcho context — user model insights relevant to this message — up to 15 lines */
   memoryBlock: string | null;
 
   /** P0: Memory system health — "ready" | "degraded" | "offline" */
@@ -136,7 +136,7 @@ export function assembleContext(inputs: ContextInputs): string {
     chunks.push(inputs.identityAnchor);
   }
 
-  // Mem0 memories (skip for agent-to-agent — not relevant to operational handoffs)
+  // Honcho memories (skip for agent-to-agent — not relevant to operational handoffs)
   if (!isAgentMessage) {
     if (inputs.memoryBlock) {
       chunks.push(truncateLines(inputs.memoryBlock, MAX_MEMORY_LINES));
@@ -402,7 +402,7 @@ function formatProvenance(prov: InputProvenance): string {
 
 // ── Identity Anchor Builder ──────────────────────────────────────────
 // Extracts the minimal identity anchor from the awareness snapshot.
-// This is the only piece that stays hardcoded — everything else goes through Mem0.
+// This is the only piece that stays hardcoded — everything else goes through Honcho.
 
 /**
  * Build a minimal identity anchor from USER.md.
