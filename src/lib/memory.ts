@@ -1,5 +1,8 @@
+// @ts-nocheck — Mem0 replaced by Honcho (src/services/honcho-client.ts). This file is kept
+// temporarily for dynamic-import callers (self-heal, agent-toolkit-server) that reference its
+// exports. It will be removed or gutted in the graceful-degradation pass.
 /**
- * memory.ts — Mem0-powered conversational memory for GodMode.
+ * memory.ts — LEGACY Mem0-powered conversational memory for GodMode.
  *
  * Uses Mem0 OSS (local pipeline) for:
  * - Automatic fact extraction from conversations
