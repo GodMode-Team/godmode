@@ -320,8 +320,8 @@ export type AppViewState = {
   workResourceFilter?: import("./views/work").ResourceFilter;
   // Onboarding experience state (6-phase flow)
   onboardingActive?: boolean;
-  onboardingPhase?: import("./views/onboarding").OnboardingPhase;
-  onboardingData?: import("./views/onboarding").OnboardingData | null;
+  onboardingPhase?: number;
+  onboardingData?: Record<string, unknown> | null;
   // Memory onboarding wizard state
   wizardActive?: boolean;
   wizardState?: import("./views/onboarding-wizard").WizardState | null;
@@ -618,7 +618,7 @@ export type AppViewState = {
   handleUpdateUserProfile: (name: string, avatar: string) => void;
   // Onboarding handlers
   handleOnboardingStart?: () => void;
-  handleOnboardingIdentitySubmit?: (identity: import("./views/onboarding").OnboardingIdentity) => Promise<void>;
+  handleOnboardingIdentitySubmit?: (identity: { name: string; mission: string; emoji: string }) => Promise<void>;
   handleOnboardingSkipPhase?: () => void;
   handleOnboardingComplete?: () => void;
   // Setup tab handlers

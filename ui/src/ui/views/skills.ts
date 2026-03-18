@@ -2,7 +2,6 @@ import { html, nothing } from "lit";
 import type { SkillMessageMap } from "../controllers/skills";
 import { clampText } from "../format";
 import type { SkillStatusEntry, SkillStatusReport } from "../types";
-import { renderClawHub, type ClawHubProps } from "./clawhub";
 
 export type SkillsSubTab = "godmode" | "my-skills" | "clawhub";
 
@@ -44,7 +43,7 @@ export type SkillsProps = {
   busyKey: string | null;
   messages: SkillMessageMap;
   subTab: SkillsSubTab;
-  clawhub: ClawHubProps;
+  clawhub?: unknown;
   godmodeSkills: GodModeSkillsData | null;
   godmodeSkillsLoading: boolean;
   expandedSkills: Set<string>;
@@ -100,9 +99,6 @@ export function renderSkills(props: SkillsProps) {
 
       ${isGodMode ? renderGodModeSkills(props) : nothing}
       ${props.subTab === "my-skills" ? renderMySkills(props) : nothing}
-      ${props.subTab === "clawhub"
-        ? html`<div style="margin-top: 16px;">${renderClawHub(props.clawhub)}</div>`
-        : nothing}
     </section>
   `;
 }

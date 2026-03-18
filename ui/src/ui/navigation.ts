@@ -6,22 +6,18 @@ export const TAB_GROUPS = [
 ] as const;
 
 export const POWER_USER_GROUPS = [
-  { label: "System", tabs: ["mission-control", "overview", "channels", "sessions", "cron", "debug"] },
+  { label: "System", tabs: ["channels", "sessions", "cron", "debug"] },
 ] as const;
 
 /** Tabs that can be dynamically inserted but aren't in static groups. */
-export const DYNAMIC_TABS = ["setup", "onboarding"] as const;
+export const DYNAMIC_TABS = ["onboarding"] as const;
 
 export type Tab =
-  | "setup"
   | "onboarding"
   | "guardrails"
   | "options"
-  | "overview"
   | "workspaces"
   | "today"
-  | "work"
-  | "my-day"
   | "channels"
   | "instances"
   | "sessions"
@@ -35,18 +31,19 @@ export type Tab =
   | "debug"
   | "logs"
   | "second-brain"
-  | "mission-control"
-  | "dashboards";
+  | "dashboards"
+  // Legacy tab aliases — not in navigation, but kept for type compat
+  | "setup"
+  | "work"
+  | "my-day"
+  | "overview"
+  | "mission-control";
 
-const TAB_PATHS: Record<Tab, string> = {
-  setup: "/setup",
+const TAB_PATHS: Partial<Record<Tab, string>> = {
   onboarding: "/onboarding",
   options: "/options",
-  overview: "/overview",
   workspaces: "/workspaces",
   today: "/today",
-  work: "/work",
-  "my-day": "/today",
   channels: "/channels",
   instances: "/instances",
   sessions: "/sessions",
@@ -61,17 +58,20 @@ const TAB_PATHS: Record<Tab, string> = {
   debug: "/debug",
   logs: "/logs",
   "second-brain": "/second-brain",
-  "mission-control": "/mission-control",
   dashboards: "/dashboards",
 };
 
 const PATH_TO_TAB = new Map(Object.entries(TAB_PATHS).map(([tab, path]) => [path, tab as Tab]));
-// Ensure /today resolves to "today" (not "my-day" which also maps to /today)
-PATH_TO_TAB.set("/today", "today");
 // Legacy URL support: /my-day redirects to today tab
 PATH_TO_TAB.set("/my-day", "today");
 // Legacy URL support: /work redirects to workspaces.
 PATH_TO_TAB.set("/work", "workspaces");
+// Legacy URL support: /setup redirects to onboarding
+PATH_TO_TAB.set("/setup", "onboarding");
+// Legacy URL support: /overview redirects to dashboards
+PATH_TO_TAB.set("/overview", "dashboards");
+// Legacy URL support: /mission-control redirects to dashboards
+PATH_TO_TAB.set("/mission-control", "dashboards");
 
 export function normalizeBasePath(basePath: string): string {
   if (!basePath) {
@@ -106,7 +106,7 @@ export function normalizePath(path: string): string {
 
 export function pathForTab(tab: Tab, basePath = ""): string {
   const base = normalizeBasePath(basePath);
-  const path = TAB_PATHS[tab];
+  const path = TAB_PATHS[tab] ?? `/${tab}`;
   return base ? `${base}${path}` : path;
 }
 
@@ -163,19 +163,12 @@ export function inferBasePathFromPathname(pathname: string): string {
 
 export function iconForTab(tab: Tab): IconName {
   switch (tab) {
-    case "setup":
-      return "compass";
     case "onboarding":
       return "compass";
     case "chat":
       return "messageSquare";
     case "today":
-    case "my-day":
       return "calendar";
-    case "work":
-      return "folder";
-    case "overview":
-      return "barChart";
     case "workspaces":
       return "folder";
     case "channels":
@@ -200,8 +193,6 @@ export function iconForTab(tab: Tab): IconName {
       return "shield";
     case "second-brain":
       return "brain";
-    case "mission-control":
-      return "radio";
     case "dashboards":
       return "barChart";
     case "config":
@@ -217,19 +208,12 @@ export function iconForTab(tab: Tab): IconName {
 
 export function titleForTab(tab: Tab) {
   switch (tab) {
-    case "setup":
-      return "Setup";
     case "onboarding":
       return "Connect Your World";
     case "chat":
       return "Chat";
     case "today":
-    case "my-day":
       return "Today";
-    case "work":
-      return "Work";
-    case "overview":
-      return "Overview";
     case "workspaces":
       return "Work";
     case "channels":
@@ -254,8 +238,6 @@ export function titleForTab(tab: Tab) {
       return "Safety";
     case "second-brain":
       return "Second Brain";
-    case "mission-control":
-      return "Mission Control";
     case "dashboards":
       return "Dashboards";
     case "config":
@@ -271,19 +253,12 @@ export function titleForTab(tab: Tab) {
 
 export function emojiForTab(tab: Tab): string {
   switch (tab) {
-    case "setup":
-      return "\u{1F9ED}";
     case "onboarding":
       return "\u{1F9ED}";
     case "chat":
       return "\u{1F4AC}";
     case "today":
-    case "my-day":
       return "\u{2600}\uFE0F";
-    case "work":
-      return "\u{1F4BC}";
-    case "overview":
-      return "\u{1F3AF}";
     case "workspaces":
       return "\u{1F4C2}";
     case "channels":
@@ -308,8 +283,6 @@ export function emojiForTab(tab: Tab): string {
       return "\u{1F6A7}";
     case "second-brain":
       return "\u{1F9E0}";
-    case "mission-control":
-      return "\u{1F6F0}\uFE0F";
     case "dashboards":
       return "\u{1F4CA}";
     case "config":
@@ -325,19 +298,12 @@ export function emojiForTab(tab: Tab): string {
 
 export function subtitleForTab(tab: Tab) {
   switch (tab) {
-    case "setup":
-      return "Get GodMode configured and running.";
     case "onboarding":
       return "Set up the integrations that power your daily brief and agent features. Everything is optional.";
     case "chat":
       return "Your command center. Ask anything, customize any view.";
     case "today":
-    case "my-day":
       return "Calendar, brief, tasks, and schedule for the day.";
-    case "work":
-      return "Your projects, files, tasks, and team — organized by workspace.";
-    case "overview":
-      return "Gateway status, entry points, and a fast health read.";
     case "workspaces":
       return "Projects, clients, and personal operating context.";
     case "channels":
@@ -362,8 +328,6 @@ export function subtitleForTab(tab: Tab) {
       return "Boundaries that keep agents focused, honest, and within scope.";
     case "second-brain":
       return "Your Second Brain — identity, knowledge, and live AI context. Stores what your ally needs to act on your behalf.";
-    case "mission-control":
-      return "Live view — what your agents are doing right now.";
     case "dashboards":
       return "Custom data views built by your AI ally — remix anything.";
     case "config":
