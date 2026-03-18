@@ -10,7 +10,7 @@ import { readFile, readdir, stat } from "node:fs/promises";
 import { join, extname } from "node:path";
 import { homedir } from "node:os";
 import type { AssessmentResult, FeatureCheck } from "./onboarding-types.js";
-import { resolveVaultPath } from "../data-paths.js";
+// resolveVaultPath not used directly — checkObsidianVault() checks for real Obsidian presence
 
 const OC_DIR = join(homedir(), ".openclaw");
 const OC_CONFIG = join(OC_DIR, "openclaw.json");
@@ -206,8 +206,12 @@ async function checkGitHubReady(): Promise<boolean> {
 
 // ── Obsidian Vault Check ────────────────────────────────────────
 
-function checkObsidianVault(): boolean {
-  return resolveVaultPath() !== null;
+async function checkObsidianVault(): Promise<boolean> {
+  // Check if a real Obsidian vault is configured (not just the ~/godmode/memory/ fallback).
+  // resolveVaultPath() now always returns a string, so we check specifically for Obsidian.
+  if (process.env.OBSIDIAN_VAULT_PATH) return true;
+  const defaultVault = join(homedir(), "Documents", "VAULT");
+  return dirExists(defaultVault);
 }
 
 // ── Health Score ─────────────────────────────────────────────────
@@ -603,7 +607,7 @@ export async function runAssessment(): Promise<AssessmentResult> {
 
   // Check key dependencies
   const githubReady = await checkGitHubReady();
-  const obsidianVaultConfigured = checkObsidianVault();
+  const obsidianVaultConfigured = await checkObsidianVault();
 
   // Check gateway token (supports both gateway.token and gateway.auth.token)
   const gateway = config.gateway as Record<string, unknown> | undefined;

@@ -13,6 +13,52 @@
  *   - src/hooks/lifecycle-hooks.ts    — Safety gates + session lifecycle
  *   - src/hooks/http-handler.ts       — HTTP route handler
  *   - src/cli/commands.ts             — CLI commands
+ *
+ * ═══════════════════════════════════════════════════════════════════════
+ * Environment Variables — Required vs Optional
+ * ═══════════════════════════════════════════════════════════════════════
+ *
+ * REQUIRED (GodMode will not function without these):
+ *   ANTHROPIC_API_KEY      — Model API key. The only hard requirement.
+ *                            Also resolved from Claude Code OAuth or
+ *                            OpenClaw auth-profiles if not in env.
+ *
+ * OPTIONAL — graceful degradation when missing:
+ *   GODMODE_ROOT           — Workspace root (default: ~/godmode)
+ *   OPENCLAW_STATE_DIR     — OC state dir (default: ~/.openclaw)
+ *   OPENCLAW_CONFIG_PATH   — OC config path (default: ~/.openclaw/openclaw.json)
+ *   OBSIDIAN_VAULT_PATH    — Obsidian vault. Falls back to ~/Documents/VAULT,
+ *                            then ~/godmode/memory/ if neither exists.
+ *   DAILY_BRIEF_FOLDER     — Vault subfolder for daily notes (default: "01-Daily")
+ *   HONCHO_API_KEY         — Honcho memory service. Without this, memory features
+ *                            are disabled but chat works perfectly.
+ *   GEMINI_API_KEY         — Gemini embeddings (legacy Mem0). No longer required.
+ *   GOOGLE_API_KEY         — Google API key (alias for Gemini). No longer required.
+ *   OPENAI_API_KEY         — OpenAI embeddings (legacy Mem0). No longer required.
+ *   PAPERCLIP_URL          — Paperclip orchestration API. Without this, delegate
+ *   PAPERCLIP_API_KEY        tool uses local queue-processor.
+ *   PAPERCLIP_COMPANY_ID
+ *   COMPOSIO_API_KEY       — Composio third-party tool auth. Without this,
+ *                            composio_execute returns a helpful setup message.
+ *   GOG_CALENDAR_ACCOUNT   — Google Calendar via gog CLI. Without this,
+ *   GOG_CLIENT               calendar methods return empty arrays.
+ *   GOG_KEYRING_PASSWORD   — Keyring password for gog CLI.
+ *   XAI_API_KEY            — X/Twitter intelligence. Without this, X search
+ *                            is unavailable but everything else works.
+ *   PROOF_API_URL          — Proof editor API (default: proofeditor.ai hosted).
+ *                            Without connectivity, docs save locally only.
+ *   GODMODE_OWNER          — Owner identifier for Honcho peer (default: "owner")
+ *   GODMODE_AGENT_LOG_WRITER_MODULE — Custom agent log writer module path.
+ *   GODMODE_DEBUG          — Enable debug logging for memory, retrieval, etc.
+ *   GODMODE_GITHUB_REPO    — GitHub repo for auto-filed issues (default: godmode-team/godmode)
+ *   FATHOM_API_KEY         — Fathom meeting notes. Without this, Fathom
+ *                            processor is inactive.
+ *   OURA_API_TOKEN         — Oura Ring health data. Without this, health
+ *                            section in daily brief is skipped.
+ *
+ * SYSTEM (read-only, not user-configured):
+ *   HOME, USER, SHELL, PATH, LANG, TERM, DISPLAY, WAYLAND_DISPLAY
+ * ═══════════════════════════════════════════════════════════════════════
  */
 
 import { existsSync, readFileSync } from "node:fs";

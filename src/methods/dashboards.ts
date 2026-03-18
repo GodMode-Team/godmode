@@ -20,7 +20,7 @@ import { homedir } from "node:os";
 import path from "node:path";
 import { secureWriteFile, secureMkdir } from "../lib/secure-fs.js";
 import type { GatewayRequestHandler } from "openclaw/plugin-sdk";
-import { DATA_DIR, GODMODE_ROOT, MEMORY_DIR, localDateString } from "../data-paths.js";
+import { DATA_DIR, GODMODE_ROOT, MEMORY_DIR, localDateString, resolveVaultPath, DAILY_FOLDER } from "../data-paths.js";
 
 type GatewayRequestHandlers = Record<string, GatewayRequestHandler>;
 
@@ -555,10 +555,8 @@ const widgetData: GatewayRequestHandler = async ({ params, respond }) => {
 
         case "brief-summary": {
           // Read today's daily brief summary data from vault
-          const vaultPath =
-            process.env.OBSIDIAN_VAULT_PATH ||
-            path.join(homedir(), "Documents", "VAULT");
-          const briefFolder = process.env.DAILY_BRIEF_FOLDER || "01-Daily";
+          const vaultPath = resolveVaultPath();
+          const briefFolder = DAILY_FOLDER;
           const briefPath = path.join(vaultPath, briefFolder, `${today}.md`);
           try {
             const content = readFileSync(briefPath, "utf-8");

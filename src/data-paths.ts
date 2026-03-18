@@ -31,9 +31,9 @@ export const DAILY_FOLDER: string =
   process.env.DAILY_BRIEF_FOLDER || "01-Daily";
 
 /**
- * Resolve the Obsidian vault path.
- * Checks OBSIDIAN_VAULT_PATH env, then falls back to ~/Documents/VAULT.
- * Returns null if neither exists.
+ * Resolve the knowledge vault path.
+ * Priority: OBSIDIAN_VAULT_PATH env → ~/Documents/VAULT → ~/godmode/memory/ (always exists).
+ * Never returns null — the fallback to ~/godmode/memory/ ensures Second Brain always works.
  */
 /**
  * Return today's date as YYYY-MM-DD in the user's local timezone.
@@ -48,7 +48,7 @@ export function localDateString(date?: Date): string {
   return `${year}-${month}-${day}`;
 }
 
-export function resolveVaultPath(): string | null {
+export function resolveVaultPath(): string {
   if (process.env.OBSIDIAN_VAULT_PATH) {
     return process.env.OBSIDIAN_VAULT_PATH;
   }
@@ -61,5 +61,7 @@ export function resolveVaultPath(): string | null {
   } catch {
     // doesn't exist
   }
-  return null;
+  // Graceful fallback: use ~/godmode/memory/ so Second Brain always works
+  // even without Obsidian configured
+  return MEMORY_DIR;
 }

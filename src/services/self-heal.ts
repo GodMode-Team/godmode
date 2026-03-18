@@ -387,7 +387,8 @@ function checkApiKeys(logger: Logger): void {
   const id: SubsystemId = "api-keys";
   const keys: Array<{ name: string; envVars: string[]; required: boolean }> = [
     { name: "Anthropic", envVars: ["ANTHROPIC_API_KEY"], required: true },
-    { name: "Embeddings", envVars: ["GEMINI_API_KEY", "GOOGLE_API_KEY", "OPENAI_API_KEY"], required: true },
+    // Embeddings are optional — Honcho replaces Mem0, embedding keys no longer required
+    { name: "Embeddings", envVars: ["GEMINI_API_KEY", "GOOGLE_API_KEY", "OPENAI_API_KEY"], required: false },
   ];
 
   const missing: string[] = [];
@@ -406,72 +407,41 @@ function checkApiKeys(logger: Logger): void {
 }
 
 /**
- * Check Mem0 memory status. If offline and keys are now available, re-init.
+ * Check memory status. Honcho is the primary memory system; Mem0 stubs are offline by design.
+ * If HONCHO_API_KEY is not configured, memory is simply unavailable (non-critical).
  */
 async function checkAndRepairMemory(logger: Logger): Promise<void> {
   const id: SubsystemId = "memory";
   try {
-    const { isMemoryReady, getMemoryStatus, initMemory } = await import("../lib/memory.js");
-    const status = getMemoryStatus();
-
-    if (status === "ready") {
-      // Don't just trust the flag — run a lightweight canary on every Nth check
-      const memStats = health.stats("memory.search");
-      const shouldVerify = !memStats || memStats.totalCalls % 20 === 0 || memStats.consecutiveFailures > 0;
-      if (shouldVerify) {
-        const verified = await verifyMemory(logger);
-        if (verified) {
-          markHealthy(id, "Mem0 operational (canary passed)");
-        } else {
-          markDegraded(id, "Mem0 reports ready but canary test failed");
-          health.signal("memory.canary", false, { error: "search returned empty for known fact" });
-        }
-      } else {
-        markHealthy(id, "Mem0 operational");
+    // Check Honcho first (primary memory system)
+    try {
+      const { isHonchoReady, initHoncho } = await import("./honcho-client.js");
+      if (isHonchoReady()) {
+        markHealthy(id, "Honcho memory operational");
+        return;
       }
-      return;
-    }
 
-    if (status === "degraded") {
-      // Last search failed but Mem0 is initialized — might recover on its own
-      markDegraded(id, "Mem0 initialized but last search failed");
-      return;
-    }
-
-    // Status is "offline" — attempt re-init if we have keys now
-    const hasAnthropicKey = !!process.env.ANTHROPIC_API_KEY;
-    const hasEmbeddingKey = !!process.env.GEMINI_API_KEY || !!process.env.GOOGLE_API_KEY || !!process.env.OPENAI_API_KEY;
-
-    if (hasAnthropicKey && hasEmbeddingKey) {
-      logger.info("[SelfHeal] Mem0 offline but keys available — attempting re-init...");
-      // Reset the init promise so initMemory() actually retries
-      // (memory.ts sets initPromise = null on failure, so this should work)
-      await initMemory();
-
-      if (isMemoryReady()) {
-        // VERIFY: Run canary test — ingest a fact and search for it
-        const verified = await verifyMemory(logger);
-        if (verified) {
-          markRepaired(id, "Re-initialized and verified Mem0 (canary passed)");
+      // Not ready — try to init if key is available
+      const hasHonchoKey = !!process.env.HONCHO_API_KEY;
+      if (hasHonchoKey) {
+        logger.info("[SelfHeal] Honcho offline but key available — attempting re-init...");
+        const ok = await initHoncho();
+        if (ok) {
+          markRepaired(id, "Re-initialized Honcho memory");
           health.signal("memory.repair", true);
         } else {
-          markDegraded(id, "Re-initialized but canary test failed — ingestion may be broken");
-          health.signal("memory.repair", false, { error: "canary failed" });
+          markDegraded(id, "Honcho re-init failed");
         }
-        // Trigger vault seeding if needed
-        try {
-          const { seedFromVault } = await import("../lib/memory.js");
-          const { getOwnerUserId } = await import("../lib/ally-identity.js");
-          void seedFromVault(getOwnerUserId());
-        } catch { /* non-fatal */ }
       } else {
-        markOffline(id, "Re-init attempted but Mem0 still not ready");
+        // No Honcho key — memory is simply unavailable, not broken
+        markDegraded(id, "HONCHO_API_KEY not configured — memory features disabled but chat works fine");
       }
-    } else {
-      markOffline(id, `Mem0 offline — missing: ${!hasAnthropicKey ? "Anthropic key" : ""}${!hasEmbeddingKey ? " Embedding key" : ""}`.trim());
+    } catch {
+      // Honcho client not available — check legacy Mem0 stubs
+      markDegraded(id, "Memory service not available — chat works fine without it");
     }
   } catch (err) {
-    markOffline(id, `Memory check failed: ${String(err).slice(0, 80)}`);
+    markDegraded(id, `Memory check failed: ${String(err).slice(0, 80)}`);
   }
 }
 
