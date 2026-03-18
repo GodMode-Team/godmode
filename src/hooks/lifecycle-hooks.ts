@@ -227,12 +227,12 @@ export async function handleMessageReceived(
       } catch { /* non-fatal */ }
     }
 
-    // Detect approval phrases ("go ahead", "approved", "do it", etc.)
-    // so deployment/client-facing gates allow retries after user grants approval.
+    // Approval gate: if a gate blocked since the user's last message,
+    // any new user message = implicit approval (user saw the block and responded).
     if (sessionKey) {
       try {
-        const { detectApprovalPhrase } = await import("./safety-gates.js");
-        if (detectApprovalPhrase(sessionKey, content)) {
+        const { processUserMessage } = await import("./safety-gates.js");
+        if (processUserMessage(sessionKey, content)) {
           logger.info(`[GodMode][SafetyGate] approval granted for session "${sessionKey}"`);
         }
       } catch { /* non-fatal */ }

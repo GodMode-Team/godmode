@@ -1021,53 +1021,59 @@ export async function checkArchitectureGate(
 
 // ── Approval Tracking (shared by deployment + any future approval gates) ──
 //
-// When a gate fires, it blocks and tells the ally to ask the user.
-// When the user says "approved"/"go ahead"/etc., detectApprovalPhrase()
-// records a blanket approval for that session (10-min TTL).
-// Subsequent retries within the same session pass through.
+// Simple model: when a gate blocks, it records a "pending" state for the
+// session. When the user sends ANY message after that (message_received),
+// the pending block is promoted to an approval. On the next retry the
+// gate sees the approval and lets the action through.
+//
+// This means the flow is:
+//   1. Ally tries action → gate blocks → ally tells user it needs approval
+//   2. User sends ANY response (even "ok") → auto-approves for 10 min
+//   3. Ally retries → passes through
 
-/** sessionKey → timestamp of last blanket approval */
-const _blanketApprovals = new Map<string, number>();
+/** sessionKey → timestamp of approval */
+const _approvals = new Map<string, number>();
 
-/** TTL for blanket approvals — 10 minutes */
-const BLANKET_APPROVAL_TTL_MS = 10 * 60 * 1000;
+/** sessionKey → true if a gate blocked since the user's last message */
+const _pendingApproval = new Map<string, boolean>();
 
-/** Phrases that grant blanket approval for the current session */
-const APPROVAL_PHRASES = [
-  /\bapproved?\b/i,
-  /\bgo\s+ahead\b/i,
-  /\bdo\s+it\b/i,
-  /\byes,?\s*(do|go|run|push|send|execute|proceed|deploy|merge|ship)\b/i,
-  /\bproceed\b/i,
-  /\bship\s+it\b/i,
-  /\bgreen\s+light\b/i,
-  /\blgtm\b/i,
-  /\bok\b.*\b(do|go|run|push|send|execute|proceed|deploy|merge)\b/i,
-  /\bjust\s+(do|push|deploy|merge|send|ship)\b/i,
-];
+/** TTL for approvals — 10 minutes */
+const APPROVAL_TTL_MS = 10 * 60 * 1000;
 
 /**
- * Call from message_received to detect user approval phrases.
- * Grants a blanket approval for the session for BLANKET_APPROVAL_TTL_MS.
+ * Called by gates when they block an action. Marks the session as
+ * having a pending approval request.
  */
-export function detectApprovalPhrase(
+export function markPendingApproval(sessionKey: string | undefined): void {
+  if (sessionKey) _pendingApproval.set(sessionKey, true);
+}
+
+/**
+ * Called from message_received. If a gate blocked in this session since
+ * the user's last message, the user's new message = implicit approval.
+ * Also detects explicit approval phrases for immediate grant.
+ */
+export function processUserMessage(
   sessionKey: string | undefined,
-  userMessage: string,
+  _userMessage: string,
 ): boolean {
-  if (!sessionKey || !userMessage) return false;
-  const matched = APPROVAL_PHRASES.some((p) => p.test(userMessage));
-  if (matched) {
-    _blanketApprovals.set(sessionKey, Date.now());
+  if (!sessionKey) return false;
+
+  // If a gate blocked since last user message, any response = approval
+  if (_pendingApproval.get(sessionKey)) {
+    _pendingApproval.delete(sessionKey);
+    _approvals.set(sessionKey, Date.now());
     return true;
   }
+
   return false;
 }
 
 /** Check if user has granted approval for this session recently */
 function hasApproval(sessionKey: string | undefined): boolean {
   if (!sessionKey) return false;
-  const ts = _blanketApprovals.get(sessionKey);
-  return !!ts && Date.now() - ts < BLANKET_APPROVAL_TTL_MS;
+  const ts = _approvals.get(sessionKey);
+  return !!ts && Date.now() - ts < APPROVAL_TTL_MS;
 }
 
 // ── Deployment Gate ────────────────────────────────────────────────
@@ -1168,6 +1174,7 @@ export async function checkDeploymentGate(
       return undefined;
     }
 
+    markPendingApproval(sessionKey);
     void logGateActivity(
       "deploymentGate",
       "blocked",
