@@ -280,7 +280,8 @@ const autoInstall: GatewayRequestHandler = async ({ params, respond }) => {
       // Step 3: Authenticate with Google (needs email)
       if (email) {
         const client = "godmode";
-        const envPrefix = process.platform === "darwin" ? "GOG_KEYRING_PASSWORD=godmode2026 " : "";
+        const gogPass = process.env.GOG_KEYRING_PASSWORD || "godmode2026";
+        const envPrefix = process.platform === "darwin" ? `GOG_KEYRING_PASSWORD=${gogPass} ` : "";
         const { code, stdout, stderr } = await runShell(
           `${envPrefix}gog auth add ${email} --services calendar --client ${client} 2>&1`,
           30_000,

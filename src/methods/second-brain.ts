@@ -1649,12 +1649,7 @@ const obsidianSyncSetMode: GatewayRequestHandler = async ({ params, respond }) =
 
 const vaultCaptureStatus: GatewayRequestHandler = async ({ respond }) => {
   try {
-    const statePath = join(DATA_DIR, "vault-capture-state.json");
-    let state: { capturedSessionPaths?: string[]; lastRun?: string } = {};
-    try {
-      const raw = readFileSync(statePath, "utf-8");
-      state = JSON.parse(raw);
-    } catch { /* first run */ }
+    const state: { capturedSessionPaths?: string[]; lastRun?: string } = {};
 
     respond(true, {
       lastRun: state.lastRun || null,

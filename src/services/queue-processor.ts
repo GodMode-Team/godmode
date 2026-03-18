@@ -75,8 +75,6 @@ export function initQueueProcessor(logger: Logger): QueueProcessor {
 
 const INBOX_DIR = path.join(MEMORY_DIR, "inbox");
 const LEARNINGS_DIR = path.join(MEMORY_DIR, "learnings");
-const AWARENESS_SNAPSHOT_FILE = path.join(DATA_DIR, "awareness-snapshot.md");
-
 function outputPathForItem(itemId: string): string {
   return path.join(INBOX_DIR, `${itemId}.md`);
 }
@@ -1139,15 +1137,6 @@ class QueueProcessor {
     body = body.replace("{description}", item.description ?? "");
     body = body.replace("{url}", item.url ?? "");
 
-    // Awareness snapshot (lean cross-session context)
-    let consciousnessContext = "";
-    try {
-      const raw = await fs.readFile(AWARENESS_SNAPSHOT_FILE, "utf-8");
-      consciousnessContext = raw;
-    } catch {
-      // Awareness snapshot may not exist yet — non-fatal
-    }
-
     // Guardrails context
     let guardrailsBlock = "";
     try {
@@ -1278,14 +1267,6 @@ class QueueProcessor {
     // Inject handoff context from predecessor agent
     if (item.handoff) {
       sections.push("", formatHandoff(item.handoff));
-    }
-
-    if (consciousnessContext) {
-      sections.push(
-        "",
-        "## Context (from CONSCIOUSNESS.md)",
-        consciousnessContext,
-      );
     }
 
     // ── Owner identity context ──────────────────────────────────────

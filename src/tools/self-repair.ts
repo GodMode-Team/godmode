@@ -38,7 +38,7 @@ export function createSelfRepairTool(): AnyAgentTool {
         },
         issue_description: {
           type: "string",
-          description: "For code-repair: describe the bug or failure you want Claude Code to fix.",
+          description: "Optional: describe the issue you're seeing for more targeted diagnosis.",
         },
       },
       required: ["action"],
@@ -180,14 +180,6 @@ export function createSelfRepairTool(): AnyAgentTool {
               repaired: result.repaired,
               failures: result.failures,
               detail: lines.join("\n"),
-            });
-          }
-
-          case "code-repair": {
-            // REMOVED (v2 slim): code-repair — use OC godmode_repair instead
-            return jsonResult({
-              started: false,
-              detail: "Code repair removed in v2 slim. Use the platform godmode_repair tool instead.",
             });
           }
 

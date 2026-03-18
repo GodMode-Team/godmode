@@ -170,7 +170,7 @@ const CODEBASE_PATTERNS: RegExp[] = [
 /** Pattern: factual claim verification */
 const FACTUAL_PATTERNS: RegExp[] = [
   /\bis\s+(it|that)\s+true\b/i,
-  /\bwhen did\s+(we|I|you|caleb)\b/i,
+  /\bwhen did\s+(we|I|you)\b/i,
   /\bwhat did\s+(we|I|you)\s+(decide|agree|say)\b/i,
   /\bdo we\s+(have|know)\b/i,
   /\bdid\s+(we|I|you)\b.*\b(ever|already)\b/i,
@@ -241,10 +241,10 @@ export function classifyQuery(userMessage: string): GroundingRequirement | null 
   if (matchesAny(lower, getPersonPatterns())) {
     return {
       category: "person-lookup",
-      requiredTools: ["memory_search"],
+      requiredTools: ["secondbrain.search"],
       instruction: buildInstruction(
         "person-lookup",
-        ["memory_search (search for the person mentioned)"],
+        ["secondBrain.search (search for the person mentioned)"],
         "A person was mentioned. You MUST search memory for context about them before responding.",
       ),
     };
@@ -280,10 +280,10 @@ export function classifyQuery(userMessage: string): GroundingRequirement | null 
   if (matchesAny(lower, FACTUAL_PATTERNS)) {
     return {
       category: "factual-claim",
-      requiredTools: ["memory_search"],
+      requiredTools: ["secondbrain.search"],
       instruction: buildInstruction(
         "factual-claim",
-        ["memory_search + verify against source"],
+        ["secondBrain.search + verify against source"],
         "This requires factual verification. You MUST search memory and verify against a source before responding.",
       ),
     };
