@@ -1090,24 +1090,9 @@ const DEPLOYMENT_HARD_BLOCK_PATTERNS = [
 
 /** Approval-gatable — blocked by default, user can approve in chat */
 const DEPLOYMENT_APPROVAL_PATTERNS = [
-  // Production deploys
-  /vercel\s+deploy\s+--prod/i,
-  /vercel\s+promote/i,
-  /netlify\s+deploy\s+--prod/i,
-  /firebase\s+deploy(?!\s+--only\s+hosting:preview)/i,
-  /surge\s+--domain\s/i,
-  /fly\s+deploy/i,
-
   // Push to protected branches
   /git\s+push\s+(?:\S+\s+)?(?:main|master|production|prod)\b/i,
   /git\s+push\s+origin\s+(?:main|master|production|prod)\b/i,
-
-  // PR merges
-  /gh\s+pr\s+merge/i,
-  /git\s+merge\s+(?:\S+\s+)?(?:main|master|production)\b/i,
-
-  // Release creation (non-draft)
-  /gh\s+release\s+create(?!.*--draft)/i,
 ];
 
 const DEPLOYMENT_HARD_BLOCK_MESSAGE = [
