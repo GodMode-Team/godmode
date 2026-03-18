@@ -10,6 +10,7 @@ import { join } from "node:path";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { MEMORY_DIR } from "../data-paths.js";
 import { handleFathomWebhookHttp } from "../methods/fathom-webhook.js";
+import { handlePaperclipWebhookHttp } from "../methods/paperclip-webhook.js";
 import type { LicenseState } from "../lib/license.js";
 
 function requestPathname(url: string): string {
@@ -67,6 +68,21 @@ export function createGodmodeHttpHandler(deps: HttpHandlerDeps) {
         }
         handleFathomWebhookHttp(body, hdrs).catch((err) => {
           console.error("[GodMode] Fathom webhook processing error:", err);
+        });
+      });
+      return true;
+    }
+
+    // Paperclip webhook endpoint
+    if (pathname === "/godmode/webhooks/paperclip" && req.method === "POST") {
+      const chunks: Buffer[] = [];
+      req.on("data", (c: Buffer) => chunks.push(c));
+      req.on("end", () => {
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ ok: true }));
+        const body = Buffer.concat(chunks).toString("utf8");
+        handlePaperclipWebhookHttp(body).catch((err) => {
+          console.error("[GodMode] Paperclip webhook processing error:", err);
         });
       });
       return true;

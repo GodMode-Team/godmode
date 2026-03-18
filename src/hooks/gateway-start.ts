@@ -417,8 +417,22 @@ export async function runGatewayStart(
     logger.warn(`[GodMode] Toolkit server failed to start: ${String(err)}`);
   }
 
-  // Note: Paperclip sidecar removed — project tracking is native (projects-state.json).
-  // Completion pipeline runs in queue-processor directly.
+  // Paperclip agent orchestration (optional — falls back to local queue)
+  try {
+    const { initPaperclip, isPaperclipReady } = await import("../services/paperclip-client.js");
+    const ok = await initPaperclip();
+    if (ok) {
+      logger.info("[GodMode] Paperclip agent orchestration connected");
+      // Wire Paperclip webhook broadcast
+      try {
+        const { setPaperclipWebhookBroadcast } = await import("../methods/paperclip-webhook.js");
+        setPaperclipWebhookBroadcast((event: string, data: unknown) => safeBroadcast(api, event, data));
+      } catch { /* non-fatal */ }
+    }
+    // If not configured, initPaperclip already logs "using local queue"
+  } catch (err) {
+    logger.warn(`[GodMode] Paperclip init failed (non-fatal): ${String(err)}`);
+  }
 
   // Obsidian Sync
   try {

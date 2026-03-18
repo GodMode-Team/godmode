@@ -14,6 +14,7 @@
  */
 
 import { type AnyAgentTool, jsonResult } from "openclaw/plugin-sdk";
+import { isPaperclipReady, createTask as paperclipCreateTask } from "../services/paperclip-client.js";
 import {
   type ProjectBrief,
   updateProjects,
@@ -131,7 +132,62 @@ export function createDelegateTool(): AnyAgentTool {
             });
           }
 
-          // ── Execute delegation ──
+          // ── Paperclip path: delegate to external orchestration if available ──
+          if (isPaperclipReady()) {
+            try {
+              const projectId = newProjectId();
+              const paperclipIssues: Array<{
+                issueId: string;
+                title: string;
+                assignee: string;
+              }> = [];
+
+              for (const task of issues) {
+                const pcIssue = await paperclipCreateTask({
+                  title: task.title,
+                  description: `Project: ${title}\n\n${task.description}`,
+                  priority: task.priority,
+                });
+                paperclipIssues.push({
+                  issueId: pcIssue.id,
+                  title: task.title,
+                  assignee: task.personaHint || "auto-assign",
+                });
+              }
+
+              // Save project to projects-state for local tracking
+              await updateProjects((state) => {
+                state.projects.push({
+                  projectId,
+                  title,
+                  description,
+                  proofWorkspace: `paperclip-${projectId.slice(0, 8)}`,
+                  issues: paperclipIssues.map((pi) => ({
+                    issueId: newIssueId(),
+                    title: pi.title,
+                    personaSlug: pi.assignee,
+                    queueItemId: pi.issueId, // Paperclip issue ID as reference
+                    proofDocSlug: undefined,
+                  })),
+                  createdAt: Date.now(),
+                  status: "active",
+                });
+              });
+
+              return jsonResult({
+                success: true,
+                backend: "paperclip",
+                message: `Project "${title}" delegated via Paperclip (${issues.length} issue(s)).`,
+                projectId,
+                issues: paperclipIssues,
+              });
+            } catch (err) {
+              // Paperclip failed — fall through to local queue
+              console.warn(`[GodMode] Paperclip delegation failed, falling back to local queue: ${String(err)}`);
+            }
+          }
+
+          // ── Execute delegation (local queue) ──
           const projectId = newProjectId();
           const workspace = `project-${projectId.slice(0, 8)}`;
 
