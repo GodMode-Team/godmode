@@ -5,7 +5,7 @@
  * lifecycle hooks, and services into the OpenClaw plugin system.
  *
  * All logic lives in extracted modules:
- *   - src/lib/license.ts       — License validation + RPC gate
+ *   - src/lib/license.ts       — License state (open-source, always valid)
  *   - src/lib/ops-proxy.ts     — Mission Control sidecar proxy
  *   - src/lib/auto-title.ts    — LLM session auto-titling
  *   - src/hooks/gateway-start.ts     — Service initialization
@@ -45,14 +45,10 @@
  *   GOG_KEYRING_PASSWORD   — Keyring password for gog CLI.
  *   XAI_API_KEY            — X/Twitter intelligence. Without this, X search
  *                            is unavailable but everything else works.
- *   PROOF_API_URL          — Proof editor API (default: proofeditor.ai hosted).
- *                            Without connectivity, docs save locally only.
  *   GODMODE_OWNER          — Owner identifier for Honcho peer (default: "owner")
  *   GODMODE_AGENT_LOG_WRITER_MODULE — Custom agent log writer module path.
  *   GODMODE_DEBUG          — Enable debug logging for memory, retrieval, etc.
  *   GODMODE_GITHUB_REPO    — GitHub repo for auto-filed issues (default: godmode-team/godmode)
- *   FATHOM_API_KEY         — Fathom meeting notes. Without this, Fathom
- *                            processor is inactive.
  *   OURA_API_TOKEN         — Oura Ring health data. Without this, health
  *                            section in daily brief is skipped.
  *
@@ -96,6 +92,7 @@ import { createQueueCheckTool } from "./src/tools/queue-check.js";
 import { createQueueActionTool } from "./src/tools/queue-action.js";
 import { createTrustRateTool } from "./src/tools/trust-rate.js";
 import { createXReadTool } from "./src/tools/x-read.js";
+import { createHonchoQueryTool } from "./src/tools/honcho-query.js";
 import { createSelfRepairTool } from "./src/tools/self-repair.js";
 import { createTasksCreateTool, createTasksListTool, createTasksUpdateTool } from "./src/tools/tasks-tool.js";
 // REMOVED (v2 slim): proof-tool — not using Proof
@@ -515,6 +512,7 @@ const godmodePlugin = {
     api.registerTool(() => createQueueActionTool());
     api.registerTool((ctx: any) => createTrustRateTool(ctx));
     api.registerTool((ctx: any) => createXReadTool(ctx));
+    api.registerTool((ctx: any) => createHonchoQueryTool(ctx));
     api.registerTool(() => createSelfRepairTool());
     api.registerTool(() => createTasksCreateTool());
     api.registerTool(() => createTasksListTool());

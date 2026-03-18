@@ -148,22 +148,6 @@ export function resolveResearchDir(): { path: string; source: "vault" | "local" 
   );
 }
 
-/** Consciousness: VAULT/99-System/CONSCIOUSNESS.md or ~/godmode/memory/CONSCIOUSNESS.md */
-export function resolveConsciousnessPath(): { path: string; source: "vault" | "local" } {
-  return resolveWithFallback(
-    join(VAULT_FOLDERS.system, "CONSCIOUSNESS.md"),
-    join(MEMORY_DIR, "CONSCIOUSNESS.md"),
-  );
-}
-
-/** Working: VAULT/99-System/WORKING.md or ~/godmode/memory/WORKING.md */
-export function resolveWorkingPath(): { path: string; source: "vault" | "local" } {
-  return resolveWithFallback(
-    join(VAULT_FOLDERS.system, "WORKING.md"),
-    join(MEMORY_DIR, "WORKING.md"),
-  );
-}
-
 /** Curated facts: VAULT/06-Brain/Knowledge/curated.md or ~/godmode/memory/curated.md */
 export function resolveCuratedPath(): { path: string; source: "vault" | "local" } {
   return resolveWithFallback(

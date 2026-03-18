@@ -45,7 +45,6 @@ export function createDelegateTool(): AnyAgentTool {
       "Step 2 — present the brief to the user. " +
       "Step 3 — when user approves (says 'go', 'yes', 'do it', etc.), call AGAIN with action='delegate', confirmed=true and THE SAME title/description/issues. " +
       "CRITICAL: 'go' means EXECUTE (confirmed=true), NOT check status. " +
-      "All agents write output to files. If Proof is available, a shared doc is created for live collaboration. " +
       "Actions: delegate (create project), status (check progress), cancel, projects (list all), team (show roster).",
     parameters: {
       type: "object" as const,
@@ -161,13 +160,11 @@ export function createDelegateTool(): AnyAgentTool {
                   projectId,
                   title,
                   description,
-                  proofWorkspace: `paperclip-${projectId.slice(0, 8)}`,
                   issues: paperclipIssues.map((pi) => ({
                     issueId: newIssueId(),
                     title: pi.title,
                     personaSlug: pi.assignee,
                     queueItemId: pi.issueId, // Paperclip issue ID as reference
-                    proofDocSlug: undefined,
                   })),
                   createdAt: Date.now(),
                   status: "active",
@@ -308,7 +305,6 @@ export function createDelegateTool(): AnyAgentTool {
               projectId,
               title,
               description,
-              proofWorkspace: workspace,
               issues: issueRecords
                 .filter((r) => queuedIssueMap.has(r.issueId))
                 .map((r) => ({
@@ -333,7 +329,6 @@ export function createDelegateTool(): AnyAgentTool {
             success: true,
             message: `Project "${title}" delegated to the team (${issues.length} issue(s)${skippedCount > 0 ? `, ${skippedCount} skipped` : ""}).`,
             projectId,
-            proofWorkspace: workspace,
             issues: issueRecords.map(r => ({
               issueId: r.issueId,
               title: r.title,
@@ -371,7 +366,6 @@ export function createDelegateTool(): AnyAgentTool {
               title: issue.title,
               status: qi?.status ?? "pending",
               assignee: issue.personaSlug,
-              proofDocSlug: issue.proofDocSlug,
             };
           });
 
@@ -379,7 +373,6 @@ export function createDelegateTool(): AnyAgentTool {
             projectId: project.projectId,
             title: project.title,
             status: project.status,
-            proofWorkspace: project.proofWorkspace,
             issues: issueStatuses,
           });
         }

@@ -29,7 +29,7 @@ tools: secondBrain.search, secondBrain.identity, secondBrain.memoryBank, secondB
 - Search uses QMD 2.0 hybrid retrieval (semantic + full-text + reranking) — natural language queries work best but keywords also work via BM25
 - People files are in 06-Brain/People/ — search by name
 - If search returns nothing, try broader terms or different phrasing
-- Vault is the source of truth for long-term knowledge — Mem0 is for conversational context
+- Vault is the source of truth for long-term knowledge — memory is for conversational context
 - All searches are logged to retrieval-log.jsonl for trajectory analysis
 
 ## Tips

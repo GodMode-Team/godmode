@@ -1,8 +1,7 @@
 /**
  * queue-steer.ts — queue_steer tool for live steering of running agents.
  *
- * v2 slim: Proof integration removed. Steering is recorded in queue state
- * for the agent to pick up on next check.
+ * Steering is recorded in queue state for the agent to pick up on next check.
  */
 
 import { type AnyAgentTool, jsonResult } from "openclaw/plugin-sdk";
@@ -50,7 +49,7 @@ export function createQueueSteerTool(): AnyAgentTool {
         });
       }
 
-      // Steering without Proof — instruction will be picked up on next retry
+      // Instruction will be picked up on next retry
       return jsonResult({
         steered: false,
         itemId,

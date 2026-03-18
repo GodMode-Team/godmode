@@ -39,7 +39,6 @@ export type InboxItem = {
     queueItemId?: string;
     projectId?: string;
   };
-  proofDocSlug?: string;
   outputPath?: string;
   sessionId?: string;
   createdAt: string;
@@ -54,7 +53,6 @@ export type InboxItem = {
   deliverables?: Array<{
     title: string;
     persona: string;
-    proofDocSlug?: string;
     summary?: string;
   }>;
   /** Session created for coworking on project review */

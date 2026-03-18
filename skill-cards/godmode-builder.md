@@ -45,8 +45,8 @@ When the user reports a bug or requests a change to GodMode itself, spin up a bu
 queue_add({
   type: "coding",
   personaHint: "godmode-builder",
-  title: "Fix: Mem0 search returns 0 results despite stored vectors",
-  description: "Memory search always returns empty. Health shows memory.search at 0% success. Root cause likely in src/lib/memory.ts — Mem0 JSON parsing. Build and deploy live after fix.",
+  title: "Fix: memory search returns 0 results despite stored vectors",
+  description: "Memory search always returns empty. Health shows memory.search at 0% success. Root cause likely in src/services/honcho-client.ts (Honcho cloud memory). Build and deploy live after fix.",
   priority: "high"
 })
 ```

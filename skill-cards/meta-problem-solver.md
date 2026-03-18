@@ -13,7 +13,7 @@ Use when the user brings a complex, ambiguous, or high-stakes request. This is a
 Work through these steps internally before responding:
 
 ### 1. What is actually true here?
-Strip away assumptions. What do we know for certain vs. what are we assuming? Pull facts from Mem0 and vault — don't rely on vibes.
+Strip away assumptions. What do we know for certain vs. what are we assuming? Pull facts from memory and vault — don't rely on vibes.
 
 ### 2. Inversion — What would make this definitely fail?
 List the top 3-5 failure modes. Work backwards from catastrophe. If you can prevent these, the path forward is clearer.
@@ -36,7 +36,7 @@ Before making any recommendation, synthesize a brief:
 
 ## Context Gathering
 
-Use Mem0 search and vault lookup to pull relevant context before reasoning. Past decisions, user preferences, and domain knowledge all improve the decomposition.
+Use memory search and vault lookup to pull relevant context before reasoning. Past decisions, user preferences, and domain knowledge all improve the decomposition.
 
 ## What This Feeds
 

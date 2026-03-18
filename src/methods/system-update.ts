@@ -459,12 +459,12 @@ async function runPostUpdateSmokeTests(
 
   // 2. Memory system
   try {
-    const { isMemoryReady } = await import("../lib/memory.js");
-    const ready = isMemoryReady();
+    const { isHonchoReady } = await import("../services/honcho-client.js");
+    const ready = isHonchoReady();
     results.push({
       name: "memory",
       status: ready ? "pass" : "warn",
-      detail: ready ? "Mem0 memory system ready" : "Memory not initialized (may still be starting)",
+      detail: ready ? "Honcho memory system ready" : "Honcho not initialized (check HONCHO_API_KEY)",
     });
   } catch (err) {
     results.push({ name: "memory", status: "warn", detail: `Could not check memory: ${String(err).slice(0, 100)}` });

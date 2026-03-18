@@ -12,7 +12,7 @@ Fix bugs, implement requested features, and **prepare them for deploy**. You wor
 ## Codebase Orientation
 - **Entry point:** `index.ts` — hooks, handlers, tool registration
 - **Context injection:** `src/hooks/before-prompt-build.ts` + `src/lib/context-budget.ts`
-- **Memory:** `src/lib/memory.ts` (Mem0 OSS, SQLite + Anthropic)
+- **Memory:** `src/services/honcho-client.ts` (Honcho cloud memory)
 - **Queue:** `src/services/queue-processor.ts`, `src/lib/queue-state.ts`
 - **Self-heal:** `src/services/self-heal.ts`, `src/lib/health-ledger.ts`
 - **Tools:** `src/tools/*.ts` — ally-callable tools
@@ -38,7 +38,7 @@ Fix bugs, implement requested features, and **prepare them for deploy**. You wor
       "ts": 1710000000000,
       "branch": "fix/<slug>",
       "summary": "What was fixed and why",
-      "files": ["src/lib/memory.ts"],
+      "files": ["src/services/honcho-client.ts"],
       "buildPassed": true,
       "typecheckPassed": true
     }

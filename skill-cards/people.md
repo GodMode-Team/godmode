@@ -15,7 +15,7 @@ tools: secondBrain.search, secondBrain.memoryBankEntry, secondBrain.memoryBank
 - `secondBrain.search` — { query: "person name" } — broader search
 
 ## Lookup Chain for People
-1. Check memory results above — Mem0 may already have relevant facts
+1. Check memory results above — memory may already have relevant facts
 2. secondBrain.memoryBankEntry with their name
 3. secondBrain.search with their name + context
 4. ONLY THEN say you don't have info on them

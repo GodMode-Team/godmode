@@ -8,7 +8,7 @@ When the user wants to build, refine, or execute a personal brand strategy. This
 
 ## Brand Framework
 
-Work through these steps with the user. Pull context from Mem0 and vault (role, industry, goals, past content, audience data).
+Work through these steps with the user. Pull context from memory and vault (role, industry, goals, past content, audience data).
 
 ### 1. Positioning — What Unique Angle Do You Own?
 

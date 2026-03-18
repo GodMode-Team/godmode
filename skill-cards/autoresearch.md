@@ -18,7 +18,7 @@ The autoresearch system uses the Karpathy pattern (modify → measure → keep/r
 |----------|------|-------------------|
 | context-words | Deterministic | TIME_WORDS, OPS_WORDS relevance gates |
 | skill-triggers | Deterministic | Skill card keyword matching |
-| memory-thresholds | Deterministic | Mem0 score thresholds, limits |
+| memory-thresholds | Deterministic | memory score thresholds, limits |
 | soul-essence | LLM Judge | SOUL_ESSENCE, CAPABILITY_MAP prompts |
 | queue-prompts | LLM Judge | Queue PROMPT_TEMPLATES |
 | ally-experience | LLM Judge | Customer persona simulation (leverage/flow/awakening/purpose) |

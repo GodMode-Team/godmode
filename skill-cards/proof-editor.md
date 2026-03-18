@@ -5,7 +5,7 @@ tools: proof_editor, queue_steer
 ---
 ## When to Use
 - The user wants to watch the document take shape live
-- Prosper should co-write with the user in a shared draft
+- The ally should co-write with the user in a shared draft
 - A background agent needs a live surface the user can steer
 
 ## How to Use Proof

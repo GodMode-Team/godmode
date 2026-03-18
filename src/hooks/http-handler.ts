@@ -88,10 +88,6 @@ export function createGodmodeHttpHandler(deps: HttpHandlerDeps) {
       return true;
     }
 
-    // NOTE: Proof documents are served via RPC (proof.get returns HTML for
-    // srcdoc embedding) rather than HTTP proxy, since the gateway's static
-    // file handler intercepts all /godmode/* routes before this handler runs.
-
     // Artifact file server
     if (pathname.startsWith("/godmode/artifacts/")) {
       const fileName = pathname.slice("/godmode/artifacts/".length);

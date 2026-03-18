@@ -37,7 +37,7 @@ For each interesting tool/technique found, answer:
 1. **What is the core pattern?** (one sentence — the reusable insight, not the tool)
 2. **Does GodMode already have this?** (check existing skill cards, services, architecture)
 3. **How would it be absorbed?** (skill card? persona? engine hook? recipe?)
-4. **What existing primitives would it use?** (heartbeat, vault-capture, queue, Mem0, identity graph, etc.)
+4. **What existing primitives would it use?** (heartbeat, vault-capture, queue, Honcho, identity graph, etc.)
 5. **Effort estimate:** trivial (just a file) / small (file + thin wiring) / medium (new engine hook)
 6. **Value:** How much better does GodMode get? (high / medium / low)
 

@@ -61,7 +61,7 @@ Each queued agent automatically gets a Proof document for live output. The user 
 
 When reviewing agent output, open the Proof doc with `proof_editor` action `open` to show it in the sidebar.
 
-For writing-heavy deliverables, create the Proof doc first so Prosper and the user can collaborate before the queue item finishes.
+For writing-heavy deliverables, create the Proof doc first so the ally and the user can collaborate before the queue item finishes.
 
 ## Rules
 - ALWAYS scope before queuing — you are the chief of staff, not a task router

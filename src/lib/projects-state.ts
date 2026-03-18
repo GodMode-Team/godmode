@@ -20,14 +20,12 @@ export interface ProjectIssue {
   title: string;
   personaSlug: string;
   queueItemId: string;
-  proofDocSlug?: string;
 }
 
 export interface DelegatedProject {
   projectId: string;
   title: string;
   description: string;
-  proofWorkspace: string;
   issues: ProjectIssue[];
   createdAt: number;
   completedAt?: number;

@@ -410,7 +410,7 @@ async function handleMemory(url: URL, res: http.ServerResponse): Promise<void> {
   }
 
   // File-based memory search over ~/godmode/memory/
-  // Replaces Mem0 searchMemories() which was deleted in v2 slim.
+  // File-walk fallback when Honcho is unavailable.
   try {
     const { readdirSync, readFileSync: rfSync } = await import("node:fs");
     const { join: pJoin, basename: pBase, extname: pExt } = await import("node:path");

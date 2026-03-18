@@ -48,7 +48,7 @@ Then synthesize:
 
 ## Customization
 
-Advisors are configurable per user context. A chiropractor gets different board members than a SaaS founder. Pull user context from Mem0 to tailor the advisors' perspectives to the user's industry, scale, and constraints.
+Advisors are configurable per user context. A chiropractor gets different board members than a SaaS founder. Pull user context from memory to tailor the advisors' perspectives to the user's industry, scale, and constraints.
 
 ## Rules
 - Run meta-problem-solver first — the board needs a structured problem to debate

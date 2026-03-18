@@ -300,6 +300,16 @@ export async function generateSnapshot(): Promise<string> {
     // No trust data yet — skip
   }
 
+  // Honcho memory status
+  try {
+    const { getHonchoStatus, getStatus: getHonchoStats } = await import("../services/honcho-client.js");
+    const status = getHonchoStatus();
+    const stats = getHonchoStats();
+    lines.push(`## Memory: Honcho ${status} (${stats.sessionCount} sessions tracked)`);
+  } catch {
+    lines.push("## Memory: Honcho offline (HONCHO_API_KEY not configured)");
+  }
+
   // Memory search engine status
   try {
     const { execFile: ef } = await import("node:child_process");

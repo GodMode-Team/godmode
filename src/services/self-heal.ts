@@ -136,12 +136,12 @@ export async function runSelfHeal(
     logger.warn(`[SelfHeal] API key check error: ${String(err)}`);
   }
 
-  // 3. Memory (Mem0)
+  // 3. Memory (Honcho)
   checked++;
   try {
     await checkAndRepairMemory(logger);
     if (getOrCreate("memory").state === "repaired") {
-      repairs.push("Re-initialized Mem0 memory");
+      repairs.push("Re-initialized Honcho memory");
     }
   } catch (err) {
     logger.warn(`[SelfHeal] Memory check error: ${String(err)}`);
@@ -291,7 +291,7 @@ async function checkAndRepairOAuth(logger: Logger): Promise<void> {
           logger.info("[SelfHeal] OAuth token expired, attempting refresh...");
           const refreshed = await refreshOAuthToken(oauth.refreshToken, credsPath, logger);
           if (refreshed) {
-            // Update process.env so Mem0 and other services pick it up
+            // Update process.env so Honcho and other services pick it up
             process.env.ANTHROPIC_API_KEY = refreshed;
             markRepaired(id, "Refreshed expired OAuth token");
             return;
@@ -407,7 +407,7 @@ function checkApiKeys(logger: Logger): void {
 }
 
 /**
- * Check memory status. Honcho is the primary memory system; Mem0 stubs are offline by design.
+ * Check memory status. Honcho is the primary memory system.
  * If HONCHO_API_KEY is not configured, memory is simply unavailable (non-critical).
  */
 async function checkAndRepairMemory(logger: Logger): Promise<void> {
@@ -437,7 +437,7 @@ async function checkAndRepairMemory(logger: Logger): Promise<void> {
         markDegraded(id, "HONCHO_API_KEY not configured — memory features disabled but chat works fine");
       }
     } catch {
-      // Honcho client not available — check legacy Mem0 stubs
+      // Honcho client not available
       markDegraded(id, "Memory service not available — chat works fine without it");
     }
   } catch (err) {

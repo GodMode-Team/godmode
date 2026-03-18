@@ -270,6 +270,18 @@ export async function runGatewayStart(
     const honchoOk = await initHoncho();
     if (honchoOk) {
       logger.info("[GodMode] Honcho memory initialized");
+
+      // Periodic vault sync every 6 hours (gateway runs indefinitely)
+      const HONCHO_SYNC_INTERVAL_MS = 6 * 60 * 60 * 1000;
+      setInterval(async () => {
+        try {
+          const { syncHonchoToVault } = await import("../services/honcho-sync.js");
+          await syncHonchoToVault();
+          logger.info("[GodMode] Periodic Honcho vault sync complete");
+        } catch (err) {
+          logger.warn(`[GodMode] Periodic Honcho vault sync failed: ${String(err)}`);
+        }
+      }, HONCHO_SYNC_INTERVAL_MS);
     } else {
       logger.warn("[GodMode] Honcho memory not available (missing HONCHO_API_KEY or init failed)");
     }

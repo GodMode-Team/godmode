@@ -2,8 +2,8 @@
 
 **Branch:** `feat/v2-slim`  
 **Date:** March 18, 2026  
-**Approach:** Hybrid deletion + cleanup. 7 sequential prompts. Each builds on the previous.  
-**Total estimated Claude Code time:** ~75-90 min
+**Approach:** Hybrid deletion + cleanup + integration. 10 prompts (7 core + 3 integrations). Parallelizable after Prompt 1.
+**Integrations:** Honcho (memory), Paperclip (orchestration), Composio (auth)
 
 ## Architecture Summary
 
@@ -62,6 +62,7 @@ You are on branch feat/v2-slim. The goal is to strip the plugin to its essential
 - x-intel.ts — OC has x_read tool
 - team-curation.ts — not core
 - resources.ts — not core (check if UI references it first; if so, stub it to return empty)
+- fathom-webhook.ts — replacing with generic meeting webhook in Prompt 4
 
 ### DELETE these src/services/ files:
 - consciousness-heartbeat.ts — Honcho replaces later
@@ -133,10 +134,51 @@ pnpm build 2>&1 | tail -5
 
 ---
 
-## PROMPT 2: Graceful Degradation
+## PROMPT 2: Lib Audit
 
 ```
-Read V2-EXECUTION-SPEC.md for context.
+Read V2-EXECUTION-SPEC.md for context. Run AFTER Prompt 1.
+
+## TASK: Audit src/lib/ — find and remove orphaned files after the Great Deletion.
+
+src/lib/ is 13,571 lines across 40+ files. Many are now orphaned.
+
+### STEP 1: Find orphans
+
+For EVERY file in src/lib/:
+- Check if it's imported by any remaining (non-deleted) file
+- Self-references don't count
+- If 0 remaining imports → DELETE
+
+### STEP 2: Likely orphans after Prompt 1 deletions:
+- awareness-snapshot.ts (654 lines) — was imported by consciousness.ts, consciousness-heartbeat.ts
+- interaction-ledger.ts (953 lines) — was imported by consciousness-heartbeat.ts, vault-capture.ts
+- correction-log.ts (645 lines) — was imported only by interaction-ledger.ts
+- config-snapshots.ts (285 lines) — was imported only by consciousness-heartbeat.ts
+
+Verify each. Delete if truly orphaned.
+
+### STEP 3: Review survivors over 300 lines
+- Read header, check purpose
+- If it serves a deleted feature → delete
+- If genuinely needed → keep
+
+### VALIDATION:
+pnpm typecheck && pnpm build
+
+### COMMIT:
+git commit -m "feat: v2 lib audit — remove orphaned files"
+
+### REPORT:
+wc -l src/lib/*.ts | tail -1
+```
+
+---
+
+## PROMPT 3: Graceful Degradation
+
+```
+Read V2-EXECUTION-SPEC.md for context. Run AFTER Prompt 2 (Lib Audit) — orphans are already deleted, so you're only hardening survivors.
 
 ## TASK: Make GodMode work with ONLY a model API key. Zero other dependencies required.
 
@@ -187,47 +229,6 @@ grep -r "process\.env\." src/ --include="*.ts" -h | grep -o 'process\.env\.[A-Z_
 
 ---
 
-## PROMPT 3: Lib Audit
-
-```
-Read V2-EXECUTION-SPEC.md for context. Run AFTER Prompt 1.
-
-## TASK: Audit src/lib/ — find and remove orphaned files after the Great Deletion.
-
-src/lib/ is 13,571 lines across 40+ files. Many are now orphaned.
-
-### STEP 1: Find orphans
-
-For EVERY file in src/lib/:
-- Check if it's imported by any remaining (non-deleted) file
-- Self-references don't count
-- If 0 remaining imports → DELETE
-
-### STEP 2: Likely orphans after Prompt 1 deletions:
-- awareness-snapshot.ts (654 lines) — was imported by consciousness.ts, consciousness-heartbeat.ts
-- interaction-ledger.ts (953 lines) — was imported by consciousness-heartbeat.ts, vault-capture.ts
-- correction-log.ts (645 lines) — was imported only by interaction-ledger.ts
-- config-snapshots.ts (285 lines) — was imported only by consciousness-heartbeat.ts
-
-Verify each. Delete if truly orphaned.
-
-### STEP 3: Review survivors over 300 lines
-- Read header, check purpose
-- If it serves a deleted feature → delete
-- If genuinely needed → keep
-
-### VALIDATION:
-pnpm typecheck && pnpm build
-
-### COMMIT:
-git commit -m "feat: v2 lib audit — remove orphaned files"
-
-### REPORT:
-wc -l src/lib/*.ts | tail -1
-```
-
----
-
 ## PROMPT 4: Fathom → Generic Meeting Webhook + Skill
 
 ```
@@ -235,10 +236,7 @@ wc -l src/lib/*.ts | tail -1
 
 Fathom stays as the meeting note-taker tool. But we don't need 1,470 lines of custom processing.
 
-### DELETE:
-- src/methods/fathom-webhook.ts (671 lines)
-- src/services/fathom-processor.ts (799 lines)
-- All fathom imports/registrations in index.ts
+NOTE: fathom-webhook.ts and fathom-processor.ts were already deleted in Prompt 1. This prompt creates the replacements.
 
 ### CREATE: src/methods/meeting-webhook.ts (~30-50 lines)
 
@@ -370,10 +368,7 @@ Look at these files:
 - my-day.ts (612 lines)
 - daily-brief.ts (421 lines)
 
-We need ONE "Today" view that shows: daily brief + tasks + inbox items.
-- Check which one does this best
-- Keep the best, merge any missing features from the others into it
-- Delete the rest
+**DECISION: Keep the current Today view (whatever is currently wired as the Today tab in navigation).** Delete the other two.
 - The inbox section should show a card per item with: title, status, options to view output in sidebar / open chat session / dismiss / score
 
 ### RESOLVE overlapping onboarding views:
@@ -486,7 +481,225 @@ wc -l skills/*/SKILL.md
 
 ---
 
-## FINAL VALIDATION (Run after all 7 prompts)
+## PROMPT 8: Honcho Integration — Real Memory
+
+```
+Read V2-EXECUTION-SPEC.md for context. Run AFTER Prompt 1 (Great Deletion).
+
+## TASK: Wire Honcho as GodMode's memory layer. Replace Mem0 entirely.
+
+Honcho (by Plastic Labs) provides persistent user modeling with async reasoning.
+SDK: @honcho-ai/sdk. Auth: HONCHO_API_KEY env var.
+
+### INSTALL:
+pnpm add @honcho-ai/sdk
+
+### CREATE: src/services/honcho-client.ts (~80-120 lines)
+
+Singleton client that wraps the Honcho SDK:
+
+1. **init(apiKey, workspaceId?)** — Create Honcho client, get or create peer for the user
+2. **forwardMessage(role, content, sessionKey)** — Forward user/assistant messages to Honcho session
+   - Get or create Honcho session keyed to the GodMode session
+   - Call session.add_messages() with the peer's message
+3. **getContext(sessionKey)** — Call session.get_context() (free, ~200ms)
+   - Returns formatted context string for injection
+   - Use .to_anthropic() format
+4. **queryPeer(question)** — Call peer.chat(question) for deep queries
+   - Used by vault sync and skills that need memory recall
+5. **getStatus()** — Return { ready: boolean, peerCount, sessionCount }
+
+### CREATE: src/services/honcho-sync.ts (~50 lines)
+
+Vault sync — runs on session_end hook and hourly:
+
+1. Call peer.chat("What are this user's current priorities and goals?")
+2. Call peer.chat("What patterns have you noticed in how this user works?")
+3. Call peer.chat("What key relationships and people matter to this user?")
+4. Write results to vault:
+   - vault/Brain/Identity/honcho-priorities.md
+   - vault/Brain/Identity/honcho-patterns.md
+   - vault/Brain/Identity/honcho-people.md
+5. If no vault configured, write to ~/godmode/memory/honcho/
+
+### WIRE INTO HOOKS (index.ts):
+
+1. **gateway_start:** Init Honcho client (non-blocking, log if unavailable)
+2. **message_received:** Forward user message to Honcho (fire-and-forget)
+3. **message_sending:** Forward assistant message to Honcho (fire-and-forget)
+4. **before_prompt_build:** Call getContext(sessionKey) → inject at P0 priority
+   - Replace the old Mem0 search injection with Honcho context
+5. **session_end (or gateway_stop):** Trigger vault sync
+
+### REMOVE:
+- Any remaining Mem0 references in context-budget.ts or anywhere else
+- The mem0ai dependency should already be gone from Prompt 1
+
+### GRACEFUL DEGRADATION:
+- No HONCHO_API_KEY → memory features disabled, log once at startup
+- All Honcho calls wrapped in try/catch, never crash
+- Context injection returns empty string if Honcho unavailable
+- Status visible in awareness/health (status: "memory: honcho | offline")
+
+### VALIDATION:
+pnpm typecheck && pnpm build
+
+### COMMIT:
+git commit -m "feat: honcho integration — real memory replaces Mem0"
+```
+
+---
+
+## PROMPT 9: Paperclip Integration — Agent Orchestration
+
+```
+Read V2-EXECUTION-SPEC.md for context. Run AFTER Prompt 1.
+
+## TASK: Wire Paperclip as GodMode's agent orchestration layer.
+
+Paperclip is an open-source Node.js server that orchestrates AI agents like a company.
+API: REST at PAPERCLIP_URL. Auth: Bearer token via PAPERCLIP_API_KEY.
+
+### CREATE: src/services/paperclip-client.ts (~100-150 lines)
+
+API client for Paperclip:
+
+1. **init(url, apiKey)** — Set base URL and auth header
+2. **createTask(task)** — POST /api/companies/{companyId}/issues
+   - Map GodMode task shape to Paperclip issue: { title, description, priority, assigneeAgentId?, goalId?, parentId? }
+   - Return the created issue with ID
+3. **getTaskStatus(issueId)** — GET /api/issues/{issueId}
+   - Return current status, comments, output
+4. **listActiveTasks()** — GET /api/companies/{companyId}/issues?status=todo,in_progress
+5. **getAgents()** — GET /api/companies/{companyId}/agents
+   - Map to GodMode's agent roster concept
+6. **cancelTask(issueId)** — PATCH /api/issues/{issueId} with status: cancelled
+
+### CREATE: src/methods/paperclip-webhook.ts (~40-60 lines)
+
+Webhook receiver for task completions:
+
+- POST /godmode/webhooks/paperclip
+- When a Paperclip task completes:
+  1. Read the issue output/comments
+  2. Write deliverable to ~/godmode/memory/inbox/{task-slug}.md
+  3. Create Inbox item for user review (title, status, link to deliverable)
+  4. Broadcast event to UI so Today/Inbox updates live
+
+### UPDATE: src/tools/delegate-tool.ts
+
+Wire delegate tool to use Paperclip when available:
+
+- If PAPERCLIP_URL configured:
+  1. Parse user's delegation request into discrete tasks
+  2. For each task: match to agent role (from GodMode roster → Paperclip agent mapping)
+  3. Create Paperclip issues via createTask()
+  4. Return task IDs + status to user
+- If NOT configured: Fall back to existing queue-processor behavior (current functionality preserved)
+
+### UPDATE: skills/paperclip-ceo/SKILL.md (from Prompt 7)
+
+Add concrete Paperclip API tool calls to the skill process steps.
+
+### WIRE INTO index.ts:
+
+1. **gateway_start:** Init Paperclip client (non-blocking)
+2. Register paperclip-webhook HTTP handler
+3. Delegate tool checks Paperclip availability at call time
+
+### GRACEFUL DEGRADATION:
+- No PAPERCLIP_URL → delegate tool uses existing queue-processor
+- All Paperclip API calls wrapped in try/catch
+- Connection failures don't crash, don't block other features
+- Status visible: "orchestration: paperclip | local-queue"
+
+### VALIDATION:
+pnpm typecheck && pnpm build
+
+### COMMIT:
+git commit -m "feat: paperclip integration — agent orchestration"
+```
+
+---
+
+## PROMPT 10: Composio Integration — Secure Auth for Tools
+
+```
+Read V2-EXECUTION-SPEC.md for context. Run AFTER Prompt 1.
+
+## TASK: Wire Composio as GodMode's auth layer for third-party tool access.
+
+Composio provides managed OAuth flows and 850+ pre-built tool connectors.
+SDK: @composio/core. Auth: COMPOSIO_API_KEY env var.
+
+### INSTALL:
+pnpm add @composio/core
+
+### CREATE: src/services/composio-client.ts (~80-120 lines)
+
+Singleton client:
+
+1. **init(apiKey)** — Create Composio client
+2. **getConnections(userId)** — List all connected accounts and their statuses
+   - Return: [{ id, appName, status (ACTIVE/EXPIRED/INITIATED), authScheme }]
+3. **initiateConnection(userId, appName, callbackUrl?)** — Start OAuth flow
+   - Return: { redirectUrl, connectionId }
+   - For CLI/local: use device flow if available, else return URL for browser
+4. **executeAction(userId, actionName, args)** — Execute a tool on behalf of user
+   - e.g., composio.tools.execute("GITHUB_CREATE_ISSUE", { userId, arguments: { ... } })
+   - Return the result
+5. **getAvailableTools(userId)** — List tools the user has access to (based on connected accounts)
+6. **getStatus()** — Return { ready, connectedApps: string[], expiredApps: string[] }
+
+### CREATE: src/methods/composio-setup.ts (~40-60 lines)
+
+Setup RPC handler for connecting new services:
+
+- godmode.composio.connect({ appName }) → returns redirect URL for OAuth
+- godmode.composio.status() → returns all connections and their health
+- godmode.composio.disconnect({ appName }) → revokes connection
+
+### CREATE: src/tools/composio-tool.ts (~30-50 lines)
+
+Agent-callable tool for executing Composio actions:
+
+- Tool name: composio_execute
+- Input: { action: string, args: Record<string, any> }
+- Executes via composio-client.executeAction()
+- Makes all Composio-connected tools available to agents without writing per-service wrappers
+
+### WIRE INTO index.ts:
+
+1. **gateway_start:** Init Composio client (non-blocking)
+2. Register composio-setup RPC methods
+3. Register composio_execute tool
+
+### UPDATE ONBOARDING:
+
+After core onboarding (name, work, style), offer progressive setup:
+"Want to connect your tools? I can help you set up:"
+- 📧 Email (Gmail/Outlook)
+- 📅 Calendar (Google/Outlook)
+- 💬 Slack
+- 🐙 GitHub
+- Each triggers composio.connect flow
+
+### GRACEFUL DEGRADATION:
+- No COMPOSIO_API_KEY → composio_execute tool not registered, setup methods return "not configured"
+- All calls wrapped in try/catch
+- Expired connections → auto-refresh attempt, then surface in Today view
+- Status visible: "tools: composio (5 connected) | offline"
+
+### VALIDATION:
+pnpm typecheck && pnpm build
+
+### COMMIT:
+git commit -m "feat: composio integration — secure auth for third-party tools"
+```
+
+---
+
+## FINAL VALIDATION (Run after all 10 prompts)
 
 ```bash
 pnpm typecheck && pnpm build && pnpm build:ui
@@ -495,4 +708,5 @@ find ui/src/ui/views -name "*.ts" | wc -l
 ls skills/*/SKILL.md
 ```
 
-Target: <60 src files, <35 UI view files, 7 skills, everything builds clean.
+Target: <60 src files, <35 UI view files, 7+ skills, everything builds clean.
+External integrations: Honcho (memory), Paperclip (orchestration), Composio (auth) — all gracefully degrading.

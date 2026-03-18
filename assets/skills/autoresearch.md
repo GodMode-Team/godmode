@@ -17,7 +17,7 @@ Runs 8 optimization campaigns using the modify-measure-keep/revert loop pattern:
 ### Deterministic Campaigns (no API calls, fast)
 1. **context-words** — Optimizes TIME_WORDS and OPS_WORDS arrays for relevance gating
 2. **skill-triggers** — Tests and improves skill card keyword trigger matching
-3. **memory-thresholds** — Tunes Mem0 score thresholds, search limits, memory line caps
+3. **memory-thresholds** — Tunes memory score thresholds, search limits, memory line caps
 
 ### LLM-Judged Campaigns (Sonnet 4.6, moderate cost)
 4. **soul-essence** — Evolves SOUL_ESSENCE and CAPABILITY_MAP prompts

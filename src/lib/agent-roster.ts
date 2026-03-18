@@ -29,7 +29,6 @@ export type PersonaProfile = {
   category: string;
   name: string;
   taskTypes: QueueItemType[];
-  swarmStages?: string[];
   engine?: AgentEngine;
   mission?: string;
   body: string;
@@ -284,9 +283,6 @@ function parsePersonaFile(filePath: string, category: string): PersonaProfile | 
     const taskTypes = meta.taskTypes
       ? (meta.taskTypes.split(",").map((t) => t.trim()) as QueueItemType[])
       : [];
-    const swarmStages = meta.swarmStages
-      ? meta.swarmStages.split(",").map((s) => s.trim())
-      : undefined;
     const engine = (["claude", "codex", "gemini"] as const).includes(
       meta.engine?.toLowerCase() as AgentEngine,
     )
@@ -298,7 +294,6 @@ function parsePersonaFile(filePath: string, category: string): PersonaProfile | 
       category,
       name: meta.name || slug.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
       taskTypes,
-      swarmStages,
       engine,
       mission,
       body: body.trim(),
@@ -384,12 +379,6 @@ export function resolvePersona(
   }
 
   return null;
-}
-
-/** Find persona for a swarm stage (design / build / qc). */
-export function resolveSwarmPersona(stage: string): PersonaProfile | null {
-  const roster = loadRoster();
-  return roster.find((p) => p.swarmStages?.includes(stage)) ?? null;
 }
 
 // ── Handoff Formatting ───────────────────────────────────────────

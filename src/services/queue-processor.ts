@@ -87,7 +87,7 @@ function buildChildEnv(): Record<string, string> {
       : `/opt/homebrew/bin:${parentPath}`,
     HOME: process.env.HOME ?? "",
     USER: process.env.USER ?? "",
-    SHELL: process.env.SHELL ?? "/bin/zsh",
+    SHELL: process.env.SHELL ?? "/bin/sh",
     LANG: process.env.LANG ?? "en_US.UTF-8",
     TERM: process.env.TERM ?? "xterm-256color",
   };
@@ -225,11 +225,7 @@ class QueueProcessor {
       }
     }
 
-    const proofInfo = await this.ensureProofDocument(item);
-    const itemForPrompt = proofInfo
-      ? { ...item, proofDocSlug: proofInfo.slug, proofDocFilePath: proofInfo.filePath }
-      : item;
-    const prompt = await this.buildPromptForItem(itemForPrompt);
+    const prompt = await this.buildPromptForItem(item);
 
     // Resolve which engine to use: explicit on item > persona > default claude
     const persona = resolvePersona(item.type, item.personaHint);
@@ -254,12 +250,6 @@ class QueueProcessor {
         qi.startedAt = Date.now();
         qi.agentPrompt = prompt;
         qi.engine = effectiveEngine;
-        if (proofInfo?.slug) {
-          qi.proofDocSlug = proofInfo.slug;
-        }
-        if (proofInfo?.filePath) {
-          qi.proofDocFilePath = proofInfo.filePath;
-        }
         claimed = true;
       }
     });
@@ -267,11 +257,6 @@ class QueueProcessor {
     if (!claimed) {
       this.logger.info(`[GodMode][Queue] Item "${item.title}" already claimed, skipping`);
       return { spawned: false };
-    }
-
-    // Notify UI to auto-open Proof viewer (if a Proof doc was created by ensureProofDocument)
-    if (proofInfo?.slug) {
-      this.broadcast("proof:open", { slug: proofInfo.slug, title: item.title });
     }
 
     const { bin: agentBin, args: agentArgs } = buildSpawnArgs(effectiveEngine, prompt);
@@ -406,7 +391,6 @@ class QueueProcessor {
         itemId: item.id,
         status: "processing",
         engine: effectiveEngine,
-        proofDocSlug: itemForPrompt.proofDocSlug ?? null,
       });
 
       return { spawned: true, pid: pid ?? undefined };
@@ -467,8 +451,6 @@ class QueueProcessor {
       summary = "Output file not found — agent may have completed without writing results.";
     }
 
-    // REMOVED (v2 slim): Proof document fallback
-
     // Retrieve the item's type for evidence checking
     const itemType = currentItem?.type ?? "task";
 
@@ -509,7 +491,6 @@ class QueueProcessor {
         qi.result = {
           summary,
           outputPath: outPath,
-          proofDocSlug: qi.proofDocSlug,
         };
         qi.artifacts = artifacts;
       }
@@ -605,7 +586,6 @@ class QueueProcessor {
           taskId: completedItem?.sourceTaskId,
           projectId,
         },
-        proofDocSlug: completedItem?.proofDocSlug,
         outputPath: outPath,
         sessionId: completedItem?.sessionId,
       });
@@ -627,7 +607,6 @@ class QueueProcessor {
         summary: `Agent finished "${completedItem?.title ?? itemId}" — ready for review.`,
         outputPreview,
         outputPath: outPath,
-        proofDocSlug: completedItem?.proofDocSlug,
         actions: [
           { label: "Review", action: "navigate", target: "today" },
           { label: "Approve", action: "rpc", method: "queue.approve", params: { id: itemId } },
@@ -899,13 +878,11 @@ class QueueProcessor {
 
     // Get project metadata for notifications
     let projectTitle = "";
-    let proofDocSlug: string | undefined;
     try {
       const { getProject } = await import("../lib/projects-state.js");
       const project = await getProject(projectId);
       if (project) {
         projectTitle = project.title;
-        proofDocSlug = project.issues.find(i => i.proofDocSlug)?.proofDocSlug;
       }
     } catch { /* best effort */ }
 
@@ -916,12 +893,11 @@ class QueueProcessor {
     this.logger.info(`[GodMode][Queue] Project "${projectTitle}" fully complete (${projectItems.length} tasks)`);
 
     // Build deliverables list
-    const deliverables: Array<{ title: string; persona: string; proofDocSlug?: string; summary?: string }> = [];
+    const deliverables: Array<{ title: string; persona: string; summary?: string }> = [];
     for (const qi of projectItems) {
       deliverables.push({
         title: qi.title,
         persona: qi.personaHint ?? "unassigned",
-        proofDocSlug: qi.proofDocSlug,
         summary: qi.result?.summary?.slice(0, 200) ?? `Completed by ${qi.personaHint ?? "agent"}`,
       });
     }
@@ -946,8 +922,6 @@ class QueueProcessor {
         "## Deliverables",
         deliverablesList,
         "",
-        proofDocSlug ? `Proof document: ${proofDocSlug}` : "",
-        "",
         "Walk me through each deliverable. Highlight what's strong, flag anything that needs iteration, and let me score the overall project.",
       ].filter(Boolean).join("\n");
 
@@ -958,7 +932,6 @@ class QueueProcessor {
         createdAt: Date.now(),
         updatedAt: Date.now(),
         projectId,
-        proofDocSlug,
       };
       await writeFile(
         join(sessionsDir, `${coworkSessionId}.json`),
@@ -977,7 +950,6 @@ class QueueProcessor {
         summary: `All ${projectItems.length} tasks finished. Deliverables ready for review.`,
         source: { queueItemId: projectId },
         projectId,
-        proofDocSlug,
         deliverables,
         coworkSessionId,
       });
@@ -991,7 +963,6 @@ class QueueProcessor {
       title: projectTitle,
       summary: `Project "${projectTitle}" is complete — ${projectItems.length} deliverables ready for review.`,
       projectId,
-      proofDocSlug,
       coworkSessionId,
       actions: [
         { label: "Review in Chat", action: "cowork", target: coworkSessionId },
@@ -1168,7 +1139,7 @@ class QueueProcessor {
           `Auth: Pass the GODMODE_TOOLKIT_TOKEN env var as a Bearer token.`,
           "Available endpoints:",
           "- GET /search?q=... — search vault, memory, and files",
-          "- GET /memory?q=... — search conversational memory (Mem0)",
+          "- GET /memory?q=... — search conversational memory (Honcho)",
           "- GET /skills — list available skill cards",
           "- GET /awareness — current system state snapshot",
           "- GET /identity — owner identity (USER.md + SOUL.md)",
@@ -1177,8 +1148,6 @@ class QueueProcessor {
         );
       }
     } catch { /* toolkit not available */ }
-
-    // REMOVED (v2 slim): Proof document integration in agent prompt
 
     // Detect godmode-builder persona for codebase-level access
     const isGodmodeBuilder = item.personaHint === "godmode-builder" ||
@@ -1253,7 +1222,6 @@ class QueueProcessor {
         "- Do NOT modify files outside ~/godmode/memory/inbox/.",
         "- Do NOT run destructive commands (rm -rf, git reset --hard).",
         "- Do NOT access sensitive config files (.env, openclaw.json, SSH keys).",
-        "- You MAY use the local Proof API on 127.0.0.1 for live document updates if a Proof doc is assigned.",
         "- Write your complete output to the path above as markdown.",
       );
     }
@@ -1361,7 +1329,7 @@ class QueueProcessor {
             "",
             "Available endpoints:",
             "- GET /search?query=...&scope=all&limit=20 — Search the vault, projects, research",
-            "- GET /memory?query=...&limit=10 — Search conversational memory (Mem0)",
+            "- GET /memory?query=...&limit=10 — Search conversational memory (Honcho)",
             "- GET /skills — List available skill cards",
             "- GET /awareness — Current system awareness snapshot",
             "- GET /identity — Owner identity context (USER.md + SOUL.md)",
@@ -1427,9 +1395,6 @@ class QueueProcessor {
       "",
       "## Output Instructions",
       `Write your complete results to: ${outPath}`,
-      item.proofDocSlug
-        ? `Also keep the Proof doc (${item.proofDocSlug}) updated as you work so the human can watch progress live.`
-        : "",
       "",
       "Use this structure:",
       "```",
@@ -1460,13 +1425,6 @@ class QueueProcessor {
     );
 
     return sections.join("\n");
-  }
-
-  // REMOVED (v2 slim): ensureProofDocument — Proof integration removed
-  private async ensureProofDocument(
-    _item: QueueItem,
-  ): Promise<{ slug: string; filePath?: string } | null> {
-    return null;
   }
 
   // ── Broadcast helper ───────────────────────────────────────────

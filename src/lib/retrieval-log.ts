@@ -17,8 +17,8 @@ import { DATA_DIR } from "../data-paths.js";
 export interface RetrievalEntry {
   /** ISO timestamp */
   ts: string;
-  /** Search source: "mem0", "qmd", "file-walk" */
-  source: "mem0" | "qmd" | "file-walk";
+  /** Search source: "honcho", "qmd", "file-walk" */
+  source: "honcho" | "qmd" | "file-walk";
   /** The query that was searched */
   query: string;
   /** Number of results returned (after filtering) */

@@ -23,7 +23,7 @@ Run the meta-problem-solver pattern internally:
 ### Step 2: Context Deep Dive (silent)
 
 Pull ALL relevant context before making any decisions:
-- Search Mem0 for related facts, preferences, past decisions
+- Search memory for related facts, preferences, past decisions
 - Search vault for notes, artifacts, prior research
 - Check recent sessions for related conversations
 - Pull people/company context if relevant

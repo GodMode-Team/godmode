@@ -11,7 +11,7 @@ This step feeds the adversarial-board and delegation pipelines. Without it, you'
 ## Context Gathering Protocol
 
 ### 1. Memory Search
-Search Mem0 for related facts, preferences, past decisions, and stated goals. Cast a wide net — search multiple angles:
+Search memory for related facts, preferences, past decisions, and stated goals. Cast a wide net — search multiple angles:
 - The topic directly
 - Related people or companies
 - Past decisions in this domain

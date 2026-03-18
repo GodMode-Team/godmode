@@ -55,7 +55,6 @@ export type QueueItem = {
   result?: {
     summary: string;
     outputPath?: string;
-    proofDocSlug?: string;
     prUrl?: string;
     prDiff?: string;
   };
@@ -71,10 +70,6 @@ export type QueueItem = {
   engine?: "claude" | "codex" | "gemini";
   /** Whether this item needs human approval before processing */
   needsApproval?: boolean;
-  /** Slug of the Proof document for live co-editing output */
-  proofDocSlug?: string;
-  /** Artifact mirror path for the Proof document markdown export */
-  proofDocFilePath?: string;
   /** Workspace this item belongs to (auto-detected or explicit) */
   workspaceId?: string;
   /** Project tracking metadata — links queue items to delegated projects */
