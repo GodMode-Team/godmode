@@ -8,6 +8,9 @@ importers:
 
   .:
     dependencies:
+      '@composio/core':
+        specifier: ^0.6.5
+        version: 0.6.5(ws@8.19.0)(zod@4.3.6)
       '@noble/ed25519':
         specifier: 3.0.0
         version: 3.0.0
@@ -34,7 +37,7 @@ importers:
         version: 17.0.3
       mem0ai:
         specifier: ^2.2.4
-        version: 2.2.4(@anthropic-ai/sdk@0.73.0(zod@3.25.76))(@azure/identity@4.13.0)(@azure/search-documents@12.2.0)(@cloudflare/workers-types@4.20260120.0)(@google/genai@1.42.0)(@langchain/core@0.3.80(openai@6.10.0(ws@8.19.0)(zod@3.25.76)))(@mistralai/mistralai@1.10.0)(@qdrant/js-client-rest@1.13.0(typescript@5.9.3))(@supabase/supabase-js@2.99.0)(@types/jest@29.5.14)(@types/pg@8.11.0)(@types/sqlite3@3.1.11)(cloudflare@4.5.0(encoding@0.1.13))(encoding@0.1.13)(groq-sdk@0.3.0(encoding@0.1.13))(neo4j-driver@5.28.3)(ollama@0.5.18)(pg@8.11.3)(redis@4.7.1)(sqlite3@5.1.7)(ws@8.19.0)
+        version: 2.2.4(@anthropic-ai/sdk@0.73.0(zod@4.3.6))(@azure/identity@4.13.0)(@azure/search-documents@12.2.0)(@cloudflare/workers-types@4.20260120.0)(@google/genai@1.42.0)(@langchain/core@0.3.80(openai@6.32.0(ws@8.19.0)(zod@4.3.6)))(@mistralai/mistralai@1.10.0)(@qdrant/js-client-rest@1.13.0(typescript@5.9.3))(@supabase/supabase-js@2.99.0)(@types/jest@29.5.14)(@types/pg@8.11.0)(@types/sqlite3@3.1.11)(cloudflare@4.5.0(encoding@0.1.13))(encoding@0.1.13)(groq-sdk@0.3.0(encoding@0.1.13))(neo4j-driver@5.28.3)(ollama@0.5.18)(pg@8.11.3)(redis@4.7.1)(sqlite3@5.1.7)(ws@8.19.0)
     devDependencies:
       '@types/node':
         specifier: ^24.3.3
@@ -321,6 +324,19 @@ packages:
 
   '@cloudflare/workers-types@4.20260120.0':
     resolution: {integrity: sha512-B8pueG+a5S+mdK3z8oKu1ShcxloZ7qWb68IEyLLaepvdryIbNC7JVPcY0bWsjS56UQVKc5fnyRge3yZIwc9bxw==}
+
+  '@composio/client@0.1.0-alpha.61':
+    resolution: {integrity: sha512-VSU20mTtMe0TIPHkBBRdCU4IYSy3886U9O69PURU8+ItLXCD2MjIN0S8VTDL8wpA4zFXamUFnvtwQyow11O2KA==}
+
+  '@composio/core@0.6.5':
+    resolution: {integrity: sha512-BHaw60KFkza5PDJDGG2ATaYlwaH5D4VhQinRYo5wLmqjiI/mdnzzXRYatsn24WTaakdqNrf3jY5sQ2WIyex6Ow==}
+    peerDependencies:
+      zod: ^3.25 || ^4
+
+  '@composio/json-schema-to-zod@0.1.20':
+    resolution: {integrity: sha512-d4V34itLrUWG/VBh7ciznKcxF/T22MBLHmuEzHoX0zsBOHsUmjYz5qtDh20S2p3FE+HHvLZxpXiv8yfdd4yI+Q==}
+    peerDependencies:
+      zod: '>=3.25.76 <5'
 
   '@discordjs/node-pre-gyp@0.4.5':
     resolution: {integrity: sha512-YJOVVZ545x24mHzANfYoy0BJX5PDyeZlpiJjDkUBM/V/Ao7TFX9lcUvCN4nr0tbr5ubeaXxtEBILUrHtTphVeQ==}
@@ -1805,6 +1821,9 @@ packages:
 
   '@types/jest@29.5.14':
     resolution: {integrity: sha512-ZN+4sdnLUbo8EVvVc2ao0GFW6oVrQRPn4K2lglySj7APvSrgzxHiNNK99us4WDMi57xxA2yggblIAMNhXOotLQ==}
+
+  '@types/json-schema@7.0.15':
+    resolution: {integrity: sha512-5+fP8P8MFNC+AyZCDxrB2pkZFPGzqQWUzpSeuuVLvm8VMcorNYavBqoFcxK8bQz4Qsbn4oUEEem4wDLfcysGHA==}
 
   '@types/jsonwebtoken@9.0.10':
     resolution: {integrity: sha512-asx5hIG9Qmf/1oStypjanR7iKTv0gXQ1Ov/jfrX6kS/EO0OFni8orbmGCn0672NHR3kXHwpAwR+B368ZGN/2rA==}
@@ -3521,6 +3540,18 @@ packages:
       zod:
         optional: true
 
+  openai@6.32.0:
+    resolution: {integrity: sha512-j3k+BjydAf8yQlcOI7WUQMQTbbF5GEIMAE2iZYCOzwwB3S2pCheaWYp+XZRNAch4jWVc52PMDGRRjutao3lLCg==}
+    hasBin: true
+    peerDependencies:
+      ws: ^8.18.0
+      zod: ^3.25 || ^4.0
+    peerDependenciesMeta:
+      ws:
+        optional: true
+      zod:
+        optional: true
+
   openclaw@2026.2.24:
     resolution: {integrity: sha512-a6zrcS6v5tUWqzsFh5cNtyu5+Tra1UW5yvPtYhRYCKSS/q6lXrLu+dj0ylJPOHRPAho2alZZL1gw1Qd2hAd2sQ==}
     engines: {node: '>=22.12.0'}
@@ -3860,6 +3891,9 @@ packages:
   punycode.js@2.3.1:
     resolution: {integrity: sha512-uxFIHU0YlHYhDQtV4R9J6a52SLx28BCjT+4ieh7IGbgwVJWO+km431c4yRlREUAsAmt/uMjQUyQHNEPf0M39CA==}
     engines: {node: '>=6'}
+
+  pusher-js@8.4.2:
+    resolution: {integrity: sha512-PPuzqQP7UyqThOryugUeV3jqiMx5ScJUJz5+Lu8xPv5CE+ewxO8RYhcyfmqIToMxK/QcixVjavaKa6WsdRhYPA==}
 
   qified@0.6.0:
     resolution: {integrity: sha512-tsSGN1x3h569ZSU1u6diwhltLyfUWDp3YbFHedapTmpBl0B3P6U3+Qptg7xu+v+1io1EwhdPyyRHYbEw0KN2FA==}
@@ -4332,6 +4366,9 @@ packages:
   tunnel-agent@0.6.0:
     resolution: {integrity: sha512-McnNiV1l8RYeY8tBgEpuodCC1mLUdbSN+CYBL7kJsJNInOP8UjDDEwdk6Mw60vdLLrr5NHKZhMAOSrR2NZuQ+w==}
 
+  tweetnacl@1.0.3:
+    resolution: {integrity: sha512-6rt+RN7aOi1nGMyC4Xa5DdYiukl2UWCbcJft7YhxReBGQD7OAM8Pbxw6YMo4r2diNEA8FEmu32YOn9rhaiE5yw==}
+
   type-is@2.0.1:
     resolution: {integrity: sha512-OZs6gsjF4vMp32qrCbiVSkrFmXtG/AZhY3t0iAMrMBiAZyV9oALtXO8hsrHbMXF9x6L3grlFuwW2oAz7cav+Gw==}
     engines: {node: '>= 0.6'}
@@ -4612,12 +4649,6 @@ snapshots:
   '@agentclientprotocol/sdk@0.14.1(zod@4.3.6)':
     dependencies:
       zod: 4.3.6
-
-  '@anthropic-ai/sdk@0.73.0(zod@3.25.76)':
-    dependencies:
-      json-schema-to-ts: 3.1.1
-    optionalDependencies:
-      zod: 3.25.76
 
   '@anthropic-ai/sdk@0.73.0(zod@4.3.6)':
     dependencies:
@@ -5234,6 +5265,26 @@ snapshots:
 
   '@cloudflare/workers-types@4.20260120.0': {}
 
+  '@composio/client@0.1.0-alpha.61': {}
+
+  '@composio/core@0.6.5(ws@8.19.0)(zod@4.3.6)':
+    dependencies:
+      '@composio/client': 0.1.0-alpha.61
+      '@composio/json-schema-to-zod': 0.1.20(zod@4.3.6)
+      '@types/json-schema': 7.0.15
+      chalk: 4.1.2
+      openai: 6.32.0(ws@8.19.0)(zod@4.3.6)
+      pusher-js: 8.4.2
+      semver: 7.7.4
+      zod: 4.3.6
+      zod-to-json-schema: 3.25.1(zod@4.3.6)
+    transitivePeerDependencies:
+      - ws
+
+  '@composio/json-schema-to-zod@0.1.20(zod@4.3.6)':
+    dependencies:
+      zod: 4.3.6
+
   '@discordjs/node-pre-gyp@0.4.5(encoding@0.1.13)':
     dependencies:
       detect-libc: 2.1.2
@@ -5574,14 +5625,14 @@ snapshots:
 
   '@kwsites/promise-deferred@1.1.1': {}
 
-  '@langchain/core@0.3.80(openai@6.10.0(ws@8.19.0)(zod@3.25.76))':
+  '@langchain/core@0.3.80(openai@6.32.0(ws@8.19.0)(zod@4.3.6))':
     dependencies:
       '@cfworker/json-schema': 4.1.1
       ansi-styles: 5.2.0
       camelcase: 6.3.0
       decamelize: 1.2.0
       js-tiktoken: 1.0.21
-      langsmith: 0.3.87(openai@6.10.0(ws@8.19.0)(zod@3.25.76))
+      langsmith: 0.3.87(openai@6.32.0(ws@8.19.0)(zod@4.3.6))
       mustache: 4.2.0
       p-queue: 6.6.2
       p-retry: 4.6.2
@@ -6761,6 +6812,8 @@ snapshots:
     dependencies:
       expect: 29.7.0
       pretty-format: 29.7.0
+
+  '@types/json-schema@7.0.15': {}
 
   '@types/jsonwebtoken@9.0.10':
     dependencies:
@@ -8145,7 +8198,7 @@ snapshots:
 
   koffi@2.15.1: {}
 
-  langsmith@0.3.87(openai@6.10.0(ws@8.19.0)(zod@3.25.76)):
+  langsmith@0.3.87(openai@6.32.0(ws@8.19.0)(zod@4.3.6)):
     dependencies:
       '@types/uuid': 10.0.0
       chalk: 4.1.2
@@ -8154,7 +8207,7 @@ snapshots:
       semver: 7.7.4
       uuid: 10.0.0
     optionalDependencies:
-      openai: 6.10.0(ws@8.19.0)(zod@3.25.76)
+      openai: 6.32.0(ws@8.19.0)(zod@4.3.6)
 
   lie@3.3.0:
     dependencies:
@@ -8306,14 +8359,14 @@ snapshots:
 
   media-typer@1.1.0: {}
 
-  mem0ai@2.2.4(@anthropic-ai/sdk@0.73.0(zod@3.25.76))(@azure/identity@4.13.0)(@azure/search-documents@12.2.0)(@cloudflare/workers-types@4.20260120.0)(@google/genai@1.42.0)(@langchain/core@0.3.80(openai@6.10.0(ws@8.19.0)(zod@3.25.76)))(@mistralai/mistralai@1.10.0)(@qdrant/js-client-rest@1.13.0(typescript@5.9.3))(@supabase/supabase-js@2.99.0)(@types/jest@29.5.14)(@types/pg@8.11.0)(@types/sqlite3@3.1.11)(cloudflare@4.5.0(encoding@0.1.13))(encoding@0.1.13)(groq-sdk@0.3.0(encoding@0.1.13))(neo4j-driver@5.28.3)(ollama@0.5.18)(pg@8.11.3)(redis@4.7.1)(sqlite3@5.1.7)(ws@8.19.0):
+  mem0ai@2.2.4(@anthropic-ai/sdk@0.73.0(zod@4.3.6))(@azure/identity@4.13.0)(@azure/search-documents@12.2.0)(@cloudflare/workers-types@4.20260120.0)(@google/genai@1.42.0)(@langchain/core@0.3.80(openai@6.32.0(ws@8.19.0)(zod@4.3.6)))(@mistralai/mistralai@1.10.0)(@qdrant/js-client-rest@1.13.0(typescript@5.9.3))(@supabase/supabase-js@2.99.0)(@types/jest@29.5.14)(@types/pg@8.11.0)(@types/sqlite3@3.1.11)(cloudflare@4.5.0(encoding@0.1.13))(encoding@0.1.13)(groq-sdk@0.3.0(encoding@0.1.13))(neo4j-driver@5.28.3)(ollama@0.5.18)(pg@8.11.3)(redis@4.7.1)(sqlite3@5.1.7)(ws@8.19.0):
     dependencies:
-      '@anthropic-ai/sdk': 0.73.0(zod@3.25.76)
+      '@anthropic-ai/sdk': 0.73.0(zod@4.3.6)
       '@azure/identity': 4.13.0
       '@azure/search-documents': 12.2.0
       '@cloudflare/workers-types': 4.20260120.0
       '@google/genai': 1.42.0
-      '@langchain/core': 0.3.80(openai@6.10.0(ws@8.19.0)(zod@3.25.76))
+      '@langchain/core': 0.3.80(openai@6.32.0(ws@8.19.0)(zod@4.3.6))
       '@mistralai/mistralai': 1.10.0
       '@qdrant/js-client-rest': 1.13.0(typescript@5.9.3)
       '@supabase/supabase-js': 2.99.0
@@ -8678,13 +8731,12 @@ snapshots:
     transitivePeerDependencies:
       - encoding
 
-  openai@6.10.0(ws@8.19.0)(zod@3.25.76):
+  openai@6.10.0(ws@8.19.0)(zod@4.3.6):
     optionalDependencies:
       ws: 8.19.0
-      zod: 3.25.76
-    optional: true
+      zod: 4.3.6
 
-  openai@6.10.0(ws@8.19.0)(zod@4.3.6):
+  openai@6.32.0(ws@8.19.0)(zod@4.3.6):
     optionalDependencies:
       ws: 8.19.0
       zod: 4.3.6
@@ -9123,6 +9175,10 @@ snapshots:
       once: 1.4.0
 
   punycode.js@2.3.1: {}
+
+  pusher-js@8.4.2:
+    dependencies:
+      tweetnacl: 1.0.3
 
   qified@0.6.0:
     dependencies:
@@ -9690,6 +9746,8 @@ snapshots:
   tunnel-agent@0.6.0:
     dependencies:
       safe-buffer: 5.2.1
+
+  tweetnacl@1.0.3: {}
 
   type-is@2.0.1:
     dependencies:

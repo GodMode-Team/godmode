@@ -61,6 +61,7 @@
     "postinstall": "bash patches/fix-imessage-native-vision.sh 2>/dev/null || true"
   },
   "dependencies": {
+    "@composio/core": "^0.6.5",
     "@noble/ed25519": "3.0.0",
     "better-sqlite3": "^11.8.1",
     "chokidar": "^4.0.3",
