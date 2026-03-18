@@ -6,6 +6,24 @@
 
 ---
 
+## Why GodMode Exists (Value Proposition)
+
+**One-line:** GodMode is the only AI that actually knows you — and uses that knowledge to help you become who you're trying to become.
+
+**For builders:** Best-of-breed open source, curated into one workspace, with a soul layer that compounds.
+
+**The moat is the relationship.** After months of use, GodMode knows your decision patterns, energy cycles, blind spots, relationships, and north star. That's not a feature — it's a switching cost. Nobody leaves their therapist of 3 years because a new one has a nicer office.
+
+**What GodMode is NOT:** A task runner (Manus), a search engine (Perplexity), a coding tool (Replit), or infrastructure (OpenClaw). It's the human-facing experience layer that curates the best of all of those — Apple-style integration with a soul.
+
+**Competitive positioning:**
+- vs Manus/Perplexity: They're transactional. GodMode is relational.
+- vs OpenClaw: OC is the runtime. GodMode is the experience.
+- vs Hermes: Hermes learns skills. GodMode learns YOU.
+- vs DIY: 6 months of integration work vs one install + one relationship.
+
+---
+
 ## What GodMode v2 IS
 
 A lightweight OpenClaw plugin that delivers:
@@ -239,7 +257,92 @@ Plugin must load in OpenClaw and serve the UI at /godmode with:
 
 ---
 
-## SESSION 4: Dependency Reduction
+## SESSION 4a: Honcho → Vault Sync Service
+
+**Goal:** Honcho outputs readable markdown into the Obsidian vault. One unified knowledge base.
+
+### Architecture:
+
+```
+Conversations → Honcho (cloud, reasons in background)
+                  ↓
+            Sync service (runs after each session, or on cron)
+                  ↓
+            Queries Honcho .chat() API for latest representations
+                  ↓
+            Writes markdown to vault:
+              vault/Brain/Identity/honcho-identity.md
+              vault/Brain/Identity/honcho-patterns.md
+              vault/Brain/Identity/honcho-conclusions.md
+```
+
+### Data Flow — Single Vault as Source of Truth:
+
+```
+OBSIDIAN VAULT (one database of all knowledge)
+├── Brain/
+│   ├── Identity/           ← Honcho syncs here (auto-maintained by AI)
+│   ├── People/             ← Agent-maintained from conversations
+│   ├── Companies/          ← Agent-maintained
+│   └── Research/           ← Agent research output
+├── Projects/
+│   ├── GodMode/
+│   ├── Patient Autopilot/
+│   └── TRP/
+├── Daily/
+│   ├── 2026-03-18.md       ← Agent breadcrumbs + user journal
+│   └── ...
+├── Working/
+│   ├── WORKING.md          ← Session state
+│   ├── MISTAKES.md         ← Error-turned-rules
+│   └── INBOX.md            ← Agent-surfaced action items
+└── Resources/
+    └── ...
+```
+
+**The agent IS the vault curator.** Nobody manually maintains anything. The vault grows organically from life, maintained by Prosper + Honcho.
+
+### Implementation:
+
+- New file: `src/services/honcho-sync.ts` (~50 lines)
+- Runs after each session ends (hook: `session_end`)
+- Also on hourly cron (replaces consciousness-heartbeat)
+- Queries Honcho peer representations
+- Writes clean markdown to vault paths
+- If no vault configured, writes to ~/godmode/memory/ as fallback
+
+---
+
+## SESSION 4b: Paperclip → Proof (Live Output)
+
+**Goal:** Agent team output appears live in the Proof sidebar.
+
+### Flow:
+
+1. User tells Prosper to delegate work
+2. Prosper dispatches to Paperclip via paperclip-ceo skill
+3. Paperclip agents start working
+4. As output is produced → webhook pushes to Proof doc in real time
+5. User sees content appearing live in Proof sidebar
+6. User edits inline or chats with Prosper about it
+7. Approve → done. Send back → returns to Paperclip agents.
+
+### Implementation:
+
+- Paperclip webhook endpoint in HTTP handler (receives task output)
+- Creates/updates Proof doc for each task
+- Proof sidebar auto-opens when deliverable is active
+- No Mission Control view needed — link to Paperclip's own dashboard instead
+
+### Mission Control → Link Only:
+
+Replace the entire mission-control.ts view with a single card:
+"View your agent team in Paperclip → [Open Dashboard]"
+Links to PAPERCLIP_URL. Done.
+
+---
+
+## SESSION 4c: Dependency Reduction
 
 **Goal:** New install works with just a model API key.
 
