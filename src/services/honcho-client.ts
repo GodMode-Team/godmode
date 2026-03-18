@@ -94,6 +94,7 @@ export async function forwardMessage(
       {
         peerId: peer.id,
         content,
+        metadata: { role },
       },
     ]);
   } catch (err) {
@@ -114,8 +115,10 @@ export async function getContext(sessionKey: string): Promise<string | null> {
     const session = await getOrCreateSession(sessionKey);
     if (!session) return null;
 
-    const ctx = await session.context({ peerTarget: peer });
-    const content = typeof ctx === "string" ? ctx : (ctx as any)?.content ?? String(ctx);
+    const ctx = await session.context();
+    const content = typeof ctx === "string"
+      ? ctx
+      : (ctx as any)?.peerRepresentation ?? (ctx as any)?.summary ?? (ctx as any)?.content ?? (typeof ctx === "string" ? ctx : JSON.stringify(ctx));
     if (!content || content.trim().length < 10) return null;
 
     return `## Memory (Honcho)\n${content}`;

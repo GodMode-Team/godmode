@@ -1439,7 +1439,7 @@ export function resetContextPressure(sessionKey: string | undefined): void {
 //       → message_sending checks usage against gates → blocks if lazy.
 
 const SEARCH_TOOLS = new Set([
-  "memory_search", "qmd_search", "qmd_vsearch",
+  "qmd_search", "qmd_vsearch",
   "secondbrain.search", "search", "web_search",
 ]);
 
@@ -1959,7 +1959,7 @@ export async function checkEnforcerGates(
         message: [
           "Your response was blocked because you claimed ignorance without searching memory.",
           "",
-          "You have access to: memory_search, qmd search, qmd vsearch, secondBrain.search.",
+          "You have access to: qmd search, qmd vsearch, secondBrain.search.",
           "Your memory bank has files on people, companies, projects, travel, preferences, and more.",
           "Check your File Index for where things live. Search FIRST, then respond.",
           "If truly not found after 3+ different searches, say what you tried.",
@@ -1973,7 +1973,7 @@ export async function checkEnforcerGates(
 
   // Gate 2: Self-Service — asking the user for searchable facts
   // Tightened: requires at least 2 search sources before delegation is allowed.
-  // One failed memory_search does NOT earn the right to ask the user.
+  // One failed search does NOT earn the right to ask the user.
   if (config.gates.selfServiceGate?.enabled) {
     const minSources = config.gates.selfServiceGate?.thresholds?.minSearchSources ?? 2;
     if (matchesAny(content, DELEGATION_PATTERNS) && usage.searchCount < minSources) {
@@ -1985,7 +1985,7 @@ export async function checkEnforcerGates(
             `Your response was blocked because you're asking the user for information after only ${usage.searchCount} search(es). Minimum: ${minSources}.`,
             "",
             "The lookup chain is: memory → vault (secondBrain.search) → tools (exec/Front/contacts/calendar) → queue → THEN ask.",
-            "You have: memory_search, qmd search, qmd vsearch, secondBrain.search, secondBrain.memoryBankEntry, exec, glob, read.",
+            "You have: qmd search, qmd vsearch, secondBrain.search, secondBrain.memoryBankEntry, exec, glob, read.",
             "The user asked because they KNOW you can find it. Exhaust the chain before asking them.",
           ].join("\n"),
         });
@@ -2011,7 +2011,7 @@ export async function checkEnforcerGates(
           "- Search memory with different terms",
           "- Read relevant files directly (check the File Index)",
           "- Use glob to find files by pattern",
-          "- Try different search tools (qmd search, memory_search, secondBrain.search)",
+          "- Try different search tools (qmd search, qmd vsearch, secondBrain.search)",
           "When you truly exhaust all options, explain everything you tried.",
         ].join("\n"),
       });
@@ -2036,7 +2036,7 @@ export async function checkEnforcerGates(
           `You searched ${usage.searchCount} time(s) but haven't exhausted your options. Minimum: ${minSearches}.`,
           "",
           "Try different search terms, different tools, check the File Index.",
-          "Tools: memory_search, qmd search, qmd vsearch, secondBrain.search, glob, read.",
+          "Tools: qmd search, qmd vsearch, secondBrain.search, glob, read.",
           "When you truly exhaust all options, explain everything you tried.",
         ].join("\n"),
       });
@@ -2095,7 +2095,7 @@ export async function checkEnforcerGates(
             `You used ${usage.searchCount} search source(s) this turn. Minimum before asking: ${minSources}.`,
             "",
             "MANDATORY lookup chain — every step before asking the user:",
-            "1. memory_search / qmd search / qmd vsearch (check what you already know)",
+            "1. qmd search / qmd vsearch (check what you already know)",
             "2. secondBrain.search / secondBrain.memoryBankEntry (search vault, people files, notes)",
             "3. Tools: exec (Front API, curl, contacts CLI), calendar, tasks, files, web_search",
             "4. queue_add for background research if needed",
@@ -2181,7 +2181,7 @@ export async function checkEnforcerGates(
             `Evidence tokens are earned by calling search tools. You used ${usage.searchCount}/${minSources} required.`,
             "",
             "THE IRON RULE: Search before you ask. Every factual question must be preceded by tool calls.",
-            "Lookup chain: memory_search → secondBrain.search → exec/read/glob → queue_add → THEN ask.",
+            "Lookup chain: secondBrain.search → exec/read/glob → queue_add → THEN ask.",
             "",
             "If you need information from the user, FIRST exhaust your own sources.",
             "If truly not found after multiple searches, explain what you tried.",

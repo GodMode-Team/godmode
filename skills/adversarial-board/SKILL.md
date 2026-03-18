@@ -15,7 +15,7 @@ Simulate a 5-person board of advisors who stress-test ideas from different angle
    - **The Customer** — Would anyone pay for this? What does the user's actual audience want vs. what's being built?
    - **The Competitor** — If a rival saw this plan, what would they do? What's the moat? How fast can this be copied?
 3. **Check context:**
-   - `memory_search` for related past decisions or market data
+   - `secondBrain.search` for related past decisions or market data
    - `web_search` if the topic needs current market context
 4. **Synthesize** — Identify the 2-3 critiques that actually change the calculus (ignore noise).
 5. **Recommend** — Proceed / modify / kill, with the specific modifications if applicable.

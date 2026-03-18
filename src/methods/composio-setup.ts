@@ -49,8 +49,8 @@ const disconnect: GatewayRequestHandler = async ({ params, respond }) => {
     respond(false, null, { code: "MISSING_PARAM", message: "appName is required" });
     return;
   }
-  // Composio SDK handles revocation through the connection API
-  respond(true, { appName, disconnected: true, note: "Connection revocation requested" });
+  // TODO: Wire actual SDK revocation when Composio supports it
+  respond(true, { appName, disconnected: false, note: "Disconnect not yet implemented — revoke access directly in the app's settings" });
 };
 
 export const composioSetupHandlers: GatewayRequestHandlers = {

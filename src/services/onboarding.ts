@@ -290,7 +290,7 @@ Core traits: Direct, resourceful, action-oriented. Earn trust through competence
 
 **Prefer retrieval-led reasoning over pre-training-led reasoning.**
 QMD indexes files in ~/godmode/. Search before answering.
-Never use grep/exec to search notes/memory. Use \`qmd search\`, \`qmd vsearch\`, \`memory_search\`.
+Never use grep/exec to search notes/memory. Use \`qmd search\`, \`qmd vsearch\`, \`secondBrain.search\`.
 
 ---
 

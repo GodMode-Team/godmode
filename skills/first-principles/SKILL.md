@@ -15,7 +15,7 @@ User asks for a decision, strategy advice, "how should I approach", "what's the 
    - The lateral path (reframe the problem entirely)
 4. **Attack each solution** — For every option, name the top 2 risks and the conditions under which it fails.
 5. **Check memory for precedent:**
-   - `memory_search` for similar past decisions
+   - `secondBrain.search` for similar past decisions
    - Surface what worked/failed before
 6. **Recommend one path** — State the recommendation, the key assumption it depends on, and the trigger to reconsider.
 
@@ -33,5 +33,5 @@ User asks for a decision, strategy advice, "how should I approach", "what's the 
 ## Failure Modes
 - **Too abstract** — If the user gives a vague problem, ask for specifics before running the framework. Don't first-principles a grocery list.
 - **Analysis paralysis** — Cap at 3 options. More than that means the framing is wrong.
-- **Missing context** — Always check `memory_search` first. The user may have already decided this and forgotten.
+- **Missing context** — Always check `secondBrain.search` first. The user may have already decided this and forgotten.
 - **Overconfidence** — If constraints are uncertain, say so. "Medium confidence — this depends on X being true."

@@ -10,7 +10,7 @@ After a complex interaction involving 5+ tool calls, repeated multi-step workflo
 1. **Detect the pattern** — Review the recent conversation for:
    - Sequences of 3+ tool calls that form a logical workflow
    - Steps the user directed manually that could be automated
-   - Repeated patterns across sessions (check `memory_search`)
+   - Repeated patterns across sessions (check `secondBrain.search`)
 2. **Extract the skeleton:**
    - What triggers this workflow?
    - What are the ordered steps?
@@ -26,7 +26,7 @@ After a complex interaction involving 5+ tool calls, repeated multi-step workflo
    - Iterate once if needed
 5. **Save and register:**
    - Write to `skills/{skill-name}/SKILL.md`
-   - Log creation in memory via `memory_search` (so future sessions know it exists)
+   - Log creation in memory via `secondBrain.search` (so future sessions know it exists)
    - Confirm: "Skill saved. It will activate when [trigger condition]."
 
 ## Output

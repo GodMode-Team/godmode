@@ -20,7 +20,7 @@ Meeting webhook fires (Fathom, Otter, etc.) via `POST /godmode/webhooks/meeting`
    - **Key context** — Important facts, numbers, or positions stated
    - **People present** — Names, roles, notable contributions
 3. **Update memory:**
-   - `memory_search` to store key decisions and action items per person
+   - Key decisions and action items are captured automatically in memory (Honcho)
    - Link to relevant projects or prior meetings
 4. **Create tasks:**
    - `tasks_create` for each action item assigned to the user

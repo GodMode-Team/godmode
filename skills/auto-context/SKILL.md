@@ -12,10 +12,10 @@ Before meetings (calendar event approaching), when a task or project comes up in
    - `calendar_today` for upcoming schedule
    - Extract attendees, meeting title, any notes/links in the event
 3. **Look up people:**
-   - `memory_search` for each attendee or mentioned person
+   - `secondBrain.search` for each attendee or mentioned person
    - Surface: role, company, last interaction, open threads, relationship notes
 4. **Pull project context:**
-   - `memory_search` for the project/company
+   - `secondBrain.search` for the project/company
    - Check for related tasks via `tasks_create` (read mode) or task history
    - Surface: current status, blockers, recent decisions, open questions
 5. **Check for unfinished threads:**

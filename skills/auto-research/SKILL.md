@@ -9,7 +9,7 @@ Questions about topics, companies, people, markets, trends, technologies, or any
 ## Process
 1. **Scope the question** — What specifically does the user need? A quick answer, a briefing, or a deep dive? Default to briefing (5-10 key points).
 2. **Check internal memory first:**
-   - `memory_search` for what we already know
+   - `secondBrain.search` for what we already know
    - Surface any prior research or decisions on this topic
 3. **Web research:**
    - `web_search` for current facts, news, data
@@ -23,7 +23,7 @@ Questions about topics, companies, people, markets, trends, technologies, or any
    - Separate facts from analysis
 6. **Identify gaps** — What couldn't be found? What's uncertain? What would require deeper digging?
 7. **Store findings:**
-   - `memory_search` key facts for future retrieval
+   - `secondBrain.search` key facts for future retrieval
    - Offer to save a research brief to vault if the topic is important
 
 ## Output
@@ -40,4 +40,4 @@ Questions about topics, companies, people, markets, trends, technologies, or any
 - **Stale data** — Web results may be months old. Always note dates on findings. Flag if freshness matters.
 - **Source quality** — Prefer primary sources (company blogs, SEC filings, official docs) over aggregator articles. Flag when sources are thin.
 - **Scope creep** — User asks about "AI" broadly. Narrow it: "Which angle? Market size, technical trends, investment, or specific companies?"
-- **API failures** — If `web_search` or `x_read` fails, say so explicitly. Don't hallucinate findings. Fall back to `memory_search` and prior knowledge with clear caveats.
+- **API failures** — If `web_search` or `x_read` fails, say so explicitly. Don't hallucinate findings. Fall back to `secondBrain.search` and prior knowledge with clear caveats.
