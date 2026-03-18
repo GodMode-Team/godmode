@@ -150,23 +150,8 @@ export function createDelegateTool(): AnyAgentTool {
             }
           } catch { /* toolkit not available */ }
 
-          // ONE shared Proof doc per project
-          let projectProofSlug: string | undefined;
-          try {
-            const { isProofRunning } = await import("../services/proof-server.js");
-            if (isProofRunning()) {
-              const { createProofDocument } = await import("../lib/proof-bridge.js");
-              const sectionHeaders = issues.map((t, i) =>
-                `## ${i + 1}. ${t.title}\n\n*Assigned to: ${t.personaHint || "TBD"}*\n\n(Agent will write here)\n`
-              ).join("\n---\n\n");
-              const doc = await createProofDocument(
-                title,
-                `# ${title}\n\n${description}\n\n---\n\n${sectionHeaders}`,
-                "ally",
-              );
-              projectProofSlug = doc.slug;
-            }
-          } catch { /* Proof not available */ }
+          // REMOVED (v2 slim): Proof document creation
+          const projectProofSlug: string | undefined = undefined;
 
           // Build issue records + resolve personas
           const issueRecords: Array<{

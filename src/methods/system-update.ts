@@ -497,18 +497,8 @@ async function runPostUpdateSmokeTests(
     results.push({ name: "data-integrity", status: "warn", detail: "Could not check data files" });
   }
 
-  // 5. Heartbeat running
-  try {
-    const { getConsciousnessHeartbeat } = await import("../services/consciousness-heartbeat.js");
-    const running = getConsciousnessHeartbeat()?.running ?? false;
-    results.push({
-      name: "heartbeat",
-      status: running ? "pass" : "warn",
-      detail: running ? "Consciousness heartbeat active" : "Heartbeat not yet running",
-    });
-  } catch (err) {
-    results.push({ name: "heartbeat", status: "warn", detail: `Could not check heartbeat: ${String(err).slice(0, 100)}` });
-  }
+  // REMOVED (v2 slim): consciousness-heartbeat check
+  results.push({ name: "heartbeat", status: "warn", detail: "Heartbeat removed in v2 slim" });
 
   logger.info(`[GodMode] Smoke tests complete: ${results.length} checks`);
   return results;

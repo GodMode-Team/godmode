@@ -280,27 +280,7 @@ export async function handleBeforeReset(
     // Only log if there was a real conversation (not just a single message)
     // and skip cron sessions (they're logged separately via queue-processor)
     if (tracked && tracked.messageCount >= SESSION_MIN_MESSAGES && !sessionKey.includes(":cron:")) {
-      void (async () => {
-        try {
-          const { hasSessionImpact, logImpact } = await import("../methods/impact-ledger.js");
-
-          // Skip if this session already has an impact entry (e.g., from trust-rate or queue-complete)
-          if (await hasSessionImpact(sessionKey)) return;
-
-          const durationMin = Math.round((Date.now() - tracked.startedAt) / 60_000);
-          // Estimate value based on session duration — longer sessions = more value
-          // Use "chat session" default (10 min) as minimum, but scale up for longer sessions
-          const minutesOverride = Math.max(10, Math.min(durationMin, 120));
-
-          await logImpact({
-            workflow: "chat session",
-            source: "session",
-            sessionId: sessionKey,
-            note: `${tracked.messageCount} messages, ${durationMin}m duration`,
-            minutesOverride,
-          });
-        } catch { /* non-fatal */ }
-      })();
+      // REMOVED (v2 slim): impact-ledger logging
     }
   }
 }

@@ -23,7 +23,8 @@
 
 import { getAllyNameLower } from "./ally-identity.js";
 import { listRoster } from "./agent-roster.js";
-import { isProofRunning } from "../services/proof-server.js";
+// REMOVED (v2 slim): proof-server import
+function isProofRunning(): boolean { return false; }
 
 // ── ACP Provenance ────────────────────────────────────────────────
 // Tells us who sent this message so the ally can adjust behavior.

@@ -1,8 +1,8 @@
 /**
  * x-read.ts — Agent tool for reading X/Twitter content.
  *
- * One tool for all X operations: search, tweet, thread, timeline, article, bookmarks.
- * Routes to XAI x_search for search and Brave CDP for everything else.
+ * v2 slim: x-client removed. This tool now returns a graceful degradation
+ * message directing users to the platform x_read tool.
  */
 
 import { type AnyAgentTool, jsonResult } from "openclaw/plugin-sdk";
@@ -25,22 +25,11 @@ export function createXReadTool(_ctx: ToolContext): AnyAgentTool {
         action: {
           type: "string",
           enum: ["search", "tweet", "thread", "timeline", "article", "bookmarks"],
-          description:
-            "What to do: " +
-            "'search' to search X for topics, " +
-            "'tweet' to read a specific tweet by URL or ID, " +
-            "'thread' to read a full tweet thread, " +
-            "'timeline' to get a user's recent tweets, " +
-            "'article' to read an article linked from a tweet, " +
-            "'bookmarks' to get your X bookmarks.",
+          description: "What to do on X/Twitter.",
         },
         query: {
           type: "string",
-          description:
-            "For 'search': the search query. " +
-            "For 'tweet'/'thread'/'article': tweet URL or ID. " +
-            "For 'timeline': the @handle or profile URL. " +
-            "For 'bookmarks': omit or leave empty.",
+          description: "Search query, tweet URL/ID, or @handle.",
         },
         count: {
           type: "number",
@@ -49,61 +38,10 @@ export function createXReadTool(_ctx: ToolContext): AnyAgentTool {
       },
       required: ["action"],
     },
-    execute: async (_toolCallId: string, params: Record<string, unknown>) => {
-      const action = String(params.action ?? "").trim();
-      const query = String(params.query ?? "").trim();
-      const count = typeof params.count === "number" ? params.count : 10;
-
-      try {
-        const {
-          searchX,
-          getTweet,
-          getThread,
-          getUserTimeline,
-          readArticle,
-          getBookmarks,
-        } = await import("../services/x-client.js");
-
-        switch (action) {
-          case "search": {
-            if (!query) return jsonResult({ error: "query is required for search" });
-            const result = await searchX(query, { limit: count });
-            return jsonResult(result);
-          }
-          case "tweet": {
-            if (!query) return jsonResult({ error: "tweet URL or ID is required" });
-            const result = await getTweet(query);
-            return jsonResult(result);
-          }
-          case "thread": {
-            if (!query) return jsonResult({ error: "tweet URL or ID is required" });
-            const result = await getThread(query);
-            return jsonResult(result);
-          }
-          case "timeline": {
-            if (!query) return jsonResult({ error: "handle or profile URL is required" });
-            const result = await getUserTimeline(query, count);
-            return jsonResult(result);
-          }
-          case "article": {
-            if (!query) return jsonResult({ error: "article or tweet URL is required" });
-            const result = await readArticle(query);
-            return jsonResult(result);
-          }
-          case "bookmarks": {
-            const result = await getBookmarks(count);
-            return jsonResult(result);
-          }
-          default:
-            return jsonResult({
-              error: `Unknown action '${action}'. Use: search, tweet, thread, timeline, article, bookmarks.`,
-            });
-        }
-      } catch (err) {
-        return jsonResult({
-          error: `x_read failed: ${err instanceof Error ? err.message : String(err)}`,
-        });
-      }
+    execute: async (_toolCallId: string, _params: Record<string, unknown>) => {
+      return jsonResult({
+        error: "X/Twitter client removed in v2 slim. Use the platform x_read tool instead.",
+      });
     },
   };
 }

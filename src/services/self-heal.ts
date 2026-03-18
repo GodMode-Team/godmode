@@ -214,22 +214,8 @@ export async function runSelfHeal(
     }));
 
   if (escalationCandidates.some((c) => c.consecutiveFailures >= 5 && c.repairCount >= 2)) {
-    try {
-      const { maybeEscalateToCodeRepair } = await import("./code-repair.js");
-      const result = await maybeEscalateToCodeRepair(logger, escalationCandidates);
-      if (result?.started) {
-        logger.info(`[SelfHeal] Escalated to code repair (pid=${result.pid})`);
-        if (broadcast) {
-          broadcast("ally:notification", {
-            type: "code-repair-started",
-            summary: "GodMode is spawning Claude Code to fix a persistent issue",
-            pid: result.pid,
-          });
-        }
-      }
-    } catch (err) {
-      logger.warn(`[SelfHeal] Code repair escalation error: ${String(err)}`);
-    }
+    // REMOVED (v2 slim): code-repair escalation — OC has godmode_repair
+    logger.warn(`[SelfHeal] Subsystems with persistent failures detected — manual intervention needed`);
   }
 
   return { checked, repaired: repairs.length, failures };

@@ -6,7 +6,7 @@ export const TAB_GROUPS = [
 ] as const;
 
 export const POWER_USER_GROUPS = [
-  { label: "System", tabs: ["mission-control", "overview", "channels", "sessions", "cron", "debug"] },
+  { label: "System", tabs: ["overview", "channels", "sessions", "cron", "debug"] },
 ] as const;
 
 /** Tabs that can be dynamically inserted but aren't in static groups. */

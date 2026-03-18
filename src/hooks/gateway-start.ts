@@ -256,20 +256,7 @@ export async function runGatewayStart(
     logger.warn(`[GodMode] workspace sync service failed to start: ${String(err)}`);
   }
 
-  // Curation agent service
-  try {
-    const clientsDir = join(dirname(DATA_DIR), "clients");
-    if (existsSync(clientsDir)) {
-      const { getCurationAgentService } = await import("../services/curation-agent.js");
-      const curation = getCurationAgentService(logger);
-      await curation.start();
-      serviceCleanup.push({ name: "curation-agent", fn: () => curation.stop() });
-    } else {
-      logger.info("[GodMode] Curation agent skipped — no team workspaces configured");
-    }
-  } catch (err) {
-    logger.warn(`[GodMode] curation service failed to start: ${String(err)}`);
-  }
+  // REMOVED (v2 slim): curation-agent service
 
   // Skill cards
   try {
@@ -343,30 +330,7 @@ export async function runGatewayStart(
     logger.warn(`[GodMode] Post-update audit error: ${String(err)}`);
   }
 
-  // Consciousness heartbeat
-  try {
-    const {
-      initConsciousnessHeartbeat,
-      startConsciousnessHeartbeat,
-      stopConsciousnessHeartbeat,
-      setConsciousnessHeartbeatApiRequest,
-      setConsciousnessHeartbeatBroadcast,
-    } = await import("../services/consciousness-heartbeat.js");
-    initConsciousnessHeartbeat(logger);
-    // Wire broadcast so heartbeat notifications (cron results, daily brief, failure alerts) reach the UI
-    setConsciousnessHeartbeatBroadcast((event: string, data: unknown) => safeBroadcast(api, event, data));
-    // Wire api.request for the session distiller pipeline (Pipeline 3)
-    if (typeof api.request === "function") {
-      setConsciousnessHeartbeatApiRequest(
-        (method: string, params: Record<string, unknown>) => api.request(method, params),
-      );
-    }
-    startConsciousnessHeartbeat();
-    serviceCleanup.push({ name: "consciousness-heartbeat", fn: () => stopConsciousnessHeartbeat() });
-    logger.info("[GodMode] Consciousness heartbeat service started");
-  } catch (err) {
-    logger.warn(`[GodMode] Consciousness heartbeat failed to start: ${String(err)}`);
-  }
+  // REMOVED (v2 slim): consciousness-heartbeat — Honcho replaces later
 
   // Queue processor
   try {
@@ -390,18 +354,7 @@ export async function runGatewayStart(
     logger.warn(`[GodMode] Inbox broadcast setup failed: ${String(err)}`);
   }
 
-  // Proof service (API client — no local server)
-  try {
-    const { initProofService } = await import("../services/proof-server.js");
-    const ok = await initProofService(logger);
-    if (ok) {
-      logger.info("[GodMode] Proof service initialized");
-    } else {
-      logger.warn("[GodMode] Proof service unavailable");
-    }
-  } catch (err) {
-    logger.warn(`[GodMode] Proof service failed to init: ${String(err)}`);
-  }
+  // REMOVED (v2 slim): proof-server — not using Proof
 
   // Agent Toolkit Server (runtime knowledge API for spawned agents)
   try {
@@ -432,25 +385,7 @@ export async function runGatewayStart(
     logger.warn(`[GodMode] Obsidian Sync failed to init: ${String(err)}`);
   }
 
-  // Fathom post-meeting processor
-  try {
-    const { initFathomProcessor, startFathomProcessor, stopFathomProcessor, setBroadcast: setFathomBroadcast } = await import("../services/fathom-processor.js");
-    initFathomProcessor(logger);
-    setFathomBroadcast((event: string, data: unknown) => safeBroadcast(api, event, data));
-    startFathomProcessor();
-    serviceCleanup.push({ name: "fathom-processor", fn: () => { stopFathomProcessor(); } });
-    logger.info("[GodMode] Fathom post-meeting processor started");
-  } catch (err) {
-    logger.warn(`[GodMode] Fathom processor failed to start: ${String(err)}`);
-  }
-
-  // X/Twitter client
-  try {
-    const { initXClient } = await import("../services/x-client.js");
-    await initXClient(logger);
-  } catch (err) {
-    logger.warn(`[GodMode] X client init failed: ${String(err)}`);
-  }
+  // REMOVED (v2 slim): fathom-processor, x-client
 
   logger.info(`[GodMode] Gateway startup complete — ${serviceCleanup.length} service(s) registered for cleanup`);
 }

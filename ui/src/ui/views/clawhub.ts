@@ -1,28 +1,50 @@
 /**
- * ClawHub view — stub (killed in lean audit).
- * Retained as empty export to satisfy skills.ts dependency.
+ * clawhub.ts — STUB (removed in v2 slim, skills browser in Second Brain replaces this)
  */
-import { html } from "lit";
+import { html, type TemplateResult } from "lit";
 
-export type ClawHubProps = {
+export type ClawHubSearchResult = {
+  slug: string;
+  name: string;
+  description: string;
+  downloads: number;
+};
+
+export type ClawHubSkillItem = {
+  slug: string;
+  name: string;
+  description: string;
+  downloads: number;
+  author: string;
+  version: string;
+};
+
+export type ClawHubSkillDetail = {
+  slug: string;
+  name: string;
+  description: string;
+  readme: string;
+  downloads: number;
+  author: string;
+  version: string;
+};
+
+export interface ClawHubProps {
   loading: boolean;
   error: string | null;
   query: string;
-  results: unknown[] | null;
-  exploreItems: unknown[] | null;
+  results: ClawHubSearchResult[] | null;
+  exploreItems: ClawHubSkillItem[] | null;
   exploreSort: string;
   detailSlug: string | null;
-  detail: unknown | null;
+  detail: ClawHubSkillDetail | null;
   importing: string | null;
-  message: unknown | null;
+  message: import("../controllers/clawhub").ClawHubMessage | null;
   onSearch: (query: string) => void;
-  onExplore: (sort?: string) => void;
-  onDetail: (slug: string) => void;
-  onCloseDetail: () => void;
-  onImport: (slug: string) => void;
-  onImportAndPersonalize: (slug: string) => void;
-};
+}
 
-export function renderClawHub(_props: ClawHubProps) {
-  return html`<div class="muted" style="padding: 16px;">ClawHub has been retired.</div>`;
+export function renderClawHub(_props: ClawHubProps): TemplateResult {
+  return html`<div style="padding: 16px; color: var(--text-secondary, #888);">
+    <p>ClawHub browser removed. Skills are managed in the Second Brain tab.</p>
+  </div>`;
 }

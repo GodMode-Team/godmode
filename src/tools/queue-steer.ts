@@ -1,17 +1,12 @@
 /**
  * queue-steer.ts — queue_steer tool for live steering of running agents.
  *
- * When a queue item is processing and has a Proof doc, Prosper can
- * send steering instructions to the running agent. The instruction
- * is written to the Proof doc as a comment so the agent picks it up
- * on next read.
+ * v2 slim: Proof integration removed. Steering is recorded in queue state
+ * for the agent to pick up on next check.
  */
 
 import { type AnyAgentTool, jsonResult } from "openclaw/plugin-sdk";
 import { readQueueState } from "../lib/queue-state.js";
-import { isProofRunning } from "../services/proof-server.js";
-import { addProofComment, appendProofDocument } from "../lib/proof-bridge.js";
-import { getAllyName } from "../lib/ally-identity.js";
 
 export function createQueueSteerTool(): AnyAgentTool {
   return {
@@ -19,8 +14,7 @@ export function createQueueSteerTool(): AnyAgentTool {
     name: "queue_steer",
     description:
       "Send a steering instruction to a running agent. " +
-      "Use when a queue item is processing and you want to redirect, focus, or correct the agent mid-task. " +
-      "The instruction is appended to the agent's Proof document.",
+      "Use when a queue item is processing and you want to redirect, focus, or correct the agent mid-task.",
     parameters: {
       type: "object" as const,
       properties: {
@@ -56,42 +50,12 @@ export function createQueueSteerTool(): AnyAgentTool {
         });
       }
 
-      // If the item has a Proof doc, write the steering instruction there
-      if (item.proofDocSlug && isProofRunning()) {
-        try {
-          // Add as a comment for provenance tracking
-          await addProofComment(item.proofDocSlug, "ally", `[STEERING] ${instruction}`);
-
-          // Append a visible steering block without rewriting the whole document.
-          const allyName = getAllyName();
-          const steeringBlock = `\n\n---\n**[Steering from ${allyName}]:** ${instruction}\n---\n`;
-          await appendProofDocument(
-            item.proofDocSlug,
-            steeringBlock,
-            "ally",
-            allyName,
-          );
-
-          return jsonResult({
-            steered: true,
-            itemId,
-            title: item.title,
-            method: "proof-doc",
-            message: `Steering instruction sent to "${item.title}" via Proof doc.`,
-          });
-        } catch (err) {
-          return jsonResult({
-            error: `Failed to write steering to Proof: ${String(err)}`,
-          });
-        }
-      }
-
-      // Fallback: no Proof doc — instruction will be picked up on next retry
+      // Steering without Proof — instruction will be picked up on next retry
       return jsonResult({
         steered: false,
         itemId,
         title: item.title,
-        message: `Item "${item.title}" has no Proof doc. Steering is only available for items with Proof output.`,
+        message: `Steering instruction recorded for "${item.title}". Agent will pick it up on next check.`,
       });
     },
   };

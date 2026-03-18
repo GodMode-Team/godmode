@@ -374,15 +374,9 @@ export function registerCliCommands(deps: CliDeps) {
       .command("run")
       .description("Manually trigger curation for a workspace")
       .requiredOption("--workspace <id>", "Workspace ID")
-      .action(async (opts: { workspace: string }) => {
-        const { getCurationAgentService } = await import("../services/curation-agent.js");
-        const service = getCurationAgentService();
-        const result = await service.runCuration(opts.workspace);
-        if (result.ok) {
-          console.log(`\x1b[32m\u2713\x1b[0m Curation completed for ${opts.workspace}`);
-        } else {
-          console.error(`\x1b[31m\u2717\x1b[0m Curation failed: ${result.error}`);
-        }
+      .action(async (_opts: { workspace: string }) => {
+        // REMOVED (v2 slim): curation-agent service
+        console.log("Curation agent removed in v2 slim.");
       });
 
     curation

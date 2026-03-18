@@ -1,7 +1,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { type AnyAgentTool, jsonResult } from "openclaw/plugin-sdk";
-import { getCurationAgentService } from "../services/curation-agent.js";
+// REMOVED (v2 slim): curation-agent import
 import { getWorkspaceSyncService } from "../lib/workspace-sync-service.js";
 import {
   loadCombinedSessionStoreForGateway,
@@ -106,10 +106,9 @@ export function createTeamMemoryWriteTool(ctx: {
         // Non-fatal
       }
 
-      // Notify curation agent
+      // REMOVED (v2 slim): curation agent notification
       try {
-        const curationService = getCurationAgentService();
-        curationService.notifyMemoryWrite(workspace.id);
+        // no-op
       } catch {
         // Non-fatal
       }

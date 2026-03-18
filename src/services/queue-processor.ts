@@ -469,25 +469,7 @@ class QueueProcessor {
       summary = "Output file not found — agent may have completed without writing results.";
     }
 
-    if ((!outputContent || outputContent.trim().length === 0) && currentItem?.proofDocSlug) {
-      try {
-        const { readProofDocument } = await import("../lib/proof-bridge.js");
-        const proofDoc = await readProofDocument(currentItem.proofDocSlug);
-        if (proofDoc.content.trim()) {
-          outputContent = proofDoc.content;
-          await fs.mkdir(INBOX_DIR, { recursive: true });
-          await fs.writeFile(outPath, outputContent, "utf-8");
-          const lines = outputContent
-            .split("\n")
-            .filter((l) => l.trim().length > 0)
-            .slice(0, 3);
-          summary = lines.join(" ").slice(0, 500);
-          artifacts = extractArtifacts(outputContent);
-        }
-      } catch {
-        // Proof fallback is best-effort.
-      }
-    }
+    // REMOVED (v2 slim): Proof document fallback
 
     // Retrieve the item's type for evidence checking
     const itemType = currentItem?.type ?? "task";
@@ -609,17 +591,7 @@ class QueueProcessor {
       askTrustRating: !!personaSlug,
     });
 
-    // Log impact entry for completed queue item
-    try {
-      const { logImpact } = await import("../methods/impact-ledger.js");
-      await logImpact({
-        workflow: completedItem?.type ?? "task",
-        source: "queue-complete",
-        note: completedItem?.title,
-      });
-    } catch (err) {
-      this.logger.warn(`[GodMode][Queue] Failed to log impact for ${itemId}: ${String(err)}`);
-    }
+    // REMOVED (v2 slim): impact-ledger logging
 
     // Push to universal inbox — every completed item gets an entry
     const projectId = completedItem?.meta?.projectId ?? completedItem?.meta?.paperclipProjectId;
@@ -1217,51 +1189,7 @@ class QueueProcessor {
       }
     } catch { /* toolkit not available */ }
 
-    if (item.proofDocSlug) {
-      try {
-        const { getProofApiBase, getProofViewUrl, getProofToken } = await import("../lib/proof-bridge.js");
-        const proofApi = getProofApiBase();
-        const proofUrl = getProofViewUrl(item.proofDocSlug);
-        const proofToken = getProofToken(item.proofDocSlug);
-        if (!proofToken) {
-          sections.push(
-            "",
-            "## Proof Document (read-only)",
-            `A Proof document was created for this task but the auth token is unavailable.`,
-            `View URL: ${getProofViewUrl(item.proofDocSlug)}`,
-            `Write your output to the file path above instead. The user can copy it into Proof later.`,
-          );
-        } else {
-        sections.push(
-          "",
-          "## Live Proof Document (optional — file output is primary)",
-          `A shared Proof doc is available for this project: ${proofUrl}`,
-          `Proof doc slug: ${item.proofDocSlug}`,
-          `Proof API base: ${proofApi}`,
-          "You MAY write progress updates to the Proof doc, but your PRIMARY output MUST go to the file path above.",
-          "If Proof API calls fail, ignore them and continue working — write everything to the output file.",
-          "The output file is what gets reviewed. Proof is a live preview bonus, not a requirement.",
-          "",
-          "Example commands (use the Proof agent bridge API):",
-          "```bash",
-          `# Read current document state`,
-          `curl -s -H "Authorization: Bearer ${proofToken}" ${proofApi}/api/agent/${item.proofDocSlug}/state`,
-          `# Replace full content`,
-          `curl -s -X POST -H "Content-Type: application/json" -H "Authorization: Bearer ${proofToken}" -H "X-Agent-Id: godmode-${roleName.toLowerCase().replace(/\s+/g, "-")}" \\`,
-          `  ${proofApi}/api/agent/${item.proofDocSlug}/ops \\`,
-          `  -d '{"type":"rewrite.apply","by":"ai:godmode-${roleName.toLowerCase().replace(/\s+/g, "-")}","content":"## Outline\\n- ..."}'`,
-          `# Append content`,
-          `curl -s -X POST -H "Content-Type: application/json" -H "Authorization: Bearer ${proofToken}" -H "X-Agent-Id: godmode-${roleName.toLowerCase().replace(/\s+/g, "-")}" \\`,
-          `  ${proofApi}/api/agent/${item.proofDocSlug}/edit \\`,
-          `  -d '{"by":"ai:godmode-${roleName.toLowerCase().replace(/\s+/g, "-")}","operations":[{"op":"append","section":"","content":"\\n\\n## Next update\\n..."}]}'`,
-          "```",
-          "The Proof editor handles real-time sync — your writes appear live to the user.",
-        );
-        } // end else (proofToken exists)
-      } catch {
-        // Proof server may be unavailable mid-run; continue with file output only.
-      }
-    }
+    // REMOVED (v2 slim): Proof document integration in agent prompt
 
     // Detect godmode-builder persona for codebase-level access
     const isGodmodeBuilder = item.personaHint === "godmode-builder" ||
@@ -1553,29 +1481,11 @@ class QueueProcessor {
     return sections.join("\n");
   }
 
+  // REMOVED (v2 slim): ensureProofDocument — Proof integration removed
   private async ensureProofDocument(
-    item: QueueItem,
+    _item: QueueItem,
   ): Promise<{ slug: string; filePath?: string } | null> {
-    if (item.proofDocSlug) {
-      return { slug: item.proofDocSlug, filePath: item.proofDocFilePath };
-    }
-
-    try {
-      const { isProofRunning } = await import("./proof-server.js");
-      if (!isProofRunning()) {
-        return null;
-      }
-      const { createProofDocument } = await import("../lib/proof-bridge.js");
-      const proofDoc = await createProofDocument(
-        item.title,
-        `# ${item.title}\n\n## Working Draft\n\n`,
-        "ally",
-      );
-      return { slug: proofDoc.slug, filePath: proofDoc.filePath };
-    } catch (err) {
-      this.logger.warn(`[GodMode][Queue] Proof doc creation failed for ${item.id}: ${String(err)}`);
-      return null;
-    }
+    return null;
   }
 
   // ── Broadcast helper ───────────────────────────────────────────

@@ -1673,25 +1673,13 @@ const vaultCaptureStatus: GatewayRequestHandler = async ({ respond }) => {
 };
 
 const vaultCaptureRunNow: GatewayRequestHandler = async ({ respond }) => {
-  try {
-    const { runAllCapturePipelines } = await import("../services/vault-capture.js");
-    const logger = {
-      info: (msg: string) => console.log(msg),
-      warn: (msg: string) => console.warn(msg),
-      error: (msg: string) => console.error(msg),
-    };
-    const result = await runAllCapturePipelines(logger);
-    respond(true, {
-      totalCaptured: result.totalCaptured,
-      sessions: result.sessions,
-      queueOutputs: result.queueOutputs,
-    });
-  } catch (err) {
-    respond(false, undefined, {
-      code: "CAPTURE_ERROR",
-      message: err instanceof Error ? err.message : String(err),
-    });
-  }
+  // REMOVED (v2 slim): vault-capture — obsidian-sync stays
+  respond(true, {
+    totalCaptured: 0,
+    sessions: 0,
+    queueOutputs: 0,
+    note: "Vault capture removed in v2 slim. Obsidian sync remains active.",
+  });
 };
 
 // ── Export ────────────────────────────────────────────────────────────

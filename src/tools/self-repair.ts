@@ -23,15 +23,14 @@ export function createSelfRepairTool(): AnyAgentTool {
       "when health warnings appear in your context, or when the user reports something " +
       "isn't working (memory, queue, calendar, etc.). " +
       "Actions: 'diagnose' (check all systems), 'repair' (fix what's broken), " +
-      "'code-repair' (spawn Claude Code to fix a code-level bug), " +
       "'history' (see recent repairs), 'status' (quick health summary).",
     parameters: {
       type: "object" as const,
       properties: {
         action: {
           type: "string",
-          enum: ["diagnose", "repair", "code-repair", "history", "status"],
-          description: "What to do. 'diagnose' runs full checks, 'repair' attempts runtime fixes, 'code-repair' spawns Claude Code CLI to fix a code bug, 'history' shows past repairs, 'status' shows current health.",
+          enum: ["diagnose", "repair", "history", "status"],
+          description: "What to do. 'diagnose' runs full checks, 'repair' attempts runtime fixes, 'history' shows past repairs, 'status' shows current health.",
         },
         subsystem: {
           type: "string",
@@ -185,58 +184,10 @@ export function createSelfRepairTool(): AnyAgentTool {
           }
 
           case "code-repair": {
-            const { spawnCodeRepair, getCodeRepairStatus } = await import("../services/code-repair.js");
-
-            // Check current status first
-            const crStatus = getCodeRepairStatus();
-            if (crStatus.active) {
-              return jsonResult({
-                started: false,
-                detail: `Code repair already running for ${crStatus.subsystem} (pid=${crStatus.pid}). Wait for it to finish.`,
-              });
-            }
-
-            const issueDesc = params.issue_description ? String(params.issue_description) : undefined;
-            const targetSubsystem = subsystem ?? "unknown";
-            const failure = issueDesc ?? `Ally-triggered code repair for ${targetSubsystem}`;
-
-            // Gather error context from ledger
-            const ledgerSnap = health.snapshot();
-            const contextLines = ledgerSnap.operations
-              .filter((op) => op.consecutiveFailures > 0)
-              .map((op) => `${op.operation}: ${op.consecutiveFailures} failures, last: ${op.lastError ?? "ok"}`)
-              .slice(0, 10);
-
-            const recentErrs = turnErrors.peek();
-            if (recentErrs.length > 0) {
-              contextLines.push("", "Recent turn errors:");
-              for (const e of recentErrs) {
-                contextLines.push(`- ${e.operation}: ${e.error}`);
-              }
-            }
-
-            const result = await spawnCodeRepair(
-              {
-                subsystem: targetSubsystem,
-                failure,
-                errorContext: contextLines.join("\n") || "No additional error context available.",
-                trigger: "ally",
-              },
-              { info: console.log, warn: console.warn, error: console.error },
-            );
-
-            if (result.started) {
-              return jsonResult({
-                started: true,
-                pid: result.pid,
-                detail: `Claude Code spawned to fix ${targetSubsystem} (pid=${result.pid}). Running in background — fix will be staged in pending-deploy.json and go live on next restart.`,
-              });
-            }
-
+            // REMOVED (v2 slim): code-repair — use OC godmode_repair instead
             return jsonResult({
               started: false,
-              detail: `Could not start code repair: ${result.error}`,
-              status: crStatus,
+              detail: "Code repair removed in v2 slim. Use the platform godmode_repair tool instead.",
             });
           }
 

@@ -24,7 +24,7 @@ import type { OpenClawPluginApi } from "openclaw/plugin-sdk";
 // Method handler imports
 import { agentLogHandlers } from "./src/methods/agent-log.js";
 import { calendarHandlers } from "./src/methods/calendar.js";
-import { consciousnessHandlers } from "./src/methods/consciousness.js";
+// REMOVED (v2 slim): consciousness — Honcho replaces later
 import { dailyBriefHandlers } from "./src/methods/daily-brief.js";
 import { briefGeneratorHandlers } from "./src/methods/brief-generator.js";
 import { goalsHandlers } from "./src/methods/goals.js";
@@ -32,7 +32,7 @@ import { onboardingHandlers } from "./src/methods/onboarding.js";
 import { projectsHandlers } from "./src/methods/projects.js";
 import { tasksHandlers } from "./src/methods/tasks.js";
 import { teamCommsHandlers } from "./src/methods/team-comms.js";
-import { teamCurationHandlers } from "./src/methods/team-curation.js";
+// REMOVED (v2 slim): team-curation — not core
 import { teamWorkspaceHandlers } from "./src/methods/team-workspace.js";
 import { createTeamMessageTool } from "./src/tools/team-message.js";
 import { createTeamMemoryWriteTool } from "./src/tools/team-memory.js";
@@ -52,25 +52,25 @@ import { createTrustRateTool } from "./src/tools/trust-rate.js";
 import { createXReadTool } from "./src/tools/x-read.js";
 import { createSelfRepairTool } from "./src/tools/self-repair.js";
 import { createTasksCreateTool, createTasksListTool, createTasksUpdateTool } from "./src/tools/tasks-tool.js";
-import { createProofEditorTool } from "./src/tools/proof-tool.js";
+// REMOVED (v2 slim): proof-tool — not using Proof
 import { createDelegateTool } from "./src/tools/delegate-tool.js";
 import { createQueueSteerTool } from "./src/tools/queue-steer.js";
 import { queueHandlers } from "./src/methods/queue.js";
-import { xIntelHandlers } from "./src/methods/x-intel.js";
+// REMOVED (v2 slim): x-intel — OC has x_read tool
 import { filesHandlers } from "./src/methods/files.js";
 import { dashboardsHandlers } from "./src/methods/dashboards.js";
-import { impactLedgerHandlers } from "./src/methods/impact-ledger.js";
+// REMOVED (v2 slim): impact-ledger — not core
 import { guardrailsHandlers } from "./src/methods/guardrails.js";
 import { imageCacheHandlers } from "./src/methods/image-cache.js";
 import { secondBrainHandlers } from "./src/methods/second-brain.js";
 import { supportHandlers } from "./src/methods/support.js";
-import { fathomWebhookHandlers } from "./src/methods/fathom-webhook.js";
+// REMOVED (v2 slim): fathom-webhook — replacing with generic meeting webhook
 import { authHandlers } from "./src/methods/auth.js";
 import { sessionPrivacyHandlers } from "./src/methods/session-privacy.js";
 import { resourcesHandlers } from "./src/methods/resources.js";
 import { inboxHandlers } from "./src/services/inbox.js";
-import { proofHandlers } from "./src/services/proof-server.js";
-import { delegationHandlers } from "./src/methods/swarm-rpc.js";
+// REMOVED (v2 slim): proof-server — not using Proof
+// REMOVED (v2 slim): swarm-rpc — replaced by delegate tool + queue processor
 
 // Extracted modules
 import { initLicenseFromConfig, withLicenseGate, getLicenseState } from "./src/lib/license.js";
@@ -138,17 +138,15 @@ const godmodePlugin = {
       ...projectsHandlers, ...tasksHandlers, ...workspacesHandlers,
       ...dailyBriefHandlers, ...briefGeneratorHandlers, ...goalsHandlers,
       ...agentLogHandlers, ...calendarHandlers, ...uiSlotsHandlers,
-      ...onboardingHandlers, ...consciousnessHandlers,
-      ...teamWorkspaceHandlers, ...teamCommsHandlers, ...teamCurationHandlers,
+      ...onboardingHandlers,
+      ...teamWorkspaceHandlers, ...teamCommsHandlers,
       ...optionsHandlers, ...trustTrackerHandlers, ...systemUpdateHandlers,
       ...guardrailsHandlers, ...imageCacheHandlers, ...secondBrainHandlers,
-      ...queueHandlers, ...dashboardsHandlers, ...impactLedgerHandlers, ...supportHandlers,
-      ...xIntelHandlers, ...filesHandlers, ...integrationsHandlers,
-      ...fathomWebhookHandlers, ...authHandlers, ...sessionPrivacyHandlers,
+      ...queueHandlers, ...dashboardsHandlers, ...supportHandlers,
+      ...filesHandlers, ...integrationsHandlers,
+      ...authHandlers, ...sessionPrivacyHandlers,
       ...resourcesHandlers,
       ...inboxHandlers,
-      ...proofHandlers,
-      ...delegationHandlers,
     };
 
     for (const [method, handler] of Object.entries(allHandlers)) {
@@ -467,7 +465,7 @@ const godmodePlugin = {
     api.registerTool(() => createTasksCreateTool());
     api.registerTool(() => createTasksListTool());
     api.registerTool(() => createTasksUpdateTool());
-    api.registerTool(() => createProofEditorTool());
+    // REMOVED (v2 slim): createProofEditorTool
     api.registerTool(() => createQueueSteerTool());
     api.registerTool(() => createDelegateTool());
 
