@@ -667,7 +667,7 @@ When users ask about GodMode capabilities, reference this list:
 | Custom Guardrails | Settings (Lab) | User-defined rules for agent behavior. JSON config, not code. |
 | Safety Gates | Always on | Loop breaker, exhaustive search, persistence, prompt/output shield. |
 | Proactive Intel | Background | Auto-fetches news, X intel, market trends for daily brief. |
-| Consciousness Sync | Background | Hourly auto-sync of CONSCIOUSNESS.md with tasks, calendar, brief. |
+| Honcho Memory | Background | Persistent user modeling via Honcho SDK — context retrieval + message forwarding. |
 | Obsidian Sync | Background | Headless vault sync via `obsidian-headless` CLI (optional). |
 | Agent Roster | Background | Persona files define agent specializations. Auto-routing for queued tasks. |
 
@@ -764,13 +764,10 @@ Services start in order. All failures are non-fatal (logged, continues):
 │   ├── vault-capture-state.json      ← auto-capture pipeline state
 │   └── snapshots/                    ← daily session snapshots
 ├── memory/
-│   ├── CONSCIOUSNESS.md              ← heartbeat output (every 15min)
-│   ├── WORKING.md                    ← current session state
 │   ├── USER.md, SOUL.md, VISION.md   ← identity files
 │   ├── agent-log/                    ← session records
 │   └── agent-roster/                 ← persona files
 └── scripts/
-    └── consciousness-sync.sh         ← bash script (90s timeout)
 ```
 
 **Vault paths (Obsidian):**
@@ -821,12 +818,10 @@ lsof -i :3000
 - If developing locally: `pnpm build` in plugin repo, then restart gateway
 - Asset fallback: `assets/godmode-ui/` is a committed npm snapshot
 
-#### Consciousness Sync Fails or Hangs
-- **Timeout (90s):** consciousness-sync.sh is stalling
-  - Test manually: `bash ~/godmode/scripts/consciousness-sync.sh`
-  - Check it exists: `ls -la ~/godmode/scripts/consciousness-sync.sh`
-- **NOT_FOUND:** Script missing — heartbeat falls back to reading existing CONSCIOUSNESS.md
-- **UI feedback:** Consciousness button shows 4 states: idle (grey), loading (pulse), ok (green glow), error (red glow)
+#### Honcho Memory Not Working
+- Check `HONCHO_API_KEY` is set in environment
+- Check `/godmode/health` endpoint — memory status should show "ready"
+- If degraded: Honcho service may be unreachable. Chat still works without memory.
 
 #### Daily Brief Not Saving or Loading
 - Check vault path: `echo $OBSIDIAN_VAULT_PATH` or verify `~/Documents/VAULT` exists

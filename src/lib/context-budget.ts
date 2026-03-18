@@ -23,8 +23,6 @@
 
 import { getAllyNameLower } from "./ally-identity.js";
 import { listRoster } from "./agent-roster.js";
-// REMOVED (v2 slim): proof-server import
-function isProofRunning(): boolean { return false; }
 
 // ── ACP Provenance ────────────────────────────────────────────────
 // Tells us who sent this message so the ally can adjust behavior.
@@ -305,14 +303,12 @@ const CAPABILITY_MAP = [
 function buildAgentRosterNudge(): string | null {
   const count = listRoster().length;
   if (count === 0) return null;
-  const proofReady = isProofRunning();
   const lines = [
     `## Agent Team: ${count} specialists available`,
     "Engage directly for conversation/strategy/planning. Delegate when the user needs a concrete deliverable (report, draft, build, campaign).",
     "Single-agent: `queue_add`. Multi-agent: `delegate` with confirmed=false first, then confirmed=true after approval. QA stage is auto-injected.",
-    proofReady ? "Use `proof_editor` for collaborative writing. Agents can write to live Proof docs." : "",
   ];
-  return lines.filter(Boolean).join("\n");
+  return lines.join("\n");
 }
 
 // ── Context Wrapper ──────────────────────────────────────────────────

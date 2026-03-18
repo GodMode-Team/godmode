@@ -546,58 +546,6 @@ async function checkAndRepairQueueProcessor(logger: Logger): Promise<void> {
   }
 }
 
-// ── VERIFY Phase — Canary Tests ──────────────────────────────────────
-
-/**
- * Memory canary: ingest a known fact, search for it, verify retrieval.
- * This is the only way to know memory actually works end-to-end.
- * Returns true if the round-trip succeeds.
- */
-async function verifyMemory(logger: Logger): Promise<boolean> {
-  try {
-    const { searchMemories, ingestConversation, isMemoryReady } = await import("../lib/memory.js");
-    if (!isMemoryReady()) return false;
-
-    const canaryFact = `GodMode canary test fact: system verification at ${new Date().toISOString().slice(0, 13)}`;
-    const canaryQuery = "GodMode canary test fact";
-
-    // Ingest
-    const { getOwnerUserId } = await import("../lib/ally-identity.js");
-    await ingestConversation(canaryFact, getOwnerUserId());
-
-    // Wait briefly for async processing
-    await new Promise((r) => setTimeout(r, 2000));
-
-    // Search
-    const results = await searchMemories(canaryQuery, getOwnerUserId(), 3);
-    const found = results.some((r) =>
-      r.memory.toLowerCase().includes("canary") || r.memory.toLowerCase().includes("verification"),
-    );
-
-    if (found) {
-      health.signal("memory.canary", true, { results: results.length });
-      return true;
-    }
-
-    // Canary not found — but check if search works at all
-    // (the canary might not have been ingested yet due to async processing)
-    const anyResults = results.length > 0;
-    if (anyResults) {
-      // Search works, just didn't find canary — likely async delay, not broken
-      health.signal("memory.canary", true, { results: results.length, note: "canary not found but search functional" });
-      return true;
-    }
-
-    health.signal("memory.canary", false, { error: "no results returned" });
-    logger.warn("[SelfHeal] Memory canary failed — search returned 0 results");
-    return false;
-  } catch (err) {
-    health.signal("memory.canary", false, { error: String(err).slice(0, 100) });
-    logger.warn(`[SelfHeal] Memory canary error: ${String(err)}`);
-    return false;
-  }
-}
-
 // ── Escalation Chain ─────────────────────────────────────────────────
 
 /**

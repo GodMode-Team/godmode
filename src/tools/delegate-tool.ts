@@ -206,15 +206,11 @@ export function createDelegateTool(): AnyAgentTool {
             }
           } catch { /* toolkit not available */ }
 
-          // REMOVED (v2 slim): Proof document creation
-          const projectProofSlug: string | undefined = undefined;
-
           // Build issue records + resolve personas
           const issueRecords: Array<{
             issueId: string;
             title: string;
             personaSlug: string;
-            proofDocSlug?: string;
           }> = [];
 
           for (const task of issues) {
@@ -225,7 +221,6 @@ export function createDelegateTool(): AnyAgentTool {
               issueId: newIssueId(),
               title: task.title,
               personaSlug: persona?.slug ?? task.personaHint ?? "unassigned",
-              proofDocSlug: projectProofSlug,
             });
           }
 
@@ -236,7 +231,6 @@ export function createDelegateTool(): AnyAgentTool {
               issueId: newIssueId(),
               title: `QA Review: ${title}`,
               personaSlug: qaPersonaSlug,
-              proofDocSlug: projectProofSlug,
             });
           }
 
@@ -257,7 +251,6 @@ export function createDelegateTool(): AnyAgentTool {
                     ...issues.map((t) => `- ${t.title} (${t.personaHint || "auto"})`),
                     ``,
                     `Apply your full review checklist. Flag any issues with specific corrections.`,
-                    `Write your review to the shared Proof document.`,
                   ].join("\n"),
                   personaHint: record.personaSlug,
                 }
@@ -293,14 +286,12 @@ export function createDelegateTool(): AnyAgentTool {
                 description:
                   `Project: ${title}\n\n${task.description}\n\n` +
                   `**Success Criteria:** Complete your section of the project. Write all output to the designated file.` +
-                  (record.proofDocSlug ? `\n\nShared Proof doc slug: ${record.proofDocSlug} (optional — file output is primary)` : "") +
                   toolkitContext,
                 priority: (!isQAStage && (task.priority === "critical" || task.priority === "high") ? "high" : "normal") as "high" | "normal" | "low",
                 status: "pending" as const,
                 source: "chat" as const,
                 createdAt: Date.now(),
                 personaHint: record.personaSlug,
-                proofDocSlug: record.proofDocSlug,
                 workspaceId: workspace,
                 meta: {
                   issueId: record.issueId,
@@ -325,7 +316,6 @@ export function createDelegateTool(): AnyAgentTool {
                   title: r.title,
                   personaSlug: r.personaSlug,
                   queueItemId: queuedIssueMap.get(r.issueId)!,
-                  proofDocSlug: r.proofDocSlug,
                 })),
               createdAt: Date.now(),
               status: "active",
@@ -344,12 +334,10 @@ export function createDelegateTool(): AnyAgentTool {
             message: `Project "${title}" delegated to the team (${issues.length} issue(s)${skippedCount > 0 ? `, ${skippedCount} skipped` : ""}).`,
             projectId,
             proofWorkspace: workspace,
-            proofDocSlug: projectProofSlug,
             issues: issueRecords.map(r => ({
               issueId: r.issueId,
               title: r.title,
               assignee: r.personaSlug,
-              proofDocSlug: r.proofDocSlug,
             })),
           });
         }
