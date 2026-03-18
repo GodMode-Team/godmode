@@ -1,7 +1,7 @@
 /**
  * http-handler.ts — HTTP route handler for GodMode endpoints.
  *
- * Serves the GodMode UI, health endpoint, artifact files, Fathom webhook,
+ * Serves the GodMode UI, health endpoint, artifact files, meeting webhook,
  * and legacy /reports/ redirect.
  */
 
@@ -9,7 +9,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { MEMORY_DIR } from "../data-paths.js";
-// REMOVED (v2 slim): fathom-webhook import
+import { handleMeetingWebhookHttp } from "../methods/meeting-webhook.js";
 import type { LicenseState } from "../lib/license.js";
 
 function requestPathname(url: string): string {
@@ -53,7 +53,24 @@ export function createGodmodeHttpHandler(deps: HttpHandlerDeps) {
       return true;
     }
 
-    // REMOVED (v2 slim): Fathom webhook endpoint — replacing with generic meeting webhook
+    // Generic meeting webhook endpoint (works with Fathom, Otter, etc.)
+    if (pathname === "/godmode/webhooks/meeting" && req.method === "POST") {
+      const chunks: Buffer[] = [];
+      req.on("data", (c: Buffer) => chunks.push(c));
+      req.on("end", () => {
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ ok: true }));
+        const body = Buffer.concat(chunks).toString("utf8");
+        const hdrs: Record<string, string> = {};
+        for (const [k, v] of Object.entries(req.headers)) {
+          hdrs[k] = Array.isArray(v) ? v[0] : v ?? "";
+        }
+        handleMeetingWebhookHttp(body, hdrs).catch((err) => {
+          console.error("[GodMode] Meeting webhook processing error:", err);
+        });
+      });
+      return true;
+    }
 
     // NOTE: Proof documents are served via RPC (proof.get returns HTML for
     // srcdoc embedding) rather than HTTP proxy, since the gateway's static

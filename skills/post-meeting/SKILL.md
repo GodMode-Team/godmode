@@ -4,7 +4,12 @@
 Turn meeting transcripts into decisions, action items, follow-ups, and memory updates — automatically.
 
 ## Trigger
-Meeting webhook fires (Fathom, Otter, etc.), user says "process this meeting", "what happened in my last meeting", or pastes a transcript/recording link.
+Meeting webhook fires (Fathom, Otter, etc.) via `POST /godmode/webhooks/meeting`, user says "process this meeting", "what happened in my last meeting", or pastes a transcript/recording link.
+
+- **Webhook event:** `meeting:received` (broadcast by `src/methods/meeting-webhook.ts`)
+- **File location:** `~/godmode/memory/meetings/{date}-{slug}.md`
+- **Manual:** The ally can also run this skill on demand when a user pastes a transcript
+- Any tool that can POST `{ title, transcript, attendees?, source }` to `/godmode/webhooks/meeting` will trigger this skill.
 
 ## Process
 1. **Get the transcript** — From webhook payload, pasted text, or linked recording. If no transcript available, ask the user for a summary instead.
@@ -46,3 +51,7 @@ Meeting webhook fires (Fathom, Otter, etc.), user says "process this meeting", "
 - **Wrong person's items** — Only create tasks for the user's action items. Other people's items go into memory as context, not the user's task list.
 - **Duplicate processing** — Check if this meeting was already processed (via memory or daily note). Don't create duplicate tasks.
 - **Long meetings** — For 60+ min transcripts, summarize by topic/segment rather than trying to capture everything linearly.
+
+## Notes
+- Fathom is the default meeting note-taker. Its webhook payload is normalized by the generic meeting webhook handler before the transcript is written.
+- Processing happens via the ally (skill context injection), not custom TypeScript. The webhook handler just writes the file and broadcasts the event.

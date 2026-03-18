@@ -387,6 +387,15 @@ export async function runGatewayStart(
 
   // REMOVED (v2 slim): fathom-processor, x-client
 
+  // Meeting webhook broadcast wiring
+  try {
+    const { setMeetingWebhookBroadcast } = await import("../methods/meeting-webhook.js");
+    setMeetingWebhookBroadcast((event: string, data: unknown) => safeBroadcast(api, event, data));
+    logger.info("[GodMode] Meeting webhook broadcast wired");
+  } catch (err) {
+    logger.warn(`[GodMode] Meeting webhook broadcast wiring failed: ${String(err)}`);
+  }
+
   logger.info(`[GodMode] Gateway startup complete — ${serviceCleanup.length} service(s) registered for cleanup`);
 }
 
