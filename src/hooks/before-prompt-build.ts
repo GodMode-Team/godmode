@@ -158,40 +158,22 @@ export async function handleBeforePromptBuild(
     logger.info(`[GodMode] Light mode active — skipping P1+ context gathering due to recent API overload`);
   }
 
-  // P0: Mem0 proactive memory search (skip in light mode — it fires a Haiku API call)
-  // This is a best-effort pre-LLM search. For long messages (brain dumps),
-  // we truncate to keep it fast and cheap — the ally can use secondBrain.search
-  // for targeted queries after it reads the full message.
-  const PRE_LLM_QUERY_MAX = 300;
-  let memoryQuery = userQuery;
-  if (memoryQuery.length > PRE_LLM_QUERY_MAX) {
-    // Take first ~300 chars, cut at last sentence boundary if possible
-    const truncated = memoryQuery.slice(0, PRE_LLM_QUERY_MAX);
-    const lastSentence = Math.max(
-      truncated.lastIndexOf(". "),
-      truncated.lastIndexOf("? "),
-      truncated.lastIndexOf("! "),
-    );
-    memoryQuery = lastSentence > 50 ? truncated.slice(0, lastSentence + 1) : truncated;
-  }
-
+  // P0: Honcho context retrieval (skip in light mode)
+  // Honcho provides persistent user modeling with async reasoning.
+  // getContext() is free and fast (~200ms).
   let memoryBlock: string | null = null;
   let memoryStatus: "ready" | "degraded" | "offline" = "offline";
-  if (provenance?.kind !== "inter_session" && !lightMode) {
+  if (provenance?.kind !== "inter_session" && !lightMode && sessionKey) {
     try {
-      const { isMemoryReady, searchMemories, formatMemoriesForContext, getMemoryStatus } = await import("../lib/memory.js");
-      memoryStatus = getMemoryStatus();
-      if (isMemoryReady()) {
-        if (memoryQuery.length >= 5) {
-          const { getOwnerUserId } = await import("../lib/ally-identity.js");
-          const memories = await searchMemories(memoryQuery, getOwnerUserId(), 8);
-          const formatted = formatMemoriesForContext(memories);
-          if (formatted) memoryBlock = formatted;
-          memoryStatus = getMemoryStatus();
-        }
+      const { isHonchoReady, getContext, getHonchoStatus } = await import("../services/honcho-client.js");
+      memoryStatus = getHonchoStatus();
+      if (isHonchoReady()) {
+        const ctx = await getContext(sessionKey);
+        if (ctx) memoryBlock = ctx;
+        memoryStatus = getHonchoStatus();
       }
     } catch (err) {
-      logger.warn(`[GodMode] Mem0 search error (non-fatal): ${String(err)}`);
+      logger.warn(`[GodMode] Honcho context error (non-fatal): ${String(err)}`);
       memoryStatus = "degraded";
     }
   } else if (lightMode) {

@@ -277,26 +277,17 @@ export async function runGatewayStart(
     ensureSkillCards(pluginRoot);
   } catch { /* non-fatal */ }
 
-  // Mem0 memory
+  // Honcho memory
   try {
-    const { initMemory, isMemoryReady, seedFromVault } = await import("../lib/memory.js");
-    await initMemory();
-    if (isMemoryReady()) {
-      logger.info("[GodMode] Mem0 memory initialized");
-      void (async () => {
-        try {
-          const { getOwnerUserId } = await import("../lib/ally-identity.js");
-          await seedFromVault(getOwnerUserId());
-          logger.info("[GodMode] Mem0 vault seeding complete");
-        } catch (seedErr) {
-          logger.warn(`[GodMode] Mem0 seeding failed (non-fatal): ${String(seedErr)}`);
-        }
-      })();
+    const { initHoncho } = await import("../services/honcho-client.js");
+    const honchoOk = await initHoncho();
+    if (honchoOk) {
+      logger.info("[GodMode] Honcho memory initialized");
     } else {
-      logger.warn("[GodMode] Mem0 memory not available (missing API keys or init failed)");
+      logger.warn("[GodMode] Honcho memory not available (missing HONCHO_API_KEY or init failed)");
     }
   } catch (err) {
-    logger.warn(`[GodMode] Mem0 memory init failed (non-fatal): ${String(err)}`);
+    logger.warn(`[GodMode] Honcho memory init failed (non-fatal): ${String(err)}`);
   }
 
   // Identity graph
@@ -465,6 +456,15 @@ export async function runGatewayStop(
     const serviceNames = serviceCleanup.map((s) => s.name);
     writeSentinel(activeSessionKeys, serviceNames, "graceful");
   } catch { /* non-fatal */ }
+
+  // Honcho vault sync (best effort)
+  try {
+    const { syncHonchoToVault } = await import("../services/honcho-sync.js");
+    await syncHonchoToVault();
+    logger.info("[GodMode] Honcho vault sync complete");
+  } catch (err) {
+    logger.warn(`[GodMode] Honcho vault sync failed (non-fatal): ${String(err)}`);
+  }
 
   // Clear duplicate guard so a fresh instance can claim the slot
   delete (globalThis as any).__godmodeInstanceId;
