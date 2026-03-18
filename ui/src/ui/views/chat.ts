@@ -19,7 +19,6 @@ import type { ChatItem, MessageGroup, ToolExecutionInfo } from "../types/chat-ty
 import type { ChatAttachment, ChatQueueItem } from "../ui-types";
 import { validateFilesForUpload } from "../upload-constants";
 import { renderMarkdownSidebar } from "./markdown-sidebar";
-import { renderProofViewer } from "./proof-viewer";
 import { renderAllyInline, type AllyChatProps } from "./ally-chat";
 import "../components/resizable-divider";
 
@@ -890,17 +889,7 @@ export function renderChat(props: ChatProps) {
                 ? html`
                     <div class="chat-sidebar chat-sidebar--split">
                       <div class="chat-sidebar-top">
-                      ${props.sidebarMode === "proof" && props.sidebarProofSlug
-                        ? renderProofViewer({
-                            slug: props.sidebarProofSlug,
-                            title: props.sidebarTitle ?? null,
-                            viewUrl: props.sidebarProofUrl ?? null,
-                            filePath: props.sidebarFilePath ?? null,
-                            fallbackMarkdown: props.sidebarProofHtml ?? null,
-                            onClose: props.onCloseSidebar!,
-                            onPushToDrive: props.onPushToDrive,
-                          })
-                        : renderMarkdownSidebar({
+                      ${renderMarkdownSidebar({
                             content: props.sidebarContent ?? null,
                             error: props.sidebarError ?? null,
                             mimeType: props.sidebarMimeType ?? null,
@@ -938,17 +927,7 @@ export function renderChat(props: ChatProps) {
                 `
                 : html`
                   <div class="chat-sidebar">
-                    ${props.sidebarMode === "proof" && props.sidebarProofSlug
-                      ? renderProofViewer({
-                          slug: props.sidebarProofSlug,
-                          title: props.sidebarTitle ?? null,
-                          viewUrl: props.sidebarProofUrl ?? null,
-                          filePath: props.sidebarFilePath ?? null,
-                          fallbackMarkdown: props.sidebarProofHtml ?? null,
-                          onClose: props.onCloseSidebar!,
-                          onPushToDrive: props.onPushToDrive,
-                        })
-                      : renderMarkdownSidebar({
+                    ${renderMarkdownSidebar({
                           content: props.sidebarContent ?? null,
                           error: props.sidebarError ?? null,
                           mimeType: props.sidebarMimeType ?? null,

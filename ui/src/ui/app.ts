@@ -502,8 +502,8 @@ export class GodModeApp extends LitElement {
   @state() workspaceNeedsSetup = false;
 
   // Onboarding experience state (6-phase flow)
-  @state() onboardingPhase: import("./views/onboarding").OnboardingPhase = 0;
-  @state() onboardingData: import("./views/onboarding").OnboardingData | null = null;
+  @state() onboardingPhase: number = 0;
+  @state() onboardingData: Record<string, unknown> | null = null;
   @state() onboardingActive = false;
 
   // Memory onboarding wizard state
@@ -3562,7 +3562,7 @@ export class GodModeApp extends LitElement {
   }
 
   /** Phase 1 → 2: User submitted identity form */
-  async handleOnboardingIdentitySubmit(identity: import("./views/onboarding").OnboardingIdentity) {
+  async handleOnboardingIdentitySubmit(identity: { name: string; mission: string; emoji: string }) {
     if (!this.client) {return;}
     try {
       await this.client.request("onboarding.update", {
@@ -3600,7 +3600,7 @@ export class GodModeApp extends LitElement {
   /** Skip current onboarding phase (tools overlay, etc.) */
   handleOnboardingSkipPhase() {
     if (!this.client) {return;}
-    const nextPhase = Math.min(this.onboardingPhase + 1, 6) as import("./views/onboarding").OnboardingPhase;
+    const nextPhase = Math.min(this.onboardingPhase + 1, 6) as number;
     this.onboardingPhase = nextPhase;
     void this.client.request("onboarding.update", {
       phase: nextPhase,

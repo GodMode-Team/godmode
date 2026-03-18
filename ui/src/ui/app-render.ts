@@ -10,7 +10,7 @@ import { createNewSession, renderChatControls, renderTab, renderThemeToggle, scr
 import { setTab, syncUrlWithSessionKey } from "./app-settings";
 import type { AppViewState } from "./app-view-state";
 import { loadChannels } from "./controllers/channels";
-import { loadChatHistory, loadLaneHistory } from "./controllers/chat";
+import { loadChatHistory } from "./controllers/chat";
 import {
   applyConfig,
   loadConfig,
@@ -72,7 +72,6 @@ import {
   updateSkillEnabled,
 } from "./controllers/skills";
 import { loadRoster } from "./controllers/agents";
-import { checkForUpdates } from "./controllers/updates";
 import { icons } from "./icons";
 import { TAB_GROUPS, POWER_USER_GROUPS, subtitleForTab, titleForTab, type Tab } from "./navigation";
 import { renderAllyChat } from "./views/ally-chat.js";
@@ -88,10 +87,8 @@ import { renderGatewayRestartConfirmation } from "./views/gateway-restart";
 import { renderInstances } from "./views/instances";
 import { renderLogs } from "./views/logs";
 import { renderMarkdownSidebar } from "./views/markdown-sidebar";
-import { renderProofViewer } from "./views/proof-viewer";
 import { renderMyDay, renderMyDayToolbar } from "./views/my-day";
 import { renderNodes } from "./views/nodes";
-import { renderOverview } from "./views/overview";
 import { renderSessions } from "./views/sessions";
 import { renderSkills } from "./views/skills";
 import { renderAgents } from "./views/agents";
@@ -102,21 +99,9 @@ import { renderOptions } from "./views/options";
 import { renderOnboardingWizard, type WizardStep } from "./views/onboarding-wizard";
 import { renderTrustTracker } from "./views/trust-tracker";
 import { renderGuardrails } from "./views/guardrails";
-import { renderMissionControl } from "./views/mission-control";
-import { renderParallelSessions } from "./views/parallel-sessions";
-import { renderWork } from "./views/work";
 import { renderWorkspaces } from "./views/workspaces";
 import { renderSecondBrain } from "./views/second-brain";
 import { renderDashboards } from "./views/dashboards";
-import {
-  renderOnboardingWelcome,
-  renderOnboardingIdentity,
-  renderOnboardingProgress,
-  renderOnboardingSummary,
-  type OnboardingPhase as OnbPhase,
-} from "./views/onboarding";
-import { renderSetup } from "./views/setup";
-import { renderOnboardingSetup } from "./views/onboarding-setup";
 
 const AVATAR_DATA_RE = /^data:/i;
 const AVATAR_HTTP_RE = /^https?:\/\//i;
@@ -261,33 +246,6 @@ function getRenderableSessionTabState(state: AppViewState): {
 }
 
 export function renderApp(state: AppViewState) {
-  // ── Onboarding full-screen takeovers (phases 0, 1, 6) ─────
-  // Only show full-screen takeover for legacy ?onboarding=1 flow.
-  // New users see the persistent Setup tab in the sidebar instead.
-  const obActive = state.onboardingActive && state.onboarding;
-  const obPhase = (state.onboardingPhase ?? 0);
-  const obData = state.onboardingData;
-
-  if (obActive && obPhase === 0) {
-    return renderOnboardingWelcome(() => {
-      state.handleOnboardingStart?.();
-    }, obData?.assessment);
-  }
-  if (obActive && obPhase === 1) {
-    return renderOnboardingIdentity((identity) => {
-      void state.handleOnboardingIdentitySubmit?.(identity);
-    });
-  }
-  if (obActive && obPhase === 6) {
-    return renderOnboardingSummary(
-      obData?.summary ?? null,
-      obData?.identity ?? null,
-      () => {
-        state.handleOnboardingComplete?.();
-      },
-    );
-  }
-
   // ── Memory Onboarding Wizard (full-screen takeover) ────────
   if (state.wizardActive && state.wizardState) {
     return renderOnboardingWizard(state.wizardState, {
@@ -320,7 +278,7 @@ export function renderApp(state: AppViewState) {
   const cronNext = state.cronStatus?.nextWakeAtMs ?? null;
   const chatDisabledReason = state.connected ? null : "Disconnected from gateway.";
   const isChat = state.tab === "chat";
-  const chatFocus = isChat && (state.settings.chatFocusMode || state.onboarding || (obActive && obPhase >= 2));
+  const chatFocus = isChat && (state.settings.chatFocusMode || state.onboarding);
   const showThinking = state.onboarding ? false : state.settings.chatShowThinking;
   const assistantAvatarUrl = resolveAssistantAvatarUrl(state);
   const chatAvatarUrl = state.chatAvatarUrl ?? assistantAvatarUrl ?? null;
@@ -367,7 +325,7 @@ export function renderApp(state: AppViewState) {
                   title="${state.updateStatus?.openclawUpdateAvailable ? "OpenClaw update available" : "GodMode plugin update available"} — click to view"
                   @click=${(e: Event) => {
                     e.preventDefault();
-                    state.setTab("overview" as Tab);
+                    state.setTab("config" as Tab);
                   }}
                 >
                   <span class="pill__icon">${icons.zap}</span>
@@ -451,19 +409,16 @@ export function renderApp(state: AppViewState) {
                   !group.label && state.godmodeOptions != null && !state.godmodeOptions?.["onboarding.hidden"]
                     ? html`
                         <a
-                          class="nav-item ${state.tab === "setup" ? "active" : ""}"
+                          class="nav-item ${state.tab === "onboarding" ? "active" : ""}"
                           href="#"
                           @click=${(e: Event) => {
                             e.preventDefault();
-                            state.setTab("setup" as Tab);
+                            state.handleWizardOpen?.();
                           }}
                           title="Power up your GodMode ally."
                         >
                           <span class="nav-item__emoji" aria-hidden="true">\u{1F9ED}</span>
                           <span class="nav-item__text">Setup</span>
-                          ${state.setupCapabilities && (state.setupCapabilities as { percentComplete?: number }).percentComplete != null
-                            ? html`<span class="nav-item__badge">${(state.setupCapabilities as { percentComplete: number }).percentComplete}%</span>`
-                            : nothing}
                         </a>
                       `
                     : nothing
@@ -519,7 +474,7 @@ export function renderApp(state: AppViewState) {
           <div>
             ${
               state.tab !== "chat" &&
-              state.tab !== "setup"
+              state.tab !== "onboarding"
                 ? html`
               <div class="page-title">${titleForTab(state.tab)}</div>
               <div class="page-sub">${subtitleForTab(state.tab)}</div>
@@ -1113,125 +1068,15 @@ export function renderApp(state: AppViewState) {
           : nothing}
 
         ${
-          state.tab === "setup"
-            ? html`
-                ${renderSetup({
-                  connected: state.connected,
-                  quickSetupDone: state.setupQuickDone ?? false,
-                  capabilities: (state.setupCapabilities as import("./views/setup").SetupViewProps["capabilities"]) ?? null,
-                  capabilitiesLoading: state.setupCapabilitiesLoading ?? false,
-                  onQuickSetup: (name) =>
-                    state.handleQuickSetup?.(name),
-                  onHideSetup: () => state.handleHideSetup?.(),
-                  onOpenWizard: () => state.handleWizardOpen?.(),
-                  onNavigate: (tab) => state.setTab(tab),
-                  onRunAssessment: () => state.handleRunAssessment?.(),
-                  onOpenSupportChat: () => state.handleOpenSupportChat(),
-                  onCapabilityAction: (id) => state.handleCapabilityAction?.(id),
-                })}
-                ${state.setupQuickDone
-                  ? renderOnboardingSetup({
-                      connected: state.connected,
-                      integrations: state.onboardingIntegrations ?? null,
-                      coreProgress: state.onboardingCoreProgress ?? null,
-                      expandedCard: state.onboardingExpandedCard ?? null,
-                      loadingGuide: state.onboardingLoadingGuide ?? null,
-                      activeGuide: state.onboardingActiveGuide ?? null,
-                      testingId: state.onboardingTestingId ?? null,
-                      testResult: state.onboardingTestResult ?? null,
-                      configValues: state.onboardingConfigValues ?? {},
-                      onLoadIntegrations: () => state.handleLoadIntegrations(),
-                      onExpandCard: (id: string | null) => state.handleExpandCard(id),
-                      onLoadGuide: (id: string) => state.handleLoadGuide(id),
-                      onTestIntegration: (id: string) => state.handleTestIntegration(id),
-                      onConfigureIntegration: (id: string, values: Record<string, string>) =>
-                        state.handleConfigureIntegration(id, values),
-                      onUpdateConfigValue: (key: string, value: string) =>
-                        state.handleUpdateConfigValue(key, value),
-                      onSkipIntegration: (id: string) => state.handleSkipIntegration(id),
-                      onNavigate: (tab) => state.setTab(tab),
-                      onMarkComplete: () => state.handleMarkOnboardingComplete?.(),
-                      onOpenSupportChat: () => state.handleOpenSupportChat(),
-                    })
-                  : nothing}
-              `
-            : nothing
-        }
-
-        ${
-          state.tab === "onboarding"
-            ? renderOnboardingSetup({
-                connected: state.connected,
-                integrations: state.onboardingIntegrations ?? null,
-                coreProgress: state.onboardingCoreProgress ?? null,
-                expandedCard: state.onboardingExpandedCard ?? null,
-                loadingGuide: state.onboardingLoadingGuide ?? null,
-                activeGuide: state.onboardingActiveGuide ?? null,
-                testingId: state.onboardingTestingId ?? null,
-                testResult: state.onboardingTestResult ?? null,
-                configValues: state.onboardingConfigValues ?? {},
-                onLoadIntegrations: () => state.handleLoadIntegrations(),
-                onExpandCard: (id: string | null) => state.handleExpandCard(id),
-                onLoadGuide: (id: string) => state.handleLoadGuide(id),
-                onTestIntegration: (id: string) => state.handleTestIntegration(id),
-                onConfigureIntegration: (id: string, values: Record<string, string>) =>
-                  state.handleConfigureIntegration(id, values),
-                onUpdateConfigValue: (key: string, value: string) =>
-                  state.handleUpdateConfigValue(key, value),
-                onSkipIntegration: (id: string) => state.handleSkipIntegration(id),
-                onNavigate: (tab) => state.setTab(tab),
-                onMarkComplete: () => state.handleMarkOnboardingComplete?.(),
-                onOpenSupportChat: () => state.handleOpenSupportChat(),
-              })
-            : nothing
-        }
-
-        ${
-          state.tab === "overview"
-            ? renderOverview({
-                connected: state.connected,
-                hello: state.hello,
-                settings: state.settings,
-                password: state.password,
-                lastError: state.lastError,
-                presenceCount,
-                sessionsCount,
-                cronEnabled: state.cronStatus?.enabled ?? null,
-                cronNext,
-                lastChannelsRefresh: state.channelsLastSuccess,
-                updateStatus: state.updateStatus,
-                updateLoading: state.updateLoading,
-                updateError: state.updateError,
-                updateLastChecked: state.updateLastChecked,
-                updateRunning: state.updateRunning,
-                onSettingsChange: (next) => state.applySettings(next),
-                onPasswordChange: (next) => (state.password = next),
-                onSessionKeyChange: (next) => {
-                  // Save current draft before switching
-                  saveDraft(state);
-                  state.sessionKey = next;
-                  // Restore draft for new session
-                  restoreDraft(state, next);
-                  state.resetToolStream();
-                  state.applySettings({
-                    ...state.settings,
-                    sessionKey: next,
-                    lastActiveSessionKey: next,
-                  });
-                  void state.loadAssistantIdentity();
-                  void state.loadSessionResources();
-                },
-                onConnect: () => state.connect(),
-                onRefresh: () => state.loadOverview(),
-                onCheckUpdates: () => checkForUpdates(state),
-                onUpdateNow: () => {
-                  void runUpdate(state);
-                },
-                pluginUpdateRunning: state.pluginUpdateRunning,
-                onUpdatePlugin: () => {
-                  void runPluginUpdate(state);
-                },
-              })
+          state.tab === "setup" || state.tab === "onboarding"
+            ? html`<div class="my-day-container">
+                <div class="my-day-card">
+                  <div class="my-day-card-content">
+                    <p>Use the onboarding wizard to get started.</p>
+                    <button class="retry-button" @click=${() => state.handleWizardOpen?.()}>Open Wizard</button>
+                  </div>
+                </div>
+              </div>`
             : nothing
         }
 
@@ -1619,35 +1464,6 @@ export function renderApp(state: AppViewState) {
         }
 
         ${
-          state.tab === "work"
-            ? state.dynamicSlots["work"]
-              ? renderDynamicSlot(state, "work")
-              : renderWork({
-                  connected: state.connected,
-                  projects: state.workProjects ?? [],
-                  loading: state.workLoading ?? false,
-                  error: state.workError ?? null,
-                  expandedProjects: state.workExpandedProjects,
-                  projectFiles: state.workProjectFiles ?? {},
-                  detailLoading: state.workDetailLoading ?? new Set(),
-                  onRefresh: () => state.handleWorkRefresh(),
-                  onToggleProject: (id) => state.handleWorkToggleProject(id),
-                  onPersonClick: (personId) => state.handleWorkPersonClick(personId),
-                  onFileClick: (path) => state.handleWorkFileClick(path),
-                  onSkillClick: (skill, projectName) =>
-                    state.handleWorkSkillClick(skill, projectName),
-                  resources: state.workResources ?? [],
-                  resourcesLoading: state.workResourcesLoading ?? false,
-                  resourceFilter: state.workResourceFilter ?? "all",
-                  onResourceFilterChange: (filter) => state.handleResourceFilterChange(filter),
-                  onResourceClick: (resource) => state.handleResourceClick(resource),
-                  onResourcePin: (id, pinned) => state.handleResourcePin(id, pinned),
-                  onResourceDelete: (id) => state.handleResourceDelete(id),
-                })
-            : nothing
-        }
-
-        ${
           state.tab === "channels"
             ? renderChannels({
                 connected: state.connected,
@@ -1974,19 +1790,7 @@ export function renderApp(state: AppViewState) {
         }
 
         ${
-          obActive && obPhase >= 2 && obPhase <= 5 && state.tab === "chat"
-            ? renderOnboardingProgress({
-                phase: obPhase,
-                identity: obData?.identity ?? null,
-                tools: (obData?.tools ?? []),
-                auditFindings: (obData?.audit?.findings ?? []),
-                summary: obData?.summary ?? null,
-                onStart: () => {},
-                onIdentitySubmit: () => {},
-                onComplete: () => state.handleOnboardingComplete?.(),
-                onSkipPhase: () => state.handleOnboardingSkipPhase?.(),
-              })
-            : state.tab === "chat" && state.workspaceNeedsSetup && !state.chatMessages?.length && !obActive
+          state.tab === "chat" && state.workspaceNeedsSetup && !state.chatMessages?.length
               ? html`
                   <div class="workspace-welcome-banner">
                     <div class="welcome-content">
@@ -2020,102 +1824,7 @@ export function renderApp(state: AppViewState) {
         }
 
         ${
-          state.tab === "chat" && state.settings.chatParallelView
-            ? renderParallelSessions({
-                state,
-                onAssignLane: (laneIndex, sessionKey) => {
-                  const canonicalSessionKey = sessionKey
-                    ? findSessionByKey(state.sessionsResult?.sessions, sessionKey)?.key ?? sessionKey
-                    : null;
-                  const lanes = [...state.settings.parallelLanes];
-                  lanes[laneIndex] = canonicalSessionKey;
-                  state.applySettings({
-                    ...state.settings,
-                    parallelLanes: lanes,
-                  });
-                  // Load history for newly assigned session, then trigger re-render
-                  if (canonicalSessionKey && state.client) {
-                    void loadLaneHistory(state.client, canonicalSessionKey).then(() => {
-                      // Touch settings to force Lit re-render with populated cache
-                      state.applySettings({ ...state.settings });
-                    });
-                  }
-                },
-                onReorderLanes: (fromIndex, toIndex) => {
-                  if (
-                    fromIndex === toIndex ||
-                    fromIndex < 0 ||
-                    toIndex < 0 ||
-                    fromIndex >= state.settings.parallelLanes.length ||
-                    toIndex >= state.settings.parallelLanes.length
-                  ) {
-                    return;
-                  }
-                  const lanes = [...state.settings.parallelLanes];
-                  const [moved] = lanes.splice(fromIndex, 1);
-                  lanes.splice(toIndex, 0, moved);
-                  state.applySettings({
-                    ...state.settings,
-                    parallelLanes: lanes,
-                  });
-                },
-                onLaneViewed: (sessionKey) => {
-                  const canonicalKey =
-                    findSessionByKey(state.sessionsResult?.sessions, sessionKey)?.key ?? sessionKey;
-                  const now = Date.now();
-                  const session = findSessionByKey(state.sessionsResult?.sessions, canonicalKey);
-                  const updatedAt = session?.updatedAt ?? 0;
-                  const lastViewed = Math.max(
-                    state.settings.tabLastViewed[sessionKey] ?? 0,
-                    state.settings.tabLastViewed[canonicalKey] ?? 0,
-                  );
-                  if (updatedAt > 0 && lastViewed >= updatedAt) {
-                    return;
-                  }
-                  state.applySettings({
-                    ...state.settings,
-                    tabLastViewed: {
-                      ...state.settings.tabLastViewed,
-                      [sessionKey]: now,
-                      [canonicalKey]: now,
-                    },
-                  });
-                },
-                onSendInLane: (sessionKey, message) => {
-                  if (sessionKey !== state.sessionKey) {
-                    // Switch to this session first, then send
-                    saveDraft(state);
-                    state.sessionKey = sessionKey;
-                    restoreDraft(state, sessionKey);
-                    state.chatLoading = true;
-                    state.chatMessages = [];
-                    state.chatStream = null;
-                    state.chatStreamStartedAt = null;
-                    state.chatRunId = null;
-                    state.resetToolStream();
-                    state.applySettings({
-                      ...state.settings,
-                      sessionKey,
-                      lastActiveSessionKey: sessionKey,
-                    });
-                    void state.loadAssistantIdentity();
-                    syncUrlWithSessionKey(state, sessionKey, true);
-                    void loadChatHistory(state).then(() => {
-                      void state.loadSessionResources();
-                      state.chatMessage = message;
-                      void state.handleSendChat(message);
-                    });
-                  } else {
-                    state.chatMessage = message;
-                    void state.handleSendChat(message);
-                  }
-                },
-              })
-            : nothing
-        }
-
-        ${
-          state.tab === "chat" && !state.settings.chatParallelView
+          state.tab === "chat"
             ? renderChat({
                 basePath: state.basePath,
                 sessionKey: state.sessionKey,
@@ -2316,35 +2025,6 @@ export function renderApp(state: AppViewState) {
                   state.handleAllyToggle();
                   if (prefill) state.handleAllyDraftChange(prefill);
                 },
-              })
-            : nothing
-        }
-
-        ${
-          state.tab === "mission-control"
-            ? renderMissionControl({
-                connected: state.connected,
-                loading: state.missionControlLoading,
-                error: state.missionControlError,
-                data: state.missionControlData ?? null,
-                fullControl: state.missionControlFullControl,
-                onToggleFullControl: () => state.handleMissionControlToggleFullControl(),
-                onRefresh: () => state.handleMissionControlRefresh(),
-                onCancelTask: (id) => state.handleMissionControlCancelTask(id),
-                onApproveItem: (id) => state.handleMissionControlApproveItem(id),
-                onRetryItem: (id) => state.handleMissionControlRetryItem(id),
-                onViewDetail: (agent) => state.handleMissionControlViewDetail(agent),
-                onAddToQueue: (type, title) => state.handleMissionControlAddToQueue(type, title),
-                onOpenSession: (key) => state.handleMissionControlOpenSession(key),
-                onOpenTaskSession: (taskId) => state.handleMissionControlOpenTaskSession(taskId),
-                onStartQueueItem: (id) => state.handleMissionControlStartQueueItem(id),
-                onViewTaskFiles: (id) => state.handleMissionControlViewTaskFiles(id),
-                onSelectSwarmProject: (projectId) => state.handleSwarmSelectProject(projectId),
-                onSteerSwarmAgent: (projectId, issueTitle, instructions) => state.handleSwarmSteer(projectId, issueTitle, instructions),
-                onViewProofDoc: (docSlug) => state.handleSwarmViewProofDoc(docSlug),
-                onViewRunLog: (queueItemId) => state.handleSwarmViewRunLog(queueItemId),
-                onAskAlly: () => { state.handleAllyToggle(); state.handleAllyDraftChange("What should I focus on next?"); },
-                allyName: state.assistantName,
               })
             : nothing
         }
@@ -2585,16 +2265,7 @@ export function renderApp(state: AppViewState) {
             <div class="global-document-viewer">
               <div class="global-document-viewer__overlay" @click=${() => state.handleCloseSidebar()}></div>
               <div class="global-document-viewer__panel">
-                ${state.sidebarMode === "proof" && state.sidebarProofSlug
-                  ? renderProofViewer({
-                      slug: state.sidebarProofSlug,
-                      title: state.sidebarTitle,
-                      viewUrl: state.sidebarProofUrl,
-                      filePath: state.sidebarFilePath,
-                      onClose: () => state.handleCloseProofDoc(),
-                      onPushToDrive: (path: string, account?: string) => state.handlePushToDrive(path, account),
-                    })
-                  : renderMarkdownSidebar({
+                ${renderMarkdownSidebar({
                       content: state.sidebarContent ?? null,
                       error: state.sidebarError ?? null,
                       mimeType: state.sidebarMimeType ?? null,
