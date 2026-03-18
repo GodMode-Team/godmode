@@ -306,12 +306,31 @@ export function renderChatControls(state: AppViewState) {
       <!-- Sidebar toggle -->
       <button
         class="chat-toolbar__btn ${state.sidebarOpen ? "active" : ""}"
-        ?disabled=${!state.sidebarContent && !state.sidebarOpen}
         @click=${() => {
           if (state.sidebarOpen) {
             state.handleCloseSidebar();
-          } else {
+          } else if (state.sidebarContent || state.sidebarProofSlug) {
+            // Re-open with existing content
             state.sidebarOpen = true;
+          } else {
+            // Scan recent messages for a proof doc to open
+            const msgs = (state as any).chatMessages as Array<Record<string, unknown>> | undefined;
+            if (msgs?.length) {
+              for (const msg of msgs.slice(-10).reverse()) {
+                const content = Array.isArray(msg.content) ? msg.content : [];
+                for (const block of content as Array<Record<string, unknown>>) {
+                  const text = typeof block.text === "string" ? block.text : typeof block.content === "string" ? block.content : null;
+                  if (!text) continue;
+                  try {
+                    const parsed = JSON.parse(text) as { _sidebarAction?: { type?: string; slug?: string } };
+                    if (parsed._sidebarAction?.type === "proof" && parsed._sidebarAction.slug) {
+                      void (state as any).handleOpenProofDoc(parsed._sidebarAction.slug);
+                      return;
+                    }
+                  } catch { /* not JSON */ }
+                }
+              }
+            }
           }
         }}
         title=${state.sidebarOpen ? "Close sidebar panel" : "Open sidebar panel"}

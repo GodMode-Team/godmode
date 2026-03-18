@@ -2359,9 +2359,12 @@ export class GodModeApp extends LitElement {
       this.sidebarMimeType = null;
       this.sidebarFilePath = null;
       this.sidebarTitle = null;
-      this.sidebarMode = "resource";
-      this.sidebarProofSlug = null;
-      this.sidebarProofUrl = null;
+      // Preserve proof slug so the sidebar toggle can re-open it
+      if (this.sidebarMode !== "proof") {
+        this.sidebarMode = "resource";
+        this.sidebarProofSlug = null;
+        this.sidebarProofUrl = null;
+      }
       this.sidebarCloseTimer = null;
     }, 200);
   }
