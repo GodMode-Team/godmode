@@ -1087,14 +1087,29 @@ export function renderChat(props: ChatProps) {
                 ${icons.paperclip}
               </button>
 
-              <button
-                class="chat-compose__send-btn"
-                ?disabled=${!props.canSend || !props.connected}
-                @click=${() => props.onSend(false)}
-                title=${isBusy ? "Send now - interrupts current run (↵)" : "Send message (↵)"}
-              >
-                ${icons.arrowUp}
-              </button>
+              ${_canAbort
+                ? html`
+                  <button
+                    class="chat-compose__send-btn chat-compose__send-btn--stop"
+                    @click=${() => props.onAbort!()}
+                    title="Stop generating"
+                  >
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                      <rect x="3" y="3" width="10" height="10" rx="1.5" />
+                    </svg>
+                  </button>
+                `
+                : html`
+                  <button
+                    class="chat-compose__send-btn"
+                    ?disabled=${!props.canSend || !props.connected}
+                    @click=${() => props.onSend(false)}
+                    title=${isBusy ? "Send now - interrupts current run (↵)" : "Send message (↵)"}
+                  >
+                    ${icons.arrowUp}
+                  </button>
+                `
+              }
             </div>
           </div>
         </div>

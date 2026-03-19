@@ -705,6 +705,25 @@
   stroke-linejoin: round;
 }
 
+.chat-compose__send-btn--stop {
+  background: var(--danger, #ef4444);
+}
+
+.chat-compose__send-btn--stop:hover {
+  background: var(--danger-hover, #dc2626);
+  transform: translateY(-1px);
+  box-shadow:
+    var(--shadow-md),
+    0 0 16px color-mix(in srgb, var(--danger, #ef4444) 40%, transparent);
+}
+
+.chat-compose__send-btn--stop svg {
+  width: 16px;
+  height: 16px;
+  fill: currentColor;
+  stroke: none;
+}
+
 /* Status row - legacy, hidden (badge now inline in actions) */
 .chat-compose__status {
   display: none;
