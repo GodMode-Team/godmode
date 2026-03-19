@@ -684,7 +684,6 @@ export function renderMyDay(props: MyDayProps) {
 
   return html`
     <div class="my-day-container">
-      ${renderTrustSummaryCard(props)}
       ${viewMode === "brief"
         ? html`<div class="my-day-brief-full">
             ${renderDailyBrief(briefProps)}

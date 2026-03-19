@@ -87,6 +87,17 @@ export async function registerGodMode(
 
   // ── 2. Inline RPC methods ─────────────────────────────────────
 
+  // Agent identity — the UI calls this to resolve "Prosper" name + avatar.
+  // On OpenClaw this is a core RPC; standalone runtimes need it registered here.
+  adapter.registerMethod("agent.identity.get", (async ({ respond }) => {
+    respond(true, {
+      name: "Prosper",
+      avatar: null,
+      agentId: "prosper",
+    });
+  }) as StandaloneRequestHandler);
+  methodCount++;
+
   adapter.registerMethod("godmode.status", (async ({ respond }) => {
     respond(true, {
       plugin: true,

@@ -58,49 +58,28 @@ const CATEGORIES: Record<string, { icon: string; label: string }> = {
   custom: { icon: "\u{2728}", label: "Custom" },
 };
 
-// Built-in template suggestions when no templates are loaded from assets
+// Built-in template suggestions — only reference widget types with real data
 const DEFAULT_TEMPLATE_IDEAS: DashboardTemplate[] = [
-  {
-    id: "morning-overview",
-    name: "Morning Overview",
-    category: "productivity",
-    description: "Tasks, calendar, priorities, and focus score",
-    prompt: "Create a morning overview dashboard that shows my top priorities, today's calendar events, active queue items, and readiness score. Use clean CSS grid layout.",
-  },
   {
     id: "weekly-impact",
     name: "Weekly Impact",
     category: "productivity",
-    description: "What you accomplished this week",
-    prompt: "Create a weekly impact dashboard showing tasks completed vs created this week, agent task outcomes, trust score changes, and top 3 wins. Use CSS bar charts.",
+    description: "Tasks completed, agent outcomes, and trust trends this week",
+    prompt: "Create a weekly impact dashboard. Use these widgets: tasks-summary, queue-status, trust-scores, streak-stats, brief-summary. Show tasks completed vs created, agent queue throughput, trust score trends, and daily streak. Use clean CSS grid with bar charts.",
   },
   {
     id: "agent-activity",
     name: "Agent Activity",
     category: "system",
-    description: "Queue throughput, personas, and trust scores",
-    prompt: "Create an agent activity dashboard showing queue stats (pending, processing, completed, failed), most active personas, cron skill execution log, and trust scores by workflow.",
+    description: "Queue pipeline, active personas, and trust scores",
+    prompt: "Create an agent activity dashboard. Use these widgets: queue-status, trust-scores, agent-activity. Show queue stats (pending, processing, completed, failed), most active personas, and trust scores by workflow. Use CSS grid layout.",
   },
   {
-    id: "health-energy",
-    name: "Health & Energy",
-    category: "personal",
-    description: "Sleep, readiness, and activity from Oura",
-    prompt: "Create a health and energy dashboard showing last night's sleep score, 7-day sleep trend, today's readiness score, activity level, and HRV trend. Pull from Oura integration.",
-  },
-  {
-    id: "goals-tracker",
-    name: "Goals Tracker",
-    category: "personal",
-    description: "Active goals with progress bars",
-    prompt: "Create a goals tracker dashboard showing my active goals as cards with progress bars, grouped by area (health, career, finance, personal), with overall completion percentage.",
-  },
-  {
-    id: "content-performance",
-    name: "Content Performance",
-    category: "business",
-    description: "Social posts and content pipeline",
-    prompt: "Create a content performance dashboard showing recent content pieces, content pipeline status, engagement metrics from X intelligence, and a content calendar for the next 7 days.",
+    id: "morning-overview",
+    name: "Morning Overview",
+    category: "productivity",
+    description: "Today's tasks, brief highlights, and queue status",
+    prompt: "Create a morning overview dashboard. Use these widgets: tasks-summary, brief-summary, queue-status, streak-stats. Show today's priorities, daily brief highlights, pending queue items, and your current streak. Use clean CSS grid layout.",
   },
 ];
 

@@ -2,6 +2,7 @@ import { LitElement } from "lit";
 import { customElement, state } from "lit/decorators.js";
 import { provide } from "@lit/context";
 import { appContext, type AppContext, createDefaultAppContext } from "./context/app-context.js";
+import { appEventBus } from "./context/event-bus.js";
 import {
   handleChannelConfigReload as handleChannelConfigReloadInternal,
   handleChannelConfigSave as handleChannelConfigSaveInternal,
@@ -788,7 +789,29 @@ export class GodModeApp extends LitElement {
 
     // Restore tracked private sessions from localStorage (expire stale ones)
     this._restorePrivateSessions();
+
+    // Listen for cross-tab chat navigation (e.g. "Create via Chat" from dashboards)
+    this._eventBusUnsubs.push(
+      appEventBus.on("chat-navigate", (payload) => {
+        if (payload.sessionKey && payload.sessionKey !== this.sessionKey) {
+          if (payload.sessionKey === "new") {
+            // Generate a fresh session key for new sessions
+            this.sessionKey = `webchat-${Date.now()}`;
+          } else {
+            this.sessionKey = payload.sessionKey;
+          }
+        }
+        if (payload.tab === "chat") {
+          this.setTab("chat");
+        }
+        if (payload.message) {
+          this.chatMessage = payload.message;
+        }
+      }),
+    );
   }
+
+  private _eventBusUnsubs: Array<() => void> = [];
 
   protected firstUpdated() {
     handleFirstUpdated(this as unknown as Parameters<typeof handleFirstUpdated>[0]);
@@ -797,6 +820,8 @@ export class GodModeApp extends LitElement {
   disconnectedCallback() {
     stopMeetingNotifications();
     this._stopPrivateSessionTimer();
+    for (const unsub of this._eventBusUnsubs) unsub();
+    this._eventBusUnsubs = [];
     handleDisconnected(this as unknown as Parameters<typeof handleDisconnected>[0]);
     super.disconnectedCallback();
   }

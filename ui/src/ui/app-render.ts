@@ -9,6 +9,7 @@ import { resetChatScroll, scheduleChatScroll } from "./app-scroll";
 import { createNewSession, renderChatControls, renderTab, renderThemeToggle, scrollActiveTabIntoView } from "./app-render.helpers";
 import { setTab, syncUrlWithSessionKey } from "./app-settings";
 import type { AppViewState } from "./app-view-state";
+import { appEventBus } from "./context/event-bus.js";
 import { loadChannels } from "./controllers/channels";
 import { loadChatHistory } from "./controllers/chat";
 import {
@@ -87,7 +88,6 @@ import { renderGatewayRestartConfirmation } from "./views/gateway-restart";
 import { renderInstances } from "./views/instances";
 import { renderLogs } from "./views/logs";
 import { renderMarkdownSidebar } from "./views/markdown-sidebar";
-import { renderMyDayToolbar } from "./views/my-day";
 import { renderNodes } from "./views/nodes";
 import { renderSessions } from "./views/sessions";
 import { renderSkills } from "./views/skills";
@@ -1074,26 +1074,7 @@ export function renderApp(state: AppViewState) {
                   : nothing
             }
             ${isChat ? renderChatControls(state) : nothing}
-            ${(state.tab === "today" || state.tab === "my-day") && !state.dynamicSlots["today"]
-              ? renderMyDayToolbar({
-                  connected: state.connected,
-                  onRefresh: () => state.handleMyDayRefresh(),
-                  selectedDate: state.todaySelectedDate,
-                  onDatePrev: () => state.handleDatePrev(),
-                  onDateNext: () => state.handleDateNext(),
-                  onDateToday: () => state.handleDateToday(),
-                  viewMode: state.todayViewMode ?? "brief",
-                  onViewModeChange: (mode) => state.handleTodayViewModeChange(mode),
-                  focusPulseActive: false,
-                  onStartMorningSet: () => state.handleFocusPulseStartMorning(),
-                  inboxItems: state.inboxItems ?? [],
-                  inboxCount: state.inboxCount ?? 0,
-                  onEveningCapture: () => {
-                    state.setTab("chat" as import("./navigation").Tab);
-                    void state.handleSendChat("Let's do my evening capture. Walk me through these:\n1. What went well today?\n2. What didn't get done?\n3. What should tomorrow's brief prioritize?\n4. Ask me for an overall GodMode score (1-10) for today and any feedback. Submit it with the daily rating tool.");
-                  },
-                })
-              : nothing}
+            ${nothing /* Today toolbar is self-contained inside <gm-today> */}
           </div>
         </section>
 
@@ -1133,7 +1114,40 @@ export function renderApp(state: AppViewState) {
 
         ${
           state.tab === "today" || state.tab === "my-day"
-            ? (ensureTab("gm-today"), html`<gm-today></gm-today>`)
+            ? (ensureTab("gm-today"), html`<gm-today
+                @today-start-task=${(e: CustomEvent<{ taskId: string }>) => {
+                  // Navigate to chat with a message about the task
+                  const taskId = e.detail.taskId;
+                  state.setTab("chat");
+                  state.setChatMessage(`Let's work on task ${taskId}. Pull up the details and let's discuss an approach.`);
+                }}
+                @today-open-file=${(e: CustomEvent<{ path: string }>) => {
+                  void state.handleOpenFile(e.detail.path);
+                }}
+                @today-decision-open-chat=${(e: CustomEvent<{ id: string; item?: unknown }>) => {
+                  const item = e.detail.item as { title?: string; id?: string } | undefined;
+                  state.setTab("chat");
+                  const title = item?.title ?? e.detail.id;
+                  state.setChatMessage(`Let's discuss the agent result for: "${title}". What are your thoughts on the output?`);
+                }}
+                @today-inbox-open-chat=${(e: CustomEvent<{ itemId: string; item?: unknown }>) => {
+                  const item = e.detail.item as { title?: string; sessionId?: string; coworkSessionId?: string } | undefined;
+                  // If the item has a cowork session, navigate to it
+                  if (item?.coworkSessionId) {
+                    appEventBus.emit("chat-navigate", { sessionKey: `agent:prosper:${item.coworkSessionId}`, tab: "chat" });
+                  } else if (item?.sessionId) {
+                    appEventBus.emit("chat-navigate", { sessionKey: item.sessionId, tab: "chat" });
+                  } else {
+                    // Fall back to main chat with a message about the inbox item
+                    state.setTab("chat");
+                    const title = item?.title ?? e.detail.itemId;
+                    state.setChatMessage(`Let's review the inbox item: "${title}". Can you summarize the key points and what actions I should take?`);
+                  }
+                }}
+                @today-open-proof=${(e: CustomEvent<{ slug: string }>) => {
+                  void state.handleOpenProofDoc(e.detail.slug);
+                }}
+              ></gm-today>`)
             : nothing
         }
 

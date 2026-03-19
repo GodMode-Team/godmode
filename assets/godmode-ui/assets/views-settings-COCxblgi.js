@@ -1,4 +1,4 @@
-import{A as d,b as a,o as $a}from"./lit-core-CTInmNPB.js";import{t as wa,f as L,a as Be,b as jn,c as Et,d as Fe}from"./ctrl-settings-C6VcoKY4.js";import{g as Pt}from"./markdown-i_gIkIP3.js";function xa(e){const{values:t,original:n}=e;return t.name!==n.name||t.displayName!==n.displayName||t.about!==n.about||t.picture!==n.picture||t.banner!==n.banner||t.website!==n.website||t.nip05!==n.nip05||t.lud16!==n.lud16}function ka(e){const{state:t,callbacks:n,accountId:s}=e,i=xa(t),l=(r,u,v={})=>{const{type:p="text",placeholder:g,maxLength:h,help:$}=v,b=t.values[r]??"",y=t.fieldErrors[r],f=`nostr-profile-${r}`;return p==="textarea"?a`
+import{A as d,b as a,o as $a}from"./lit-core-CTInmNPB.js";import{t as wa,f as L,a as Be,b as jn,c as Et,d as Fe}from"./ctrl-settings-CzLVBbt9.js";import{g as Pt}from"./markdown-i_gIkIP3.js";function xa(e){const{values:t,original:n}=e;return t.name!==n.name||t.displayName!==n.displayName||t.about!==n.about||t.picture!==n.picture||t.banner!==n.banner||t.website!==n.website||t.nip05!==n.nip05||t.lud16!==n.lud16}function ka(e){const{state:t,callbacks:n,accountId:s}=e,i=xa(t),l=(r,u,v={})=>{const{type:p="text",placeholder:g,maxLength:h,help:$}=v,b=t.values[r]??"",y=t.fieldErrors[r],f=`nostr-profile-${r}`;return p==="textarea"?a`
         <div class="form-field" style="margin-bottom: 12px;">
           <label for="${f}" style="display: block; margin-bottom: 4px; font-weight: 500;">
             ${u}
@@ -2644,146 +2644,10 @@ ${e.snapshot?JSON.stringify(e.snapshot,null,2):"No snapshot yet."}
               `)}
       </div>
     </section>
-  `}const fi=/(^~\/|^\/|^\.\.?\/|[\\/])/;function Dn(e){const t=e.trim();if(!t)return null;const n=t.replace(/^["']|["']$/g,"").trim();return!n||/^[a-z][a-z0-9+.-]*:\/\//i.test(n)||/[*?<>|]/.test(n)||n.includes("\0")||n.includes(`
-`)||n.includes("\r")||!fi.test(n)&&!/\.[a-z0-9]{1,12}$/i.test(n)?null:n}function hi(e){const t=e instanceof Element?e:e instanceof Node?e.parentElement:null;if(!t)return null;const n=t.closest("a");if(n){const i=n.getAttribute("href")??"";let l=i;if(i.includes("%"))try{l=decodeURIComponent(i)}catch{l=i}return Dn(l)}const s=t.closest("code");return!s||s.closest("pre")?null:Dn(s.textContent??"")}function mi(e){const n=new DOMParser().parseFromString(`<div>${e}</div>`,"text/html").body.firstElementChild;if(!n)return"";const i=X(n,{listDepth:0,orderedIndex:[]});return yi(i)}function It(e,t){if(e.nodeType===Node.TEXT_NODE)return e.textContent??"";if(e.nodeType!==Node.ELEMENT_NODE)return"";const n=e;switch(n.tagName.toLowerCase()){case"h1":return`# ${ne(n,t)}
-
-`;case"h2":return`## ${ne(n,t)}
-
-`;case"h3":return`### ${ne(n,t)}
-
-`;case"h4":return`#### ${ne(n,t)}
-
-`;case"h5":return`##### ${ne(n,t)}
-
-`;case"h6":return`###### ${ne(n,t)}
-
-`;case"p":return`${X(n,t)}
-
-`;case"br":return`
-`;case"hr":return`---
-
-`;case"strong":case"b":return`**${X(n,t)}**`;case"em":case"i":return`*${X(n,t)}*`;case"del":return`~~${X(n,t)}~~`;case"a":{const i=n.getAttribute("href")??"",l=X(n,t);return!i||i===l?l:`[${l}](${i})`}case"code":return n.parentElement?.tagName.toLowerCase()==="pre"?n.textContent??"":`\`${n.textContent??""}\``;case"pre":{const i=n.querySelector("code"),l=i?i.textContent??"":n.textContent??"",o=i?.className.match(/language-(\S+)/);return`\`\`\`${o?o[1]:""}
-${l}
-\`\`\`
-
-`}case"blockquote":return X(n,t).trim().split(`
-`).map(o=>`> ${o}`).join(`
-`)+`
-
-`;case"ul":return zn(n,t,!1);case"ol":return zn(n,t,!0);case"li":return ta(n,t);case"input":return n.getAttribute("type")==="checkbox"?n.checked?"[x]":"[ ]":"";case"table":return bi(n,t);case"div":case"span":case"section":case"article":case"main":case"header":case"footer":case"nav":case"aside":case"figure":case"figcaption":case"details":case"summary":return X(n,t);default:return X(n,t)}}function X(e,t){let n="";for(const s of Array.from(e.childNodes))n+=It(s,t);return n}function ne(e,t){return X(e,t).replace(/\n+/g," ").trim()}function zn(e,t,n){const s=Array.from(e.children).filter(o=>o.tagName.toLowerCase()==="li"),i="  ".repeat(t.listDepth);let l="";for(let o=0;o<s.length;o++){const r=s[o],u={listDepth:t.listDepth+1,orderedIndex:[...t.orderedIndex,o+1]},v=n?`${o+1}. `:"- ",p=ta(r,u);l+=`${i}${v}${p}
-`}return t.listDepth===0&&(l+=`
-`),l}function ta(e,t){let n="";for(const s of Array.from(e.childNodes)){const i=s.tagName?.toLowerCase();i==="ul"||i==="ol"?n+=`
-`+It(s,t):n+=It(s,t)}return n.trim()}function bi(e,t){const n=[],s=e.querySelector("thead tr"),i=e.querySelectorAll("tbody tr");if(s){const v=Array.from(s.querySelectorAll("th, td")).map(p=>ne(p,t));n.push(v)}for(const v of Array.from(i)){const p=Array.from(v.querySelectorAll("td, th")).map(g=>ne(g,t));n.push(p)}if(n.length===0){const v=e.querySelectorAll("tr");for(const p of Array.from(v)){const g=Array.from(p.querySelectorAll("td, th")).map(h=>ne(h,t));n.push(g)}}if(n.length===0)return"";const l=Math.max(...n.map(v=>v.length)),o=[];for(let v=0;v<l;v++)o[v]=Math.max(3,...n.map(p=>(p[v]??"").length));let r="";const u=v=>`| ${o.map((g,h)=>(v[h]??"").padEnd(g)).join(" | ")} |`;r+=u(n[0])+`
-`,r+=`| ${o.map(v=>"-".repeat(v)).join(" | ")} |
-`;for(let v=1;v<n.length;v++)r+=u(n[v])+`
-`;return r+`
-`}function yi(e){let t=e;return t=t.replace(/\u00a0/g," "),t=t.replace(/\n{3,}/g,`
-
-`),t=t.trim(),t&&!t.endsWith(`
-`)&&(t+=`
-`),t}function $i(e){return e.includes(`
-`)&&e.indexOf(`
-`)<e.length-1?e:e.replace(/\\n/g,`
-`)}function wi(e){const t=new Date(e),s=new Date().getTime()-t.getTime(),i=Math.floor(s/(1e3*60));if(i<1)return"Just now";if(i<60)return`${i}m ago`;const l=Math.floor(i/60);return l<24?`${l}h ago`:t.toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"})}function xi(e){const t="VAULT",n=encodeURIComponent(`01-Daily/${e}`);return`obsidian://open?vault=${t}&file=${n}`}let Oe=null,_e=null;function In(e,t,n=1500){Oe&&clearTimeout(Oe),Oe=setTimeout(()=>{e!==_e&&(_e=e,t(e))},n)}function ki(e,t){Oe&&clearTimeout(Oe),e!==_e&&(_e=e,t(e))}function St(e){for(const t of e.querySelectorAll('input[type="checkbox"]')){const n=t;n.checked?n.setAttribute("checked",""):n.removeAttribute("checked")}return mi(e.innerHTML)}function _o(e){const{data:t,loading:n,error:s,onRefresh:i,onGenerate:l,onOpenInObsidian:o,onSaveBrief:r,onToggleCheckbox:u,onOpenFile:v}=e;if(n)return a`
-      <div class="my-day-card brief-section">
-        <div class="my-day-card-header">
-          <div class="my-day-card-title">
-            <span class="my-day-card-icon">\uD83D\uDCCA</span>
-            <span>DAILY BRIEF</span>
-          </div>
-        </div>
-        <div class="my-day-card-content">
-          <div class="brief-loading">
-            <div class="spinner"></div>
-            <span>Loading brief...</span>
-          </div>
-        </div>
-      </div>
-    `;if(s)return a`
-      <div class="my-day-card brief-section">
-        <div class="my-day-card-header">
-          <div class="my-day-card-title">
-            <span class="my-day-card-icon">\uD83D\uDCCA</span>
-            <span>DAILY BRIEF</span>
-          </div>
-        </div>
-        <div class="my-day-card-content">
-          <div class="brief-error">
-            <span class="error-icon">\u26A0\uFE0F</span>
-            <span>${s}</span>
-            ${i?a`<button class="retry-button" @click=${i}>Retry</button>`:d}
-          </div>
-        </div>
-      </div>
-    `;if(!t||!t.content)return a`
-      <div class="my-day-card brief-section">
-        <div class="my-day-card-header">
-          <div class="my-day-card-title">
-            <span class="my-day-card-icon">\uD83D\uDCCA</span>
-            <span>DAILY BRIEF</span>
-          </div>
-        </div>
-        <div class="my-day-card-content">
-          <div class="brief-empty">
-            <span class="empty-icon">\uD83D\uDCDD</span>
-            <span>No brief available for today</span>
-            <span class="empty-hint">Your morning brief pulls together your calendar, tasks, goals, and energy data into a single scannable page.</span>
-            ${l?a`<button class="brief-generate-btn" @click=${l}>Generate Brief Now</button>`:i?a`<button class="brief-generate-btn" @click=${i}>Generate Brief Now</button>`:d}
-            <span class="empty-hint" style="margin-top: 8px; font-size: 12px;">Briefs auto-generate at 5:00 AM when configured.</span>
-          </div>
-        </div>
-      </div>
-    `;_e===null&&(_e=t.content);const p=f=>{const w=f.currentTarget;if(r){const S=St(w);In(S,r)}},g=f=>{if((f.ctrlKey||f.metaKey)&&f.key==="s"){f.preventDefault();const w=f.currentTarget;if(r){const S=St(w);ki(S,r)}}if((f.ctrlKey||f.metaKey)&&f.key==="l"){f.preventDefault();const w=window.getSelection();if(!w||w.rangeCount===0)return;const S=w.focusNode,T=S instanceof HTMLElement?S.closest("li"):S?.parentElement?.closest("li");if(T){const k=T.querySelector('input[type="checkbox"]');if(k)k.nextSibling?.nodeType===Node.TEXT_NODE&&k.nextSibling.textContent===" "&&k.nextSibling.remove(),k.remove();else{const M=document.createElement("input");M.type="checkbox",T.insertBefore(document.createTextNode(" "),T.firstChild),T.insertBefore(M,T.firstChild)}const _=f.currentTarget;if(r){const M=St(_);In(M,r)}}}if(f.key==="Enter"&&!f.shiftKey){const w=window.getSelection();if(!w||w.rangeCount===0)return;const S=w.focusNode,T=S instanceof HTMLElement?S.closest("li"):S?.parentElement?.closest("li");T&&T.querySelector('input[type="checkbox"]')&&setTimeout(()=>{const k=window.getSelection();if(!k||k.rangeCount===0)return;const _=k.focusNode,M=_ instanceof HTMLElement?_.closest("li"):_?.parentElement?.closest("li");if(M&&M!==T&&!M.querySelector('input[type="checkbox"]')){const C=document.createElement("input");C.type="checkbox",M.insertBefore(C,M.firstChild),M.insertBefore(document.createTextNode(" "),C.nextSibling);const ce=document.createRange();ce.setStartAfter(C.nextSibling),ce.collapse(!0),k.removeAllRanges(),k.addRange(ce)}},0)}},h=f=>{const w=f.target;if(w.tagName==="INPUT"&&w.getAttribute("type")==="checkbox"){const k=w,_=f.currentTarget;if(u&&_){const C=Array.from(_.querySelectorAll('input[type="checkbox"]')).indexOf(k);C>=0&&u(C,k.checked)}return}const S=hi(f.target);if(S&&v){f.preventDefault(),v(S);return}const T=w.closest?.("a")??w.parentElement?.closest("a");if(T){const k=T.getAttribute("href")??"";/^https?:\/\//i.test(k)&&(f.preventDefault(),window.open(k,"_blank","noopener,noreferrer"))}},$=es($i(t.content)),b=t.summary.readiness!=null?a`<span class="brief-readiness" title="Readiness Score${t.summary.readinessMode?` — ${t.summary.readinessMode}`:""}">
-        <span class="readiness-score">${t.summary.readiness}</span>
-        <span class="readiness-label">Readiness</span>
-      </span>`:d,y=t.summary.tasks.total>0?a`<span class="brief-task-progress" title="${t.summary.tasks.completed}/${t.summary.tasks.total} tasks done">
-        ${t.summary.tasks.completed}/${t.summary.tasks.total}
-      </span>`:d;return a`
-    <div class="my-day-card brief-section brief-editor">
-      <div class="my-day-card-header">
-        <div class="my-day-card-title">
-          <span class="my-day-card-icon">\uD83D\uDCCA</span>
-          <span>DAILY BRIEF</span>
-          ${b}
-          ${y}
-        </div>
-        <div class="brief-header-actions">
-          <span class="brief-updated">${wi(t.updatedAt)}</span>
-          ${o?a`
-                <a
-                  href="${xi(t.date)}"
-                  class="brief-obsidian-link"
-                  title="Open in Obsidian"
-                  @click=${f=>{f.preventDefault(),o()}}
-                >
-                  <span class="obsidian-icon">\uD83D\uDCD3</span>
-                </a>
-              `:d}
-          ${i?a`
-                <button class="brief-refresh-btn" @click=${i} title="Refresh">
-                  \uD83D\uDD04
-                </button>
-              `:d}
-        </div>
-      </div>
-
-      <div class="my-day-card-content">
-        <div class="brief-content brief-content--live">
-          <div
-            class="brief-rendered brief-editable"
-            contenteditable="true"
-            spellcheck="false"
-            @input=${p}
-            @keydown=${g}
-            @click=${h}
-          >${$a($)}</div>
-        </div>
-      </div>
-    </div>
-  `}function So(e){const t=Ei(e),n=zi(e);return a`
-    ${Pi(n)}
-    ${Ii(t)}
-    ${Ai(e)}
+  `}function _o(e){const t=$i(e),n=Si(e);return a`
+    ${Ti(n)}
+    ${Ci(t)}
+    ${fi(e)}
     <section class="card">
       <div class="row" style="justify-content: space-between;">
         <div>
@@ -2797,10 +2661,10 @@ ${l}
       <div class="list" style="margin-top: 16px;">
         ${e.nodes.length===0?a`
                 <div class="muted">No nodes found.</div>
-              `:e.nodes.map(s=>Yi(s))}
+              `:e.nodes.map(s=>Oi(s))}
       </div>
     </section>
-  `}function Ai(e){const t=e.devicesList??{pending:[],paired:[]},n=Array.isArray(t.pending)?t.pending:[],s=Array.isArray(t.paired)?t.paired:[];return a`
+  `}function fi(e){const t=e.devicesList??{pending:[],paired:[]},n=Array.isArray(t.pending)?t.pending:[],s=Array.isArray(t.paired)?t.paired:[];return a`
     <section class="card">
       <div class="row" style="justify-content: space-between;">
         <div>
@@ -2815,18 +2679,18 @@ ${l}
       <div class="list" style="margin-top: 16px;">
         ${n.length>0?a`
               <div class="muted" style="margin-bottom: 8px;">Pending</div>
-              ${n.map(i=>_i(i,e))}
+              ${n.map(i=>hi(i,e))}
             `:d}
         ${s.length>0?a`
               <div class="muted" style="margin-top: 12px; margin-bottom: 8px;">Paired</div>
-              ${s.map(i=>Si(i,e))}
+              ${s.map(i=>mi(i,e))}
             `:d}
         ${n.length===0&&s.length===0?a`
                 <div class="muted">No paired devices.</div>
               `:d}
       </div>
     </section>
-  `}function _i(e,t){const n=e.displayName?.trim()||e.deviceId,s=typeof e.ts=="number"?L(e.ts):"n/a",i=e.role?.trim()?`role: ${e.role}`:"role: -",l=e.isRepair?" · repair":"",o=e.remoteIp?` · ${e.remoteIp}`:"";return a`
+  `}function hi(e,t){const n=e.displayName?.trim()||e.deviceId,s=typeof e.ts=="number"?L(e.ts):"n/a",i=e.role?.trim()?`role: ${e.role}`:"role: -",l=e.isRepair?" · repair":"",o=e.remoteIp?` · ${e.remoteIp}`:"";return a`
     <div class="list-item">
       <div class="list-main">
         <div class="list-title">${n}</div>
@@ -2846,7 +2710,7 @@ ${l}
         </div>
       </div>
     </div>
-  `}function Si(e,t){const n=e.displayName?.trim()||e.deviceId,s=e.remoteIp?` · ${e.remoteIp}`:"",i=`roles: ${Et(e.roles)}`,l=`scopes: ${Et(e.scopes)}`,o=Array.isArray(e.tokens)?e.tokens:[];return a`
+  `}function mi(e,t){const n=e.displayName?.trim()||e.deviceId,s=e.remoteIp?` · ${e.remoteIp}`:"",i=`roles: ${Et(e.roles)}`,l=`scopes: ${Et(e.scopes)}`,o=Array.isArray(e.tokens)?e.tokens:[];return a`
     <div class="list-item">
       <div class="list-main">
         <div class="list-title">${n}</div>
@@ -2857,12 +2721,12 @@ ${l}
               `:a`
               <div class="muted" style="margin-top: 10px;">Tokens</div>
               <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 6px;">
-                ${o.map(r=>Ci(e.deviceId,r,t))}
+                ${o.map(r=>bi(e.deviceId,r,t))}
               </div>
             `}
       </div>
     </div>
-  `}function Ci(e,t,n){const s=t.revokedAtMs?"revoked":"active",i=`scopes: ${Et(t.scopes)}`,l=L(t.rotatedAtMs??t.createdAtMs??t.lastUsedAtMs??null);return a`
+  `}function bi(e,t,n){const s=t.revokedAtMs?"revoked":"active",i=`scopes: ${Et(t.scopes)}`,l=L(t.rotatedAtMs??t.createdAtMs??t.lastUsedAtMs??null);return a`
     <div class="row" style="justify-content: space-between; gap: 8px;">
       <div class="list-sub">${t.role} · ${s} · ${i} · ${l}</div>
       <div class="row" style="justify-content: flex-end; gap: 6px; flex-wrap: wrap;">
@@ -2882,7 +2746,7 @@ ${l}
             `}
       </div>
     </div>
-  `}const oe="__defaults__",Pn=[{value:"deny",label:"Deny"},{value:"allowlist",label:"Allowlist"},{value:"full",label:"Full"}],Ti=[{value:"off",label:"Off"},{value:"on-miss",label:"On miss"},{value:"always",label:"Always"}];function Ei(e){const t=e.configForm,n=Wi(e.nodes),{defaultBinding:s,agents:i}=Gi(t),l=!!t,o=e.configSaving||e.configFormMode==="raw";return{ready:l,disabled:o,configDirty:e.configDirty,configLoading:e.configLoading,configSaving:e.configSaving,defaultBinding:s,agents:i,nodes:n,onBindDefault:e.onBindDefault,onBindAgent:e.onBindAgent,onSave:e.onSaveBindings,onLoadConfig:e.onLoadConfig,formMode:e.configFormMode}}function On(e){return e==="allowlist"||e==="full"||e==="deny"?e:"deny"}function Mi(e){return e==="always"||e==="off"||e==="on-miss"?e:"on-miss"}function Li(e){const t=e?.defaults??{};return{security:On(t.security),ask:Mi(t.ask),askFallback:On(t.askFallback??"deny"),autoAllowSkills:!!(t.autoAllowSkills??!1)}}function Ri(e){const t=e?.agents??{},n=Array.isArray(t.list)?t.list:[],s=[];return n.forEach(i=>{if(!i||typeof i!="object")return;const l=i,o=typeof l.id=="string"?l.id.trim():"";if(!o)return;const r=typeof l.name=="string"?l.name.trim():void 0,u=l.default===!0;s.push({id:o,name:r||void 0,isDefault:u})}),s}function Ni(e,t){const n=Ri(e),s=Object.keys(t?.agents??{}),i=new Map;n.forEach(o=>i.set(o.id,o)),s.forEach(o=>{i.has(o)||i.set(o,{id:o})});const l=Array.from(i.values());return l.length===0&&l.push({id:"main",isDefault:!0}),l.sort((o,r)=>{if(o.isDefault&&!r.isDefault)return-1;if(!o.isDefault&&r.isDefault)return 1;const u=o.name?.trim()?o.name:o.id,v=r.name?.trim()?r.name:r.id;return u.localeCompare(v)}),l}function Di(e,t){return e===oe?oe:e&&t.some(n=>n.id===e)?e:oe}function zi(e){const t=e.execApprovalsForm??e.execApprovalsSnapshot?.file??null,n=!!t,s=Li(t),i=Ni(e.configForm,t),l=Vi(e.nodes),o=e.execApprovalsTarget;let r=o==="node"&&e.execApprovalsTargetNodeId?e.execApprovalsTargetNodeId:null;o==="node"&&r&&!l.some(g=>g.id===r)&&(r=null);const u=Di(e.execApprovalsSelectedAgent,i),v=u!==oe?(t?.agents??{})[u]??null:null,p=Array.isArray(v?.allowlist)?v.allowlist??[]:[];return{ready:n,disabled:e.execApprovalsSaving||e.execApprovalsLoading,dirty:e.execApprovalsDirty,loading:e.execApprovalsLoading,saving:e.execApprovalsSaving,form:t,defaults:s,selectedScope:u,selectedAgent:v,agents:i,allowlist:p,target:o,targetNodeId:r,targetNodes:l,onSelectScope:e.onExecApprovalsSelectAgent,onSelectTarget:e.onExecApprovalsTargetChange,onPatch:e.onExecApprovalsPatch,onRemove:e.onExecApprovalsRemove,onLoad:e.onLoadExecApprovals,onSave:e.onSaveExecApprovals}}function Ii(e){const t=e.nodes.length>0,n=e.defaultBinding??"";return a`
+  `}const oe="__defaults__",Dn=[{value:"deny",label:"Deny"},{value:"allowlist",label:"Allowlist"},{value:"full",label:"Full"}],yi=[{value:"off",label:"Off"},{value:"on-miss",label:"On miss"},{value:"always",label:"Always"}];function $i(e){const t=e.configForm,n=zi(e.nodes),{defaultBinding:s,agents:i}=Pi(t),l=!!t,o=e.configSaving||e.configFormMode==="raw";return{ready:l,disabled:o,configDirty:e.configDirty,configLoading:e.configLoading,configSaving:e.configSaving,defaultBinding:s,agents:i,nodes:n,onBindDefault:e.onBindDefault,onBindAgent:e.onBindAgent,onSave:e.onSaveBindings,onLoadConfig:e.onLoadConfig,formMode:e.configFormMode}}function zn(e){return e==="allowlist"||e==="full"||e==="deny"?e:"deny"}function wi(e){return e==="always"||e==="off"||e==="on-miss"?e:"on-miss"}function xi(e){const t=e?.defaults??{};return{security:zn(t.security),ask:wi(t.ask),askFallback:zn(t.askFallback??"deny"),autoAllowSkills:!!(t.autoAllowSkills??!1)}}function ki(e){const t=e?.agents??{},n=Array.isArray(t.list)?t.list:[],s=[];return n.forEach(i=>{if(!i||typeof i!="object")return;const l=i,o=typeof l.id=="string"?l.id.trim():"";if(!o)return;const r=typeof l.name=="string"?l.name.trim():void 0,u=l.default===!0;s.push({id:o,name:r||void 0,isDefault:u})}),s}function Ai(e,t){const n=ki(e),s=Object.keys(t?.agents??{}),i=new Map;n.forEach(o=>i.set(o.id,o)),s.forEach(o=>{i.has(o)||i.set(o,{id:o})});const l=Array.from(i.values());return l.length===0&&l.push({id:"main",isDefault:!0}),l.sort((o,r)=>{if(o.isDefault&&!r.isDefault)return-1;if(!o.isDefault&&r.isDefault)return 1;const u=o.name?.trim()?o.name:o.id,v=r.name?.trim()?r.name:r.id;return u.localeCompare(v)}),l}function _i(e,t){return e===oe?oe:e&&t.some(n=>n.id===e)?e:oe}function Si(e){const t=e.execApprovalsForm??e.execApprovalsSnapshot?.file??null,n=!!t,s=xi(t),i=Ai(e.configForm,t),l=Ii(e.nodes),o=e.execApprovalsTarget;let r=o==="node"&&e.execApprovalsTargetNodeId?e.execApprovalsTargetNodeId:null;o==="node"&&r&&!l.some(g=>g.id===r)&&(r=null);const u=_i(e.execApprovalsSelectedAgent,i),v=u!==oe?(t?.agents??{})[u]??null:null,p=Array.isArray(v?.allowlist)?v.allowlist??[]:[];return{ready:n,disabled:e.execApprovalsSaving||e.execApprovalsLoading,dirty:e.execApprovalsDirty,loading:e.execApprovalsLoading,saving:e.execApprovalsSaving,form:t,defaults:s,selectedScope:u,selectedAgent:v,agents:i,allowlist:p,target:o,targetNodeId:r,targetNodes:l,onSelectScope:e.onExecApprovalsSelectAgent,onSelectTarget:e.onExecApprovalsTargetChange,onPatch:e.onExecApprovalsPatch,onRemove:e.onExecApprovalsRemove,onLoad:e.onLoadExecApprovals,onSave:e.onSaveExecApprovals}}function Ci(e){const t=e.nodes.length>0,n=e.defaultBinding??"";return a`
     <section class="card">
       <div class="row" style="justify-content: space-between; align-items: center;">
         <div>
@@ -2937,7 +2801,7 @@ ${l}
 
               ${e.agents.length===0?a`
                       <div class="muted">No agents found.</div>
-                    `:e.agents.map(s=>ji(s,e))}
+                    `:e.agents.map(s=>Di(s,e))}
             </div>
           `:a`<div class="row" style="margin-top: 12px; gap: 12px;">
             <div class="muted">Load config to edit bindings.</div>
@@ -2946,7 +2810,7 @@ ${l}
             </button>
           </div>`}
     </section>
-  `}function Pi(e){const t=e.ready,n=e.target!=="node"||!!e.targetNodeId;return a`
+  `}function Ti(e){const t=e.ready,n=e.target!=="node"||!!e.targetNodeId;return a`
     <section class="card">
       <div class="row" style="justify-content: space-between; align-items: center;">
         <div>
@@ -2964,12 +2828,12 @@ ${l}
         </button>
       </div>
 
-      ${Oi(e)}
+      ${Ei(e)}
 
       ${t?a`
-            ${Bi(e)}
-            ${Fi(e)}
-            ${e.selectedScope===oe?d:Ui(e)}
+            ${Mi(e)}
+            ${Li(e)}
+            ${e.selectedScope===oe?d:Ri(e)}
           `:a`<div class="row" style="margin-top: 12px; gap: 12px;">
             <div class="muted">Load exec approvals to edit allowlists.</div>
             <button class="btn" ?disabled=${e.loading||!n} @click=${e.onLoad}>
@@ -2977,7 +2841,7 @@ ${l}
             </button>
           </div>`}
     </section>
-  `}function Oi(e){const t=e.targetNodes.length>0,n=e.targetNodeId??"";return a`
+  `}function Ei(e){const t=e.targetNodes.length>0,n=e.targetNodeId??"";return a`
     <div class="list" style="margin-top: 12px;">
       <div class="list-item">
         <div class="list-main">
@@ -3020,7 +2884,7 @@ ${l}
               <div class="muted">No nodes advertise exec approvals yet.</div>
             `:d}
     </div>
-  `}function Bi(e){return a`
+  `}function Mi(e){return a`
     <div class="row" style="margin-top: 12px; gap: 8px; flex-wrap: wrap;">
       <span class="label">Scope</span>
       <div class="row" style="gap: 8px; flex-wrap: wrap;">
@@ -3040,7 +2904,7 @@ ${l}
           `})}
       </div>
     </div>
-  `}function Fi(e){const t=e.selectedScope===oe,n=e.defaults,s=e.selectedAgent??{},i=t?["defaults"]:["agents",e.selectedScope],l=typeof s.security=="string"?s.security:void 0,o=typeof s.ask=="string"?s.ask:void 0,r=typeof s.askFallback=="string"?s.askFallback:void 0,u=t?n.security:l??"__default__",v=t?n.ask:o??"__default__",p=t?n.askFallback:r??"__default__",g=typeof s.autoAllowSkills=="boolean"?s.autoAllowSkills:void 0,h=g??n.autoAllowSkills,$=g==null;return a`
+  `}function Li(e){const t=e.selectedScope===oe,n=e.defaults,s=e.selectedAgent??{},i=t?["defaults"]:["agents",e.selectedScope],l=typeof s.security=="string"?s.security:void 0,o=typeof s.ask=="string"?s.ask:void 0,r=typeof s.askFallback=="string"?s.askFallback:void 0,u=t?n.security:l??"__default__",v=t?n.ask:o??"__default__",p=t?n.askFallback:r??"__default__",g=typeof s.autoAllowSkills=="boolean"?s.autoAllowSkills:void 0,h=g??n.autoAllowSkills,$=g==null;return a`
     <div class="list" style="margin-top: 16px;">
       <div class="list-item">
         <div class="list-main">
@@ -3059,7 +2923,7 @@ ${l}
               ${t?d:a`<option value="__default__" ?selected=${u==="__default__"}>
                     Use default (${n.security})
                   </option>`}
-              ${Pn.map(b=>a`<option
+              ${Dn.map(b=>a`<option
                     value=${b.value}
                     ?selected=${u===b.value}
                   >
@@ -3087,7 +2951,7 @@ ${l}
               ${t?d:a`<option value="__default__" ?selected=${v==="__default__"}>
                     Use default (${n.ask})
                   </option>`}
-              ${Ti.map(b=>a`<option
+              ${yi.map(b=>a`<option
                     value=${b.value}
                     ?selected=${v===b.value}
                   >
@@ -3115,7 +2979,7 @@ ${l}
               ${t?d:a`<option value="__default__" ?selected=${p==="__default__"}>
                     Use default (${n.askFallback})
                   </option>`}
-              ${Pn.map(b=>a`<option
+              ${Dn.map(b=>a`<option
                     value=${b.value}
                     ?selected=${p===b.value}
                   >
@@ -3153,7 +3017,7 @@ ${l}
         </div>
       </div>
     </div>
-  `}function Ui(e){const t=["agents",e.selectedScope,"allowlist"],n=e.allowlist;return a`
+  `}function Ri(e){const t=["agents",e.selectedScope,"allowlist"],n=e.allowlist;return a`
     <div class="row" style="margin-top: 18px; justify-content: space-between;">
       <div>
         <div class="card-title">Allowlist</div>
@@ -3170,9 +3034,9 @@ ${l}
     <div class="list" style="margin-top: 12px;">
       ${n.length===0?a`
               <div class="muted">No allowlist entries yet.</div>
-            `:n.map((s,i)=>Hi(e,s,i))}
+            `:n.map((s,i)=>Ni(e,s,i))}
     </div>
-  `}function Hi(e,t,n){const s=t.lastUsedAt?L(t.lastUsedAt):"never",i=t.lastUsedCommand?Fe(t.lastUsedCommand,120):null,l=t.lastResolvedPath?Fe(t.lastResolvedPath,120):null;return a`
+  `}function Ni(e,t,n){const s=t.lastUsedAt?L(t.lastUsedAt):"never",i=t.lastUsedCommand?Fe(t.lastUsedCommand,120):null,l=t.lastResolvedPath?Fe(t.lastResolvedPath,120):null;return a`
     <div class="list-item">
       <div class="list-main">
         <div class="list-title">${t.pattern?.trim()?t.pattern:"New pattern"}</div>
@@ -3199,7 +3063,7 @@ ${l}
         </button>
       </div>
     </div>
-  `}function ji(e,t){const n=e.binding??"__default__",s=e.name?.trim()?`${e.name} (${e.id})`:e.id,i=t.nodes.length>0;return a`
+  `}function Di(e,t){const n=e.binding??"__default__",s=e.name?.trim()?`${e.name} (${e.id})`:e.id,i=t.nodes.length>0;return a`
     <div class="list-item">
       <div class="list-main">
         <div class="list-title">${s}</div>
@@ -3228,7 +3092,7 @@ ${l}
         </label>
       </div>
     </div>
-  `}function Wi(e){const t=[];for(const n of e){if(!(Array.isArray(n.commands)?n.commands:[]).some(r=>String(r)==="system.run"))continue;const l=typeof n.nodeId=="string"?n.nodeId.trim():"";if(!l)continue;const o=typeof n.displayName=="string"&&n.displayName.trim()?n.displayName.trim():l;t.push({id:l,label:o===l?l:`${o} · ${l}`})}return t.sort((n,s)=>n.label.localeCompare(s.label)),t}function Vi(e){const t=[];for(const n of e){if(!(Array.isArray(n.commands)?n.commands:[]).some(r=>String(r)==="system.execApprovals.get"||String(r)==="system.execApprovals.set"))continue;const l=typeof n.nodeId=="string"?n.nodeId.trim():"";if(!l)continue;const o=typeof n.displayName=="string"&&n.displayName.trim()?n.displayName.trim():l;t.push({id:l,label:o===l?l:`${o} · ${l}`})}return t.sort((n,s)=>n.label.localeCompare(s.label)),t}function Gi(e){const t={id:"main",name:void 0,index:0,isDefault:!0,binding:null};if(!e||typeof e!="object")return{defaultBinding:null,agents:[t]};const s=(e.tools??{}).exec??{},i=typeof s.node=="string"&&s.node.trim()?s.node.trim():null,l=e.agents??{},o=Array.isArray(l.list)?l.list:[];if(o.length===0)return{defaultBinding:i,agents:[t]};const r=[];return o.forEach((u,v)=>{if(!u||typeof u!="object")return;const p=u,g=typeof p.id=="string"?p.id.trim():"";if(!g)return;const h=typeof p.name=="string"?p.name.trim():void 0,$=p.default===!0,y=(p.tools??{}).exec??{},f=typeof y.node=="string"&&y.node.trim()?y.node.trim():null;r.push({id:g,name:h||void 0,index:v,isDefault:$,binding:f})}),r.length===0&&r.push(t),{defaultBinding:i,agents:r}}function Yi(e){const t=!!e.connected,n=!!e.paired,s=typeof e.displayName=="string"&&e.displayName.trim()||(typeof e.nodeId=="string"?e.nodeId:"unknown"),i=Array.isArray(e.caps)?e.caps:[],l=Array.isArray(e.commands)?e.commands:[];return a`
+  `}function zi(e){const t=[];for(const n of e){if(!(Array.isArray(n.commands)?n.commands:[]).some(r=>String(r)==="system.run"))continue;const l=typeof n.nodeId=="string"?n.nodeId.trim():"";if(!l)continue;const o=typeof n.displayName=="string"&&n.displayName.trim()?n.displayName.trim():l;t.push({id:l,label:o===l?l:`${o} · ${l}`})}return t.sort((n,s)=>n.label.localeCompare(s.label)),t}function Ii(e){const t=[];for(const n of e){if(!(Array.isArray(n.commands)?n.commands:[]).some(r=>String(r)==="system.execApprovals.get"||String(r)==="system.execApprovals.set"))continue;const l=typeof n.nodeId=="string"?n.nodeId.trim():"";if(!l)continue;const o=typeof n.displayName=="string"&&n.displayName.trim()?n.displayName.trim():l;t.push({id:l,label:o===l?l:`${o} · ${l}`})}return t.sort((n,s)=>n.label.localeCompare(s.label)),t}function Pi(e){const t={id:"main",name:void 0,index:0,isDefault:!0,binding:null};if(!e||typeof e!="object")return{defaultBinding:null,agents:[t]};const s=(e.tools??{}).exec??{},i=typeof s.node=="string"&&s.node.trim()?s.node.trim():null,l=e.agents??{},o=Array.isArray(l.list)?l.list:[];if(o.length===0)return{defaultBinding:i,agents:[t]};const r=[];return o.forEach((u,v)=>{if(!u||typeof u!="object")return;const p=u,g=typeof p.id=="string"?p.id.trim():"";if(!g)return;const h=typeof p.name=="string"?p.name.trim():void 0,$=p.default===!0,y=(p.tools??{}).exec??{},f=typeof y.node=="string"&&y.node.trim()?y.node.trim():null;r.push({id:g,name:h||void 0,index:v,isDefault:$,binding:f})}),r.length===0&&r.push(t),{defaultBinding:i,agents:r}}function Oi(e){const t=!!e.connected,n=!!e.paired,s=typeof e.displayName=="string"&&e.displayName.trim()||(typeof e.nodeId=="string"?e.nodeId:"unknown"),i=Array.isArray(e.caps)?e.caps:[],l=Array.isArray(e.commands)?e.commands:[];return a`
     <div class="list-item">
       <div class="list-main">
         <div class="list-title">${s}</div>
@@ -3247,20 +3111,20 @@ ${l}
         </div>
       </div>
     </div>
-  `}const Ki=["","off","minimal","low","medium","high"],qi=["","off","on"],Ji=[{value:"",label:"inherit"},{value:"off",label:"off (explicit)"},{value:"on",label:"on"}],Xi=["","off","on","stream"];function Zi(e){if(!e)return"";const t=e.trim().toLowerCase();return t==="z.ai"||t==="z-ai"?"zai":t}function na(e){return Zi(e)==="zai"}function Qi(e){return na(e)?qi:Ki}function el(e,t){return!t||!e||e==="off"?e:"on"}function tl(e,t){return e?t&&e==="on"?"low":e:null}function nl(e){switch(e){case"idle-7d":return"Idle > 7 days";case"task-complete":return"Task completed";case"manual":return"Manual";default:return e}}function al(){return a`<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+  `}const Bi=["","off","minimal","low","medium","high"],Fi=["","off","on"],Ui=[{value:"",label:"inherit"},{value:"off",label:"off (explicit)"},{value:"on",label:"on"}],Hi=["","off","on","stream"];function ji(e){if(!e)return"";const t=e.trim().toLowerCase();return t==="z.ai"||t==="z-ai"?"zai":t}function ta(e){return ji(e)==="zai"}function Wi(e){return ta(e)?Fi:Bi}function Vi(e,t){return!t||!e||e==="off"?e:"on"}function Gi(e,t){return e?t&&e==="on"?"low":e:null}function Yi(e){switch(e){case"idle-7d":return"Idle > 7 days";case"task-complete":return"Task completed";case"manual":return"Manual";default:return e}}function Ki(){return a`<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
     <rect x="2" y="3" width="20" height="5" rx="1"/>
     <path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8"/>
     <path d="M10 12h4"/>
-  </svg>`}function sl(){return a`<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+  </svg>`}function qi(){return a`<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
     <polyline points="9 14 4 9 9 4"/>
     <path d="M20 20v-7a4 4 0 0 0-4-4H4"/>
-  </svg>`}function il(e){return a`<svg
+  </svg>`}function Ji(e){return a`<svg
     width="12" height="12" viewBox="0 0 24 24" fill="none"
     stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
     style="transition: transform 150ms ease; transform: rotate(${e?"90deg":"0deg"});"
   >
     <polyline points="9 18 15 12 9 6"/>
-  </svg>`}function Co(e){const t=e.result?.sessions??[],n=new Set(e.archivedSessions.map(l=>l.sessionKey)),s=t.filter(l=>!n.has(l.key)),i=e.archivedSessions.length;return a`
+  </svg>`}function So(e){const t=e.result?.sessions??[],n=new Set(e.archivedSessions.map(l=>l.sessionKey)),s=t.filter(l=>!n.has(l.key)),i=e.archivedSessions.length;return a`
     <section class="card">
       <div class="row" style="justify-content: space-between;">
         <div>
@@ -3335,19 +3199,19 @@ ${l}
         </div>
         ${s.length===0?a`
                 <div class="muted">No active sessions found.</div>
-              `:s.map(l=>ol(l,e.basePath,e.onPatch,e.onDelete,e.onArchive,e.loading))}
+              `:s.map(l=>Zi(l,e.basePath,e.onPatch,e.onDelete,e.onArchive,e.loading))}
       </div>
     </section>
 
-    ${ll(e,i)}
-  `}function ll(e,t){return t===0&&!e.archivedSessionsLoading?d:a`
+    ${Xi(e,i)}
+  `}function Xi(e,t){return t===0&&!e.archivedSessionsLoading?d:a`
     <section class="card archived-section">
       <div
         class="archived-section__header"
         @click=${e.onToggleArchived}
       >
         <div class="row" style="gap: 8px; align-items: center;">
-          ${il(e.archivedSessionsExpanded)}
+          ${Ji(e.archivedSessionsExpanded)}
           <span class="archived-section__title">Archived</span>
           ${t>0?a`<span class="archived-badge">${t}</span>`:d}
         </div>
@@ -3365,11 +3229,11 @@ ${l}
                   <div>Linked Task</div>
                   <div>Actions</div>
                 </div>
-                ${e.archivedSessionsLoading?a`<div class="muted" style="padding: 12px;">Loading...</div>`:e.archivedSessions.length===0?a`<div class="muted" style="padding: 12px;">No archived sessions.</div>`:e.archivedSessions.map(n=>rl(n,e.onUnarchive,e.loading))}
+                ${e.archivedSessionsLoading?a`<div class="muted" style="padding: 12px;">Loading...</div>`:e.archivedSessions.length===0?a`<div class="muted" style="padding: 12px;">No archived sessions.</div>`:e.archivedSessions.map(n=>Qi(n,e.onUnarchive,e.loading))}
               </div>
             `:d}
     </section>
-  `}function ol(e,t,n,s,i,l){const o=e.updatedAt?L(e.updatedAt):"n/a",r=e.thinkingLevel??"",u=na(e.modelProvider),v=el(r,u),p=Qi(e.modelProvider),g=e.verboseLevel??"",h=e.reasoningLevel??"",$=e.displayName??e.key,b=e.kind!=="global",y=b?`${Aa("chat",t)}?session=${encodeURIComponent(e.key)}`:null;return a`
+  `}function Zi(e,t,n,s,i,l){const o=e.updatedAt?L(e.updatedAt):"n/a",r=e.thinkingLevel??"",u=ta(e.modelProvider),v=Vi(r,u),p=Wi(e.modelProvider),g=e.verboseLevel??"",h=e.reasoningLevel??"",$=e.displayName??e.key,b=e.kind!=="global",y=b?`${Aa("chat",t)}?session=${encodeURIComponent(e.key)}`:null;return a`
     <div class="table-row">
       <div class="mono">${b?a`<a href=${y} class="session-link">${$}</a>`:$}</div>
       <div>
@@ -3387,7 +3251,7 @@ ${l}
         <select
           .value=${v}
           ?disabled=${l}
-          @change=${f=>{const w=f.target.value;n(e.key,{thinkingLevel:tl(w,u)})}}
+          @change=${f=>{const w=f.target.value;n(e.key,{thinkingLevel:Gi(w,u)})}}
         >
           ${p.map(f=>a`<option value=${f}>${f||"inherit"}</option>`)}
         </select>
@@ -3398,7 +3262,7 @@ ${l}
           ?disabled=${l}
           @change=${f=>{const w=f.target.value;n(e.key,{verboseLevel:w||null})}}
         >
-          ${Ji.map(f=>a`<option value=${f.value}>${f.label}</option>`)}
+          ${Ui.map(f=>a`<option value=${f.value}>${f.label}</option>`)}
         </select>
       </div>
       <div>
@@ -3407,7 +3271,7 @@ ${l}
           ?disabled=${l}
           @change=${f=>{const w=f.target.value;n(e.key,{reasoningLevel:w||null})}}
         >
-          ${Xi.map(f=>a`<option value=${f}>${f||"inherit"}</option>`)}
+          ${Hi.map(f=>a`<option value=${f}>${f||"inherit"}</option>`)}
         </select>
       </div>
       <div class="row" style="gap: 4px;">
@@ -3417,18 +3281,18 @@ ${l}
           @click=${()=>i(e.key)}
           title="Archive this session"
         >
-          ${al()}
+          ${Ki()}
         </button>
         <button class="btn danger btn--sm" ?disabled=${l} @click=${()=>s(e.key)}>
           Delete
         </button>
       </div>
     </div>
-  `}function rl(e,t,n){const s=L(Date.parse(e.archivedAt));return a`
+  `}function Qi(e,t,n){const s=L(Date.parse(e.archivedAt));return a`
     <div class="archived-table__row">
       <div class="mono" style="opacity: 0.7;">${e.sessionKey}</div>
       <div>${s}</div>
-      <div>${nl(e.reason)}</div>
+      <div>${Yi(e.reason)}</div>
       <div class="mono" style="font-size: 11px; opacity: 0.6;">
         ${e.linkedTaskId?e.linkedTaskId.slice(0,8):"--"}
       </div>
@@ -3439,11 +3303,11 @@ ${l}
           @click=${()=>t(e.sessionKey)}
           title="Restore this session"
         >
-          ${sl()}
+          ${qi()}
         </button>
       </div>
     </div>
-  `}function To(e){const t=e.subTab==="godmode",n=t||e.subTab==="my-skills";return a`
+  `}function Co(e){const t=e.subTab==="godmode",n=t||e.subTab==="my-skills";return a`
     <section class="card">
       <div class="row" style="justify-content: space-between; align-items: center;">
         <div class="chip-row" style="gap: 0;">
@@ -3477,10 +3341,10 @@ ${l}
             </button>`:d}
       </div>
 
-      ${t?cl(e):d}
-      ${e.subTab==="my-skills"?pl(e):d}
+      ${t?el(e):d}
+      ${e.subTab==="my-skills"?al(e):d}
     </section>
-  `}function cl(e){const t=e.godmodeSkills,n=e.godmodeSkillsLoading,s=e.filter.trim().toLowerCase();if(n&&!t)return a`<div class="muted" style="margin-top: 16px;">Loading GodMode skills...</div>`;if(!t||t.total===0)return a`<div class="muted" style="margin-top: 16px;">No GodMode skills found.</div>`;const i=[...t.skills.map(o=>({...o,_kind:"skill"})),...t.cards.map(o=>({...o,_kind:"card"}))],l=s?i.filter(o=>[o.slug,o.name,o.body.slice(0,200)].join(" ").toLowerCase().includes(s)):i;return a`
+  `}function el(e){const t=e.godmodeSkills,n=e.godmodeSkillsLoading,s=e.filter.trim().toLowerCase();if(n&&!t)return a`<div class="muted" style="margin-top: 16px;">Loading GodMode skills...</div>`;if(!t||t.total===0)return a`<div class="muted" style="margin-top: 16px;">No GodMode skills found.</div>`;const i=[...t.skills.map(o=>({...o,_kind:"skill"})),...t.cards.map(o=>({...o,_kind:"card"}))],l=s?i.filter(o=>[o.slug,o.name,o.body.slice(0,200)].join(" ").toLowerCase().includes(s)):i;return a`
     <div class="filters" style="margin-top: 14px;">
       <label class="field" style="flex: 1;">
         <span>Filter</span>
@@ -3494,9 +3358,9 @@ ${l}
     </div>
 
     ${l.length===0?a`<div class="muted" style="margin-top: 16px;">No matches.</div>`:a`<div class="list" style="margin-top: 16px;">
-          ${l.map(o=>o._kind==="skill"?dl(o,e.expandedSkills.has(o.slug),e.onToggleExpand):ul(o,e.expandedSkills.has(o.slug),e.onToggleExpand))}
+          ${l.map(o=>o._kind==="skill"?tl(o,e.expandedSkills.has(o.slug),e.onToggleExpand):nl(o,e.expandedSkills.has(o.slug),e.onToggleExpand))}
         </div>`}
-  `}function dl(e,t,n){const s=e.body.split(`
+  `}function tl(e,t,n){const s=e.body.split(`
 `).find(l=>l.trim().length>0)??"",i=!!e.schedule;return a`
     <div
       class="list-item"
@@ -3552,7 +3416,7 @@ ${l}
             `:d}
       </div>
     </div>
-  `}function ul(e,t,n){return a`
+  `}function nl(e,t,n){return a`
     <div
       class="list-item"
       style="cursor: pointer;"
@@ -3598,7 +3462,7 @@ ${l}
             `:d}
       </div>
     </div>
-  `}function pl(e){const t=e.report?.skills??[],n=e.filter.trim().toLowerCase(),s=n?t.filter(i=>[i.name,i.description,i.source].join(" ").toLowerCase().includes(n)):t;return a`
+  `}function al(e){const t=e.report?.skills??[],n=e.filter.trim().toLowerCase(),s=n?t.filter(i=>[i.name,i.description,i.source].join(" ").toLowerCase().includes(n)):t;return a`
     <div class="filters" style="margin-top: 14px;">
       <label class="field" style="flex: 1;">
         <span>Filter</span>
@@ -3614,9 +3478,9 @@ ${l}
     ${e.error?a`<div class="callout danger" style="margin-top: 12px;">${e.error}</div>`:d}
 
     ${s.length===0?a`<div class="muted" style="margin-top: 16px">No integrations found.</div>`:a`<div class="list" style="margin-top: 16px;">
-            ${s.map(i=>vl(i,e))}
+            ${s.map(i=>sl(i,e))}
           </div>`}
-  `}function vl(e,t){const n=t.busyKey===e.skillKey,s=t.edits[e.skillKey]??"",i=t.messages[e.skillKey]??null,l=e.install.length>0&&e.missing.bins.length>0,o=[...e.missing.bins.map(u=>`bin:${u}`),...e.missing.env.map(u=>`env:${u}`),...e.missing.config.map(u=>`config:${u}`),...e.missing.os.map(u=>`os:${u}`)],r=[];return e.disabled&&r.push("disabled"),e.blockedByAllowlist&&r.push("blocked by allowlist"),a`
+  `}function sl(e,t){const n=t.busyKey===e.skillKey,s=t.edits[e.skillKey]??"",i=t.messages[e.skillKey]??null,l=e.install.length>0&&e.missing.bins.length>0,o=[...e.missing.bins.map(u=>`bin:${u}`),...e.missing.env.map(u=>`env:${u}`),...e.missing.config.map(u=>`config:${u}`),...e.missing.os.map(u=>`os:${u}`)],r=[];return e.disabled&&r.push("disabled"),e.blockedByAllowlist&&r.push("blocked by allowlist"),a`
     <div class="list-item">
       <div class="list-main">
         <div class="list-title">
@@ -3686,7 +3550,7 @@ ${l}
             `:d}
       </div>
     </div>
-  `}function gl(e){switch(e){case"claude":return"chip-ok";case"codex":return"chip-warn";case"gemini":return"chip-info";default:return""}}function Eo(e){const t=e.filter.trim().toLowerCase(),n=t?e.roster.filter(l=>[l.slug,l.name,l.category,l.mission??"",...l.taskTypes].join(" ").toLowerCase().includes(t)):e.roster,s=new Map;for(const l of n){const o=l.category||"_default";s.has(o)||s.set(o,[]),s.get(o).push(l)}const i=[...s.keys()].sort((l,o)=>l==="_default"?1:o==="_default"?-1:l.localeCompare(o));return a`
+  `}function il(e){switch(e){case"claude":return"chip-ok";case"codex":return"chip-warn";case"gemini":return"chip-info";default:return""}}function To(e){const t=e.filter.trim().toLowerCase(),n=t?e.roster.filter(l=>[l.slug,l.name,l.category,l.mission??"",...l.taskTypes].join(" ").toLowerCase().includes(t)):e.roster,s=new Map;for(const l of n){const o=l.category||"_default";s.has(o)||s.set(o,[]),s.get(o).push(l)}const i=[...s.keys()].sort((l,o)=>l==="_default"?1:o==="_default"?-1:l.localeCompare(o));return a`
     <section class="card">
       <div class="row" style="justify-content: space-between; align-items: center;">
         <div class="muted">${n.length} agent${n.length!==1?"s":""}</div>
@@ -3714,7 +3578,7 @@ ${l}
             ${e.roster.length===0?"No agents found. Add persona files to your agent-roster directory.":"No matches."}
           </div>`:d}
 
-      ${i.map(l=>{const o=s.get(l),r=l==="_default"?"General":aa(l);return a`
+      ${i.map(l=>{const o=s.get(l),r=l==="_default"?"General":na(l);return a`
           <div style="margin-top: 20px;">
             <div
               style="font-size: 12px; font-weight: 600; text-transform: uppercase;
@@ -3724,12 +3588,12 @@ ${l}
               ${r}
             </div>
             <div class="list">
-              ${o.map(u=>fl(u,e.expandedAgents.has(u.slug),e.onToggleExpand))}
+              ${o.map(u=>ll(u,e.expandedAgents.has(u.slug),e.onToggleExpand))}
             </div>
           </div>
         `})}
     </section>
-  `}function aa(e){return e.replace(/[-_]/g," ").replace(/\b\w/g,t=>t.toUpperCase())}function fl(e,t,n){return a`
+  `}function na(e){return e.replace(/[-_]/g," ").replace(/\b\w/g,t=>t.toUpperCase())}function ll(e,t,n){return a`
     <div
       class="list-item"
       style="cursor: pointer;"
@@ -3742,7 +3606,7 @@ ${l}
             \u25B6
           </span>
           <div class="list-title" style="flex: 1;">${e.name}</div>
-          ${e.engine?a`<span class="chip ${gl(e.engine)}" style="font-size: 11px;">${e.engine}</span>`:d}
+          ${e.engine?a`<span class="chip ${il(e.engine)}" style="font-size: 11px;">${e.engine}</span>`:d}
         </div>
         ${e.mission?a`<div class="list-sub" style="margin-left: 18px;">${Fe(e.mission,120)}</div>`:d}
         <div class="chip-row" style="margin-top: 6px; margin-left: 18px;">
@@ -3757,7 +3621,7 @@ ${l}
                   <span class="muted">Slug:</span>
                   <span style="font-family: monospace;">${e.slug}</span>
                   <span class="muted">Category:</span>
-                  <span>${aa(e.category||"_default")}</span>
+                  <span>${na(e.category||"_default")}</span>
                   ${e.engine?a`
                         <span class="muted">Engine:</span>
                         <span>${e.engine}</span>
@@ -3779,7 +3643,7 @@ ${l}
             `:d}
       </div>
     </div>
-  `}const Bn=["America/New_York","America/Chicago","America/Denver","America/Los_Angeles","America/Anchorage","Pacific/Honolulu","Europe/London","Europe/Paris","Europe/Berlin","Asia/Tokyo","Asia/Shanghai","Asia/Kolkata","Australia/Sydney","Pacific/Auckland"],hl=["Direct and concise -- no fluff, just answers","Detailed explanations -- walk me through the reasoning","Casual and conversational -- like talking to a friend","Structured with bullet points -- organized and scannable","Technical and precise -- specifics matter"],ml=[{value:"sonnet",label:"Sonnet (fast, balanced)"},{value:"opus",label:"Opus (deep reasoning)"},{value:"haiku",label:"Haiku (quick, lightweight)"}],Ct=["Never send emails without explicit approval","Never delete or overwrite files without backup","Always search memory before guessing","Never share private information externally"],Fn=[{label:"Name",question:"What should I call you?"},{label:"Timezone",question:"What timezone are you in?"},{label:"Focus",question:"What are you building or focused on?"},{label:"Projects",question:"What are your top projects? (1-3)"},{label:"Style",question:"How do you like to communicate?"},{label:"Rules",question:"What rules must the AI always follow?"},{label:"People",question:"Who are the key people in your work/life?"},{label:"Model",question:"What AI model do you prefer?"}];function Un(e){const n=Math.min(Number(e),8);return a`
+  `}const In=["America/New_York","America/Chicago","America/Denver","America/Los_Angeles","America/Anchorage","Pacific/Honolulu","Europe/London","Europe/Paris","Europe/Berlin","Asia/Tokyo","Asia/Shanghai","Asia/Kolkata","Australia/Sydney","Pacific/Auckland"],ol=["Direct and concise -- no fluff, just answers","Detailed explanations -- walk me through the reasoning","Casual and conversational -- like talking to a friend","Structured with bullet points -- organized and scannable","Technical and precise -- specifics matter"],rl=[{value:"sonnet",label:"Sonnet (fast, balanced)"},{value:"opus",label:"Opus (deep reasoning)"},{value:"haiku",label:"Haiku (quick, lightweight)"}],St=["Never send emails without explicit approval","Never delete or overwrite files without backup","Always search memory before guessing","Never share private information externally"],Pn=[{label:"Name",question:"What should I call you?"},{label:"Timezone",question:"What timezone are you in?"},{label:"Focus",question:"What are you building or focused on?"},{label:"Projects",question:"What are your top projects? (1-3)"},{label:"Style",question:"How do you like to communicate?"},{label:"Rules",question:"What rules must the AI always follow?"},{label:"People",question:"Who are the key people in your work/life?"},{label:"Model",question:"What AI model do you prefer?"}];function On(e){const n=Math.min(Number(e),8);return a`
     <div class="wizard-progress">
       <div class="wizard-progress-dots">
         ${Array.from({length:8},(s,i)=>a`
@@ -3790,11 +3654,11 @@ ${l}
         ${n<8?`Step ${n+1} of 8`:"Review"}
       </div>
     </div>
-  `}function bl(e){if(e>=Fn.length)return a`${d}`;const t=Fn[e];return a`
+  `}function cl(e){if(e>=Pn.length)return a`${d}`;const t=Pn[e];return a`
     <div class="wizard-step-header">
       <h2 class="wizard-question">${t.question}</h2>
     </div>
-  `}function yl(e,t,n,s){return a`
+  `}function dl(e,t,n,s){return a`
     <div class="wizard-nav">
       ${e>0?a`
             <button
@@ -3808,7 +3672,7 @@ ${l}
         @click=${()=>{s?(t.onStepChange(8),t.onPreview()):t.onStepChange(e+1)}}
       >${s?"Review":"Continue"}</button>
     </div>
-  `}function sa(){return a`<p class="wizard-skip-hint">Press Enter to use the default and continue</p>`}function $l(e,t){function n(i){const l=i.target.value;t.onAnswerChange("name",l)}function s(i){i.key==="Enter"&&(i.preventDefault(),t.onStepChange(1))}return a`
+  `}function aa(){return a`<p class="wizard-skip-hint">Press Enter to use the default and continue</p>`}function ul(e,t){function n(i){const l=i.target.value;t.onAnswerChange("name",l)}function s(i){i.key==="Enter"&&(i.preventDefault(),t.onStepChange(1))}return a`
     <div class="wizard-field">
       <input
         type="text"
@@ -3820,7 +3684,7 @@ ${l}
         autofocus
       />
     </div>
-  `}function wl(e,t){const n=Intl.DateTimeFormat().resolvedOptions().timeZone;return a`
+  `}function pl(e,t){const n=Intl.DateTimeFormat().resolvedOptions().timeZone;return a`
     <div class="wizard-field">
       <div class="wizard-detected">
         Detected: <strong>${n}</strong>
@@ -3830,16 +3694,16 @@ ${l}
         .value=${e.timezone||n}
         @change=${s=>{t.onAnswerChange("timezone",s.target.value)}}
       >
-        ${Bn.includes(n)?d:a`<option value="${n}">${n} (detected)</option>`}
-        ${Bn.map(s=>a`
+        ${In.includes(n)?d:a`<option value="${n}">${n} (detected)</option>`}
+        ${In.map(s=>a`
             <option value="${s}" ?selected=${(e.timezone||n)===s}>
               ${s}${s===n?" (detected)":""}
             </option>
           `)}
       </select>
-      ${sa()}
+      ${aa()}
     </div>
-  `}function xl(e,t){function n(i){t.onAnswerChange("focus",i.target.value)}function s(i){i.key==="Enter"&&(i.preventDefault(),t.onStepChange(3))}return a`
+  `}function vl(e,t){function n(i){t.onAnswerChange("focus",i.target.value)}function s(i){i.key==="Enter"&&(i.preventDefault(),t.onStepChange(3))}return a`
     <div class="wizard-field">
       <input
         type="text"
@@ -3851,7 +3715,7 @@ ${l}
         autofocus
       />
     </div>
-  `}function kl(e,t){function n(){const l=document.querySelector(".wizard-project-input");if(!l)return;const o=l.value.trim();o&&e.projects.length<5&&(t.onAnswerChange("projects",[...e.projects,o]),l.value="",l.focus())}function s(l){const o=e.projects.filter((r,u)=>u!==l);t.onAnswerChange("projects",o)}function i(l){l.key==="Enter"&&(l.preventDefault(),l.target.value.trim()?n():e.projects.length>0&&t.onStepChange(4))}return a`
+  `}function gl(e,t){function n(){const l=document.querySelector(".wizard-project-input");if(!l)return;const o=l.value.trim();o&&e.projects.length<5&&(t.onAnswerChange("projects",[...e.projects,o]),l.value="",l.focus())}function s(l){const o=e.projects.filter((r,u)=>u!==l);t.onAnswerChange("projects",o)}function i(l){l.key==="Enter"&&(l.preventDefault(),l.target.value.trim()?n():e.projects.length>0&&t.onStepChange(4))}return a`
     <div class="wizard-field">
       <div class="wizard-tag-list">
         ${e.projects.map((l,o)=>a`
@@ -3873,10 +3737,10 @@ ${l}
       </div>
       ${e.projects.length===0?a`<p class="wizard-hint">Add 1-3 projects, or skip to continue</p>`:d}
     </div>
-  `}function Al(e,t){return a`
+  `}function fl(e,t){return a`
     <div class="wizard-field">
       <div class="wizard-radio-list">
-        ${hl.map(n=>a`
+        ${ol.map(n=>a`
             <label class="wizard-radio ${e.commStyle===n?"wizard-radio--selected":""}">
               <input
                 type="radio"
@@ -3899,11 +3763,11 @@ ${l}
         />
       </div>
     </div>
-  `}function _l(e,t){const n=e.hardRules.length>0?e.hardRules:[];function s(o){n.includes(o)?t.onAnswerChange("hardRules",n.filter(r=>r!==o)):t.onAnswerChange("hardRules",[...n,o])}function i(){const o=document.querySelector(".wizard-rule-input");if(!o)return;const r=o.value.trim();r&&(t.onAnswerChange("hardRules",[...n,r]),o.value="",o.focus())}function l(o){o.key==="Enter"&&(o.preventDefault(),o.target.value.trim()&&i())}return a`
+  `}function hl(e,t){const n=e.hardRules.length>0?e.hardRules:[];function s(o){n.includes(o)?t.onAnswerChange("hardRules",n.filter(r=>r!==o)):t.onAnswerChange("hardRules",[...n,o])}function i(){const o=document.querySelector(".wizard-rule-input");if(!o)return;const r=o.value.trim();r&&(t.onAnswerChange("hardRules",[...n,r]),o.value="",o.focus())}function l(o){o.key==="Enter"&&(o.preventDefault(),o.target.value.trim()&&i())}return a`
     <div class="wizard-field">
       <p class="wizard-hint">Select common rules or add your own:</p>
       <div class="wizard-checkbox-list">
-        ${Ct.map(o=>a`
+        ${St.map(o=>a`
             <label class="wizard-checkbox ${n.includes(o)?"wizard-checkbox--selected":""}">
               <input
                 type="checkbox"
@@ -3923,9 +3787,9 @@ ${l}
         />
         <button class="wizard-btn wizard-btn--small" @click=${i}>Add</button>
       </div>
-      ${n.filter(o=>!Ct.includes(o)).length>0?a`
+      ${n.filter(o=>!St.includes(o)).length>0?a`
             <div class="wizard-tag-list" style="margin-top: 8px;">
-              ${n.filter(o=>!Ct.includes(o)).map(o=>a`
+              ${n.filter(o=>!St.includes(o)).map(o=>a`
                     <span class="wizard-tag">
                       ${o}
                       <button class="wizard-tag-remove" @click=${()=>{t.onAnswerChange("hardRules",n.filter(r=>r!==o))}}>x</button>
@@ -3934,7 +3798,7 @@ ${l}
             </div>
           `:d}
     </div>
-  `}function Sl(e,t){function n(){const l=document.querySelector(".wizard-person-input");if(!l)return;const o=l.value.trim();o&&e.keyPeople.length<10&&(t.onAnswerChange("keyPeople",[...e.keyPeople,o]),l.value="",l.focus())}function s(l){t.onAnswerChange("keyPeople",e.keyPeople.filter((o,r)=>r!==l))}function i(l){l.key==="Enter"&&(l.preventDefault(),l.target.value.trim()?n():e.keyPeople.length>0&&t.onStepChange(7))}return a`
+  `}function ml(e,t){function n(){const l=document.querySelector(".wizard-person-input");if(!l)return;const o=l.value.trim();o&&e.keyPeople.length<10&&(t.onAnswerChange("keyPeople",[...e.keyPeople,o]),l.value="",l.focus())}function s(l){t.onAnswerChange("keyPeople",e.keyPeople.filter((o,r)=>r!==l))}function i(l){l.key==="Enter"&&(l.preventDefault(),l.target.value.trim()?n():e.keyPeople.length>0&&t.onStepChange(7))}return a`
     <div class="wizard-field">
       <div class="wizard-tag-list">
         ${e.keyPeople.map((l,o)=>a`
@@ -3956,10 +3820,10 @@ ${l}
       </div>
       <p class="wizard-hint">Co-founders, family, key collaborators. You can add more later.</p>
     </div>
-  `}function Cl(e,t){return a`
+  `}function bl(e,t){return a`
     <div class="wizard-field">
       <div class="wizard-radio-list">
-        ${ml.map(n=>a`
+        ${rl.map(n=>a`
             <label class="wizard-radio ${e.defaultModel===n.value?"wizard-radio--selected":""}">
               <input
                 type="radio"
@@ -3972,9 +3836,9 @@ ${l}
             </label>
           `)}
       </div>
-      ${sa()}
+      ${aa()}
     </div>
-  `}function Tt(e){return e==null?"not set":typeof e=="string"?e:typeof e=="boolean"||typeof e=="number"?String(e):(Array.isArray(e),JSON.stringify(e))}function Tl(e,t){const{answers:n,preview:s,diff:i,fileSelections:l,configSelections:o,generating:r}=e,u=s?.some(p=>p.exists)??!1,v=i&&(i.changes.length>0||i.additions.length>0);return a`
+  `}function Ct(e){return e==null?"not set":typeof e=="string"?e:typeof e=="boolean"||typeof e=="number"?String(e):(Array.isArray(e),JSON.stringify(e))}function yl(e,t){const{answers:n,preview:s,diff:i,fileSelections:l,configSelections:o,generating:r}=e,u=s?.some(p=>p.exists)??!1,v=i&&(i.changes.length>0||i.additions.length>0);return a`
     <div class="wizard-review">
       <h2 class="wizard-review-title">Ready to generate your workspace</h2>
 
@@ -4045,7 +3909,7 @@ ${l}
                               @change=${h=>t.onConfigToggle(p.path,h.target.checked)}
                             />
                             <span class="wizard-config-path">${p.path}</span>
-                            <span class="wizard-config-value">${Tt(p.recommended)}</span>
+                            <span class="wizard-config-value">${Ct(p.recommended)}</span>
                           </label>
                         `})}
                     </div>
@@ -4064,9 +3928,9 @@ ${l}
                             />
                             <span class="wizard-config-path">${p.path}</span>
                             <span class="wizard-config-diff">
-                              <span class="wizard-config-current">${Tt(p.current)}</span>
+                              <span class="wizard-config-current">${Ct(p.current)}</span>
                               <span class="wizard-config-arrow">&rarr;</span>
-                              <span class="wizard-config-recommended">${Tt(p.recommended)}</span>
+                              <span class="wizard-config-recommended">${Ct(p.recommended)}</span>
                             </span>
                           </label>
                         `})}
@@ -4092,7 +3956,7 @@ ${l}
 
       ${e.error?a`<div class="wizard-error">${e.error}</div>`:d}
     </div>
-  `}function El(e,t){const n=e.result;return n?a`
+  `}function $l(e,t){const n=e.result;return n?a`
     <div class="wizard-success">
       <div class="wizard-success-icon">
         <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="var(--ok, #22c55e)" stroke-width="2">
@@ -4124,28 +3988,28 @@ ${l}
         Start Using GodMode
       </button>
     </div>
-  `:a`${d}`}function ia(){return{name:"",timezone:Intl.DateTimeFormat().resolvedOptions().timeZone,focus:"",projects:[],commStyle:"Direct and concise -- no fluff, just answers",hardRules:[],keyPeople:[],defaultModel:"sonnet"}}function Ml(){return{step:0,answers:ia(),preview:null,diff:null,fileSelections:{},configSelections:{},generating:!1,result:null,error:null}}function Ll(e,t){const{step:n,answers:s}=e;if(n===9)return a`
+  `:a`${d}`}function sa(){return{name:"",timezone:Intl.DateTimeFormat().resolvedOptions().timeZone,focus:"",projects:[],commStyle:"Direct and concise -- no fluff, just answers",hardRules:[],keyPeople:[],defaultModel:"sonnet"}}function wl(){return{step:0,answers:sa(),preview:null,diff:null,fileSelections:{},configSelections:{},generating:!1,result:null,error:null}}function xl(e,t){const{step:n,answers:s}=e;if(n===9)return a`
       <div class="wizard-fullscreen">
-        ${El(e,t)}
+        ${$l(e,t)}
       </div>
     `;if(n===8)return a`
       <div class="wizard-fullscreen">
         <div class="wizard-container">
-          ${Un(n)}
-          ${Tl(e,t)}
+          ${On(n)}
+          ${yl(e,t)}
         </div>
       </div>
-    `;const i=(()=>{switch(n){case 0:return s.name.trim().length>0;case 1:return!0;case 2:return!0;case 3:return!0;case 4:return s.commStyle.trim().length>0;case 5:return!0;case 6:return!0;case 7:return!0;default:return!1}})(),l=n===7,o=(()=>{switch(n){case 0:return $l(s,t);case 1:return wl(s,t);case 2:return xl(s,t);case 3:return kl(s,t);case 4:return Al(s,t);case 5:return _l(s,t);case 6:return Sl(s,t);case 7:return Cl(s,t);default:return a`${d}`}})();return a`
+    `;const i=(()=>{switch(n){case 0:return s.name.trim().length>0;case 1:return!0;case 2:return!0;case 3:return!0;case 4:return s.commStyle.trim().length>0;case 5:return!0;case 6:return!0;case 7:return!0;default:return!1}})(),l=n===7,o=(()=>{switch(n){case 0:return ul(s,t);case 1:return pl(s,t);case 2:return vl(s,t);case 3:return gl(s,t);case 4:return fl(s,t);case 5:return hl(s,t);case 6:return ml(s,t);case 7:return bl(s,t);default:return a`${d}`}})();return a`
     <div class="wizard-fullscreen">
       <div class="wizard-container">
         <div class="wizard-glow"></div>
-        ${Un(n)}
-        ${bl(n)}
+        ${On(n)}
+        ${cl(n)}
         ${o}
-        ${yl(n,t,i,l)}
+        ${dl(n,t,i,l)}
       </div>
     </div>
-  `}const Mo=Object.freeze(Object.defineProperty({__proto__:null,emptyWizardAnswers:ia,emptyWizardState:Ml,renderOnboardingWizard:Ll},Symbol.toStringTag,{value:"Module"}));function Se(e){return e===null?"none":e>=8?"high":e>=5?"medium":"low"}function He(e){return{high:"trust-score--high",medium:"trust-score--medium",low:"trust-score--low",none:"trust-score--none"}[e]}function Rl(e){return{improving:"Improving",declining:"Declining",stable:"Stable",new:"New"}[e]??"New"}function Nl(e){return{improving:"trust-trend--up",declining:"trust-trend--down",stable:"trust-trend--stable",new:"trust-trend--new"}[e]??"trust-trend--new"}function Dl(e){return{improving:"↑",declining:"↓",stable:"→",new:"•"}[e]??"•"}function zl(e){const t=Date.now()-Date.parse(e),n=Math.floor(t/6e4);if(n<1)return"just now";if(n<60)return`${n}m ago`;const s=Math.floor(n/60);if(s<24)return`${s}h ago`;const i=Math.floor(s/24);return i<7?`${i}d ago`:new Date(e).toLocaleDateString()}function Il(e){const t=e.overallScore,n=Se(t);return a`
+  `}const Eo=Object.freeze(Object.defineProperty({__proto__:null,emptyWizardAnswers:sa,emptyWizardState:wl,renderOnboardingWizard:xl},Symbol.toStringTag,{value:"Module"}));function Se(e){return e===null?"none":e>=8?"high":e>=5?"medium":"low"}function He(e){return{high:"trust-score--high",medium:"trust-score--medium",low:"trust-score--low",none:"trust-score--none"}[e]}function kl(e){return{improving:"Improving",declining:"Declining",stable:"Stable",new:"New"}[e]??"New"}function Al(e){return{improving:"trust-trend--up",declining:"trust-trend--down",stable:"trust-trend--stable",new:"trust-trend--new"}[e]??"trust-trend--new"}function _l(e){return{improving:"↑",declining:"↓",stable:"→",new:"•"}[e]??"•"}function Sl(e){const t=Date.now()-Date.parse(e),n=Math.floor(t/6e4);if(n<1)return"just now";if(n<60)return`${n}m ago`;const s=Math.floor(n/60);if(s<24)return`${s}h ago`;const i=Math.floor(s/24);return i<7?`${i}d ago`:new Date(e).toLocaleDateString()}function Cl(e){const t=e.overallScore,n=Se(t);return a`
     <div class="trust-overall">
       <div class="trust-overall-score ${He(n)}">
         <span class="trust-overall-number">${t!==null?t.toFixed(1):"--"}</span>
@@ -4159,14 +4023,14 @@ ${l}
         </span>
       </div>
     </div>
-  `}function Pl(e,t){const s=Math.min(100,Math.max(0,(e??t)/10*100)),i=Se(e??(t>0?t:null));return a`
+  `}function Tl(e,t){const s=Math.min(100,Math.max(0,(e??t)/10*100)),i=Se(e??(t>0?t:null));return a`
     <div class="trust-progress">
       <div
         class="trust-progress-fill ${He(i)}"
         style="width: ${s}%"
       ></div>
     </div>
-  `}function Ol(e,t){const s=e.trustScore!==null?e.trustScore.toFixed(1):e.avgRating>0?e.avgRating.toFixed(1):"--",i=Se(e.trustScore??(e.avgRating>0?e.avgRating:null)),l=e.count<10?10-e.count:0;return a`
+  `}function El(e,t){const s=e.trustScore!==null?e.trustScore.toFixed(1):e.avgRating>0?e.avgRating.toFixed(1):"--",i=Se(e.trustScore??(e.avgRating>0?e.avgRating:null)),l=e.count<10?10-e.count:0;return a`
     <div class="trust-card">
       <div class="trust-card-header">
         <span class="trust-card-name">${e.workflow}</span>
@@ -4180,12 +4044,12 @@ ${l}
       <div class="trust-card-score-row">
         <span class="trust-card-score ${He(i)}">${s}</span>
         <span class="trust-card-score-label">/10</span>
-        <span class="trust-trend ${Nl(e.trend)}">
-          ${Dl(e.trend)} ${Rl(e.trend)}
+        <span class="trust-trend ${Al(e.trend)}">
+          ${_l(e.trend)} ${kl(e.trend)}
         </span>
       </div>
 
-      ${Pl(e.trustScore,e.avgRating)}
+      ${Tl(e.trustScore,e.avgRating)}
 
       <div class="trust-card-meta">
         <span class="trust-card-count">${e.count} rating${e.count!==1?"s":""}</span>
@@ -4200,18 +4064,18 @@ ${l}
             </div>
           `:d}
     </div>
-  `}function Bl(){return[{workflow:"Code Reviews",avgRating:8.2,count:14,trustScore:8.2,needsFeedback:!1,trend:"improving",recentNotes:[],recentFeedback:[]},{workflow:"Email Drafts",avgRating:6.5,count:11,trustScore:6.5,needsFeedback:!0,trend:"stable",recentNotes:[],recentFeedback:["Be more concise","Match my tone"]},{workflow:"Research",avgRating:7.8,count:3,trustScore:null,needsFeedback:!1,trend:"new",recentNotes:[],recentFeedback:[]}]}function Fl(){const e=Bl();return{workflows:e.map(t=>t.workflow),summaries:e,ratings:[],total:0,overallScore:7.6,totalRatings:28,totalUses:28}}function Ul(e){const t=Se(e.rating);return a`
+  `}function Ml(){return[{workflow:"Code Reviews",avgRating:8.2,count:14,trustScore:8.2,needsFeedback:!1,trend:"improving",recentNotes:[],recentFeedback:[]},{workflow:"Email Drafts",avgRating:6.5,count:11,trustScore:6.5,needsFeedback:!0,trend:"stable",recentNotes:[],recentFeedback:["Be more concise","Match my tone"]},{workflow:"Research",avgRating:7.8,count:3,trustScore:null,needsFeedback:!1,trend:"new",recentNotes:[],recentFeedback:[]}]}function Ll(){const e=Ml();return{workflows:e.map(t=>t.workflow),summaries:e,ratings:[],total:0,overallScore:7.6,totalRatings:28,totalUses:28}}function Rl(e){const t=Se(e.rating);return a`
     <div class="trust-rating-row">
       <span class="trust-rating-score ${He(t)}">${e.rating}</span>
       <span class="trust-rating-workflow">${e.workflow}</span>
       ${e.note?a`<span class="trust-rating-note">${e.note}</span>`:d}
-      <span class="trust-rating-time">${zl(e.timestamp)}</span>
+      <span class="trust-rating-time">${Sl(e.timestamp)}</span>
     </div>
-  `}function Hl(){return a`
+  `}function Nl(){return a`
     <div class="trust-sample-banner">
       Sample data — use skills and rate them to build your real trust profile.
     </div>
-  `}function jl(e){const t=e.connected,n=e.guardrailsData,s=e.consciousnessStatus,i=e.data?.todayRating??null,l=e.updateStatus??null,o=l?.openclawUpdateAvailable||l?.pluginUpdateAvailable;if(!t)return{level:"alert",icon:"⚠️",text:"Gateway disconnected",detail:"Reconnect to restore full functionality."};if(o){const u=[];return l.openclawUpdateAvailable&&l.openclawLatest&&u.push(`OpenClaw ${l.openclawVersion} → ${l.openclawLatest}`),l.pluginUpdateAvailable&&l.pluginLatest&&u.push(`GodMode ${l.pluginVersion} → ${l.pluginLatest}`),{level:"warn",icon:"🔄",text:"Update available",detail:u.join(", ")+". Visit Overview to update."}}if(s==="error")return{level:"warn",icon:"🧠",text:"Consciousness sync needs attention",detail:"Your system is running but the last sync encountered an error."};if(n){const u=n.gates.filter(p=>p.enabled).length,v=n.gates.length;if(u<v)return{level:"warn",icon:"🛡",text:`${v-u} security gate${v-u!==1?"s":""} disabled`,detail:"Your system is running with reduced safety coverage."}}const r=l&&!o?" Up to date.":"";return i?i.rating>=8?{level:"ok",icon:"✨",text:`Rated ${i.rating}/10 today — GodMode is running great.`,detail:`All systems secure and building trust daily.${r}`}:i.rating>=5?{level:"ok",icon:"💪",text:`Rated ${i.rating}/10 today — working to improve.`,detail:`Your feedback is being applied. All systems secure.${r}`}:{level:"warn",icon:"💬",text:`Rated ${i.rating}/10 today — your feedback matters.`,detail:`We're using your input to get better. All systems secure.${r}`}:{level:"ok",icon:"✅",text:"Your GodMode is safe, secure, and building trust daily.",detail:`All systems healthy.${r} Rate your day below to help improve.`}}function Wl(e){const{level:t,icon:n,text:s,detail:i}=jl(e);return a`
+  `}function Dl(e){const t=e.connected,n=e.guardrailsData,s=e.consciousnessStatus,i=e.data?.todayRating??null,l=e.updateStatus??null,o=l?.openclawUpdateAvailable||l?.pluginUpdateAvailable;if(!t)return{level:"alert",icon:"⚠️",text:"Gateway disconnected",detail:"Reconnect to restore full functionality."};if(o){const u=[];return l.openclawUpdateAvailable&&l.openclawLatest&&u.push(`OpenClaw ${l.openclawVersion} → ${l.openclawLatest}`),l.pluginUpdateAvailable&&l.pluginLatest&&u.push(`GodMode ${l.pluginVersion} → ${l.pluginLatest}`),{level:"warn",icon:"🔄",text:"Update available",detail:u.join(", ")+". Visit Overview to update."}}if(s==="error")return{level:"warn",icon:"🧠",text:"Consciousness sync needs attention",detail:"Your system is running but the last sync encountered an error."};if(n){const u=n.gates.filter(p=>p.enabled).length,v=n.gates.length;if(u<v)return{level:"warn",icon:"🛡",text:`${v-u} security gate${v-u!==1?"s":""} disabled`,detail:"Your system is running with reduced safety coverage."}}const r=l&&!o?" Up to date.":"";return i?i.rating>=8?{level:"ok",icon:"✨",text:`Rated ${i.rating}/10 today — GodMode is running great.`,detail:`All systems secure and building trust daily.${r}`}:i.rating>=5?{level:"ok",icon:"💪",text:`Rated ${i.rating}/10 today — working to improve.`,detail:`Your feedback is being applied. All systems secure.${r}`}:{level:"warn",icon:"💬",text:`Rated ${i.rating}/10 today — your feedback matters.`,detail:`We're using your input to get better. All systems secure.${r}`}:{level:"ok",icon:"✅",text:"Your GodMode is safe, secure, and building trust daily.",detail:`All systems healthy.${r} Rate your day below to help improve.`}}function zl(e){const{level:t,icon:n,text:s,detail:i}=Dl(e);return a`
     <div class="trust-hero trust-hero--${t}">
       <span class="trust-hero-icon">${n}</span>
       <div class="trust-hero-body">
@@ -4219,7 +4083,7 @@ ${l}
         <div class="trust-hero-detail">${i}</div>
       </div>
     </div>
-  `}function Vl(e){return e<=4?"trust-daily-button--low":e<=7?"trust-daily-button--med":"trust-daily-button--high"}function Hn(e){const t=[];for(let n=0;n<7;n++)t.push(e[n]??null);return a`
+  `}function Il(e){return e<=4?"trust-daily-button--low":e<=7?"trust-daily-button--med":"trust-daily-button--high"}function Bn(e){const t=[];for(let n=0;n<7;n++)t.push(e[n]??null);return a`
     <div class="trust-daily-trend">
       ${t.map(n=>{if(!n)return a`<div class="trust-daily-trend-dot trust-daily-trend-dot--empty"></div>`;const s=Math.max(4,n.rating/10*28),i=Se(n.rating);return a`
           <div
@@ -4229,7 +4093,7 @@ ${l}
           ></div>
         `})}
     </div>
-  `}function Gl(e){const t=e.data,n=t?.todayRating??null,s=t?.recentDaily??[],i=t?.dailyStreak??0,l=t?.dailyAverage??null;if(!e.onDailyRate)return d;if(n){const o=Se(n.rating),r=n.rating<7&&!n.note;return a`
+  `}function Pl(e){const t=e.data,n=t?.todayRating??null,s=t?.recentDaily??[],i=t?.dailyStreak??0,l=t?.dailyAverage??null;if(!e.onDailyRate)return d;if(n){const o=Se(n.rating),r=n.rating<7&&!n.note;return a`
       <div class="trust-daily">
         <div class="trust-daily-header">
           <span class="trust-daily-prompt">Today's Rating</span>
@@ -4246,7 +4110,7 @@ ${l}
             ${n.note?a`<span class="trust-daily-result-note">"${n.note}"</span>`:d}
             ${l!==null?a`<span class="trust-daily-result-note">7-day avg: ${l}/10</span>`:d}
           </div>
-          ${s.length>1?Hn(s):d}
+          ${s.length>1?Bn(s):d}
         </div>
         ${r?a`
               <div class="trust-daily-feedback">
@@ -4273,7 +4137,7 @@ ${l}
       <div class="trust-daily-buttons">
         ${[1,2,3,4,5,6,7,8,9,10].map(o=>a`
             <button
-              class="trust-daily-button ${Vl(o)}"
+              class="trust-daily-button ${Il(o)}"
               type="button"
               title="${o}/10"
               @click=${()=>e.onDailyRate(o)}
@@ -4282,12 +4146,12 @@ ${l}
       </div>
       ${s.length>0?a`
             <div style="margin-top: 0.75rem; display: flex; align-items: center; gap: 0.5rem;">
-              ${Hn(s)}
+              ${Bn(s)}
               ${l!==null?a`<span style="font-size: 0.75rem; color: var(--text-muted);">7-day avg: ${l}/10</span>`:d}
             </div>
           `:d}
     </div>
-  `}function Yl(e){if(!e)return a`
+  `}function Ol(e){if(!e)return a`
       <div class="trust-health-card">
         <div class="trust-health-card-header">
           <span class="trust-health-card-icon">\u{1F6E1}</span>
@@ -4329,7 +4193,7 @@ ${l}
             <div class="trust-health-activity">No activity in last 24h</div>
           `}
     </div>
-  `}function Kl(e){return!e||e==="idle"?"Idle":e==="loading"?"Syncing...":e==="ok"?"Synced":"Error"}function ql(e){return!e||e==="idle"?"trust-health-dot--idle":e==="loading"?"trust-health-dot--warn":e==="ok"?"trust-health-dot--ok":"trust-health-dot--error"}function Jl(e){const t=e.connected,n=e.consciousnessStatus,s=e.sessionsCount,i=e.gatewayUptimeMs,r=(t?1:0)+(n==="ok"||n==="idle"?1:0)===2&&t;return a`
+  `}function Bl(e){return!e||e==="idle"?"Idle":e==="loading"?"Syncing...":e==="ok"?"Synced":"Error"}function Fl(e){return!e||e==="idle"?"trust-health-dot--idle":e==="loading"?"trust-health-dot--warn":e==="ok"?"trust-health-dot--ok":"trust-health-dot--error"}function Ul(e){const t=e.connected,n=e.consciousnessStatus,s=e.sessionsCount,i=e.gatewayUptimeMs,r=(t?1:0)+(n==="ok"||n==="idle"?1:0)===2&&t;return a`
     <div class="trust-health-card">
       <div class="trust-health-card-header">
         <span class="trust-health-card-icon">\u{1F4E1}</span>
@@ -4344,9 +4208,9 @@ ${l}
       </div>
 
       <div class="trust-health-row">
-        <span class="trust-health-dot ${ql(n)}"></span>
+        <span class="trust-health-dot ${Fl(n)}"></span>
         <span class="trust-health-label">Consciousness</span>
-        <span class="trust-health-value">${Kl(n)}</span>
+        <span class="trust-health-value">${Bl(n)}</span>
       </div>
 
       ${s!=null?a`
@@ -4365,15 +4229,15 @@ ${l}
             </div>
           `:d}
     </div>
-  `}function Xl(e){return a`
+  `}function Hl(e){return a`
     <div class="trust-health">
       <h3 class="trust-health-title">System Health</h3>
       <div class="trust-health-grid">
-        ${Yl(e.guardrailsData)}
-        ${Jl(e)}
+        ${Ol(e.guardrailsData)}
+        ${Ul(e)}
       </div>
     </div>
-  `}function Lo(e){const{connected:t,loading:n,data:s,onRemoveWorkflow:i,onRefresh:l}=e;if(!t)return a`
+  `}function Mo(e){const{connected:t,loading:n,data:s,onRemoveWorkflow:i,onRefresh:l}=e;if(!t)return a`
       <section class="tab-body trust-section">
         <div class="trust-disconnected">Not connected to gateway.</div>
       </section>
@@ -4381,32 +4245,32 @@ ${l}
       <section class="tab-body trust-section">
         <div class="trust-loading">Loading trust tracker...</div>
       </section>
-    `;const r=!(s?.summaries??[]).some(g=>g.count>0),u=r?Fl():s,v=u.summaries,p=r?[]:s?.ratings??[];return a`
+    `;const r=!(s?.summaries??[]).some(g=>g.count>0),u=r?Ll():s,v=u.summaries,p=r?[]:s?.ratings??[];return a`
     <section class="tab-body trust-section">
-      ${Wl(e)}
+      ${zl(e)}
 
-      ${r?Hl():d}
+      ${r?Nl():d}
 
-      ${Gl(e)}
+      ${Pl(e)}
 
-      ${Il(u)}
+      ${Cl(u)}
 
       <div class="trust-workflows-grid">
-        ${v.map(g=>Ol(g,r?null:i))}
+        ${v.map(g=>El(g,r?null:i))}
       </div>
 
-      ${Xl(e)}
+      ${Hl(e)}
 
       ${p.length>0?a`
             <div class="trust-history">
               <h3 class="trust-history-title">Recent Ratings</h3>
               <div class="trust-history-list">
-                ${p.slice(0,20).map(Ul)}
+                ${p.slice(0,20).map(Rl)}
               </div>
             </div>
           `:d}
     </section>
-  `}function Zl(e){const t=Date.now()-Date.parse(e),n=Math.floor(t/6e4);if(n<1)return"just now";if(n<60)return`${n}m ago`;const s=Math.floor(n/60);if(s<24)return`${s}h ago`;const i=Math.floor(s/24);return i<7?`${i}d ago`:new Date(e).toLocaleDateString()}function Ql(e){return{fired:"guardrails-badge--fired",blocked:"guardrails-badge--blocked",cleaned:"guardrails-badge--cleaned"}[e]??""}function la(e,t){return a`
+  `}function jl(e){const t=Date.now()-Date.parse(e),n=Math.floor(t/6e4);if(n<1)return"just now";if(n<60)return`${n}m ago`;const s=Math.floor(n/60);if(s<24)return`${s}h ago`;const i=Math.floor(s/24);return i<7?`${i}d ago`:new Date(e).toLocaleDateString()}function Wl(e){return{fired:"guardrails-badge--fired",blocked:"guardrails-badge--blocked",cleaned:"guardrails-badge--cleaned"}[e]??""}function ia(e,t){return a`
     <button
       class="options-toggle ${e?"options-toggle--on":""}"
       role="switch"
@@ -4417,7 +4281,7 @@ ${l}
         <span class="options-toggle-thumb"></span>
       </span>
     </button>
-  `}function eo(e,t,n,s){const i=e.thresholds?.[t]??0;return a`
+  `}function Vl(e,t,n,s){const i=e.thresholds?.[t]??0;return a`
     <div class="guardrails-threshold">
       <label class="guardrails-threshold-label">${n}</label>
       <input
@@ -4429,7 +4293,7 @@ ${l}
         @change=${l=>{const o=Number(l.target.value);!Number.isNaN(o)&&o>0&&s(e.id,t,o)}}
       />
     </div>
-  `}function to(e,t,n){const s=e.thresholdLabels?Object.keys(e.thresholdLabels):[];return a`
+  `}function Gl(e,t,n){const s=e.thresholdLabels?Object.keys(e.thresholdLabels):[];return a`
     <div class="guardrails-card card ${e.enabled?"":"guardrails-card--disabled"}">
       <div class="guardrails-card-header">
         <div class="guardrails-card-info">
@@ -4437,16 +4301,16 @@ ${l}
           <span class="guardrails-card-name">${e.name}</span>
           <span class="guardrails-card-hook">${e.hook}</span>
         </div>
-        ${la(e.enabled,()=>t(e.id,!e.enabled))}
+        ${ia(e.enabled,()=>t(e.id,!e.enabled))}
       </div>
       <div class="guardrails-card-description">${e.description}</div>
       ${s.length>0?a`
             <div class="guardrails-thresholds">
-              ${s.map(i=>eo(e,i,e.thresholdLabels[i],n))}
+              ${s.map(i=>Vl(e,i,e.thresholdLabels[i],n))}
             </div>
           `:d}
     </div>
-  `}function no(e,t,n){const s=e.action==="redirect"?"↪":"🚫",i=e.action==="redirect"?"redirect":"block";return a`
+  `}function Yl(e,t,n){const s=e.action==="redirect"?"↪":"🚫",i=e.action==="redirect"?"redirect":"block";return a`
     <div class="guardrails-card card guardrails-custom-card ${e.enabled?"":"guardrails-card--disabled"}">
       <div class="guardrails-card-header">
         <div class="guardrails-card-info">
@@ -4455,7 +4319,7 @@ ${l}
           <span class="guardrails-card-hook guardrails-action-tag guardrails-action-tag--${i}">${i}</span>
         </div>
         <div class="guardrails-custom-actions">
-          ${la(e.enabled,()=>t(e.id,!e.enabled))}
+          ${ia(e.enabled,()=>t(e.id,!e.enabled))}
           <button class="guardrails-delete-btn" title="Delete rule" @click=${()=>n(e.id)}>&times;</button>
         </div>
       </div>
@@ -4465,14 +4329,14 @@ ${l}
         ${e.trigger.patterns.map(l=>a`<span class="guardrails-pattern-tag">${l}</span>`)}
       </div>
     </div>
-  `}function ao(e){return a`
+  `}function Kl(e){return a`
     <div class="guardrails-activity-row">
-      <span class="guardrails-badge ${Ql(e.action)}">${e.action}</span>
+      <span class="guardrails-badge ${Wl(e.action)}">${e.action}</span>
       <span class="guardrails-activity-gate">${e.gateId}</span>
       <span class="guardrails-activity-detail">${e.detail}</span>
-      <span class="guardrails-activity-time">${Zl(e.timestamp)}</span>
+      <span class="guardrails-activity-time">${jl(e.timestamp)}</span>
     </div>
-  `}function Ro(e){const{connected:t,loading:n,data:s,onToggle:i,onThresholdChange:l,onCustomToggle:o,onCustomDelete:r,onToggleAddForm:u,onOpenAllyChat:v}=e;if(!t)return a`
+  `}function Lo(e){const{connected:t,loading:n,data:s,onToggle:i,onThresholdChange:l,onCustomToggle:o,onCustomDelete:r,onToggleAddForm:u,onOpenAllyChat:v}=e;if(!t)return a`
       <section class="tab-body guardrails-section">
         <div class="guardrails-empty">Not connected to gateway.</div>
       </section>
@@ -4487,7 +4351,7 @@ ${l}
           <h2 class="guardrails-col-heading">Safety Gates</h2>
           <p class="guardrails-col-subtitle">${$}/${p.length} active — prevent runaway loops, bad searches, and lazy responses.</p>
           <div class="guardrails-grid">
-            ${p.map(f=>to(f,i,l))}
+            ${p.map(f=>Gl(f,i,l))}
           </div>
         </div>
 
@@ -4503,7 +4367,7 @@ ${l}
 
             ${h.length>0?a`
                   <div class="guardrails-custom-grid">
-                    ${h.map(f=>no(f,o,r))}
+                    ${h.map(f=>Yl(f,o,r))}
                   </div>
                 `:a`
                   <div class="guardrails-custom-empty">
@@ -4516,11 +4380,147 @@ ${l}
             <h3 class="guardrails-history-title">Recent Activity</h3>
             ${g.length>0?a`
                   <div class="guardrails-history-list">
-                    ${g.slice(0,30).map(ao)}
+                    ${g.slice(0,30).map(Kl)}
                   </div>
                 `:a`<div class="guardrails-no-activity">No gate activity recorded yet.</div>`}
           </div>
         </div>
       </div>
     </section>
-  `}export{xo as A,mo as B,Mo as C,co as P,ro as T,ho as a,uo as b,oo as c,po as d,Mt as e,go as f,Ll as g,bo as h,os as i,ko as j,Co as k,qa as l,$o as m,Vn as n,To as o,Aa as p,Eo as q,_o as r,fo as s,vo as t,So as u,Ro as v,Lo as w,yo as x,wo as y,Ao as z};
+  `}const ql=/(^~\/|^\/|^\.\.?\/|[\\/])/;function Fn(e){const t=e.trim();if(!t)return null;const n=t.replace(/^["']|["']$/g,"").trim();return!n||/^[a-z][a-z0-9+.-]*:\/\//i.test(n)||/[*?<>|]/.test(n)||n.includes("\0")||n.includes(`
+`)||n.includes("\r")||!ql.test(n)&&!/\.[a-z0-9]{1,12}$/i.test(n)?null:n}function Jl(e){const t=e instanceof Element?e:e instanceof Node?e.parentElement:null;if(!t)return null;const n=t.closest("a");if(n){const i=n.getAttribute("href")??"";let l=i;if(i.includes("%"))try{l=decodeURIComponent(i)}catch{l=i}return Fn(l)}const s=t.closest("code");return!s||s.closest("pre")?null:Fn(s.textContent??"")}function Xl(e){const n=new DOMParser().parseFromString(`<div>${e}</div>`,"text/html").body.firstElementChild;if(!n)return"";const i=X(n,{listDepth:0,orderedIndex:[]});return Ql(i)}function It(e,t){if(e.nodeType===Node.TEXT_NODE)return e.textContent??"";if(e.nodeType!==Node.ELEMENT_NODE)return"";const n=e;switch(n.tagName.toLowerCase()){case"h1":return`# ${ne(n,t)}
+
+`;case"h2":return`## ${ne(n,t)}
+
+`;case"h3":return`### ${ne(n,t)}
+
+`;case"h4":return`#### ${ne(n,t)}
+
+`;case"h5":return`##### ${ne(n,t)}
+
+`;case"h6":return`###### ${ne(n,t)}
+
+`;case"p":return`${X(n,t)}
+
+`;case"br":return`
+`;case"hr":return`---
+
+`;case"strong":case"b":return`**${X(n,t)}**`;case"em":case"i":return`*${X(n,t)}*`;case"del":return`~~${X(n,t)}~~`;case"a":{const i=n.getAttribute("href")??"",l=X(n,t);return!i||i===l?l:`[${l}](${i})`}case"code":return n.parentElement?.tagName.toLowerCase()==="pre"?n.textContent??"":`\`${n.textContent??""}\``;case"pre":{const i=n.querySelector("code"),l=i?i.textContent??"":n.textContent??"",o=i?.className.match(/language-(\S+)/);return`\`\`\`${o?o[1]:""}
+${l}
+\`\`\`
+
+`}case"blockquote":return X(n,t).trim().split(`
+`).map(o=>`> ${o}`).join(`
+`)+`
+
+`;case"ul":return Un(n,t,!1);case"ol":return Un(n,t,!0);case"li":return la(n,t);case"input":return n.getAttribute("type")==="checkbox"?n.checked?"[x]":"[ ]":"";case"table":return Zl(n,t);case"div":case"span":case"section":case"article":case"main":case"header":case"footer":case"nav":case"aside":case"figure":case"figcaption":case"details":case"summary":return X(n,t);default:return X(n,t)}}function X(e,t){let n="";for(const s of Array.from(e.childNodes))n+=It(s,t);return n}function ne(e,t){return X(e,t).replace(/\n+/g," ").trim()}function Un(e,t,n){const s=Array.from(e.children).filter(o=>o.tagName.toLowerCase()==="li"),i="  ".repeat(t.listDepth);let l="";for(let o=0;o<s.length;o++){const r=s[o],u={listDepth:t.listDepth+1,orderedIndex:[...t.orderedIndex,o+1]},v=n?`${o+1}. `:"- ",p=la(r,u);l+=`${i}${v}${p}
+`}return t.listDepth===0&&(l+=`
+`),l}function la(e,t){let n="";for(const s of Array.from(e.childNodes)){const i=s.tagName?.toLowerCase();i==="ul"||i==="ol"?n+=`
+`+It(s,t):n+=It(s,t)}return n.trim()}function Zl(e,t){const n=[],s=e.querySelector("thead tr"),i=e.querySelectorAll("tbody tr");if(s){const v=Array.from(s.querySelectorAll("th, td")).map(p=>ne(p,t));n.push(v)}for(const v of Array.from(i)){const p=Array.from(v.querySelectorAll("td, th")).map(g=>ne(g,t));n.push(p)}if(n.length===0){const v=e.querySelectorAll("tr");for(const p of Array.from(v)){const g=Array.from(p.querySelectorAll("td, th")).map(h=>ne(h,t));n.push(g)}}if(n.length===0)return"";const l=Math.max(...n.map(v=>v.length)),o=[];for(let v=0;v<l;v++)o[v]=Math.max(3,...n.map(p=>(p[v]??"").length));let r="";const u=v=>`| ${o.map((g,h)=>(v[h]??"").padEnd(g)).join(" | ")} |`;r+=u(n[0])+`
+`,r+=`| ${o.map(v=>"-".repeat(v)).join(" | ")} |
+`;for(let v=1;v<n.length;v++)r+=u(n[v])+`
+`;return r+`
+`}function Ql(e){let t=e;return t=t.replace(/\u00a0/g," "),t=t.replace(/\n{3,}/g,`
+
+`),t=t.trim(),t&&!t.endsWith(`
+`)&&(t+=`
+`),t}function eo(e){return e.includes(`
+`)&&e.indexOf(`
+`)<e.length-1?e:e.replace(/\\n/g,`
+`)}function to(e){const t=new Date(e),s=new Date().getTime()-t.getTime(),i=Math.floor(s/(1e3*60));if(i<1)return"Just now";if(i<60)return`${i}m ago`;const l=Math.floor(i/60);return l<24?`${l}h ago`:t.toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"})}function no(e){const t="VAULT",n=encodeURIComponent(`01-Daily/${e}`);return`obsidian://open?vault=${t}&file=${n}`}let Oe=null,_e=null;function Hn(e,t,n=1500){Oe&&clearTimeout(Oe),Oe=setTimeout(()=>{e!==_e&&(_e=e,t(e))},n)}function ao(e,t){Oe&&clearTimeout(Oe),e!==_e&&(_e=e,t(e))}function Tt(e){for(const t of e.querySelectorAll('input[type="checkbox"]')){const n=t;n.checked?n.setAttribute("checked",""):n.removeAttribute("checked")}return Xl(e.innerHTML)}function Ro(e){const{data:t,loading:n,error:s,onRefresh:i,onGenerate:l,onOpenInObsidian:o,onSaveBrief:r,onToggleCheckbox:u,onOpenFile:v}=e;if(n)return a`
+      <div class="my-day-card brief-section">
+        <div class="my-day-card-header">
+          <div class="my-day-card-title">
+            <span class="my-day-card-icon">\uD83D\uDCCA</span>
+            <span>DAILY BRIEF</span>
+          </div>
+        </div>
+        <div class="my-day-card-content">
+          <div class="brief-loading">
+            <div class="spinner"></div>
+            <span>Loading brief...</span>
+          </div>
+        </div>
+      </div>
+    `;if(s)return a`
+      <div class="my-day-card brief-section">
+        <div class="my-day-card-header">
+          <div class="my-day-card-title">
+            <span class="my-day-card-icon">\uD83D\uDCCA</span>
+            <span>DAILY BRIEF</span>
+          </div>
+        </div>
+        <div class="my-day-card-content">
+          <div class="brief-error">
+            <span class="error-icon">\u26A0\uFE0F</span>
+            <span>${s}</span>
+            ${i?a`<button class="retry-button" @click=${i}>Retry</button>`:d}
+          </div>
+        </div>
+      </div>
+    `;if(!t||!t.content)return a`
+      <div class="my-day-card brief-section">
+        <div class="my-day-card-header">
+          <div class="my-day-card-title">
+            <span class="my-day-card-icon">\uD83D\uDCCA</span>
+            <span>DAILY BRIEF</span>
+          </div>
+        </div>
+        <div class="my-day-card-content">
+          <div class="brief-empty">
+            <span class="empty-icon">\uD83D\uDCDD</span>
+            <span>No brief available for today</span>
+            <span class="empty-hint">Your morning brief pulls together your calendar, tasks, goals, and energy data into a single scannable page.</span>
+            ${l?a`<button class="brief-generate-btn" @click=${l}>Generate Brief Now</button>`:i?a`<button class="brief-generate-btn" @click=${i}>Generate Brief Now</button>`:d}
+            <span class="empty-hint" style="margin-top: 8px; font-size: 12px;">Briefs auto-generate at 5:00 AM when configured.</span>
+          </div>
+        </div>
+      </div>
+    `;_e===null&&(_e=t.content);const p=f=>{const w=f.currentTarget;if(r){const S=Tt(w);Hn(S,r)}},g=f=>{if((f.ctrlKey||f.metaKey)&&f.key==="s"){f.preventDefault();const w=f.currentTarget;if(r){const S=Tt(w);ao(S,r)}}if((f.ctrlKey||f.metaKey)&&f.key==="l"){f.preventDefault();const w=window.getSelection();if(!w||w.rangeCount===0)return;const S=w.focusNode,T=S instanceof HTMLElement?S.closest("li"):S?.parentElement?.closest("li");if(T){const k=T.querySelector('input[type="checkbox"]');if(k)k.nextSibling?.nodeType===Node.TEXT_NODE&&k.nextSibling.textContent===" "&&k.nextSibling.remove(),k.remove();else{const M=document.createElement("input");M.type="checkbox",T.insertBefore(document.createTextNode(" "),T.firstChild),T.insertBefore(M,T.firstChild)}const _=f.currentTarget;if(r){const M=Tt(_);Hn(M,r)}}}if(f.key==="Enter"&&!f.shiftKey){const w=window.getSelection();if(!w||w.rangeCount===0)return;const S=w.focusNode,T=S instanceof HTMLElement?S.closest("li"):S?.parentElement?.closest("li");T&&T.querySelector('input[type="checkbox"]')&&setTimeout(()=>{const k=window.getSelection();if(!k||k.rangeCount===0)return;const _=k.focusNode,M=_ instanceof HTMLElement?_.closest("li"):_?.parentElement?.closest("li");if(M&&M!==T&&!M.querySelector('input[type="checkbox"]')){const C=document.createElement("input");C.type="checkbox",M.insertBefore(C,M.firstChild),M.insertBefore(document.createTextNode(" "),C.nextSibling);const ce=document.createRange();ce.setStartAfter(C.nextSibling),ce.collapse(!0),k.removeAllRanges(),k.addRange(ce)}},0)}},h=f=>{const w=f.target;if(w.tagName==="INPUT"&&w.getAttribute("type")==="checkbox"){const k=w,_=f.currentTarget;if(u&&_){const C=Array.from(_.querySelectorAll('input[type="checkbox"]')).indexOf(k);C>=0&&u(C,k.checked)}return}const S=Jl(f.target);if(S&&v){f.preventDefault(),v(S);return}const T=w.closest?.("a")??w.parentElement?.closest("a");if(T){const k=T.getAttribute("href")??"";/^https?:\/\//i.test(k)&&(f.preventDefault(),window.open(k,"_blank","noopener,noreferrer"))}},$=es(eo(t.content)),b=t.summary.readiness!=null?a`<span class="brief-readiness" title="Readiness Score${t.summary.readinessMode?` — ${t.summary.readinessMode}`:""}">
+        <span class="readiness-score">${t.summary.readiness}</span>
+        <span class="readiness-label">Readiness</span>
+      </span>`:d,y=t.summary.tasks.total>0?a`<span class="brief-task-progress" title="${t.summary.tasks.completed}/${t.summary.tasks.total} tasks done">
+        ${t.summary.tasks.completed}/${t.summary.tasks.total}
+      </span>`:d;return a`
+    <div class="my-day-card brief-section brief-editor">
+      <div class="my-day-card-header">
+        <div class="my-day-card-title">
+          <span class="my-day-card-icon">\uD83D\uDCCA</span>
+          <span>DAILY BRIEF</span>
+          ${b}
+          ${y}
+        </div>
+        <div class="brief-header-actions">
+          <span class="brief-updated">${to(t.updatedAt)}</span>
+          ${o?a`
+                <a
+                  href="${no(t.date)}"
+                  class="brief-obsidian-link"
+                  title="Open in Obsidian"
+                  @click=${f=>{f.preventDefault(),o()}}
+                >
+                  <span class="obsidian-icon">\uD83D\uDCD3</span>
+                </a>
+              `:d}
+          ${i?a`
+                <button class="brief-refresh-btn" @click=${i} title="Refresh">
+                  \uD83D\uDD04
+                </button>
+              `:d}
+        </div>
+      </div>
+
+      <div class="my-day-card-content">
+        <div class="brief-content brief-content--live">
+          <div
+            class="brief-rendered brief-editable"
+            contenteditable="true"
+            spellcheck="false"
+            @input=${p}
+            @keydown=${g}
+            @click=${h}
+          >${$a($)}</div>
+        </div>
+      </div>
+    </div>
+  `}export{Ro as A,mo as B,Eo as C,co as P,ro as T,ho as a,uo as b,oo as c,po as d,Mt as e,go as f,bo as g,ko as h,os as i,So as j,$o as k,qa as l,Co as m,Vn as n,To as o,Aa as p,_o as q,xl as r,fo as s,vo as t,Lo as u,Mo as v,yo as w,wo as x,Ao as y,xo as z};

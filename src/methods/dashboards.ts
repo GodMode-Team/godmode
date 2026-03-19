@@ -366,31 +366,7 @@ const widgetData: GatewayRequestHandler = async ({ params, respond }) => {
 
 
         case "goals-progress": {
-          const raw = safeReadJson(path.join(DATA_DIR, "goals.json")) as {
-            goals?: Array<{
-              title: string;
-              area?: string;
-              progress?: number;
-              status?: string;
-            }>;
-          } | null;
-          const goals = raw?.goals ?? [];
-          data[widgetId] = {
-            goals: goals.map((g) => ({
-              title: g.title,
-              area: g.area,
-              progress: g.progress ?? 0,
-              status: g.status ?? "active",
-            })),
-            total: goals.length,
-            avgProgress:
-              goals.length > 0
-                ? Math.round(
-                    goals.reduce((s, g) => s + (g.progress ?? 0), 0) /
-                      goals.length,
-                  )
-                : 0,
-          };
+          data[widgetId] = null;
           break;
         }
 
@@ -486,70 +462,9 @@ const widgetData: GatewayRequestHandler = async ({ params, respond }) => {
           break;
         }
 
-        case "wheel-of-life": {
-          const wheelPath = path.join(
-            process.env.OPENCLAW_STATE_DIR ||
-              path.join(homedir(), ".openclaw"),
-            "dashboards",
-            "data",
-            "wheel-of-life.json",
-          );
-          const raw = safeReadJson(wheelPath) as {
-            scores?: Record<
-              string,
-              { current?: number; target?: number; trend?: string }
-            >;
-          } | null;
-          data[widgetId] = raw?.scores ?? null;
-          break;
-        }
-
-
+        case "wheel-of-life":
         case "recent-files": {
-          // List most recently modified files across ~/godmode/memory/
-          const recentFiles: Array<{
-            name: string;
-            path: string;
-            modified: string;
-          }> = [];
-          const scanRecent = (dir: string, depth: number) => {
-            if (depth > 3 || recentFiles.length >= 10) return;
-            try {
-              const entries = readdirSync(dir, { withFileTypes: true });
-              for (const e of entries) {
-                if (e.name.startsWith(".") || e.name.startsWith("_")) continue;
-                const fp = path.join(dir, e.name);
-                if (e.isDirectory()) {
-                  if (
-                    !["node_modules", ".git", "dist", "build"].includes(
-                      e.name,
-                    )
-                  ) {
-                    scanRecent(fp, depth + 1);
-                  }
-                } else {
-                  const ext = path.extname(e.name).toLowerCase();
-                  if ([".md", ".txt", ".json", ".html"].includes(ext)) {
-                    try {
-                      const st = statSync(fp);
-                      recentFiles.push({
-                        name: e.name,
-                        path: path.relative(GODMODE_ROOT, fp),
-                        modified: st.mtime.toISOString(),
-                      });
-                    } catch {
-                      /* skip */
-                    }
-                  }
-                }
-              }
-            } catch {
-              /* skip */
-            }
-          };
-          scanRecent(MEMORY_DIR, 0);
-          recentFiles.sort((a, b) => b.modified.localeCompare(a.modified));
-          data[widgetId] = recentFiles.slice(0, 10);
+          data[widgetId] = null;
           break;
         }
 
@@ -653,7 +568,6 @@ const widgetData: GatewayRequestHandler = async ({ params, respond }) => {
         }
 
         case "impact-summary": {
-          // REMOVED (v2 slim): impact-ledger
           data[widgetId] = null;
           break;
         }

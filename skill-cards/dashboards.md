@@ -19,7 +19,7 @@ tools: dashboards.save, dashboards.widgetData, dashboards.list
 4. Tell the user: "I've saved this to your Dashboards tab."
 
 ### Available Widgets
-`tasks-summary`, `tasks-today`, `goals-progress`, `agent-activity`, `queue-status`, `trust-scores`, `brief-summary`, `streak-stats`, `workspace-stats`, `recent-files`, `intel-highlights`
+`tasks-summary`, `tasks-today`, `agent-activity`, `queue-status`, `trust-scores`, `brief-summary`, `streak-stats`, `workspace-stats`
 
 ## HTML Rules
 - ✅ Use: `<style>`, SVG, inline styles, all HTML, animations, @keyframes, @media

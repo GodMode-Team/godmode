@@ -445,8 +445,9 @@ async function checkOnboardingStatus(host: GatewayHost) {
       if (res.identity?.name) {
         setupApp.setupQuickDone = true;
         // Restore display name from server if not already set in UI
+        // Check settings.userName (persisted) — userName state may hold the default "You"
         const nameHost = host as unknown as { userName: string; settings: UiSettings; applySettings: (s: UiSettings) => void };
-        if (!nameHost.userName || !nameHost.settings.userName) {
+        if (!nameHost.settings.userName) {
           nameHost.userName = res.identity.name;
           nameHost.applySettings({ ...nameHost.settings, userName: res.identity.name });
         }
@@ -454,6 +455,14 @@ async function checkOnboardingStatus(host: GatewayHost) {
     } else {
       app.onboardingActive = false;
       app.onboardingData = res ?? null;
+      // Onboarding already completed — still restore display name if not set
+      if (res?.identity?.name) {
+        const nameHost = host as unknown as { userName: string; settings: UiSettings; applySettings: (s: UiSettings) => void };
+        if (!nameHost.settings.userName) {
+          nameHost.userName = res.identity.name;
+          nameHost.applySettings({ ...nameHost.settings, userName: res.identity.name });
+        }
+      }
     }
   } catch {
     // Onboarding status not available — skip (probably standalone without the method)

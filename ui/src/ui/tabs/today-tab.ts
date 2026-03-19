@@ -93,6 +93,8 @@ export class GmToday extends LitElement {
 
   private _unsubs: Array<() => void> = [];
 
+  private _dataLoaded = false;
+
   override connectedCallback() {
     super.connectedCallback();
 
@@ -104,13 +106,14 @@ export class GmToday extends LitElement {
         }
       }),
     );
+  }
 
-    // Auto-load data once context is available
-    this.updateComplete.then(() => {
-      if (this.ctx?.connected) {
-        void this._loadAll();
-      }
-    });
+  override willUpdate(changed: Map<string, unknown>) {
+    // Load data when connection becomes available (handles late-connecting gateway)
+    if (this.ctx?.connected && !this._dataLoaded && !this.myDayLoading) {
+      this._dataLoaded = true;
+      void this._loadAll();
+    }
   }
 
   override disconnectedCallback() {
@@ -317,6 +320,17 @@ export class GmToday extends LitElement {
 
   private _handleViewModeChange(mode: "brief" | "tasks" | "inbox") {
     this.todayViewMode = mode;
+    // Trigger data load if switching to a tab that needs fresh data
+    if (mode === "inbox" && this.inboxItems.length === 0 && !this.inboxLoading) {
+      void this._handleInboxRefresh();
+    }
+    if (mode === "tasks" && this.todayTasks.length === 0 && !this.todayTasksLoading) {
+      const s = this._state;
+      void loadTodayTasksWithQueueStatus(s).then(() => {
+        this.todayTasks = s.todayTasks ?? [];
+        this.todayTasksLoading = s.todayTasksLoading ?? false;
+      });
+    }
   }
 
   // ── Morning Set / Evening Capture ──────────────────────────────────
@@ -636,35 +650,92 @@ export class GmToday extends LitElement {
     }
   }
 
-  private _handleInboxViewOutput(itemId: string) {
+  private async _handleInboxViewOutput(itemId: string) {
     const item = this.inboxItems?.find((i) => i.id === itemId);
     if (!item) return;
     const gateway = this.ctx?.gateway;
-    if (item.outputPath && gateway) {
-      gateway
-        .request<{ content: string }>("files.read", { path: item.outputPath, maxSize: 500_000 })
-        .then((result) => {
+    if (!gateway || !this.ctx?.connected) {
+      this.ctx?.addToast?.("Not connected to gateway", "error");
+      return;
+    }
+
+    // Strategy 1: If we have an outputPath, read it via queue.readOutput (canonical reader)
+    if (item.outputPath) {
+      try {
+        const result = await gateway.request<{ content: string }>(
+          "queue.readOutput",
+          { path: item.outputPath },
+        );
+        if (result?.content) {
+          this.ctx?.openSidebar?.({
+            content: result.content,
+            mimeType: "text/markdown",
+            filePath: item.outputPath,
+            title: item.title,
+          });
+          return;
+        }
+      } catch {
+        // queue.readOutput failed — try fallback strategies below
+      }
+    }
+
+    // Strategy 2: Look up the queue item by queueItemId and read its result outputPath
+    if (item.source?.queueItemId) {
+      try {
+        const queueResult = await gateway.request<{
+          items: Array<{ id: string; result?: { outputPath?: string; summary?: string } }>;
+        }>("queue.list", { limit: 200 });
+        const qi = queueResult?.items?.find((i) => i.id === item.source.queueItemId);
+        const qiOutputPath = qi?.result?.outputPath;
+        if (qiOutputPath) {
+          const result = await gateway.request<{ content: string }>(
+            "queue.readOutput",
+            { path: qiOutputPath },
+          );
           if (result?.content) {
             this.ctx?.openSidebar?.({
               content: result.content,
               mimeType: "text/markdown",
-              filePath: item.outputPath!,
+              filePath: qiOutputPath,
               title: item.title,
             });
+            return;
           }
-        })
-        .catch((err) => {
-          console.error("[GmToday] Inbox view output failed:", err);
-        });
-      return;
+        }
+        // If we have a summary from the queue item but no readable file, show the summary
+        if (qi?.result?.summary) {
+          this.ctx?.openSidebar?.({
+            content: `# ${item.title}\n\n${qi.result.summary}`,
+            mimeType: "text/markdown",
+            title: item.title,
+          });
+          return;
+        }
+      } catch (err) {
+        console.error("[GmToday] Inbox queue lookup failed:", err);
+      }
     }
-    // Fall back to proof doc via event
+
+    // Strategy 3: Fall back to proof doc via event
     if (item.proofDocSlug) {
       this.dispatchEvent(new CustomEvent("today-open-proof", {
         detail: { slug: item.proofDocSlug },
         bubbles: true,
         composed: true,
       }));
+      return;
+    }
+
+    // Nothing worked — show what we have (the summary)
+    if (item.summary) {
+      this.ctx?.openSidebar?.({
+        content: `# ${item.title}\n\n${item.summary}`,
+        mimeType: "text/markdown",
+        title: item.title,
+      });
+    } else {
+      this.ctx?.addToast?.("No output available for this item", "info");
     }
   }
 
@@ -860,7 +931,7 @@ export class GmToday extends LitElement {
       onEveningCapture: () => this._handleEveningCapture(),
     };
 
-    return renderMyDay(props);
+    return html`${this.renderToolbar()}${renderMyDay(props)}`;
   }
 }
 
