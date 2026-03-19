@@ -284,8 +284,8 @@ export async function wakeupAgent(
     method: "POST",
     mutating: true,
     body: {
-      source: "api",
-      triggerDetail: context?.reason ?? "delegate",
+      source: "on_demand",
+      triggerDetail: "manual",
       payload: context?.issueId ? { issueId: context.issueId } : undefined,
     },
   });

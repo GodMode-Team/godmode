@@ -30,8 +30,7 @@ if (!["hermes_local", "openclaw_gateway", "claude_local"].includes(ADAPTER)) {
 const ADAPTER_CONFIGS = {
   hermes_local: {
     command: "hermes",
-    args: ["chat", "-q"],
-    cwd: process.env.HOME,
+    model: "anthropic/claude-sonnet-4-20250514",
     timeoutSec: 1800,
     graceSec: 30,
     env: {},
@@ -86,8 +85,9 @@ async function main() {
   for (const agent of agents) {
     const current = agent.adapterType || "(none)";
 
-    // Skip agents already on the target adapter
-    if (current === ADAPTER) {
+    // Skip agents already on the target adapter (unless --force)
+    const FORCE = process.argv.includes("--force");
+    if (current === ADAPTER && !FORCE) {
       console.log(`  ✓ ${agent.name} — already on ${ADAPTER}`);
       skipped++;
       continue;
