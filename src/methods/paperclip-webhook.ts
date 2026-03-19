@@ -96,7 +96,26 @@ export async function handlePaperclipWebhookHttp(
     console.error("[GodMode] Paperclip webhook: failed to add inbox item", err);
   }
 
-  console.log(`[GodMode] Paperclip webhook: task "${title}" (${issueId}) → inbox`);
+  // Auto-register as a resource so it appears in the sidebar resource bar
+  try {
+    const { resourcesHandlers } = await import("./resources.js");
+    const registerHandler = resourcesHandlers["resources.register"];
+    if (registerHandler) {
+      await registerHandler({
+        params: {
+          title,
+          type: "doc",
+          path: filePath,
+          sessionKey: "paperclip",
+          summary: output.slice(0, 200),
+          tags: ["paperclip", "agent-output"],
+        },
+        respond: () => {},
+      } as any);
+    }
+  } catch { /* non-fatal */ }
+
+  console.log(`[GodMode] Paperclip webhook: task "${title}" (${issueId}) → inbox + resources`);
 
   // Broadcast to UI
   if (broadcastFn) {
