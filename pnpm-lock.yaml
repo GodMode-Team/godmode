@@ -42,6 +42,9 @@ importers:
       '@types/node':
         specifier: ^24.3.3
         version: 24.10.13
+      '@types/ws':
+        specifier: ^8.18.1
+        version: 8.18.1
       openclaw:
         specifier: ^2026.2.23
         version: 2026.2.24(@napi-rs/canvas@0.1.95)(@types/express@5.0.6)(encoding@0.1.13)(hono@4.12.2)(node-llama-cpp@3.15.1(typescript@5.9.3))

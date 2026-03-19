@@ -23,7 +23,7 @@ const FEEDBACK_HEADING = "## User Feedback";
 // ── File Resolution ──────────────────────────────────────────────
 
 /** Find the markdown file path for a workflow name (persona or skill). */
-function resolveWorkflowFile(workflow: string): string | null {
+export function resolveWorkflowFile(workflow: string): string | null {
   const normalized = workflow.toLowerCase().replace(/[_-]/g, " ");
 
   // Search agent-roster dirs

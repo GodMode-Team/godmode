@@ -4,10 +4,50 @@ import type { ArchivedSessionEntry, SessionsListResult } from "../types";
 
 /**
  * Persistent cache of auto-generated titles.
- * Survives sessionsResult overwrites from loadSessions race conditions.
+ * Backed by localStorage so titles survive page refreshes.
  * Both app-gateway (writer) and this module (reader) use this shared cache.
  */
-export const autoTitleCache = new Map<string, string>();
+const TITLE_CACHE_KEY = "godmode:autoTitleCache";
+
+function loadTitleCache(): Map<string, string> {
+  try {
+    const raw = localStorage.getItem(TITLE_CACHE_KEY);
+    if (raw) {
+      const entries: [string, string][] = JSON.parse(raw);
+      return new Map(entries);
+    }
+  } catch { /* ignore corrupt data */ }
+  return new Map();
+}
+
+function saveTitleCache(map: Map<string, string>) {
+  try {
+    // Cap at 200 entries to avoid unbounded localStorage growth
+    const entries = [...map.entries()];
+    const trimmed = entries.length > 200 ? entries.slice(-200) : entries;
+    localStorage.setItem(TITLE_CACHE_KEY, JSON.stringify(trimmed));
+  } catch { /* localStorage full or unavailable */ }
+}
+
+/** Map wrapper that auto-persists to localStorage on writes. */
+class PersistentTitleCache extends Map<string, string> {
+  set(key: string, value: string): this {
+    super.set(key, value);
+    saveTitleCache(this);
+    return this;
+  }
+  delete(key: string): boolean {
+    const result = super.delete(key);
+    if (result) saveTitleCache(this);
+    return result;
+  }
+  clear(): void {
+    super.clear();
+    saveTitleCache(this);
+  }
+}
+
+export const autoTitleCache: Map<string, string> = new PersistentTitleCache(loadTitleCache());
 
 export type SessionsState = {
   client: GatewayBrowserClient | null;

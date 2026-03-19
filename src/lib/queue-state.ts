@@ -15,7 +15,8 @@ export type QueueItemType =
   | "ops"
   | "task"
   | "url"
-  | "idea";
+  | "idea"
+  | "optimize";
 
 export type QueueItemStatus = "pending" | "processing" | "review" | "needs-review" | "done" | "failed";
 
@@ -30,6 +31,7 @@ export const AGENT_ROLE_NAMES: Record<QueueItemType, string> = {
   task: "Agent",
   url: "Reader",
   idea: "Explorer",
+  optimize: "Skill Optimizer",
 };
 
 // ── Queue item type ──────────────────────────────────────────────

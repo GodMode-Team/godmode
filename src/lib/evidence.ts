@@ -31,7 +31,8 @@ export type TaskType =
   // Extended types from QueueItemType that map to generic "task" rules
   | "analysis"
   | "url"
-  | "idea";
+  | "idea"
+  | "optimize";
 
 // ── Artifact Extraction ──────────────────────────────────────────
 

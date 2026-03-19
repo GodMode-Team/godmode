@@ -119,6 +119,17 @@ export type MyDayProps = {
   onInboxSortToggle?: () => void;
   inboxSortOrder?: "newest" | "oldest";
   onInboxMarkAll?: () => void;
+  // Trust summary
+  trustSummary?: {
+    overallScore: number | null;
+    dailyStreak: number;
+    todayRated: boolean;
+    workflowCount: number;
+    highPerformers: number;
+    needsAttention: number;
+  } | null;
+  onTrustDailyRate?: (rating: number, note?: string) => void;
+  onNavigateToTrust?: () => void;
 };
 
 // ===== Helper Functions =====
@@ -556,6 +567,75 @@ function renderInbox(props: MyDayProps) {
   `;
 }
 
+// ===== Trust Summary Card =====
+
+function renderTrustSummaryCard(props: MyDayProps) {
+  const trust = props.trustSummary;
+  if (!trust || trust.workflowCount === 0) return nothing;
+
+  const scoreColor =
+    trust.overallScore === null
+      ? "var(--text-secondary)"
+      : trust.overallScore >= 8
+        ? "var(--ok, #22c55e)"
+        : trust.overallScore >= 5
+          ? "var(--warn, #eab308)"
+          : "var(--danger, #ef4444)";
+
+  const scoreDisplay = trust.overallScore !== null ? trust.overallScore.toFixed(1) : "--";
+
+  return html`
+    <div class="my-day-card trust-summary-card">
+      <div class="my-day-card-header">
+        <div class="my-day-card-title">
+          <span class="my-day-card-icon">&#x1F3AF;</span>
+          <span>TRUST</span>
+        </div>
+        ${props.onNavigateToTrust
+          ? html`<button class="brief-refresh-btn" @click=${props.onNavigateToTrust}
+              title="View full trust dashboard">Details &#x2192;</button>`
+          : nothing}
+      </div>
+      <div class="my-day-card-content" style="display:flex;gap:16px;align-items:center;flex-wrap:wrap;">
+        <div style="text-align:center;min-width:60px;">
+          <div style="font-size:28px;font-weight:700;color:${scoreColor};line-height:1;">${scoreDisplay}</div>
+          <div style="font-size:11px;color:var(--text-secondary);margin-top:2px;">/ 10</div>
+        </div>
+        <div style="flex:1;min-width:120px;font-size:13px;color:var(--text-secondary);line-height:1.6;">
+          <div>${trust.workflowCount} workflow${trust.workflowCount !== 1 ? "s" : ""} tracked</div>
+          ${trust.highPerformers > 0
+            ? html`<div style="color:var(--ok, #22c55e);">${trust.highPerformers} above 8.0</div>`
+            : nothing}
+          ${trust.needsAttention > 0
+            ? html`<div style="color:var(--warn, #eab308);">${trust.needsAttention} need${trust.needsAttention !== 1 ? "" : "s"} attention</div>`
+            : nothing}
+          ${trust.dailyStreak > 0
+            ? html`<div>${trust.dailyStreak}-day streak</div>`
+            : nothing}
+        </div>
+        ${!trust.todayRated && props.onTrustDailyRate
+          ? html`
+            <div style="display:flex;flex-direction:column;align-items:center;gap:4px;">
+              <div style="font-size:11px;color:var(--text-secondary);">Rate today</div>
+              <div style="display:flex;gap:2px;">
+                ${[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(
+                  (n) => html`<button
+                    class="rating-btn"
+                    style="width:24px;height:24px;font-size:11px;border:1px solid var(--border);border-radius:4px;background:var(--surface-2);color:var(--text-secondary);cursor:pointer;"
+                    @click=${() => props.onTrustDailyRate!(n)}
+                    title="${n}/10"
+                  >${n}</button>`,
+                )}
+              </div>
+            </div>`
+          : trust.todayRated
+            ? html`<div style="font-size:12px;color:var(--ok, #22c55e);">Rated today &#x2713;</div>`
+            : nothing}
+      </div>
+    </div>
+  `;
+}
+
 // ===== Main Render Function =====
 
 export function renderMyDay(props: MyDayProps) {
@@ -604,6 +684,7 @@ export function renderMyDay(props: MyDayProps) {
 
   return html`
     <div class="my-day-container">
+      ${renderTrustSummaryCard(props)}
       ${viewMode === "brief"
         ? html`<div class="my-day-brief-full">
             ${renderDailyBrief(briefProps)}

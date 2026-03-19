@@ -21,7 +21,7 @@ import { DATA_DIR } from "../data-paths.js";
 type GatewayRequestHandlers = Record<string, GatewayRequestHandler>;
 
 const STATE_FILE = join(DATA_DIR, "trust-tracker.json");
-export const MAX_WORKFLOWS = 5;
+export const MAX_WORKFLOWS = 15;
 const MAX_RATINGS = 500;
 const MAX_DAILY_RATINGS = 90; // ~3 months of daily ratings
 /** Number of ratings needed before a trust score is assigned. */
@@ -46,6 +46,8 @@ export type DailyRating = {
   date: string; // YYYY-MM-DD
   rating: number; // 1-10
   note?: string;
+  /** Workflows that ran on this day — for correlating daily ratings with workflow performance. */
+  activeWorkflows?: string[];
   timestamp: string;
 };
 
@@ -493,6 +495,12 @@ export const trustTrackerHandlers: GatewayRequestHandlers = {
     await updateState((s) => {
       if (!s.dailyRatings) s.dailyRatings = [];
 
+      // Record which workflows ran today for correlation
+      const todayWorkflows = s.ratings
+        .filter((r) => r.timestamp.startsWith(today))
+        .map((r) => r.workflow);
+      const activeWorkflows = [...new Set(todayWorkflows)];
+
       // Overwrite if already rated today
       const existingIdx = s.dailyRatings.findIndex((r) => r.date === today);
       entry = {
@@ -500,6 +508,7 @@ export const trustTrackerHandlers: GatewayRequestHandlers = {
         date: today,
         rating,
         ...(note ? { note: note.trim() } : {}),
+        ...(activeWorkflows.length > 0 ? { activeWorkflows } : {}),
         timestamp: new Date().toISOString(),
       };
 

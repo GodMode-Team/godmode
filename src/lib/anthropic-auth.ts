@@ -57,6 +57,46 @@ export function resolveAnthropicKey(): string | null {
 }
 
 /**
+ * Call the Anthropic Messages API and return the first text content block.
+ * Handles auth resolution, prefill, and timeout. Returns null on failure.
+ */
+export async function callHaiku(opts: {
+  messages: Array<{ role: string; content: string }>;
+  model?: string;
+  maxTokens?: number;
+  system?: string;
+  timeoutMs?: number;
+}): Promise<string | null> {
+  const apiKey = resolveAnthropicKey();
+  if (!apiKey) return null;
+
+  const body: Record<string, unknown> = {
+    model: opts.model ?? "claude-haiku-4-5-20251001",
+    max_tokens: opts.maxTokens ?? 1024,
+    messages: opts.messages,
+  };
+  if (opts.system) body.system = opts.system;
+
+  const response = await fetchWithTimeout(
+    "https://api.anthropic.com/v1/messages",
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01",
+      },
+      body: JSON.stringify(body),
+    },
+    opts.timeoutMs ?? 15_000,
+  );
+
+  if (!response.ok) return null;
+  const json = (await response.json()) as { content?: Array<{ type: string; text?: string }> };
+  return json?.content?.[0]?.type === "text" ? (json.content[0].text ?? null) : null;
+}
+
+/**
  * Fetch with a timeout. Aborts the request if it takes longer than timeoutMs.
  */
 export async function fetchWithTimeout(

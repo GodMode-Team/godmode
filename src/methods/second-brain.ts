@@ -4,15 +4,7 @@
  * Vault-first window into the user's Obsidian-driven second brain.
  * Reads from Obsidian vault (PARA structure) with fallback to ~/godmode/memory/.
  *
- * RPC methods:
- *   secondBrain.identity        — USER.md, SOUL.md, VISION.md, opinions.md, THESIS.md
- *   secondBrain.memoryBank      — file/folder listings from Brain/, Projects/
- *   secondBrain.memoryBankEntry — single file content
- *   secondBrain.aiPacket        — CONSCIOUSNESS.md + WORKING.md
- *   secondBrain.sync            — trigger consciousness-sync.sh
- *   secondBrain.vaultHealth     — vault stats and recent activity
- *   secondBrain.inboxItems      — vault inbox listing
- *   secondBrain.migrateToVault  — trigger migration from ~/godmode/memory/ to vault
+ * 3-tab UI: Identity | Knowledge | Context
  */
 
 import { execFile } from "node:child_process";
@@ -24,7 +16,6 @@ import {
   realpathSync,
   statSync,
 } from "node:fs";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { basename, extname, join, relative } from "node:path";
 import { promisify } from "node:util";
@@ -219,23 +210,7 @@ const identity: GatewayRequestHandler = async ({ respond }) => {
     }
   }
 
-  // Check for Identity OS dashboard — served via artifact file server
-  const identityOsDashboardFile = join(MEMORY_DIR, "projects", "identity-os", "final", "dashboard", "index.html");
-  const identityOsExists = existsSync(identityOsDashboardFile);
-  // Return the served URL so the UI can open it directly (preserving relative links)
-  const identityOsDashboard = "/godmode/artifacts/index.html";
-
-  // Identity OS final artifacts
-  const identityOsFinalPath = join(MEMORY_DIR, "projects", "identity-os", "final");
-  const identityOsArtifacts = listEntries(identityOsFinalPath);
-
-  respond(true, {
-    files,
-    identityOs: identityOsExists ? {
-      dashboardPath: identityOsDashboard,
-      artifacts: identityOsArtifacts,
-    } : null,
-  });
+  respond(true, { files });
 };
 
 // ── Memory Bank ──────────────────────────────────────────────────────
@@ -537,27 +512,7 @@ const sources: GatewayRequestHandler = async ({ respond }) => {
     }
   } catch { /* empty */ }
 
-  // 3. Community resources (agent-discoverable bookmarks)
-  try {
-    const communityData = await readCommunityResources();
-    if (communityData.resources.length > 0) {
-      const crId = "community-resources";
-      if (!seenIds.has(crId)) {
-        seenIds.add(crId);
-        result.push({
-          id: crId,
-          name: "Community Resources",
-          type: "community",
-          status: "connected",
-          icon: "\u{1F310}",
-          description: `${communityData.resources.length} curated open-source repos and tools for agents to reference`,
-          stats: communityData.resources.map(r => r.label).join(", "),
-        });
-      }
-    }
-  } catch { /* non-critical */ }
-
-  // 4. Integration registry sources (calendar, health, intelligence, etc.)
+  // 3. Integration registry sources (calendar, health, intelligence, etc.)
   try {
     const { getIntegrationsForPlatform, detectAllIntegrations } = await import("../lib/integration-registry.js");
     const integrations = getIntegrationsForPlatform();
@@ -766,196 +721,6 @@ const research: GatewayRequestHandler = async ({ params, respond }) => {
   respond(true, { categories, totalEntries });
 };
 
-function sanitizeSlug(text: string): string {
-  return text.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 80);
-}
-
-const addResearch: GatewayRequestHandler = async ({ params, respond }) => {
-  const p = params as {
-    title?: string;
-    url?: string;
-    category?: string;
-    tags?: string[];
-    notes?: string;
-    source?: string;
-  };
-
-  const title = typeof p.title === "string" ? p.title.trim() : "";
-  if (!title) {
-    respond(false, undefined, { code: "INVALID_REQUEST", message: "Title is required" });
-    return;
-  }
-
-  const category = typeof p.category === "string" ? sanitizeSlug(p.category) : "";
-  const researchDir = getResearchDir();
-  const targetDir = category ? join(researchDir, category) : researchDir;
-  if (!isAllowedPath(targetDir)) {
-    respond(false, undefined, { code: "INVALID_REQUEST", message: "Target path is outside allowed directory" });
-    return;
-  }
-  await mkdir(targetDir, { recursive: true });
-
-  // Generate filename, handle collisions
-  const baseSlug = sanitizeSlug(title);
-  let filename = `${baseSlug}.md`;
-  let filePath = join(targetDir, filename);
-  let suffix = 2;
-  while (existsSync(filePath)) {
-    filename = `${baseSlug}-${suffix}.md`;
-    filePath = join(targetDir, filename);
-    suffix++;
-  }
-
-  // Build YAML frontmatter
-  const today = new Date().toISOString().slice(0, 10);
-  const tags = Array.isArray(p.tags) ? p.tags.filter(t => typeof t === "string" && t.trim()) : [];
-  const source = typeof p.source === "string" ? p.source : "manual";
-  const url = typeof p.url === "string" ? p.url.trim() : "";
-  const notes = typeof p.notes === "string" ? p.notes : "";
-
-  const lines = ["---", `title: ${title}`];
-  if (url) lines.push(`url: ${url}`);
-  if (category) lines.push(`category: ${category}`);
-  if (tags.length > 0) lines.push(`tags: [${tags.join(", ")}]`);
-  lines.push(`date: ${today}`);
-  lines.push(`source: ${source}`);
-  lines.push("---", "");
-  if (notes) lines.push(notes);
-
-  await writeFile(filePath, lines.join("\n"), "utf-8");
-  respond(true, { ok: true, path: filePath, category: category || null });
-};
-
-const researchCategories: GatewayRequestHandler = async ({ respond }) => {
-  const cats = new Set<string>();
-  for (const dir of [getResearchDir(), RESEARCH_DIR_ALT]) {
-    if (!existsSync(dir)) continue;
-    try {
-      const entries = readdirSync(dir, { withFileTypes: true });
-      for (const e of entries) {
-        if (e.isDirectory() && !e.name.startsWith(".") && !e.name.startsWith("_")) {
-          cats.add(e.name);
-        }
-      }
-    } catch { /* skip */ }
-  }
-  respond(true, { categories: [...cats].sort() });
-};
-
-// ── Community Resources ──────────────────────────────────────────────
-
-const COMMUNITY_RESOURCES_FILE = join(DATA_DIR, "community-resources.json");
-
-type CommunityResource = {
-  id: string;
-  url: string;
-  label: string;
-  description: string;
-  tags: string[];
-  addedAt: number;
-};
-
-type CommunityResourcesData = {
-  version: 1;
-  resources: CommunityResource[];
-};
-
-const SEED_RESOURCES: CommunityResource[] = [
-  {
-    id: "hesamsheikh/awesome-openclaw-usecases",
-    url: "https://github.com/hesamsheikh/awesome-openclaw-usecases",
-    label: "Awesome OpenClaw Use Cases",
-    description: "Community collection of 34+ OpenClaw use cases — productivity, creative, devops, research, finance, and more.",
-    tags: ["use-cases", "prompts", "workflows", "community"],
-    addedAt: Date.now(),
-  },
-];
-
-async function readCommunityResources(): Promise<CommunityResourcesData> {
-  try {
-    const raw = await readFile(COMMUNITY_RESOURCES_FILE, "utf-8");
-    return JSON.parse(raw) as CommunityResourcesData;
-  } catch {
-    // First access — seed with defaults
-    const data: CommunityResourcesData = { version: 1, resources: SEED_RESOURCES };
-    await mkdir(DATA_DIR, { recursive: true });
-    await writeFile(COMMUNITY_RESOURCES_FILE, JSON.stringify(data, null, 2) + "\n");
-    return data;
-  }
-}
-
-async function writeCommunityResources(data: CommunityResourcesData): Promise<void> {
-  await mkdir(DATA_DIR, { recursive: true });
-  await writeFile(COMMUNITY_RESOURCES_FILE, JSON.stringify(data, null, 2) + "\n");
-}
-
-const communityResourcesList: GatewayRequestHandler = async ({ respond }) => {
-  try {
-    const data = await readCommunityResources();
-    respond(true, { resources: data.resources, count: data.resources.length });
-  } catch (err) {
-    respond(false, undefined, {
-      code: "COMMUNITY_RESOURCES_ERROR",
-      message: err instanceof Error ? err.message : String(err),
-    });
-  }
-};
-
-const communityResourcesAdd: GatewayRequestHandler = async ({ params, respond }) => {
-  const p = params as { url?: string; label?: string; description?: string; tags?: string[] };
-  const url = typeof p.url === "string" ? p.url.trim() : "";
-  if (!url) {
-    respond(false, undefined, { code: "INVALID_REQUEST", message: "url is required" });
-    return;
-  }
-  const label = typeof p.label === "string" ? p.label.trim() : url.split("/").slice(-2).join("/");
-  const description = typeof p.description === "string" ? p.description.trim() : "";
-  const tags = Array.isArray(p.tags) ? p.tags.filter(t => typeof t === "string" && t.trim()) : [];
-
-  // Derive ID from URL (owner/repo for GitHub, or full URL)
-  const ghMatch = url.match(/github\.com\/([^/]+\/[^/]+)/);
-  const id = ghMatch ? ghMatch[1] : url;
-
-  try {
-    const data = await readCommunityResources();
-    if (data.resources.some(r => r.id === id)) {
-      respond(false, undefined, { code: "DUPLICATE", message: `Resource already exists: ${id}` });
-      return;
-    }
-    data.resources.push({ id, url, label, description, tags, addedAt: Date.now() });
-    await writeCommunityResources(data);
-    respond(true, { ok: true, id, count: data.resources.length });
-  } catch (err) {
-    respond(false, undefined, {
-      code: "COMMUNITY_RESOURCES_ERROR",
-      message: err instanceof Error ? err.message : String(err),
-    });
-  }
-};
-
-const communityResourcesRemove: GatewayRequestHandler = async ({ params, respond }) => {
-  const { id } = params as { id?: string };
-  if (!id || typeof id !== "string") {
-    respond(false, undefined, { code: "INVALID_REQUEST", message: "id is required" });
-    return;
-  }
-  try {
-    const data = await readCommunityResources();
-    const before = data.resources.length;
-    data.resources = data.resources.filter(r => r.id !== id);
-    if (data.resources.length === before) {
-      respond(false, undefined, { code: "NOT_FOUND", message: `Resource not found: ${id}` });
-      return;
-    }
-    await writeCommunityResources(data);
-    respond(true, { ok: true, removed: id, count: data.resources.length });
-  } catch (err) {
-    respond(false, undefined, {
-      code: "COMMUNITY_RESOURCES_ERROR",
-      message: err instanceof Error ? err.message : String(err),
-    });
-  }
-};
 
 // ── File Tree ────────────────────────────────────────────────────────
 
@@ -1325,86 +1090,6 @@ const brainSearch: GatewayRequestHandler = async ({ params, respond }) => {
   respond(true, { results, query, total: results.length });
 };
 
-// ── Consolidate Research ─────────────────────────────────────────────
-
-const consolidateResearch: GatewayRequestHandler = async ({ params, respond }) => {
-  const p = params as { execute?: boolean };
-  const dryRun = !p.execute;
-
-  type MoveAction = { source: string; destination: string; reason: string };
-  const actions: MoveAction[] = [];
-
-  // 1. Scan ~/godmode/research/* -> ~/godmode/memory/research/*
-  const altDir = join(GODMODE_ROOT, "research");
-  if (existsSync(altDir)) {
-    try {
-      const walk = (dir: string, relativeBase: string) => {
-        const entries = readdirSync(dir, { withFileTypes: true });
-        for (const e of entries) {
-          if (e.name.startsWith(".")) continue;
-          const srcPath = join(dir, e.name);
-          const relPath = relativeBase ? `${relativeBase}/${e.name}` : e.name;
-          if (e.isDirectory()) {
-            walk(srcPath, relPath);
-          } else {
-            const destPath = join(getResearchDir(), relPath);
-            if (!existsSync(destPath)) {
-              actions.push({
-                source: relative(GODMODE_ROOT, srcPath),
-                destination: relative(GODMODE_ROOT, destPath),
-                reason: "Move from ~/godmode/research/ to canonical location",
-              });
-            }
-          }
-        }
-      };
-      walk(altDir, "");
-    } catch { /* skip inaccessible */ }
-  }
-
-  // 2. Scan ~/godmode/*.html -> ~/godmode/memory/research/proposals/*
-  try {
-    const rootEntries = readdirSync(GODMODE_ROOT, { withFileTypes: true });
-    for (const e of rootEntries) {
-      if (e.isDirectory() || !e.name.endsWith(".html") || e.name.startsWith(".")) continue;
-      const srcPath = join(GODMODE_ROOT, e.name);
-      const destPath = join(getResearchDir(), "proposals", e.name);
-      if (!existsSync(destPath)) {
-        actions.push({
-          source: relative(GODMODE_ROOT, srcPath),
-          destination: relative(GODMODE_ROOT, destPath),
-          reason: "Move HTML doc to research/proposals/",
-        });
-      }
-    }
-  } catch { /* skip */ }
-
-  // Execute if not dry run
-  if (!dryRun && actions.length > 0) {
-    for (const action of actions) {
-      const src = join(GODMODE_ROOT, action.source);
-      const dest = join(GODMODE_ROOT, action.destination);
-      try {
-        if (!isAllowedPath(src) || !isAllowedPath(dest)) continue;
-        if (!isSymlinkSafe(src)) continue;
-        const destDir = dest.substring(0, dest.lastIndexOf("/"));
-        await mkdir(destDir, { recursive: true });
-        // Copy instead of move to be safe
-        const content = await readFile(src);
-        await writeFile(dest, content);
-      } catch { /* skip individual failures */ }
-    }
-  }
-
-  respond(true, {
-    actions,
-    executed: !dryRun,
-    count: actions.length,
-    message: dryRun
-      ? `Found ${actions.length} files to consolidate. Call with execute: true to move them.`
-      : `Consolidated ${actions.length} files to canonical research location.`,
-  });
-};
 
 // ── Vault Health ──────────────────────────────────────────────────────
 
@@ -1687,14 +1372,8 @@ export const secondBrainHandlers: GatewayRequestHandlers = {
   "secondBrain.sync": sync,
   "secondBrain.sources": sources,
   "secondBrain.research": research,
-  "secondBrain.addResearch": addResearch,
-  "secondBrain.researchCategories": researchCategories,
-  "secondBrain.communityResources": communityResourcesList,
-  "secondBrain.communityResourcesAdd": communityResourcesAdd,
-  "secondBrain.communityResourcesRemove": communityResourcesRemove,
   "secondBrain.fileTree": fileTree,
   "secondBrain.search": brainSearch,
-  "secondBrain.consolidateResearch": consolidateResearch,
   "secondBrain.vaultHealth": vaultHealth,
   "secondBrain.inboxItems": inboxItems,
   "secondBrain.migrateToVault": migrateToVaultRpc,

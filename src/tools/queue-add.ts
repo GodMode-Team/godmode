@@ -22,7 +22,7 @@ export function createQueueAddTool(_ctx: ToolContext): AnyAgentTool {
       properties: {
         type: {
           type: "string",
-          enum: ["coding", "research", "analysis", "creative", "review", "ops", "task", "url", "idea"],
+          enum: ["coding", "research", "analysis", "creative", "review", "ops", "task", "url", "idea", "optimize"],
           description: "Agent role type",
         },
         title: {

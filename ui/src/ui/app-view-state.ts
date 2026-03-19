@@ -283,6 +283,9 @@ export type AppViewState = {
   inboxScoringId?: string | null;
   inboxScoringValue?: number;
   inboxFeedbackText?: string;
+  // Trust summary
+  trustSummary?: import("./controllers/my-day").TrustSummaryData | null;
+  handleTrustDailyRate: (rating: number) => Promise<void>;
   // Ally side-chat state
   allyPanelOpen?: boolean;
   allyMessages?: AllyChatMessage[];
@@ -400,20 +403,13 @@ export type AppViewState = {
   secondBrainAiPacket?: import("./views/second-brain").SecondBrainAiPacketData | null;
   secondBrainSourcesData?: import("./views/second-brain").SecondBrainSourcesData | null;
   secondBrainResearchData?: import("./views/second-brain").SecondBrainResearchData | null;
-  secondBrainResearchAddFormOpen?: boolean;
-  secondBrainResearchAddForm?: import("./views/second-brain").ResearchAddForm;
-  secondBrainResearchCategories?: string[];
   secondBrainSelectedEntry?: import("./views/second-brain").SecondBrainEntryDetail | null;
   secondBrainSearchQuery?: string;
   secondBrainSyncing?: boolean;
   secondBrainBrowsingFolder?: string | null;
   secondBrainFolderEntries?: import("./views/second-brain").SecondBrainMemoryEntry[] | null;
   secondBrainFolderName?: string | null;
-  secondBrainCommunityResources?: import("./views/second-brain").CommunityResourcesData | null;
-  secondBrainCommunityResourceAddFormOpen?: boolean;
-  secondBrainCommunityResourceAddForm?: import("./views/second-brain").CommunityResourceAddForm;
   secondBrainVaultHealth?: import("./views/second-brain").VaultHealthData | null;
-  // Second Brain Files tab state
   secondBrainFileTree?: import("./views/second-brain").BrainTreeNode[] | null;
   secondBrainFileTreeLoading?: boolean;
   secondBrainFileSearchQuery?: string;
@@ -653,21 +649,11 @@ export type AppViewState = {
   handleSecondBrainRefresh: () => Promise<void>;
   handleSecondBrainSubtabChange: (subtab: import("./views/second-brain").SecondBrainSubtab) => void;
   handleSecondBrainSelectEntry: (path: string) => Promise<void>;
-  handleSecondBrainOpenInBrowser: (path: string) => Promise<void>;
   handleSecondBrainBrowseFolder: (path: string) => Promise<void>;
   handleSecondBrainBack: () => void;
   handleSecondBrainSearch: (query: string) => void;
   handleSecondBrainSync: () => Promise<void>;
-  handleResearchAddFormToggle: () => void;
-  handleResearchAddFormChange: (field: string, value: string) => void;
-  handleResearchAddSubmit: () => Promise<void>;
   handleResearchSaveViaChat: () => Promise<void>;
-  handleCommunityResourceAdd: () => Promise<void>;
-  handleCommunityResourceRemove: (id: string) => Promise<void>;
-  handleCommunityResourceAddFormToggle: () => void;
-  handleCommunityResourceAddFormChange: (field: string, value: string) => void;
-  // Second Brain Files tab handlers
-  handleSecondBrainFileTreeRefresh: () => Promise<void>;
   handleSecondBrainFileSearch: (query: string) => void;
   handleSecondBrainFileSelect: (path: string) => Promise<void>;
   // Dashboards state + handlers

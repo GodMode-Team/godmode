@@ -51,6 +51,8 @@ const PROMPT_TEMPLATES: Record<QueueItemType, string> = {
     "Analyze this URL: {url}\n{title}\n{description}\n\nFetch the content, analyze it. Write: Source, Key Points, Relevance, Action Items.\n\nThink step by step before acting.\n\nEnd with: ## Next Steps — what the user should do with this.",
   idea:
     "Explore this idea: {title}\n{description}\n\nAnalyze feasibility, implementation approach, potential issues.\n\nIMPORTANT: Show your sources. Link to evidence.\n\nBe thorough but concise. Quality over quantity.\n\nEnd with: ## Next Steps — what the user should do with this.",
+  optimize:
+    "Optimize this skill/persona: {title}\n{description}\n\nFollow the AutoResearch protocol:\n1. Read the current skill/persona markdown file\n2. Generate 3-6 yes/no eval criteria from the stored trust feedback\n3. Run baseline evaluation against the criteria\n4. Make ONE targeted mutation to the markdown (clarity, examples, constraints)\n5. Test the mutation against eval criteria\n6. If improved, keep. If worse or equal, revert.\n7. Repeat up to 4 rounds.\n\nNEVER modify: name, role, core traits, communication style.\nONLY modify: instructions, examples, constraints, workflow steps.\n\nWrite results as: ## Optimization Results\n- Baseline score: X%\n- Final score: Y%\n- Rounds: N\n- Changes made: (list each kept mutation)\n- Evaluation log: (per-round scores)",
 };
 
 // ── Singleton ──────────────────────────────────────────────────────

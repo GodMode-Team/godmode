@@ -54,7 +54,7 @@ describe("handleChatEvent", () => {
     expect(state.chatStream).toBe("Hello");
   });
 
-  it("returns 'final' for final from another run (e.g. sub-agent announce) without clearing state", () => {
+  it("returns null for final from another run when user is actively streaming (prevents optimistic message loss)", () => {
     const state = createState({
       sessionKey: "main",
       chatRunId: "run-user",
@@ -70,13 +70,34 @@ describe("handleChatEvent", () => {
         content: [{ type: "text", text: "Sub-agent findings" }],
       },
     };
-    expect(handleChatEvent(state, payload)).toBe("final");
+    // Should NOT trigger loadChatHistoryAfterFinal while user is streaming
+    expect(handleChatEvent(state, payload)).toBe(null);
     expect(state.chatRunId).toBe("run-user");
     expect(state.chatStream).toBe("Working...");
     expect(state.chatStreamStartedAt).toBe(123);
   });
 
-  it("processes final from own run and clears state", () => {
+  it("returns 'final' for final from another run when user is NOT streaming", () => {
+    const state = createState({
+      sessionKey: "main",
+      chatRunId: "run-user",
+      chatStream: null,
+      chatStreamStartedAt: null,
+    });
+    const payload: ChatEventPayload = {
+      runId: "run-announce",
+      sessionKey: "main",
+      state: "final",
+      message: {
+        role: "assistant",
+        content: [{ type: "text", text: "Sub-agent findings" }],
+      },
+    };
+    expect(handleChatEvent(state, payload)).toBe("final");
+    expect(state.chatRunId).toBe("run-user");
+  });
+
+  it("processes final from own run — clears runId but keeps chatStream for loadChatHistoryAfterFinal", () => {
     const state = createState({
       sessionKey: "main",
       chatRunId: "run-1",
@@ -90,7 +111,9 @@ describe("handleChatEvent", () => {
     };
     expect(handleChatEvent(state, payload)).toBe("final");
     expect(state.chatRunId).toBe(null);
-    expect(state.chatStream).toBe(null);
+    // chatStream is intentionally preserved until loadChatHistoryAfterFinal
+    // replaces it with server history — prevents flash of empty chat
+    expect(state.chatStream).toBe("Reply");
     expect(state.chatStreamStartedAt).toBe(null);
   });
 });

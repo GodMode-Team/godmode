@@ -718,16 +718,13 @@ export class GodModeApp extends LitElement {
   @state() secondBrainAiPacket: import("./views/second-brain").SecondBrainAiPacketData | null = null;
   @state() secondBrainSourcesData: import("./views/second-brain").SecondBrainSourcesData | null = null;
   @state() secondBrainResearchData: import("./views/second-brain").SecondBrainResearchData | null = null;
-  @state() secondBrainResearchAddFormOpen = false;
-  @state() secondBrainResearchAddForm: import("./views/second-brain").ResearchAddForm = { title: "", url: "", category: "", tags: "", notes: "" };
-  @state() secondBrainResearchCategories: string[] = [];
   @state() secondBrainSelectedEntry: import("./views/second-brain").SecondBrainEntryDetail | null = null;
   @state() secondBrainSearchQuery = "";
   @state() secondBrainSyncing = false;
   @state() secondBrainBrowsingFolder: string | null = null;
   @state() secondBrainFolderEntries: import("./views/second-brain").SecondBrainMemoryEntry[] | null = null;
   @state() secondBrainFolderName: string | null = null;
-  // Second Brain Files tab state
+  @state() secondBrainVaultHealth: import("./views/second-brain").VaultHealthData | null = null;
   @state() secondBrainFileTree: import("./views/second-brain").BrainTreeNode[] | null = null;
   @state() secondBrainFileTreeLoading = false;
   @state() secondBrainFileSearchQuery = "";
@@ -1801,28 +1798,17 @@ export class GodModeApp extends LitElement {
     this.secondBrainLoading = false;
     this.secondBrainSelectedEntry = null;
     this.secondBrainSearchQuery = "";
+    this.secondBrainFileSearchQuery = "";
+    this.secondBrainFileSearchResults = null;
     this.secondBrainError = null;
     this.secondBrainBrowsingFolder = null;
     this.secondBrainFolderEntries = null;
     this.secondBrainFolderName = null;
-    if (subtab === "intel") {
-      // Intel subtab loads its own data
-      this.handleIntelLoad().catch((err) => {
-        console.error("[Intel] Load after subtab change failed:", err);
-        this.intelError = err instanceof Error ? err.message : "Failed to load intel data";
-      });
-    } else if (subtab === "files") {
-      // Files subtab loads its own data
-      this.handleSecondBrainFileTreeRefresh().catch((err) => {
-        console.error("[SecondBrain] File tree load after subtab change failed:", err);
-      });
-    } else {
-      this.handleSecondBrainRefresh().catch((err) => {
-        console.error("[SecondBrain] Refresh after subtab change failed:", err);
-        this.secondBrainError = err instanceof Error ? err.message : "Failed to load data";
-        this.secondBrainLoading = false;
-      });
-    }
+    this.handleSecondBrainRefresh().catch((err) => {
+      console.error("[SecondBrain] Refresh after subtab change failed:", err);
+      this.secondBrainError = err instanceof Error ? err.message : "Failed to load data";
+      this.secondBrainLoading = false;
+    });
   }
 
   async handleSecondBrainSelectEntry(path: string) {
@@ -1852,27 +1838,6 @@ export class GodModeApp extends LitElement {
     await loadSecondBrainEntry(this, path);
   }
 
-  async handleSecondBrainOpenInBrowser(path: string) {
-    try {
-      // If path is a URL or served route, open directly (preserves relative links)
-      if (path.startsWith("http://") || path.startsWith("https://") || path.startsWith("/")) {
-        window.open(path, "_blank", "noopener,noreferrer");
-        return;
-      }
-      const result = await this.client!.request<{ name: string; content: string }>(
-        "secondBrain.memoryBankEntry",
-        { path },
-      );
-      if (result?.content) {
-        const blob = new Blob([result.content], { type: "text/html" });
-        const url = URL.createObjectURL(blob);
-        window.open(url, "_blank", "noopener,noreferrer");
-      }
-    } catch (err) {
-      console.error("[SecondBrain] Failed to open in browser:", err);
-    }
-  }
-
   async handleSecondBrainBrowseFolder(path: string) {
     const { browseFolder } = await import("./controllers/second-brain.js");
     await browseFolder(this, path);
@@ -1897,22 +1862,7 @@ export class GodModeApp extends LitElement {
     await syncSecondBrain(this);
   }
 
-  // Second Brain Files tab handlers
-
-  async handleSecondBrainFileTreeRefresh() {
-    if (!this.client || !this.connected) return;
-    this.secondBrainFileTreeLoading = true;
-    try {
-      const result = await this.client.request<{
-        tree: import("./views/second-brain").BrainTreeNode[];
-      }>("secondBrain.fileTree", { depth: 4 });
-      this.secondBrainFileTree = result.tree ?? [];
-    } catch (err) {
-      console.error("[SecondBrain] fileTree failed:", err);
-    } finally {
-      this.secondBrainFileTreeLoading = false;
-    }
-  }
+  // Second Brain file handlers
 
   handleSecondBrainFileSearch(query: string) {
     this.secondBrainFileSearchQuery = query;
@@ -1920,7 +1870,6 @@ export class GodModeApp extends LitElement {
       this.secondBrainFileSearchResults = null;
       return;
     }
-    // Fire search request (simple debounce: last-write-wins)
     void this._doSecondBrainFileSearch(query);
   }
 
@@ -1930,7 +1879,6 @@ export class GodModeApp extends LitElement {
       const result = await this.client.request<{
         results: import("./views/second-brain").BrainSearchResult[];
       }>("secondBrain.search", { query, limit: 50 });
-      // Only update if query hasn't changed during the request
       if (this.secondBrainFileSearchQuery === query) {
         this.secondBrainFileSearchResults = result.results ?? [];
       }
@@ -1960,22 +1908,6 @@ export class GodModeApp extends LitElement {
     }
   }
 
-  handleResearchAddFormToggle() {
-    this.secondBrainResearchAddFormOpen = !this.secondBrainResearchAddFormOpen;
-    if (this.secondBrainResearchAddFormOpen) {
-      this.secondBrainResearchAddForm = { title: "", url: "", category: "", tags: "", notes: "" };
-    }
-  }
-
-  handleResearchAddFormChange(field: string, value: string) {
-    this.secondBrainResearchAddForm = { ...this.secondBrainResearchAddForm, [field]: value };
-  }
-
-  async handleResearchAddSubmit() {
-    const { addResearch } = await import("./controllers/second-brain.js");
-    await addResearch(this);
-  }
-
   async handleResearchSaveViaChat() {
     this.setTab("chat" as import("./navigation").Tab);
     const { createNewSession } = await import("./app-render.helpers.js");
@@ -1992,28 +1924,6 @@ export class GodModeApp extends LitElement {
     void this.handleSendChat(
       "I want to add a new data source to my Second Brain. Help me figure out what I need — whether it's an API integration, a local file sync, or a new skill. Ask me what source I'd like to connect.",
     );
-  }
-
-  // Community Resources handlers
-  async handleCommunityResourceAdd() {
-    const { addCommunityResource } = await import("./controllers/second-brain.js");
-    await addCommunityResource(this);
-  }
-
-  async handleCommunityResourceRemove(id: string) {
-    const { removeCommunityResource } = await import("./controllers/second-brain.js");
-    await removeCommunityResource(this, id);
-  }
-
-  handleCommunityResourceAddFormToggle() {
-    this.secondBrainCommunityResourceAddFormOpen = !this.secondBrainCommunityResourceAddFormOpen;
-    if (this.secondBrainCommunityResourceAddFormOpen) {
-      this.secondBrainCommunityResourceAddForm = { url: "", label: "", description: "", tags: "" };
-    }
-  }
-
-  handleCommunityResourceAddFormChange(field: string, value: string) {
-    this.secondBrainCommunityResourceAddForm = { ...this.secondBrainCommunityResourceAddForm, [field]: value };
   }
 
   removeQueuedMessage(id: string) {

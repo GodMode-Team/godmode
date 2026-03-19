@@ -367,16 +367,7 @@ export async function refreshActiveTab(host: SettingsHost) {
   }
   if (host.tab === "second-brain") {
     const app = host as unknown as GodModeApp;
-    const subtab = (app as unknown as { secondBrainSubtab?: string }).secondBrainSubtab;
-    if (subtab === "intel") {
-      if (typeof app.handleIntelLoad === "function") {
-        await app.handleIntelLoad();
-      }
-    } else if (subtab === "files") {
-      if (typeof app.handleSecondBrainFileTreeRefresh === "function") {
-        await app.handleSecondBrainFileTreeRefresh();
-      }
-    } else if (typeof app.handleSecondBrainRefresh === "function") {
+    if (typeof app.handleSecondBrainRefresh === "function") {
       await app.handleSecondBrainRefresh();
     }
   }

@@ -6,7 +6,7 @@ import { syncUrlWithSessionKey } from "./app-settings";
 import type { AppViewState } from "./app-view-state";
 import { exportConversationAsMarkdown } from "./chat/export-conversation";
 import { loadChatHistory } from "./controllers/chat";
-import { loadSessions } from "./controllers/sessions";
+import { autoTitleCache, loadSessions } from "./controllers/sessions";
 import { formatAgoShort } from "./format";
 import { icons } from "./icons";
 import { emojiForTab, pathForTab, titleForTab, type Tab } from "./navigation";
@@ -643,7 +643,7 @@ function renderSessionPickerDropdown(state: AppViewState) {
     <div class="session-picker-item" @click=${() => handleSessionClick(s.key)}>
       <span class="session-picker-item__status ${s.isActive ? "active" : ""}"></span>
       <div class="session-picker-item__content">
-        <div class="session-picker-item__name">${s.label ?? s.displayName ?? s.key}</div>
+        <div class="session-picker-item__name">${s.label ?? s.displayName ?? autoTitleCache.get(s.key) ?? s.key}</div>
       </div>
       <div class="session-picker-item__actions">
         ${

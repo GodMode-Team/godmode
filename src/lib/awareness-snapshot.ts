@@ -278,22 +278,29 @@ export async function generateSnapshot(): Promise<string> {
     // No agent log today — skip
   }
 
-  // Trust scores (top workflow scores for autonomy awareness)
+  // Trust scores (computed from ratings, not stored on workflow entries)
   try {
-    const trustPath = join(DATA_DIR, "trust-tracker.json");
-    const trustRaw = await readFile(trustPath, "utf-8");
-    const trustData = JSON.parse(trustRaw) as {
-      workflows?: Array<{ name: string; score: number }>;
-    };
-    if (trustData.workflows && trustData.workflows.length > 0) {
-      const sorted = [...trustData.workflows].sort((a, b) => b.score - a.score);
-      lines.push(`## Trust`);
+    const { readTrustState, computeTrustSummary } = await import("../methods/trust-tracker.js");
+    const trustState = await readTrustState();
+    const summaries = computeTrustSummary(trustState, 30);
+    const scored = summaries.filter((s: { trustScore: number | null }) => s.trustScore !== null);
+    if (scored.length > 0) {
+      const sorted = scored.sort((a: { trustScore: number | null }, b: { trustScore: number | null }) => (b.trustScore ?? 0) - (a.trustScore ?? 0));
+      lines.push("## Trust");
       if (sorted.length === 1) {
-        lines.push(`- 1 workflow tracked: ${sorted[0].name} (${sorted[0].score.toFixed(1)}/10).`);
+        lines.push(`- 1 workflow tracked: ${sorted[0].workflow} (${sorted[0].trustScore}/10).`);
       } else {
-        const highest = sorted[0];
-        const lowest = sorted[sorted.length - 1];
-        lines.push(`- ${sorted.length} workflows tracked. Highest: ${highest.name} (${highest.score.toFixed(1)}/10). Lowest: ${lowest.name} (${lowest.score.toFixed(1)}/10).`);
+        lines.push(`- ${sorted.length} workflows tracked. Highest: ${sorted[0].workflow} (${sorted[0].trustScore}/10). Lowest: ${sorted[sorted.length - 1].workflow} (${sorted[sorted.length - 1].trustScore}/10).`);
+      }
+      // Surface optimization opportunities
+      const needsWork = scored.filter((s: { trustScore: number | null; workflow: string }) =>
+        (s.trustScore ?? 10) < 7 && (trustState.workflowFeedback[s.workflow]?.length ?? 0) >= 2,
+      );
+      if (needsWork.length > 0) {
+        lines.push("## Optimization Opportunities");
+        for (const w of needsWork) {
+          lines.push(`- "${w.workflow}" at ${w.trustScore}/10 with ${trustState.workflowFeedback[w.workflow]?.length ?? 0} feedback items. Consider running optimization.`);
+        }
       }
     }
   } catch {

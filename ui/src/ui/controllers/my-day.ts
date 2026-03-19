@@ -8,6 +8,15 @@ import type { GatewayBrowserClient } from "../gateway";
 import type { AgentLogData, DailyBriefData, DecisionCardItem } from "../views/my-day";
 import type { WorkspaceTask } from "../views/workspaces";
 
+export type TrustSummaryData = {
+  overallScore: number | null;
+  dailyStreak: number;
+  todayRated: boolean;
+  workflowCount: number;
+  highPerformers: number;
+  needsAttention: number;
+};
+
 export type MyDayState = {
   client: GatewayBrowserClient | null;
   connected: boolean;
@@ -29,6 +38,8 @@ export type MyDayState = {
   // Today's tasks
   todayTasks?: WorkspaceTask[];
   todayTasksLoading?: boolean;
+  // Trust summary
+  trustSummary?: TrustSummaryData | null;
   // Inbox
   inboxItems?: Array<{
     id: string;
@@ -338,6 +349,33 @@ export async function loadInboxItems(state: MyDayState): Promise<void> {
   }
 }
 
+// ── Trust Summary ────────────────────────────────────────────────
+
+export async function loadTrustSummary(state: MyDayState): Promise<void> {
+  if (!state.client || !state.connected) return;
+  try {
+    const res = await state.client.request<{
+      overallScore: number | null;
+      dailyStreak: number;
+      todayRating: { rating: number } | null;
+      summaries: Array<{ trustScore: number | null }>;
+      workflows: string[];
+    }>("trust.dashboard", {});
+
+    const scored = res.summaries.filter((s) => s.trustScore !== null);
+    state.trustSummary = {
+      overallScore: res.overallScore,
+      dailyStreak: res.dailyStreak,
+      todayRated: res.todayRating !== null,
+      workflowCount: res.workflows.length,
+      highPerformers: scored.filter((s) => (s.trustScore ?? 0) >= 8).length,
+      needsAttention: scored.filter((s) => (s.trustScore ?? 10) < 7).length,
+    };
+  } catch {
+    state.trustSummary = null;
+  }
+}
+
 // ── Overnight Decision Cards ─────────────────────────────────────
 
 type QueueResultItem = {
@@ -496,17 +534,19 @@ export async function loadMyDay(state: MyDayState) {
     withTimeout(loadAgentLog(state.client, date, { refresh: false }), 10_000, "Agent Log"),
     withTimeout(loadTodayTasksWithQueueStatus(state), 8_000, "Today Tasks"),
     withTimeout(loadInboxItems(state), 5_000, "Inbox"),
+    withTimeout(loadTrustSummary(state), 5_000, "Trust Summary"),
   ]);
 
   state.dailyBrief = results[0].status === "fulfilled" ? results[0].value : null;
   state.agentLog = results[2].status === "fulfilled" ? results[2].value : null;
   // todayTasks is set inside loadTodayTasks — no extra assignment needed
+  // trustSummary is set inside loadTrustSummary
 
   // Task sync removed (F3 decoupling) — page loads no longer trigger task imports.
   // syncTasksFromBrief runs once per day via morning set or manual invocation.
 
   // Log failures but don't block the page
-  const labels = ["Brief", "Brief Notes", "Agent Log", "Today Tasks", "Inbox"];
+  const labels = ["Brief", "Brief Notes", "Agent Log", "Today Tasks", "Inbox", "Trust"];
   const failures = results
     .map((r, i) => (r.status === "rejected" ? { section: labels[i], reason: r.reason } : null))
     .filter(Boolean);

@@ -93,57 +93,6 @@
   gap: 0.75rem;
 }
 
-/* ── Hero block (Identity OS) ───────────────────────────────────── */
-
-.second-brain-hero {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  padding: 1.25rem 1.5rem;
-  background: linear-gradient(135deg, rgba(255, 107, 107, 0.12) 0%, rgba(20, 184, 166, 0.08) 100%);
-  border: 1px solid var(--accent);
-  border-radius: var(--radius-md, 8px);
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.second-brain-hero:hover {
-  background: linear-gradient(135deg, rgba(255, 107, 107, 0.2) 0%, rgba(20, 184, 166, 0.12) 100%);
-  box-shadow: 0 0 20px rgba(255, 107, 107, 0.15);
-}
-
-.second-brain-hero-content {
-  flex: 1;
-}
-
-.second-brain-hero-badge {
-  font-size: 0.5625rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
-  color: var(--accent);
-  margin-bottom: 0.375rem;
-}
-
-.second-brain-hero-title {
-  font-size: 1.25rem;
-  font-weight: 700;
-  color: var(--text-strong);
-  margin-bottom: 0.25rem;
-}
-
-.second-brain-hero-desc {
-  font-size: 0.8125rem;
-  color: var(--muted);
-  line-height: 1.4;
-}
-
-.second-brain-hero-arrow {
-  font-size: 1.5rem;
-  color: var(--accent);
-  flex-shrink: 0;
-}
-
 /* ── Cards ──────────────────────────────────────────────────────── */
 
 .second-brain-card {
@@ -724,70 +673,6 @@
   align-items: center;
 }
 
-.second-brain-research-add-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.25rem;
-  padding: 0.375rem 0.75rem;
-  background: var(--accent-subtle);
-  color: var(--accent);
-  border: 1px solid var(--accent);
-  border-radius: var(--radius-sm, 6px);
-  font-size: 0.75rem;
-  font-weight: 500;
-  cursor: pointer;
-  font-family: var(--font-body);
-  transition: all 0.15s ease;
-  white-space: nowrap;
-  flex-shrink: 0;
-}
-
-.second-brain-research-add-btn:hover {
-  background: var(--accent);
-  color: var(--primary-foreground);
-}
-
-.second-brain-research-form {
-  display: flex;
-  flex-direction: column;
-  gap: 0.625rem;
-  padding: 1rem 1.25rem;
-  background: var(--card);
-  border: 1px solid var(--accent);
-  border-radius: var(--radius-md, 8px);
-}
-
-.second-brain-research-form-row {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-}
-
-.second-brain-research-form-label {
-  font-size: 0.6875rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--muted);
-}
-
-.second-brain-research-form-textarea {
-  padding: 0.5rem 0.75rem;
-  background: var(--bg-elevated);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm, 6px);
-  color: var(--text);
-  font-size: 0.8125rem;
-  font-family: var(--font-body);
-  outline: none;
-  transition: border-color 0.15s ease;
-  resize: vertical;
-  min-height: 80px;
-}
-
-.second-brain-research-form-textarea:focus {
-  border-color: var(--accent);
-}
 
 .second-brain-research-url {
   font-size: 0.625rem;
@@ -828,10 +713,6 @@
     text-align: center;
     padding: 0.5rem 0.375rem;
     font-size: 0.75rem;
-  }
-
-  .second-brain-hero {
-    padding: 1rem;
   }
 
   .second-brain-sync-bar {
@@ -994,47 +875,31 @@
   line-height: 1.4;
 }
 
-/* ── Context Health Score ────────────────────────────────────── */
+/* ── Context Health Row ─────────────────────────────────────── */
 
-.sb-health-score {
-  padding: 10px 16px;
+.context-health-row {
   display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.sb-health-score-bar {
-  height: 6px;
-  background: var(--border, #e5e7eb);
-  border-radius: 3px;
-  overflow: hidden;
-}
-
-.sb-health-score-fill {
-  height: 100%;
-  background: linear-gradient(90deg, #3b82f6, #22c55e);
-  border-radius: 3px;
-  transition: width 0.5s ease;
-}
-
-.sb-health-score-info {
-  display: flex;
-  justify-content: space-between;
   align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md, 8px);
+  font-size: 0.8125rem;
+  color: var(--text);
 }
 
-.sb-health-score-label {
-  font-size: 11px;
+.context-health-row .health-label {
   font-weight: 600;
-  color: var(--text, #111);
+  font-size: 0.6875rem;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+  flex-shrink: 0;
 }
 
-.sb-health-score-tip {
-  font-size: 11px;
-  color: var(--muted, #6b7280);
-  font-style: italic;
+.context-health-row .health-value {
+  font-weight: 500;
 }
 
 /* ── Chat Button ────────────────────────────────────────────── */

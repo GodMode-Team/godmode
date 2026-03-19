@@ -183,11 +183,15 @@ export async function loadChatHistoryAfterFinal(
   // Clear the stream now that server history is loaded.
   state.chatStream = null;
 
-  if (
-    !opts?.allowShrink &&
-    snapshotLen > 0 &&
-    state.chatMessages.length < snapshotLen
-  ) {
+  // Floor guard: if the server returned fewer messages OR the last user
+  // message was lost (optimistic message replaced by server data that
+  // doesn't include it), restore the snapshot and retry after a delay.
+  const shouldRestore = !opts?.allowShrink && snapshotLen > 0 && (
+    state.chatMessages.length < snapshotLen ||
+    lastUserMessageLost(snapshot, state.chatMessages)
+  );
+
+  if (shouldRestore) {
     state.chatMessages = snapshot;
     // Retry once after a short delay — the file may still be flushing
     setTimeout(() => {
@@ -197,6 +201,37 @@ export async function loadChatHistoryAfterFinal(
       });
     }, 2000);
   }
+}
+
+/**
+ * Check whether the last user message from the snapshot is missing in the
+ * server history. This catches a race where loadChatHistory returns the
+ * same message count but the optimistic user message was replaced by a
+ * different message (e.g. an assistant response from a stale run).
+ */
+function lastUserMessageLost(
+  snapshot: unknown[],
+  serverMessages: unknown[],
+): boolean {
+  // Find the last user message in the snapshot
+  const lastUserIdx = findLastIndex(snapshot, (m: any) => m?.role === "user");
+  if (lastUserIdx === -1) return false;
+
+  const lastUser = snapshot[lastUserIdx] as Record<string, unknown>;
+  const ts = lastUser.timestamp;
+  if (typeof ts !== "number") return false;
+
+  // Check if any user message in the server history has the same timestamp
+  return !serverMessages.some(
+    (m: any) => m?.role === "user" && m?.timestamp === ts,
+  );
+}
+
+function findLastIndex<T>(arr: T[], predicate: (item: T) => boolean): number {
+  for (let i = arr.length - 1; i >= 0; i--) {
+    if (predicate(arr[i])) return i;
+  }
+  return -1;
 }
 
 function dataUrlToBase64(dataUrl: string): { content: string; mimeType: string } | null {
@@ -449,6 +484,13 @@ export function handleChatEvent(state: ChatState, payload?: ChatEventPayload) {
   // See https://github.com/openclaw/openclaw/issues/1909
   if (payload.runId && state.chatRunId && payload.runId !== state.chatRunId) {
     if (payload.state === "final") {
+      // Don't trigger history reload while the user's current run is actively
+      // streaming — loadChatHistoryAfterFinal would replace the optimistic user
+      // message with server history that may not include it yet (race condition).
+      // The user's own "final" will reload history when the stream ends.
+      if (state.chatStream !== null) {
+        return null;
+      }
       return "final";
     }
     return null;

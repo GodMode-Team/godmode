@@ -298,6 +298,17 @@ export function assembleWorkspaceContext(inputs: Partial<ContextInputs>): string
   if (inputs.teamStatus) chunks.push(inputs.teamStatus);
   if (inputs.routingLessons) chunks.push(inputs.routingLessons);
 
+  // Trust rating protocol — Hermes doesn't have lifecycle hooks,
+  // so the agent needs a prompt-level instruction to self-rate.
+  chunks.push(
+    "## Trust Rating Protocol\n" +
+    "After completing a task that matches a tracked workflow, call `trust_rate` with:\n" +
+    "- workflow: the workflow name\n" +
+    "- rating: your honest 1-10 assessment\n" +
+    "- note: brief note on what went well or poorly\n" +
+    "If the trust score drops below 7, ask the user what could be improved.",
+  );
+
   if (chunks.length === 0) return "";
 
   return (
