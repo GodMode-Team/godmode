@@ -15,8 +15,9 @@
  */
 
 import { createServer, type Server as HttpServer, type IncomingMessage, type ServerResponse } from "node:http";
-import { existsSync, createReadStream, statSync } from "node:fs";
+import { existsSync, createReadStream, readFileSync, statSync } from "node:fs";
 import { join, extname } from "node:path";
+import { homedir } from "node:os";
 import type {
   HostAdapter,
   HostCapabilities,
@@ -402,6 +403,22 @@ export class HermesAdapter implements HostAdapter {
         runtime: "hermes",
         tools: this.mcpServer.getToolDefinitions().length,
       });
+    });
+
+    // Active model — UI model pill reads this
+    this.wsServer.registerMethod("godmode.config.model", async ({ respond }) => {
+      try {
+        const cfgPath = join(homedir(), ".openclaw", "openclaw.json");
+        if (existsSync(cfgPath)) {
+          const raw = JSON.parse(readFileSync(cfgPath, "utf-8"));
+          const primary = raw?.agents?.defaults?.model?.primary ?? raw?.defaults?.model?.primary ?? null;
+          respond(true, { primary });
+        } else {
+          respond(true, { primary: null });
+        }
+      } catch {
+        respond(true, { primary: null });
+      }
     });
   }
 }
