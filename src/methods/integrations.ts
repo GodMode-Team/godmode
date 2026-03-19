@@ -279,8 +279,23 @@ const autoInstall: GatewayRequestHandler = async ({ params, respond }) => {
 
       // Step 3: Authenticate with Google (needs email)
       if (email) {
+        const gogPass = process.env.GOG_KEYRING_PASSWORD;
+        if (!gogPass) {
+          steps.push({
+            step: "Set GOG_KEYRING_PASSWORD env var",
+            status: "error",
+            detail: "Required for gog keyring. Add to ~/godmode/.env",
+          });
+          respond(true, { success: false, steps });
+          return;
+        }
+        // Validate email format to prevent shell injection
+        if (!/^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$/.test(email)) {
+          steps.push({ step: "Invalid email format", status: "error" });
+          respond(true, { success: false, steps });
+          return;
+        }
         const client = "godmode";
-        const gogPass = process.env.GOG_KEYRING_PASSWORD || "godmode2026";
         const envPrefix = process.platform === "darwin" ? `GOG_KEYRING_PASSWORD=${gogPass} ` : "";
         const { code, stdout, stderr } = await runShell(
           `${envPrefix}gog auth add ${email} --services calendar --client ${client} 2>&1`,

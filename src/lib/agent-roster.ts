@@ -18,6 +18,7 @@ import { getVaultPath, VAULT_FOLDERS } from "./vault-paths.js";
 import type { QueueItemType } from "./queue-state.js";
 import type { OnboardingState } from "../methods/onboarding-types.js";
 import { loadSkillCards, type SkillCard } from "./skill-cards.js";
+import { sanitizeForPrompt } from "./prompt-sanitizer.js";
 
 // ── Types ────────────────────────────────────────────────────────
 
@@ -386,14 +387,14 @@ export function resolvePersona(
 export function formatHandoff(ctx: HandoffContext): string {
   return [
     "## Handoff from Previous Agent",
-    `**From:** ${ctx.fromAgent}`,
+    `**From:** ${sanitizeForPrompt(ctx.fromAgent, "handoff.fromAgent")}`,
     `**Task ID:** ${ctx.fromTaskId}`,
     "",
     "### Summary",
-    ctx.summary,
+    sanitizeForPrompt(ctx.summary, "handoff.summary"),
     "",
     "### Deliverable Expected",
-    ctx.deliverable,
+    sanitizeForPrompt(ctx.deliverable, "handoff.deliverable"),
   ].join("\n");
 }
 

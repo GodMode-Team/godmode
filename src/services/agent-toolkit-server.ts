@@ -47,7 +47,7 @@ export type AgentTokenMeta = {
   expiresAt: number;
 };
 
-const TOKEN_TTL_MS = 4 * 60 * 60 * 1000; // 4 hours
+const TOKEN_TTL_MS = 45 * 60 * 1000; // 45 min (agent timeout is 30 min)
 const tokens = new Map<string, AgentTokenMeta>();
 
 export function registerAgentToken(
@@ -204,8 +204,10 @@ function appendCheckpoint(checkpoint: Record<string, unknown>): void {
 // ── Request handler ─────────────────────────────────────────────────
 
 async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse): Promise<void> {
-  // CORS
-  res.setHeader("Access-Control-Allow-Origin", "*");
+  // CORS — restrict to localhost origins only
+  const origin = req.headers.origin ?? "";
+  const isLocalOrigin = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin);
+  res.setHeader("Access-Control-Allow-Origin", isLocalOrigin ? origin : "http://localhost");
   res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Authorization, Content-Type");
   if (req.method === "OPTIONS") {

@@ -20,6 +20,8 @@ import {
   type QueueItem,
   type QueueItemType,
 } from "../lib/queue-state.js";
+import { audit } from "../lib/audit-log.js";
+import { sanitizeForPrompt } from "../lib/prompt-sanitizer.js";
 import { resolvePersona, formatHandoff } from "../lib/agent-roster.js";
 import { resolveIdentityDir, getVaultPath, VAULT_FOLDERS } from "../lib/vault-paths.js";
 import {
@@ -296,6 +298,14 @@ class QueueProcessor {
       });
 
       const pid = child.pid;
+      audit("agent.spawn", {
+        itemId: item.id,
+        title: item.title,
+        type: item.type,
+        engine: item.engine ?? "claude",
+        pid,
+        persona: item.assignedTo ?? "default",
+      });
 
       // Store PID in queue state for liveness checks
       if (pid) {
@@ -357,6 +367,12 @@ class QueueProcessor {
         exited = true;
         clearTimeout(killTimer);
         livenessChecks.forEach(clearTimeout);
+        audit(code === 0 ? "agent.complete" : "agent.fail", {
+          itemId: item.id,
+          title: item.title,
+          exitCode: code,
+          pid,
+        });
         this.logger.info(
           `[GodMode][Queue] Agent for item ${item.id} exited (code=${code})`,
         );
@@ -1104,9 +1120,9 @@ class QueueProcessor {
 
     // Type-specific body
     let body = PROMPT_TEMPLATES[item.type] ?? PROMPT_TEMPLATES.task;
-    body = body.replace("{title}", item.title);
-    body = body.replace("{description}", item.description ?? "");
-    body = body.replace("{url}", item.url ?? "");
+    body = body.replace("{title}", sanitizeForPrompt(item.title, "title"));
+    body = body.replace("{description}", sanitizeForPrompt(item.description ?? "", "description"));
+    body = body.replace("{url}", sanitizeForPrompt(item.url ?? "", "url"));
 
     // Guardrails context
     let guardrailsBlock = "";

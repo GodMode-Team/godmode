@@ -138,6 +138,31 @@ export async function runGatewayStart(
     logger.warn(`[GodMode] Failed to load workspace .env: ${String(err)}`);
   }
 
+  // ── Auto-generate security secrets if not set ─────────────────────
+  // On first run (or fresh install), generate secrets and append to ~/godmode/.env
+  try {
+    const { randomBytes } = await import("node:crypto");
+    const { appendFile } = await import("node:fs/promises");
+    const godmodeEnvPath = join(
+      process.env.GODMODE_ROOT || join(process.env.HOME || process.env.USERPROFILE || "", "godmode"),
+      ".env",
+    );
+    const secrets: { key: string; label: string }[] = [
+      { key: "GODMODE_WEBHOOK_SECRET", label: "Webhook HMAC signing secret" },
+      { key: "GOG_KEYRING_PASSWORD", label: "gog CLI keyring password" },
+    ];
+    for (const { key, label } of secrets) {
+      if (!process.env[key]) {
+        const generated = randomBytes(32).toString("hex");
+        process.env[key] = generated;
+        await appendFile(godmodeEnvPath, `\n# ${label} (auto-generated)\n${key}=${generated}\n`);
+        logger.info(`[GodMode] Auto-generated ${key} and saved to .env`);
+      }
+    }
+  } catch (err) {
+    logger.warn(`[GodMode] Failed to auto-generate secrets: ${String(err)}`);
+  }
+
   // Drain stale cleanup from a previous gateway cycle
   if (serviceCleanup.length > 0) {
     logger.warn(`[GodMode] Draining ${serviceCleanup.length} stale service cleanup(s) from previous cycle`);

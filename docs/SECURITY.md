@@ -106,9 +106,50 @@ GodMode relies on OS-level full-disk encryption (FileVault on macOS, LUKS on Lin
 
 ### Agent Delegation Safety
 
-- Agent sub-processes run with `--dangerously-skip-permissions` (inherent to the queue system)
+- **Known risk:** Agent sub-processes run with `--dangerously-skip-permissions` (Claude CLI) / `--dangerously-bypass-approvals-and-sandbox` (Codex). This is inherent to detached CLI agent execution — they cannot answer interactive permission prompts. Mitigation:
+  - Queue items require user approval before execution
+  - Safety gates (`before_tool_call`) block dangerous exec patterns
+  - ClawdStrike egress policy limits network access
+  - Agents run with minimal env vars (no API keys forwarded)
+  - Trust scores track agent quality; low scores trigger review
 - Review queue items before approval — the ally scopes tasks, you approve execution
-- Trust scores track agent quality; low scores trigger improvement feedback loops
+- **Toolkit tokens:** Agents receive short-lived Bearer tokens (45-min TTL) for the toolkit API. Tokens are workspace-scoped, rate-limited (60 req/min), and automatically revoked on agent completion.
+
+### Queue Prompt Sanitization
+
+- User-provided queue item fields (title, description, URL, handoff) are sanitized before interpolation into agent prompts
+- Strips: XML injection tags (`<system>`, `<instructions>`), fake authority headers (`## System`, `## Admin`), classic override phrases (`ignore previous instructions`, `you are now`)
+- Sanitization happens at prompt-build time — stored queue data retains the original text
+- Sanitization events are logged to the audit trail
+
+### Webhook Security
+
+- Webhook endpoints (`/godmode/webhooks/*`) require HMAC-SHA256 signature verification
+- Set `GODMODE_WEBHOOK_SECRET` env var — auto-generated on first boot if not set
+- Required headers:
+  - `X-Webhook-Signature: sha256=<hmac hex of timestamp.body>`
+  - `X-Webhook-Timestamp: <unix seconds>`
+- HMAC is computed over `timestamp + "." + body` (binds timestamp to signature)
+- Requests older than 5 minutes are rejected (replay protection)
+- Duplicate signatures are rejected (nonce tracking)
+- Signatures use timing-safe comparison to prevent timing attacks
+
+### Rate Limiting
+
+- All HTTP endpoints are rate-limited to 60 requests per minute per IP
+- Toolkit server has per-token rate limiting (60 req/min per agent)
+
+### Audit Trail
+
+- Security events logged to `~/godmode/data/audit-log.jsonl` (append-only JSONL)
+- Events tracked: agent spawns/completions/failures, webhook accepts/rejects, rate limit hits, prompt sanitization
+- Designed for post-incident review — never blocks operations
+
+### Auto-Generated Secrets
+
+- `GODMODE_WEBHOOK_SECRET` and `GOG_KEYRING_PASSWORD` are auto-generated on first gateway boot
+- Saved to `~/godmode/.env` automatically
+- No hardcoded fallbacks — missing secrets cause graceful failures, not insecure defaults
 
 ### Updating
 
