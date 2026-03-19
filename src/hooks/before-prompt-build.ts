@@ -328,6 +328,31 @@ export async function handleBeforePromptBuild(
     } catch { /* non-fatal */ }
   }
 
+  // P2: Paperclip deliverables pending review — check inbox for unreviewed agent completions
+  if (!lightMode) {
+    try {
+      const { listInboxItems } = await import("../services/inbox.js");
+      const inbox = await listInboxItems({ status: "pending", limit: 10 });
+      const pending = inbox.items.filter(
+        (i) => i.status === "pending" && i.source?.persona === "paperclip",
+      );
+      if (pending.length > 0) {
+        const deliverableLines = pending.slice(0, 5).map(
+          (i) => `- "${i.title}" → ${i.outputPath || "inbox"}`,
+        );
+        const block =
+          `## Deliverables Ready (${pending.length})\n` +
+          `Paperclip agents completed work that needs your review:\n` +
+          deliverableLines.join("\n") +
+          `\n\nPresent each deliverable to the user. Read the output file, summarize key findings, ` +
+          `and ask for approval or edits. The file can be opened in the sidebar for detailed review. ` +
+          `After the user reviews, mark the inbox item as reviewed.`;
+        // Append to teamStatus or create new
+        teamStatus = teamStatus ? teamStatus + "\n\n" + block : block;
+      }
+    } catch { /* non-fatal */ }
+  }
+
   // Extract user message for skill card + routing lesson matching
   let currentUserMessage = "";
   let isFirstTurn = false;
