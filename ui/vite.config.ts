@@ -13,7 +13,7 @@ function normalizeBase(input: string): string {
 }
 
 export default defineConfig(({ command }) => {
-  const envBase = process.env.CLAWDBOT_CONTROL_UI_BASE_PATH?.trim();
+  const envBase = (process.env.OPENCLAW_CONTROL_UI_BASE_PATH || process.env.CLAWDBOT_CONTROL_UI_BASE_PATH)?.trim();
   const base = envBase ? normalizeBase(envBase) : "./";
   const isDev = command === "serve";
   const gwPort = process.env.GODMODE_DEV_GATEWAY_PORT || "18789";

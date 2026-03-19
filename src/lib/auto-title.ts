@@ -125,7 +125,10 @@ export async function generateSessionTitle(
     };
 
     const raw = data.content?.find((c) => c.type === "text")?.text?.trim();
-    if (!raw || raw.length < 3 || raw.length > 60) return null;
+    if (!raw || raw.length < 3 || raw.length > 60) {
+      console.warn(`[GodMode][AutoTitle] LLM returned invalid title: "${raw ?? "(empty)}"} (len=${raw?.length ?? 0})`);
+      return null;
+    }
 
     // Strip any quotes or "Title:" prefix the model might add despite instructions
     const title = raw
@@ -141,7 +144,8 @@ export async function generateSessionTitle(
     if (TITLE_BLOCKLIST.has(title.toLowerCase())) return null;
 
     return title || null;
-  } catch {
+  } catch (err) {
+    console.warn(`[GodMode][AutoTitle] Title generation failed: ${String(err)}`);
     return null;
   }
 }

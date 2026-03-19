@@ -12,6 +12,11 @@ export type AssistantIdentity = {
 
 declare global {
   interface Window {
+    __OPENCLAW_ASSISTANT_NAME__?: string;
+    __OPENCLAW_ASSISTANT_AVATAR__?: string;
+    __OPENCLAW_USER_NAME__?: string;
+    __OPENCLAW_USER_AVATAR__?: string;
+    // Legacy aliases (deprecated — remove after next release cycle)
     __CLAWDBOT_ASSISTANT_NAME__?: string;
     __CLAWDBOT_ASSISTANT_AVATAR__?: string;
     __CLAWDBOT_USER_NAME__?: string;
@@ -48,8 +53,8 @@ export function resolveInjectedAssistantIdentity(): AssistantIdentity {
     return normalizeAssistantIdentity({});
   }
   return normalizeAssistantIdentity({
-    name: window.__CLAWDBOT_ASSISTANT_NAME__,
-    avatar: window.__CLAWDBOT_ASSISTANT_AVATAR__,
+    name: window.__OPENCLAW_ASSISTANT_NAME__ || window.__CLAWDBOT_ASSISTANT_NAME__,
+    avatar: window.__OPENCLAW_ASSISTANT_AVATAR__ || window.__CLAWDBOT_ASSISTANT_AVATAR__,
   });
 }
 
@@ -73,7 +78,7 @@ export function resolveInjectedUserIdentity(): UserIdentity {
     return normalizeUserIdentity({});
   }
   return normalizeUserIdentity({
-    name: window.__CLAWDBOT_USER_NAME__,
-    avatar: window.__CLAWDBOT_USER_AVATAR__,
+    name: window.__OPENCLAW_USER_NAME__ || window.__CLAWDBOT_USER_NAME__,
+    avatar: window.__OPENCLAW_USER_AVATAR__ || window.__CLAWDBOT_USER_AVATAR__,
   });
 }

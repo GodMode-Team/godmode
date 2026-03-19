@@ -253,9 +253,10 @@ export async function handleMessageReceived(
 
     // Auto-title: buffer the user message for before_prompt_build to pick up.
     // message_received fires immediately before before_prompt_build in the same tick.
-    if (content.length >= 10) {
-      lastReceivedMessage = { content, capturedAt: Date.now() };
-    }
+    // Always update the buffer (even for short messages) to prevent stale cross-session leaks.
+    lastReceivedMessage = content.length >= 10
+      ? { content, capturedAt: Date.now() }
+      : null;
 
     // Honcho: forward user message (fire and forget)
     if (sessionKey) {

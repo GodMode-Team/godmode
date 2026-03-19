@@ -372,7 +372,7 @@ export async function handleBeforePromptBuild(
   // On the first turn, event.messages is empty — pull from lastReceivedMessage
   // populated by message_received (which fires immediately before this hook).
   if (!currentUserMessage && sessionKey && lastReceivedMessage) {
-    if (Date.now() - lastReceivedMessage.capturedAt < 5_000) {
+    if (Date.now() - lastReceivedMessage.capturedAt < 30_000) {
       currentUserMessage = lastReceivedMessage.content;
     }
   }
