@@ -16,9 +16,10 @@ export interface CliDeps {
   licenseKey: string | undefined;
   godmodeUiRoot: string | undefined;
   methodCount: number;
-  api: any;
+  api: { logger: { info: (msg: string) => void; warn: (msg: string) => void }; pluginConfig?: Record<string, unknown> };
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Commander-style program API has deeply chained return types
 export function registerCliCommands(deps: CliDeps) {
   return ({ program }: { program: any }) => {
     const godmode = program.command("godmode").description("GodMode commands");

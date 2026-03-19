@@ -29,6 +29,7 @@ import {
   extractArtifacts as extractArtifactsShared,
   type EvidenceResult as SharedEvidenceResult,
 } from "../lib/evidence.js";
+import { reportConnected, reportDegraded } from "../lib/service-health.js";
 
 // ── Prompt Templates ───────────────────────────────────────────────
 
@@ -215,7 +216,7 @@ class QueueProcessor {
       // "approval" and "full" both allow spawning; the difference is in
       // post-completion handling (auto-approve vs manual review)
     } catch {
-      // Trust tracker not available — proceed (default: allow)
+      reportDegraded("queue", "Trust tracker unavailable during queue dispatch");
     }
 
     // Link a session to the source task so opening the task always hits the
@@ -466,6 +467,7 @@ class QueueProcessor {
       summary = lines.join(" ").slice(0, 500);
       artifacts = extractArtifacts(outputContent);
     } catch {
+      reportDegraded("queue", "Agent output file missing after completion");
       summary = "Output file not found — agent may have completed without writing results.";
     }
 
@@ -574,7 +576,7 @@ class QueueProcessor {
           return;
         }
       } catch {
-        // Trust tracker not available — fall through to manual review
+        reportDegraded("queue", "Trust tracker unavailable for auto-approve check");
       }
     }
 

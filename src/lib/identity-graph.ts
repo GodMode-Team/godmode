@@ -13,6 +13,7 @@
 
 import Database from "better-sqlite3";
 import { join } from "node:path";
+import { reportConnected, reportDegraded } from "./service-health.js";
 import { DATA_DIR } from "../data-paths.js";
 import { resolveAnthropicKey, fetchWithTimeout } from "./anthropic-auth.js";
 import { getOwnerName } from "./ally-identity.js";
@@ -49,8 +50,10 @@ export function initIdentityGraph(): void {
       CREATE INDEX IF NOT EXISTS idx_edges_src ON edges(src);
       CREATE INDEX IF NOT EXISTS idx_edges_dst ON edges(dst);
     `);
+    reportConnected("identity-graph");
   } catch (err) {
     console.warn(`[Identity Graph] Init failed: ${String(err)}`);
+    reportDegraded("identity-graph", "SQLite init failed", "Check ~/godmode/data/ permissions");
     db = null;
   }
 }
@@ -205,7 +208,7 @@ ${truncated}`,
       }
     }
   } catch {
-    // Extraction failure is invisible
+    reportDegraded("identity-graph", "Entity extraction failed", "Check ANTHROPIC_API_KEY");
   }
 }
 

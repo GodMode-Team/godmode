@@ -19,6 +19,7 @@ import { writeSentinel, consumeSentinel } from "../lib/restart-sentinel.js";
 type Logger = { warn: (msg: string) => void; info: (msg: string) => void; error: (msg: string) => void };
 type CleanupEntry = { name: string; fn: () => void | Promise<void> };
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- accepts both OpenClawPluginApi and Hermes adapter shim
 export async function runGatewayStart(
   api: any,
   pluginVersion: string,
@@ -32,7 +33,7 @@ export async function runGatewayStart(
   // If another copy of GodMode is already loaded in this process, refuse
   // to double-register. This prevents the catastrophic silent-death bug
   // where duplicate plugins cause re-registration on every message.
-  const g = globalThis as any;
+  const g = globalThis as Record<string, unknown>;
   if (g.__godmodeInstanceId) {
     logger.error(
       `[GodMode] FATAL: Duplicate plugin detected! Instance already loaded from "${g.__godmodeInstanceId}". ` +
@@ -497,7 +498,7 @@ export async function runGatewayStop(
   }
 
   // Clear duplicate guard so a fresh instance can claim the slot
-  delete (globalThis as any).__godmodeInstanceId;
+  delete (globalThis as Record<string, unknown>).__godmodeInstanceId;
 
   logger.info(`[GodMode] Gateway stopping — cleaning up ${serviceCleanup.length} service(s)`);
   let cleaned = 0;

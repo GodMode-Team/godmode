@@ -16,6 +16,19 @@ import {
   resetContextPressure,
 } from "./safety-gates.js";
 import { checkCustomGuardrails, logGateActivity } from "../services/guardrails.js";
+import type {
+  MessageReceivedEvent,
+  MessageSendingEvent,
+  BeforeToolCallEvent,
+  LlmOutputEvent,
+  AfterToolCallEvent,
+  BeforeResetEvent,
+  AfterCompactionEvent,
+  HookContext,
+  ResourceRegistry,
+  ResourceEntry,
+} from "../types/plugin-api.js";
+import type { OpenClawPluginApi } from "openclaw/plugin-sdk";
 import {
   pendingAutoTitles,
   titledSessions,
@@ -164,9 +177,9 @@ function interceptApiError(content: string): string | null {
 // ── message_received ──────────────────────────────────────────────────
 
 export async function handleMessageReceived(
-  event: any,
-  ctx: any,
-  api: any,
+  event: MessageReceivedEvent,
+  ctx: HookContext,
+  api: OpenClawPluginApi,
 ): Promise<void> {
   const logger: Logger = api.logger;
   const sessionKey = extractSessionKey(ctx);
@@ -257,9 +270,9 @@ export async function handleMessageReceived(
 // ── before_reset ──────────────────────────────────────────────────────
 
 export async function handleBeforeReset(
-  event: any,
-  ctx: any,
-  api: any,
+  event: BeforeResetEvent,
+  ctx: HookContext,
+  api: OpenClawPluginApi,
 ): Promise<void> {
   const logger: Logger = api.logger;
   const sessionKey = extractSessionKey(ctx);
@@ -296,9 +309,9 @@ export async function handleBeforeReset(
 // ── before_tool_call ──────────────────────────────────────────────────
 
 export async function handleBeforeToolCall(
-  event: any,
-  ctx: any,
-  api: any,
+  event: BeforeToolCallEvent,
+  ctx: HookContext,
+  api: OpenClawPluginApi,
 ): Promise<{ block: true; blockReason: string } | { prependContext: string } | undefined> {
   const logger: Logger = api.logger;
   const name = event.toolName?.trim().toLowerCase() ?? "";
@@ -405,9 +418,9 @@ export async function handleBeforeToolCall(
 // ── message_sending ───────────────────────────────────────────────────
 
 export async function handleMessageSending(
-  event: any,
-  ctx: any,
-  api: any,
+  event: MessageSendingEvent,
+  ctx: HookContext,
+  api: OpenClawPluginApi,
 ): Promise<{ cancel: true } | { content: string } | undefined> {
   const logger: Logger = api.logger;
   const sessionKey = extractSessionKey(ctx);
@@ -501,15 +514,15 @@ export async function handleMessageSending(
 // ── llm_output: context pressure ──────────────────────────────────────
 
 export async function handleLlmOutputPressure(
-  event: any,
-  ctx: any,
-  api: any,
+  event: LlmOutputEvent,
+  ctx: HookContext,
+  api: OpenClawPluginApi,
 ): Promise<void> {
   const logger: Logger = api.logger;
   const sessionKey = extractSessionKey(ctx);
 
   try {
-    const tier = await trackContextPressure(sessionKey, event.usage);
+    const tier = await trackContextPressure(sessionKey, event.usage as { input?: number; output?: number; total?: number } | undefined);
     if (tier === "critical" && sessionKey) {
       safeBroadcast(api, "session:auto-compact", { sessionKey });
       logger.info(`[GodMode] auto-compact broadcast for session: ${sessionKey}`);
@@ -538,9 +551,9 @@ export async function handleLlmOutputPressure(
 // we simply skip rounds that have no assistant text (don't count them).
 
 export async function handleLlmOutputAutoTitle(
-  event: any,
-  ctx: any,
-  api: any,
+  event: LlmOutputEvent,
+  ctx: HookContext,
+  api: OpenClawPluginApi,
 ): Promise<void> {
   const logger: Logger = api.logger;
 
@@ -616,8 +629,8 @@ export async function handleLlmOutputAutoTitle(
 // ── llm_output: agent log ─────────────────────────────────────────────
 
 export async function handleLlmOutputAgentLog(
-  event: any,
-  ctx: any,
+  event: LlmOutputEvent,
+  ctx: HookContext,
 ): Promise<void> {
   const sessionKey = extractSessionKey(ctx);
   if (!sessionKey) return;
@@ -629,8 +642,8 @@ export async function handleLlmOutputAgentLog(
     const cronName = sessionKey.split(":cron:")[1]?.split(":")[0] ?? sessionKey;
     if (isError) {
       await appendEntry({
-        category: "error" as any,
-        item: `Cron "${cronName}" failed: ${String(event.error)}`,
+        category: "activity",
+        item: `[ERROR] Cron "${cronName}" failed: ${String(event.error)}`,
       });
     } else {
       await appendEntry({
@@ -662,9 +675,9 @@ function inferResourceType(filePath: string): string {
 }
 
 export async function handleAfterToolCall(
-  event: any,
-  ctx: any,
-  api: any,
+  event: AfterToolCallEvent,
+  ctx: HookContext,
+  api: OpenClawPluginApi,
 ): Promise<void> {
   const logger: Logger = api.logger;
   const sessionKey = extractSessionKey(ctx);
@@ -673,7 +686,7 @@ export async function handleAfterToolCall(
   // ── Trust feedback (fire and forget) ──
   try {
     const { handlePostToolFeedback } = await import("./trust-feedback.js");
-    await handlePostToolFeedback(toolName, sessionKey, event.error);
+    await handlePostToolFeedback(toolName, sessionKey, event.error != null ? String(event.error) : undefined);
   } catch { /* non-fatal */ }
 
   // ── Auto-register resources ──
@@ -699,7 +712,7 @@ export async function handleAfterToolCall(
     const RESOURCES_PATH = join(DATA_DIR, "resources.json");
 
     // Read existing registry
-    let registry: { version: number; resources: any[] };
+    let registry: ResourceRegistry;
     try {
       const raw = await readFile(RESOURCES_PATH, "utf-8");
       registry = JSON.parse(raw);
@@ -708,7 +721,7 @@ export async function handleAfterToolCall(
     }
 
     // Don't duplicate — skip if same path already registered
-    if (registry.resources.some((r: any) => r.path === filePath)) return;
+    if (registry.resources.some((r: ResourceEntry) => r.path === filePath)) return;
 
     const title = filePath.split("/").pop() ?? filePath;
     const type = inferResourceType(filePath);
@@ -734,9 +747,9 @@ export async function handleAfterToolCall(
 // ── after_compaction ──────────────────────────────────────────────────
 
 export async function handleAfterCompaction(
-  _event: any,
-  ctx: any,
-  api: any,
+  _event: AfterCompactionEvent,
+  ctx: HookContext,
+  api: OpenClawPluginApi,
 ): Promise<void> {
   const sessionKey = extractSessionKey(ctx);
   resetContextPressure(sessionKey);

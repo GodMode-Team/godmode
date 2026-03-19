@@ -1,5 +1,7 @@
 import { LitElement } from "lit";
 import { customElement, state } from "lit/decorators.js";
+import { provide } from "@lit/context";
+import { appContext, type AppContext, createDefaultAppContext } from "./context/app-context.js";
 import {
   handleChannelConfigReload as handleChannelConfigReloadInternal,
   handleChannelConfigSave as handleChannelConfigSaveInternal,
@@ -318,6 +320,9 @@ const CHAT_FILE_LINK_QUERY_KEYS = ["path", "filePath", "file", "workspacePath"] 
 
 @customElement("godmode-app")
 export class GodModeApp extends LitElement {
+  @provide({ context: appContext })
+  @state() _ctx: AppContext = createDefaultAppContext();
+
   @state() settings: UiSettings = loadSettings();
   @state() password = "";
   @state() tab: Tab = "chat";
@@ -798,6 +803,54 @@ export class GodModeApp extends LitElement {
 
   protected updated(changed: Map<PropertyKey, unknown>) {
     handleUpdated(this as unknown as Parameters<typeof handleUpdated>[0], changed);
+    this._syncContext();
+  }
+
+  private _syncContext() {
+    const prev = this._ctx;
+    // Only update if scalar values actually changed to avoid infinite re-render loop
+    if (
+      prev.connected === this.connected &&
+      prev.reconnecting === this.reconnecting &&
+      prev.sessionKey === this.sessionKey &&
+      prev.assistantName === this.assistantName &&
+      prev.assistantAvatar === this.assistantAvatar &&
+      prev.userName === this.userName &&
+      prev.userAvatar === this.userAvatar &&
+      prev.theme === this.theme &&
+      prev.themeResolved === this.themeResolved &&
+      prev.settings === this.settings &&
+      prev.basePath === this.basePath &&
+      prev.gateway === this.client
+    ) {
+      return;
+    }
+    this._ctx = {
+      connected: this.connected,
+      reconnecting: this.reconnecting,
+      sessionKey: this.sessionKey,
+      assistantName: this.assistantName,
+      assistantAvatar: this.assistantAvatar,
+      userName: this.userName,
+      userAvatar: this.userAvatar,
+      theme: this.theme,
+      themeResolved: this.themeResolved,
+      settings: this.settings,
+      basePath: this.basePath,
+      gateway: this.client,
+      send: (method: string, params?: unknown) =>
+        this.client?.request(method, params) ?? Promise.reject(new Error("Not connected")),
+      setTab: (tab) => this.setTab(tab),
+      addToast: (message: string, variant?: string) =>
+        this.showToast(message, (variant as "success" | "error" | "warning" | "info") ?? "info"),
+      openSidebar: (opts) =>
+        this.handleOpenSidebar(opts.content, {
+          title: opts.title,
+          mimeType: opts.mimeType,
+          filePath: opts.filePath,
+        }),
+      closeSidebar: () => this.handleCloseSidebar(),
+    };
   }
 
   connect() {

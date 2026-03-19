@@ -13,6 +13,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { dirname, join, basename } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { HostAdapter, StandaloneRequestHandler } from "./types.js";
+import type { TaskItem, QueueItem } from "../types/plugin-api.js";
 
 type CleanupEntry = { name: string; fn: () => void | Promise<void> };
 type Logger = { info: (msg: string) => void; warn: (msg: string) => void; error: (msg: string) => void };
@@ -65,6 +66,7 @@ export async function registerGodMode(
     () => import("../methods/auth.js"),
     () => import("../methods/session-privacy.js"),
     () => import("../services/inbox.js"),
+    () => import("../methods/health.js"),
   ];
 
   for (const load of methodModules) {
@@ -252,7 +254,10 @@ export async function registerGodMode(
         const { forwardMessage } = await import("../services/honcho-client.js");
         await forwardMessage("user", userMsg, _sessionKey);
         await forwardMessage("assistant", assistantMsg, _sessionKey);
-      } catch { /* non-fatal — Honcho may not be configured */ }
+      } catch {
+        const { reportDegraded } = await import("../lib/service-health.js");
+        reportDegraded("honcho", "Honcho message forwarding failed", "Check HONCHO_API_KEY in Settings");
+      }
 
       // Identity graph — extract entities from the response
       try {
@@ -296,7 +301,7 @@ async function gatherWorkspaceInputs(logger: Logger): Promise<Record<string, unk
       const raw = execSync(cmd, { timeout: 5000 }).toString().trim();
       const events = JSON.parse(raw);
       if (Array.isArray(events) && events.length > 0) {
-        const lines = events.slice(0, 5).map((e: any) =>
+        const lines = events.slice(0, 5).map((e: { start?: string; summary?: string }) =>
           `- ${e.start?.slice(11, 16) ?? "?"} ${e.summary ?? "Event"}`,
         );
         inputs.schedule = `## Today's Schedule\n${lines.join("\n")}`;
@@ -312,14 +317,14 @@ async function gatherWorkspaceInputs(logger: Logger): Promise<Record<string, unk
 
     const tasksRaw = await readFile(join(DATA_DIR, "tasks.json"), "utf-8").catch(() => "[]");
     const tasks = JSON.parse(tasksRaw);
-    const pending = Array.isArray(tasks) ? tasks.filter((t: any) => t.status === "pending") : [];
-    const overdue = pending.filter((t: any) => t.dueDate && new Date(t.dueDate) < new Date());
+    const pending = Array.isArray(tasks) ? tasks.filter((t: TaskItem) => t.status === "pending") : [];
+    const overdue = pending.filter((t: TaskItem) => t.dueDate && new Date(t.dueDate!) < new Date());
 
     const queueRaw = await readFile(join(DATA_DIR, "queue-state.json"), "utf-8").catch(() => '{"items":[]}');
     const queue = JSON.parse(queueRaw);
     const queueItems = Array.isArray(queue.items) ? queue.items : [];
-    const queuePending = queueItems.filter((i: any) => i.status === "pending" || i.status === "approved");
-    const queueDone = queueItems.filter((i: any) => i.status === "done");
+    const queuePending = queueItems.filter((i: QueueItem) => i.status === "pending" || i.status === "approved");
+    const queueDone = queueItems.filter((i: QueueItem) => i.status === "done");
 
     const counts = [];
     if (pending.length > 0) counts.push(`${pending.length} task(s) pending`);
@@ -332,18 +337,18 @@ async function gatherWorkspaceInputs(logger: Logger): Promise<Record<string, unk
 
     // Queue review items
     if (queueDone.length > 0) {
-      const reviewLines = queueDone.slice(0, 3).map((i: any) => `- "${i.title}" (${i.type})`);
+      const reviewLines = queueDone.slice(0, 3).map((i: QueueItem) => `- "${i.title}" (${i.type})`);
       inputs.queueReview = `## Queue Items Ready for Review\n${reviewLines.join("\n")}`;
     }
 
     // Priorities (top 3 tasks by due date)
     if (pending.length > 0) {
-      const sorted = [...pending].sort((a: any, b: any) => {
+      const sorted = [...pending].sort((a: TaskItem, b: TaskItem) => {
         if (!a.dueDate) return 1;
         if (!b.dueDate) return -1;
         return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
       });
-      const top = sorted.slice(0, 3).map((t: any) =>
+      const top = sorted.slice(0, 3).map((t: TaskItem) =>
         `- ${t.title}${t.dueDate ? ` (due: ${t.dueDate})` : ""}`,
       );
       inputs.priorities = `## Top Priorities\n${top.join("\n")}`;

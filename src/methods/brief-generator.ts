@@ -29,6 +29,7 @@ import {
   localDateString,
 } from "../data-paths.js";
 import { getUserTimezone, getUserLocation, getTempUnit } from "../lib/user-config.js";
+import { loadLatestReflection } from "../lib/evening-reflection.js";
 
 type GatewayRequestHandlers = Record<string, GatewayRequestHandler>;
 
@@ -1464,7 +1465,7 @@ async function generateDailyBrief(date?: string): Promise<GenerateResult> {
   const [
     calendar, oura, weather, context, xIntel, carryForward,
     frontInbox, eveningReview, overnightWork,
-    cronFailures,
+    cronFailures, latestReflection,
   ] = await Promise.all([
     fetchCalendarEvents().catch((e) => ({ events: [] as CalendarEvent[], error: String(e) })),
     fetchOuraData().catch(() => ({
@@ -1487,6 +1488,7 @@ async function generateDailyBrief(date?: string): Promise<GenerateResult> {
         return await scanForFailures();
       } catch { return null; }
     })(),
+    loadLatestReflection().catch(() => null),
   ]);
 
   if (calendar.error) warnings.push(`Calendar: ${calendar.error}`);
@@ -1692,6 +1694,11 @@ ${eveningReview.tomorrowHandoff || "(no evening review from yesterday)"}
 ### Evening Reflection (${yesterdayDate()})
 ${eveningReview.reflection || "(none)"}
 
+### Yesterday's Reflection${latestReflection ? ` (${latestReflection.date})` : ""}
+${latestReflection
+  ? `- **Moved the needle:** ${latestReflection.movedNeedle}\n- **Busywork:** ${latestReflection.busywork}\n- **Avoiding:** ${latestReflection.avoiding}`
+  : "(no reflection captured)"}
+
 ### Current Pending Tasks (from tasks.json — FIRST-CLASS source for Win The Day)
 ${tasksRaw}
 
@@ -1770,6 +1777,7 @@ ${cronFailures && cronFailures.cronErrors.length > 0 ? "\nIMPORTANT: Surface the
         : "*Check your inbox for urgent items.*",
       "", "---", "",
       carryForward.yesterdayImpact ? `## Yesterday's Impact\n\n${carryForward.yesterdayImpact}\n\n---\n` : "",
+      latestReflection ? `## Yesterday's Reflection (${latestReflection.date})\n\n- **Moved the needle:** ${latestReflection.movedNeedle}\n- **Busywork:** ${latestReflection.busywork}\n- **Avoiding:** ${latestReflection.avoiding}\n\n---\n` : "",
       "## Body Check", "", formatBodyCheck(oura), "", "---",
     ].filter(Boolean).join("\n");
     sections.push("Win The Day", "Calendar", "Communications", "Body Check");
@@ -1928,6 +1936,21 @@ async function generateStarterBrief(): Promise<{
     }
   } catch { /* non-fatal */ }
 
+  // Yesterday's reflection
+  let reflectionLines: string[] = [];
+  try {
+    const reflection = await loadLatestReflection();
+    if (reflection) {
+      reflectionLines = [
+        `## Yesterday's Reflection (${reflection.date})`,
+        `- **Moved the needle:** ${reflection.movedNeedle}`,
+        `- **Busywork:** ${reflection.busywork}`,
+        `- **Avoiding:** ${reflection.avoiding}`,
+        "",
+      ];
+    }
+  } catch { /* non-fatal */ }
+
   // Tip of the day (rotate by day of year)
   const dayOfYear = Math.floor((Date.now() - new Date(new Date().getFullYear(), 0, 0).getTime()) / 86_400_000);
   const tip = STARTER_TIPS[dayOfYear % STARTER_TIPS.length];
@@ -1943,6 +1966,7 @@ async function generateStarterBrief(): Promise<{
       goalsLines,
       "",
     ] : []),
+    ...reflectionLines,
     "## Today's Focus",
     taskLines,
     "",

@@ -24,13 +24,21 @@ import {
   resolveAgentStorePath,
 } from "../lib/workspace-session-store.js";
 import { safeBroadcast } from "../lib/host-context.js";
+import type {
+  PromptBuildEvent,
+  HookContext,
+  ChatMessage,
+  MessageContentBlock,
+  CalendarEvent,
+} from "../types/plugin-api.js";
+import type { OpenClawPluginApi } from "openclaw/plugin-sdk";
 
 type Logger = { warn: (msg: string) => void; info: (msg: string) => void };
 
 export async function handleBeforePromptBuild(
-  event: any,
-  ctx: any,
-  api: any,
+  event: PromptBuildEvent,
+  ctx: HookContext,
+  api: OpenClawPluginApi,
   pluginRoot: string,
 ): Promise<{ prependContext: string } | undefined> {
   const logger: Logger = api.logger;
@@ -97,8 +105,8 @@ export async function handleBeforePromptBuild(
   // ACP Provenance
   let provenance: InputProvenance | null = null;
   try {
-    const allMessages = event.messages ?? [];
-    const lastMsg = [...allMessages].reverse().find((m: any) => m.role === "user");
+    const allMessages = (event.messages ?? []) as ChatMessage[];
+    const lastMsg = [...allMessages].reverse().find((m) => m.role === "user");
     if (lastMsg?.provenance && typeof lastMsg.provenance === "object") {
       const p = lastMsg.provenance as Record<string, unknown>;
       const kind = p.kind as string;
@@ -134,12 +142,12 @@ export async function handleBeforePromptBuild(
   if (lastReceivedMessage && Date.now() - lastReceivedMessage.capturedAt < 5_000) {
     userQuery = lastReceivedMessage.content;
   } else {
-    const _messages = event.messages ?? [];
-    const _lastUserMsg = [..._messages].reverse().find((m: any) => m.role === "user");
+    const _messages = (event.messages ?? []) as ChatMessage[];
+    const _lastUserMsg = [..._messages].reverse().find((m) => m.role === "user");
     if (typeof _lastUserMsg?.content === "string") {
       userQuery = _lastUserMsg.content;
     } else if (Array.isArray(_lastUserMsg?.content)) {
-      const _textBlock = _lastUserMsg.content.find((b: any) => b.type === "text");
+      const _textBlock = _lastUserMsg.content.find((b: MessageContentBlock) => b.type === "text");
       userQuery = typeof _textBlock?.text === "string" ? _textBlock.text : "";
     }
     // Strip system-context tags that may have been injected in prior turns
@@ -219,7 +227,7 @@ export async function handleBeforePromptBuild(
       const { fetchCalendarEvents } = await import("../methods/brief-generator.js");
       const result = await fetchCalendarEvents();
       const now = Date.now();
-      const upcoming = result.events.filter((e: any) => {
+      const upcoming = result.events.filter((e: CalendarEvent) => {
         const start = new Date(e.startTime).getTime();
         return start > now && start - now <= 2 * 60 * 60 * 1000;
       });
@@ -324,15 +332,15 @@ export async function handleBeforePromptBuild(
   let currentUserMessage = "";
   let isFirstTurn = false;
   try {
-    const msgs = event.messages ?? [];
-    const lastMsg = [...msgs].reverse().find((m: any) => m.role === "user");
+    const msgs = (event.messages ?? []) as ChatMessage[];
+    const lastMsg = [...msgs].reverse().find((m) => m.role === "user");
     if (typeof lastMsg?.content === "string") {
       currentUserMessage = lastMsg.content;
     } else if (Array.isArray(lastMsg?.content)) {
-      const textBlock = lastMsg.content.find((b: any) => b.type === "text");
+      const textBlock = lastMsg.content.find((b: MessageContentBlock) => b.type === "text");
       currentUserMessage = typeof textBlock?.text === "string" ? textBlock.text : "";
     }
-    const userMsgCount = msgs.filter((m: any) => m.role === "user").length;
+    const userMsgCount = msgs.filter((m) => m.role === "user").length;
     isFirstTurn = userMsgCount <= 1;
   } catch { /* non-fatal */ }
 
@@ -465,7 +473,7 @@ export async function handleBeforePromptBuild(
       );
       const tgConfig = {
         ...TOOL_GROUNDING_DEFAULTS,
-        ...((guardrailState as any).toolGrounding ?? {}),
+        ...((guardrailState as Record<string, unknown>).toolGrounding ?? {}),
       };
       const result = generateGroundingInstruction(currentUserMessage, tgConfig);
       if (result) {
@@ -488,7 +496,7 @@ export async function handleBeforePromptBuild(
   // Conditional: Team bootstrap, onboarding, private session
   try {
     const { handleTeamBootstrap } = await import("./team-bootstrap.js");
-    const teamResult = await handleTeamBootstrap(event, ctx);
+    const teamResult = await handleTeamBootstrap(event as { prompt: string; messages: unknown[] }, ctx);
     if (teamResult?.prependContext) safetyNudges.push(teamResult.prependContext);
   } catch { /* non-fatal */ }
   try {

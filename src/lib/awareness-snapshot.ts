@@ -11,6 +11,7 @@
 import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { join, dirname } from "node:path";
 import { DATA_DIR, localDateString } from "../data-paths.js";
+import { reportConnected, reportDegraded, reportUnavailable } from "./service-health.js";
 
 const SNAPSHOT_PATH = join(DATA_DIR, "awareness-snapshot.md");
 let cachedSnapshot: string | null = null;
@@ -30,10 +31,11 @@ export async function generateSnapshot(): Promise<string> {
   try {
     const identityDigest = await loadIdentityDigest();
     if (identityDigest) {
+      reportConnected("vault");
       lines.push(identityDigest);
     }
   } catch {
-    // Identity unavailable — non-fatal
+    reportDegraded("vault", "Vault identity files not found", "Set OBSIDIAN_VAULT_PATH or run onboarding");
   }
 
   // Soul digest — behavioral essence from SOUL.md
@@ -62,6 +64,7 @@ export async function generateSnapshot(): Promise<string> {
     const { fetchCalendarEvents } = await import("../methods/brief-generator.js");
     const result = await fetchCalendarEvents();
     calendarEvents = result.events;
+    reportConnected("calendar");
     if (calendarEvents.length > 0) {
       lines.push("## Schedule");
       for (const e of calendarEvents.slice(0, 5)) {
@@ -77,6 +80,7 @@ export async function generateSnapshot(): Promise<string> {
       lines.push("## Schedule: No meetings today");
     }
   } catch {
+    reportDegraded("calendar", "Calendar not connected", "Connect Google Calendar in Settings");
     lines.push("## Schedule: (unavailable)");
   }
 
@@ -167,6 +171,7 @@ export async function generateSnapshot(): Promise<string> {
   try {
     const { readQueueState } = await import("./queue-state.js");
     const qs = await readQueueState();
+    reportConnected("queue");
     const processing = qs.items.filter((i: { status: string }) => i.status === "processing").length;
     const reviewItems = qs.items.filter((i: { status: string }) => i.status === "review");
     const review = reviewItems.length;
@@ -189,7 +194,7 @@ export async function generateSnapshot(): Promise<string> {
       }
     }
   } catch {
-    // Queue unavailable
+    reportDegraded("queue", "Queue state unreadable", "Check ~/godmode/data/queue-state.json");
   }
 
   // Proactive suggestions — delegatable work the ally can volunteer for
@@ -312,8 +317,14 @@ export async function generateSnapshot(): Promise<string> {
     const { getHonchoStatus, getStatus: getHonchoStats } = await import("../services/honcho-client.js");
     const status = getHonchoStatus();
     const stats = getHonchoStats();
+    if (status === "ready") {
+      reportConnected("honcho");
+    } else {
+      reportDegraded("honcho", `Honcho ${status}`, "Check Honcho configuration in Settings");
+    }
     lines.push(`## Memory: Honcho ${status} (${stats.sessionCount} sessions tracked)`);
   } catch {
+    reportUnavailable("honcho", "Honcho offline", "Set HONCHO_API_KEY in Settings");
     lines.push("## Memory: Honcho offline (HONCHO_API_KEY not configured)");
   }
 

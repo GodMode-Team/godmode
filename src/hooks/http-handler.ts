@@ -100,7 +100,7 @@ export interface HttpHandlerDeps {
   pluginVersion: string;
   getLicenseState: () => LicenseState;
   godmodeUiRoot: string | undefined;
-  godmodeHandler: ((req: any, res: any) => void) | null;
+  godmodeHandler: ((req: IncomingMessage, res: ServerResponse) => void) | null;
   methodCount: number;
 }
 

@@ -136,7 +136,6 @@ import {
   handleAfterCompaction,
 } from "./src/hooks/lifecycle-hooks.js";
 import { registerCliCommands } from "./src/cli/commands.js";
-
 // ── Version ───────────────────────────────────────────────────────────
 let pluginVersion = "1.0.0";
 try {
@@ -240,13 +239,9 @@ const godmodePlugin = {
       methodCount,
     });
 
-    // Use registerHttpHandler (fallback dispatch) — registerHttpRoute does exact-path
-    // matching in current OpenClaw versions, which breaks SPA prefix routing.
-    if (typeof (api as any).registerHttpHandler === "function") {
-      (api as any).registerHttpHandler(godmodeHttpHandler);
-    } else if (typeof (api as any).registerHttpRoute === "function") {
-      (api as any).registerHttpRoute({ path: "/godmode", handler: godmodeHttpHandler });
-      (api as any).registerHttpRoute({ path: "/reports", handler: godmodeHttpHandler });
+    if (typeof (api as any).registerHttpRoute === "function") {
+      (api as any).registerHttpRoute({ path: "/godmode", handler: godmodeHttpHandler, auth: "plugin", match: "prefix" });
+      (api as any).registerHttpRoute({ path: "/reports", handler: godmodeHttpHandler, auth: "plugin", match: "prefix" });
     } else {
       console.warn("[godmode] No HTTP route registration API found — UI and health endpoints unavailable");
     }
@@ -336,14 +331,14 @@ const godmodePlugin = {
             const lines = raw.split("\n");
             for (const line of lines) {
               if (!line.trim()) continue;
-              let entry: any;
+              let entry: Record<string, unknown>;
               try { entry = JSON.parse(line); } catch { continue; }
               if (entry.type !== "message" || !entry.message) continue;
-              const msg = entry.message;
+              const msg = entry.message as Record<string, unknown>;
               const content = typeof msg.content === "string"
                 ? msg.content
                 : Array.isArray(msg.content)
-                  ? msg.content.filter((b: any) => b.type === "text").map((b: any) => b.text).join(" ")
+                  ? msg.content.filter((b: Record<string, unknown>) => b.type === "text").map((b: Record<string, unknown>) => b.text).join(" ")
                   : "";
               const clean = content
                 .replace(/<system-context>[\s\S]*?<\/system-context>/g, "")
@@ -356,7 +351,7 @@ const godmodePlugin = {
                 const snippet = (start > 0 ? "..." : "") +
                   clean.slice(start, end).replace(/\n/g, " ").trim() +
                   (end < clean.length ? "..." : "");
-                contentMatches.push({ role: msg.role, text: snippet, timestamp: entry.timestamp ? new Date(entry.timestamp).getTime() : undefined });
+                contentMatches.push({ role: String(msg.role), text: snippet, timestamp: entry.timestamp ? new Date(entry.timestamp as string | number).getTime() : undefined });
               }
               if (contentMatches.length >= 3) break;
             }
@@ -463,58 +458,59 @@ const godmodePlugin = {
       await runGatewayStop(serviceCleanup, api.logger);
     });
 
-    api.on("message_received", async (event: any, ctx: any) => {
+    api.on("message_received", async (event, ctx) => {
       await handleMessageReceived(event, ctx, api);
     });
 
-    api.on("before_prompt_build", async (event: any, ctx: any) => {
+    api.on("before_prompt_build", async (event, ctx) => {
       return handleBeforePromptBuild(event, ctx, api, pluginRoot);
     });
 
-    api.on("before_reset", async (event: any, ctx: any) => {
+    api.on("before_reset", async (event, ctx) => {
       await handleBeforeReset(event, ctx, api);
     });
 
-    api.on("before_tool_call", (async (event: any, ctx: any) => {
+    api.on("before_tool_call", (async (event: Record<string, unknown>, ctx: Record<string, unknown>) => {
       return handleBeforeToolCall(event, ctx, api);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- SDK return type is narrower than our union
     }) as any);
 
-    api.on("message_sending", async (event: any, ctx: any) => {
+    api.on("message_sending", async (event, ctx) => {
       return handleMessageSending(event, ctx, api);
     });
 
-    api.on("llm_output", async (event: any, ctx: any) => {
+    api.on("llm_output", async (event, ctx) => {
       await handleLlmOutputPressure(event, ctx, api);
     });
 
-    api.on("llm_output", async (event: any, ctx: any) => {
+    api.on("llm_output", async (event, ctx) => {
       await handleLlmOutputAutoTitle(event, ctx, api);
     });
 
-    api.on("llm_output", async (event: any, ctx: any) => {
+    api.on("llm_output", async (event, ctx) => {
       await handleLlmOutputAgentLog(event, ctx);
     });
 
-    api.on("after_compaction", async (event: any, ctx: any) => {
+    api.on("after_compaction", async (event, ctx) => {
       await handleAfterCompaction(event, ctx, api);
     });
 
-    api.on("after_tool_call", async (event: any, ctx: any) => {
+    api.on("after_tool_call", async (event, ctx) => {
       await handleAfterToolCall(event, ctx, api);
     });
 
     // ── 6. Tools ──────────────────────────────────────────────────
-    api.registerTool((ctx: any) => createTeamMessageTool(ctx));
-    api.registerTool((ctx: any) => createTeamMemoryWriteTool(ctx));
-    api.registerTool((ctx: any) => createOnboardTool(ctx));
-    api.registerTool((ctx: any) => createMorningSetTool(ctx));
-    api.registerTool((ctx: any) => createGuardrailTool(ctx));
-    api.registerTool((ctx: any) => createQueueAddTool(ctx));
+    api.registerTool((ctx: { sessionKey?: string; agentId?: string }) => createTeamMessageTool(ctx));
+    api.registerTool((ctx: { sessionKey?: string; agentId?: string }) => createTeamMemoryWriteTool(ctx));
+    api.registerTool((ctx: { sessionKey?: string; agentId?: string }) => createOnboardTool(ctx));
+    api.registerTool((ctx: { sessionKey?: string; agentId?: string }) => createMorningSetTool(ctx));
+    api.registerTool((ctx: { sessionKey?: string; agentId?: string }) => createGuardrailTool(ctx));
+    api.registerTool((ctx: { sessionKey?: string; agentId?: string }) => createQueueAddTool(ctx));
     api.registerTool(() => createQueueCheckTool());
     api.registerTool(() => createQueueActionTool());
-    api.registerTool((ctx: any) => createTrustRateTool(ctx));
-    api.registerTool((ctx: any) => createXReadTool(ctx));
-    api.registerTool((ctx: any) => createHonchoQueryTool(ctx));
+    api.registerTool((ctx: { sessionKey?: string; agentId?: string }) => createTrustRateTool(ctx));
+    api.registerTool((ctx: { sessionKey?: string; agentId?: string }) => createXReadTool(ctx));
+    api.registerTool((ctx: { sessionKey?: string; agentId?: string }) => createHonchoQueryTool(ctx));
     api.registerTool(() => createSelfRepairTool());
     api.registerTool(() => createTasksCreateTool());
     api.registerTool(() => createTasksListTool());
