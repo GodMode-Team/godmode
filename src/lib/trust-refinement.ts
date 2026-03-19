@@ -71,7 +71,7 @@ function findInDir(dir: string, normalized: string): string | null {
     for (const entry of entries) {
       if (entry.isFile() && entry.name.endsWith(".md")) {
         const slug = basename(entry.name, ".md").toLowerCase().replace(/[_-]/g, " ");
-        if (slug === normalized || normalized.includes(slug) || slug.includes(normalized)) {
+        if (slug === normalized) {
           return join(dir, entry.name);
         }
       } else if (entry.isDirectory() && !entry.name.startsWith(".")) {
@@ -136,10 +136,14 @@ function appendFeedback(content: string, feedback: string): {
     return { content: newContent, itemCount: 1, feedbackItems: [feedback.trim()] };
   }
 
-  // Find existing items
+  // Find existing items (stop at the next heading to avoid cross-section leakage)
   const afterHeading = content.slice(headingIdx + FEEDBACK_HEADING.length);
-  const existingItems = afterHeading
-    .split("\n")
+  const sectionLines: string[] = [];
+  for (const line of afterHeading.split("\n")) {
+    if (sectionLines.length > 0 && (line.startsWith("## ") || line.startsWith("# "))) break;
+    sectionLines.push(line);
+  }
+  const existingItems = sectionLines
     .filter((l) => l.startsWith("- "))
     .map((l) => l.slice(2).trim());
 

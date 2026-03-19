@@ -11,6 +11,7 @@ import { customElement, state } from "lit/decorators.js";
 import { consume } from "@lit/context";
 import { appContext, type AppContext } from "../context/app-context.js";
 import { localDateString } from "../format.js";
+import { appEventBus } from "../context/event-bus.js";
 import { renderMyDay, renderMyDayToolbar } from "../views/my-day.js";
 import type { MyDayProps, DecisionCardItem, AgentLogData } from "../views/my-day.js";
 import type { DailyBriefData } from "../views/daily-brief.js";
@@ -90,14 +91,32 @@ export class GmToday extends LitElement {
 
   // ── Lifecycle ──────────────────────────────────────────────────────
 
+  private _unsubs: Array<() => void> = [];
+
   override connectedCallback() {
     super.connectedCallback();
+
+    // Listen for external refresh requests
+    this._unsubs.push(
+      appEventBus.on("refresh-requested", (payload) => {
+        if (payload.target === "today" || payload.target === "my-day") {
+          void this.refresh();
+        }
+      }),
+    );
+
     // Auto-load data once context is available
     this.updateComplete.then(() => {
       if (this.ctx?.connected) {
         void this._loadAll();
       }
     });
+  }
+
+  override disconnectedCallback() {
+    for (const unsub of this._unsubs) unsub();
+    this._unsubs = [];
+    super.disconnectedCallback();
   }
 
   // ── MyDayState bridge ──────────────────────────────────────────────

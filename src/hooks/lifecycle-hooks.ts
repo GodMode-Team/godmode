@@ -264,6 +264,14 @@ export async function handleMessageReceived(
         void forwardMessage("user", content, sessionKey);
       } catch { /* invisible */ }
     }
+
+    // Hermes iMessage fan-out: forward to Hermes so both allies reply
+    if (sessionKey?.includes("imessage") && content) {
+      try {
+        const { forwardToHermes } = await import("../services/hermes-imessage-forwarder.js");
+        void forwardToHermes(sessionKey, content, logger);
+      } catch { /* invisible */ }
+    }
   }
 }
 

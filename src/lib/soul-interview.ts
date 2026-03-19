@@ -150,7 +150,7 @@ function summarizeCollected(p: Partial<SoulProfile> | null): string {
 function getAnsweredKeys(p: Partial<SoulProfile> | null): Set<string> {
   const k = new Set<string>();
   if (!p) return k;
-  if (p.ground || p.goodDay) k.add("wantMore"); if (p.atMyBest) k.add("atBest");
+  if (p.ground) k.add("wantMore"); if (p.atMyBest) k.add("atBest");
   if (p.recurringPattern) k.add("pattern"); if (p.goodDay) k.add("perfectTuesday");
   if (p.nonNegotiables?.length) k.add("beyondMoney");
   if (p.desiredWorkflows?.length) k.add("neverThinkAbout");

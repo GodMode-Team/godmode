@@ -66,7 +66,6 @@ export async function registerGodMode(
     () => import("../methods/auth.js"),
     () => import("../methods/session-privacy.js"),
     () => import("../services/inbox.js"),
-    () => import("../methods/health.js"),
   ];
 
   for (const load of methodModules) {

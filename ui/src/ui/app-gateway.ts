@@ -641,6 +641,10 @@ export function connectGateway(host: GatewayHost) {
         workingSessionClearTimers.clear();
       }
 
+      // Set browser tab title to distinguish OC vs Hermes instances
+      const feat = hello.features as Record<string, unknown> | undefined;
+      document.title = feat?.hermes ? "Hermes - GodMode" : "OC - GodMode";
+
       // Initialize host compatibility layer — probes capabilities in background
       initHostCompat(hello as unknown as Record<string, unknown>, host.client);
 
