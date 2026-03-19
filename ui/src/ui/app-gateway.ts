@@ -614,20 +614,12 @@ export function connectGateway(host: GatewayHost) {
           }
         }, 3000);
 
-        // Clear potentially stale chat streaming state from before disconnect
-        // This prevents the "..." indicator from hanging indefinitely if the
-        // final event was lost during the disconnect
+        // Preserve chat streaming state across brief reconnects to avoid flicker.
+        // The 90-second safety timeout (line ~820) already handles truly lost
+        // final events. Clearing the stream here caused visible disappear/reappear
+        // whenever the WebSocket briefly disconnected mid-stream.
+        // Only clear chatRunId so the next delta/final can re-establish if needed.
         host.chatRunId = null;
-        const fullApp = host as unknown as {
-          chatStream?: string | null;
-          chatStreamStartedAt?: number | null;
-        };
-        if ("chatStream" in fullApp) {
-          fullApp.chatStream = null;
-        }
-        if ("chatStreamStartedAt" in fullApp) {
-          fullApp.chatStreamStartedAt = null;
-        }
 
         // Auto-advance Today date if stale (e.g. app left open overnight)
         const dateHost = host as unknown as { todaySelectedDate?: string };
@@ -667,8 +659,7 @@ export function connectGateway(host: GatewayHost) {
       void refreshActiveTab(host as unknown as Parameters<typeof refreshActiveTab>[0]);
       // Check workspace setup first, then onboarding (onboarding depends on workspace state)
       void checkWorkspaceSetup(host).then(() => checkOnboardingStatus(host));
-      // Load Focus Pulse state and GodMode options
-      void loadFocusPulseOnConnect(host);
+      // Load GodMode options
       void loadOptionsOnConnect(host);
       // Start background update check heartbeat (every 30 min)
       startUpdatePolling(host as unknown as GodModeApp);
@@ -1448,13 +1439,6 @@ function handleGatewayEventUnsafe(host: GatewayHost, evt: GatewayEventFrame) {
       }
     }
     return;
-  }
-}
-
-async function loadFocusPulseOnConnect(host: GatewayHost) {
-  const app = host as unknown as GodModeApp;
-  if (typeof app.loadFocusPulse === "function") {
-    await app.loadFocusPulse();
   }
 }
 

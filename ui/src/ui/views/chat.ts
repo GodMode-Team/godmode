@@ -1286,16 +1286,45 @@ function buildChatItems(props: ChatProps): Array<ChatItem | MessageGroup> {
   }
 
   if (props.stream !== null) {
-    const key = `stream:${props.sessionKey}:${props.streamStartedAt ?? "live"}`;
-    if (props.stream.trim().length > 0) {
-      items.push({
-        kind: "stream",
-        key,
-        text: props.stream,
-        startedAt: props.streamStartedAt ?? Date.now(),
-      });
-    } else {
-      items.push({ kind: "reading-indicator", key });
+    // Deduplicate: if the last assistant message in history already contains
+    // the stream text, skip the stream bubble to prevent the flash-to-duplicate
+    // pattern during the final→history transition.
+    let streamCoveredByHistory = false;
+    if (props.stream.trim().length > 0 && history.length > 0) {
+      const lastMsg = history[history.length - 1] as Record<string, unknown>;
+      if (
+        typeof lastMsg.role === "string" &&
+        lastMsg.role.toLowerCase() === "assistant"
+      ) {
+        const content = lastMsg.content;
+        let historyText = "";
+        if (typeof content === "string") {
+          historyText = content;
+        } else if (Array.isArray(content)) {
+          historyText = (content as Array<Record<string, unknown>>)
+            .filter((b) => b.type === "text" && typeof b.text === "string")
+            .map((b) => b.text as string)
+            .join("");
+        }
+        // History covers the stream if it contains at least as much text
+        if (historyText.length > 0 && historyText.length >= props.stream.trim().length) {
+          streamCoveredByHistory = true;
+        }
+      }
+    }
+
+    if (!streamCoveredByHistory) {
+      const key = `stream:${props.sessionKey}:${props.streamStartedAt ?? "live"}`;
+      if (props.stream.trim().length > 0) {
+        items.push({
+          kind: "stream",
+          key,
+          text: props.stream,
+          startedAt: props.streamStartedAt ?? Date.now(),
+        });
+      } else {
+        items.push({ kind: "reading-indicator", key });
+      }
     }
   } else if (props.isWorking) {
     // Show working indicator even when not streaming (e.g., running tools)

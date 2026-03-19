@@ -180,9 +180,6 @@ export async function loadChatHistoryAfterFinal(
 
   await loadChatHistory(state);
 
-  // Clear the stream now that server history is loaded.
-  state.chatStream = null;
-
   // Floor guard: if the server returned fewer messages OR the last user
   // message was lost (optimistic message replaced by server data that
   // doesn't include it), restore the snapshot and retry after a delay.
@@ -192,14 +189,23 @@ export async function loadChatHistoryAfterFinal(
   );
 
   if (shouldRestore) {
+    // Don't clear chatStream yet — history doesn't have the final message.
+    // The stream bubble keeps the response visible while we retry.
     state.chatMessages = snapshot;
     // Retry once after a short delay — the file may still be flushing
     setTimeout(() => {
       void loadChatHistory(state).then(() => {
-        // Ensure stream is cleared even on retry
+        // Now clear the stream — history should have the final message.
+        // The render-level dedup in buildChatItems also prevents flicker
+        // if there's still a brief overlap.
         state.chatStream = null;
       });
     }, 2000);
+  } else {
+    // History loaded successfully with the final message — clear the stream.
+    // The render-level dedup in buildChatItems ensures no visual gap even
+    // if Lit renders chatMessages before chatStream is cleared.
+    state.chatStream = null;
   }
 }
 
