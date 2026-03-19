@@ -42,6 +42,46 @@ export default defineConfig(({ command }) => {
       emptyOutDir: true,
       // Only enable source maps in development to avoid exposing source code in production
       sourcemap: command === "serve",
+      rollupOptions: {
+        output: {
+          manualChunks(id) {
+            // Core framework — always loaded
+            if (id.includes("node_modules/lit") || id.includes("node_modules/@lit/")) {
+              return "lit-core";
+            }
+            // Markdown rendering — heavy, only needed by chat + second-brain
+            if (id.includes("node_modules/marked")) {
+              return "markdown";
+            }
+            // Settings / power-user views — split for faster main chunk parse
+            const settingsViews = [
+              "views/nodes", "views/config", "views/config-form",
+              "views/cron", "views/trust-tracker", "views/skills",
+              "views/sessions", "views/channels", "views/debug",
+              "views/logs", "views/agents", "views/guardrails",
+              "views/instances", "views/exec-approval",
+              "views/calendar", "views/daily-brief",
+              "views/onboarding-wizard",
+            ];
+            for (const v of settingsViews) {
+              if (id.includes(`/ui/${v}`)) return "views-settings";
+            }
+            // Controllers for settings / power-user tabs
+            const settingsCtrl = [
+              "controllers/config", "controllers/cron",
+              "controllers/debug", "controllers/logs",
+              "controllers/nodes", "controllers/channels",
+              "controllers/devices", "controllers/presence",
+              "controllers/skills", "controllers/agents",
+              "controllers/guardrails", "controllers/exec-approvals",
+              "controllers/sessions", "controllers/mission-control",
+            ];
+            for (const c of settingsCtrl) {
+              if (id.includes(`/ui/${c}`)) return "ctrl-settings";
+            }
+          },
+        },
+      },
     },
     server: {
       host: true,

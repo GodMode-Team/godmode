@@ -87,7 +87,7 @@ import { renderGatewayRestartConfirmation } from "./views/gateway-restart";
 import { renderInstances } from "./views/instances";
 import { renderLogs } from "./views/logs";
 import { renderMarkdownSidebar } from "./views/markdown-sidebar";
-import { renderMyDay, renderMyDayToolbar } from "./views/my-day";
+import { renderMyDayToolbar } from "./views/my-day";
 import { renderNodes } from "./views/nodes";
 import { renderSessions } from "./views/sessions";
 import { renderSkills } from "./views/skills";
@@ -99,13 +99,19 @@ import { renderOptions } from "./views/options";
 import { renderOnboardingWizard, type WizardStep } from "./views/onboarding-wizard";
 import { renderTrustTracker } from "./views/trust-tracker";
 import { renderGuardrails } from "./views/guardrails";
-import { renderWorkspaces } from "./views/workspaces";
-import { renderSecondBrain } from "./views/second-brain";
-import { renderDashboards } from "./views/dashboards";
-import "./tabs/second-brain-tab.js";
-import "./tabs/today-tab.js";
-import "./tabs/dashboards-tab.js";
-import "./tabs/work-tab.js";
+// Tab components are lazy-loaded on first visit (code splitting)
+const _tabLoaders: Record<string, () => Promise<unknown>> = {
+  "gm-work": () => import("./tabs/work-tab.js"),
+  "gm-today": () => import("./tabs/today-tab.js"),
+  "gm-second-brain": () => import("./tabs/second-brain-tab.js"),
+  "gm-dashboards": () => import("./tabs/dashboards-tab.js"),
+};
+const _tabLoaded = new Set<string>();
+function ensureTab(tag: string) {
+  if (_tabLoaded.has(tag)) return;
+  _tabLoaded.add(tag);
+  _tabLoaders[tag]?.();
+}
 
 const AVATAR_DATA_RE = /^data:/i;
 const AVATAR_HTTP_RE = /^https?:\/\//i;
@@ -1121,13 +1127,13 @@ export function renderApp(state: AppViewState) {
 
         ${
           state.tab === "workspaces"
-            ? html`<gm-work></gm-work>`
+            ? (ensureTab("gm-work"), html`<gm-work></gm-work>`)
             : nothing
         }
 
         ${
           state.tab === "today" || state.tab === "my-day"
-            ? html`<gm-today></gm-today>`
+            ? (ensureTab("gm-today"), html`<gm-today></gm-today>`)
             : nothing
         }
 
@@ -1723,13 +1729,13 @@ export function renderApp(state: AppViewState) {
 
         ${
           state.tab === "second-brain"
-            ? html`<gm-second-brain></gm-second-brain>`
+            ? (ensureTab("gm-second-brain"), html`<gm-second-brain></gm-second-brain>`)
             : nothing
         }
 
         ${
           state.tab === "dashboards"
-            ? html`<gm-dashboards></gm-dashboards>`
+            ? (ensureTab("gm-dashboards"), html`<gm-dashboards></gm-dashboards>`)
             : nothing
         }
 
