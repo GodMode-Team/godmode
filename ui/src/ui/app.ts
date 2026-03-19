@@ -590,6 +590,9 @@ export class GodModeApp extends LitElement {
   @state() inboxFeedbackText: string | undefined = undefined;
   @state() inboxSortOrder: "newest" | "oldest" = "newest";
 
+  // Trust summary (for My Day card)
+  @state() trustSummary: import("./controllers/my-day").TrustSummaryData | null = null;
+
   @state() chatPrivateMode = false;
   /** Maps private session keys → expiry timestamp (ms). Ephemeral sessions auto-delete. */
   @state() privateSessions: Map<string, number> = new Map();
@@ -4109,6 +4112,20 @@ export class GodModeApp extends LitElement {
 
   handleInboxSortToggle() {
     this.inboxSortOrder = this.inboxSortOrder === "newest" ? "oldest" : "newest";
+  }
+
+  async handleTrustDailyRate(rating: number) {
+    if (!this.client) return;
+    try {
+      await this.client.request("trust.dailyRate", { rating });
+      // Refresh trust summary
+      if (this.trustSummary) {
+        this.trustSummary = { ...this.trustSummary, todayRated: true };
+      }
+    } catch (err) {
+      console.error("[Trust] Daily rate failed:", err);
+      this.showToast("Failed to submit daily rating", "error");
+    }
   }
 
   // ── Proof sidebar handlers ──────────────────────────────────

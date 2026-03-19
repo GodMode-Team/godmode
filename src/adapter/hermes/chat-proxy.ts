@@ -19,9 +19,22 @@ import type { AdapterLogger } from "../types.js";
 
 // ── Types ────────────────────────────────────────────────────────
 
+/** A content block in an OpenAI-compatible multimodal message. */
+export type ContentBlock =
+  | { type: "text"; text: string }
+  | { type: "image_url"; image_url: { url: string } };
+
 export interface ChatMessage {
   role: "system" | "user" | "assistant";
-  content: string;
+  content: string | ContentBlock[];
+}
+
+/** Image attachment from the GodMode UI. */
+export interface ChatImageAttachment {
+  type: "image";
+  mimeType: string;
+  content: string; // base64 data (no data: prefix)
+  fileName?: string;
 }
 
 export interface ChatProxyOptions {
@@ -118,6 +131,7 @@ export class HermesChatProxy {
     sessionId: string,
     userMessage: string,
     callbacks: StreamCallbacks,
+    attachments?: ChatImageAttachment[],
   ): Promise<void> {
     const session = await loadSession(sessionId);
 
@@ -134,11 +148,31 @@ export class HermesChatProxy {
     const historySlice = session.messages.slice(-50);
     messages.push(...historySlice);
 
-    // 3. Add the new user message
-    messages.push({ role: "user", content: userMessage });
+    // 3. Add the new user message — with image attachments as content blocks
+    const hasImages = attachments && attachments.length > 0;
+    if (hasImages) {
+      const contentBlocks: ContentBlock[] = [];
+      // Add text first
+      if (userMessage) {
+        contentBlocks.push({ type: "text", text: userMessage });
+      }
+      // Add each image as an image_url block with data URI
+      for (const att of attachments) {
+        const dataUrl = att.content.startsWith("data:")
+          ? att.content
+          : `data:${att.mimeType};base64,${att.content}`;
+        contentBlocks.push({ type: "image_url", image_url: { url: dataUrl } });
+      }
+      messages.push({ role: "user", content: contentBlocks });
+    } else {
+      messages.push({ role: "user", content: userMessage });
+    }
 
-    // Save user message to session immediately
-    session.messages.push({ role: "user", content: userMessage });
+    // Save user message to session (text-only for history serialization)
+    const historyLabel = hasImages
+      ? `${userMessage}\n\n[${attachments.length} image(s) attached]`
+      : userMessage;
+    session.messages.push({ role: "user", content: historyLabel });
 
     // 4. Call Hermes API with streaming
     const headers: Record<string, string> = {
@@ -174,6 +208,8 @@ export class HermesChatProxy {
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
       let buffer = "";
+      // Track tool call boundaries to insert paragraph breaks
+      let sawToolCall = false;
 
       while (true) {
         const { done, value } = await reader.read();
@@ -186,8 +222,12 @@ export class HermesChatProxy {
         buffer = lines.pop() ?? ""; // Keep incomplete line in buffer
 
         for (const line of lines) {
-          if (!line.startsWith("data: ")) continue;
-          const data = line.slice(6).trim();
+          // Handle both "data: " and "data:" (some APIs omit the space)
+          const trimmedLine = line.replace(/\r$/, "");
+          if (!trimmedLine.startsWith("data:")) continue;
+          const data = trimmedLine.startsWith("data: ")
+            ? trimmedLine.slice(6).trim()
+            : trimmedLine.slice(5).trim();
 
           if (data === "[DONE]") {
             // Stream complete
@@ -199,10 +239,34 @@ export class HermesChatProxy {
 
           try {
             const chunk = JSON.parse(data);
-            const delta = chunk.choices?.[0]?.delta?.content;
+            const choice = chunk.choices?.[0];
+
+            // Detect tool execution boundaries — Hermes sends tool_calls
+            // deltas between text sections. When text resumes after a tool
+            // call, inject a paragraph break so sentences don't run together.
+            if (choice?.delta?.tool_calls || choice?.finish_reason === "tool_calls") {
+              sawToolCall = true;
+              continue;
+            }
+
+            const delta = choice?.delta?.content;
             if (delta) {
-              fullResponse += delta;
-              callbacks.onToken(delta);
+              // After a tool call boundary, or when the previous text ends
+              // with sentence punctuation and new text starts with a capital
+              // letter (no leading whitespace), insert a paragraph break.
+              let separator = "";
+              if (sawToolCall && fullResponse.length > 0) {
+                separator = "\n\n";
+                sawToolCall = false;
+              } else if (
+                fullResponse.length > 0 &&
+                /[.!?:]\s*$/.test(fullResponse) &&
+                /^[A-Z]/.test(delta)
+              ) {
+                separator = "\n\n";
+              }
+              fullResponse += separator + delta;
+              callbacks.onToken(separator + delta);
             }
           } catch {
             // Skip malformed chunks

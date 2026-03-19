@@ -296,7 +296,20 @@ export class HermesAdapter implements HostAdapter {
       const sessionKey = (params.sessionKey as string) ?? "default";
       const runId = (params.idempotencyKey as string) ?? `hermes-${Date.now()}`;
 
-      if (!message) {
+      // Extract image attachments sent by the UI
+      const rawAttachments = params.attachments as
+        | Array<{ type?: string; mimeType?: string; content?: string; fileName?: string }>
+        | undefined;
+      const imageAttachments = rawAttachments
+        ?.filter((a) => a.type === "image" && a.mimeType && a.content)
+        .map((a) => ({
+          type: "image" as const,
+          mimeType: a.mimeType!,
+          content: a.content!,
+          fileName: a.fileName,
+        }));
+
+      if (!message && (!imageAttachments || imageAttachments.length === 0)) {
         respond(false, null, { code: "INVALID_REQUEST", message: "No message provided" });
         return;
       }
@@ -323,7 +336,7 @@ export class HermesAdapter implements HostAdapter {
       let cumulative = "";
 
       // Stream response via broadcast events matching the UI's expected protocol
-      await this.chatProxy.sendMessage(sessionKey, message, {
+      await this.chatProxy.sendMessage(sessionKey, message ?? "", {
         onToken: (token) => {
           cumulative += token;
           this.broadcast("chat", {
@@ -354,7 +367,7 @@ export class HermesAdapter implements HostAdapter {
             errorMessage: error.message,
           });
         },
-      });
+      }, imageAttachments && imageAttachments.length > 0 ? imageAttachments : undefined);
     });
 
     // Chat history — return stored messages so UI persists after stream ends
