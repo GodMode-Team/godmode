@@ -4,6 +4,7 @@ import { saveDraft, restoreDraft, refreshChat } from "./app-chat";
 import { resetChatScroll, scheduleChatScroll } from "./app-scroll";
 import { syncUrlWithSessionKey } from "./app-settings";
 import type { AppViewState } from "./app-view-state";
+import { exportConversationAsMarkdown } from "./chat/export-conversation";
 import { loadChatHistory } from "./controllers/chat";
 import { loadSessions } from "./controllers/sessions";
 import { formatAgoShort } from "./format";
@@ -307,6 +308,26 @@ export function renderChatControls(state: AppViewState) {
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <rect x="3" y="3" width="18" height="18" rx="2"></rect>
           <path d="M15 3v18"></path>
+        </svg>
+      </button>
+      <!-- Export conversation -->
+      <button
+        class="chat-toolbar__btn"
+        ?disabled=${!state.chatMessages || state.chatMessages.length === 0}
+        @click=${() => {
+          exportConversationAsMarkdown(
+            state.chatMessages,
+            state.sessionKey,
+            state.assistantName,
+          );
+        }}
+        title="Export conversation as markdown"
+        aria-label="Export conversation as markdown"
+      >
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 17V3"></path>
+          <path d="m6 11 6 6 6-6"></path>
+          <path d="M19 21H5"></path>
         </svg>
       </button>
     </div>

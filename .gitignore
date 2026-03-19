@@ -8,3 +8,4 @@ coverage/
 .tmp/
 .worktrees/
 .claude/worktrees/
+experiments/

@@ -400,15 +400,43 @@ export async function runGatewayStart(
 
   // Paperclip agent orchestration (optional — falls back to local queue)
   try {
-    const { initPaperclip, isPaperclipReady } = await import("../services/paperclip-client.js");
+    const { initPaperclip, startCompletionPoller, stopCompletionPoller } = await import("../services/paperclip-client.js");
     const ok = await initPaperclip();
     if (ok) {
       logger.info("[GodMode] Paperclip agent orchestration connected");
-      // Wire Paperclip webhook broadcast
+
+      // Wire Paperclip webhook broadcast (for inbound webhooks)
       try {
         const { setPaperclipWebhookBroadcast } = await import("../methods/paperclip-webhook.js");
         setPaperclipWebhookBroadcast((event: string, data: unknown) => safeBroadcast(api, event, data));
       } catch { /* non-fatal */ }
+
+      // Start polling for completed Paperclip tasks and route results to inbox
+      try {
+        const { handlePaperclipWebhookHttp } = await import("../methods/paperclip-webhook.js");
+        startCompletionPoller((issue) => {
+          // Synthesize a webhook-style payload and route through existing handler
+          const payload = JSON.stringify({
+            issue: {
+              id: issue.id,
+              title: issue.title,
+              description: issue.description,
+              status: issue.status,
+              output: (issue as Record<string, unknown>).resultSummary
+                ?? (issue as Record<string, unknown>).output
+                ?? issue.description,
+            },
+          });
+          handlePaperclipWebhookHttp(payload).catch((err) => {
+            logger.warn(`[GodMode] Paperclip completion handler failed: ${String(err)}`);
+          });
+          logger.info(`[GodMode] Paperclip task completed: "${issue.title}" (${issue.id})`);
+        }, 30_000); // poll every 30 seconds
+        serviceCleanup.push({ name: "paperclip-poller", fn: () => stopCompletionPoller() });
+        logger.info("[GodMode] Paperclip completion poller started (30s interval)");
+      } catch (err) {
+        logger.warn(`[GodMode] Paperclip completion poller failed to start: ${String(err)}`);
+      }
     }
     // If not configured, initPaperclip already logs "using local queue"
   } catch (err) {

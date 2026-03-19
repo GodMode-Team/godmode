@@ -116,6 +116,8 @@ export type MyDayProps = {
   onInboxScore?: (itemId: string, score: number, feedback?: string) => void;
   onInboxSetScoring?: (itemId: string | null, score?: number) => void;
   onInboxFeedbackChange?: (text: string) => void;
+  onInboxSortToggle?: () => void;
+  inboxSortOrder?: "newest" | "oldest";
   onInboxMarkAll?: () => void;
 };
 
@@ -536,6 +538,7 @@ function renderInbox(props: MyDayProps) {
         items: props.inboxItems ?? [],
         loading: props.inboxLoading,
         count: props.inboxCount,
+        sortOrder: props.inboxSortOrder ?? "newest",
         scoringId: props.inboxScoringId,
         scoringValue: props.inboxScoringValue,
         feedbackText: props.inboxFeedbackText,
@@ -546,6 +549,7 @@ function renderInbox(props: MyDayProps) {
         onScore: (itemId: string, score: number, feedback?: string) => props.onInboxScore?.(itemId, score, feedback),
         onSetScoring: (itemId: string | null, score?: number) => props.onInboxSetScoring?.(itemId, score),
         onFeedbackChange: (text: string) => props.onInboxFeedbackChange?.(text),
+        onSortToggle: () => props.onInboxSortToggle?.(),
         onMarkAll: () => props.onInboxMarkAll?.(),
       })}
     </div>

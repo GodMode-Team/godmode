@@ -6,6 +6,7 @@ import { toStreamingMarkdownHtml } from "../markdown-streaming";
 import type { MessageGroup, ToolExecutionInfo } from "../types/chat-types";
 import { renderCopyAsMarkdownButton } from "./copy-as-markdown";
 import {
+  extractRawText,
   extractTextCached,
   extractThinkingCached,
   formatApiError,
@@ -15,6 +16,7 @@ import { isToolResultMessage, normalizeRoleForGrouping } from "./message-normali
 import type { LightboxImage } from "./lightbox";
 import { getFileIcon, getFileTypeLabel } from "./file-utils";
 import { extractToolCards, renderToolCardSidebar } from "./tool-cards";
+import { handleChatFileClick } from "./file-click";
 
 // Fun verbs for different tool types
 const WORKING_VERBS: Record<string, string[]> = {
@@ -120,6 +122,33 @@ function renderFileUploadCards(files: ParsedFileUpload[]) {
  */
 function stripFileUploadText(text: string): string {
   return text.replace(/\[Files uploaded:[^\]]+\]\s*/g, "").trim();
+}
+
+/**
+ * Parse <document> blocks (base64-inlined file uploads) from message text.
+ * Returns file metadata for rendering file cards in the UI.
+ */
+const DOCUMENT_BLOCK_PARSE_RE = /<document>\s*<source>([^<]*)<\/source>\s*<mime_type>([^<]*)<\/mime_type>\s*<content\s+encoding="base64">\s*[\s\S]*?<\/content>\s*<\/document>/gi;
+
+function parseInlinedDocuments(text: string): ParsedFileUpload[] | null {
+  const files: ParsedFileUpload[] = [];
+  let match;
+  while ((match = DOCUMENT_BLOCK_PARSE_RE.exec(text)) !== null) {
+    const fileName = match[1]?.trim() || "file";
+    const mimeType = match[2]?.trim() || "application/octet-stream";
+    files.push({ fileName, fileId: "", size: "", mimeType });
+  }
+  DOCUMENT_BLOCK_PARSE_RE.lastIndex = 0;
+  return files.length > 0 ? files : null;
+}
+
+/**
+ * Strip <document> blocks from text (base64 blobs not meant for display).
+ */
+const DOCUMENT_BLOCK_STRIP_RE = /<document>\s*<source>[^<]*<\/source>\s*<mime_type>[^<]*<\/mime_type>\s*<content\s+encoding="base64">\s*[\s\S]*?<\/content>\s*<\/document>/gi;
+
+function stripInlinedDocuments(text: string): string {
+  return text.replace(DOCUMENT_BLOCK_STRIP_RE, "").trim();
 }
 
 /**
@@ -750,13 +779,26 @@ function renderGroupedMessageUnsafe(
   // Parse file uploads from text pattern (user messages with [Files uploaded: ...])
   const parsedFileUploads =
     role === "user" && extractedText ? parseFileUploadsFromText(extractedText) : null;
-  const hasFileUploads = parsedFileUploads && parsedFileUploads.length > 0;
+
+  // Parse <document> blocks (base64-inlined file uploads) from the raw message text.
+  // extractText() already strips these, so we need the raw text for parsing metadata.
+  const rawText = role === "user" ? extractRawText(message) : null;
+  const inlinedDocUploads = rawText ? parseInlinedDocuments(rawText) : null;
+
+  // Merge both file upload sources
+  const allFileUploads = [
+    ...(parsedFileUploads ?? []),
+    ...(inlinedDocUploads ?? []),
+  ];
+  const hasFileUploads = allFileUploads.length > 0;
 
   // Strip file upload text and system event lines from user messages
   // System events are prepended for agent context but shouldn't show in the UI
   let cleanedText = extractedText;
   if (role === "user" && cleanedText) {
     cleanedText = stripSystemLines(cleanedText);
+    // Strip any residual <document> blocks that extractText may not have fully removed
+    cleanedText = stripInlinedDocuments(cleanedText);
   }
   // Strip <system-context> blocks that may leak from prependContext injection
   if (cleanedText) {
@@ -820,13 +862,33 @@ function renderGroupedMessageUnsafe(
         </div>
       `;
     }
+    // Never silently hide user messages — if the original text existed before
+    // stripping (system-context removal ate the user's text), recover it.
+    if (role === "user" && extractedText?.trim()) {
+      // Re-extract: strip system-context but keep whatever else remains
+      let recovered = extractedText
+        .replace(/<(?:system|godmode)-context\b[^>]*>[\s\S]*?<\/(?:system|godmode)-context>/gi, "")
+        .trim();
+      // Also strip system event prefixes
+      if (recovered.startsWith("System:") || recovered.startsWith("GatewayRestart:") || recovered.startsWith("Sender (untrusted metadata)")) {
+        const sepIdx = recovered.indexOf("\n\n");
+        recovered = sepIdx !== -1 ? recovered.slice(sepIdx + 2).trim() : "";
+      }
+      if (recovered) {
+        return html`
+          <div class="chat-bubble fade-in">
+            <div class="chat-text">${recovered}</div>
+          </div>
+        `;
+      }
+    }
     return nothing;
   }
 
   return html`
     <div class="${bubbleClasses}">
       ${canCopyMarkdown ? renderCopyAsMarkdownButton(markdown!) : nothing}
-      ${hasFileUploads ? renderFileUploadCards(parsedFileUploads) : nothing}
+      ${hasFileUploads ? renderFileUploadCards(allFileUploads) : nothing}
       ${renderMessageImages(images, onImageClick, boundResolver)}
       ${renderFileAttachments(fileAttachments)}
       ${
@@ -841,7 +903,7 @@ function renderGroupedMessageUnsafe(
       }
       ${
         markdown
-          ? html`<div class="chat-text">${unsafeHTML(
+          ? html`<div class="chat-text" @click=${(e: Event) => handleChatFileClick(e, onOpenFile)}>${unsafeHTML(
               opts.isStreaming
                 ? toStreamingMarkdownHtml(markdown)
                 : toSanitizedMarkdownHtml(markdown),

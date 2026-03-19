@@ -136,6 +136,7 @@ export type AppViewState = {
   pendingGatewayUrl: string | null;
   gatewayRestartPending: boolean;
   gatewayRestartBusy: boolean;
+  deployPanelOpen: boolean;
   configLoading: boolean;
   configRaw: string;
   configRawOriginal: string;
@@ -469,6 +470,8 @@ export type AppViewState = {
   handleGatewayRestartClick: () => void;
   handleGatewayRestartConfirm: () => Promise<void>;
   handleGatewayRestartCancel: () => void;
+  handleDeployPanelToggle: () => void;
+  handleDeployDismiss: () => Promise<void>;
   handleConfigLoad: () => Promise<void>;
   handleConfigSave: () => Promise<void>;
   handleConfigApply: () => Promise<void>;

@@ -336,15 +336,15 @@ export function renderApp(state: AppViewState) {
           ${
             state.updateStatus?.pendingDeploy
               ? html`<button
-                  class="pill pill--restart"
+                  class="pill pill--deploy"
                   @click=${(e: Event) => {
                     e.preventDefault();
-                    state.handleGatewayRestartClick();
+                    state.handleDeployPanelToggle();
                   }}
-                  title="Restart to apply: ${state.updateStatus.pendingDeploy.summary ?? "pending fix"}"
+                  title="${state.updateStatus.pendingDeploy.summary ?? "pending fix"}"
                 >
                   <span class="pill__icon">${icons.rotateCcw}</span>
-                  <span>Restart</span>
+                  <span>Deploy Ready</span>
                 </button>`
               : nothing
           }
@@ -373,7 +373,42 @@ export function renderApp(state: AppViewState) {
           ${renderThemeToggle(state)}
         </div>
       </header>
+      ${state.deployPanelOpen && state.updateStatus?.pendingDeploy
+        ? (() => {
+            const deploy = state.updateStatus.pendingDeploy;
+            const agoMs = Date.now() - deploy.ts;
+            const agoMin = Math.floor(agoMs / 60_000);
+            const agoText = agoMin < 1 ? "just now" : agoMin < 60 ? `${agoMin}m ago` : `${Math.floor(agoMin / 60)}h ago`;
+            return html`
+              <div class="deploy-review-panel">
+                <div class="deploy-review-panel__body">
+                  <div class="deploy-review-panel__info">
+                    <strong>Staged Deploy</strong>
+                    <span class="deploy-review-panel__summary">${deploy.summary ?? "Pending fix"}</span>
+                    <span class="deploy-review-panel__meta">Staged ${agoText}</span>
+                    ${deploy.files?.length
+                      ? html`<details class="deploy-review-panel__files">
+                          <summary>${deploy.files.length} file${deploy.files.length > 1 ? "s" : ""} changed</summary>
+                          <ul>${deploy.files.map((f: string) => html`<li>${f}</li>`)}</ul>
+                        </details>`
+                      : nothing}
+                  </div>
+                  <div class="deploy-review-panel__actions">
+                    <button
+                      class="btn btn--sm primary"
+                      @click=${() => { state.handleDeployPanelToggle(); state.handleGatewayRestartClick(); }}
+                    >Apply (Restart)</button>
+                    <button
+                      class="btn btn--sm"
+                      @click=${() => state.handleDeployDismiss()}
+                    >Dismiss</button>
+                  </div>
+                </div>
+              </div>`;
+          })()
+        : nothing}
       <aside class="nav ${state.settings.navCollapsed ? "nav--collapsed" : ""}">
+
         ${TAB_GROUPS.map((group) => {
           const isGroupCollapsed = state.settings.navGroupsCollapsed[group.label] ?? false;
           const hasActiveTab = group.tabs.some((tab) => tab === state.tab);
@@ -1453,6 +1488,8 @@ export function renderApp(state: AppViewState) {
                   onInboxSetScoring: (itemId: string | null, score?: number) =>
                     state.handleInboxSetScoring(itemId, score),
                   onInboxFeedbackChange: (text: string) => state.handleInboxFeedbackChange(text),
+                  onInboxSortToggle: () => state.handleInboxSortToggle(),
+                  inboxSortOrder: state.inboxSortOrder ?? "newest",
                   onInboxMarkAll: () => void state.handleInboxMarkAll(),
                   // Evening capture
                   onEveningCapture: () => {

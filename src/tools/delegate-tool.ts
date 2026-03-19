@@ -14,7 +14,7 @@
  */
 
 import { type AnyAgentTool, jsonResult } from "openclaw/plugin-sdk";
-import { isPaperclipReady, createTask as paperclipCreateTask } from "../services/paperclip-client.js";
+import { isPaperclipReady, createTask as paperclipCreateTask, findOrCreateProject as paperclipFindOrCreateProject, resolveAgentId as paperclipResolveAgent } from "../services/paperclip-client.js";
 import {
   type ProjectBrief,
   updateProjects,
@@ -135,6 +135,10 @@ export function createDelegateTool(): AnyAgentTool {
           if (isPaperclipReady()) {
             try {
               const projectId = newProjectId();
+
+              // Find existing project or create a new one (prevents duplicates)
+              const pcProject = await paperclipFindOrCreateProject(title, description);
+
               const paperclipIssues: Array<{
                 issueId: string;
                 title: string;
@@ -142,15 +146,24 @@ export function createDelegateTool(): AnyAgentTool {
               }> = [];
 
               for (const task of issues) {
+                // Resolve GodMode persona to Paperclip agent
+                const persona = resolvePersona(inferTaskType(task.title), task.personaHint);
+                const agentId = await paperclipResolveAgent(
+                  persona?.name ?? task.personaHint ?? task.title,
+                );
+
                 const pcIssue = await paperclipCreateTask({
                   title: task.title,
-                  description: `Project: ${title}\n\n${task.description}`,
+                  description: task.description,
                   priority: task.priority,
+                  assigneeAgentId: agentId,
+                  projectId: pcProject.id,
+                  status: "todo",
                 });
                 paperclipIssues.push({
                   issueId: pcIssue.id,
                   title: task.title,
-                  assignee: task.personaHint || "auto-assign",
+                  assignee: persona?.slug ?? task.personaHint ?? "auto-assign",
                 });
               }
 
@@ -357,17 +370,53 @@ export function createDelegateTool(): AnyAgentTool {
           const project = projects.find(p => p.projectId === projectId);
           if (!project) return jsonResult({ error: `Project not found: ${projectId}` });
 
-          // Cross-reference queue state for live statuses
+          // Cross-reference queue state + Paperclip for live statuses
           const qs = await readQueueState();
-          const issueStatuses = project.issues.map(issue => {
+          const issueStatuses: Array<{
+            issueId: string;
+            title: string;
+            status: string;
+            assignee: string;
+            backend?: string;
+          }> = [];
+
+          for (const issue of project.issues) {
+            // Check local queue first
             const qi = qs.items.find(i => i.meta?.issueId === issue.issueId || i.meta?.paperclipIssueId === issue.issueId);
-            return {
+            if (qi) {
+              issueStatuses.push({
+                issueId: issue.issueId,
+                title: issue.title,
+                status: qi.status,
+                assignee: issue.personaSlug,
+                backend: "local",
+              });
+              continue;
+            }
+
+            // Check Paperclip if connected (queueItemId may hold Paperclip issue ID)
+            if (isPaperclipReady() && issue.queueItemId) {
+              try {
+                const { getTaskStatus } = await import("../services/paperclip-client.js");
+                const pcIssue = await getTaskStatus(issue.queueItemId);
+                issueStatuses.push({
+                  issueId: issue.issueId,
+                  title: issue.title,
+                  status: pcIssue.status,
+                  assignee: issue.personaSlug,
+                  backend: "paperclip",
+                });
+                continue;
+              } catch { /* fall through */ }
+            }
+
+            issueStatuses.push({
               issueId: issue.issueId,
               title: issue.title,
-              status: qi?.status ?? "pending",
+              status: "pending",
               assignee: issue.personaSlug,
-            };
-          });
+            });
+          }
 
           return jsonResult({
             projectId: project.projectId,

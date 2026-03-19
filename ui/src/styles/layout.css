@@ -374,6 +374,109 @@
   fill: none;
 }
 
+/* Deploy Ready pill */
+.topbar-status .pill--deploy {
+  background: var(--surface-2);
+  border-color: var(--border);
+  color: var(--text-secondary);
+  cursor: pointer;
+  font: inherit;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease;
+}
+
+.topbar-status .pill--deploy:hover {
+  background: var(--accent-subtle, rgba(99, 102, 241, 0.1));
+  border-color: var(--accent, #6366f1);
+  color: var(--accent, #6366f1);
+}
+
+.topbar-status .pill--deploy .pill__icon {
+  width: 14px;
+  height: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.topbar-status .pill--deploy .pill__icon svg {
+  width: 100%;
+  height: 100%;
+  stroke: currentColor;
+  stroke-width: 2;
+  fill: none;
+}
+
+/* Deploy Review Panel — slide-down banner below topbar */
+.deploy-review-panel {
+  background: var(--surface-1);
+  border-bottom: 1px solid var(--border);
+  padding: 12px 20px;
+  grid-column: 1 / -1;
+  z-index: 10;
+}
+
+.deploy-review-panel__body {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  max-width: 800px;
+}
+
+.deploy-review-panel__info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+}
+
+.deploy-review-panel__info strong {
+  font-size: 14px;
+  color: var(--text-primary);
+}
+
+.deploy-review-panel__summary {
+  color: var(--text-secondary);
+}
+
+.deploy-review-panel__meta {
+  color: var(--text-tertiary, var(--text-secondary));
+  font-size: 12px;
+}
+
+.deploy-review-panel__files {
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.deploy-review-panel__files summary {
+  cursor: pointer;
+  color: var(--accent, #6366f1);
+}
+
+.deploy-review-panel__files ul {
+  margin: 4px 0 0;
+  padding-left: 18px;
+  list-style: disc;
+}
+
+.deploy-review-panel__files li {
+  font-family: var(--font-mono, monospace);
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.deploy-review-panel__actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+  align-items: center;
+}
+
 .topbar-status .theme-toggle {
   --theme-item: 24px;
   --theme-gap: 2px;

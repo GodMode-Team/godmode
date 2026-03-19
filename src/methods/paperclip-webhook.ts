@@ -10,6 +10,7 @@
 import { writeFile, mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { MEMORY_DIR } from "../data-paths.js";
+import { addInboxItem } from "../services/inbox.js";
 
 // ── Helpers ──────────────────────────────────────────────────────
 
@@ -81,6 +82,19 @@ export async function handlePaperclipWebhookHttp(
 
   const filePath = join(inboxDir, `${slug}.md`);
   await writeFile(filePath, content, "utf-8");
+
+  // Add to inbox.json so the UI surfaces it
+  try {
+    await addInboxItem({
+      type: "agent-execution",
+      title,
+      summary: output.slice(0, 500),
+      source: { persona: "paperclip", taskId: issueId },
+      outputPath: filePath,
+    });
+  } catch (err) {
+    console.error("[GodMode] Paperclip webhook: failed to add inbox item", err);
+  }
 
   console.log(`[GodMode] Paperclip webhook: task "${title}" (${issueId}) → inbox`);
 

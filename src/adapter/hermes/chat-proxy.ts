@@ -1,0 +1,299 @@
+/**
+ * hermes/chat-proxy.ts — Proxies chat messages to Hermes Agent HTTP API.
+ *
+ * Sends user messages to Hermes at /v1/chat/completions with:
+ *   - Workspace context as a system message (tasks, queue, schedule)
+ *   - Conversation history (multi-turn)
+ *   - SSE streaming back to the caller
+ *
+ * Hermes runs the full agent loop (tools, memory, skills) on its side.
+ * GodMode only injects workspace state that Hermes doesn't have.
+ */
+
+import { join } from "node:path";
+import { randomUUID } from "node:crypto";
+import { readFile, writeFile, mkdir } from "node:fs/promises";
+import { existsSync } from "node:fs";
+import { DATA_DIR } from "../../data-paths.js";
+import type { AdapterLogger } from "../types.js";
+
+// ── Types ────────────────────────────────────────────────────────
+
+export interface ChatMessage {
+  role: "system" | "user" | "assistant";
+  content: string;
+}
+
+export interface ChatProxyOptions {
+  hermesUrl: string;
+  hermesApiKey?: string;
+  logger: AdapterLogger;
+  /** Called with workspace context to inject as system message. */
+  getWorkspaceContext?: () => Promise<string | null>;
+}
+
+export interface StreamCallbacks {
+  onToken: (token: string) => void;
+  onDone: (fullResponse: string) => void;
+  onError: (error: Error) => void;
+}
+
+// ── Session Store ────────────────────────────────────────────────
+
+const SESSIONS_DIR = join(DATA_DIR, "hermes-sessions");
+
+interface SessionHistory {
+  id: string;
+  createdAt: number;
+  messages: ChatMessage[];
+}
+
+async function ensureSessionsDir(): Promise<void> {
+  if (!existsSync(SESSIONS_DIR)) {
+    await mkdir(SESSIONS_DIR, { recursive: true });
+  }
+}
+
+function sanitizeSessionId(id: string): string {
+  // Strip path separators and dots to prevent traversal
+  return id.replace(/[^a-zA-Z0-9_-]/g, "_");
+}
+
+async function loadSession(sessionId: string): Promise<SessionHistory> {
+  const safeId = sanitizeSessionId(sessionId);
+  const filePath = join(SESSIONS_DIR, `${safeId}.json`);
+  try {
+    const raw = await readFile(filePath, "utf-8");
+    return JSON.parse(raw);
+  } catch {
+    return { id: sessionId, createdAt: Date.now(), messages: [] };
+  }
+}
+
+async function saveSession(session: SessionHistory): Promise<void> {
+  await ensureSessionsDir();
+  const safeId = sanitizeSessionId(session.id);
+  const filePath = join(SESSIONS_DIR, `${safeId}.json`);
+  await writeFile(filePath, JSON.stringify(session, null, 2));
+}
+
+// ── Chat Proxy ───────────────────────────────────────────────────
+
+export class HermesChatProxy {
+  private hermesUrl: string;
+  private hermesApiKey?: string;
+  private logger: AdapterLogger;
+  private getWorkspaceContext: () => Promise<string | null>;
+
+  constructor(opts: ChatProxyOptions) {
+    this.hermesUrl = opts.hermesUrl.replace(/\/$/, "");
+    this.hermesApiKey = opts.hermesApiKey;
+    this.logger = opts.logger;
+    this.getWorkspaceContext = opts.getWorkspaceContext ?? (async () => null);
+  }
+
+  /** Check if Hermes API is reachable. */
+  async healthCheck(): Promise<boolean> {
+    try {
+      const res = await fetch(`${this.hermesUrl}/health`, { signal: AbortSignal.timeout(5000) });
+      return res.ok;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Send a user message and stream the response.
+   * Returns the full response text when streaming completes.
+   */
+  async sendMessage(
+    sessionId: string,
+    userMessage: string,
+    callbacks: StreamCallbacks,
+  ): Promise<void> {
+    const session = await loadSession(sessionId);
+
+    // Build message array: workspace context + history + new user message
+    const messages: ChatMessage[] = [];
+
+    // 1. Inject workspace context as system message
+    const wsContext = await this.getWorkspaceContext();
+    if (wsContext) {
+      messages.push({ role: "system", content: wsContext });
+    }
+
+    // 2. Include conversation history (trim to last 50 messages for context window)
+    const historySlice = session.messages.slice(-50);
+    messages.push(...historySlice);
+
+    // 3. Add the new user message
+    messages.push({ role: "user", content: userMessage });
+
+    // Save user message to session immediately
+    session.messages.push({ role: "user", content: userMessage });
+
+    // 4. Call Hermes API with streaming
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+    };
+    if (this.hermesApiKey) {
+      headers["Authorization"] = `Bearer ${this.hermesApiKey}`;
+    }
+
+    let fullResponse = "";
+
+    try {
+      const res = await fetch(`${this.hermesUrl}/v1/chat/completions`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          model: "hermes-agent",
+          messages,
+          stream: true,
+        }),
+      });
+
+      if (!res.ok) {
+        const body = await res.text();
+        throw new Error(`Hermes API error ${res.status}: ${body}`);
+      }
+
+      if (!res.body) {
+        throw new Error("Hermes API returned no body");
+      }
+
+      // Parse SSE stream
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+
+        // Process complete SSE lines
+        const lines = buffer.split("\n");
+        buffer = lines.pop() ?? ""; // Keep incomplete line in buffer
+
+        for (const line of lines) {
+          if (!line.startsWith("data: ")) continue;
+          const data = line.slice(6).trim();
+
+          if (data === "[DONE]") {
+            // Stream complete
+            session.messages.push({ role: "assistant", content: fullResponse });
+            await saveSession(session);
+            callbacks.onDone(fullResponse);
+            return;
+          }
+
+          try {
+            const chunk = JSON.parse(data);
+            const delta = chunk.choices?.[0]?.delta?.content;
+            if (delta) {
+              fullResponse += delta;
+              callbacks.onToken(delta);
+            }
+          } catch {
+            // Skip malformed chunks
+          }
+        }
+      }
+
+      // Stream ended without [DONE] — still save what we got
+      if (fullResponse) {
+        session.messages.push({ role: "assistant", content: fullResponse });
+        await saveSession(session);
+        callbacks.onDone(fullResponse);
+      }
+    } catch (err) {
+      this.logger.error(`[Hermes Chat] Error: ${err}`);
+      callbacks.onError(err instanceof Error ? err : new Error(String(err)));
+    }
+  }
+
+  /**
+   * Send a message without streaming (simpler, for internal use).
+   */
+  async sendMessageSync(
+    sessionId: string,
+    userMessage: string,
+  ): Promise<string> {
+    const session = await loadSession(sessionId);
+
+    const messages: ChatMessage[] = [];
+    const wsContext = await this.getWorkspaceContext();
+    if (wsContext) {
+      messages.push({ role: "system", content: wsContext });
+    }
+    messages.push(...session.messages.slice(-50));
+    messages.push({ role: "user", content: userMessage });
+
+    session.messages.push({ role: "user", content: userMessage });
+
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+    };
+    if (this.hermesApiKey) {
+      headers["Authorization"] = `Bearer ${this.hermesApiKey}`;
+    }
+
+    const res = await fetch(`${this.hermesUrl}/v1/chat/completions`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        model: "hermes-agent",
+        messages,
+        stream: false,
+      }),
+    });
+
+    if (!res.ok) {
+      throw new Error(`Hermes API error ${res.status}: ${await res.text()}`);
+    }
+
+    const json = await res.json() as {
+      choices: Array<{ message: { content: string } }>;
+    };
+    const content = json.choices?.[0]?.message?.content ?? "";
+
+    session.messages.push({ role: "assistant", content });
+    await saveSession(session);
+
+    return content;
+  }
+
+  /** Create a new session ID. */
+  createSession(): string {
+    return randomUUID();
+  }
+
+  /** List existing sessions. */
+  async listSessions(): Promise<Array<{ id: string; createdAt: number; messageCount: number }>> {
+    await ensureSessionsDir();
+    const { readdirSync } = await import("node:fs");
+    const files = readdirSync(SESSIONS_DIR).filter((f) => f.endsWith(".json"));
+    const sessions = [];
+    for (const f of files) {
+      try {
+        const raw = await readFile(join(SESSIONS_DIR, f), "utf-8");
+        const s = JSON.parse(raw) as SessionHistory;
+        sessions.push({ id: s.id, createdAt: s.createdAt, messageCount: s.messages.length });
+      } catch {
+        // Skip corrupt files
+      }
+    }
+    return sessions.sort((a, b) => b.createdAt - a.createdAt);
+  }
+
+  /** Get chat history for a session, formatted for the UI. */
+  async getHistory(sessionId: string): Promise<Array<{ role: string; content: string; timestamp?: number }>> {
+    const session = await loadSession(sessionId);
+    return session.messages.map((m) => ({
+      role: m.role,
+      content: m.content,
+    }));
+  }
+}

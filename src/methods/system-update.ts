@@ -598,6 +598,23 @@ const postStatus: GatewayRequestHandler = async ({ respond }) => {
   }
 };
 
+// ── godmode.deploy.dismiss ────────────────────────────────────────────────
+
+const deployDismiss: GatewayRequestHandler = ({ respond }) => {
+  try {
+    const pendingPath = join(DATA_DIR, "pending-deploy.json");
+    if (existsSync(pendingPath)) {
+      unlinkSync(pendingPath);
+    }
+    respond(true, { dismissed: true });
+  } catch (err) {
+    respond(false, undefined, {
+      code: "DEPLOY_DISMISS_FAILED",
+      message: String(err),
+    });
+  }
+};
+
 // ── Export ────────────────────────────────────────────────────────────────
 
 export const systemUpdateHandlers: GatewayRequestHandlers = {
@@ -607,4 +624,5 @@ export const systemUpdateHandlers: GatewayRequestHandlers = {
   "godmode.update.pluginRun": pluginRun,
   "godmode.update.postStatus": postStatus,
   "godmode.gateway.restart": gatewayRestart,
+  "godmode.deploy.dismiss": deployDismiss,
 };

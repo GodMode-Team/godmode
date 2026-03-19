@@ -18,9 +18,16 @@ const FILE_EXT_RE = /\.(html?|css|js|ts|tsx|jsx|json|md|txt|csv|py|sh|yaml|yml|x
 // Negative lookbehind avoids matching paths already inside markdown links.
 const FILE_PATH_RE = /(?<![(\[`])(?:~\/|\/(?:Users|home|tmp|var|opt|etc|godmode)\/)[\w/.+@-]+(?:\.\w+|\/)(?=\s|[),;:!?]|$)/g;
 
+// Match bare filenames with known extensions (e.g. "my-report-abc123.md").
+// Must contain at least one hyphen or underscore (to avoid matching plain words like "file.md")
+// and must NOT already be inside a markdown link or code span.
+// Negative lookbehind: not preceded by ( [ ` / ~ to avoid double-matching paths.
+const BARE_FILENAME_RE = /(?<![(\[`/~\w])(?:[\w][\w.-]*[-_][\w.-]*\.(?:html?|css|js|ts|tsx|jsx|json|md|txt|csv|py|sh|yaml|yml|xml|svg|png|jpe?g|gif|webp|pdf|log|mp4|mov|mkv|avi|webm|mp3|wav|aac|ogg|flac|zip|tar|gz|bz2|dmg|iso|doc|docx|xls|xlsx|ppt|pptx))(?=\s|[),;:!?|]|$)/gi;
+
 /**
  * Pre-process markdown to wrap bare file paths in clickable links.
  * Skips fenced code blocks (``` ... ```) and inline code (` ... `).
+ * Also detects bare filenames with known extensions (e.g. deliverable names).
  */
 export function linkifyFilePaths(markdown: string): string {
   // Split on fenced code blocks to avoid linkifying inside them
@@ -28,6 +35,8 @@ export function linkifyFilePaths(markdown: string): string {
   for (let i = 0; i < parts.length; i++) {
     // Odd indices are code blocks/inline code — skip them
     if (i % 2 !== 0) continue;
+
+    // First pass: absolute paths → file:// links
     parts[i] = parts[i].replace(FILE_PATH_RE, (match) => {
       const isDir = match.endsWith("/");
       if (!isDir && !FILE_EXT_RE.test(match)) return match;
@@ -41,6 +50,12 @@ export function linkifyFilePaths(markdown: string): string {
         ? (segments.pop() ?? match) + "/"
         : segments.pop() ?? match;
       return `[${basename}](${href})`;
+    });
+
+    // Second pass: bare filenames → godmode-file:// links
+    // Skip if already inside a markdown link [...](...)
+    parts[i] = parts[i].replace(BARE_FILENAME_RE, (match) => {
+      return `[${match}](godmode-file://${encodeURIComponent(match)})`;
     });
   }
   return parts.join("");
@@ -116,9 +131,9 @@ const allowedAttrs = [
   "style",
 ];
 
-// DOMPurify URI regex — default + file: protocol for local file links
+// DOMPurify URI regex — default + file: and godmode-file: protocols for local file links
 const ALLOWED_URI_RE =
-  /^(?:(?:(?:f|ht)tps?|mailto|tel|callto|sms|cid|xmpp|file):|[^a-z]|[a-z+.\-]+(?:[^a-z+.\-:]|$))/i;
+  /^(?:(?:(?:f|ht)tps?|mailto|tel|callto|sms|cid|xmpp|file|godmode-file):|[^a-z]|[a-z+.\-]+(?:[^a-z+.\-:]|$))/i;
 
 let hooksInstalled = false;
 const MARKDOWN_CHAR_LIMIT = 140_000;

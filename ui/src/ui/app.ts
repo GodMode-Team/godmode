@@ -435,6 +435,7 @@ export class GodModeApp extends LitElement {
   @state() pendingGatewayUrl: string | null = null;
   @state() gatewayRestartPending = false;
   @state() gatewayRestartBusy = false;
+  @state() deployPanelOpen = false;
 
   @state() configLoading = false;
   @state() configRaw = "{\n}\n";
@@ -587,6 +588,7 @@ export class GodModeApp extends LitElement {
   @state() inboxScoringId: string | null = null;
   @state() inboxScoringValue: number | undefined = undefined;
   @state() inboxFeedbackText: string | undefined = undefined;
+  @state() inboxSortOrder: "newest" | "oldest" = "newest";
 
   @state() chatPrivateMode = false;
   /** Maps private session keys → expiry timestamp (ms). Ephemeral sessions auto-delete. */
@@ -2321,6 +2323,24 @@ export class GodModeApp extends LitElement {
 
   handleGatewayRestartCancel() {
     this.gatewayRestartPending = false;
+  }
+
+  handleDeployPanelToggle() {
+    this.deployPanelOpen = !this.deployPanelOpen;
+  }
+
+  async handleDeployDismiss() {
+    if (!this.client) return;
+    try {
+      await this.client.request("godmode.deploy.dismiss");
+    } catch {
+      // Best effort — file may already be gone
+    }
+    this.deployPanelOpen = false;
+    // Clear pendingDeploy from local state
+    if (this.updateStatus) {
+      this.updateStatus = { ...this.updateStatus, pendingDeploy: null };
+    }
   }
 
   // Sidebar handlers for tool output viewing
@@ -4068,6 +4088,10 @@ export class GodModeApp extends LitElement {
 
   handleInboxFeedbackChange(text: string) {
     this.inboxFeedbackText = text;
+  }
+
+  handleInboxSortToggle() {
+    this.inboxSortOrder = this.inboxSortOrder === "newest" ? "oldest" : "newest";
   }
 
   // ── Proof sidebar handlers ──────────────────────────────────

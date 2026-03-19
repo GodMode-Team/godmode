@@ -182,19 +182,52 @@ function renderContextBadge(props: ChatProps) {
   const used = activeSession?.totalTokens ?? 0;
   const max = activeSession?.contextTokens ?? props.sessions?.defaults?.contextTokens ?? 200000;
 
+  // Context budget tier info
+  const tierLabel =
+    percentage >= 90
+      ? "Soul + identity only"
+      : percentage >= 70
+        ? "P0 + P1 active"
+        : "Full context";
+
+  const trimmedNote =
+    percentage >= 90
+      ? html`<span class="chat-context-badge__tier-note chat-context-badge__tier-note--danger">
+          Schedule, tasks, skill cards trimmed
+        </span>`
+      : percentage >= 70
+        ? html`<span class="chat-context-badge__tier-note chat-context-badge__tier-note--warn">
+            Meetings, cron, queue review trimmed
+          </span>`
+        : nothing;
+
+  const tierRows = html`
+    <span class="chat-context-badge__tier ${percentage < 70 ? "active" : "trimmed"}">P3 Safety nudges, onboarding</span>
+    <span class="chat-context-badge__tier ${percentage < 70 ? "active" : "trimmed"}">P2 Meetings, cron, queue review</span>
+    <span class="chat-context-badge__tier ${percentage < 90 ? "active" : "trimmed"}">P1 Schedule, tasks, skill cards</span>
+    <span class="chat-context-badge__tier active">P0 Soul, identity, memory</span>
+  `;
+
   return html`
     <button
       type="button"
       class="chat-context-badge chat-context-badge--${colorClass}"
       role="status"
-      aria-label="Context window: ${percentage}% used. Click to compact."
+      aria-label="Context window: ${percentage}% used (${tierLabel}). Click to compact."
       @click=${() => props.onCompact?.()}
       ?disabled=${!props.connected}
     >
       ${percentage}%
+      <span class="chat-context-badge__bar">
+        <span class="chat-context-badge__bar-fill chat-context-badge__bar-fill--${colorClass}" style="width:${percentage}%"></span>
+      </span>
       <span class="chat-context-badge__tooltip">
-        ${used.toLocaleString()} / ${max.toLocaleString()} tokens<br>
-        Click to compact
+        <span class="chat-context-badge__tooltip-header">
+          ${used.toLocaleString()} / ${max.toLocaleString()} tokens
+        </span>
+        ${trimmedNote}
+        <span class="chat-context-badge__tier-list">${tierRows}</span>
+        <span class="chat-context-badge__tooltip-action">Click to compact</span>
       </span>
     </button>
   `;

@@ -7,6 +7,13 @@ const SILENT_REPLY_TOKEN = "NO_REPLY";
 const SYSTEM_CONTEXT_RE = /<(?:system|godmode)-context\b[^>]*>[\s\S]*?<\/(?:system|godmode)-context>/gi;
 
 /**
+ * Strip <document> blocks containing base64-encoded file content.
+ * Non-image file uploads are inlined as <document> XML blocks in the message text
+ * for the LLM, but should never be displayed raw in the chat UI.
+ */
+const DOCUMENT_BLOCK_RE = /<document>\s*<source>[^<]*<\/source>\s*<mime_type>[^<]*<\/mime_type>\s*<content\s+encoding="base64">\s*[\s\S]*?<\/content>\s*<\/document>/gi;
+
+/**
  * GodMode system context fingerprints. The model sometimes echoes the
  * inner content of <system-context> blocks WITHOUT the XML tags, so
  * the tag-based regex above misses it. These fingerprints detect the
@@ -24,7 +31,7 @@ const CONTEXT_FINGERPRINTS = [
 ];
 
 function stripSystemContext(text: string): string {
-  let stripped = text.replace(SYSTEM_CONTEXT_RE, "").trim();
+  let stripped = text.replace(SYSTEM_CONTEXT_RE, "").replace(DOCUMENT_BLOCK_RE, "").trim();
 
   // Detect tagless echo — model outputting system context without XML wrapper
   const lower = stripped.toLowerCase();

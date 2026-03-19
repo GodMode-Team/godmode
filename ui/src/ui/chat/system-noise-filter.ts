@@ -56,8 +56,10 @@ export function isSystemPromptNoise(msg: Record<string, unknown>): boolean {
   // the gateway prepends it to the user message. Strip the tags so that
   // subsequent checks operate on the real user text. If nothing remains
   // after stripping, the message is pure system injection — hide it.
+  // Use includes() instead of startsWith() — sometimes a "Sender" or
+  // "System:" prefix precedes the system-context block.
   let check = t;
-  if (t.startsWith("<system-context") || t.startsWith("<godmode-context")) {
+  if (t.includes("<system-context") || t.includes("<godmode-context")) {
     check = t
       .replace(/<system-context[\s\S]*?<\/system-context>/gi, "")
       .replace(/<godmode-context[\s\S]*?<\/godmode-context>/gi, "")
