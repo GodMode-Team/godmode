@@ -1,5 +1,5 @@
 import { GodModeApp } from "./app";
-import { appEventBus } from "./app-events";
+import { appEventBus } from "./context/event-bus.js";
 import { flushChatQueueForEvent } from "./app-chat";
 import type { EventLogEntry } from "./app-events";
 import { applySettings, loadCron, refreshActiveTab, setLastActiveSessionKey } from "./app-settings";
@@ -1237,34 +1237,21 @@ function handleGatewayEventUnsafe(host: GatewayHost, evt: GatewayEventFrame) {
   }
 
   if (evt.event === "inbox:update") {
-    const inboxHost = host as unknown as {
-      handleInboxRefresh?: () => Promise<unknown>;
-      requestUpdate?: () => void;
-    };
-    inboxHost.handleInboxRefresh?.().catch(() => {});
-    inboxHost.requestUpdate?.();
+    appEventBus.emit("refresh-requested", { target: "today" });
     return;
   }
 
   if (evt.event === "queue:update") {
     const payload = evt.payload as
-      | {
-          status?: string;
-          proofDocSlug?: string | null;
-        }
+      | { status?: string; proofDocSlug?: string | null }
       | undefined;
-    const queueHost = host as unknown as {
-      handleOpenProofDoc?: (slug: string) => Promise<unknown>;
-      handleInboxRefresh?: () => Promise<unknown>;
-      loadTodayQueueResults?: () => Promise<unknown>;
-      requestUpdate?: () => void;
-    };
     if (payload?.status === "processing" && payload.proofDocSlug) {
+      const queueHost = host as unknown as {
+        handleOpenProofDoc?: (slug: string) => Promise<unknown>;
+      };
       queueHost.handleOpenProofDoc?.(payload.proofDocSlug).catch(() => {});
     }
-    queueHost.handleInboxRefresh?.().catch(() => {});
-    queueHost.loadTodayQueueResults?.().catch(() => {});
-    queueHost.requestUpdate?.();
+    appEventBus.emit("refresh-requested", { target: "today" });
     return;
   }
 
@@ -1296,8 +1283,6 @@ function handleGatewayEventUnsafe(host: GatewayHost, evt: GatewayEventFrame) {
         allyUnread?: number;
         tab?: string;
         requestUpdate?: () => void;
-        loadTodayQueueResults?: () => Promise<unknown>;
-        handleInboxRefresh?: () => Promise<unknown>;
       };
       const msg = {
         role: "assistant" as const,
@@ -1310,13 +1295,10 @@ function handleGatewayEventUnsafe(host: GatewayHost, evt: GatewayEventFrame) {
       if (!allyHost.allyPanelOpen && host.tab !== "chat") {
         allyHost.allyUnread = (allyHost.allyUnread ?? 0) + 1;
       }
-      // Reload decision cards when queue/cron/paperclip results arrive so Inbox badge updates
+      // Reload today tab when queue/cron/paperclip results arrive so Inbox badge updates
       const queueTypes = ["queue-complete", "queue-needs-review", "queue-failed", "cron-result", "paperclip-completion"];
-      if (payload.type && queueTypes.includes(payload.type) && allyHost.loadTodayQueueResults) {
-        allyHost.loadTodayQueueResults().catch(() => {});
-      }
-      if (payload.type && queueTypes.includes(payload.type) && allyHost.handleInboxRefresh) {
-        allyHost.handleInboxRefresh().catch(() => {});
+      if (payload.type && queueTypes.includes(payload.type)) {
+        appEventBus.emit("refresh-requested", { target: "today" });
       }
 
       // Paperclip completions: inject into the originating chat session
