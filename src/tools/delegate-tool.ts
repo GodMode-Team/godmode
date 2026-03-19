@@ -14,7 +14,7 @@
  */
 
 import { type AnyAgentTool, jsonResult } from "openclaw/plugin-sdk";
-import { isPaperclipReady, createTask as paperclipCreateTask, findOrCreateProject as paperclipFindOrCreateProject, resolveAgentId as paperclipResolveAgent } from "../services/paperclip-client.js";
+import { isPaperclipReady, createTask as paperclipCreateTask, findOrCreateProject as paperclipFindOrCreateProject, resolveAgentId as paperclipResolveAgent, wakeupAgent as paperclipWakeup } from "../services/paperclip-client.js";
 import {
   type ProjectBrief,
   updateProjects,
@@ -165,6 +165,19 @@ export function createDelegateTool(): AnyAgentTool {
                   title: task.title,
                   assignee: persona?.slug ?? task.personaHint ?? "auto-assign",
                 });
+
+                // Trigger execution — Paperclip's heartbeat service picks up
+                // the assigned issue and runs it via the agent's adapter
+                if (agentId) {
+                  try {
+                    await paperclipWakeup(agentId, {
+                      issueId: pcIssue.id,
+                      reason: `delegate: ${task.title}`,
+                    });
+                  } catch (err) {
+                    console.warn(`[GodMode] Paperclip wakeup failed for ${agentId}: ${String(err)}`);
+                  }
+                }
               }
 
               // Save project to projects-state for local tracking

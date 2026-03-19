@@ -273,6 +273,39 @@ export async function resolveAgentId(personaSlug: string): Promise<string | unde
 }
 
 /**
+ * Trigger an agent wakeup — Paperclip's heartbeat service will pick up
+ * assigned issues and execute via the agent's configured adapter.
+ */
+export async function wakeupAgent(
+  agentId: string,
+  context?: { issueId?: string; reason?: string },
+): Promise<void> {
+  await paperclipFetch(`/api/agents/${agentId}/wakeup`, {
+    method: "POST",
+    mutating: true,
+    body: {
+      source: "api",
+      triggerDetail: context?.reason ?? "delegate",
+      payload: context?.issueId ? { issueId: context.issueId } : undefined,
+    },
+  });
+}
+
+/**
+ * Update an agent's adapter configuration (e.g. switch from openclaw_gateway to hermes_local).
+ */
+export async function updateAgent(
+  agentId: string,
+  patch: Record<string, unknown>,
+): Promise<PaperclipAgent> {
+  return paperclipFetch<PaperclipAgent>(`/api/agents/${agentId}`, {
+    method: "PATCH",
+    mutating: true,
+    body: patch,
+  });
+}
+
+/**
  * Cancel a task by setting its status to "cancelled".
  */
 export async function cancelTask(issueId: string): Promise<PaperclipIssue> {

@@ -430,6 +430,13 @@ export async function runGatewayStart(
           handlePaperclipWebhookHttp(payload).catch((err) => {
             logger.warn(`[GodMode] Paperclip completion handler failed: ${String(err)}`);
           });
+          // Notify ally in chat so Prosper can synthesize results
+          safeBroadcast(api, "ally:notification", {
+            type: "paperclip-completion",
+            title: issue.title,
+            issueId: issue.id,
+            message: `Agent completed: "${issue.title}". Check the inbox for deliverables.`,
+          });
           logger.info(`[GodMode] Paperclip task completed: "${issue.title}" (${issue.id})`);
         }, 30_000); // poll every 30 seconds
         serviceCleanup.push({ name: "paperclip-poller", fn: () => stopCompletionPoller() });
