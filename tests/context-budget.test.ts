@@ -38,13 +38,13 @@ describe("assembleContext", () => {
     expect(result).toBeTruthy();
     expect(result).toContain("system-context");
     // Soul essence is always present
-    expect(result).toContain("Who You Are");
+    expect(result).toContain("## Rules");
   });
 
   it("includes soul essence at all pressure levels", () => {
     for (const pressure of [0, 0.5, 0.7, 0.95]) {
       const result = assembleContext(baseInputs({ contextPressure: pressure }));
-      expect(result).toContain("Who You Are");
+      expect(result).toContain("## Rules");
     }
   });
 
@@ -213,7 +213,7 @@ describe("assembleContext", () => {
     expect(result).not.toContain("Meeting prep");
     expect(result).not.toContain("Cron failures");
     // Soul essence still present
-    expect(result).toContain("Who You Are");
+    expect(result).toContain("## Rules");
   });
 
   // Inter-session (agent-to-agent) tests
@@ -229,7 +229,7 @@ describe("assembleContext", () => {
       isFirstTurn: true,
     }));
     // Soul essence always present
-    expect(result).toContain("Who You Are");
+    expect(result).toContain("## Rules");
     // Provenance notice present
     expect(result).toContain("Message Origin: Agent");
     // Personal context stripped — identity, memories, graph, schedule, ops
@@ -244,7 +244,7 @@ describe("assembleContext", () => {
 
   it("includes capability map on first turn", () => {
     const result = assembleContext(baseInputs({ isFirstTurn: true }));
-    expect(result).toContain("How to Find What You Need");
+    expect(result).toContain("Lookup Chain");
   });
 
   it("includes capability map when routing lessons fire", () => {
@@ -252,15 +252,16 @@ describe("assembleContext", () => {
       routingLessons: "## Routing Lessons\n- Use gog for calendar",
       isFirstTurn: false,
     }));
-    expect(result).toContain("How to Find What You Need");
+    expect(result).toContain("Lookup Chain");
   });
 
-  it("omits capability map on subsequent turns without lessons", () => {
+  it("includes capability map on all turns (mandatory lookup chain)", () => {
     const result = assembleContext(baseInputs({
       isFirstTurn: false,
       routingLessons: null,
     }));
-    expect(result).not.toContain("How to Find What You Need");
+    // Lookup chain is now always injected — too important to gate on first-turn
+    expect(result).toContain("Lookup Chain");
   });
 
   // Wrapping

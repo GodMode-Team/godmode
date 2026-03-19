@@ -194,7 +194,7 @@ export async function registerGodMode(
   for (const load of toolImports) {
     try {
       const factory = await load();
-      adapter.registerTool(factory);
+      adapter.registerTool(factory as unknown as (ctx: import("./types.js").ToolContext) => import("./types.js").StandaloneAgentTool);
       toolCount++;
     } catch (err) {
       logger.warn(`[GodMode] Skipped tool: ${String(err)}`);
@@ -249,8 +249,9 @@ export async function registerGodMode(
     adapter.onAfterChat(async (_sessionKey: string, userMsg: string, assistantMsg: string) => {
       // Honcho memory ingest — learn from the conversation
       try {
-        const { ingestTurn } = await import("../services/honcho-client.js");
-        await ingestTurn(userMsg, assistantMsg);
+        const { forwardMessage } = await import("../services/honcho-client.js");
+        await forwardMessage("user", userMsg, _sessionKey);
+        await forwardMessage("assistant", assistantMsg, _sessionKey);
       } catch { /* non-fatal — Honcho may not be configured */ }
 
       // Identity graph — extract entities from the response
@@ -286,8 +287,7 @@ async function gatherWorkspaceInputs(logger: Logger): Promise<Record<string, unk
 
   // Schedule (calendar)
   try {
-    const { getCalendarHandlers } = await import("../methods/calendar.js");
-    // Light approach: read today's schedule from the calendar method
+    // Light approach: read today's schedule via gog CLI
     const { execSync } = await import("node:child_process");
     const today = new Date().toISOString().slice(0, 10);
     const account = process.env.GOG_CALENDAR_ACCOUNT;

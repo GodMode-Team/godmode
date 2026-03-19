@@ -365,7 +365,7 @@ export class HermesChatProxy {
     const session = await loadSession(sessionId);
     return session.messages.map((m) => ({
       role: m.role,
-      content: m.content,
+      content: typeof m.content === "string" ? m.content : m.content.map((b) => ("text" in b ? b.text : "")).join(""),
     }));
   }
 }

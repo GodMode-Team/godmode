@@ -120,7 +120,7 @@ type EvidenceResult = {
 };
 
 function checkEvidence(taskType: QueueItemType, output: string): EvidenceResult {
-  const result = checkEvidenceShared(taskType, output);
+  const result = checkEvidenceShared(taskType as import("../lib/evidence.js").TaskType, output);
   return { passed: result.passed, reason: result.reason, hint: result.hint };
 }
 
@@ -306,7 +306,7 @@ class QueueProcessor {
         type: item.type,
         engine: item.engine ?? "claude",
         pid,
-        persona: item.assignedTo ?? "default",
+        persona: item.personaHint ?? "default",
       });
 
       // Store PID in queue state for liveness checks

@@ -22,7 +22,8 @@ export type AuditEvent =
   | "queue.added"
   | "tool.sensitive"
   | "auth.attempt"
-  | "ratelimit.hit";
+  | "ratelimit.hit"
+  | "prompt.sanitized";
 
 export interface AuditEntry {
   ts: string;
