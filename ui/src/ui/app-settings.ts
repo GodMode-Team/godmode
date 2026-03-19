@@ -9,8 +9,6 @@ import {
   stopNodesPolling,
   startDebugPolling,
   stopDebugPolling,
-  startMissionControlPolling,
-  stopMissionControlPolling,
 } from "./app-polling";
 import { scheduleChatScroll, scheduleLogsScroll } from "./app-scroll";
 import { loadChannels } from "./controllers/channels";
@@ -239,11 +237,7 @@ export function setTab(host: SettingsHost, next: Tab) {
   } else {
     stopDebugPolling(host as unknown as Parameters<typeof stopDebugPolling>[0]);
   }
-  if (next === "mission-control") {
-    startMissionControlPolling(host as unknown as Parameters<typeof startMissionControlPolling>[0]);
-  } else {
-    stopMissionControlPolling(host as unknown as Parameters<typeof stopMissionControlPolling>[0]);
-  }
+  // Mission Control polling removed (v3 slim)
   void refreshActiveTab(host);
   syncUrlWithTab(host, next, false);
 }
@@ -325,12 +319,6 @@ export async function refreshActiveTab(host: SettingsHost) {
     );
     void (host as any).loadSessionResources?.();
   }
-  if (host.tab === "options") {
-    const app = host as unknown as GodModeApp;
-    if (typeof app.handleOptionsLoad === "function") {
-      await app.handleOptionsLoad();
-    }
-  }
   if (host.tab === "trust") {
     const app = host as unknown as GodModeApp;
     const loads: Promise<void>[] = [];
@@ -347,12 +335,7 @@ export async function refreshActiveTab(host: SettingsHost) {
       await app.handleGuardrailsLoad();
     }
   }
-  if (host.tab === "mission-control") {
-    const app = host as unknown as GodModeApp;
-    if (typeof app.handleMissionControlRefresh === "function") {
-      await app.handleMissionControlRefresh();
-    }
-  }
+  // Mission Control tab refresh removed (v3 slim)
   if (host.tab === "setup") {
     const app = host as unknown as GodModeApp;
     if (typeof (app as any).handleLoadCapabilities === "function") {
@@ -515,11 +498,7 @@ export function setTabFromRoute(host: SettingsHost, next: Tab) {
   } else {
     stopDebugPolling(host as unknown as Parameters<typeof stopDebugPolling>[0]);
   }
-  if (next === "mission-control") {
-    startMissionControlPolling(host as unknown as Parameters<typeof startMissionControlPolling>[0]);
-  } else {
-    stopMissionControlPolling(host as unknown as Parameters<typeof stopMissionControlPolling>[0]);
-  }
+  // Mission Control polling removed (v3 slim)
   if (host.connected) {
     void refreshActiveTab(host);
   }

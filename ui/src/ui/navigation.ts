@@ -2,7 +2,7 @@ import type { IconName } from "./icons.js";
 
 export const TAB_GROUPS = [
   { label: "", tabs: ["chat", "today", "workspaces", "second-brain", "dashboards"] },
-  { label: "Settings", tabs: ["config", "skills", "agents", "trust", "guardrails", "options"] },
+  { label: "Settings", tabs: ["config", "skills", "agents", "trust", "guardrails"] },
 ] as const;
 
 export const POWER_USER_GROUPS = [
@@ -15,7 +15,6 @@ export const DYNAMIC_TABS = ["onboarding"] as const;
 export type Tab =
   | "onboarding"
   | "guardrails"
-  | "options"
   | "workspaces"
   | "today"
   | "channels"
@@ -41,7 +40,6 @@ export type Tab =
 
 const TAB_PATHS: Partial<Record<Tab, string>> = {
   onboarding: "/onboarding",
-  options: "/options",
   workspaces: "/workspaces",
   today: "/today",
   channels: "/channels",
@@ -185,8 +183,6 @@ export function iconForTab(tab: Tab): IconName {
       return "radio";
     case "nodes":
       return "monitor";
-    case "options":
-      return "flask";
     case "trust":
       return "shield";
     case "guardrails":
@@ -230,8 +226,6 @@ export function titleForTab(tab: Tab) {
       return "Agents";
     case "nodes":
       return "Network";
-    case "options":
-      return "Experiments";
     case "trust":
       return "Trust";
     case "guardrails":
@@ -275,8 +269,6 @@ export function emojiForTab(tab: Tab): string {
       return "\u{1F916}";
     case "nodes":
       return "\u{1F5A5}\uFE0F";
-    case "options":
-      return "\u{1F9EA}";
     case "trust":
       return "\u{1F6E1}\uFE0F";
     case "guardrails":
@@ -320,8 +312,6 @@ export function subtitleForTab(tab: Tab) {
       return "Your agent roster — sub-agents that handle queue tasks, grouped by category.";
     case "nodes":
       return "Devices in your GodMode network and what they can do.";
-    case "options":
-      return "Beta features you can toggle on or off.";
     case "trust":
       return "Scores build automatically as you use and rate skills.";
     case "guardrails":

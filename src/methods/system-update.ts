@@ -497,8 +497,7 @@ async function runPostUpdateSmokeTests(
     results.push({ name: "data-integrity", status: "warn", detail: "Could not check data files" });
   }
 
-  // REMOVED (v2 slim): consciousness-heartbeat check
-  results.push({ name: "heartbeat", status: "warn", detail: "Heartbeat removed in v2 slim" });
+  results.push({ name: "heartbeat", status: "skip", detail: "Heartbeat removed in v3 slim" });
 
   logger.info(`[GodMode] Smoke tests complete: ${results.length} checks`);
   return results;

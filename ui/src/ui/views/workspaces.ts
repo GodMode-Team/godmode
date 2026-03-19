@@ -114,6 +114,7 @@ export type WorkspacesProps = {
   onSetTaskSearch?: (query: string) => void;
   onToggleCompletedTasks?: () => void;
   onStartTask?: (taskId: string) => void;
+  onViewTaskOutput?: (taskId: string) => void;
   onEditTask?: (taskId: string | null) => void;
   onUpdateTask?: (taskId: string, updates: { title?: string; dueDate?: string | null }) => void;
   browsePath?: string | null;
@@ -995,6 +996,7 @@ function renderWorkspaceDetail(props: {
           onCreateTask,
           onToggleCompletedTasks,
           onStartTask,
+          onViewTaskOutput,
           editingTaskId,
           onEditTask,
           onUpdateTask,
@@ -1137,13 +1139,14 @@ function renderWorkspaceTasksSection(props: {
   onCreateTask?: (title: string, project: string) => void;
   onToggleCompletedTasks?: () => void;
   onStartTask?: (taskId: string) => void;
+  onViewTaskOutput?: (taskId: string) => void;
   editingTaskId?: string | null;
   onEditTask?: (taskId: string | null) => void;
   onUpdateTask?: (taskId: string, updates: { title?: string; dueDate?: string | null }) => void;
 }): ReturnType<typeof html> {
   const {
     tasks, workspaceName, showCompleted, onToggleTaskComplete, onCreateTask,
-    onToggleCompletedTasks, onStartTask, editingTaskId, onEditTask, onUpdateTask,
+    onToggleCompletedTasks, onStartTask, onViewTaskOutput, editingTaskId, onEditTask, onUpdateTask,
   } = props;
   const pending = sortTasks(tasks.filter((t) => t.status === "pending"));
   const completed = sortTasks(tasks.filter((t) => t.status === "complete"));
@@ -1158,13 +1161,13 @@ function renderWorkspaceTasksSection(props: {
         ${pending.length === 0 && completed.length === 0
           ? html`<div class="ws-empty">No tasks</div>`
           : nothing}
-        ${pending.map((task) => renderTaskRow(task, onToggleTaskComplete, onStartTask, editingTaskId, onEditTask, onUpdateTask))}
+        ${pending.map((task) => renderTaskRow(task, onToggleTaskComplete, onStartTask, editingTaskId, onEditTask, onUpdateTask, onViewTaskOutput))}
         ${completed.length > 0
           ? html`
               <button class="ws-task-completed-toggle" @click=${() => onToggleCompletedTasks?.()}>
                 ${showCompleted ? "Hide" : "Show"} ${completed.length} completed
               </button>
-              ${showCompleted ? completed.map((task) => renderTaskRow(task, onToggleTaskComplete, onStartTask, editingTaskId, onEditTask, onUpdateTask)) : nothing}
+              ${showCompleted ? completed.map((task) => renderTaskRow(task, onToggleTaskComplete, onStartTask, editingTaskId, onEditTask, onUpdateTask, onViewTaskOutput)) : nothing}
             `
           : nothing}
       </div>
@@ -1232,6 +1235,7 @@ export function renderWorkspaces(props: WorkspacesProps) {
     onSetTaskSearch,
     onToggleCompletedTasks,
     onStartTask,
+    onViewTaskOutput,
     onEditTask,
     onUpdateTask,
   } = props;
@@ -1529,7 +1533,7 @@ function renderAllTasksSection(props: {
         <div class="ws-list ws-list--scroll">
           ${sorted.length === 0
             ? html`<div class="ws-empty">No tasks</div>`
-            : sorted.map((task) => renderAllTaskRow(task, onToggleTaskComplete, onStartTask, editingTaskId, onEditTask, onUpdateTask))}
+            : sorted.map((task) => renderAllTaskRow(task, onToggleTaskComplete, onStartTask, editingTaskId, onEditTask, onUpdateTask, onViewTaskOutput))}
         </div>
       </section>
     </div>

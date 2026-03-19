@@ -197,6 +197,7 @@ export class GmWork extends LitElement {
         this.showCompletedTasks = !this.showCompletedTasks;
       },
       onStartTask: (taskId) => this._onStartTask(taskId),
+      onViewTaskOutput: (taskId) => this._onViewTaskOutput(taskId),
       onEditTask: (taskId) => {
         this.editingTaskId = taskId;
       },
@@ -466,6 +467,35 @@ export class GmWork extends LitElement {
       tab: "chat" as Tab,
       message,
     });
+  }
+
+  private async _onViewTaskOutput(taskId: string): Promise<void> {
+    const gateway = this.ctx?.gateway;
+    if (!gateway || !this.ctx?.connected) return;
+    try {
+      const queueResult = await gateway.request<{
+        items: Array<{ id: string; sourceTaskId?: string; result?: { outputPath?: string; summary?: string } }>;
+      }>("queue.list", { limit: 100 });
+      const qi = queueResult?.items?.find((i) => i.sourceTaskId === taskId);
+      if (!qi?.result?.outputPath) {
+        this.ctx?.addToast?.("No output available for this task", "info");
+        return;
+      }
+      const result = await gateway.request<{ content: string }>(
+        "queue.readOutput",
+        { path: qi.result.outputPath },
+      );
+      const title = qi.result.outputPath.split("/").pop() ?? "Agent Output";
+      this.ctx?.openSidebar?.({
+        content: result.content,
+        mimeType: "text/markdown",
+        filePath: qi.result.outputPath,
+        title,
+      });
+    } catch (err) {
+      console.error("[GmWork] View task output failed:", err);
+      this.ctx?.addToast?.("Failed to load agent output", "error");
+    }
   }
 
   private async _onBrowseFolder(folderPath: string): Promise<void> {

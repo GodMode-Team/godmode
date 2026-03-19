@@ -56,14 +56,7 @@ import {
   triggerAutoArchive,
   unarchiveSession,
 } from "./controllers/sessions";
-import {
-  searchClawHub,
-  exploreClawHub,
-  getClawHubDetail,
-  importFromClawHub,
-  getPersonalizePrompt,
-  clearClawHubDetail,
-} from "./controllers/clawhub";
+// ClawHub controller removed (v3 slim)
 import {
   installSkill,
   loadGodModeSkills,
@@ -95,7 +88,6 @@ import { renderAgents } from "./views/agents";
 import { renderLightbox } from "./chat/lightbox";
 import { getResolvedImageUrl, triggerImageResolve } from "./app-gateway";
 import { renderToasts } from "./views/toast";
-import { renderOptions } from "./views/options";
 import { renderOnboardingWizard, type WizardStep } from "./views/onboarding-wizard";
 import { renderTrustTracker } from "./views/trust-tracker";
 import { renderGuardrails } from "./views/guardrails";
@@ -292,8 +284,6 @@ export function renderApp(state: AppViewState) {
   const showThinking = state.onboarding ? false : state.settings.chatShowThinking;
   const assistantAvatarUrl = resolveAssistantAvatarUrl(state);
   const chatAvatarUrl = state.chatAvatarUrl ?? assistantAvatarUrl ?? null;
-  // Focus pulse retired in lean audit — variables kept as false for downstream prop compatibility
-  const focusPulseActive = false;
   const { tabKeys: renderSessionTabKeys, activeIdentity: activeSessionTabIdentity } =
     getRenderableSessionTabState(state);
 
@@ -451,7 +441,7 @@ export function renderApp(state: AppViewState) {
               }
               <div class="nav-group__items">
                 ${
-                  !group.label && state.godmodeOptions != null && !state.godmodeOptions?.["onboarding.hidden"]
+                  !group.label
                     ? html`
                         <a
                           class="nav-item ${state.tab === "onboarding" ? "active" : ""}"
@@ -1328,9 +1318,6 @@ export function renderApp(state: AppViewState) {
                   if (tab === "godmode" && !state.godmodeSkills) {
                     loadGodModeSkills(state);
                   }
-                  if (tab === "clawhub" && !state.clawhubExploreItems) {
-                    exploreClawHub(state);
-                  }
                 },
                 onToggleExpand: (slug) => {
                   const next = new Set(state.expandedSkills);
@@ -1340,36 +1327,6 @@ export function renderApp(state: AppViewState) {
                     next.add(slug);
                   }
                   state.expandedSkills = next;
-                },
-                clawhub: {
-                  loading: state.clawhubLoading,
-                  error: state.clawhubError,
-                  query: state.clawhubQuery,
-                  results: state.clawhubResults,
-                  exploreItems: state.clawhubExploreItems,
-                  exploreSort: state.clawhubExploreSort,
-                  detailSlug: state.clawhubDetailSlug,
-                  detail: state.clawhubDetail,
-                  importing: state.clawhubImporting,
-                  message: state.clawhubMessage,
-                  onSearch: (query) => {
-                    state.clawhubQuery = query;
-                    searchClawHub(state, query);
-                  },
-                  onExplore: (sort) => exploreClawHub(state, sort),
-                  onDetail: (slug) => getClawHubDetail(state, slug),
-                  onCloseDetail: () => clearClawHubDetail(state),
-                  onImport: (slug) => importFromClawHub(state, slug),
-                  onImportAndPersonalize: async (slug) => {
-                    const ok = await importFromClawHub(state, slug);
-                    if (!ok) return;
-                    const prompt = await getPersonalizePrompt(state, slug);
-                    if (prompt) {
-                      setTab(state, "chat");
-                      createNewSession(state);
-                      state.chatMessage = prompt;
-                    }
-                  },
                 },
               })
             : nothing
@@ -1675,19 +1632,6 @@ export function renderApp(state: AppViewState) {
                 onToggleSessionResources: () => state.handleToggleSessionResources(),
                 onSessionResourceClick: (r: { path?: string; url?: string }) => state.handleSessionResourceClick(r),
                 onViewAllResources: () => state.handleViewAllResources(),
-              })
-            : nothing
-        }
-
-        ${
-          state.tab === "options"
-            ? renderOptions({
-                connected: state.connected,
-                loading: state.godmodeOptionsLoading,
-                options: state.godmodeOptions,
-                onToggle: (key, value) => state.handleOptionToggle(key, value),
-                onRefresh: () => state.handleOptionsLoad(),
-                onOpenWizard: state.handleWizardOpen ? () => state.handleWizardOpen?.() : undefined,
               })
             : nothing
         }

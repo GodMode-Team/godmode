@@ -81,7 +81,6 @@ import { createTeamMemoryWriteTool } from "./src/tools/team-memory.js";
 import { integrationsHandlers } from "./src/methods/integrations.js";
 import { uiSlotsHandlers } from "./src/methods/ui-slots.js";
 import { workspacesHandlers } from "./src/methods/workspaces.js";
-import { optionsHandlers } from "./src/methods/options.js";
 import { trustTrackerHandlers } from "./src/methods/trust-tracker.js";
 import { systemUpdateHandlers, setPluginVersion } from "./src/methods/system-update.js";
 import { createGuardrailTool } from "./src/tools/guardrail.js";
@@ -184,7 +183,7 @@ const godmodePlugin = {
       ...agentLogHandlers, ...calendarHandlers, ...uiSlotsHandlers,
       ...onboardingHandlers,
       ...teamWorkspaceHandlers, ...teamCommsHandlers,
-      ...optionsHandlers, ...trustTrackerHandlers, ...systemUpdateHandlers,
+      ...trustTrackerHandlers, ...systemUpdateHandlers,
       ...guardrailsHandlers, ...imageCacheHandlers, ...secondBrainHandlers,
       ...queueHandlers, ...dashboardsHandlers, ...supportHandlers,
       ...filesHandlers, ...integrationsHandlers,

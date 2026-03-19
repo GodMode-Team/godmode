@@ -359,8 +359,6 @@ export async function runGatewayStart(
     logger.warn(`[GodMode] Post-update audit error: ${String(err)}`);
   }
 
-  // REMOVED (v2 slim): consciousness-heartbeat — Honcho replaces later
-
   // Queue processor
   try {
     const { initQueueProcessor, getQueueProcessor } = await import("../services/queue-processor.js");
@@ -504,8 +502,6 @@ export async function runGatewayStart(
   } catch (err) {
     logger.warn(`[GodMode] Obsidian Sync failed to init: ${String(err)}`);
   }
-
-  // REMOVED (v2 slim): fathom-processor, x-client
 
   // Meeting webhook broadcast wiring
   try {

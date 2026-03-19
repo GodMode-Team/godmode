@@ -712,9 +712,7 @@ export const onboardingHandlers: GatewayRequestHandlers = {
 
     try {
       context?.broadcast?.("onboarding:update", state);
-    } catch {
-      // broadcast not available in all contexts
-    }
+    } catch { /* broadcast best-effort */ }
 
     respond(true, state);
   },
@@ -749,14 +747,14 @@ export const onboardingHandlers: GatewayRequestHandlers = {
       const rosterConfig = await generateRosterConfig(state);
       try {
         context?.broadcast?.("roster:configured", rosterConfig);
-      } catch {}
+      } catch { /* broadcast best-effort */ }
     } catch {
       // Non-fatal — roster config generation failure doesn't block onboarding
     }
 
     try {
       context?.broadcast?.("onboarding:update", state);
-    } catch {}
+    } catch { /* broadcast best-effort */ }
 
     respond(true, state);
   },
@@ -770,7 +768,7 @@ export const onboardingHandlers: GatewayRequestHandlers = {
 
     try {
       context?.broadcast?.("onboarding:update", state);
-    } catch {}
+    } catch { /* broadcast best-effort */ }
 
     respond(true, state);
   },
@@ -790,7 +788,7 @@ export const onboardingHandlers: GatewayRequestHandlers = {
 
     try {
       context?.broadcast?.("onboarding:update", state);
-    } catch {}
+    } catch { /* broadcast best-effort */ }
 
     respond(true, { assessment });
   },
@@ -895,7 +893,7 @@ export const onboardingHandlers: GatewayRequestHandlers = {
 
     try {
       context?.broadcast?.("onboarding:update", state);
-    } catch {}
+    } catch { /* broadcast best-effort */ }
 
     respond(true, {
       total: recommendations.length,
@@ -971,7 +969,7 @@ export const onboardingHandlers: GatewayRequestHandlers = {
 
     try {
       context?.broadcast?.("onboarding:update", state);
-    } catch {}
+    } catch { /* broadcast best-effort */ }
 
     respond(true, { state });
   },
@@ -1177,7 +1175,7 @@ export const onboardingHandlers: GatewayRequestHandlers = {
         filesSkipped: skipped,
         configPatched: configResult.patched,
       });
-    } catch {}
+    } catch { /* broadcast best-effort */ }
 
     respond(true, {
       success: true,

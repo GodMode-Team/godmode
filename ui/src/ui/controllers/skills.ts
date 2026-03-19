@@ -1,12 +1,8 @@
 import type { GatewayBrowserClient } from "../gateway";
 import type {
-  ClawHubSearchResult,
-  ClawHubSkillDetail,
-  ClawHubSkillItem,
   SkillStatusReport,
 } from "../types";
 import type { GodModeSkillsData, SkillsSubTab } from "../views/skills";
-import type { ClawHubMessage } from "./clawhub";
 
 export type SkillsState = {
   client: GatewayBrowserClient | null;
@@ -20,18 +16,7 @@ export type SkillsState = {
   // GodMode skills
   godmodeSkills: GodModeSkillsData | null;
   godmodeSkillsLoading: boolean;
-  // ClawHub state
   skillsSubTab: SkillsSubTab;
-  clawhubQuery: string;
-  clawhubResults: ClawHubSearchResult[] | null;
-  clawhubExploreItems: ClawHubSkillItem[] | null;
-  clawhubExploreSort: string;
-  clawhubLoading: boolean;
-  clawhubError: string | null;
-  clawhubDetailSlug: string | null;
-  clawhubDetail: ClawHubSkillDetail | null;
-  clawhubImporting: string | null;
-  clawhubMessage: ClawHubMessage | null;
 };
 
 export type SkillMessage = {

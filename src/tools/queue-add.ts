@@ -87,6 +87,17 @@ export function createQueueAddTool(_ctx: ToolContext): AnyAgentTool {
       const title = String(params.title || "").trim();
       if (!title) return jsonResult({ error: true, message: "title is required" });
 
+      // Guard: reject titles that look like auto-generated IDs instead of real topics
+      const ID_PATTERN = /^(concurrent|batch|item|task)-\d{10,}-\d+$/;
+      if (ID_PATTERN.test(title) || /^\d{10,}$/.test(title)) {
+        return jsonResult({
+          error: true,
+          message:
+            `Title "${title}" looks like an auto-generated ID, not a real topic. ` +
+            "Please provide a descriptive title for the task.",
+        });
+      }
+
       const personaSlug = params.persona ? String(params.persona) : undefined;
       const persona = resolvePersona(type, personaSlug);
       const personaName = persona?.name ?? personaSlug ?? "(auto-resolved)";

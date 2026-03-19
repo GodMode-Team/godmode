@@ -449,7 +449,6 @@ const updateDailyBrief: GatewayRequestHandler = async ({ params, respond }) => {
     respond(true, { date: briefDate, updatedAt: new Date().toISOString() });
 
     // Brief saves no longer trigger syncTasksFromBrief (F3 decoupling).
-    // The sync runs once per day via focus-pulse morning set or manually.
   } catch (err) {
     console.error("[DailyBrief] Error writing brief:", err);
     respond(false, null, {
@@ -979,7 +978,7 @@ const toggleCheckbox: GatewayRequestHandler = async ({ params, respond }) => {
   }
 };
 
-// --- Win The Day helpers (migrated from focus-pulse.ts) ---
+// --- Win The Day helpers ---
 
 export type FocusItem = {
   index: number;

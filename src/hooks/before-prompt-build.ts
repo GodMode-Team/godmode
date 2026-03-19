@@ -200,7 +200,7 @@ export async function handleBeforePromptBuild(
           graphBlock = formatGraphContext(graphResults);
         }
       }
-    } catch { /* graph query failure is invisible */ }
+    } catch (e) { logger.warn?.(`[GodMode] Identity graph query failed: ${(e as Error).message}`); }
   }
 
   // ── P1: Operational context — TOOL HINTS, not pre-injected facts ──
@@ -278,7 +278,7 @@ export async function handleBeforePromptBuild(
       const { scanForFailures, formatFailuresForSnapshot } = await import("../services/failure-notify.js");
       const failures = await scanForFailures();
       cronFailures = formatFailuresForSnapshot(failures) || null;
-    } catch { /* non-fatal */ }
+    } catch (e) { logger.warn?.(`[GodMode] Cron failure scan error: ${(e as Error).message}`); }
   }
 
   // P2: Queue review prompt (skip in light mode)
@@ -291,7 +291,7 @@ export async function handleBeforePromptBuild(
       if (review > 0) {
         queueReview = `${review} queue item(s) ready for review. Prompt the user.`;
       }
-    } catch { /* non-fatal */ }
+    } catch (e) { logger.warn?.(`[GodMode] Queue review count error: ${(e as Error).message}`); }
   }
 
   // P2: Agent team status — surface active/completed projects
@@ -367,7 +367,7 @@ export async function handleBeforePromptBuild(
     }
     const userMsgCount = msgs.filter((m) => m.role === "user").length;
     isFirstTurn = userMsgCount <= 1;
-  } catch { /* non-fatal */ }
+  } catch (e) { logger.warn?.(`[GodMode] Message count detection error: ${(e as Error).message}`); }
 
   // On the first turn, event.messages is empty — pull from lastReceivedMessage
   // populated by message_received (which fires immediately before this hook).
@@ -485,7 +485,7 @@ export async function handleBeforePromptBuild(
     const { consumeEnforcerNudge } = await import("./safety-gates.js");
     const enforcerNudge = consumeEnforcerNudge(sessionKey);
     if (enforcerNudge) safetyNudges.push(enforcerNudge);
-  } catch { /* non-fatal */ }
+  } catch (e) { logger.warn?.(`[GodMode] Safety enforcer nudge error: ${(e as Error).message}`); }
 
   // P3: Tool-grounding gate — inject per-turn grounding instructions
   // when the user message requires tool-backed verification.
@@ -515,7 +515,7 @@ export async function handleBeforePromptBuild(
           });
         }
       }
-    } catch { /* non-fatal — grounding gate failure should never break context */ }
+    } catch (e) { logger.warn?.(`[GodMode] Tool-grounding gate error: ${(e as Error).message}`); }
   }
 
   // Conditional: Team bootstrap, onboarding, private session
@@ -534,7 +534,7 @@ export async function handleBeforePromptBuild(
   try {
     const { isPrivateSession } = await import("../lib/private-session.js");
     isPrivate = await isPrivateSession(sessionKey ?? "");
-  } catch { /* non-fatal */ }
+  } catch (e) { logger.warn?.(`[GodMode] Private session detection error: ${(e as Error).message}`); }
   if (isPrivate) {
     safetyNudges.push(
       "[Private Session] Nothing from this session is saved to vault or memory. " +
@@ -553,7 +553,7 @@ export async function handleBeforePromptBuild(
     const { getEscalationContext } = await import("../services/self-heal.js");
     const escalation = getEscalationContext();
     if (escalation) safetyNudges.push(escalation);
-  } catch { /* non-fatal */ }
+  } catch (e) { logger.warn?.(`[GodMode] Self-heal escalation context error: ${(e as Error).message}`); }
 
   // Restart awareness: if GodMode just restarted, tell the ally
   try {
@@ -586,7 +586,7 @@ export async function handleBeforePromptBuild(
         ...errorLines,
       ].join("\n"));
     }
-  } catch { /* non-fatal */ }
+  } catch (e) { logger.warn?.(`[GodMode] Turn-level errors surface failed: ${(e as Error).message}`); }
 
   // Pending builder deploy: let the ally know a fix is staged
   try {

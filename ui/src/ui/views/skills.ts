@@ -3,7 +3,7 @@ import type { SkillMessageMap } from "../controllers/skills";
 import { clampText } from "../format";
 import type { SkillStatusEntry, SkillStatusReport } from "../types";
 
-export type SkillsSubTab = "godmode" | "my-skills" | "clawhub";
+export type SkillsSubTab = "godmode" | "my-skills";
 
 // ── GodMode skill types (from godmode.skills.list RPC) ──
 
@@ -43,7 +43,6 @@ export type SkillsProps = {
   busyKey: string | null;
   messages: SkillMessageMap;
   subTab: SkillsSubTab;
-  clawhub?: unknown;
   godmodeSkills: GodModeSkillsData | null;
   godmodeSkillsLoading: boolean;
   expandedSkills: Set<string>;
@@ -80,14 +79,6 @@ export function renderSkills(props: SkillsProps) {
             @click=${() => props.onSubTabChange("my-skills")}
           >
             Integrations
-          </button>
-          <button
-            class="chip ${props.subTab === "clawhub" ? "chip-ok" : ""}"
-            style="cursor: pointer; border: none; padding: 6px 14px; font-size: 13px;
-                   background: var(${props.subTab === "clawhub" ? "--chip-ok-bg, #e6f4ea" : "--chip-bg, #f3f3f3"});"
-            @click=${() => props.onSubTabChange("clawhub")}
-          >
-            ClawHub
           </button>
         </div>
         ${showRefresh

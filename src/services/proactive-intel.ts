@@ -6,8 +6,7 @@
  *   - Observer (user patterns):     every 15 min
  *   - Advisor (synthesis):          debounced, max 1x per 30 min
  *
- * Follows the same lifecycle pattern as focus-pulse-heartbeat.ts:
- *   start() / stop() / resume()
+ * Lifecycle: start() / stop() / resume()
  */
 
 import { readFile } from "node:fs/promises";

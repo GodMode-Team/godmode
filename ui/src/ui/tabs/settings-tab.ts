@@ -30,7 +30,6 @@ import { renderAgents } from "../views/agents.js";
 import { renderNodes } from "../views/nodes.js";
 import { renderDebug } from "../views/debug.js";
 import { renderLogs } from "../views/logs.js";
-import { renderOptions } from "../views/options.js";
 import { renderTrustTracker } from "../views/trust-tracker.js";
 import { renderGuardrails } from "../views/guardrails.js";
 
@@ -82,14 +81,6 @@ import {
   unarchiveSession,
 } from "../controllers/sessions.js";
 import {
-  searchClawHub,
-  exploreClawHub,
-  getClawHubDetail,
-  importFromClawHub,
-  getPersonalizePrompt,
-  clearClawHubDetail,
-} from "../controllers/clawhub.js";
-import {
   installSkill,
   loadGodModeSkills,
   loadSkills,
@@ -121,7 +112,6 @@ export type SettingsSubtab =
   | "nodes"
   | "debug"
   | "logs"
-  | "options"
   | "trust"
   | "guardrails";
 
@@ -132,7 +122,6 @@ const SETTINGS_SUBTABS: Array<{ id: SettingsSubtab; label: string; group: string
   { id: "agents", label: "Agents", group: "Settings" },
   { id: "trust", label: "Trust", group: "Settings" },
   { id: "guardrails", label: "Guardrails", group: "Settings" },
-  { id: "options", label: "Options", group: "Settings" },
   // System group
   { id: "channels", label: "Channels", group: "System" },
   { id: "sessions", label: "Sessions", group: "System" },
@@ -450,13 +439,10 @@ export class GmSettings extends LitElement {
           onSaveKey: (key: string) => saveSkillApiKey(s, key),
           onInstall: (skillKey: string, name: string, installId: string) =>
             installSkill(s, skillKey, name, installId),
-          onSubTabChange: (tab: "godmode" | "my-skills" | "clawhub") => {
+          onSubTabChange: (tab: "godmode" | "my-skills") => {
             s.skillsSubTab = tab;
             if (tab === "godmode" && !s.godmodeSkills) {
               loadGodModeSkills(s);
-            }
-            if (tab === "clawhub" && !s.clawhubExploreItems) {
-              exploreClawHub(s);
             }
           },
           onToggleExpand: (slug: string) => {
@@ -467,38 +453,6 @@ export class GmSettings extends LitElement {
               next.add(slug);
             }
             s.expandedSkills = next;
-          },
-          clawhub: {
-            loading: s.clawhubLoading,
-            error: s.clawhubError,
-            query: s.clawhubQuery,
-            results: s.clawhubResults,
-            exploreItems: s.clawhubExploreItems,
-            exploreSort: s.clawhubExploreSort,
-            detailSlug: s.clawhubDetailSlug,
-            detail: s.clawhubDetail,
-            importing: s.clawhubImporting,
-            message: s.clawhubMessage,
-            onSearch: (query: string) => {
-              s.clawhubQuery = query;
-              searchClawHub(s, query);
-            },
-            onExplore: (sort?: string) => exploreClawHub(s, sort),
-            onDetail: (slug: string) => getClawHubDetail(s, slug),
-            onCloseDetail: () => clearClawHubDetail(s),
-            onImport: (slug: string) => importFromClawHub(s, slug),
-            onImportAndPersonalize: async (slug: string) => {
-              const ok = await importFromClawHub(s, slug);
-              if (!ok) return;
-              const prompt = await getPersonalizePrompt(s, slug);
-              if (prompt) {
-                setTab(s, "chat");
-                if (typeof s.handleNewSession === "function") {
-                  s.handleNewSession();
-                }
-                s.chatMessage = prompt;
-              }
-            },
           },
         });
 
@@ -598,16 +552,6 @@ export class GmSettings extends LitElement {
                 : { kind: "gateway" as const };
             return saveExecApprovals(s, target);
           },
-        });
-
-      case "options":
-        return renderOptions({
-          connected: s.connected,
-          loading: s.godmodeOptionsLoading,
-          options: s.godmodeOptions,
-          onToggle: (key: string, value: boolean) => s.handleOptionToggle(key, value),
-          onRefresh: () => s.handleOptionsLoad(),
-          onOpenWizard: s.handleWizardOpen ? () => s.handleWizardOpen?.() : undefined,
         });
 
       case "trust": {
@@ -755,11 +699,6 @@ export class GmSettings extends LitElement {
             loadDevices(s),
             loadConfig(s),
           ]);
-          break;
-        case "options":
-          if (typeof s.handleOptionsLoad === "function") {
-            await s.handleOptionsLoad();
-          }
           break;
         case "trust":
           await Promise.all([

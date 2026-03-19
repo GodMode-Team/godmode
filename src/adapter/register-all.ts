@@ -40,7 +40,6 @@ export async function registerGodMode(
   const methodModules: Array<() => Promise<Record<string, unknown>>> = [
     () => import("../methods/tasks.js"),
     () => import("../methods/queue.js"),
-    () => import("../methods/options.js"),
     () => import("../methods/goals.js"),
     () => import("../methods/resources.js"),
     () => import("../methods/second-brain.js"),

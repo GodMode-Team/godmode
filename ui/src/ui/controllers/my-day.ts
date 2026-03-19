@@ -5,7 +5,7 @@
 
 import { localDateString } from "../format";
 import type { GatewayBrowserClient } from "../gateway";
-import type { AgentLogData, DailyBriefData, DecisionCardItem } from "../views/my-day";
+import type { AgentLogData, DailyBriefData, DecisionCardItem } from "../tabs/today-tab";
 import type { WorkspaceTask } from "../views/workspaces";
 
 export type TrustSummaryData = {

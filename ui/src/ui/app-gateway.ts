@@ -1,4 +1,5 @@
 import { GodModeApp } from "./app";
+import { appEventBus } from "./app-events";
 import { flushChatQueueForEvent } from "./app-chat";
 import type { EventLogEntry } from "./app-events";
 import { applySettings, loadCron, refreshActiveTab, setLastActiveSessionKey } from "./app-settings";
@@ -621,15 +622,7 @@ export function connectGateway(host: GatewayHost) {
         // Only clear chatRunId so the next delta/final can re-establish if needed.
         host.chatRunId = null;
 
-        // Auto-advance Today date if stale (e.g. app left open overnight)
-        const dateHost = host as unknown as { todaySelectedDate?: string };
-        if (dateHost.todaySelectedDate) {
-          const d = new Date();
-          const now = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-          if (dateHost.todaySelectedDate !== now) {
-            dateHost.todaySelectedDate = now;
-          }
-        }
+        // todaySelectedDate auto-advance moved to <gm-today>
 
         // Clear working session indicators
         host.workingSessions.clear();
@@ -1118,28 +1111,9 @@ function handleGatewayEventUnsafe(host: GatewayHost, evt: GatewayEventFrame) {
     }
   }
 
-  // Daily Brief live updates
+  // Daily Brief live updates — forward to <gm-today> via event bus
   if (evt.event === "daily-brief:update") {
-    const payload = evt.payload as
-      | {
-          date: string;
-          content: string;
-          summary: {
-            readiness: number | null;
-            readinessMode: string | null;
-            weather: { temp: number; condition: string; icon: string } | null;
-            tasks: { total: number; completed: number };
-          };
-          sections: string[];
-          updatedAt: string;
-        }
-      | undefined;
-
-    if (payload) {
-      // Type assertion to access dailyBrief property
-      const appHost = host as unknown as { dailyBrief?: typeof payload };
-      appHost.dailyBrief = payload;
-    }
+    appEventBus.emit("refresh-requested", { target: "today" });
     return;
   }
 

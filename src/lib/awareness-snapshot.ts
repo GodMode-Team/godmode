@@ -14,6 +14,8 @@ import { DATA_DIR, localDateString } from "../data-paths.js";
 import { reportConnected, reportDegraded, reportUnavailable } from "./service-health.js";
 
 const SNAPSHOT_PATH = join(DATA_DIR, "awareness-snapshot.md");
+let logger: { warn?: (msg: string) => void } | null = null;
+export function setSnapshotLogger(l: { warn?: (msg: string) => void }): void { logger = l; }
 let cachedSnapshot: string | null = null;
 let cachedAt = 0;
 const CACHE_TTL_MS = 60_000; // 1 min — heartbeat regenerates every 15 min
@@ -163,9 +165,7 @@ export async function generateSnapshot(): Promise<string> {
     if (overdue.length > 0) {
       lines.push("Proactively surface overdue tasks early in the conversation.");
     }
-  } catch {
-    // Tasks unavailable
-  }
+  } catch (e) { logger?.warn?.(`[Snapshot] Task counts failed: ${(e as Error).message}`); }
 
   // Queue status
   try {
@@ -390,9 +390,7 @@ export async function generateSnapshot(): Promise<string> {
     if (failureBlock) {
       lines.push(failureBlock);
     }
-  } catch {
-    // Failure detection non-fatal
-  }
+  } catch (e) { logger?.warn?.(`[Snapshot] Cron failure detection error: ${(e as Error).message}`); }
 
   // Operational rules
   lines.push("## Operational Rules");
@@ -407,9 +405,7 @@ export async function generateSnapshot(): Promise<string> {
   try {
     await mkdir(dirname(SNAPSHOT_PATH), { recursive: true });
     await writeFile(SNAPSHOT_PATH, snapshot, "utf-8");
-  } catch {
-    // Non-fatal
-  }
+  } catch (e) { logger?.warn?.(`[Snapshot] Disk write failed: ${(e as Error).message}`); }
 
   cachedSnapshot = snapshot;
   cachedAt = Date.now();

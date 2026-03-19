@@ -18,8 +18,6 @@ import {
   logGateActivity,
   GATE_DEFAULTS,
 } from "../services/guardrails.js";
-// injection-fingerprints removed in lean audit
-
 // ── Loop Breaker ────────────────────────────────────────────────
 //
 // Problem: Ralph ran 94 executions in 5 hours. $50-150 wasted.
@@ -467,7 +465,6 @@ const OUTPUT_LEAK_CHECKS: { name: string; check: (content: string, sessionKey?: 
       return markers.filter((m) => lower.includes(m)).length >= 3;
     },
   },
-  // dynamic_context_leak removed — injection-fingerprints killed in lean audit
   {
     name: "config_file_leak",
     check: (content) => {
@@ -518,7 +515,6 @@ const OUTPUT_LEAK_CHECKS: { name: string; check: (content: string, sessionKey?: 
       return markers.filter((m) => lower.includes(m)).length >= 3;
     },
   },
-  // Note: dynamic_context_leak was removed in lean audit (injection-fingerprints killed).
   // The remaining checks above (system_prompt_recitation, config_file_leak, soul_profile_leak,
   // agents_md_leak) provide defense-in-depth against context leakage.
 ];

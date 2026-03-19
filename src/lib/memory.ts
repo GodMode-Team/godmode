@@ -3,7 +3,7 @@
  *
  * This file exports stub functions so that dynamic-import callers
  * (self-heal, agent-toolkit-server, before-prompt-build, lifecycle-hooks,
- * consciousness-heartbeat, system-update) don't crash.
+ * system-update) don't crash.
  *
  * All real memory operations now go through honcho-client.ts.
  * This file can be fully removed once all callers are migrated.

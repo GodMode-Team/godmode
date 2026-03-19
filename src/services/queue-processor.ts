@@ -288,9 +288,7 @@ class QueueProcessor {
         env.GODMODE_TOOLKIT_TOKEN = tokenResult.token;
         env.GODMODE_TOOLKIT_URL = tokenResult.baseUrl;
       }
-    } catch {
-      // Toolkit server may not be running — agent continues without it
-    }
+    } catch (e) { this.logger.warn(`[GodMode][Queue] Toolkit token creation failed: ${(e as Error).message}`); }
 
     try {
       const child = spawn(agentBin, agentArgs, {
@@ -1132,9 +1130,7 @@ class QueueProcessor {
     let guardrailsBlock = "";
     try {
       guardrailsBlock = await formatGuardrailsForPrompt();
-    } catch {
-      // Non-fatal — agent runs without guardrail awareness
-    }
+    } catch (e) { this.logger.warn(`[GodMode][Queue] Guardrails format failed: ${(e as Error).message}`); }
 
     // Build full prompt
     const sections: string[] = [
@@ -1293,7 +1289,7 @@ class QueueProcessor {
           }
         }
       } catch { /* Daily brief not found — that's fine */ }
-    } catch { /* Identity dir resolution failed — skip all identity context */ }
+    } catch (e) { this.logger.warn(`[GodMode][Queue] Identity dir resolution failed: ${(e as Error).message}`); }
 
     if (guardrailsBlock) {
       sections.push("", guardrailsBlock);
@@ -1397,9 +1393,7 @@ class QueueProcessor {
           }
         }
       }
-    } catch {
-      // Toolkit server not available — agents run without runtime access (still works)
-    }
+    } catch (e) { this.logger.warn(`[GodMode][Queue] Toolkit server context failed: ${(e as Error).message}`); }
 
     // Include previous error context for retries
     if (item.lastError) {

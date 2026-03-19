@@ -1,14 +1,12 @@
 import type { GodModeApp } from "./app";
 import { loadDebug } from "./controllers/debug";
 import { loadLogs } from "./controllers/logs";
-import { loadMissionControl } from "./controllers/mission-control";
 import { loadNodes } from "./controllers/nodes";
 
 type PollingHost = {
   nodesPollInterval: number | null;
   logsPollInterval: number | null;
   debugPollInterval: number | null;
-  missionControlPollInterval: number | null;
   tab: string;
 };
 
@@ -70,22 +68,4 @@ export function stopDebugPolling(host: PollingHost) {
   host.debugPollInterval = null;
 }
 
-export function startMissionControlPolling(host: PollingHost) {
-  if (host.missionControlPollInterval != null) {
-    return;
-  }
-  host.missionControlPollInterval = window.setInterval(() => {
-    if (host.tab !== "mission-control") {
-      return;
-    }
-    void loadMissionControl(host as unknown as GodModeApp, { quiet: true });
-  }, 5000);
-}
-
-export function stopMissionControlPolling(host: PollingHost) {
-  if (host.missionControlPollInterval == null) {
-    return;
-  }
-  clearInterval(host.missionControlPollInterval);
-  host.missionControlPollInterval = null;
-}
+// Mission Control polling removed (v3 slim)

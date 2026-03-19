@@ -57,6 +57,12 @@ const addItem: GatewayRequestHandler = async ({ params, respond }) => {
     respond(false, null, { code: "INVALID_REQUEST", message: "Missing title" });
     return;
   }
+  // Reject auto-generated IDs passed as titles
+  const ID_PATTERN = /^(concurrent|batch|item|task)-\d{10,}-\d+$/;
+  if (ID_PATTERN.test(title) || /^\d{10,}$/.test(title)) {
+    respond(false, null, { code: "INVALID_REQUEST", message: `Title "${title}" looks like an auto-generated ID, not a real topic` });
+    return;
+  }
   if (!type) {
     respond(false, null, { code: "INVALID_REQUEST", message: "Missing type" });
     return;
