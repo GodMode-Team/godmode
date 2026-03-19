@@ -1,0 +1,79 @@
+/* ─── Design System: Spacing, Typography & Layout Tokens ───
+ *
+ * 4px base grid spacing scale, typographic scale, and layout constants.
+ * These tokens are used throughout the UI but were previously undefined —
+ * components relied on CSS custom property fallback behavior.
+ *
+ * Import order: base.css → spacing.css → everything else
+ */
+
+:root {
+  /* ─── Spacing scale (4px base grid) ─── */
+  --space-0: 0px;
+  --space-px: 1px;
+  --space-0-5: 2px;
+  --space-1: 4px;
+  --space-1-5: 6px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+  --space-20: 80px;
+  --space-24: 96px;
+
+  /* ─── Typography scale ─── */
+  --text-2xs: 0.625rem;    /* 10px — fine print, badges */
+  --text-xs: 0.6875rem;    /* 11px — labels, meta */
+  --text-sm: 0.8125rem;    /* 13px — secondary text */
+  --text-base: 0.9375rem;  /* 15px — body copy */
+  --text-lg: 1.125rem;     /* 18px — section headers */
+  --text-xl: 1.5rem;       /* 24px — page titles */
+  --text-2xl: 2rem;        /* 32px — hero / display */
+  --text-3xl: 2.5rem;      /* 40px — large display */
+
+  /* ─── Line heights ─── */
+  --leading-none: 1;
+  --leading-tight: 1.25;
+  --leading-snug: 1.375;
+  --leading-normal: 1.55;
+  --leading-relaxed: 1.65;
+  --leading-loose: 2;
+
+  /* ─── Font weights ─── */
+  --weight-normal: 400;
+  --weight-medium: 500;
+  --weight-semibold: 600;
+  --weight-bold: 700;
+
+  /* ─── Letter spacing ─── */
+  --tracking-tighter: -0.03em;
+  --tracking-tight: -0.02em;
+  --tracking-normal: 0em;
+  --tracking-wide: 0.025em;
+  --tracking-wider: 0.05em;
+  --tracking-widest: 0.1em;
+
+  /* ─── Layout constants ─── */
+  --sidebar-width: 260px;
+  --sidebar-collapsed-width: 60px;
+  --header-height: 48px;
+  --input-height: 36px;
+  --input-height-lg: 44px;
+  --max-content-width: 800px;
+  --max-content-width-wide: 1200px;
+
+  /* ─── Z-index scale ─── */
+  --z-base: 0;
+  --z-above: 1;
+  --z-dropdown: 100;
+  --z-sticky: 200;
+  --z-overlay: 300;
+  --z-modal: 400;
+  --z-toast: 500;
+  --z-tooltip: 600;
+}
