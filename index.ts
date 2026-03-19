@@ -240,11 +240,13 @@ const godmodePlugin = {
       methodCount,
     });
 
-    if (typeof (api as any).registerHttpRoute === "function") {
-      (api as any).registerHttpRoute({ path: "/godmode", auth: "plugin", match: "prefix", handler: godmodeHttpHandler });
-      (api as any).registerHttpRoute({ path: "/reports", auth: "plugin", match: "prefix", handler: godmodeHttpHandler });
-    } else if (typeof (api as any).registerHttpHandler === "function") {
+    // Use registerHttpHandler (fallback dispatch) — registerHttpRoute does exact-path
+    // matching in current OpenClaw versions, which breaks SPA prefix routing.
+    if (typeof (api as any).registerHttpHandler === "function") {
       (api as any).registerHttpHandler(godmodeHttpHandler);
+    } else if (typeof (api as any).registerHttpRoute === "function") {
+      (api as any).registerHttpRoute({ path: "/godmode", handler: godmodeHttpHandler });
+      (api as any).registerHttpRoute({ path: "/reports", handler: godmodeHttpHandler });
     } else {
       console.warn("[godmode] No HTTP route registration API found — UI and health endpoints unavailable");
     }
