@@ -1588,6 +1588,7 @@ export function renderApp(state: AppViewState) {
                 assistantAvatar: state.assistantAvatar,
                 userName: state.userName,
                 userAvatar: state.userAvatar,
+                currentModel: state.currentModel,
                 currentToolName: state.currentToolName,
                 currentToolInfo: state.currentToolInfo,
                 privateMode: state.chatPrivateMode,

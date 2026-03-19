@@ -252,6 +252,7 @@ export class GmChat extends LitElement {
       assistantAvatar: s.assistantAvatar,
       userName: s.userName,
       userAvatar: s.userAvatar,
+      currentModel: s.currentModel,
 
       // Tool / working state
       currentToolName: s.currentToolName,

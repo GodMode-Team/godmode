@@ -393,7 +393,7 @@ const godmodePlugin = {
         const cfgPath = resolveConfigPath();
         if (existsSync(cfgPath)) {
           const raw = JSON.parse(readFileSync(cfgPath, "utf-8"));
-          const primary = raw?.defaults?.model?.primary ?? null;
+          const primary = raw?.agents?.defaults?.model?.primary ?? raw?.defaults?.model?.primary ?? null;
           respond(true, { primary });
         } else {
           respond(true, { primary: null });

@@ -1,5 +1,6 @@
 import type { GodModeApp } from "./app";
 import { ALLY_SESSION_KEY } from "./controllers/ally";
+import { appEventBus } from "./context/event-bus.js";
 import { refreshChat } from "./app-chat";
 import { getEventLogSnapshot } from "./app-gateway";
 import {
@@ -19,7 +20,6 @@ import { loadGuardrails } from "./controllers/guardrails";
 import { loadDevices } from "./controllers/devices";
 import { loadExecApprovals } from "./controllers/exec-approvals";
 import { loadLogs } from "./controllers/logs";
-import { loadMyDay } from "./controllers/my-day";
 import { loadNodes } from "./controllers/nodes";
 import { loadPresence } from "./controllers/presence";
 import { loadArchivedSessions, loadSessions } from "./controllers/sessions";
@@ -261,13 +261,8 @@ export async function refreshActiveTab(host: SettingsHost) {
     await loadOverview(host);
   }
   if (host.tab === "today" || host.tab === "my-day") {
-    await loadMyDay(host as unknown as GodModeApp);
-    // Load decision cards alongside My Day data
-    import("./controllers/my-day").then(async ({ loadTodayQueueResults }) => {
-      (host as unknown as GodModeApp).todayQueueResults = await loadTodayQueueResults(
-        host as unknown as GodModeApp,
-      );
-    }).catch(() => {});
+    // <gm-today> handles its own data loading; just signal a refresh
+    appEventBus.emit("refresh-requested", { target: "today" });
   }
   if (host.tab === "work") {
     await Promise.all([
@@ -277,12 +272,6 @@ export async function refreshActiveTab(host: SettingsHost) {
   }
   if (host.tab === "workspaces") {
     await loadWorkspaces(host as unknown as GodModeApp);
-    // Load all tasks for the workspaces landing page
-    import("./controllers/workspaces").then(async ({ loadAllTasksWithQueueStatus }) => {
-      (host as unknown as GodModeApp).allTasks = await loadAllTasksWithQueueStatus(
-        host as unknown as GodModeApp,
-      );
-    });
   }
   if (host.tab === "channels") {
     await loadChannelsTab(host);

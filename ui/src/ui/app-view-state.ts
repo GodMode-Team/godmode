@@ -32,9 +32,7 @@ import type { ToolExecutionInfo } from "./types/chat-types";
 import type { ChatAttachment, ChatQueueItem, CronFormState, FileTreeNode } from "./ui-types";
 import type { NostrProfileFormState } from "./views/channels.nostr-profile-form";
 import type { AllyChatMessage } from "./views/ally-chat";
-import type { AgentLogData, DailyBriefData, DecisionCardItem } from "./tabs/today-tab";
 import type { Project } from "./views/work";
-import type { TaskFilter, TaskSort, WorkspaceDetail, WorkspaceSummary, WorkspaceTask } from "./views/workspaces";
 
 export type AppViewState = {
   settings: UiSettings;
@@ -218,61 +216,9 @@ export type AppViewState = {
   logsLevelFilters: Record<LogLevel, boolean>;
   logsAutoFollow: boolean;
   logsTruncated: boolean;
-  // Workspaces state
-  workspaces?: WorkspaceSummary[];
-  selectedWorkspace?: WorkspaceDetail | null;
-  workspacesSearchQuery?: string;
-  workspaceItemSearchQuery?: string;
-  workspaceExpandedFolders?: Set<string>;
-  workspaceBrowsePath?: string | null;
-  workspaceBrowseEntries?: import("./controllers/workspaces").BrowseEntry[] | null;
-  workspaceBreadcrumbs?: Array<{ name: string; path: string }> | null;
-  workspaceBrowseSearchQuery?: string;
-  workspaceBrowseSearchResults?: Array<{ path: string; name: string; type: string; excerpt?: string }> | null;
-  workspacesLoading?: boolean;
-  workspacesCreateLoading?: boolean;
-  workspacesError?: string | null;
-  allTasks?: WorkspaceTask[];
-  taskFilter?: TaskFilter;
-  taskSort?: TaskSort;
-  taskSearch?: string;
-  showCompletedTasks?: boolean;
-  editingTaskId?: string | null;
-  // My Day state
-  myDayLoading?: boolean;
-  myDayError?: string | null;
-  todaySelectedDate?: string;
-  todayViewMode?: "brief" | "tasks" | "inbox";
-  // Today tasks
-  todayTasks?: WorkspaceTask[];
-  todayTasksLoading?: boolean;
-  todayEditingTaskId?: string | null;
-  todayShowCompleted?: boolean;
-  todayInboxItems?: Array<{ name: string; path: string; updatedAt: string | null; excerpt: string; source?: string }>;
-  todayInboxLoading?: boolean;
-  // Universal Inbox state
-  inboxItems?: Array<{
-    id: string;
-    type: string;
-    title: string;
-    summary: string;
-    source: { persona?: string; skill?: string; taskId?: string; queueItemId?: string };
-    proofDocSlug?: string;
-    outputPath?: string;
-    sessionId?: string;
-    createdAt: string;
-    status: string;
-    score?: number;
-    feedback?: string;
-  }>;
-  inboxLoading?: boolean;
-  inboxCount?: number;
-  inboxScoringId?: string | null;
-  inboxScoringValue?: number;
-  inboxFeedbackText?: string;
-  // Trust summary
-  trustSummary?: import("./controllers/my-day").TrustSummaryData | null;
-  handleTrustDailyRate: (rating: number) => Promise<void>;
+  // Workspaces state — owned by <gm-work>
+  // My Day state — owned by <gm-today>
+  // Universal Inbox state — owned by <gm-today>
   // Ally side-chat state
   allyPanelOpen?: boolean;
   allyMessages?: AllyChatMessage[];
@@ -282,15 +228,7 @@ export type AppViewState = {
   allySending?: boolean;
   allyWorking?: boolean;
   allyAttachments?: import("./ui-types").ChatAttachment[];
-  todayQueueResults?: DecisionCardItem[];
-  // Daily Brief state
-  dailyBrief?: DailyBriefData | null;
-  dailyBriefLoading?: boolean;
-  dailyBriefError?: string | null;
-  // Agent Log state
-  agentLog?: AgentLogData | null;
-  agentLogLoading?: boolean;
-  agentLogError?: string | null;
+  // todayQueueResults, dailyBrief*, agentLog* — owned by <gm-today>
   // Private mode (no memory/learning from this chat)
   chatPrivateMode?: boolean;
   /** Maps private session keys → expiry timestamp (ms). */
@@ -357,34 +295,8 @@ export type AppViewState = {
   updateLoading: boolean;
   updateError: string | null;
   updateLastChecked: number | null;
-  // Dashboards state
-  dashboardsList?: import("./controllers/dashboards").DashboardManifest[];
-  dashboardsLoading?: boolean;
-  dashboardsError?: string | null;
-  activeDashboardId?: string | null;
-  activeDashboardHtml?: string | null;
-  activeDashboardManifest?: import("./controllers/dashboards").DashboardManifest | null;
-  dashboardCategoryFilter?: string | null;
-  // SecondBrain state
-  secondBrainSubtab?: import("./views/second-brain").SecondBrainSubtab;
-  secondBrainLoading?: boolean;
-  secondBrainError?: string | null;
-  secondBrainIdentity?: import("./views/second-brain").SecondBrainIdentityData | null;
-  secondBrainMemoryBank?: import("./views/second-brain").SecondBrainMemoryBankData | null;
-  secondBrainAiPacket?: import("./views/second-brain").SecondBrainAiPacketData | null;
-  secondBrainSourcesData?: import("./views/second-brain").SecondBrainSourcesData | null;
-  secondBrainResearchData?: import("./views/second-brain").SecondBrainResearchData | null;
-  secondBrainSelectedEntry?: import("./views/second-brain").SecondBrainEntryDetail | null;
-  secondBrainSearchQuery?: string;
-  secondBrainSyncing?: boolean;
-  secondBrainBrowsingFolder?: string | null;
-  secondBrainFolderEntries?: import("./views/second-brain").SecondBrainMemoryEntry[] | null;
-  secondBrainFolderName?: string | null;
-  secondBrainVaultHealth?: import("./views/second-brain").VaultHealthData | null;
-  secondBrainFileTree?: import("./views/second-brain").BrainTreeNode[] | null;
-  secondBrainFileTreeLoading?: boolean;
-  secondBrainFileSearchQuery?: string;
-  secondBrainFileSearchResults?: import("./views/second-brain").BrainSearchResult[] | null;
+  // Dashboards state — owned by <gm-dashboards>
+  // SecondBrain state — owned by <gm-second-brain>
   // Onboarding integrations state
   onboardingIntegrations: unknown[] | null;
   onboardingCoreProgress: { connected: number; total: number } | null;
@@ -518,27 +430,7 @@ export type AppViewState = {
     duration?: number,
   ) => void;
   dismissToast: (id: string) => void;
-  // My Day handlers
-  handleMyDayRefresh: () => Promise<void>;
-  handleMyDayTaskStatusChange: (taskId: string, newStatus: "pending" | "complete") => Promise<void>;
-  handleTodayStartTask: (taskId: string) => Promise<void>;
-  handleTodayViewTaskOutput: (taskId: string) => Promise<void>;
-  handleTodayCreateTask: (title: string) => Promise<void>;
-  handleTodayEditTask: (taskId: string | null) => void;
-  handleTodayUpdateTask: (taskId: string, updates: { title?: string; dueDate?: string | null }) => Promise<void>;
-  handleTodayToggleCompleted: () => void;
-  // Date navigation handlers
-  handleDatePrev: () => void;
-  handleDateNext: () => void;
-  handleDateToday: () => void;
-  // Daily Brief handlers
-  handleDailyBriefRefresh: () => Promise<void>;
-  handleDailyBriefGenerate: () => Promise<void>;
-  handleDailyBriefOpenInObsidian: () => void;
-  handleBriefSave: (content: string) => Promise<void>;
-  handleBriefToggleCheckbox: (index: number, checked: boolean) => Promise<void>;
-  // Today view mode handler
-  handleTodayViewModeChange: (mode: "brief" | "tasks" | "inbox") => void;
+  // My Day, Date, Daily Brief, Today view mode handlers — moved to <gm-today>
   handlePrivateModeToggle: () => void;
   // Ally side-chat handlers
   handleAllyToggle: () => void;
@@ -547,14 +439,7 @@ export type AppViewState = {
   handleAllyOpenFull: () => void;
   handleAllyAttachmentsChange: (attachments: import("./ui-types").ChatAttachment[]) => void;
   handleAllyAction: (action: string, target?: string, method?: string, params?: Record<string, unknown>) => Promise<void>;
-  // Decision card handlers
-  handleDecisionApprove: (id: string) => Promise<void>;
-  handleDecisionReject: (id: string) => Promise<void>;
-  handleDecisionDismiss: (id: string) => Promise<void>;
-  handleDecisionViewOutput: (id: string, outputPath: string) => Promise<void>;
-  handleDecisionOpenChat: (id: string) => void;
-  handleDecisionRate: (id: string, workflow: string, rating: number) => Promise<void>;
-  handleDecisionFeedback: (id: string, workflow: string, feedback: string) => Promise<void>;
+  // Decision card handlers — moved to <gm-today>
   // File open handler
   handleOpenFile: (filePath: string) => Promise<void>;
   // Inner Work handlers
@@ -577,12 +462,7 @@ export type AppViewState = {
   handleToggleSessionResources: () => void;
   handleViewAllResources: () => void;
   // People tab handlers
-  // Workspaces handlers
-  handleWorkspacesRefresh: () => Promise<void>;
-  handleWorkspaceBrowse: (folderPath: string) => Promise<void>;
-  handleWorkspaceBrowseSearch: (query: string) => Promise<void>;
-  handleWorkspaceBrowseBack: () => void;
-  handleWorkspaceCreateFolder: (folderPath: string) => Promise<void>;
+  // Workspaces handlers — moved to <gm-work>
   handleStartChatWithPrompt: (prompt: string) => void;
   // User profile handlers
   handleUpdateUserProfile: (name: string, avatar: string) => void;
@@ -606,38 +486,9 @@ export type AppViewState = {
   handleWizardGenerate?: () => Promise<void>;
   handleWizardFileToggle?: (path: string, checked: boolean) => void;
   handleWizardConfigToggle?: (path: string, checked: boolean) => void;
-  // SecondBrain handlers
-  handleSecondBrainRefresh: () => Promise<void>;
-  handleSecondBrainSubtabChange: (subtab: import("./views/second-brain").SecondBrainSubtab) => void;
-  handleSecondBrainSelectEntry: (path: string) => Promise<void>;
-  handleSecondBrainBrowseFolder: (path: string) => Promise<void>;
-  handleSecondBrainBack: () => void;
-  handleSecondBrainSearch: (query: string) => void;
-  handleSecondBrainSync: () => Promise<void>;
-  handleResearchSaveViaChat: () => Promise<void>;
-  handleSecondBrainFileSearch: (query: string) => void;
-  handleSecondBrainFileSelect: (path: string) => Promise<void>;
-  // Dashboards state + handlers
-  dashboardChatOpen?: boolean;
-  dashboardPreviousSessionKey?: string | null;
-  handleDashboardsRefresh: () => Promise<void>;
-  handleDashboardSelect: (id: string) => Promise<void>;
-  handleDashboardDelete: (id: string) => Promise<void>;
-  handleDashboardCreateViaChat: (prompt?: string) => void;
-  handleDashboardTogglePin: (id: string) => Promise<void>;
-  handleDashboardCategoryFilter: (category: string | null) => void;
-  handleDashboardBack: () => void;
-  handleDashboardOpenSession: (dashboardId: string) => Promise<void>;
-  // Inbox handlers
-  handleInboxRefresh: () => Promise<void>;
-  handleInboxScore: (itemId: string, score: number, feedback?: string) => Promise<void>;
-  handleInboxDismiss: (itemId: string) => Promise<void>;
-  handleInboxMarkAll: () => Promise<void>;
-  handleInboxViewOutput: (itemId: string) => Promise<void>;
-  handleInboxViewProof: (itemId: string) => Promise<void>;
-  handleInboxOpenChat: (itemId: string) => void;
-  handleInboxSetScoring: (itemId: string | null, score?: number) => void;
-  handleInboxFeedbackChange: (text: string) => void;
+  // SecondBrain handlers — moved to <gm-second-brain>
+  // Dashboards handlers — moved to <gm-dashboards>
+  // Inbox handlers — moved to <gm-today>
   // Proof sidebar handlers
   handleOpenProofDoc: (slug: string) => Promise<void>;
   handleCloseProofDoc: () => void;

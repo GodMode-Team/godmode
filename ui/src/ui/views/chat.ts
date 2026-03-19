@@ -28,6 +28,17 @@ export type CompactionIndicatorStatus = {
   completedAt: number | null;
 };
 
+/** Format "anthropic/claude-opus-4-6" → "Opus 4.6" */
+function formatModelLabel(raw: string): string {
+  const modelId = raw.includes("/") ? raw.split("/").pop()! : raw;
+  const m = modelId.match(/claude-(\w+)-(\d+)-(\d+)/);
+  if (m) {
+    const family = m[1].charAt(0).toUpperCase() + m[1].slice(1);
+    return `${family} ${m[2]}.${m[3]}`;
+  }
+  return modelId.replace(/^claude-/, "").replace(/-/g, " ");
+}
+
 export type ChatProps = {
   basePath?: string;
   sessionKey: string;
@@ -69,6 +80,7 @@ export type ChatProps = {
   assistantAvatar: string | null;
   userName?: string;
   userAvatar?: string | null;
+  currentModel?: string | null;
   // Working indicator
   currentToolName?: string | null;
   currentToolInfo?: ToolExecutionInfo | null;
@@ -1072,6 +1084,7 @@ export function renderChat(props: ChatProps) {
             ></textarea>
 
             <div class="chat-compose__actions">
+              ${props.currentModel ? html`<span class="chat-model-label">${formatModelLabel(props.currentModel)}</span>` : nothing}
               ${renderContextBadge(props)}
 
               <button

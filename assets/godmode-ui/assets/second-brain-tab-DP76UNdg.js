@@ -1,4 +1,4 @@
-import{b as a,A as r,o as x,d as E,g as C,r as u,t as _}from"./lit-core-CTInmNPB.js";import{a as m,o as A}from"./index-B529-CI3.js";import{a as T}from"./views-settings-C5QwUeqU.js";import{f as D}from"./ctrl-settings-Qu6zIwzj.js";import"./markdown-i_gIkIP3.js";function y(e){if(!e)return"";try{return D(new Date(e).getTime())}catch{return""}}function B(e){return a`<div class="second-brain-md-body">${x(T(e))}</div>`}function L(e){const{identity:n}=e;return!n||n.files.length===0?a`
+import{b as a,A as r,o as x,d as E,g as C,r as u,t as _}from"./lit-core-CTInmNPB.js";import{a as m,o as A}from"./index-DFY1NMp8.js";import{a as T}from"./views-settings-WZfHp19p.js";import{f as D}from"./ctrl-settings-yPdxnkF_.js";import"./markdown-i_gIkIP3.js";function y(e){if(!e)return"";try{return D(new Date(e).getTime())}catch{return""}}function B(e){return a`<div class="second-brain-md-body">${x(T(e))}</div>`}function L(e){const{identity:n}=e;return!n||n.files.length===0?a`
       <div class="second-brain-panel">
         <div class="second-brain-empty-block">
           <div class="second-brain-empty-icon">\u{1F464}</div>

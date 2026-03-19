@@ -1023,18 +1023,8 @@ function handleGatewayEventUnsafe(host: GatewayHost, evt: GatewayEventFrame) {
       });
 
       // Auto-refresh dashboard when its session completes (agent may have updated it)
-      const app = host as unknown as {
-        activeDashboardManifest?: { sessionId?: string | null; id?: string } | null;
-        tab?: string;
-      };
-      if (
-        app.tab === "dashboards" &&
-        app.activeDashboardManifest?.sessionId &&
-        app.activeDashboardManifest.sessionId === payload.sessionKey
-      ) {
-        void import("./controllers/dashboards.js").then(({ loadDashboard }) => {
-          void loadDashboard(host as unknown as GodModeApp, app.activeDashboardManifest!.id!);
-        });
+      if (host.tab === "dashboards") {
+        appEventBus.emit("refresh-requested", { target: "dashboards", sessionKey: payload.sessionKey });
       }
     }
     return;

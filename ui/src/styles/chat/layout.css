@@ -730,6 +730,15 @@
 }
 
 /* Context badge - compact pill (inline in compose) */
+.chat-model-label {
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--text-muted);
+  opacity: 0.7;
+  white-space: nowrap;
+  user-select: none;
+}
+
 .chat-context-badge {
   display: inline-flex;
   align-items: center;
