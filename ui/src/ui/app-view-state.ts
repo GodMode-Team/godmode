@@ -3,7 +3,6 @@ import type { FailedMessage } from "./controllers/chat";
 import type { DevicePairingList } from "./controllers/devices";
 import type { ExecApprovalRequest } from "./controllers/exec-approval";
 import type { ExecApprovalsFile, ExecApprovalsSnapshot } from "./controllers/exec-approvals";
-import type { ClawHubMessage } from "./controllers/clawhub";
 import type { SkillMessage } from "./controllers/skills";
 import type { GatewayBrowserClient, GatewayHelloOk } from "./gateway";
 import type { Tab } from "./navigation";
@@ -15,9 +14,6 @@ import type {
   AgentsListResult,
   ArchivedSessionEntry,
   ChannelsStatusSnapshot,
-  ClawHubSearchResult,
-  ClawHubSkillDetail,
-  ClawHubSkillItem,
   ConfigSnapshot,
   CronJob,
   CronRunLogEntry,
@@ -36,7 +32,7 @@ import type { ToolExecutionInfo } from "./types/chat-types";
 import type { ChatAttachment, ChatQueueItem, CronFormState, FileTreeNode } from "./ui-types";
 import type { NostrProfileFormState } from "./views/channels.nostr-profile-form";
 import type { AllyChatMessage } from "./views/ally-chat";
-import type { AgentLogData, DailyBriefData, DecisionCardItem } from "./views/my-day";
+import type { AgentLogData, DailyBriefData, DecisionCardItem } from "./tabs/today-tab";
 import type { Project } from "./views/work";
 import type { TaskFilter, TaskSort, WorkspaceDetail, WorkspaceSummary, WorkspaceTask } from "./views/workspaces";
 
@@ -60,6 +56,7 @@ export type AppViewState = {
   userName: string;
   userAvatar: string | null;
   assistantAgentId: string | null;
+  currentModel: string | null;
   sessionKey: string;
   sessionPickerOpen: boolean;
   sessionPickerPosition: { top: number; right: number } | null;
@@ -195,7 +192,7 @@ export type AppViewState = {
   skillEdits: Record<string, string>;
   skillMessages: Record<string, SkillMessage>;
   skillsBusyKey: string | null;
-  skillsSubTab: "godmode" | "my-skills" | "clawhub";
+  skillsSubTab: "godmode" | "my-skills";
   godmodeSkills: import("./views/skills").GodModeSkillsData | null;
   godmodeSkillsLoading: boolean;
   expandedSkills: Set<string>;
@@ -204,16 +201,6 @@ export type AppViewState = {
   rosterError: string | null;
   rosterFilter: string;
   expandedAgents: Set<string>;
-  clawhubQuery: string;
-  clawhubResults: ClawHubSearchResult[] | null;
-  clawhubExploreItems: ClawHubSkillItem[] | null;
-  clawhubExploreSort: string;
-  clawhubLoading: boolean;
-  clawhubError: string | null;
-  clawhubDetailSlug: string | null;
-  clawhubDetail: ClawHubSkillDetail | null;
-  clawhubImporting: string | null;
-  clawhubMessage: ClawHubMessage | null;
   debugLoading: boolean;
   debugStatus: StatusSummary | null;
   debugHealth: HealthSnapshot | null;
@@ -304,10 +291,6 @@ export type AppViewState = {
   agentLog?: AgentLogData | null;
   agentLogLoading?: boolean;
   agentLogError?: string | null;
-  // Mission Control state
-  missionControlData?: import("./controllers/mission-control").MissionControlData | null;
-  missionControlLoading?: boolean;
-  missionControlError?: string | null;
   // Private mode (no memory/learning from this chat)
   chatPrivateMode?: boolean;
   /** Maps private session keys → expiry timestamp (ms). */
@@ -334,8 +317,6 @@ export type AppViewState = {
   setupCapabilities?: { capabilities: Array<{ id: string; title: string; description: string; icon: string; status: "active" | "available" | "coming-soon"; detail?: string; action?: string }>; percentComplete: number } | null;
   setupCapabilitiesLoading?: boolean;
   setupQuickDone?: boolean;
-  // Focus Pulse state
-  focusPulseData?: import("./controllers/focus-pulse").FocusPulseData | null;
   // Trust Tracker state
   trustTrackerData: import("./controllers/trust-tracker").TrustTrackerData | null;
   trustTrackerLoading: boolean;
@@ -349,25 +330,15 @@ export type AppViewState = {
   handleGuardrailsLoad: () => Promise<void>;
   handleGuardrailToggle: (gateId: string, enabled: boolean) => Promise<void>;
   handleGuardrailThresholdChange: (gateId: string, key: string, value: number) => Promise<void>;
-  // Mission Control handlers
-  handleMissionControlRefresh: () => Promise<void>;
-  handleMissionControlCancelTask: (taskId: string) => Promise<void>;
-  handleMissionControlApproveItem: (id: string) => Promise<void>;
-  handleMissionControlRetryItem: (id: string) => Promise<void>;
-  handleMissionControlViewDetail: (agent: import("./controllers/mission-control").AgentRunView) => Promise<void>;
+  // Task session + queue handlers (kept from Mission Control for queue/today tab use)
   handleMissionControlAddToQueue: (type: string, title: string) => Promise<void>;
   handleMissionControlOpenSession: (sessionKey: string) => Promise<void>;
   handleMissionControlOpenTaskSession: (sourceTaskId: string) => Promise<void>;
   handleMissionControlStartQueueItem: (itemId: string) => Promise<void>;
-  handleSwarmSelectProject: (projectId: string) => Promise<void>;
-  handleSwarmSteer: (projectId: string, issueTitle: string, instructions: string) => Promise<void>;
   handleSwarmViewProofDoc: (docSlug: string) => Promise<void>;
   handleSwarmViewRunLog: (queueItemId: string) => Promise<void>;
   handleOpenSupportChat: () => void;
   seedSessionWithAgentOutput: (taskTitle: string, output: string, agentPrompt?: string) => Promise<void>;
-  // GodMode Options state
-  godmodeOptions: Record<string, unknown> | null;
-  godmodeOptionsLoading: boolean;
   // Dynamic HTML slot state (AI-generated tab content)
   dynamicSlots: Record<string, string>;
   // Update check state
@@ -635,16 +606,6 @@ export type AppViewState = {
   handleWizardGenerate?: () => Promise<void>;
   handleWizardFileToggle?: (path: string, checked: boolean) => void;
   handleWizardConfigToggle?: (path: string, checked: boolean) => void;
-  // Focus Pulse handlers
-  loadFocusPulse: () => Promise<void>;
-  handleFocusPulseStartMorning: () => Promise<void>;
-  handleFocusPulseSetFocus: (index: number) => Promise<void>;
-  handleFocusPulseComplete: () => Promise<void>;
-  handleFocusPulsePulseCheck: () => Promise<void>;
-  handleFocusPulseEndDay: () => Promise<void>;
-  // Options handlers
-  handleOptionsLoad: () => Promise<void>;
-  handleOptionToggle: (key: string, value: unknown) => Promise<void>;
   // SecondBrain handlers
   handleSecondBrainRefresh: () => Promise<void>;
   handleSecondBrainSubtabChange: (subtab: import("./views/second-brain").SecondBrainSubtab) => void;

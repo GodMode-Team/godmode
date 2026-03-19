@@ -330,8 +330,28 @@ export function renderChatControls(state: AppViewState) {
           <path d="M19 21H5"></path>
         </svg>
       </button>
+      ${state.currentModel ? html`
+        <span class="chat-toolbar__spacer"></span>
+        <span class="chat-toolbar__model-pill" title=${state.currentModel}>
+          ${formatModelName(state.currentModel)}
+        </span>
+      ` : nothing}
     </div>
   `;
+}
+
+/** Format "anthropic/claude-opus-4-6" → "Opus 4.6" */
+function formatModelName(raw: string): string {
+  // Strip provider prefix (e.g. "anthropic/")
+  const modelId = raw.includes("/") ? raw.split("/").pop()! : raw;
+  // Match claude-{family}-{version} pattern
+  const m = modelId.match(/claude-(\w+)-(\d+)-(\d+)/);
+  if (m) {
+    const family = m[1].charAt(0).toUpperCase() + m[1].slice(1);
+    return `${family} ${m[2]}.${m[3]}`;
+  }
+  // Fallback: just show the model ID cleaned up
+  return modelId.replace(/^claude-/, "").replace(/-/g, " ");
 }
 
 // Session Picker Types and Helpers

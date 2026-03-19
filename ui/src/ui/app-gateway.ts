@@ -651,6 +651,7 @@ export function connectGateway(host: GatewayHost) {
 
       applySnapshot(host, hello);
       void loadAssistantIdentity(host as unknown as GodModeApp);
+      void loadCurrentModel(host);
       void loadAgents(host as unknown as GodModeApp);
       void loadNodes(host as unknown as GodModeApp, { quiet: true });
       void loadDevices(host as unknown as GodModeApp, { quiet: true });
@@ -659,8 +660,6 @@ export function connectGateway(host: GatewayHost) {
       void refreshActiveTab(host as unknown as Parameters<typeof refreshActiveTab>[0]);
       // Check workspace setup first, then onboarding (onboarding depends on workspace state)
       void checkWorkspaceSetup(host).then(() => checkOnboardingStatus(host));
-      // Load GodMode options
-      void loadOptionsOnConnect(host);
       // Start background update check heartbeat (every 30 min)
       startUpdatePolling(host as unknown as GodModeApp);
       // Check for post-update audit results (shows toast if update just completed)
@@ -1182,17 +1181,6 @@ function handleGatewayEventUnsafe(host: GatewayHost, evt: GatewayEventFrame) {
     return;
   }
 
-  // GodMode Options live updates
-  if (evt.event === "godmode.options:update") {
-    const payload = evt.payload as Record<string, unknown> | undefined;
-    if (payload) {
-      const app = host as unknown as { godmodeOptions?: Record<string, unknown> | null; requestUpdate?: () => void };
-      app.godmodeOptions = payload;
-      app.requestUpdate?.();
-    }
-    return;
-  }
-
   // Fathom meeting processed — notify via toast + ally chat + main chat
   if (evt.event === "fathom:meeting-processed") {
     const payload = evt.payload as
@@ -1442,11 +1430,14 @@ function handleGatewayEventUnsafe(host: GatewayHost, evt: GatewayEventFrame) {
   }
 }
 
-async function loadOptionsOnConnect(host: GatewayHost) {
-  const app = host as unknown as GodModeApp;
-  if (typeof app.handleOptionsLoad === "function") {
-    await app.handleOptionsLoad();
-  }
+async function loadCurrentModel(host: GatewayHost) {
+  if (!host.client) return;
+  try {
+    const res = await host.client.request("godmode.config.model", {});
+    if (res?.primary) {
+      (host as unknown as { currentModel: string | null }).currentModel = res.primary;
+    }
+  } catch { /* non-critical */ }
 }
 
 /**

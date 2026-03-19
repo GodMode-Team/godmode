@@ -110,6 +110,24 @@ export async function registerGodMode(
   }) as StandaloneRequestHandler);
   methodCount++;
 
+  // Active model — UI calls this to display the model pill in the chat toolbar.
+  adapter.registerMethod("godmode.config.model", (async ({ respond }) => {
+    try {
+      const { resolveConfigPath } = await import("../lib/openclaw-state.js");
+      const cfgPath = resolveConfigPath();
+      if (existsSync(cfgPath)) {
+        const raw = JSON.parse(readFileSync(cfgPath, "utf-8"));
+        const primary = raw?.defaults?.model?.primary ?? null;
+        respond(true, { primary });
+      } else {
+        respond(true, { primary: null });
+      }
+    } catch {
+      respond(true, { primary: null });
+    }
+  }) as StandaloneRequestHandler);
+  methodCount++;
+
   adapter.registerMethod("godmode.health", (async ({ respond }) => {
     try {
       const { getHealthReport } = await import("../services/self-heal.js");

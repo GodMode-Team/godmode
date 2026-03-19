@@ -31,7 +31,6 @@ import {
   handleUpdated,
 } from "./app-lifecycle";
 import { renderApp } from "./app-render";
-import { localDateString } from "./format";
 import {
   exportLogs as exportLogsInternal,
   handleChatScroll as handleChatScrollInternal,
@@ -66,20 +65,12 @@ import { loadAssistantIdentity as loadAssistantIdentityInternal } from "./contro
 import type { FailedMessage } from "./controllers/chat";
 import { retryPendingMessage } from "./controllers/chat";
 import type { AllyChatMessage } from "./views/ally-chat.js";
-import type { DecisionCardItem } from "./views/my-day.js";
+import type { DecisionCardItem } from "./tabs/today-tab.js";
 import { ALLY_SESSION_KEY, buildAllyContext } from "./controllers/ally.js";
 import type { DevicePairingList } from "./controllers/devices";
 import type { ExecApprovalRequest } from "./controllers/exec-approval";
 import type { ExecApprovalsFile, ExecApprovalsSnapshot } from "./controllers/exec-approvals";
-import {
-  loadFocusPulse as loadFocusPulseInternal,
-  startMorningSet as startMorningSetInternal,
-  setFocus as setFocusInternal,
-  completeFocus as completeFocusInternal,
-  runPulseCheck as runPulseCheckInternal,
-  endDay as endDayInternal,
-  type FocusPulseData,
-} from "./controllers/focus-pulse";
+// Focus Pulse controller removed (v3 slim)
 import {
   loadTrustTracker as loadTrustTrackerInternal,
   addTrustWorkflow as addTrustWorkflowInternal,
@@ -91,18 +82,12 @@ import type { GuardrailsViewData } from "./controllers/guardrails";
 import { startMeetingNotifications, stopMeetingNotifications } from "./controllers/meeting-notify";
 // GodMode view controllers
 import {
-  loadMyDay as loadMyDayInternal,
-  loadBriefOnly as loadBriefOnlyInternal,
-  openBriefInObsidian as openBriefInObsidianInternal,
-} from "./controllers/my-day";
-import {
   loadWork as loadWorkInternal,
   loadProjectDetails as loadProjectDetailsInternal,
   loadResources as loadResourcesInternal,
   pinResource as pinResourceInternal,
   deleteResource as deleteResourceInternal,
 } from "./controllers/work";
-import { loadWorkspaces as loadWorkspacesInternal } from "./controllers/workspaces";
 import type { GatewayBrowserClient, GatewayHelloOk } from "./gateway";
 import type { Tab } from "./navigation";
 import { loadSettings, type UiSettings } from "./storage";
@@ -113,9 +98,6 @@ import type {
   AgentsListResult,
   ArchivedSessionEntry,
   ChannelsStatusSnapshot,
-  ClawHubSearchResult,
-  ClawHubSkillDetail,
-  ClawHubSkillItem,
   ConfigSnapshot,
   ConfigUiHints,
   CronJob,
@@ -348,6 +330,8 @@ export class GodModeApp extends LitElement {
   @state() userName = getInjectedUserIdentity().name;
   @state() userAvatar = getInjectedUserIdentity().avatar;
 
+  @state() currentModel: string | null = null;
+
   @state() sessionKey = this.settings.sessionKey;
   @state() sessionPickerOpen = false;
   @state() sessionPickerPosition: { top: number; right: number } | null = null;
@@ -534,49 +518,19 @@ export class GodModeApp extends LitElement {
   @state() onboardingConfigValues: Record<string, string> = {};
   @state() onboardingProgress: number | null = null;
 
-  // Workspaces state
-  @state() workspaces?: WorkspaceSummary[];
-  @state() selectedWorkspace: WorkspaceDetail | null = null;
-  @state() workspacesSearchQuery = "";
-  @state() workspaceItemSearchQuery = "";
-  @state() workspacesLoading = false;
-  @state() workspacesCreateLoading = false;
-  @state() workspacesError: string | null = null;
-  @state() workspaceExpandedFolders: Set<string> = new Set();
-  @state() allTasks?: WorkspaceTask[];
-  @state() taskFilter?: TaskFilter;
-  @state() taskSort?: TaskSort;
-  @state() taskSearch?: string;
-  @state() showCompletedTasks?: boolean;
-  @state() editingTaskId: string | null = null;
+  // Workspaces state — owned by <gm-work> tab component
+  // (declarations removed: workspaces, selectedWorkspace, workspacesSearchQuery,
+  //  workspaceItemSearchQuery, workspacesLoading, workspacesCreateLoading,
+  //  workspacesError, workspaceExpandedFolders, allTasks, taskFilter, taskSort,
+  //  taskSearch, showCompletedTasks, editingTaskId, workspaceBrowsePath,
+  //  workspaceBrowseEntries, workspaceBreadcrumbs, workspaceBrowseSearchQuery,
+  //  workspaceBrowseSearchResults)
 
-  // Workspace browsing state
-  @state() workspaceBrowsePath: string | null = null;
-  @state() workspaceBrowseEntries: import("./controllers/workspaces.js").BrowseEntry[] | null = null;
-  @state() workspaceBreadcrumbs: Array<{ name: string; path: string }> | null = null;
-  @state() workspaceBrowseSearchQuery = "";
-  @state() workspaceBrowseSearchResults: Array<{ path: string; name: string; type: string; excerpt?: string }> | null = null;
-
-  // My Day state
-  @state() myDayLoading = false;
-  @state() myDayError: string | null = null;
-  @state() todaySelectedDate: string = localDateString();
-  @state() todayViewMode: "brief" | "tasks" | "inbox" = "brief";
-
-  // Daily Brief state
-  @state() dailyBrief?: import("./views/daily-brief").DailyBriefData | null;
-  @state() dailyBriefLoading = false;
-  @state() dailyBriefError: string | null = null;
-  @state() agentLog?: import("./views/my-day").AgentLogData | null;
-  @state() agentLogLoading = false;
-  @state() agentLogError: string | null = null;
-  @state() briefNotes: Record<string, string> = {};
-
-  // Today tasks state
-  @state() todayTasks: import("./views/workspaces").WorkspaceTask[] = [];
-  @state() todayTasksLoading = false;
-  @state() todayEditingTaskId: string | null = null;
-  @state() todayShowCompleted = false;
+  // My Day / Daily Brief / Today tasks state — owned by <gm-today> tab component
+  // (declarations removed: myDayLoading, myDayError, todaySelectedDate,
+  //  todayViewMode, dailyBrief, dailyBriefLoading, dailyBriefError, agentLog,
+  //  agentLogLoading, agentLogError, briefNotes, todayTasks, todayTasksLoading,
+  //  todayEditingTaskId, todayShowCompleted)
 
   // Ally side-chat state
   @state() allyPanelOpen = false;
@@ -587,17 +541,10 @@ export class GodModeApp extends LitElement {
   @state() allySending = false;
   @state() allyWorking = false;
   @state() allyAttachments: import("./ui-types").ChatAttachment[] = [];
-  @state() todayQueueResults: DecisionCardItem[] = [];
-  @state() inboxItems: NonNullable<import("./app-view-state").AppViewState["inboxItems"]> = [];
-  @state() inboxLoading = false;
-  @state() inboxCount = 0;
-  @state() inboxScoringId: string | null = null;
-  @state() inboxScoringValue: number | undefined = undefined;
-  @state() inboxFeedbackText: string | undefined = undefined;
-  @state() inboxSortOrder: "newest" | "oldest" = "newest";
-
-  // Trust summary (for My Day card)
-  @state() trustSummary: import("./controllers/my-day").TrustSummaryData | null = null;
+  // Today queue/inbox/trust state — owned by <gm-today> tab component
+  // (declarations removed: todayQueueResults, inboxItems, inboxLoading,
+  //  inboxCount, inboxScoringId, inboxScoringValue, inboxFeedbackText,
+  //  inboxSortOrder, trustSummary)
 
   @state() chatPrivateMode = false;
   /** Maps private session keys → expiry timestamp (ms). Ephemeral sessions auto-delete. */
@@ -628,7 +575,7 @@ export class GodModeApp extends LitElement {
   @state() skillEdits: Record<string, string> = {};
   @state() skillsBusyKey: string | null = null;
   @state() skillMessages: Record<string, SkillMessage> = {};
-  @state() skillsSubTab: "godmode" | "my-skills" | "clawhub" = "godmode";
+  @state() skillsSubTab: "godmode" | "my-skills" = "godmode";
   @state() godmodeSkills: import("./views/skills").GodModeSkillsData | null = null;
   @state() godmodeSkillsLoading = false;
   @state() expandedSkills: Set<string> = new Set();
@@ -676,9 +623,6 @@ export class GodModeApp extends LitElement {
   @state() private chatNewMessagesBelow = false;
   @state() consciousnessStatus: "idle" | "loading" | "ok" | "error" = "idle";
 
-  // Focus Pulse state
-  @state() focusPulseData: FocusPulseData | null = null;
-
   // Trust Tracker state
   @state() trustTrackerData: TrustTrackerData | null = null;
   @state() trustTrackerLoading = false;
@@ -688,53 +632,21 @@ export class GodModeApp extends LitElement {
   @state() guardrailsLoading = false;
   @state() guardrailsShowAddForm = false;
 
-  // Mission Control state
-  @state() missionControlData: import("./controllers/mission-control.js").MissionControlData | null = null;
-  @state() missionControlLoading = false;
-  @state() missionControlError: string | null = null;
-  @state() missionControlFullControl = (() => {
-    try { return localStorage.getItem("godmode.mc.fullControl") === "1"; } catch { return true; }
-  })();
-  missionControlPollInterval: number | null = null;
-
-  // GodMode Options state
-  @state() godmodeOptions: Record<string, unknown> | null = null;
-  @state() godmodeOptionsLoading = false;
-
-  // Dashboards state
-  @state() dashboardsList: import("./controllers/dashboards.js").DashboardManifest[] | undefined;
-  @state() dashboardsLoading = false;
-  @state() dashboardsError: string | null = null;
-  @state() activeDashboardId: string | null = null;
-  @state() activeDashboardHtml: string | null = null;
-  @state() activeDashboardManifest: import("./controllers/dashboards.js").DashboardManifest | null = null;
+  // Dashboards state — owned by <gm-dashboards> tab component
+  // (declarations removed: dashboardsList, dashboardsLoading, dashboardsError,
+  //  activeDashboardId, activeDashboardHtml, activeDashboardManifest,
+  //  dashboardChatOpen, dashboardCategoryFilter)
   /** Stashed session key to restore when leaving an active dashboard */
   dashboardPreviousSessionKey: string | null = null;
-  /** Whether the inline chat panel is expanded */
-  @state() dashboardChatOpen = false;
-  /** Active category filter for dashboards gallery */
-  @state() dashboardCategoryFilter: string | null = null;
 
-  // Second Brain state
-  @state() secondBrainSubtab: import("./views/second-brain").SecondBrainSubtab = "identity";
-  @state() secondBrainLoading = false;
-  @state() secondBrainError: string | null = null;
-  @state() secondBrainIdentity: import("./views/second-brain").SecondBrainIdentityData | null = null;
-  @state() secondBrainMemoryBank: import("./views/second-brain").SecondBrainMemoryBankData | null = null;
-  @state() secondBrainAiPacket: import("./views/second-brain").SecondBrainAiPacketData | null = null;
-  @state() secondBrainSourcesData: import("./views/second-brain").SecondBrainSourcesData | null = null;
-  @state() secondBrainResearchData: import("./views/second-brain").SecondBrainResearchData | null = null;
-  @state() secondBrainSelectedEntry: import("./views/second-brain").SecondBrainEntryDetail | null = null;
-  @state() secondBrainSearchQuery = "";
-  @state() secondBrainSyncing = false;
-  @state() secondBrainBrowsingFolder: string | null = null;
-  @state() secondBrainFolderEntries: import("./views/second-brain").SecondBrainMemoryEntry[] | null = null;
-  @state() secondBrainFolderName: string | null = null;
-  @state() secondBrainVaultHealth: import("./views/second-brain").VaultHealthData | null = null;
-  @state() secondBrainFileTree: import("./views/second-brain").BrainTreeNode[] | null = null;
-  @state() secondBrainFileTreeLoading = false;
-  @state() secondBrainFileSearchQuery = "";
-  @state() secondBrainFileSearchResults: import("./views/second-brain").BrainSearchResult[] | null = null;
+  // Second Brain state — owned by <gm-second-brain> tab component
+  // (declarations removed: secondBrainSubtab, secondBrainLoading,
+  //  secondBrainError, secondBrainIdentity, secondBrainMemoryBank,
+  //  secondBrainAiPacket, secondBrainSourcesData, secondBrainResearchData,
+  //  secondBrainSelectedEntry, secondBrainSearchQuery, secondBrainSyncing,
+  //  secondBrainBrowsingFolder, secondBrainFolderEntries, secondBrainFolderName,
+  //  secondBrainVaultHealth, secondBrainFileTree, secondBrainFileTreeLoading,
+  //  secondBrainFileSearchQuery, secondBrainFileSearchResults)
 
   private nodesPollInterval: number | null = null;
   private logsPollInterval: number | null = null;
@@ -776,13 +688,7 @@ export class GodModeApp extends LitElement {
 
     handleConnected(this as unknown as Parameters<typeof handleConnected>[0]);
 
-    // Auto-advance to today if the selected date is stale (e.g. app left open overnight)
-    const today = localDateString();
-    if (this.todaySelectedDate !== today) {
-      this.todaySelectedDate = today;
-    }
-
-    // daily-brief:update events are handled centrally in app-gateway.ts.
+    // todaySelectedDate auto-advance moved to <gm-today>
 
     // Start meeting notifications (polls every 60s, fires toast 15 min before)
     startMeetingNotifications(this);
@@ -952,38 +858,7 @@ export class GodModeApp extends LitElement {
     }, 3000);
   }
 
-  // Focus Pulse handlers
-  async loadFocusPulse() {
-    await loadFocusPulseInternal(this);
-  }
-
-  async handleFocusPulseStartMorning() {
-    // Initialize backend state first — parse daily note, populate items, set active
-    await startMorningSetInternal(this);
-
-    // Then switch to chat and kick off the morning priority conversation in a new session
-    this.setTab("chat" as import("./navigation").Tab);
-    const prompt = "Let's do my morning set. Check my daily note for today's Win The Day items, review my calendar, and then walk me through a proposed plan for the day. Ask me clarifying questions before finalizing anything. Suggest which tasks you can handle vs what I should do myself. Do NOT call the morning_set tool or kick off any agents until I explicitly approve the plan.";
-    const { createNewSession } = await import("./app-render.helpers.js");
-    createNewSession(this);
-    void this.handleSendChat(prompt);
-  }
-
-  async handleFocusPulseSetFocus(index: number) {
-    await setFocusInternal(this, index);
-  }
-
-  async handleFocusPulseComplete() {
-    await completeFocusInternal(this);
-  }
-
-  async handleFocusPulsePulseCheck() {
-    await runPulseCheckInternal(this);
-  }
-
-  async handleFocusPulseEndDay() {
-    await endDayInternal(this);
-  }
+  // Focus Pulse removed (v3 slim) — morning set now handled via chat
 
   // Trust Tracker handlers
   async handleTrustLoad() {
@@ -1038,45 +913,7 @@ export class GodModeApp extends LitElement {
     this.guardrailsShowAddForm = !this.guardrailsShowAddForm;
   }
 
-  // Mission Control handlers
-  handleMissionControlToggleFullControl() {
-    this.missionControlFullControl = !this.missionControlFullControl;
-    try { localStorage.setItem("godmode.mc.fullControl", this.missionControlFullControl ? "1" : "0"); } catch { /* non-fatal */ }
-  }
-
-  async handleMissionControlRefresh() {
-    const { loadMissionControl } = await import("./controllers/mission-control.js");
-    await loadMissionControl(this);
-  }
-
-  async handleMissionControlCancelTask(taskId: string) {
-    const { cancelCodingTask } = await import("./controllers/mission-control.js");
-    await cancelCodingTask(this, taskId);
-  }
-
-  async handleMissionControlApproveItem(itemId: string) {
-    // Try coding task approval first; fall back to queue item approval
-    const { approveCodingTask, approveQueueItem } = await import("./controllers/mission-control.js");
-    const wasCodingTask = await approveCodingTask(this, itemId);
-    if (!wasCodingTask) {
-      await approveQueueItem(this, itemId);
-    }
-  }
-
-  async handleMissionControlRetryItem(itemId: string) {
-    const { retryQueueItem } = await import("./controllers/mission-control.js");
-    await retryQueueItem(this, itemId);
-  }
-
-  async handleMissionControlViewDetail(agent: import("./controllers/mission-control.js").AgentRunView) {
-    const { loadAgentDetail } = await import("./controllers/mission-control.js");
-    const detail = await loadAgentDetail(this, agent);
-    this.handleOpenSidebar(detail.content, {
-      mimeType: detail.mimeType,
-      title: detail.title,
-    });
-  }
-
+  // Task session helpers (kept for queue/today tab — originally part of Mission Control)
   async handleMissionControlOpenSession(sessionKey: string) {
     const openTabs = this.settings.openTabs.includes(sessionKey)
       ? this.settings.openTabs
@@ -1146,16 +983,6 @@ export class GodModeApp extends LitElement {
     await this.handleMissionControlOpenTaskSession(itemId);
   }
 
-  async handleSwarmSelectProject(projectId: string) {
-    const { selectSwarmProject } = await import("./controllers/mission-control.js");
-    await selectSwarmProject(this, projectId);
-  }
-
-  async handleSwarmSteer(projectId: string, issueTitle: string, instructions: string) {
-    const { steerSwarmAgent } = await import("./controllers/mission-control.js");
-    await steerSwarmAgent(this, projectId, issueTitle, instructions);
-  }
-
   async handleSwarmViewProofDoc(docSlug: string) {
     return this.handleOpenProofDoc(docSlug);
   }
@@ -1177,28 +1004,6 @@ export class GodModeApp extends LitElement {
       }
     } catch {
       this.showToast("Failed to load agent logs", "error");
-    }
-  }
-
-  async handleMissionControlViewTaskFiles(itemId: string) {
-    try {
-      const result = await this.client?.request<{
-        files?: Array<{ path: string; name: string; size: number; type: string }>;
-      }>("queue.taskFiles", { itemId });
-      const files = result?.files ?? [];
-      if (files.length === 0) {
-        this.showToast("No files found for this task", "info");
-        return;
-      }
-      // Format as markdown for sidebar
-      const lines = files.map(
-        (f) => `- **${f.name}** (${f.type}, ${(f.size / 1024).toFixed(1)} KB)\n  \`${f.path}\``
-      );
-      const md = `## Task Files\n\n${lines.join("\n\n")}`;
-      this.handleOpenSidebar(md, { title: "Task Files" });
-    } catch (e: unknown) {
-      console.error("Failed to load task files:", e);
-      this.showToast("Failed to load task files", "error");
     }
   }
 
@@ -1463,207 +1268,9 @@ export class GodModeApp extends LitElement {
     }
   }
 
-  // ── Decision Card Handlers ──────────────────────────────────────────
+  // Decision Card Handlers — moved to <gm-today> tab component
 
-  async handleDecisionApprove(id: string) {
-    if (!this.client || !this.connected) return;
-    try {
-      await this.client.request("queue.approve", { id });
-      this.todayQueueResults = this.todayQueueResults.filter(r => r.id !== id);
-    } catch (e) {
-      console.error("[DecisionCard] Approve failed:", e);
-      this.showToast("Failed to approve", "error");
-    }
-  }
-
-  async handleDecisionReject(id: string) {
-    if (!this.client || !this.connected) return;
-    try {
-      await this.client.request("queue.reject", { id });
-      this.todayQueueResults = this.todayQueueResults.filter(r => r.id !== id);
-    } catch (e) {
-      console.error("[DecisionCard] Reject failed:", e);
-      this.showToast("Failed to reject", "error");
-    }
-  }
-
-  async handleDecisionDismiss(id: string) {
-    if (!this.client || !this.connected) return;
-    try {
-      await this.client.request("queue.remove", { id });
-      this.todayQueueResults = this.todayQueueResults.filter(r => r.id !== id);
-    } catch (e) {
-      console.error("[DecisionCard] Dismiss failed:", e);
-      this.showToast("Failed to dismiss", "error");
-    }
-  }
-
-  async handleDecisionMarkComplete(id: string) {
-    if (!this.client || !this.connected) return;
-    try {
-      const item = this.todayQueueResults?.find((r) => r.id === id);
-      if (item?.sourceTaskId) {
-        await this.client.request("tasks.update", {
-          id: item.sourceTaskId,
-          status: "complete",
-        });
-      }
-      await this.client.request("queue.remove", { id });
-      this.todayQueueResults = this.todayQueueResults.filter(r => r.id !== id);
-      this.showToast("Task marked complete", "success");
-    } catch (e) {
-      console.error("[DecisionCard] Mark complete failed:", e);
-      this.showToast("Failed to mark complete", "error");
-    }
-  }
-
-  async handleDecisionRate(id: string, workflow: string, rating: number) {
-    if (!this.client || !this.connected) return;
-    try {
-      await this.client.request("trust.rate", { workflow, rating });
-      // Below threshold (7) — ask for improvement feedback before dismissing
-      const needsFeedback = rating < 7;
-      this.todayQueueResults = this.todayQueueResults.map((r) =>
-        r.id === id ? { ...r, userRating: rating, feedbackPending: needsFeedback } : r,
-      );
-      if (!needsFeedback) {
-        // Good rating — auto-dismiss cron results, toast for queue items
-        const item = this.todayQueueResults?.find((r) => r.id === id);
-        if (item?.source === "cron") {
-          await this.client.request("queue.remove", { id });
-          this.todayQueueResults = this.todayQueueResults.filter((r) => r.id !== id);
-        }
-        this.showToast(`Rated ${workflow} ${rating}/10`, "success");
-      } else {
-        this.showToast(`Rated ${workflow} ${rating}/10 — what could be better?`, "info");
-      }
-    } catch (e) {
-      console.error("[DecisionCard] Rate failed:", e);
-      this.showToast("Failed to submit rating", "error");
-    }
-  }
-
-  async handleDecisionFeedback(id: string, workflow: string, feedback: string) {
-    if (!this.client || !this.connected) return;
-    try {
-      // Submit improvement feedback (if provided — skip means empty string)
-      if (feedback) {
-        await this.client.request("trust.feedback", { workflow, feedback });
-        this.showToast(`Feedback saved for ${workflow} — will apply next time`, "success");
-      }
-      // Dismiss the card now that feedback is collected (or skipped)
-      const item = this.todayQueueResults?.find((r) => r.id === id);
-      if (item?.source === "cron") {
-        await this.client.request("queue.remove", { id });
-      }
-      this.todayQueueResults = this.todayQueueResults
-        .map((r) => r.id === id ? { ...r, feedbackPending: false } : r)
-        .filter((r) => !(r.id === id && r.source === "cron"));
-    } catch (e) {
-      console.error("[DecisionCard] Feedback failed:", e);
-      this.showToast("Failed to save feedback", "error");
-    }
-  }
-
-  async handleDecisionViewOutput(id: string, outputPath: string) {
-    if (!this.client || !this.connected) {
-      this.showToast("Not connected to gateway", "error");
-      return;
-    }
-    try {
-      const result = await this.client.request<{ content: string }>(
-        "queue.readOutput",
-        { path: outputPath },
-      );
-      const title = outputPath.split("/").pop() ?? "Agent Output";
-      this.handleOpenSidebar(result.content, {
-        mimeType: "text/markdown",
-        filePath: outputPath,
-        title,
-      });
-    } catch (err) {
-      console.error("[DecisionCard] View output failed:", err);
-      // Fallback to host files.read
-      void this.handleOpenFile(outputPath);
-    }
-  }
-
-  async handleDecisionOpenChat(id: string) {
-    // Open a main chat session with agent output context pre-seeded
-    const item = this.todayQueueResults?.find((r) => r.id === id);
-    if (!item) return;
-
-    // If the queue item is linked to a task, use the task session flow
-    // (creates/reuses session, seeds output, navigates to chat tab)
-    if (item.sourceTaskId) {
-      await this.handleMissionControlOpenTaskSession(item.sourceTaskId);
-      return;
-    }
-
-    // No linked task — create a fresh session and seed it with the output
-    const { createNewSession } = await import("./app-render.helpers.js");
-    createNewSession(this);
-    this.setTab("chat" as import("./navigation.js").Tab);
-
-    // Title the session tab with the agent result name
-    const { autoTitleCache } = await import("./controllers/sessions.js");
-    autoTitleCache.set(this.sessionKey, item.title);
-
-    // Seed with agent output if we have an outputPath
-    if (item.outputPath && this.client && this.connected) {
-      try {
-        const res = await this.client.request<{ content: string }>(
-          "queue.readOutput",
-          { path: item.outputPath },
-        );
-        if (res?.content) {
-          await this.seedSessionWithAgentOutput(item.title, res.content);
-        }
-      } catch {
-        // Fallback: seed with just the summary
-        await this.seedSessionWithAgentOutput(item.title, item.summary);
-      }
-    } else if (item.summary) {
-      await this.seedSessionWithAgentOutput(item.title, item.summary);
-    }
-  }
-
-  async handleTodayOpenChatToEdit(itemId: string) {
-    try {
-      // Look up outputPath from queue results
-      const item = this.todayQueueResults?.find((r) => r.id === itemId);
-      const outputPath = item?.outputPath;
-
-      // Open sidebar with output if we have a path
-      if (outputPath && this.client && this.connected) {
-        try {
-          const res = await this.client.request<{ content: string }>(
-            "queue.readOutput",
-            { path: outputPath },
-          );
-          this.handleOpenSidebar(res.content, {
-            mimeType: "text/markdown",
-            filePath: outputPath,
-            title: item?.title ?? outputPath.split("/").pop() ?? "Agent Output",
-          });
-        } catch {
-          // Fallback to host files.read
-          await this.handleOpenFile(outputPath);
-        }
-      }
-
-      // Open ally panel
-      this.allyPanelOpen = true;
-      this.allyUnread = 0;
-
-      // Switch to chat tab so sidebar is visible
-      if (this.tab !== ("chat" as any)) {
-        this.setTab("chat" as import("./navigation.js").Tab);
-      }
-    } catch (e) {
-      console.error("Open chat to edit failed:", e);
-    }
-  }
+  // handleDecisionViewOutput, handleDecisionOpenChat, handleTodayOpenChatToEdit — moved to <gm-today>
 
   /**
    * Seeds a newly opened session with agent output context.
@@ -1707,302 +1314,14 @@ export class GodModeApp extends LitElement {
     try {
       await this.client.request("queue.add", { type, title, priority: "normal" });
       this.showToast("Added to queue", "success", 2000);
-      const { loadMissionControl } = await import("./controllers/mission-control.js");
-      await loadMissionControl(this);
     } catch {
       this.showToast("Failed to add to queue", "error");
     }
   }
 
-  // Dashboards handlers
-  async handleDashboardsRefresh() {
-    const { loadDashboards } = await import("./controllers/dashboards.js");
-    await loadDashboards(this);
-  }
+  // Dashboards handlers — moved to <gm-dashboards>
 
-  async handleDashboardSelect(id: string) {
-    const { loadDashboard } = await import("./controllers/dashboards.js");
-    await loadDashboard(this, id);
-
-    // Open/get the persistent session for this dashboard and switch to it
-    // so inline chat panel is powered by the real session
-    if (this.client && this.connected) {
-      try {
-        const result = await this.client.request<{
-          sessionId: string;
-          created: boolean;
-          manifest: { title: string; id: string; widgets?: string[] };
-        }>("dashboards.openSession", { dashboardId: id });
-
-        if (result?.sessionId) {
-          // Stash the current session so we can restore it when leaving
-          this.dashboardPreviousSessionKey = this.sessionKey;
-
-          const nextKey = result.sessionId;
-          const { autoTitleCache } = await import("./controllers/sessions.js");
-          autoTitleCache.set(nextKey, result.manifest.title);
-
-          // Update manifest with sessionId if it was just created
-          if (this.activeDashboardManifest) {
-            this.activeDashboardManifest = {
-              ...this.activeDashboardManifest,
-              sessionId: nextKey,
-            };
-          }
-
-          // Switch session context
-          const { saveDraft } = await import("./app-chat.js");
-          saveDraft(this);
-          this.sessionKey = nextKey;
-
-          // Load the chat history for inline display
-          this.chatMessages = [];
-          this.chatStream = null;
-          this.chatStreamStartedAt = null;
-          this.chatRunId = null;
-          this.resetToolStream();
-          const { loadChatHistory } = await import("./controllers/chat.js");
-          await loadChatHistory(this);
-          void this.loadSessionResources();
-
-          // Default open the chat panel for dashboards
-          this.dashboardChatOpen = true;
-        }
-      } catch (err) {
-        console.error("[Dashboards] Failed to init session on select:", err);
-        // Non-critical — dashboard still renders, just no inline chat
-      }
-    }
-  }
-
-  async handleDashboardDelete(id: string) {
-    const { deleteDashboard } = await import("./controllers/dashboards.js");
-    await deleteDashboard(this, id);
-  }
-
-  async handleDashboardTogglePin(id: string) {
-    const { toggleDashboardPin } = await import("./controllers/dashboards.js");
-    await toggleDashboardPin(this, id);
-  }
-
-  async handleDashboardCreateViaChat(prompt?: string) {
-    this.setTab("chat" as import("./navigation").Tab);
-    const { createNewSession } = await import("./app-render.helpers.js");
-    createNewSession(this);
-    void this.handleSendChat(
-      prompt ?? "I want to create a custom dashboard. Ask me what data I want to see and design it for me. You can use any of GodMode's data — tasks, calendar, focus pulse, goals, trust scores, agent activity, queue status, coding tasks, workspace stats, and more.",
-    );
-  }
-
-  handleDashboardCategoryFilter(category: string | null) {
-    this.dashboardCategoryFilter = category;
-  }
-
-  handleDashboardBack() {
-    this.activeDashboardId = null;
-    this.activeDashboardHtml = null;
-    this.activeDashboardManifest = null;
-    this.dashboardChatOpen = false;
-
-    // Restore previous session
-    if (this.dashboardPreviousSessionKey) {
-      const prev = this.dashboardPreviousSessionKey;
-      this.dashboardPreviousSessionKey = null;
-      void import("./app-chat.js").then(({ saveDraft }) => {
-        saveDraft(this);
-        this.sessionKey = prev;
-        void import("./controllers/chat.js").then(({ loadChatHistory }) => {
-          void loadChatHistory(this);
-        });
-      });
-    }
-  }
-
-  async handleDashboardOpenSession(dashboardId: string) {
-    // Session is already active from handleDashboardSelect — just navigate to chat tab
-    const sessionId = this.activeDashboardManifest?.sessionId;
-    if (!sessionId) {
-      this.showToast("No session for this dashboard", "error");
-      return;
-    }
-
-    // Clear the stashed key — user is intentionally leaving to chat
-    this.dashboardPreviousSessionKey = null;
-    this.activeDashboardId = null;
-    this.activeDashboardHtml = null;
-    this.activeDashboardManifest = null;
-    this.dashboardChatOpen = false;
-
-    // Ensure session is in open tabs
-    const openTabs = this.settings.openTabs.includes(sessionId)
-      ? this.settings.openTabs
-      : [...this.settings.openTabs, sessionId];
-
-    this.applySettings({
-      ...this.settings,
-      openTabs,
-      sessionKey: sessionId,
-      lastActiveSessionKey: sessionId,
-      tabLastViewed: {
-        ...this.settings.tabLastViewed,
-        [sessionId]: Date.now(),
-      },
-    });
-
-    this.setTab("chat" as import("./navigation").Tab);
-    const { syncUrlWithSessionKey } = await import("./app-settings.js");
-    syncUrlWithSessionKey(this, sessionId, true);
-  }
-
-  // Options handlers
-  async handleOptionsLoad() {
-    const { loadOptions } = await import("./controllers/options.js");
-    await loadOptions(this);
-  }
-
-  async handleOptionToggle(key: string, value: unknown) {
-    const { saveOption } = await import("./controllers/options.js");
-    await saveOption(this, key, value);
-  }
-
-  // Second Brain handlers
-  async handleSecondBrainRefresh() {
-    const { loadSecondBrain } = await import("./controllers/second-brain.js");
-    await loadSecondBrain(this);
-  }
-
-  handleSecondBrainSubtabChange(subtab: import("./views/second-brain").SecondBrainSubtab) {
-    this.secondBrainSubtab = subtab;
-    this.secondBrainLoading = false;
-    this.secondBrainSelectedEntry = null;
-    this.secondBrainSearchQuery = "";
-    this.secondBrainFileSearchQuery = "";
-    this.secondBrainFileSearchResults = null;
-    this.secondBrainError = null;
-    this.secondBrainBrowsingFolder = null;
-    this.secondBrainFolderEntries = null;
-    this.secondBrainFolderName = null;
-    this.handleSecondBrainRefresh().catch((err) => {
-      console.error("[SecondBrain] Refresh after subtab change failed:", err);
-      this.secondBrainError = err instanceof Error ? err.message : "Failed to load data";
-      this.secondBrainLoading = false;
-    });
-  }
-
-  async handleSecondBrainSelectEntry(path: string) {
-    const isHtml = path.endsWith(".html") || path.endsWith(".htm");
-
-    // HTML files open directly in sidebar — bypass panel loading state
-    if (isHtml) {
-      try {
-        const result = await this.client!.request<{ name: string; content: string }>(
-          "secondBrain.memoryBankEntry",
-          { path },
-        );
-        if (result?.content) {
-          this.handleOpenSidebar(result.content, {
-            mimeType: "text/html",
-            filePath: path,
-            title: result.name || path.split("/").pop() || "File",
-          });
-        }
-      } catch (err) {
-        console.error("[SecondBrain] Failed to open HTML file:", err);
-      }
-      return;
-    }
-
-    const { loadSecondBrainEntry } = await import("./controllers/second-brain.js");
-    await loadSecondBrainEntry(this, path);
-  }
-
-  async handleSecondBrainBrowseFolder(path: string) {
-    const { browseFolder } = await import("./controllers/second-brain.js");
-    await browseFolder(this, path);
-  }
-
-  handleSecondBrainBack() {
-    if (this.secondBrainSelectedEntry) {
-      this.secondBrainSelectedEntry = null;
-    } else if (this.secondBrainBrowsingFolder) {
-      this.secondBrainBrowsingFolder = null;
-      this.secondBrainFolderEntries = null;
-      this.secondBrainFolderName = null;
-    }
-  }
-
-  handleSecondBrainSearch(query: string) {
-    this.secondBrainSearchQuery = query;
-  }
-
-  async handleSecondBrainSync() {
-    const { syncSecondBrain } = await import("./controllers/second-brain.js");
-    await syncSecondBrain(this);
-  }
-
-  // Second Brain file handlers
-
-  handleSecondBrainFileSearch(query: string) {
-    this.secondBrainFileSearchQuery = query;
-    if (!query.trim()) {
-      this.secondBrainFileSearchResults = null;
-      return;
-    }
-    void this._doSecondBrainFileSearch(query);
-  }
-
-  private async _doSecondBrainFileSearch(query: string) {
-    if (!this.client || !this.connected) return;
-    try {
-      const result = await this.client.request<{
-        results: import("./views/second-brain").BrainSearchResult[];
-      }>("secondBrain.search", { query, limit: 50 });
-      if (this.secondBrainFileSearchQuery === query) {
-        this.secondBrainFileSearchResults = result.results ?? [];
-      }
-    } catch (err) {
-      console.error("[SecondBrain] search failed:", err);
-    }
-  }
-
-  async handleSecondBrainFileSelect(path: string) {
-    if (!this.client || !this.connected) return;
-    try {
-      const result = await this.client.request<{ name: string; content: string; updatedAt?: string }>(
-        "secondBrain.memoryBankEntry",
-        { path },
-      );
-      if (result?.content) {
-        const isHtml = path.endsWith(".html") || path.endsWith(".htm");
-        this.handleOpenSidebar(result.content, {
-          mimeType: isHtml ? "text/html" : "text/markdown",
-          filePath: path,
-          title: result.name || path.split("/").pop() || "File",
-        });
-      }
-    } catch (err) {
-      console.error("[SecondBrain] Failed to open file:", err);
-      this.showToast("Failed to open file", "error");
-    }
-  }
-
-  async handleResearchSaveViaChat() {
-    this.setTab("chat" as import("./navigation").Tab);
-    const { createNewSession } = await import("./app-render.helpers.js");
-    createNewSession(this);
-    void this.handleSendChat(
-      "I want to save some research. I'll paste links, bookmarks, or notes — please organize them into ~/godmode/memory/research/ with proper frontmatter (title, url, category, tags, date). Ask me what I'd like to save.",
-    );
-  }
-
-  async handleAddSource() {
-    this.setTab("chat" as import("./navigation").Tab);
-    const { createNewSession } = await import("./app-render.helpers.js");
-    createNewSession(this);
-    void this.handleSendChat(
-      "I want to add a new data source to my Second Brain. Help me figure out what I need — whether it's an API integration, a local file sync, or a new skill. Ask me what source I'd like to connect.",
-    );
-  }
+  // Second Brain handlers — moved to <gm-second-brain>
 
   removeQueuedMessage(id: string) {
     removeQueuedMessageInternal(
@@ -2948,259 +2267,7 @@ export class GodModeApp extends LitElement {
     this.toasts = [];
   }
 
-  // My Day handlers
-  async handleMyDayRefresh() {
-    await loadMyDayInternal(this);
-    // Also refresh decision cards
-    this._loadDecisionCards();
-  }
-
-  private _loadDecisionCards() {
-    import("./controllers/my-day.js").then(async (mod) => {
-      this.todayQueueResults = await mod.loadTodayQueueResults(this as any);
-    }).catch(() => {});
-  }
-
-  /** Public wrapper for gateway event handler to trigger decision card refresh */
-  async loadTodayQueueResults(): Promise<void> {
-    this._loadDecisionCards();
-  }
-
-  async handleMyDayTaskStatusChange(taskId: string, newStatus: "pending" | "complete") {
-    if (!this.client || !this.connected) {
-      return;
-    }
-    try {
-      await this.client.request("tasks.update", {
-        id: taskId,
-        status: newStatus,
-        completedAt: newStatus === "complete" ? new Date().toISOString() : null,
-      });
-      // Refresh today tasks so the UI updates
-      const { loadTodayTasksWithQueueStatus } = await import("./controllers/my-day.js");
-      await loadTodayTasksWithQueueStatus(this);
-    } catch (err) {
-      console.error("[MyDay] Failed to update task status:", err);
-    }
-  }
-
-  async handleTodayCreateTask(title: string) {
-    if (!this.client || !this.connected) return;
-    try {
-      await this.client.request("tasks.create", {
-        title,
-        dueDate: localDateString(),
-        priority: "medium",
-        source: "chat",
-      });
-      const { loadTodayTasksWithQueueStatus } = await import("./controllers/my-day.js");
-      await loadTodayTasksWithQueueStatus(this);
-    } catch (err) {
-      console.error("[MyDay] Failed to create task:", err);
-      this.showToast("Failed to create task", "error");
-    }
-  }
-
-  handleTodayEditTask(taskId: string | null) {
-    this.todayEditingTaskId = taskId;
-  }
-
-  async handleTodayUpdateTask(taskId: string, updates: { title?: string; dueDate?: string | null }) {
-    if (!this.client || !this.connected) return;
-    try {
-      await this.client.request("tasks.update", { id: taskId, ...updates });
-      this.todayEditingTaskId = null;
-      const { loadTodayTasksWithQueueStatus } = await import("./controllers/my-day.js");
-      await loadTodayTasksWithQueueStatus(this);
-    } catch (err) {
-      console.error("[MyDay] Failed to update task:", err);
-      this.showToast("Failed to update task", "error");
-    }
-  }
-
-  handleTodayToggleCompleted() {
-    this.todayShowCompleted = !this.todayShowCompleted;
-  }
-
-  async handleTodayViewTaskOutput(taskId: string) {
-    if (!this.client || !this.connected) return;
-    try {
-      // Find the queue item linked to this task
-      const queueResult = await this.client.request<{
-        items: Array<{ id: string; sourceTaskId?: string; result?: { outputPath?: string; summary?: string } }>;
-      }>("queue.list", { limit: 100 });
-      const qi = queueResult?.items?.find((i) => i.sourceTaskId === taskId);
-      if (!qi?.result?.outputPath) {
-        this.showToast("No output available for this task", "info");
-        return;
-      }
-      // Read the output and open in sidebar
-      const result = await this.client.request<{ content: string }>(
-        "queue.readOutput",
-        { path: qi.result.outputPath },
-      );
-      const title = qi.result.outputPath.split("/").pop() ?? "Agent Output";
-      this.handleOpenSidebar(result.content, {
-        mimeType: "text/markdown",
-        filePath: qi.result.outputPath,
-        title,
-      });
-    } catch (err) {
-      console.error("[Tasks] View output failed:", err);
-      this.showToast("Failed to load agent output", "error");
-    }
-  }
-
-  async handleTodayStartTask(taskId: string) {
-    if (!this.client || !this.connected) {
-      return;
-    }
-    try {
-      const result = await this.client.request<{
-        sessionId: string;
-        sessionKey?: string;
-        created: boolean;
-        task?: { title?: string };
-        queueOutput?: string | null;
-        agentPrompt?: string | null;
-      }>(
-        "tasks.openSession",
-        { taskId },
-      );
-      const key = result?.sessionId ?? result?.sessionKey;
-      if (key) {
-        // Set the tab title to the task name and persist it
-        if (result.task?.title) {
-          const { autoTitleCache } = await import("./controllers/sessions.js");
-          autoTitleCache.set(key, result.task.title);
-          // Persist to OpenClaw so it survives refresh
-          const { hostPatchSession } = await import("../lib/host-compat.js");
-          void hostPatchSession(this.client, key, result.task.title);
-        }
-        this.setTab("chat" as import("./navigation").Tab);
-        this.sessionKey = key;
-        // Ensure session is in open tabs
-        const openTabs = this.settings.openTabs.includes(key)
-          ? this.settings.openTabs
-          : [...this.settings.openTabs, key];
-        this.applySettings({
-          ...this.settings,
-          sessionKey: key,
-          lastActiveSessionKey: key,
-          openTabs,
-        });
-        this.chatMessages = [];
-        this.chatStream = null;
-        this.chatStreamStartedAt = null;
-        this.chatRunId = null;
-        this.resetToolStream();
-        this.resetChatScroll();
-        void this.loadAssistantIdentity();
-        const { loadChatHistory } = await import("./controllers/chat.js");
-        await loadChatHistory(this);
-        void this.loadSessionResources();
-        // Seed empty sessions with agent output (handles new + pre-existing empty sessions)
-        if (result.queueOutput && this.chatMessages.length === 0) {
-          void this.seedSessionWithAgentOutput(
-            result.task?.title ?? "this task",
-            result.queueOutput,
-            result.agentPrompt ?? undefined,
-          );
-        }
-        this.requestUpdate();
-      }
-    } catch (err) {
-      console.error("[MyDay] Failed to open session for task:", err);
-      this.showToast("Failed to open session for task", "error");
-    }
-  }
-
-  // Date navigation handlers
-  handleDatePrev() {
-    const d = new Date(this.todaySelectedDate + "T12:00:00");
-    d.setDate(d.getDate() - 1);
-    this.todaySelectedDate = localDateString(d);
-    void loadBriefOnlyInternal(this);
-  }
-
-  handleDateNext() {
-    const d = new Date(this.todaySelectedDate + "T12:00:00");
-    d.setDate(d.getDate() + 1);
-    const today = localDateString();
-    // Don't go past today
-    const next = localDateString(d);
-    if (next > today) {
-      return;
-    }
-    this.todaySelectedDate = next;
-    void loadBriefOnlyInternal(this);
-  }
-
-  handleDateToday() {
-    this.todaySelectedDate = localDateString();
-    void loadMyDayInternal(this);
-  }
-
-  // Daily Brief handlers
-  async handleDailyBriefRefresh() {
-    await loadBriefOnlyInternal(this);
-  }
-
-  async handleDailyBriefGenerate() {
-    if (!this.client || !this.connected) return;
-    this.dailyBriefLoading = true;
-    try {
-      await this.client.request("dailyBrief.generate", {});
-      await loadBriefOnlyInternal(this);
-    } catch (err) {
-      this.dailyBriefError = err instanceof Error ? err.message : "Failed to generate brief";
-    } finally {
-      this.dailyBriefLoading = false;
-    }
-  }
-
-  handleDailyBriefOpenInObsidian() {
-    const date = this.dailyBrief?.date;
-    openBriefInObsidianInternal(date);
-  }
-
-  async loadBriefNotes() {
-    if (!this.client || !this.connected) {
-      return;
-    }
-    const date = this.todaySelectedDate;
-    try {
-      const result = await this.client.request<{ notes: Record<string, string> }>(
-        "briefNotes.get",
-        { date },
-      );
-      this.briefNotes = result.notes ?? {};
-    } catch (err) {
-      console.error("[BriefNotes] Load error:", err);
-      this.briefNotes = {};
-    }
-  }
-
-  async handleBriefNoteSave(section: string, text: string) {
-    if (!this.client || !this.connected) {
-      return;
-    }
-    const date = this.todaySelectedDate;
-    try {
-      const result = await this.client.request<{ notes: Record<string, string> }>(
-        "briefNotes.update",
-        { date, section, text },
-      );
-      this.briefNotes = result.notes ?? {};
-    } catch (err) {
-      console.error("[BriefNotes] Save error:", err);
-      this.showToast("Failed to save note", "error");
-    }
-  }
-
-  handleTodayViewModeChange(mode: "brief" | "tasks" | "inbox") {
-    this.todayViewMode = mode;
-  }
+  // My Day / Today handlers — moved to <gm-today> tab component
 
   handlePrivateModeToggle() {
     if (this.chatPrivateMode) {
@@ -3345,41 +2412,7 @@ export class GodModeApp extends LitElement {
     }
   }
 
-  async handleBriefSave(content: string) {
-    if (!this.client || !this.connected) {
-      return;
-    }
-    const date = this.dailyBrief?.date || this.todaySelectedDate;
-    try {
-      await this.client.request("dailyBrief.update", { date, content });
-      // Update only metadata — do NOT update content to avoid re-rendering
-      // the contenteditable div and losing cursor position during auto-save.
-      if (this.dailyBrief) {
-        this.dailyBrief = { ...this.dailyBrief, updatedAt: new Date().toISOString() };
-      }
-      // Note: syncTasksFromBrief runs server-side inside dailyBrief.update
-      // (fire-and-forget). No need for a separate client-side sync call.
-    } catch (err) {
-      console.error("[DailyBrief] Save error:", err);
-      this.showToast("Failed to save brief", "error");
-    }
-  }
-
-  async handleBriefToggleCheckbox(index: number, checked: boolean) {
-    if (!this.client || !this.connected) {
-      return;
-    }
-    const date = this.dailyBrief?.date || this.todaySelectedDate;
-    try {
-      await this.client.request("dailyBrief.toggleCheckbox", { date, index, checked });
-      if (this.dailyBrief) {
-        this.dailyBrief = { ...this.dailyBrief, updatedAt: new Date().toISOString() };
-      }
-    } catch (err) {
-      console.error("[DailyBrief] Checkbox toggle error:", err);
-      this.showToast("Failed to toggle checkbox", "error");
-    }
-  }
+  // handleBriefSave, handleBriefToggleCheckbox — moved to <gm-today>
 
 
   // Work tab handlers
@@ -3527,55 +2560,7 @@ export class GodModeApp extends LitElement {
     this.handleStartChatWithPrompt(prompt);
   }
 
-  // Workspaces handlers
-  async handleWorkspacesRefresh() {
-    await loadWorkspacesInternal(this);
-  }
-
-  async handleWorkspaceBrowse(folderPath: string) {
-    if (!this.selectedWorkspace) return;
-    const { browseWorkspaceFolder } = await import("./controllers/workspaces.js");
-    const result = await browseWorkspaceFolder(this, this.selectedWorkspace.id, folderPath);
-    if (result) {
-      this.workspaceBrowsePath = folderPath;
-      this.workspaceBrowseEntries = result.entries;
-      this.workspaceBreadcrumbs = result.breadcrumbs;
-    }
-  }
-
-  async handleWorkspaceBrowseSearch(query: string) {
-    this.workspaceBrowseSearchQuery = query;
-    if (!query.trim() || !this.selectedWorkspace) {
-      this.workspaceBrowseSearchResults = null;
-      return;
-    }
-    const { searchWorkspaceFiles } = await import("./controllers/workspaces.js");
-    this.workspaceBrowseSearchResults = await searchWorkspaceFiles(
-      this,
-      this.selectedWorkspace.id,
-      query,
-    );
-  }
-
-  handleWorkspaceBrowseBack() {
-    this.workspaceBrowsePath = null;
-    this.workspaceBrowseEntries = null;
-    this.workspaceBreadcrumbs = null;
-    this.workspaceBrowseSearchQuery = "";
-    this.workspaceBrowseSearchResults = null;
-  }
-
-  async handleWorkspaceCreateFolder(folderPath: string) {
-    if (!this.selectedWorkspace) return;
-    const { createWorkspaceFolder } = await import("./controllers/workspaces.js");
-    const ok = await createWorkspaceFolder(this, this.selectedWorkspace.id, folderPath);
-    if (ok && this.workspaceBrowsePath) {
-      await this.handleWorkspaceBrowse(this.workspaceBrowsePath);
-    }
-    if (ok) {
-      this.showToast("Folder created", "success", 2000);
-    }
-  }
+  // Workspaces handlers — moved to <gm-work>
 
 
   // ── Onboarding handlers ──────────────────────────────────────
@@ -3964,7 +2949,6 @@ export class GodModeApp extends LitElement {
     if (!this.client || !this.connected) return;
     try {
       await this.client.request("onboarding.complete", {});
-      if (this.godmodeOptions) this.godmodeOptions = { ...this.godmodeOptions, "onboarding.complete": true };
       this.showSetupTab = false;
       this.setTab("chat" as import("./navigation").Tab);
     } catch (err) {
@@ -3972,149 +2956,7 @@ export class GodModeApp extends LitElement {
     }
   }
 
-  // ── Universal Inbox handlers ──────────────────────────────────
-
-  async handleInboxRefresh() {
-    if (!this.client || !this.connected) return;
-    this.inboxLoading = true;
-    try {
-      const result = await this.client.request<{
-        items: NonNullable<import("./app-view-state").AppViewState["inboxItems"]>;
-        total: number;
-        pendingCount: number;
-      }>("inbox.list", { status: "pending", limit: 50 });
-      this.inboxItems = result.items;
-      this.inboxCount = result.pendingCount;
-    } catch (err) {
-      console.error("[Inbox] Failed to load:", err);
-    } finally {
-      this.inboxLoading = false;
-    }
-  }
-
-  async handleInboxScore(itemId: string, score: number, feedback?: string) {
-    if (!this.client || !this.connected) return;
-    try {
-      await this.client.request("inbox.score", { itemId, score, feedback });
-      this.inboxScoringId = null;
-      this.inboxScoringValue = undefined;
-      this.inboxFeedbackText = undefined;
-      await this.handleInboxRefresh();
-    } catch (err) {
-      console.error("[Inbox] Score failed:", err);
-    }
-  }
-
-  async handleInboxDismiss(itemId: string) {
-    if (!this.client || !this.connected) return;
-    try {
-      await this.client.request("inbox.dismiss", { itemId });
-      await this.handleInboxRefresh();
-    } catch (err) {
-      console.error("[Inbox] Dismiss failed:", err);
-    }
-  }
-
-  async handleInboxMarkAll() {
-    if (!this.client || !this.connected) return;
-    try {
-      await this.client.request("inbox.markAllComplete", {});
-      await this.handleInboxRefresh();
-    } catch (err) {
-      console.error("[Inbox] Mark all failed:", err);
-    }
-  }
-
-  async handleInboxViewOutput(itemId: string) {
-    const item = this.inboxItems?.find((i) => i.id === itemId);
-    if (!item) return;
-
-    // Prefer the actual output file (the deliverable) over the proof doc (a review/QA doc)
-    if (item.outputPath && this.client) {
-      try {
-        const result = await this.client.request<{ content: string }>(
-          "files.read",
-          { path: item.outputPath, maxSize: 500_000 },
-        );
-        if (result?.content) {
-          this.handleOpenSidebar(result.content, {
-            mimeType: "text/markdown",
-            filePath: item.outputPath,
-            title: item.title,
-          });
-          return;
-        }
-      } catch (err) {
-        console.error("[Inbox] Failed to load output file:", err);
-      }
-    }
-
-    // Fall back to Proof doc if no output file
-    if (item.proofDocSlug) {
-      this.handleOpenProofDoc(item.proofDocSlug);
-    }
-  }
-
-  async handleInboxViewProof(itemId: string) {
-    const item = this.inboxItems?.find((i) => i.id === itemId);
-    if (!item?.proofDocSlug) return;
-    this.handleOpenProofDoc(item.proofDocSlug);
-  }
-
-  handleInboxOpenChat(itemId: string) {
-    const item = this.inboxItems?.find((i) => i.id === itemId);
-
-    // Project-completion items open the cowork session
-    if (item?.type === "project-completion" && (item as any).coworkSessionId) {
-      this.setSessionKey((item as any).coworkSessionId);
-      this.setTab("chat" as import("./navigation").Tab);
-      // Also open Proof doc in sidebar if available
-      if (item?.proofDocSlug) {
-        void this.handleOpenProofDoc(item.proofDocSlug);
-      }
-      return;
-    }
-
-    if (item?.source.taskId) {
-      void this.handleMissionControlOpenTaskSession(item.source.taskId);
-      return;
-    }
-    if (item?.sessionId) {
-      this.setSessionKey(item.sessionId);
-      this.setTab("chat" as import("./navigation").Tab);
-    }
-  }
-
-  handleInboxSetScoring(itemId: string | null, score?: number) {
-    // Only reset feedback when opening scoring for a different item
-    if (itemId !== this.inboxScoringId) {
-      this.inboxFeedbackText = "";
-    }
-    this.inboxScoringId = itemId;
-    this.inboxScoringValue = score ?? 7;
-  }
-
-  handleInboxFeedbackChange(text: string) {
-    this.inboxFeedbackText = text;
-  }
-
-  handleInboxSortToggle() {
-    this.inboxSortOrder = this.inboxSortOrder === "newest" ? "oldest" : "newest";
-  }
-
-  async handleTrustDailyRate(rating: number) {
-    if (!this.client) return;
-    try {
-      await this.client.request("trust.dailyRate", { rating });
-      // Refresh trust summary
-      if (this.trustSummary) {
-        this.trustSummary = { ...this.trustSummary, todayRated: true };
-      }
-    } catch (err) {
-      console.error("[Trust] Daily rate failed:", err);
-      this.showToast("Failed to submit daily rating", "error");
-    }
-  }
+  // Universal Inbox + Trust Daily Rate handlers — moved to <gm-today>
 
   // ── Proof sidebar handlers ──────────────────────────────────
 
