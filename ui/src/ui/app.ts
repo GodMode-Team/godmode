@@ -2394,6 +2394,23 @@ export class GodModeApp extends LitElement {
       this.showToast("Not connected to gateway", "error");
       return;
     }
+
+    let resolvedPath = filePath;
+
+    // If the path looks like a bare filename (no slashes, no ~ prefix), resolve it first
+    if (!filePath.includes("/") && !filePath.includes("\\") && !filePath.startsWith("~")) {
+      try {
+        const resolved = await this.client.request<{ path: string; size: number }>(
+          "files.resolve",
+          { filename: filePath },
+        );
+        resolvedPath = resolved.path;
+      } catch {
+        // Resolution failed — fall through and try files.read with original path
+        // (it will likely fail too, but gives a consistent error)
+      }
+    }
+
     try {
       const result = await this.client.request<{
         content: string;
@@ -2401,19 +2418,19 @@ export class GodModeApp extends LitElement {
         truncated: boolean;
         mime?: string;
         contentType?: string;
-      }>("files.read", { path: filePath });
+      }>("files.read", { path: resolvedPath });
 
-      const ext = filePath.split(".").pop()?.toLowerCase() ?? "";
+      const ext = resolvedPath.split(".").pop()?.toLowerCase() ?? "";
       const mime = result.contentType ?? result.mime ?? (ext === "md" ? "text/markdown" : null);
-      const title = filePath.split("/").pop() ?? filePath;
+      const title = resolvedPath.split("/").pop() ?? resolvedPath;
 
       this.handleOpenSidebar(result.content, {
         mimeType: mime,
-        filePath,
+        filePath: resolvedPath,
         title,
       });
       if (result.truncated) {
-        this.showToast(`Opened truncated file: ${filePath}`, "warning");
+        this.showToast(`Opened truncated file: ${title}`, "warning");
       }
     } catch (err) {
       console.error("[Chat] Failed to open file:", err);

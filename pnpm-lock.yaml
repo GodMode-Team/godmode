@@ -35,6 +35,9 @@ importers:
       marked:
         specifier: ^17.0.1
         version: 17.0.3
+      ws:
+        specifier: ^8.18.0
+        version: 8.19.0
     devDependencies:
       '@types/node':
         specifier: ^24.3.3

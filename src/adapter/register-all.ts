@@ -227,7 +227,136 @@ export async function registerGodMode(
     .then(({ init }) => init(process.env.COMPOSIO_API_KEY, logger).catch(() => {}))
     .catch(() => {});
 
+  // ── 5. Wire lifecycle hooks (capability-aware) ────────────────
+  // Only hooks that add value alongside the host's capabilities.
+  // Hermes handles: memory, personality, skills, compression, tool execution.
+  // GodMode adds: workspace context, action items, Honcho ingest, identity graph.
+
+  if (adapter.onBeforeChat) {
+    adapter.onBeforeChat(async (_sessionKey: string) => {
+      try {
+        const { assembleWorkspaceContext } = await import("../lib/context-budget.js");
+        const inputs = await gatherWorkspaceInputs(logger);
+        return assembleWorkspaceContext(inputs);
+      } catch (err) {
+        logger.warn(`[GodMode] Workspace context assembly failed: ${String(err)}`);
+        return null;
+      }
+    });
+  }
+
+  if (adapter.onAfterChat) {
+    adapter.onAfterChat(async (_sessionKey: string, userMsg: string, assistantMsg: string) => {
+      // Honcho memory ingest — learn from the conversation
+      try {
+        const { ingestTurn } = await import("../services/honcho-client.js");
+        await ingestTurn(userMsg, assistantMsg);
+      } catch { /* non-fatal — Honcho may not be configured */ }
+
+      // Identity graph — extract entities from the response
+      try {
+        const { extractAndStore } = await import("../lib/identity-graph.js");
+        await extractAndStore(assistantMsg);
+      } catch { /* non-fatal */ }
+    });
+  }
+
+  if (adapter.onMessageReceived) {
+    adapter.onMessageReceived(async (_sessionKey: string, message: string) => {
+      // Action item extraction from brain dumps
+      try {
+        const { extractActionItems } = await import("../lib/action-items.js");
+        extractActionItems(message);
+      } catch { /* non-fatal */ }
+    });
+  }
+
   return { methodCount, cleanup };
+}
+
+// ── Context Gathering ─────────────────────────────────────────────
+
+/**
+ * Gather workspace-level context inputs for Hermes context injection.
+ * Reuses the same data sources as before-prompt-build.ts but skips
+ * memory/identity (Hermes handles those).
+ */
+async function gatherWorkspaceInputs(logger: Logger): Promise<Record<string, unknown>> {
+  const inputs: Record<string, unknown> = {};
+
+  // Schedule (calendar)
+  try {
+    const { getCalendarHandlers } = await import("../methods/calendar.js");
+    // Light approach: read today's schedule from the calendar method
+    const { execSync } = await import("node:child_process");
+    const today = new Date().toISOString().slice(0, 10);
+    const account = process.env.GOG_CALENDAR_ACCOUNT;
+    if (account) {
+      const cmd = `gog events list --account "${account}" --from "${today}" --to "${today}" --format json 2>/dev/null || echo "[]"`;
+      const raw = execSync(cmd, { timeout: 5000 }).toString().trim();
+      const events = JSON.parse(raw);
+      if (Array.isArray(events) && events.length > 0) {
+        const lines = events.slice(0, 5).map((e: any) =>
+          `- ${e.start?.slice(11, 16) ?? "?"} ${e.summary ?? "Event"}`,
+        );
+        inputs.schedule = `## Today's Schedule\n${lines.join("\n")}`;
+      }
+    }
+  } catch { /* calendar unavailable — non-fatal */ }
+
+  // Task and queue counts
+  try {
+    const { readFile } = await import("node:fs/promises");
+    const { DATA_DIR } = await import("../data-paths.js");
+    const { join } = await import("node:path");
+
+    const tasksRaw = await readFile(join(DATA_DIR, "tasks.json"), "utf-8").catch(() => "[]");
+    const tasks = JSON.parse(tasksRaw);
+    const pending = Array.isArray(tasks) ? tasks.filter((t: any) => t.status === "pending") : [];
+    const overdue = pending.filter((t: any) => t.dueDate && new Date(t.dueDate) < new Date());
+
+    const queueRaw = await readFile(join(DATA_DIR, "queue-state.json"), "utf-8").catch(() => '{"items":[]}');
+    const queue = JSON.parse(queueRaw);
+    const queueItems = Array.isArray(queue.items) ? queue.items : [];
+    const queuePending = queueItems.filter((i: any) => i.status === "pending" || i.status === "approved");
+    const queueDone = queueItems.filter((i: any) => i.status === "done");
+
+    const counts = [];
+    if (pending.length > 0) counts.push(`${pending.length} task(s) pending`);
+    if (overdue.length > 0) counts.push(`${overdue.length} OVERDUE`);
+    if (queuePending.length > 0) counts.push(`${queuePending.length} queue item(s) waiting`);
+    if (queueDone.length > 0) counts.push(`${queueDone.length} queue item(s) done — ready for review`);
+    if (counts.length > 0) {
+      inputs.operationalCounts = `## Workspace: ${counts.join(", ")}`;
+    }
+
+    // Queue review items
+    if (queueDone.length > 0) {
+      const reviewLines = queueDone.slice(0, 3).map((i: any) => `- "${i.title}" (${i.type})`);
+      inputs.queueReview = `## Queue Items Ready for Review\n${reviewLines.join("\n")}`;
+    }
+
+    // Priorities (top 3 tasks by due date)
+    if (pending.length > 0) {
+      const sorted = [...pending].sort((a: any, b: any) => {
+        if (!a.dueDate) return 1;
+        if (!b.dueDate) return -1;
+        return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
+      });
+      const top = sorted.slice(0, 3).map((t: any) =>
+        `- ${t.title}${t.dueDate ? ` (due: ${t.dueDate})` : ""}`,
+      );
+      inputs.priorities = `## Top Priorities\n${top.join("\n")}`;
+    }
+  } catch { /* task/queue read failed — non-fatal */ }
+
+  // Skill card (lightweight — just load if keyword matches)
+  try {
+    const { matchSkillCard } = await import("../lib/skill-cards.js");
+    // No user message in this context — skip keyword matching
+  } catch { /* non-fatal */ }
+
+  return inputs;
 }
 
 // ── Helpers ───────────────────────────────────────────────────────

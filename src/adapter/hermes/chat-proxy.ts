@@ -92,6 +92,14 @@ export class HermesChatProxy {
     this.getWorkspaceContext = opts.getWorkspaceContext ?? (async () => null);
   }
 
+  /**
+   * Set workspace context to inject into the next chat message.
+   * Called by the adapter's beforeChat hook with assembled workspace state.
+   */
+  setWorkspaceContext(context: string): void {
+    this.getWorkspaceContext = async () => context;
+  }
+
   /** Check if Hermes API is reachable. */
   async healthCheck(): Promise<boolean> {
     try {

@@ -396,10 +396,101 @@ const readFile: GatewayRequestHandler = async ({ params, respond }) => {
   }
 };
 
+/**
+ * Resolve a bare filename to its full path by searching known GodMode directories.
+ * Searches: queue outputs (inbox), godmode data, vault, workspace roots.
+ * Returns the first match found.
+ */
+const resolveFile: GatewayRequestHandler = async ({ params, respond }) => {
+  const filename = (params as { filename?: string }).filename;
+  if (!filename) {
+    respond(false, null, { code: "MISSING_PARAM", message: "filename is required" });
+    return;
+  }
+
+  // SECURITY: Reject path traversal attempts
+  if (filename.includes("/") || filename.includes("\\") || filename.includes("\0") || filename.includes("..")) {
+    respond(false, null, { code: "INVALID_FILENAME", message: "Invalid filename" });
+    return;
+  }
+
+  const home = process.env.HOME ?? "";
+  const godmodeRoot = process.env.GODMODE_ROOT ?? path.join(home, "godmode");
+  const vaultPath = process.env.OBSIDIAN_VAULT_PATH ?? path.join(home, "Documents", "VAULT");
+
+  // Directories to search, ordered by likelihood
+  const searchDirs = [
+    path.join(godmodeRoot, "memory", "inbox"),
+    path.join(godmodeRoot, "data"),
+    path.join(godmodeRoot, "memory"),
+    vaultPath,
+  ];
+
+  // Also add workspace directories
+  try {
+    const wsConfig = await readWorkspaceConfig({ initializeIfMissing: false });
+    for (const ws of wsConfig.workspaces) {
+      searchDirs.push(ws.path);
+    }
+  } catch { /* workspace config unavailable */ }
+
+  // Search each directory (non-recursive first pass)
+  for (const dir of searchDirs) {
+    const candidate = path.join(dir, filename);
+    try {
+      const stat = await fs.stat(candidate);
+      if (stat.isFile()) {
+        respond(true, { path: candidate, size: stat.size });
+        return;
+      }
+    } catch { /* not found here */ }
+  }
+
+  // Recursive search in inbox and data (queue outputs often have subdirectories)
+  const recursiveDirs = [
+    path.join(godmodeRoot, "memory", "inbox"),
+    path.join(godmodeRoot, "data"),
+  ];
+
+  for (const dir of recursiveDirs) {
+    try {
+      const found = await findFileRecursive(dir, filename, 3);
+      if (found) {
+        const stat = await fs.stat(found);
+        respond(true, { path: found, size: stat.size });
+        return;
+      }
+    } catch { /* dir may not exist */ }
+  }
+
+  respond(false, null, { code: "NOT_FOUND", message: `File not found: ${filename}` });
+};
+
+async function findFileRecursive(dir: string, filename: string, maxDepth: number): Promise<string | null> {
+  if (maxDepth <= 0) return null;
+  try {
+    const entries = await fs.readdir(dir, { withFileTypes: true });
+    for (const entry of entries) {
+      if (entry.isFile() && entry.name === filename) {
+        return path.join(dir, entry.name);
+      }
+    }
+    // Recurse into subdirectories
+    for (const entry of entries) {
+      if (entry.isDirectory() && !entry.name.startsWith(".")) {
+        const found = await findFileRecursive(path.join(dir, entry.name), filename, maxDepth - 1);
+        if (found) return found;
+      }
+    }
+  } catch { /* skip unreadable dirs */ }
+  return null;
+}
+
 // ── Export ────────────────────────────────────────────────────────
 
 export const filesHandlers: Record<string, GatewayRequestHandler> = {
   "files.read": readFile,
+  "files.resolve": resolveFile,
   "files.listDriveAccounts": listDriveAccounts,
   "files.pushToDrive": pushToDrive,
   "files.batchPushToDrive": batchPushToDrive,

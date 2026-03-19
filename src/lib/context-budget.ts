@@ -260,6 +260,54 @@ export function assembleContext(inputs: ContextInputs): string {
   return wrapContext(chunks);
 }
 
+/**
+ * Assemble workspace-only context for hosts that handle memory & personality.
+ *
+ * When running on Hermes, the host already injects soul/identity/memory.
+ * GodMode only adds workspace state: tools, schedule, tasks, queue, etc.
+ * This prevents duplicating Hermes's own context injection.
+ */
+export function assembleWorkspaceContext(inputs: Partial<ContextInputs>): string {
+  const chunks: string[] = [];
+
+  // SKIP: SOUL_ESSENCE — Hermes has SOUL.md
+  // SKIP: identityAnchor — Hermes has USER.md
+  // SKIP: memoryBlock — Hermes has MEMORY.md + Honcho
+  // SKIP: graphBlock — Hermes has its own entity tracking
+
+  // Capability map — always inject so Hermes knows about GodMode tools
+  chunks.push(CAPABILITY_MAP);
+
+  // Agent roster nudge
+  const rosterNudge = buildAgentRosterNudge();
+  if (rosterNudge) chunks.push(rosterNudge);
+
+  // P1: Workspace operational state
+  if (inputs.schedule) chunks.push(truncateLines(inputs.schedule, MAX_SCHEDULE_LINES));
+  if (inputs.operationalCounts) chunks.push(inputs.operationalCounts);
+  if (inputs.priorities) chunks.push(inputs.priorities);
+
+  // P1.5: Action items + skill card
+  if (inputs.actionItemsBlock) chunks.push(inputs.actionItemsBlock);
+  if (inputs.skillCard) chunks.push(inputs.skillCard);
+
+  // P2: Meeting prep, queue review, team status
+  if (inputs.meetingPrep) chunks.push(inputs.meetingPrep);
+  if (inputs.cronFailures) chunks.push(inputs.cronFailures);
+  if (inputs.queueReview) chunks.push(inputs.queueReview);
+  if (inputs.teamStatus) chunks.push(inputs.teamStatus);
+  if (inputs.routingLessons) chunks.push(inputs.routingLessons);
+
+  if (chunks.length === 0) return "";
+
+  return (
+    `<system-context priority="workspace">\n` +
+    `GodMode workspace context — your tools and operational state:\n\n` +
+    `${chunks.join("\n\n")}\n` +
+    `</system-context>`
+  );
+}
+
 // ── Soul Essence ────────────────────────────────────────────────────
 // Redesigned 2026-03-14: Ultra-lean, Claude Code–inspired.
 //

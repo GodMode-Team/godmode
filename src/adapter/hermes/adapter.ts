@@ -84,6 +84,11 @@ export class HermesAdapter implements HostAdapter {
   private uiRoot: string | null = null;
   private uiBasePath = "/godmode";
 
+  // Hook handlers — wired by register-all.ts
+  private beforeChatHandler: ((sessionKey: string) => Promise<string | null>) | null = null;
+  private afterChatHandler: ((sessionKey: string, userMsg: string, assistantMsg: string) => Promise<void>) | null = null;
+  private messageReceivedHandler: ((sessionKey: string, message: string) => Promise<void>) | null = null;
+
   constructor(opts: HermesAdapterOptions = {}) {
     this.port = opts.port ?? 3333;
     this.hermesUrl = opts.hermesUrl ?? "http://localhost:8642";
@@ -125,6 +130,20 @@ export class HermesAdapter implements HostAdapter {
 
   broadcast(event: string, data: unknown): void {
     this.wsServer.broadcast(event, data);
+  }
+
+  // ── HostAdapter: Hooks ───────────────────────────────────
+
+  onBeforeChat(handler: (sessionKey: string) => Promise<string | null>): void {
+    this.beforeChatHandler = handler;
+  }
+
+  onAfterChat(handler: (sessionKey: string, userMsg: string, assistantMsg: string) => Promise<void>): void {
+    this.afterChatHandler = handler;
+  }
+
+  onMessageReceived(handler: (sessionKey: string, message: string) => Promise<void>): void {
+    this.messageReceivedHandler = handler;
   }
 
   // ── HostAdapter: Lifecycle ─────────────────────────────────
@@ -282,6 +301,21 @@ export class HermesAdapter implements HostAdapter {
         return;
       }
 
+      // Hook: message_received — action item extraction, session tracking
+      if (this.messageReceivedHandler) {
+        try { await this.messageReceivedHandler(sessionKey, message); } catch { /* non-fatal */ }
+      }
+
+      // Hook: before_prompt_build — inject workspace context into chat proxy
+      if (this.beforeChatHandler) {
+        try {
+          const ctx = await this.beforeChatHandler(sessionKey);
+          if (ctx) {
+            this.chatProxy.setWorkspaceContext(ctx);
+          }
+        } catch { /* non-fatal */ }
+      }
+
       // Acknowledge receipt immediately
       respond(true, { status: "ok" });
 
@@ -306,6 +340,11 @@ export class HermesAdapter implements HostAdapter {
             state: "final",
             message: { role: "assistant", content: cumulative },
           });
+
+          // Hook: message_sending — Honcho ingest, identity graph update
+          if (this.afterChatHandler) {
+            this.afterChatHandler(sessionKey, message, cumulative).catch(() => {});
+          }
         },
         onError: (error) => {
           this.broadcast("chat", {
