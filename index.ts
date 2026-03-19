@@ -517,7 +517,7 @@ const godmodePlugin = {
     api.registerTool(() => createTasksUpdateTool());
     // REMOVED (v2 slim): createProofEditorTool
     api.registerTool(() => createQueueSteerTool());
-    api.registerTool(() => createDelegateTool());
+    api.registerTool((ctx: { sessionKey?: string }) => createDelegateTool(ctx));
     api.registerTool(() => createComposioExecuteTool());
 
     // ── 7. CLI commands ───────────────────────────────────────────

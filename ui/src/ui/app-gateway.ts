@@ -1335,7 +1335,7 @@ function handleGatewayEventUnsafe(host: GatewayHost, evt: GatewayEventFrame) {
       };
       const msg = {
         role: "assistant" as const,
-        content: payload.summary || "Notification received.",
+        content: payload.summary || (payload as Record<string, unknown>).message as string || "Notification received.",
         timestamp: Date.now(),
         isNotification: true,
         actions: payload.actions ?? [],
@@ -1344,13 +1344,38 @@ function handleGatewayEventUnsafe(host: GatewayHost, evt: GatewayEventFrame) {
       if (!allyHost.allyPanelOpen && host.tab !== "chat") {
         allyHost.allyUnread = (allyHost.allyUnread ?? 0) + 1;
       }
-      // Reload decision cards when queue/cron results arrive so Inbox badge updates
-      const queueTypes = ["queue-complete", "queue-needs-review", "queue-failed", "cron-result"];
+      // Reload decision cards when queue/cron/paperclip results arrive so Inbox badge updates
+      const queueTypes = ["queue-complete", "queue-needs-review", "queue-failed", "cron-result", "paperclip-completion"];
       if (payload.type && queueTypes.includes(payload.type) && allyHost.loadTodayQueueResults) {
         allyHost.loadTodayQueueResults().catch(() => {});
       }
       if (payload.type && queueTypes.includes(payload.type) && allyHost.handleInboxRefresh) {
         allyHost.handleInboxRefresh().catch(() => {});
+      }
+
+      // Paperclip completions: inject into the originating chat session
+      // so the ally can present the deliverable for review
+      if (payload.type === "paperclip-completion") {
+        const pcPayload = payload as {
+          message?: string;
+          sessionKey?: string;
+          outputPath?: string;
+          outputPreview?: string;
+          title?: string;
+        };
+        const chatHost = host as unknown as {
+          sessionKey?: string;
+          chatMessages?: Array<Record<string, unknown>>;
+          requestUpdate?: () => void;
+          loadChatHistory?: () => Promise<unknown>;
+        };
+        // If this is the session that initiated the delegation, reload history
+        // so the ally's response about the completed work appears naturally
+        if (pcPayload.sessionKey && chatHost.sessionKey === pcPayload.sessionKey) {
+          chatHost.loadChatHistory?.().catch(() => {});
+        }
+        // Use the message field for the notification content
+        msg.content = pcPayload.message || msg.content;
       }
       allyHost.requestUpdate?.();
     }

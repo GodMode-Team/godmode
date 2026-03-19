@@ -33,7 +33,7 @@ import {
 } from "../lib/queue-state.js";
 import { isPersonaDormant, loadRoster, resolvePersona } from "../lib/agent-roster.js";
 
-export function createDelegateTool(): AnyAgentTool {
+export function createDelegateTool(ctx?: { sessionKey?: string }): AnyAgentTool {
   return {
     label: "Delegate",
     name: "delegate",
@@ -194,6 +194,7 @@ export function createDelegateTool(): AnyAgentTool {
                   })),
                   createdAt: Date.now(),
                   status: "active",
+                  sessionKey: ctx?.sessionKey,
                 });
               });
 
@@ -341,6 +342,7 @@ export function createDelegateTool(): AnyAgentTool {
                 })),
               createdAt: Date.now(),
               status: "active",
+              sessionKey: ctx?.sessionKey,
             });
           });
 

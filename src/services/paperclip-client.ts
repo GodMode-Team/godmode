@@ -316,6 +316,61 @@ export async function cancelTask(issueId: string): Promise<PaperclipIssue> {
   });
 }
 
+/**
+ * Fetch the latest heartbeat run for an agent (to get stdout/output after completion).
+ */
+export async function getLatestRun(
+  agentId: string,
+): Promise<Record<string, unknown> | null> {
+  try {
+    const result = await paperclipFetch<Record<string, unknown>[] | { runs?: Record<string, unknown>[] }>(
+      `/api/companies/${companyId}/heartbeat-runs?agentId=${agentId}&limit=1`,
+    );
+    const runs = Array.isArray(result) ? result : result.runs ?? [];
+    return runs[0] ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Read a run's log file from the local Paperclip data directory.
+ * Extracts agent output (non-system lines) from the ndjson log.
+ */
+export function readRunLog(logRef: string): string {
+  try {
+    const { readFileSync } = require("node:fs");
+    const { join } = require("node:path");
+    const { homedir } = require("node:os");
+    const logPath = join(
+      homedir(),
+      ".paperclip/instances/default/data/run-logs",
+      logRef,
+    );
+    const raw = readFileSync(logPath, "utf-8");
+    const lines: string[] = [];
+    for (const line of raw.split("\n")) {
+      if (!line.trim()) continue;
+      try {
+        const entry = JSON.parse(line);
+        const chunk = entry.chunk ?? "";
+        // Skip system lines (paperclip/hermes/godmode prefixes)
+        if (
+          chunk.includes("[paperclip]") ||
+          chunk.includes("[hermes]") ||
+          chunk.includes("[GodMode")
+        ) continue;
+        // Skip spinner/progress lines
+        if (chunk.startsWith("  ⠋") || chunk.startsWith("  ⠙") || chunk.startsWith("  ⠹")) continue;
+        if (chunk.trim()) lines.push(chunk);
+      } catch { /* skip unparseable lines */ }
+    }
+    return lines.join("").trim();
+  } catch {
+    return "";
+  }
+}
+
 // ── Completion Poller ────────────────────────────────────────────
 
 const _seenCompleted = new Set<string>();

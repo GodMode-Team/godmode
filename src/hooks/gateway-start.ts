@@ -414,31 +414,73 @@ export async function runGatewayStart(
 
       // Start polling for completed Paperclip tasks and route results to inbox
       try {
-        const { handlePaperclipWebhookHttp } = await import("../methods/paperclip-webhook.js");
-        startCompletionPoller((issue) => {
-          // Synthesize a webhook-style payload and route through existing handler
-          const payload = JSON.stringify({
-            issue: {
-              id: issue.id,
+        startCompletionPoller(async (issue) => {
+          try {
+            // 1. Fetch actual agent output from run log
+            const { getLatestRun, readRunLog } = await import("../services/paperclip-client.js");
+            let agentOutput = "";
+            if (issue.assigneeAgentId) {
+              const run = await getLatestRun(issue.assigneeAgentId as string);
+              if (run?.logRef) {
+                agentOutput = readRunLog(run.logRef as string);
+              }
+            }
+            const output = agentOutput
+              || (issue as Record<string, unknown>).resultSummary as string
+              || (issue as Record<string, unknown>).output as string
+              || issue.description;
+
+            // 2. Write deliverable MD to inbox directory
+            const { handlePaperclipWebhookHttp } = await import("../methods/paperclip-webhook.js");
+            const payload = JSON.stringify({
+              issue: {
+                id: issue.id,
+                title: issue.title,
+                description: issue.description,
+                status: issue.status,
+                output,
+              },
+            });
+            await handlePaperclipWebhookHttp(payload);
+
+            // 3. Look up originating session from projects-state
+            const { listProjects } = await import("../lib/projects-state.js");
+            const projects = await listProjects();
+            let sessionKey: string | undefined;
+            for (const project of projects) {
+              // Match by Paperclip issue ID stored as queueItemId
+              const match = project.issues.find(
+                (pi) => pi.queueItemId === issue.id,
+              );
+              if (match) {
+                sessionKey = project.sessionKey;
+                break;
+              }
+            }
+
+            // 4. Build output path for the MD file
+            const slugify = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 60);
+            const slug = slugify(issue.title) || `paperclip-${issue.id}`;
+            const outputPath = join(MEMORY_DIR, "inbox", `${slug}.md`);
+
+            // 5. Notify ally — targeted to originating session if known
+            safeBroadcast(api, "ally:notification", {
+              type: "paperclip-completion",
               title: issue.title,
-              description: issue.description,
-              status: issue.status,
-              output: (issue as Record<string, unknown>).resultSummary
-                ?? (issue as Record<string, unknown>).output
-                ?? issue.description,
-            },
-          });
-          handlePaperclipWebhookHttp(payload).catch((err) => {
+              issueId: issue.id,
+              sessionKey,
+              outputPath,
+              outputPreview: output.slice(0, 1000),
+              message: `Agent completed: "${issue.title}". The deliverable is ready for your review.`,
+            });
+
+            logger.info(
+              `[GodMode] Paperclip task completed: "${issue.title}" (${issue.id})` +
+              (sessionKey ? ` → session ${sessionKey}` : ""),
+            );
+          } catch (err) {
             logger.warn(`[GodMode] Paperclip completion handler failed: ${String(err)}`);
-          });
-          // Notify ally in chat so Prosper can synthesize results
-          safeBroadcast(api, "ally:notification", {
-            type: "paperclip-completion",
-            title: issue.title,
-            issueId: issue.id,
-            message: `Agent completed: "${issue.title}". Check the inbox for deliverables.`,
-          });
-          logger.info(`[GodMode] Paperclip task completed: "${issue.title}" (${issue.id})`);
+          }
         }, 30_000); // poll every 30 seconds
         serviceCleanup.push({ name: "paperclip-poller", fn: () => stopCompletionPoller() });
         logger.info("[GodMode] Paperclip completion poller started (30s interval)");

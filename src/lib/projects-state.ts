@@ -30,6 +30,8 @@ export interface DelegatedProject {
   createdAt: number;
   completedAt?: number;
   status: "active" | "completed" | "failed";
+  /** Session that initiated the delegation — results route back here */
+  sessionKey?: string;
 }
 
 export interface ProjectBrief {
