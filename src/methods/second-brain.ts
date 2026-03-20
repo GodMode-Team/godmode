@@ -473,20 +473,11 @@ const sources: GatewayRequestHandler = async ({ respond }) => {
   const result: SourceEntry[] = [];
   const seenIds = new Set<string>();
 
-  // 1. Built-in GodMode sources (memory bank, identity os, consciousness)
+  // 1. Skip built-in GodMode sources — Connections tab shows external integrations only.
+  //    Internal systems (vault, memory-bank, identity-os, consciousness) are visible
+  //    elsewhere (Second Brain tab, Settings). Just mark their IDs as seen to avoid dupes.
   for (const src of KNOWN_SOURCES) {
-    const detection = src.detect();
     seenIds.add(src.id);
-    result.push({
-      id: src.id,
-      name: src.name,
-      type: src.type,
-      status: detection.connected ? "connected" : "available",
-      icon: src.icon,
-      description: src.description,
-      stats: detection.stats,
-      lastSync: detection.lastSync,
-    });
   }
 
   // 2. External integrations from data-sources.json

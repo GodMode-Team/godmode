@@ -225,6 +225,9 @@ export class GmConnections extends LitElement {
                 `,
               )}
             </div>
+            <button class="btn btn--sm btn--primary" @click=${() => this._askAllyToConnect("a new service")}>
+              + Add Connection
+            </button>
             <button class="btn btn--sm" @click=${() => void this._load()}>Refresh</button>
           </div>
         </div>
@@ -242,11 +245,16 @@ export class GmConnections extends LitElement {
             : filtered.map((source) => this._renderSourceCard(source, composioIds))}
         </div>
 
-        <div class="connections-footer">
-          <button class="btn btn--ghost btn--sm" @click=${() => this._askAllyToConnect("a new service")}>
-            Ask ally to connect a service...
-          </button>
-        </div>
+        ${!this._composioConfigured
+          ? html`<div class="connections-footer">
+              <p class="connections-footer__hint">
+                Set up <strong>Composio</strong> to connect services with one-click OAuth.
+                <button class="btn btn--ghost btn--sm" @click=${() => this._askAllyToConnect("Composio")}>
+                  Set up Composio
+                </button>
+              </p>
+            </div>`
+          : nothing}
       </div>
     `;
   }

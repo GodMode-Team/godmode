@@ -11,7 +11,6 @@ import {
 import type { LightboxImage } from "../chat/lightbox";
 import { normalizeMessage, normalizeRoleForGrouping } from "../chat/message-normalizer";
 import { isSystemPromptNoise } from "../chat/system-noise-filter";
-import type { FailedMessage } from "../controllers/chat";
 import { icons } from "../icons";
 import type { ToastType } from "../toast";
 import type { SessionsListResult } from "../types";
@@ -119,10 +118,6 @@ export type ChatProps = {
   onImageClick?: (url: string, allImages: LightboxImage[], index: number) => void;
   resolveImageUrl?: (messageIndex: number, imageIndex: number) => string | null;
   onChatScroll?: (event: Event) => void;
-  // Retry after context overflow
-  pendingRetry?: FailedMessage | null;
-  onRetry?: () => void;
-  onClearRetry?: () => void;
   // Toast notifications for file upload errors
   showToast?: (message: string, type: ToastType) => void;
   // Ally inline panel (for split sidebar layout)
@@ -842,40 +837,6 @@ export function renderChat(props: ChatProps) {
       ${props.error ? html`<div class="callout danger">${props.error}</div>` : nothing}
 
       ${renderCompactionIndicator(props.compactionStatus)}
-
-      ${
-        props.pendingRetry && props.onRetry
-          ? html`
-            <div class="callout info chat-retry-banner">
-              <span class="chat-retry-banner__text">
-                Message ready to retry after compaction
-              </span>
-              <div class="chat-retry-banner__actions">
-                <button
-                  class="btn btn--primary btn--sm"
-                  type="button"
-                  @click=${props.onRetry}
-                >
-                  Retry
-                </button>
-                ${
-                  props.onClearRetry
-                    ? html`
-                      <button
-                        class="btn btn--ghost btn--sm"
-                        type="button"
-                        @click=${props.onClearRetry}
-                      >
-                        Dismiss
-                      </button>
-                    `
-                    : nothing
-                }
-              </div>
-            </div>
-          `
-          : nothing
-      }
 
       ${
         props.focusMode

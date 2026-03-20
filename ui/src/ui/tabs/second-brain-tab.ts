@@ -239,21 +239,24 @@ function renderIdentityPanel(props: SecondBrainProps) {
 
   return html`
     <div class="second-brain-panel">
-      <div class="sb-identity-actions" style="display: flex; gap: 8px; margin-bottom: 12px;">
+      <div class="sb-identity-actions" style="display: flex; gap: 8px; margin-bottom: 4px;">
         <button class="sb-chat-btn" @click=${() => props.onSaveViaChat()}>
           \u{1F4AC} Update via Chat
         </button>
       </div>
 
-      ${identity.files.map((file) => html`
-        <div class="second-brain-card">
-          <div class="second-brain-card-header">
-            <span class="second-brain-card-label">${file.label}</span>
-            ${file.updatedAt ? html`<span class="second-brain-card-updated">${fmtUpdated(file.updatedAt)}</span>` : nothing}
+      <div class="second-brain-entry-list">
+        ${identity.files.map((file) => html`
+          <div class="second-brain-entry" @click=${() => props.onSelectEntry(file.key)}>
+            <div class="second-brain-entry-icon">\u{1F4C4}</div>
+            <div class="second-brain-entry-body">
+              <div class="second-brain-entry-name">${file.label}</div>
+              <div class="second-brain-entry-excerpt">${file.content.slice(0, 120).replace(/[#\n]+/g, " ").trim()}\u{2026}</div>
+            </div>
+            ${file.updatedAt ? html`<div class="second-brain-entry-meta">${fmtUpdated(file.updatedAt)}</div>` : nothing}
           </div>
-          <div class="second-brain-card-content">${renderMd(file.content)}</div>
-        </div>
-      `)}
+        `)}
+      </div>
     </div>
   `;
 }
@@ -367,26 +370,7 @@ function renderFileTree(
 // ── Memory Bank Panel ────────────────────────────────────────────────
 
 function renderMemoryBankPanel(props: SecondBrainProps) {
-  const { memoryBank, selectedEntry, searchQuery, browsingFolder, folderEntries, folderName } = props;
-
-  // Detail view — reading a file
-  if (selectedEntry) {
-    return html`
-      <div class="second-brain-panel">
-        <button class="second-brain-back-btn" @click=${() => props.onBack()}>
-          \u{2190} Back
-        </button>
-        <div class="second-brain-card">
-          <div class="second-brain-card-header">
-            <span class="second-brain-card-label">${selectedEntry.name}</span>
-            ${selectedEntry.updatedAt ? html`<span class="second-brain-card-updated">${fmtUpdated(selectedEntry.updatedAt)}</span>` : nothing}
-          </div>
-          ${selectedEntry.relativePath ? html`<div class="second-brain-card-path">${selectedEntry.relativePath}</div>` : nothing}
-          <div class="second-brain-card-content">${renderMd(selectedEntry.content)}</div>
-        </div>
-      </div>
-    `;
-  }
+  const { memoryBank, searchQuery, browsingFolder, folderEntries, folderName } = props;
 
   // Browsing a subfolder
   if (browsingFolder && folderEntries) {
@@ -488,26 +472,7 @@ function renderMemoryBankPanel(props: SecondBrainProps) {
 // ── Knowledge Panel (unified: Memory Bank + Research + Files) ────────
 
 function renderKnowledgePanel(props: SecondBrainProps) {
-  const { memoryBank, researchData, selectedEntry, searchQuery, browsingFolder, folderEntries, folderName } = props;
-
-  // Detail view — reading a file
-  if (selectedEntry) {
-    return html`
-      <div class="second-brain-panel">
-        <button class="second-brain-back-btn" @click=${() => props.onBack()}>
-          \u{2190} Back
-        </button>
-        <div class="second-brain-card">
-          <div class="second-brain-card-header">
-            <span class="second-brain-card-label">${selectedEntry.name}</span>
-            ${selectedEntry.updatedAt ? html`<span class="second-brain-card-updated">${fmtUpdated(selectedEntry.updatedAt)}</span>` : nothing}
-          </div>
-          ${selectedEntry.relativePath ? html`<div class="second-brain-card-path">${selectedEntry.relativePath}</div>` : nothing}
-          <div class="second-brain-card-content">${renderMd(selectedEntry.content)}</div>
-        </div>
-      </div>
-    `;
-  }
+  const { memoryBank, researchData, searchQuery, browsingFolder, folderEntries, folderName } = props;
 
   // Browsing a subfolder
   if (browsingFolder && folderEntries) {
@@ -599,11 +564,11 @@ function renderKnowledgePanel(props: SecondBrainProps) {
           const filtered = filterMemoryEntries(section.entries);
           if (section.entries.length === 0) return nothing;
           return html`
-            <div class="second-brain-section">
-              <div class="second-brain-section-header">
+            <details class="second-brain-section-details">
+              <summary class="second-brain-section-header second-brain-section-header--toggle">
                 <span class="second-brain-section-title">${section.icon} ${section.label}</span>
                 <span class="second-brain-section-count">${section.entries.length}</span>
-              </div>
+              </summary>
               <div class="second-brain-entry-list">
                 ${filtered.length > 0
                   ? filtered.map((e) => renderEntryRow(e, props))
@@ -611,32 +576,32 @@ function renderKnowledgePanel(props: SecondBrainProps) {
                     ? html`<div class="second-brain-empty-inline">No matches</div>`
                     : nothing}
               </div>
-            </div>
+            </details>
           `;
         })}
 
         ${memoryBank.extraFiles.length > 0 ? html`
-          <div class="second-brain-section">
-            <div class="second-brain-section-header">
+          <details class="second-brain-section-details">
+            <summary class="second-brain-section-header second-brain-section-header--toggle">
               <span class="second-brain-section-title">\u{1F4CB} Reference Files</span>
               <span class="second-brain-section-count">${memoryBank.extraFiles.length}</span>
-            </div>
+            </summary>
             <div class="second-brain-entry-list">
               ${memoryBank.extraFiles.map((e) => renderEntryRow(e, props))}
             </div>
-          </div>
+          </details>
         ` : nothing}
 
         ${memoryBank.curated ? html`
-          <div class="second-brain-section">
-            <div class="second-brain-section-header">
+          <details class="second-brain-section-details">
+            <summary class="second-brain-section-header second-brain-section-header--toggle">
               <span class="second-brain-section-title">\u{2B50} Curated Facts</span>
               <span class="second-brain-section-count">${fmtUpdated(memoryBank.curated.updatedAt)}</span>
-            </div>
+            </summary>
             <div class="second-brain-card">
               <div class="second-brain-card-content">${renderMd(memoryBank.curated.content)}</div>
             </div>
-          </div>
+          </details>
         ` : nothing}
       ` : nothing}
 
@@ -644,26 +609,26 @@ function renderKnowledgePanel(props: SecondBrainProps) {
         ${researchData.categories.map((cat) => {
           if (cat.entries.length === 0) return nothing;
           return html`
-            <div class="second-brain-section">
-              <div class="second-brain-section-header">
+            <details class="second-brain-section-details">
+              <summary class="second-brain-section-header second-brain-section-header--toggle">
                 <span class="second-brain-section-title">\u{1F50D} ${cat.label}</span>
                 <span class="second-brain-section-count">${cat.entries.length}</span>
-              </div>
+              </summary>
               <div class="second-brain-entry-list">
                 ${cat.entries.map((e) => renderResearchEntryRow(e, props))}
               </div>
-            </div>
+            </details>
           `;
         })}
       ` : nothing}
 
       ${!query && props.fileTree && props.fileTree.length > 0 ? html`
-        <div class="second-brain-section">
-          <div class="second-brain-section-header">
+        <details class="second-brain-section-details">
+          <summary class="second-brain-section-header second-brain-section-header--toggle">
             <span class="second-brain-section-title">\u{1F5C2}\uFE0F Browse All</span>
-          </div>
+          </summary>
           ${renderFileTree(props.fileTree, props)}
-        </div>
+        </details>
       ` : nothing}
     </div>
   `;
@@ -726,9 +691,15 @@ function renderContextPanel(props: SecondBrainProps) {
         </div>
 
         ${snapshotData ? html`
-          <div class="second-brain-card">
-            <div class="second-brain-card-content">${renderMd(snapshotData.content)}</div>
-          </div>
+          <details class="second-brain-section-details">
+            <summary class="second-brain-section-header second-brain-section-header--toggle">
+              <span class="second-brain-section-title">\u{1F9E0} Snapshot Content</span>
+              <span class="second-brain-section-count">${snapshotData.lineCount} lines</span>
+            </summary>
+            <div class="second-brain-card">
+              <div class="second-brain-card-content">${renderMd(snapshotData.content)}</div>
+            </div>
+          </details>
         ` : html`
           <div class="second-brain-empty-block">
             <div class="second-brain-empty-icon">\u{1F9E0}</div>
@@ -990,31 +961,26 @@ export class GmSecondBrain extends LitElement {
   }
 
   private async _onSelectEntry(path: string): Promise<void> {
+    if (!this.ctx.gateway || !this.ctx.connected) return;
     const isHtml = path.endsWith(".html") || path.endsWith(".htm");
-
-    // HTML files open directly in sidebar — bypass panel loading state
-    if (isHtml) {
-      try {
-        const result = await this.ctx.gateway!.request<{
-          name: string;
-          content: string;
-        }>("secondBrain.memoryBankEntry", { path });
-        if (result?.content) {
-          this.ctx.openSidebar({
-            content: result.content,
-            mimeType: "text/html",
-            filePath: path,
-            title: result.name || path.split("/").pop() || "File",
-          });
-        }
-      } catch (err) {
-        console.error("[SecondBrain] Failed to open HTML file:", err);
+    try {
+      const result = await this.ctx.gateway.request<{
+        name: string;
+        content: string;
+        updatedAt?: string;
+      }>("secondBrain.memoryBankEntry", { path });
+      if (result?.content) {
+        this.ctx.openSidebar({
+          content: result.content,
+          mimeType: isHtml ? "text/html" : "text/markdown",
+          filePath: path,
+          title: result.name || path.split("/").pop() || "File",
+        });
       }
-      return;
+    } catch (err) {
+      console.error("[SecondBrain] Failed to open file:", err);
+      this.ctx.addToast("Failed to open file", "error");
     }
-
-    await loadSecondBrainEntry(this as unknown as SecondBrainState, path);
-    this.requestUpdate();
   }
 
   private async _onBrowseFolder(path: string): Promise<void> {

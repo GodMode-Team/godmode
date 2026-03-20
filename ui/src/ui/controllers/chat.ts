@@ -5,9 +5,6 @@ import { resetStreamingCache } from "../markdown-streaming";
 import type { ChatAttachment } from "../ui-types";
 import { generateUUID } from "../uuid";
 
-// Module-level storage for pending message (for retry on context overflow)
-let pendingSendMessage: { message: string; attachments?: ChatAttachment[] } | null = null;
-
 /** Pending image cache promise — image resolution should wait for this before resolving. */
 let _pendingImageCache: Promise<unknown> | null = null;
 
@@ -53,16 +50,6 @@ export async function loadLaneHistory(
 // at response-time matches the generation at call-time.
 let _chatLoadGeneration = 0;
 
-/**
- * Represents a message that failed to send (e.g., due to context overflow).
- * Used for retry functionality.
- */
-export type FailedMessage = {
-  message: string;
-  attachments?: ChatAttachment[];
-  timestamp: number;
-};
-
 export type ChatState = {
   client: GatewayBrowserClient | null;
   connected: boolean;
@@ -78,8 +65,6 @@ export type ChatState = {
   chatStream: string | null;
   chatStreamStartedAt: number | null;
   lastError: string | null;
-  /** Message pending retry after context overflow */
-  pendingRetry?: FailedMessage | null;
 };
 
 export type ChatEventPayload = {
@@ -321,9 +306,6 @@ export async function sendChatMessage(
   state.chatStream = "";
   state.chatStreamStartedAt = now;
 
-  // Save message for potential retry on context overflow
-  pendingSendMessage = { message: msg, attachments: hasAttachments ? attachments : undefined };
-
   // Convert attachments to API format.
   // The gateway only supports image attachments — non-image files (PDFs, etc.)
   // are dropped by the gateway's parseMessageWithAttachments(). To work around
@@ -436,32 +418,6 @@ export async function sendChatMessage(
   }
 }
 
-/**
- * Retry a message that failed due to context overflow.
- * Call this after compacting the conversation.
- */
-export async function retryPendingMessage(state: ChatState): Promise<boolean> {
-  const pending = state.pendingRetry;
-  if (!pending) {
-    return false;
-  }
-
-  // Clear the pending retry before sending
-  state.pendingRetry = null;
-
-  // The user message is already in the chat from the original send attempt
-  // Just resend without adding another optimistic message
-  return sendChatMessage(state, pending.message, pending.attachments, {
-    skipOptimisticUpdate: true,
-  });
-}
-
-/**
- * Clear pending retry without sending
- */
-export function clearPendingRetry(state: ChatState): void {
-  state.pendingRetry = null;
-}
 
 export async function abortChatRun(state: ChatState): Promise<boolean> {
   if (!state.client || !state.connected) {
@@ -526,12 +482,10 @@ export function handleChatEvent(state: ChatState, payload?: ChatEventPayload) {
     // chatStream is cleared by loadChatHistoryAfterFinal() after loading.
     state.chatRunId = null;
     state.chatStreamStartedAt = null;
-    pendingSendMessage = null; // Clear on successful completion
   } else if (payload.state === "aborted") {
     state.chatStream = null;
     state.chatRunId = null;
     state.chatStreamStartedAt = null;
-    pendingSendMessage = null; // Clear on abort
   } else if (payload.state === "error") {
     state.chatStream = null;
     state.chatRunId = null;
@@ -539,29 +493,19 @@ export function handleChatEvent(state: ChatState, payload?: ChatEventPayload) {
     const errorMsg = payload.errorMessage ?? "chat error";
     state.lastError = errorMsg;
 
-    // Check for context overflow and save pending message for retry
-    const isOverflow = errorMsg.includes("prompt is too long") || errorMsg.includes("tokens >");
-    if (isOverflow && pendingSendMessage) {
-      state.pendingRetry = {
-        message: pendingSendMessage.message,
-        attachments: pendingSendMessage.attachments,
-        timestamp: Date.now(),
-      };
-    }
-    pendingSendMessage = null;
-
     // Add error message to chat thread so it persists visibly
     // Parse context overflow errors for friendly message
     let friendlyError = errorMsg;
+    const isOverflow = errorMsg.includes("prompt is too long") || errorMsg.includes("tokens >");
     if (isOverflow) {
       const match = errorMsg.match(/(\d+)\s*tokens?\s*>\s*(\d+)/);
       if (match) {
         const used = parseInt(match[1]).toLocaleString();
         const max = parseInt(match[2]).toLocaleString();
-        friendlyError = `⚠️ Context overflow: ${used} tokens exceeds ${max} limit. Compact the conversation, then click "Retry" to resend your message.`;
+        friendlyError = `⚠️ Context overflow: ${used} tokens exceeds ${max} limit. Use /compact to free up space.`;
       } else {
         friendlyError =
-          '⚠️ Context overflow: The conversation is too long. Compact and click "Retry" to resend.';
+          "⚠️ Context overflow: The conversation is too long. Use /compact to free up space.";
       }
     }
 

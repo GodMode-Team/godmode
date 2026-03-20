@@ -206,9 +206,6 @@ export class GmChat extends LitElement {
       canAbort: Boolean(s.chatRunId),
       onAbort: () => void s.handleAbortChat(),
       onCompact: () => void s.handleCompactChat(),
-      pendingRetry: s.pendingRetry,
-      onRetry: () => void s.handleRetryMessage(),
-      onClearRetry: () => s.handleClearRetry(),
       onQueueRemove: (id: string) => s.removeQueuedMessage(id),
       onNewSession: () => s.handleSendChat("/new", { restoreDraft: true }),
 

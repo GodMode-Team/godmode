@@ -30,6 +30,8 @@ import {
   type EvidenceResult as SharedEvidenceResult,
 } from "../lib/evidence.js";
 import { reportConnected, reportDegraded } from "../lib/service-health.js";
+import { notifySession } from "../lib/session-notifier.js";
+import type { OpenClawPluginApi } from "openclaw/plugin-sdk";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
@@ -210,6 +212,7 @@ const AGENT_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes max runtime per agent
 class QueueProcessor {
   private logger: Logger;
   private broadcastFn: BroadcastFn | null = null;
+  private pluginApi: OpenClawPluginApi | null = null;
   private maxParallel = 5;
   private activeCount = 0;
   private stopped = false;
@@ -223,6 +226,10 @@ class QueueProcessor {
 
   setBroadcast(fn: BroadcastFn): void {
     this.broadcastFn = fn;
+  }
+
+  setApi(api: OpenClawPluginApi): void {
+    this.pluginApi = api;
   }
 
   /** Start the fast queue polling loop (10-min cadence). */
@@ -718,6 +725,16 @@ class QueueProcessor {
         ],
       });
     } catch { /* broadcast non-fatal */ }
+
+    // Push system event into the originating session so the agent proactively presents the deliverable
+    if (this.pluginApi) {
+      const sessionKey = completedItem?.sessionId;
+      notifySession(
+        this.pluginApi,
+        sessionKey,
+        `[Agent completed] "${completedItem?.title ?? itemId}" is ready for review. Output: ${outPath}`,
+      );
+    }
   }
 
   // ── Failure + retry handler ────────────────────────────────────
@@ -1076,6 +1093,26 @@ class QueueProcessor {
     });
     this.broadcast("inbox:update", {});
     this.broadcast("queue:update", { type: "project-complete", projectId });
+
+    // Push system event into the originating session for proactive notification
+    if (this.pluginApi) {
+      // Resolve sessionKey from the project record
+      let sessionKey: string | undefined;
+      try {
+        const { getProject } = await import("../lib/projects-state.js");
+        const project = await getProject(projectId);
+        sessionKey = project?.sessionKey;
+      } catch { /* best effort */ }
+      // Fall back to sessionId from any queue item in the project
+      if (!sessionKey) {
+        sessionKey = projectItems.find(qi => qi.sessionId)?.sessionId;
+      }
+      notifySession(
+        this.pluginApi,
+        sessionKey,
+        `[Project complete] "${projectTitle}" — all ${projectItems.length} deliverables ready for review.`,
+      );
+    }
   }
 
   // ── Batch process all pending ──────────────────────────────────

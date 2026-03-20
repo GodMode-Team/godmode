@@ -318,7 +318,7 @@ export function subtitleForTab(tab: Tab) {
     case "workspaces":
       return "Projects, clients, and personal operating context.";
     case "connections":
-      return "All your data sources and third-party integrations in one place.";
+      return "Your integrations and third-party connections.";
     case "channels":
       return "Connected apps — iMessage, Slack, email, calendar, and more.";
     case "instances":

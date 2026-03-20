@@ -1576,9 +1576,6 @@ export function renderApp(state: AppViewState) {
                 canAbort: Boolean(state.chatRunId),
                 onAbort: () => void state.handleAbortChat(),
                 onCompact: () => void state.handleCompactChat(),
-                pendingRetry: state.pendingRetry,
-                onRetry: () => void state.handleRetryMessage(),
-                onClearRetry: () => state.handleClearRetry(),
                 onQueueRemove: (id) => state.removeQueuedMessage(id),
                 onNewSession: () => state.handleSendChat("/new", { restoreDraft: true }),
                 // Sidebar props for tool output viewing

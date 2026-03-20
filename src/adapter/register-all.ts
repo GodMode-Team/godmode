@@ -304,6 +304,7 @@ export async function registerGodMode(
   methodCount++;
 
   // sessions.searchContent — full-text search across Hermes session history.
+  // Primary: FTS5 SQLite (fast, pre-indexed). Fallback: hermes-sessions JSON scan.
   adapter.registerMethod("sessions.searchContent", (async ({ params, respond }) => {
     const query = typeof params.query === "string" ? params.query.trim() : "";
     if (!query) {
@@ -311,9 +312,37 @@ export async function registerGodMode(
       return;
     }
     const limit = Math.min(Math.max(1, typeof params.limit === "number" ? params.limit : 20), 50);
-    const queryLower = query.toLowerCase();
 
     try {
+      // ── Primary: FTS5 SQLite ──────────────────────────────────────
+      try {
+        const { isSessionSearchReady, searchMessages } = await import("../lib/session-search.js");
+        if (isSessionSearchReady()) {
+          const hits = searchMessages(query, limit * 3);
+          if (hits.length > 0) {
+            const grouped = new Map<string, Array<{ role: string; text: string; timestamp?: number }>>();
+            for (const hit of hits) {
+              if (!grouped.has(hit.sessionKey)) grouped.set(hit.sessionKey, []);
+              const arr = grouped.get(hit.sessionKey)!;
+              if (arr.length < 3) {
+                const text = hit.content.length > 200 ? hit.content.slice(0, 200) + "..." : hit.content;
+                arr.push({ role: hit.role, text, timestamp: hit.createdAt ? hit.createdAt * 1000 : undefined });
+              }
+            }
+            type SearchResult = { key: string; displayName?: string; matches: Array<{ role: string; text: string; timestamp?: number }> };
+            const ftsResults: SearchResult[] = [];
+            for (const [key, matches] of grouped) {
+              if (ftsResults.length >= limit) break;
+              ftsResults.push({ key, matches });
+            }
+            respond(true, { ts: Date.now(), results: ftsResults });
+            return;
+          }
+        }
+      } catch { /* FTS5 unavailable — fall through */ }
+
+      // ── Fallback: hermes-sessions JSON scan ───────────────────────
+      const queryLower = query.toLowerCase();
       const { readdirSync, readFileSync: readFs, existsSync: exists } = await import("node:fs");
       const { join: joinPath } = await import("node:path");
       const { homedir } = await import("node:os");
@@ -323,8 +352,8 @@ export async function registerGodMode(
       const sessionsDir = joinPath(dataDir, "hermes-sessions");
 
       type MatchEntry = { role: string; text: string };
-      type SearchResult = { key: string; displayName?: string; matches: MatchEntry[] };
-      const results: SearchResult[] = [];
+      type FallbackResult = { key: string; displayName?: string; matches: MatchEntry[] };
+      const results: FallbackResult[] = [];
 
       if (exists(sessionsDir)) {
         const files = readdirSync(sessionsDir).filter((f: string) => f.endsWith(".json") && f !== "__compat_probe__.json");

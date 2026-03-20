@@ -11,6 +11,7 @@ import { homedir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { DATA_DIR, MEMORY_DIR } from "../data-paths.js";
 import { detectHostContext, safeBroadcast } from "../lib/host-context.js";
+import { notifySession } from "../lib/session-notifier.js";
 import { killZombieGateways } from "../lib/zombie-guard.js";
 import { refreshLicenseOnStart } from "../lib/license.js";
 import { health, turnErrors, sessions } from "../lib/health-ledger.js";
@@ -393,6 +394,7 @@ export async function runGatewayStart(
     const { initQueueProcessor, getQueueProcessor } = await import("../services/queue-processor.js");
     const queueProcessor = initQueueProcessor(logger);
     queueProcessor.setBroadcast((event: string, data: unknown) => safeBroadcast(api, event, data));
+    queueProcessor.setApi(api);
     await queueProcessor.recoverOrphaned();
     queueProcessor.startPolling();
     serviceCleanup.push({ name: "queue-processor", fn: () => getQueueProcessor()?.stop() });
@@ -500,6 +502,13 @@ export async function runGatewayStart(
               outputPreview: output.slice(0, 1000),
               message: `Agent completed: "${issue.title}". The deliverable is ready for your review.`,
             });
+
+            // 6. Push system event into originating session for proactive agent response
+            notifySession(
+              api,
+              sessionKey,
+              `[Agent completed] "${issue.title}" is ready for review. Output: ${outputPath}`,
+            );
 
             logger.info(
               `[GodMode] Paperclip task completed: "${issue.title}" (${issue.id})` +

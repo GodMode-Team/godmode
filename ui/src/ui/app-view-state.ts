@@ -1,5 +1,4 @@
 import type { EventLogEntry } from "./app-events";
-import type { FailedMessage } from "./controllers/chat";
 import type { DevicePairingList } from "./controllers/devices";
 import type { ExecApprovalRequest } from "./controllers/exec-approval";
 import type { ExecApprovalsFile, ExecApprovalsSnapshot } from "./controllers/exec-approvals";
@@ -95,7 +94,6 @@ export type AppViewState = {
   chatAvatarUrl: string | null;
   chatThinkingLevel: string | null;
   chatQueue: ChatQueueItem[];
-  pendingRetry: FailedMessage | null;
   compactionStatus: import("./app-tool-stream").CompactionStatus | null;
   sidebarOpen: boolean;
   sidebarContent: string | null;
@@ -389,8 +387,6 @@ export type AppViewState = {
   handleAbortChat: () => Promise<void>;
   handleConsciousnessFlush: () => Promise<void>;
   handleCompactChat: () => Promise<void>;
-  handleRetryMessage: () => Promise<void>;
-  handleClearRetry: () => void;
   removeQueuedMessage: (id: string) => void;
   handleOpenSidebar: (
     content: string,

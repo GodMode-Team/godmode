@@ -242,3 +242,11 @@
   justify-content: center;
   padding-top: 8px;
 }
+
+.connections-footer__hint {
+  color: var(--muted);
+  font-size: 0.875rem;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}

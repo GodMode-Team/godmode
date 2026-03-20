@@ -260,6 +260,42 @@
   border-radius: 999px;
 }
 
+/* ── Collapsible Sections ───────────────────────────────────────── */
+
+.second-brain-section-details {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+}
+
+.second-brain-section-details > summary {
+  list-style: none;
+  cursor: pointer;
+  user-select: none;
+}
+
+.second-brain-section-details > summary::-webkit-details-marker {
+  display: none;
+}
+
+.second-brain-section-header--toggle {
+  position: relative;
+  padding-left: 1rem;
+}
+
+.second-brain-section-header--toggle::before {
+  content: "\25B8";
+  position: absolute;
+  left: 0;
+  font-size: 0.6875rem;
+  color: var(--muted);
+  transition: transform 0.15s ease;
+}
+
+.second-brain-section-details[open] > .second-brain-section-header--toggle::before {
+  transform: rotate(90deg);
+}
+
 /* ── Entry rows ─────────────────────────────────────────────────── */
 
 .second-brain-entry-list {
@@ -560,6 +596,7 @@
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
   gap: 0.5rem;
+  justify-content: start;
 }
 
 .second-brain-source-card {

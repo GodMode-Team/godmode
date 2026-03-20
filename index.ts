@@ -271,14 +271,41 @@ const godmodePlugin = {
     }) as Parameters<typeof api.registerGatewayMethod>[1]);
 
     api.registerGatewayMethod("sessions.searchContent", (async ({ params, respond }: { params: Record<string, unknown>; respond: Function }) => {
-      const query = typeof params.query === "string" ? params.query.trim().toLowerCase() : "";
+      const query = typeof params.query === "string" ? params.query.trim() : "";
       const limit = typeof params.limit === "number" ? Math.min(params.limit, 50) : 20;
       if (!query) {
         respond(true, { ts: Date.now(), results: [] });
         return;
       }
       try {
-        // Read session index directly from the filesystem (plugin API has no request() method)
+        // ── Primary: FTS5 SQLite (fast, pre-indexed) ──────────────────
+        try {
+          const { isSessionSearchReady, searchMessages } = await import("./src/lib/session-search.js");
+          if (isSessionSearchReady()) {
+            const hits = searchMessages(query, limit * 3); // over-fetch for grouping by session
+            if (hits.length > 0) {
+              const grouped = new Map<string, Array<{ role: string; text: string; timestamp?: number }>>();
+              for (const hit of hits) {
+                if (!grouped.has(hit.sessionKey)) grouped.set(hit.sessionKey, []);
+                const arr = grouped.get(hit.sessionKey)!;
+                if (arr.length < 3) {
+                  const text = hit.content.length > 200 ? hit.content.slice(0, 200) + "..." : hit.content;
+                  arr.push({ role: hit.role, text, timestamp: hit.createdAt ? hit.createdAt * 1000 : undefined });
+                }
+              }
+              const ftsResults: Array<{ key: string; displayName?: string; matches: Array<{ role: string; text: string; timestamp?: number }> }> = [];
+              for (const [key, matches] of grouped) {
+                if (ftsResults.length >= limit) break;
+                ftsResults.push({ key, matches });
+              }
+              respond(true, { ts: Date.now(), results: ftsResults });
+              return;
+            }
+          }
+        } catch { /* FTS5 unavailable — fall through to JSONL */ }
+
+        // ── Fallback: brute-force JSONL scan ──────────────────────────
+        const queryLower = query.toLowerCase();
         const stateDir = process.env.OPENCLAW_STATE_DIR || join(homedir(), ".openclaw");
         const agentSessionsDir = join(stateDir, "agents", "main", "sessions");
         const sessionsIndexPath = join(agentSessionsDir, "sessions.json");
@@ -297,12 +324,7 @@ const godmodePlugin = {
         const sessionEntries = Object.entries(sessionsIndex)
           .map(([key, meta]) => ({ key, ...meta }))
           .sort((a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0))
-          .slice(0, 200); // cap to avoid scanning too many
-
-        if (sessionEntries.length === 0) {
-          respond(true, { ts: Date.now(), results: [] });
-          return;
-        }
+          .slice(0, 200);
 
         const results: Array<{
           key: string; label?: string; displayName?: string;
@@ -314,24 +336,19 @@ const godmodePlugin = {
 
           const nameMatch = [s.displayName, s.key]
             .filter(Boolean)
-            .some((f) => f!.toLowerCase().includes(query));
+            .some((f) => f!.toLowerCase().includes(queryLower));
 
-          // Resolve the session JSONL file path
           const sessionFile = s.sessionFile
             ?? (s.sessionId ? join(agentSessionsDir, `${s.sessionId}.jsonl`) : null);
           if (!sessionFile || !existsSync(sessionFile)) {
-            if (nameMatch) {
-              results.push({ key: s.key, displayName: s.displayName, matches: [] });
-            }
+            if (nameMatch) results.push({ key: s.key, displayName: s.displayName, matches: [] });
             continue;
           }
 
-          // Read and search session content
           const contentMatches: Array<{ role: string; text: string; timestamp?: number }> = [];
           try {
             const raw = readFileSync(sessionFile, "utf-8");
-            const lines = raw.split("\n");
-            for (const line of lines) {
+            for (const line of raw.split("\n")) {
               if (!line.trim()) continue;
               let entry: Record<string, unknown>;
               try { entry = JSON.parse(line); } catch { continue; }
@@ -347,10 +364,10 @@ const godmodePlugin = {
                 .replace(/<system-reminder>[\s\S]*?<\/system-reminder>/g, "")
                 .replace(/<godmode-context>[\s\S]*?<\/godmode-context>/g, "")
                 .replace(/<capability-map>[\s\S]*?<\/capability-map>/g, "");
-              if (clean.toLowerCase().includes(query)) {
-                const idx = clean.toLowerCase().indexOf(query);
+              if (clean.toLowerCase().includes(queryLower)) {
+                const idx = clean.toLowerCase().indexOf(queryLower);
                 const start = Math.max(0, idx - 40);
-                const end = Math.min(clean.length, idx + query.length + 60);
+                const end = Math.min(clean.length, idx + queryLower.length + 60);
                 const snippet = (start > 0 ? "..." : "") +
                   clean.slice(start, end).replace(/\n/g, " ").trim() +
                   (end < clean.length ? "..." : "");
@@ -358,9 +375,7 @@ const godmodePlugin = {
               }
               if (contentMatches.length >= 3) break;
             }
-          } catch {
-            // Unreadable session file — skip content search
-          }
+          } catch { /* unreadable session file */ }
 
           if (nameMatch || contentMatches.length > 0) {
             results.push({ key: s.key, displayName: s.displayName, matches: contentMatches });

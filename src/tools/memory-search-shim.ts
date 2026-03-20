@@ -7,6 +7,7 @@
  *
  *   1. Honcho (queryPeer) — conversational memory / user model
  *   2. QMD (runQmdSearch) — vault full-text search
+ *   3. FTS5 (session-search) — local SQLite session search (episodic recall)
  *
  * Results are merged and returned in a shape the ally can consume.
  */
@@ -43,10 +44,11 @@ export function createMemorySearchShimTool(ctx: ToolContext): AnyAgentTool {
       const results: Array<{ source: string; content: string }> = [];
       const warnings: string[] = [];
 
-      // Run both backends concurrently
-      const [honchoResult, qmdResult] = await Promise.allSettled([
+      // Run all three backends concurrently
+      const [honchoResult, qmdResult, ftsResult] = await Promise.allSettled([
         searchHoncho(query, ctx.sessionKey),
         searchQmd(query),
+        searchFts5(query),
       ]);
 
       // Collect Honcho results
@@ -65,12 +67,21 @@ export function createMemorySearchShimTool(ctx: ToolContext): AnyAgentTool {
         warnings.push(`vault: ${String(qmdResult.reason)}`);
       }
 
+      // Collect FTS5 session search results
+      if (ftsResult.status === "fulfilled") {
+        for (const hit of ftsResult.value) {
+          results.push(hit);
+        }
+      } else if (ftsResult.status === "rejected") {
+        warnings.push(`sessions: ${String(ftsResult.reason)}`);
+      }
+
       // Signal health
       try {
         const { health } = await import("../lib/health-ledger.js");
         health.signal("memory.search", results.length > 0, {
           total: results.length,
-          backends: { honcho: honchoResult.status === "fulfilled", qmd: qmdResult.status === "fulfilled" },
+          backends: { honcho: honchoResult.status === "fulfilled", qmd: qmdResult.status === "fulfilled", fts5: ftsResult.status === "fulfilled" },
         });
       } catch { /* non-fatal */ }
 
@@ -103,4 +114,16 @@ async function searchQmd(query: string): Promise<Array<{ source: string; content
       source: "vault",
       content: h.file ? `[${h.file}] ${h.snippet}` : h.snippet,
     }));
+}
+
+/** Query FTS5 SQLite for session history. Returns formatted hits. */
+async function searchFts5(query: string): Promise<Array<{ source: string; content: string }>> {
+  const { isSessionSearchReady, searchMessages } = await import("../lib/session-search.js");
+  if (!isSessionSearchReady()) return [];
+
+  const hits = searchMessages(query, 5);
+  return hits.map((h) => ({
+    source: "session",
+    content: `[${h.sessionKey} / ${h.role}] ${h.content.length > 300 ? h.content.slice(0, 300) + "..." : h.content}`,
+  }));
 }
