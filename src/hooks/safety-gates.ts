@@ -1044,24 +1044,33 @@ export function markPendingApproval(sessionKey: string | undefined): void {
   if (sessionKey) _pendingApproval.set(sessionKey, true);
 }
 
+/** The ONE phrase that grants approval */
+const EXPLICIT_APPROVAL_PHRASE = /\bI\s+approve\b/i;
+
 /**
- * Called from message_received. If a gate blocked in this session since
- * the user's last message, the user's new message = implicit approval.
- * Also detects explicit approval phrases for immediate grant.
+ * Called from message_received. Only grants approval if:
+ * 1. A gate blocked since the user's last message, AND
+ * 2. The user's message contains "I approve" (case-insensitive).
  */
 export function processUserMessage(
   sessionKey: string | undefined,
-  _userMessage: string,
+  userMessage: string,
 ): boolean {
   if (!sessionKey) return false;
 
-  // If a gate blocked since last user message, any response = approval
-  if (_pendingApproval.get(sessionKey)) {
+  // Only check approval if a gate is actually pending
+  if (!_pendingApproval.get(sessionKey)) return false;
+
+  const isApproval = EXPLICIT_APPROVAL_PHRASE.test(userMessage);
+  if (isApproval) {
     _pendingApproval.delete(sessionKey);
     _approvals.set(sessionKey, Date.now());
     return true;
   }
 
+  // User responded but didn't approve — clear the pending flag
+  // so the gate will re-block and re-prompt on next attempt
+  _pendingApproval.delete(sessionKey);
   return false;
 }
 
@@ -1119,10 +1128,12 @@ const DEPLOYMENT_APPROVAL_MESSAGE = [
   "",
   "This would push to a protected branch, deploy to production, or merge a PR.",
   "",
-  "You MUST:",
-  "1. Tell the user EXACTLY what you're about to do",
-  "2. Wait for them to say 'approved', 'go ahead', 'do it', or similar",
-  "3. Only then retry — it will go through after approval",
+  "STOP. Do NOT retry this command in your current response.",
+  "",
+  "Instead:",
+  '1. Tell the user EXACTLY what you were about to do',
+  '2. Ask them to say "I approve" to continue',
+  "3. WAIT — only retry in your NEXT response after the user says exactly that",
 ].join("\n");
 
 /**
@@ -1354,11 +1365,13 @@ const CLIENT_FACING_BLOCK_MESSAGE = [
   "- Publishing or posting to public systems",
   "- Mutating data via external API calls",
   "",
-  "You MUST:",
-  "1. Present the EXACT action you want to take",
-  "2. Show the specific API call, recipients, or content",
-  "3. Wait for the user to say 'approved', 'go ahead', 'do it', or similar",
-  "4. Only then retry the action — it will go through after approval",
+  "STOP. Do NOT retry this action in your current response.",
+  "",
+  "Instead:",
+  '1. Present the EXACT action you want to take',
+  '2. Show the specific API call, recipients, or content',
+  '3. Ask the user to say "I approve" to continue',
+  "4. WAIT — only retry in your NEXT response after the user says exactly that",
   "",
   "Planning, reading, and searching are fine. Executing requires a green light.",
 ].join("\n");
