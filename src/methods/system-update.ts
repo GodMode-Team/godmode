@@ -243,7 +243,7 @@ const pluginCheck: GatewayRequestHandler = async ({ respond }) => {
 
 // ── Post-update health audit (called from gateway_start) ─────────────────
 
-type SmokeResult = { name: string; status: "pass" | "warn" | "fail"; detail: string };
+type SmokeResult = { name: string; status: "pass" | "warn" | "fail" | "skip"; detail: string };
 type BroadcastFn = (event: string, payload: unknown) => void;
 
 /**

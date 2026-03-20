@@ -28,7 +28,7 @@ const SESSION_CACHE_MAX = 100;
 export async function initHoncho(apiKey?: string): Promise<boolean> {
   const key = apiKey ?? process.env.HONCHO_API_KEY;
   if (!key) {
-    console.log("[GodMode] Honcho not configured -- memory disabled");
+    console.warn("[GodMode] Honcho not configured -- memory disabled");
     return false;
   }
 
@@ -40,7 +40,7 @@ export async function initHoncho(apiKey?: string): Promise<boolean> {
     peer = await honcho.peer(ownerKey);
 
     ready = true;
-    console.log("[GodMode] Honcho memory initialized");
+    console.warn("[GodMode] Honcho memory initialized");
     return true;
   } catch (err) {
     console.warn(`[GodMode] Honcho init failed (non-fatal): ${String(err)}`);

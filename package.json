@@ -43,6 +43,7 @@
     "dist/**/*.pem",
     "assets/agent-roster/**/*.md",
     "assets/skills/**/*.md",
+    "skill-cards/**/*.md",
     "dist/assets/**/*.json",
     "dist/assets/**/*.md",
     "openclaw.plugin.json",

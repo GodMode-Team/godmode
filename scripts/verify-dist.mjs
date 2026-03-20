@@ -62,6 +62,10 @@ if (hasSourceMaps) {
 // 5. openclaw.plugin.json must exist at root
 check("openclaw.plugin.json exists", existsSync(join(root, "openclaw.plugin.json")));
 
+// 6. Binary entry points must exist (required for `godmode` and `godmode-mcp` bin commands)
+check("dist/standalone.js exists", existsSync(join(dist, "standalone.js")));
+check("dist/mcp-entry.js exists", existsSync(join(dist, "mcp-entry.js")));
+
 if (!ok) {
   console.error("\n[verify-dist] Pre-publish check FAILED. Fix the issues above before publishing.");
   process.exit(1);

@@ -4,6 +4,11 @@ ui/
 docs/
 skills/
 assets/
+# Personal workspace templates — never ship to npm
+dist/assets/workspace-templates/patient-autopilot
+dist/assets/workspace-templates/patient-autopilot/**
+dist/assets/workspace-templates/trp
+dist/assets/workspace-templates/trp/**
 .github/
 tsup.config.ts
 tsconfig.json
