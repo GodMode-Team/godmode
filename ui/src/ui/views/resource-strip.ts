@@ -9,7 +9,7 @@
  * - Filter tabs: All | Images | Code | Docs | HTML | Video
  * - Right-click context menu: Open, Download, Copy Path, Delete
  * - Drag to reorder / pin favorites
- * - Empty state: "Your artifacts will appear here"
+ * - Empty state: "Your resources will appear here"
  * - Gold accent theme matching GodMode dark UI
  * - Keyboard navigation
  */
@@ -308,7 +308,7 @@ function renderEmptyState(): TemplateResult {
           <path d="M9 14h6M9 18h4"/>
         </svg>
       </div>
-      <span class="rs-empty__text">Your artifacts will appear here</span>
+      <span class="rs-empty__text">Your resources will appear here</span>
     </div>
   `;
 }
@@ -337,14 +337,28 @@ export function renderResourceStrip(props: ResourceStripProps): TemplateResult {
 
   return html`
     <div class="resource-strip ${collapsed ? "resource-strip--collapsed" : ""}">
-      <div class="resource-strip__header">
+      <div
+        class="resource-strip__header"
+        role="button"
+        tabindex="0"
+        @click=${(e: MouseEvent) => {
+          // Don't toggle if clicking "View all" button
+          if ((e.target as HTMLElement).closest(".resource-strip__view-all")) return;
+          props.onToggleCollapse?.();
+        }}
+        @keydown=${(e: KeyboardEvent) => {
+          if (e.key === "Enter" || e.key === " ") { e.preventDefault(); props.onToggleCollapse?.(); }
+        }}
+        title=${collapsed ? "Show resources" : "Hide resources"}
+        style="cursor: pointer;"
+      >
         <div class="resource-strip__title-area">
           <span class="resource-strip__label">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/>
               <path d="M13 2v7h7"/>
             </svg>
-            Artifacts
+            Resources
           </span>
           ${resources.length > 0
             ? html`<span class="resource-strip__count">${resources.length}</span>`
@@ -354,12 +368,10 @@ export function renderResourceStrip(props: ResourceStripProps): TemplateResult {
           ${!collapsed && resources.length > 0 && props.onViewAll
             ? html`<button class="resource-strip__view-all" @click=${props.onViewAll} title="View all in Work tab">View all →</button>`
             : nothing}
-          <button
+          <span
             class="resource-strip__collapse-btn"
-            @click=${props.onToggleCollapse}
-            title=${collapsed ? "Show artifacts" : "Hide artifacts"}
             aria-expanded=${!collapsed}
-          >${collapsed ? "▲" : "▼"}</button>
+          >${collapsed ? "▲" : "▼"}</span>
         </div>
       </div>
 
