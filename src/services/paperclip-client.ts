@@ -71,8 +71,12 @@ import { randomUUID } from "node:crypto";
 function headers(mutating = false): Record<string, string> {
   const h: Record<string, string> = {
     "Content-Type": "application/json",
-    Authorization: `Bearer ${apiKey}`,
   };
+  // Only send Authorization header when an API key is configured.
+  // In local_trusted deployment mode, Paperclip doesn't require auth.
+  if (apiKey) {
+    h.Authorization = `Bearer ${apiKey}`;
+  }
   if (mutating) {
     h["X-Paperclip-Run-Id"] = randomUUID();
   }
