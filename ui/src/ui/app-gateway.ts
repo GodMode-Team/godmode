@@ -1,4 +1,4 @@
-import { isAllySessionKey } from "../lib/session-key-utils.js";
+import { isAllySessionKey, sessionKeysMatch } from "../lib/session-key-utils.js";
 import { GodModeApp } from "./app";
 import { appEventBus } from "./context/event-bus.js";
 import { flushChatQueueForEvent } from "./app-chat";
@@ -621,7 +621,9 @@ export function connectGateway(host: GatewayHost) {
         // The 90-second safety timeout (line ~820) already handles truly lost
         // final events. Clearing the stream here caused visible disappear/reappear
         // whenever the WebSocket briefly disconnected mid-stream.
-        // Only clear chatRunId so the next delta/final can re-establish if needed.
+        // Clear chatRunId — it will be re-adopted from the first incoming
+        // delta or tool event for this session (see handleChatEvent and
+        // handleAgentEvent re-adoption logic).
         host.chatRunId = null;
 
         // todaySelectedDate auto-advance moved to <gm-today>
@@ -807,8 +809,25 @@ function handleGatewayEventUnsafe(host: GatewayHost, evt: GatewayEventFrame) {
             workingSessionClearTimers.delete(safetyKey);
             if (host.workingSessions.has(payload.sessionKey)) {
               host.workingSessions.delete(payload.sessionKey);
-              (host as unknown as { requestUpdate?: () => void }).requestUpdate?.();
             }
+            // Also clear stuck stream state if the final event was truly lost —
+            // without this, the ellipsis/stream bubble persists indefinitely.
+            const chatHost = host as unknown as {
+              sessionKey: string;
+              chatRunId: string | null;
+              chatStream: string | null;
+              chatStreamStartedAt: number | null;
+              requestUpdate?: () => void;
+            };
+            if (
+              sessionKeysMatch(payload.sessionKey, chatHost.sessionKey) &&
+              chatHost.chatStream !== null &&
+              chatHost.chatRunId === null
+            ) {
+              chatHost.chatStream = null;
+              chatHost.chatStreamStartedAt = null;
+            }
+            chatHost.requestUpdate?.();
           }, 90_000),
         );
       } else if (

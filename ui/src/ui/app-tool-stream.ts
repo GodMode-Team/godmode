@@ -407,8 +407,15 @@ export function handleAgentEvent(host: ToolStreamHost, payload?: AgentEventPaylo
   if (host.chatRunId && payload.runId !== host.chatRunId) {
     return;
   }
+  // After a WebSocket reconnect, chatRunId is null but the server may still
+  // be streaming tool events for the active run. Re-adopt the run so tool
+  // indicators resume instead of silently dropping every event.
   if (!host.chatRunId) {
-    return;
+    if (sessionKey === host.sessionKey && payload.runId) {
+      host.chatRunId = payload.runId;
+    } else {
+      return;
+    }
   }
 
   const data = payload.data ?? {};

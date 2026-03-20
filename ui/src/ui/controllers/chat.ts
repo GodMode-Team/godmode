@@ -466,6 +466,13 @@ export function handleChatEvent(state: ChatState, payload?: ChatEventPayload) {
   }
 
   if (payload.state === "delta") {
+    // Re-adopt runId after reconnect — chatRunId is nulled on reconnect to
+    // avoid stale state, but the server keeps streaming. Re-establishing here
+    // lets tool events (which check chatRunId) flow again.
+    if (!state.chatRunId && payload.runId) {
+      state.chatRunId = payload.runId;
+      state.chatStreamStartedAt ??= Date.now();
+    }
     const next = extractText(payload.message);
     if (typeof next === "string") {
       const current = state.chatStream ?? "";
