@@ -223,20 +223,6 @@
   animation: pulse-warning 1.5s ease-in-out infinite;
 }
 
-.support-pill {
-  text-decoration: none;
-  color: var(--text-muted);
-  font-size: 11px;
-  padding: 4px 10px;
-  opacity: 0.7;
-  transition: opacity 0.15s;
-}
-
-.support-pill:hover {
-  opacity: 1;
-  color: var(--text);
-}
-
 @keyframes pulse-warning {
   0%,
   100% {

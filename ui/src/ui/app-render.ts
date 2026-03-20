@@ -1078,13 +1078,6 @@ export function renderApp(state: AppViewState) {
             }
             ${isChat ? renderChatControls(state) : nothing}
             ${nothing /* Today toolbar is self-contained inside <gm-today> */}
-            <a
-              class="pill support-pill"
-              href="https://community.lifeongodmode.com"
-              target="_blank"
-              rel="noreferrer"
-              title="Get help from the GodMode community"
-            >Support</a>
           </div>
         </section>
 
