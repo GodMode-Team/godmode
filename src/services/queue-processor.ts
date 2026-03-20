@@ -30,6 +30,8 @@ import {
   type EvidenceResult as SharedEvidenceResult,
 } from "../lib/evidence.js";
 import { reportConnected, reportDegraded } from "../lib/service-health.js";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 
 // ── Prompt Templates ───────────────────────────────────────────────
 
@@ -84,6 +86,61 @@ function outputPathForItem(itemId: string): string {
   return path.join(INBOX_DIR, `${itemId}.md`);
 }
 
+/**
+ * Resolve Anthropic API key for spawned agents.
+ * Resolution order: env var → godmode .env → OpenClaw .env → OpenClaw auth-profiles (OAuth token).
+ * Mirrors the resolution chain in brief-generator.ts so agents authenticate consistently.
+ */
+function resolveAnthropicKeyForAgents(): string | null {
+  // 1. Environment variable (direct)
+  if (process.env.ANTHROPIC_API_KEY) return process.env.ANTHROPIC_API_KEY;
+
+  // 2. GodMode .env file
+  const gmEnv = path.join(GODMODE_ROOT, ".env");
+  try {
+    const raw = readFileSync(gmEnv, "utf-8");
+    for (const line of raw.split("\n")) {
+      if (line.startsWith("ANTHROPIC_API_KEY=")) {
+        const val = line.slice("ANTHROPIC_API_KEY=".length).trim();
+        if (val && !val.startsWith("#")) return val;
+      }
+    }
+  } catch { /* not found */ }
+
+  // 3. OpenClaw .env file
+  try {
+    const oclawEnv = path.join(os.homedir(), ".openclaw", ".env");
+    const raw = readFileSync(oclawEnv, "utf-8");
+    for (const line of raw.split("\n")) {
+      if (line.startsWith("ANTHROPIC_API_KEY=")) {
+        const val = line.slice("ANTHROPIC_API_KEY=".length).trim();
+        if (val && !val.startsWith("#")) return val;
+      }
+    }
+  } catch { /* not found */ }
+
+  // 4. OpenClaw auth-profiles.json (OAuth token — works as API bearer token)
+  try {
+    const profilesPath = path.join(os.homedir(), ".openclaw", "auth-profiles.json");
+    const raw = JSON.parse(readFileSync(profilesPath, "utf-8")) as {
+      profiles?: Record<string, { token?: string }>;
+    };
+    const oauthProfile = raw.profiles?.["anthropic:oauth"];
+    if (oauthProfile?.token) return oauthProfile.token;
+  } catch { /* not found */ }
+
+  // 5. Hermes config (if using OpenRouter or other provider)
+  try {
+    const hermesConfig = path.join(os.homedir(), ".hermes", "config.yaml");
+    const raw = readFileSync(hermesConfig, "utf-8");
+    // Simple YAML parse for api_key under providers
+    const keyMatch = raw.match(/ANTHROPIC_API_KEY[=:]\s*(.+)/i);
+    if (keyMatch?.[1]?.trim()) return keyMatch[1].trim();
+  } catch { /* not found */ }
+
+  return null;
+}
+
 function buildChildEnv(): Record<string, string> {
   const parentPath = process.env.PATH ?? "";
   const childEnv: Record<string, string> = {
@@ -96,11 +153,20 @@ function buildChildEnv(): Record<string, string> {
     LANG: process.env.LANG ?? "en_US.UTF-8",
     TERM: process.env.TERM ?? "xterm-256color",
   };
-  // Forward ANTHROPIC_API_KEY if available — needed for Claude CLI auth
-  // when OAuth/Max subscription isn't configured on this machine.
-  if (process.env.ANTHROPIC_API_KEY) {
-    childEnv.ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
+
+  // Resolve and forward Anthropic API key — critical for headless/SSH agent spawning.
+  // Claude CLI OAuth may not work in non-interactive contexts (SSH, detached processes).
+  // This ensures agents can authenticate via API key even when OAuth fails.
+  const anthropicKey = resolveAnthropicKeyForAgents();
+  if (anthropicKey) {
+    childEnv.ANTHROPIC_API_KEY = anthropicKey;
   }
+
+  // Forward XDG dirs so Claude CLI can find its config in non-interactive contexts
+  if (process.env.XDG_CONFIG_HOME) {
+    childEnv.XDG_CONFIG_HOME = process.env.XDG_CONFIG_HOME;
+  }
+
   return childEnv;
 }
 
