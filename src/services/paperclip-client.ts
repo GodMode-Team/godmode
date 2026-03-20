@@ -436,15 +436,37 @@ export function stopCompletionPoller(): void {
 }
 
 /**
- * Get overall Paperclip status.
+ * Get overall Paperclip status with diagnostics.
  */
-export async function getPaperclipStatus(): Promise<PaperclipStatus> {
+export async function getPaperclipStatus(): Promise<PaperclipStatus & { diagnostics?: Record<string, unknown> }> {
   if (!ready) {
-    return { ready: false, url: baseUrl || "(not configured)", taskCount: 0 };
+    return {
+      ready: false,
+      url: baseUrl || "(not configured)",
+      taskCount: 0,
+      diagnostics: {
+        baseUrl: baseUrl || "(empty)",
+        companyId: companyId || "(empty)",
+        hasApiKey: !!apiKey,
+        envUrl: process.env.PAPERCLIP_URL || "(not set)",
+        envCompany: process.env.PAPERCLIP_COMPANY_ID || "(not set)",
+      },
+    };
   }
   try {
     const tasks = await listActiveTasks();
-    return { ready: true, url: baseUrl, taskCount: tasks.length };
+    const agents = await getAgents();
+    return {
+      ready: true,
+      url: baseUrl,
+      taskCount: tasks.length,
+      diagnostics: {
+        agentCount: agents.length,
+        activeAgents: agents.filter((a) => a.status === "busy" || a.status === "active").length,
+        idleAgents: agents.filter((a) => a.status === "idle").length,
+        errorAgents: agents.filter((a) => a.status === "error").length,
+      },
+    };
   } catch {
     return { ready: false, url: baseUrl, taskCount: 0 };
   }
