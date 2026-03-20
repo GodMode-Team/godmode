@@ -81,6 +81,10 @@ export type ChatProps = {
   userName?: string;
   userAvatar?: string | null;
   currentModel?: string | null;
+  availableModels?: { id: string; name: string; provider: string }[];
+  modelPickerOpen?: boolean;
+  onToggleModelPicker?: () => void;
+  onSwitchModel?: (modelId: string) => void;
   // Working indicator
   currentToolName?: string | null;
   currentToolInfo?: ToolExecutionInfo | null;
@@ -1084,7 +1088,35 @@ export function renderChat(props: ChatProps) {
             ></textarea>
 
             <div class="chat-compose__actions">
-              ${props.currentModel ? html`<span class="chat-model-label">${formatModelLabel(props.currentModel)}</span>` : nothing}
+              ${props.currentModel ? html`
+                <div class="model-picker-inline">
+                  <button
+                    class="chat-model-label chat-model-label--clickable"
+                    @click=${(e: Event) => {
+                      e.stopPropagation();
+                      props.onToggleModelPicker?.();
+                    }}
+                    title="Switch model"
+                  >${formatModelLabel(props.currentModel)} &#9662;</button>
+                  ${props.modelPickerOpen && (props.availableModels?.length ?? 0) > 0 ? html`
+                    <div class="model-picker-dropdown">
+                      ${props.availableModels!.map(m => html`
+                        <button
+                          class="model-picker-dropdown__item ${m.id === props.currentModel ? 'model-picker-dropdown__item--active' : ''}"
+                          @click=${(e: Event) => {
+                            e.stopPropagation();
+                            if (m.id !== props.currentModel) props.onSwitchModel?.(m.id);
+                          }}
+                        >
+                          <span class="model-picker-dropdown__name">${m.name}</span>
+                          <span class="model-picker-dropdown__provider">${m.provider}</span>
+                          ${m.id === props.currentModel ? html`<span class="model-picker-dropdown__check">&#10003;</span>` : nothing}
+                        </button>
+                      `)}
+                    </div>
+                  ` : nothing}
+                </div>
+              ` : nothing}
               ${renderContextBadge(props)}
 
               <button

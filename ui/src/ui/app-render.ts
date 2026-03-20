@@ -1078,6 +1078,13 @@ export function renderApp(state: AppViewState) {
             }
             ${isChat ? renderChatControls(state) : nothing}
             ${nothing /* Today toolbar is self-contained inside <gm-today> */}
+            <a
+              class="pill support-pill"
+              href="https://community.lifeongodmode.com"
+              target="_blank"
+              rel="noreferrer"
+              title="Get help from the GodMode community"
+            >Support</a>
           </div>
         </section>
 
@@ -1613,6 +1620,24 @@ export function renderApp(state: AppViewState) {
                 userName: state.userName,
                 userAvatar: state.userAvatar,
                 currentModel: state.currentModel,
+                availableModels: state.availableModels,
+                modelPickerOpen: state.modelPickerOpen,
+                onToggleModelPicker: () => {
+                  const opening = !state.modelPickerOpen;
+                  state.modelPickerOpen = opening;
+                  if (opening) {
+                    setTimeout(() => {
+                      const close = () => { state.modelPickerOpen = false; document.removeEventListener("click", close, true); };
+                      document.addEventListener("click", close, true);
+                    }, 0);
+                  }
+                },
+                onSwitchModel: (modelId: string) => {
+                  void (async () => {
+                    const { switchModelFromChat } = await import("./app-gateway.js");
+                    await switchModelFromChat(state as unknown as Parameters<typeof switchModelFromChat>[0], modelId);
+                  })();
+                },
                 currentToolName: state.currentToolName,
                 currentToolInfo: state.currentToolInfo,
                 privateMode: state.chatPrivateMode,

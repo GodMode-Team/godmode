@@ -54,6 +54,8 @@ export type AppViewState = {
   userAvatar: string | null;
   assistantAgentId: string | null;
   currentModel: string | null;
+  availableModels: { id: string; name: string; provider: string }[];
+  modelPickerOpen: boolean;
   sessionKey: string;
   sessionPickerOpen: boolean;
   sessionPickerPosition: { top: number; right: number } | null;

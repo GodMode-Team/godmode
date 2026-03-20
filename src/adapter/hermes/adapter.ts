@@ -15,7 +15,7 @@
  */
 
 import { createServer, type Server as HttpServer, type IncomingMessage, type ServerResponse } from "node:http";
-import { existsSync, createReadStream, readFileSync, statSync } from "node:fs";
+import { existsSync, createReadStream, readFileSync, statSync, writeFileSync } from "node:fs";
 import { join, extname } from "node:path";
 import { homedir } from "node:os";
 import type {
@@ -412,12 +412,50 @@ export class HermesAdapter implements HostAdapter {
         if (existsSync(cfgPath)) {
           const raw = JSON.parse(readFileSync(cfgPath, "utf-8"));
           const primary = raw?.agents?.defaults?.model?.primary ?? raw?.defaults?.model?.primary ?? null;
-          respond(true, { primary });
+          const available: { id: string; name: string; provider: string }[] = [];
+          const providers = raw?.models?.providers;
+          if (providers && typeof providers === "object") {
+            for (const [provKey, prov] of Object.entries(providers)) {
+              for (const m of ((prov as Record<string, unknown>).models as any[]) ?? []) {
+                available.push({ id: `${provKey}/${m.id}`, name: m.name ?? m.id, provider: provKey });
+              }
+            }
+          }
+          respond(true, { primary, available });
         } else {
-          respond(true, { primary: null });
+          respond(true, { primary: null, available: [] });
         }
       } catch {
-        respond(true, { primary: null });
+        respond(true, { primary: null, available: [] });
+      }
+    });
+
+    // Set active model — quick model switching from chat
+    this.wsServer.registerMethod("godmode.config.model.set", async ({ params, respond }) => {
+      try {
+        const cfgPath = join(homedir(), ".openclaw", "openclaw.json");
+        const primary = (params as Record<string, unknown>)?.primary as string;
+        if (!primary) { respond(false, { error: "primary is required" }); return; }
+        let raw: Record<string, unknown> = {};
+        if (existsSync(cfgPath)) {
+          raw = JSON.parse(readFileSync(cfgPath, "utf-8"));
+        }
+        if (!raw.agents) raw.agents = {};
+        const agents = raw.agents as Record<string, unknown>;
+        if (!agents.defaults) agents.defaults = {};
+        const defaults = agents.defaults as Record<string, unknown>;
+        if (!defaults.model) defaults.model = {};
+        const model = defaults.model as Record<string, unknown>;
+        model.primary = primary;
+        if (primary.startsWith("anthropic/")) {
+          model.fallbacks = ["openai-codex/gpt-5.3-codex"];
+        } else {
+          model.fallbacks = ["anthropic/claude-sonnet-4-6"];
+        }
+        writeFileSync(cfgPath, JSON.stringify(raw, null, 2), "utf-8");
+        respond(true, { primary, fallbacks: model.fallbacks });
+      } catch (err) {
+        respond(false, { error: String(err) });
       }
     });
   }

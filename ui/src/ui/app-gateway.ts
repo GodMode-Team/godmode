@@ -1386,10 +1386,32 @@ async function loadCurrentModel(host: GatewayHost) {
   if (!host.client) return;
   try {
     const res = await host.client.request("godmode.config.model", {});
+    const app = host as unknown as {
+      currentModel: string | null;
+      availableModels: { id: string; name: string; provider: string }[];
+    };
     if (res?.primary) {
-      (host as unknown as { currentModel: string | null }).currentModel = res.primary;
+      app.currentModel = res.primary;
+    }
+    if (Array.isArray(res?.available)) {
+      app.availableModels = res.available;
     }
   } catch { /* non-critical */ }
+}
+
+export async function switchModelFromChat(host: GatewayHost, modelId: string) {
+  if (!host.client) return;
+  const app = host as unknown as {
+    currentModel: string | null;
+    modelPickerOpen: boolean;
+  };
+  try {
+    await host.client.request("godmode.config.model.set", { primary: modelId });
+    app.currentModel = modelId;
+    app.modelPickerOpen = false;
+  } catch (err) {
+    console.error("[model-switch]", err);
+  }
 }
 
 /**
