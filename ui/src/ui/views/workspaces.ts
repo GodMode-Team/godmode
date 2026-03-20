@@ -1402,6 +1402,7 @@ export function renderWorkspaces(props: WorkspacesProps) {
                   editingTaskId,
                   onEditTask,
                   onUpdateTask,
+                  onViewTaskOutput,
                 })}
               </div>
             `
@@ -1425,10 +1426,11 @@ function renderAllTasksSection(props: {
   editingTaskId?: string | null;
   onEditTask?: (taskId: string | null) => void;
   onUpdateTask?: (taskId: string, updates: { title?: string; dueDate?: string | null }) => void;
+  onViewTaskOutput?: (taskId: string) => void;
 }): ReturnType<typeof html> {
   const {
     tasks, taskFilter, taskSort = "due", taskSearch = "", onToggleTaskComplete, onSetTaskFilter, onSetTaskSort,
-    onSetTaskSearch, onCreateTask, workspaceNames = [], onStartTask, editingTaskId, onEditTask, onUpdateTask,
+    onSetTaskSearch, onCreateTask, workspaceNames = [], onStartTask, editingTaskId, onEditTask, onUpdateTask, onViewTaskOutput,
   } = props;
 
   if (tasks.length === 0 && !onCreateTask) {

@@ -8,14 +8,14 @@
 import { existsSync, mkdirSync } from "node:fs";
 import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { queryPeer, isHonchoReady } from "./honcho-client.js";
+import { queryPeer, isMemoryReady } from "../lib/memory.js";
 
 /**
  * Sync Honcho's user model insights to the vault as markdown files.
  * Best-effort — failures are logged but never thrown.
  */
 export async function syncHonchoToVault(sessionKey = "system:honcho-sync"): Promise<void> {
-  if (!isHonchoReady()) return;
+  if (!isMemoryReady()) return;
 
   // Resolve output directory: vault Brain/Identity or fallback
   let outDir: string;

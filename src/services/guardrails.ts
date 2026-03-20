@@ -36,7 +36,8 @@ export type GuardrailGateId =
   | "evidenceTokenGate"
   | "architectureGate"
   | "deploymentGate"
-  | "destructiveWriteGate";
+  | "destructiveWriteGate"
+  | "clientFacingGate";
 
 export type GateConfig = {
   enabled: boolean;
@@ -61,7 +62,7 @@ export type CustomGuardrail = {
 export type GuardrailActivityEntry = {
   id: string;
   gateId: GuardrailGateId | `custom:${string}`;
-  action: "fired" | "blocked" | "cleaned";
+  action: "fired" | "blocked" | "cleaned" | "approved";
   detail: string;
   sessionKey?: string;
   timestamp: string;
@@ -117,6 +118,7 @@ export const GATE_DEFAULTS: Record<GuardrailGateId, GateConfig> = {
   architectureGate: { enabled: true },
   deploymentGate: { enabled: true },
   destructiveWriteGate: { enabled: true },
+  clientFacingGate: { enabled: true },
 };
 
 /** Default config for the tool-grounding gate (top-level, not a gate). */
@@ -296,9 +298,9 @@ export const GATE_DESCRIPTORS: Record<GuardrailGateId, GateDescriptor> = {
   deploymentGate: {
     name: "Deployment Gate",
     description:
-      "HARD BLOCK on production deployments, pushes to main/master, PR merges, and force pushes. " +
-      "Agents must work on feature branches, create draft PRs with preview links, and let humans approve. " +
-      "Protects live client websites and production infrastructure.",
+      "Approval gate for production deploys, pushes to main/master, and PR merges. " +
+      "Force pushes are always hard-blocked. Other deploy actions require user approval " +
+      "('go ahead', 'approved', etc.) before retries pass through.",
     icon: "\u{1F6A8}",
     hook: "before_tool_call",
   },
@@ -308,6 +310,15 @@ export const GATE_DESCRIPTORS: Record<GuardrailGateId, GateDescriptor> = {
       "HARD BLOCK on destructive operations: rm -rf on project dirs, git reset --hard, " +
       "force pushes, DROP TABLE, and bulk deletes. Forces backup-first workflow.",
     icon: "\u{1F4A3}",
+    hook: "before_tool_call",
+  },
+  clientFacingGate: {
+    name: "Client-Facing Gate",
+    description:
+      "Approval gate for public/outbound actions: API mutations, email sends, invites, " +
+      "social media posts. First attempt blocks and asks ally to get user approval. " +
+      "After user says 'approved'/'go ahead'/etc., retries pass through for 10 minutes.",
+    icon: "\u{1F6A6}",
     hook: "before_tool_call",
   },
 };
@@ -427,7 +438,7 @@ export async function getGateThreshold(
 
 export async function logGateActivity(
   gateId: GuardrailGateId | `custom:${string}`,
-  action: "fired" | "blocked" | "cleaned",
+  action: "fired" | "blocked" | "cleaned" | "approved",
   detail: string,
   sessionKey?: string,
 ): Promise<void> {

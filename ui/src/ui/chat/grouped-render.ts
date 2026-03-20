@@ -28,6 +28,7 @@ const WORKING_VERBS: Record<string, string[]> = {
   web_search: ["Searching", "Hunting", "Investigating", "Sleuthing", "Scouring"],
   web_fetch: ["Fetching", "Grabbing", "Retrieving", "Summoning", "Acquiring"],
   memory_search: ["Remembering", "Recalling", "Pondering", "Reflecting"],
+  honcho_query: ["Remembering", "Recalling", "Pondering", "Reflecting"],
   image: ["Analyzing", "Examining", "Scrutinizing", "Inspecting", "Beholding"],
   default: ["Working on", "Processing", "Handling", "Tinkering with", "Wrangling"],
 };

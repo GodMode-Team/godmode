@@ -20,8 +20,8 @@
  *   tools: calendar.events.today, calendar.events.range
  */
 
-import { existsSync, readdirSync, readFileSync, mkdirSync, copyFileSync } from "node:fs";
-import { join, basename, dirname } from "node:path";
+import { existsSync, readdirSync, readFileSync, mkdirSync, copyFileSync, writeFileSync, unlinkSync } from "node:fs";
+import { join, basename } from "node:path";
 import { MEMORY_DIR } from "../data-paths.js";
 import { getVaultPath, VAULT_FOLDERS } from "./vault-paths.js";
 
@@ -33,6 +33,7 @@ export type SkillCard = {
   triggers: string[];
   tools: string[];
   body: string;
+  isDraft?: boolean;
 };
 
 // ── Cache ────────────────────────────────────────────────────────
@@ -97,6 +98,19 @@ function parseSkillCard(filePath: string): SkillCard | null {
   }
 }
 
+// ── Skill Drafts Path ────────────────────────────────────────────
+
+function resolveSkillDraftsDir(): string | null {
+  const vault = getVaultPath();
+  if (vault) {
+    const vaultDrafts = join(vault, VAULT_FOLDERS.system, "skill-drafts");
+    if (existsSync(vaultDrafts)) return vaultDrafts;
+  }
+  const localDrafts = join(MEMORY_DIR, "skill-drafts");
+  if (existsSync(localDrafts)) return localDrafts;
+  return null;
+}
+
 // ── Load All Cards ───────────────────────────────────────────────
 
 export function loadSkillCards(): SkillCard[] {
@@ -115,6 +129,23 @@ export function loadSkillCards(): SkillCard[] {
     }
   } catch {
     // Dir unreadable — return empty
+  }
+
+  // Also scan skill-drafts/ — drafts don't overwrite canonical cards
+  const draftsDir = resolveSkillDraftsDir();
+  if (draftsDir) {
+    try {
+      const draftEntries = readdirSync(draftsDir).filter((f) => f.endsWith(".md"));
+      for (const f of draftEntries) {
+        const card = parseSkillCard(join(draftsDir, f));
+        if (card && !_cache.has(card.slug)) {
+          card.isDraft = true;
+          _cache.set(card.slug, card);
+        }
+      }
+    } catch {
+      // Dir unreadable — skip drafts
+    }
   }
 
   _cacheTs = Date.now();
@@ -165,6 +196,46 @@ export function formatSkillCard(card: SkillCard): string {
     : card.body;
 
   return `## Skill Card: ${card.domain}\n${truncated}`;
+}
+
+// ── Skill Promotion ──────────────────────────────────────────────
+// Promotes a draft skill card to the canonical skill-cards/ directory.
+
+export function promoteSkillCard(slug: string): { ok: boolean; error?: string } {
+  const draftsDir = resolveSkillDraftsDir();
+  if (!draftsDir) return { ok: false, error: "No skill-drafts directory found" };
+
+  const draftPath = join(draftsDir, `${slug}.md`);
+  if (!existsSync(draftPath)) return { ok: false, error: `Draft "${slug}" not found` };
+
+  // Resolve canonical destination
+  let destDir = resolveSkillCardsDir();
+  if (!destDir) {
+    // Create default location
+    destDir = join(MEMORY_DIR, "skill-cards");
+    mkdirSync(destDir, { recursive: true });
+  }
+
+  const destPath = join(destDir, `${slug}.md`);
+  if (existsSync(destPath)) return { ok: false, error: `Canonical card "${slug}" already exists` };
+
+  try {
+    // Read draft, strip "status: draft" from frontmatter
+    let content = readFileSync(draftPath, "utf-8");
+    content = content.replace(/^status:\s*draft\s*\r?\n/m, "");
+
+    // Write to canonical dir and delete original
+    writeFileSync(destPath, content, "utf-8");
+    unlinkSync(draftPath);
+
+    // Invalidate cache so next load picks up the promoted card
+    _cache.clear();
+    _cacheTs = 0;
+
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: String(err) };
+  }
 }
 
 // ── First-Boot Seeding ──────────────────────────────────────────

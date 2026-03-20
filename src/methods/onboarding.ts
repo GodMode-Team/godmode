@@ -620,6 +620,16 @@ export const onboardingHandlers: GatewayRequestHandlers = {
       state.phase = params.phase as OnboardingPhase;
     }
 
+    // Ally name (user naming their AI ally)
+    if (typeof params.allyName === "string" && params.allyName.trim()) {
+      state.allyName = params.allyName.trim();
+      // Clear cached ally name so it picks up the new value immediately
+      try {
+        const { clearAllyNameCache } = await import("../lib/ally-identity.js");
+        clearAllyNameCache();
+      } catch { /* best-effort */ }
+    }
+
     // Legacy: identity (backward compat)
     if (params.identity && typeof params.identity === "object") {
       const id = params.identity as Record<string, unknown>;

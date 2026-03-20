@@ -27,6 +27,7 @@ export function getAllyName(): string {
     return cachedName;
   }
 
+  // 1. OpenClaw host config (primary source)
   try {
     const configPath = join(
       process.env.OPENCLAW_STATE_DIR || join(homedir(), ".openclaw"),
@@ -46,7 +47,25 @@ export function getAllyName(): string {
       }
     }
   } catch {
-    // Config not readable — use default
+    // Config not readable — try onboarding state
+  }
+
+  // 2. Onboarding state (user named their ally during setup)
+  try {
+    const dataDir = join(
+      process.env.GODMODE_ROOT || join(homedir(), "godmode"),
+      "data",
+    );
+    const raw = readFileSync(join(dataDir, "onboarding.json"), "utf-8");
+    const ob = JSON.parse(raw) as { allyName?: string; identity?: { allyName?: string } };
+    const name = ob.allyName || ob.identity?.allyName;
+    if (typeof name === "string" && name.trim()) {
+      cachedName = name.trim();
+      cachedAt = Date.now();
+      return cachedName;
+    }
+  } catch {
+    // Not onboarded yet
   }
 
   cachedName = DEFAULT_ALLY_NAME;

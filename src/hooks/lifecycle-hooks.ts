@@ -258,11 +258,17 @@ export async function handleMessageReceived(
       ? { content, capturedAt: Date.now() }
       : null;
 
-    // Honcho: forward user message (fire and forget)
+    // Memory: forward user message (fire and forget)
     if (sessionKey) {
       try {
-        const { forwardMessage } = await import("../services/honcho-client.js");
+        const { forwardMessage } = await import("../lib/memory.js");
         void forwardMessage("user", content, sessionKey);
+      } catch { /* invisible */ }
+
+      // Session search: index user message locally (fire and forget)
+      try {
+        const { isSessionSearchReady, storeMessage } = await import("../lib/session-search.js");
+        if (isSessionSearchReady()) storeMessage(sessionKey, "user", content);
       } catch { /* invisible */ }
     }
 
@@ -390,12 +396,12 @@ export async function handleBeforeToolCall(
     }
   } catch { /* non-fatal */ }
 
-  // Gate 1g: Deployment Gate — HARD BLOCK production deploys, pushes to main, PR merges
+  // Gate 1g: Deployment Gate — force push hard-blocked, other deploys approval-gated
   try {
     const { checkDeploymentGate } = await import("./safety-gates.js");
     const deployBlock = await checkDeploymentGate(name, (event.params ?? {}) as Record<string, unknown>, sessionKey);
     if (deployBlock) {
-      logger.warn(`[GodMode][SafetyGate] deployment gate BLOCKED: ${name}`);
+      logger.warn(`[GodMode][SafetyGate] deployment gate GATED: ${name}`);
       return { block: true, blockReason: deployBlock };
     }
   } catch { /* non-fatal */ }
@@ -407,6 +413,18 @@ export async function handleBeforeToolCall(
     if (destructiveBlock) {
       logger.warn(`[GodMode][SafetyGate] destructive write gate BLOCKED: ${name}`);
       return { block: true, blockReason: destructiveBlock };
+    }
+  } catch { /* non-fatal */ }
+
+  // Gate 1i: Client-Facing Gate — APPROVAL GATE for public/outbound actions
+  // First attempt: blocks and tells ally to ask user. After user approves
+  // in chat ("go ahead", "approved", etc.), retries pass through.
+  try {
+    const { checkClientFacingGate } = await import("./safety-gates.js");
+    const clientBlock = await checkClientFacingGate(name, (event.params ?? {}) as Record<string, unknown>, sessionKey);
+    if (clientBlock) {
+      logger.warn(`[GodMode][SafetyGate] client-facing gate GATED: ${name}`);
+      return { block: true, blockReason: clientBlock };
     }
   } catch { /* non-fatal */ }
 
@@ -466,11 +484,17 @@ export async function handleMessageSending(
     return { cancel: true };
   }
 
-  // Honcho: forward assistant message (fire and forget)
+  // Memory: forward assistant message (fire and forget)
   if (sessionKey) {
     try {
-      const { forwardMessage } = await import("../services/honcho-client.js");
+      const { forwardMessage } = await import("../lib/memory.js");
       void forwardMessage("assistant", content, sessionKey);
+    } catch { /* invisible */ }
+
+    // Session search: index assistant message locally (fire and forget)
+    try {
+      const { isSessionSearchReady, storeMessage } = await import("../lib/session-search.js");
+      if (isSessionSearchReady()) storeMessage(sessionKey, "assistant", content);
     } catch { /* invisible */ }
   }
 
@@ -533,6 +557,21 @@ export async function handleLlmOutputPressure(
   try {
     const tier = await trackContextPressure(sessionKey, event.usage as { input?: number; output?: number; total?: number } | undefined);
     if (tier === "critical" && sessionKey) {
+      // Pre-compression memory flush: save durable facts before context is lost
+      try {
+        const { forwardMessage, isMemoryReady } = await import("../lib/memory.js");
+        if (isMemoryReady()) {
+          await forwardMessage(
+            "user",
+            "[System: Context window is nearly full. Save any important facts, decisions, or action items from this conversation to permanent memory before compression.]",
+            sessionKey,
+          );
+          logger.info(`[GodMode] pre-compression memory flush sent for session: ${sessionKey}`);
+        }
+      } catch (err) {
+        logger.warn(`[GodMode] pre-compression memory flush failed (non-fatal): ${String(err)}`);
+      }
+
       safeBroadcast(api, "session:auto-compact", { sessionKey });
       logger.info(`[GodMode] auto-compact broadcast for session: ${sessionKey}`);
     }
@@ -763,4 +802,63 @@ export async function handleAfterCompaction(
   const sessionKey = extractSessionKey(ctx);
   resetContextPressure(sessionKey);
   api.logger.info(`[GodMode] context pressure reset after compaction (session: ${sessionKey ?? "unknown"})`);
+
+  // Memory flush: forward compaction event so the memory system
+  // captures that context was compacted. Messages forwarded before compaction
+  // are already stored; this signal lets the user model note the boundary.
+  if (sessionKey) {
+    try {
+      const { forwardMessage, isMemoryReady } = await import("../lib/memory.js");
+      if (isMemoryReady()) {
+        await forwardMessage(
+          "assistant",
+          "[System: Context was compacted. Earlier messages have been summarized. Memory and context are preserved.]",
+          sessionKey,
+        );
+        api.logger.info(`[GodMode] memory flush signal sent after compaction (session: ${sessionKey})`);
+      }
+    } catch (err) {
+      api.logger.warn(`[GodMode] Memory flush after compaction failed (non-fatal): ${String(err)}`);
+    }
+  }
+}
+
+// ── agent_end ─────────────────────────────────────────────────────────
+// Fires when an agent run completes (success or error). When the API
+// is overloaded or errors out, the session dies silently — no toast,
+// no error in chat. This hook broadcasts a visible notification so
+// the user knows to retry.
+
+export async function handleAgentEnd(
+  event: any,
+  ctx: any,
+  api: any,
+): Promise<void> {
+  if (event.success) return; // normal completion — nothing to do
+
+  const logger: Logger = api.logger;
+  const sessionKey = extractSessionKey(ctx);
+  const error: string = event.error ?? "Unknown error";
+
+  logger.warn(`[GodMode] agent_end with error (session: ${sessionKey ?? "?"}): ${error}`);
+
+  // Track overload for before_prompt_build lightweight mode
+  if (error.includes("overloaded") || error.includes("rate_limit") || error.includes("529")) {
+    recordOverload();
+  }
+
+  // Broadcast a toast so the UI shows something instead of going dark
+  const friendlyMsg = error.includes("overloaded")
+    ? "Prosper paused — AI service is overloaded. Send another message to retry."
+    : error.includes("rate_limit") || error.includes("429")
+      ? "Prosper paused — rate limit hit. Wait a moment and send another message."
+      : `Prosper stopped unexpectedly: ${error.slice(0, 100)}. Send another message to retry.`;
+
+  try {
+    await safeBroadcast(api, "toast", {
+      message: friendlyMsg,
+      type: "warning",
+      duration: 8000,
+    });
+  } catch { /* non-fatal */ }
 }

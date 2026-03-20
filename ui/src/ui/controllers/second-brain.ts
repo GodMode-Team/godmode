@@ -15,7 +15,7 @@ import type {
   SecondBrainSubtab,
   BrainTreeNode,
   VaultHealthData,
-} from "../views/second-brain";
+} from "../tabs/second-brain-tab";
 
 export type SecondBrainState = {
   client: GatewayBrowserClient | null;
@@ -38,7 +38,7 @@ export type SecondBrainState = {
   secondBrainFileTree?: BrainTreeNode[] | null;
   secondBrainFileTreeLoading?: boolean;
   secondBrainFileSearchQuery?: string;
-  secondBrainFileSearchResults?: import("../views/second-brain").BrainSearchResult[] | null;
+  secondBrainFileSearchResults?: import("../tabs/second-brain-tab").BrainSearchResult[] | null;
 };
 
 export async function loadSecondBrain(state: SecondBrainState): Promise<void> {

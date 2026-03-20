@@ -1,6 +1,8 @@
+import { isAllySessionKey } from "../lib/session-key-utils.js";
 import { GodModeApp } from "./app";
 import { appEventBus } from "./context/event-bus.js";
 import { flushChatQueueForEvent } from "./app-chat";
+import { scheduleChatScroll } from "./app-scroll";
 import type { EventLogEntry } from "./app-events";
 import { applySettings, loadCron, refreshActiveTab, setLastActiveSessionKey } from "./app-settings";
 import {
@@ -848,8 +850,7 @@ function handleGatewayEventUnsafe(host: GatewayHost, evt: GatewayEventFrame) {
     // When the ally-main session receives chat events and is NOT the
     // active full-screen session, route messages to the ally overlay state.
     // Match both "main" and canonicalized forms like "agent:main:main"
-    const isAllySession = payload?.sessionKey === ALLY_SESSION_KEY
-      || (payload?.sessionKey?.endsWith(`:${ALLY_SESSION_KEY}`) ?? false);
+    const isAllySession = isAllySessionKey(payload?.sessionKey);
     if (payload && isAllySession) {
       const allyHost = host as unknown as {
         allyMessages?: Array<{ role: string; content: string; timestamp?: number }>;
@@ -953,7 +954,10 @@ function handleGatewayEventUnsafe(host: GatewayHost, evt: GatewayEventFrame) {
             showToast?: (msg: string, type: string, duration?: number) => void;
             handleSendChat?: (msg: string) => Promise<void>;
           };
-          if (retryHost.autoRetryAfterCompact && retryHost.pendingRetry) {
+          // Always auto-retry if there's a pending message, regardless of how
+          // compaction was triggered (UI pre-emptive, server auto-compact, or
+          // manual /compact after overflow error).
+          if (retryHost.pendingRetry) {
             retryHost.autoRetryAfterCompact = false;
             // Small delay to let loadChatHistoryAfterFinal finish first
             setTimeout(() => {
@@ -979,6 +983,8 @@ function handleGatewayEventUnsafe(host: GatewayHost, evt: GatewayEventFrame) {
     if (state === "final") {
       const allowShrink = Boolean(host.compactionStatus?.completedAt);
       void loadChatHistoryAfterFinal(host as unknown as GodModeApp, { allowShrink }).then(() => {
+        // Scroll to bottom after history replaces the stream bubble
+        scheduleChatScroll(host as unknown as Parameters<typeof scheduleChatScroll>[0], true);
         void cacheAndResolveImages(host as unknown as GodModeApp);
         // Refresh session resources strip after each assistant turn
         void (host as any).loadSessionResources?.();

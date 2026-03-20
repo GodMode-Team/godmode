@@ -70,6 +70,8 @@ export type QueueItem = {
   personaHint?: string;
   /** Which CLI engine to use (claude/codex/gemini). Resolved from persona or explicit. */
   engine?: "claude" | "codex" | "gemini";
+  /** Which model to use (e.g. "opus", "sonnet", "claude-opus-4-6"). Passed to --model flag. */
+  model?: string;
   /** Whether this item needs human approval before processing */
   needsApproval?: boolean;
   /** Workspace this item belongs to (auto-detected or explicit) */

@@ -120,6 +120,11 @@ export function createGodmodeHttpHandler(deps: HttpHandlerDeps) {
     // Health endpoint
     if (pathname === "/godmode/health" || pathname === "/godmode/health/") {
       const licenseState = deps.getLicenseState();
+      let memoryStatus: string = "unknown";
+      try {
+        const { getMemoryStatus } = await import("../lib/memory.js");
+        memoryStatus = getMemoryStatus();
+      } catch { /* non-fatal */ }
       const health = {
         plugin: "godmode",
         version: deps.pluginVersion,
@@ -128,6 +133,7 @@ export function createGodmodeHttpHandler(deps: HttpHandlerDeps) {
           tier: licenseState.tier ?? null,
           ...(licenseState.error ? { error: licenseState.error } : {}),
         },
+        memoryStatus,
         ui: deps.godmodeUiRoot ? "available" : "not-built",
         methods: deps.methodCount,
       };

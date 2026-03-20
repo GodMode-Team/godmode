@@ -104,6 +104,17 @@ export interface ContextInputs {
 const MAX_MEMORY_LINES = 15;
 const MAX_SCHEDULE_LINES = 6;
 
+/** Hard character caps for P0 blocks to prevent oversized context injection */
+const MAX_MEMORY_CHARS = 2000;
+const MAX_IDENTITY_CHARS = 500;
+const MAX_GRAPH_CHARS = 800;
+
+/** Truncate text to a character limit, appending ellipsis if truncated */
+function truncateChars(text: string, maxChars: number): string {
+  if (text.length <= maxChars) return text;
+  return text.slice(0, maxChars - 1) + "…";
+}
+
 /**
  * Assemble the final context block for injection.
  * Respects priority tiers and context pressure.
@@ -131,13 +142,13 @@ export function assembleContext(inputs: ContextInputs): string {
 
   // Identity anchor — who the user is (skip for agent-to-agent)
   if (inputs.identityAnchor && !isAgentMessage) {
-    chunks.push(inputs.identityAnchor);
+    chunks.push(truncateChars(inputs.identityAnchor, MAX_IDENTITY_CHARS));
   }
 
   // Honcho memories (skip for agent-to-agent — not relevant to operational handoffs)
   if (!isAgentMessage) {
     if (inputs.memoryBlock) {
-      chunks.push(truncateLines(inputs.memoryBlock, MAX_MEMORY_LINES));
+      chunks.push(truncateChars(truncateLines(inputs.memoryBlock, MAX_MEMORY_LINES), MAX_MEMORY_CHARS));
     } else if (inputs.memoryStatus === "offline") {
       chunks.push(
         "## Memory Status: Offline\n" +
@@ -155,7 +166,7 @@ export function assembleContext(inputs: ContextInputs): string {
 
   // Identity graph — entity/relationship context (skip for agent-to-agent)
   if (!isAgentMessage && inputs.graphBlock) {
-    chunks.push(inputs.graphBlock);
+    chunks.push(truncateChars(inputs.graphBlock, MAX_GRAPH_CHARS));
   }
 
   // Relevance signals — determines what operational context to inject
@@ -274,6 +285,11 @@ export function assembleWorkspaceContext(inputs: Partial<ContextInputs>): string
   // SKIP: identityAnchor — Hermes has USER.md
   // SKIP: memoryBlock — Hermes has MEMORY.md + Honcho
   // SKIP: graphBlock — Hermes has its own entity tracking
+
+  // Provenance notice — channel-specific formatting rules (e.g., iMessage → no tables)
+  if (inputs.provenance) {
+    chunks.push(formatProvenance(inputs.provenance));
+  }
 
   // Capability map — always inject so Hermes knows about GodMode tools
   chunks.push(CAPABILITY_MAP);
@@ -446,7 +462,22 @@ function formatProvenance(prov: InputProvenance): string {
     }
     case "external_user": {
       const channel = prov.sourceChannel ?? "external";
-      return `## Message Origin: ${channel}\nThis message arrived via ${channel}. The user is authentic.`;
+      const isTextMessage = /imessage|sms|whatsapp|signal|telegram/i.test(channel);
+      let notice = `## Message Origin: ${channel}\nThis message arrived via ${channel}. The user is authentic.`;
+      if (isTextMessage) {
+        notice +=
+          "\n\n## HARD RULE — Text Message Formatting" +
+          "\nThis is a text message channel. You MUST follow these rules:" +
+          "\n- NEVER use markdown tables" +
+          "\n- NEVER use headers (#, ##, ###)" +
+          "\n- NEVER use bold (**), italic (*), or code blocks (```)" +
+          "\n- NEVER wrap links in markdown — no [text](url) or **url**. Just paste the raw URL. Markdown links are NOT clickable in text messages" +
+          "\n- NEVER use bullet lists longer than 3 items" +
+          "\n- Keep replies SHORT — 2-4 sentences max unless the user asks for detail" +
+          "\n- Write like a human texting: casual, direct, conversational" +
+          "\n- Use line breaks sparingly — dense walls of text don't render well in SMS";
+      }
+      return notice;
     }
     case "internal_system":
       return "## Message Origin: Internal System\nThis is a system-generated message (cron, heartbeat, etc.).";

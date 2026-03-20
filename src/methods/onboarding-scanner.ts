@@ -17,6 +17,8 @@ const OC_CONFIG = join(OC_DIR, "openclaw.json");
 const AUTH_PROFILES = join(OC_DIR, "auth-profiles.json");
 const GODMODE_ROOT = process.env.GODMODE_ROOT || join(homedir(), "godmode");
 const MEMORY_DIR = join(GODMODE_ROOT, "memory");
+const HERMES_DIR = join(homedir(), ".hermes");
+const SOUL_MD = join(MEMORY_DIR, "SOUL.md");
 
 // ── Helpers ──────────────────────────────────────────────────────
 
@@ -123,12 +125,13 @@ async function detectChannels(config: Record<string, unknown>): Promise<string[]
   for (const key of channelKeys) {
     const section = config[key] as Record<string, unknown> | undefined;
     if (section && typeof section === "object") {
-      // Check if there's a token/bot config
-      const hasToken = Boolean(
-        section.token || section.botToken || section.apiKey ||
-        section.enabled || section.phoneNumber,
-      );
-      if (hasToken) {
+      // Check if there's a token/bot config with actual values (not empty strings)
+      const tokenVal = section.token || section.botToken || section.apiKey;
+      const hasRealToken = typeof tokenVal === "string" && tokenVal.length > 5;
+      const hasEnabled = section.enabled === true;
+      const hasPhone = typeof section.phoneNumber === "string" && section.phoneNumber.length > 3;
+
+      if (hasRealToken || hasEnabled || hasPhone) {
         channels.push(key);
       }
     }
@@ -214,6 +217,46 @@ async function checkObsidianVault(): Promise<boolean> {
   return dirExists(defaultVault);
 }
 
+// ── Existing install detection ───────────────────────────────────
+
+async function countAgentRosterFiles(): Promise<number> {
+  let count = 0;
+  const rosterDirs = [
+    join(MEMORY_DIR, "agent-roster"),
+    join(GODMODE_ROOT, "memory", "agent-roster"),
+  ];
+  // Also check vault roster if OBSIDIAN_VAULT_PATH is set
+  const vaultPath = process.env.OBSIDIAN_VAULT_PATH || join(homedir(), "Documents", "VAULT");
+  rosterDirs.push(join(vaultPath, "99-System", "agent-roster"));
+
+  const seen = new Set<string>();
+  for (const dir of rosterDirs) {
+    try {
+      const entries = await readdir(dir, { withFileTypes: true });
+      for (const entry of entries) {
+        if (entry.isFile() && extname(entry.name) === ".md" && !seen.has(entry.name)) {
+          seen.add(entry.name);
+          count++;
+        }
+      }
+    } catch {
+      // dir doesn't exist
+    }
+  }
+  return count;
+}
+
+async function countQueueCompleted(): Promise<number> {
+  try {
+    const queueFile = join(GODMODE_ROOT, "data", "queue.json");
+    const raw = await safeReadJson<{ items?: Array<{ status?: string }> }>(queueFile);
+    if (!raw?.items) return 0;
+    return raw.items.filter((i) => i.status === "done" || i.status === "review" || i.status === "needs-review").length;
+  } catch {
+    return 0;
+  }
+}
+
 // ── Health Score ─────────────────────────────────────────────────
 
 function calculateHealthScore(result: Omit<AssessmentResult, "healthScore" | "timestamp">): number {
@@ -245,13 +288,13 @@ function calculateHealthScore(result: Omit<AssessmentResult, "healthScore" | "ti
 
   // Integrations configured: 35 pts (5 pts each for 6 core + 1 for deep presence)
   if (result.integrationsStatus) {
-    const coreIds = ["x-intelligence", "tailscale", "google-calendar", "obsidian-vault", "github-cli", "messaging-channel"];
+    const coreIds = ["x-intelligence", "tailscale", "google-calendar", "obsidian-vault", "github-cli", "messaging-channel", "honcho-memory"];
     for (const id of coreIds) {
       const s = result.integrationsStatus[id];
       if (s?.configured || s?.working) score += 5;
     }
     // Bonus for any deep integrations
-    const deepIds = ["oura-ring", "weather", "obsidian-sync"];
+    const deepIds = ["oura-ring", "weather", "obsidian-sync", "composio"];
     const anyDeep = deepIds.some(id => result.integrationsStatus![id]?.configured);
     if (anyDeep) score += 5;
   }
@@ -594,7 +637,8 @@ export async function runAssessment(): Promise<AssessmentResult> {
   const authMethod = await detectAuthMethod();
 
   const memDirExists = await dirExists(MEMORY_DIR);
-  const hasMemoryMd = await fileExists(join(MEMORY_DIR, "MEMORY.md"));
+  const hasMemoryMd = await fileExists(join(GODMODE_ROOT, "data", ".mem0-seeded"))
+    || await fileExists(join(MEMORY_DIR, "MEMORY.md"));
   const { count: fileCount, totalBytes } = await countFilesAndSize(MEMORY_DIR);
 
   const channelsConnected = await detectChannels(config);
@@ -625,6 +669,14 @@ export async function runAssessment(): Promise<AssessmentResult> {
     }
   } catch { /* integration registry not available */ }
 
+  // Detect existing install state (Hermes, SOUL.md, agent roster, queue history)
+  const [soulMdExists, agentRosterCount, hermesDetected, queueCompletedCount] = await Promise.all([
+    fileExists(SOUL_MD),
+    countAgentRosterFiles(),
+    dirExists(HERMES_DIR),
+    countQueueCompleted(),
+  ]);
+
   const partial = {
     configExists,
     authMethod,
@@ -642,6 +694,10 @@ export async function runAssessment(): Promise<AssessmentResult> {
     obsidianVaultConfigured,
     gatewayTokenSet,
     integrationsStatus,
+    soulMdExists,
+    agentRosterCount,
+    hermesDetected,
+    queueCompletedCount,
   };
 
   return {

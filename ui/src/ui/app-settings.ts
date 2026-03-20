@@ -24,7 +24,6 @@ import { loadNodes } from "./controllers/nodes";
 import { loadPresence } from "./controllers/presence";
 import { loadArchivedSessions, loadSessions } from "./controllers/sessions";
 import { loadGodModeSkills, loadSkills } from "./controllers/skills";
-import { loadWork, loadResources } from "./controllers/work";
 import { loadWorkspaces } from "./controllers/workspaces";
 import {
   inferBasePathFromPathname,
@@ -263,12 +262,6 @@ export async function refreshActiveTab(host: SettingsHost) {
   if (host.tab === "today" || host.tab === "my-day") {
     // <gm-today> handles its own data loading; just signal a refresh
     appEventBus.emit("refresh-requested", { target: "today" });
-  }
-  if (host.tab === "work") {
-    await Promise.all([
-      loadWork(host as unknown as GodModeApp),
-      loadResources(host as unknown as GodModeApp),
-    ]);
   }
   if (host.tab === "workspaces") {
     await loadWorkspaces(host as unknown as GodModeApp);

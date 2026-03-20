@@ -39,11 +39,11 @@ export function createHonchoQueryTool(ctx: ToolContext): AnyAgentTool {
       }
 
       try {
-        const { queryPeer, isHonchoReady } = await import("../services/honcho-client.js");
+        const { queryPeer, isMemoryReady } = await import("../lib/memory.js");
 
-        if (!isHonchoReady()) {
+        if (!isMemoryReady()) {
           return jsonResult({
-            error: "Honcho memory is not configured. Set HONCHO_API_KEY to enable memory queries.",
+            error: "Memory is not configured. Set HONCHO_API_KEY to enable memory queries.",
           });
         }
 

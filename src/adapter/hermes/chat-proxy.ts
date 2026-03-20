@@ -59,6 +59,12 @@ interface SessionHistory {
   id: string;
   createdAt: number;
   messages: ChatMessage[];
+  /** Cumulative input tokens (from Hermes API usage responses). */
+  inputTokens?: number;
+  /** Cumulative output tokens (from Hermes API usage responses). */
+  outputTokens?: number;
+  /** Last turn's prompt_tokens — actual current context window size. */
+  lastInputTokens?: number;
 }
 
 async function ensureSessionsDir(): Promise<void> {
@@ -183,6 +189,7 @@ export class HermesChatProxy {
     }
 
     let fullResponse = "";
+    let lastUsage: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number } | null = null;
 
     try {
       const res = await fetch(`${this.hermesUrl}/v1/chat/completions`, {
@@ -230,8 +237,15 @@ export class HermesChatProxy {
             : trimmedLine.slice(5).trim();
 
           if (data === "[DONE]") {
-            // Stream complete
+            // Stream complete — save response and token usage
             session.messages.push({ role: "assistant", content: fullResponse });
+            if (lastUsage) {
+              session.inputTokens = (session.inputTokens ?? 0) + (lastUsage.prompt_tokens ?? 0);
+              session.outputTokens = (session.outputTokens ?? 0) + (lastUsage.completion_tokens ?? 0);
+              // Track the last turn's prompt tokens — this is the actual current
+              // context window size, not the cumulative sum across all turns.
+              session.lastInputTokens = lastUsage.prompt_tokens ?? 0;
+            }
             await saveSession(session);
             callbacks.onDone(fullResponse);
             return;
@@ -239,6 +253,10 @@ export class HermesChatProxy {
 
           try {
             const chunk = JSON.parse(data);
+            // Capture usage from the final chunk (Hermes sends it with finish_reason)
+            if (chunk.usage) {
+              lastUsage = chunk.usage;
+            }
             const choice = chunk.choices?.[0];
 
             // Detect tool execution boundaries — Hermes sends tool_calls

@@ -1,8 +1,8 @@
 import type { IconName } from "./icons.js";
 
 export const TAB_GROUPS = [
-  { label: "", tabs: ["chat", "today", "workspaces", "second-brain", "dashboards"] },
-  { label: "Settings", tabs: ["config", "skills", "agents", "trust", "guardrails"] },
+  { label: "", tabs: ["chat", "today", "team", "workspaces", "second-brain", "dashboards"] },
+  { label: "Settings", tabs: ["config", "connections", "skills", "agents", "trust", "guardrails"] },
 ] as const;
 
 export const POWER_USER_GROUPS = [
@@ -12,12 +12,17 @@ export const POWER_USER_GROUPS = [
 /** Tabs that can be dynamically inserted but aren't in static groups. */
 export const DYNAMIC_TABS = ["onboarding"] as const;
 
+/** Tabs that open an external URL instead of rendering a view. */
+export const EXTERNAL_TABS: ReadonlySet<Tab> = new Set<Tab>([]);
+
 export type Tab =
   | "onboarding"
   | "guardrails"
   | "workspaces"
   | "today"
+  | "team"
   | "channels"
+  | "connections"
   | "instances"
   | "sessions"
   | "cron"
@@ -42,6 +47,8 @@ const TAB_PATHS: Partial<Record<Tab, string>> = {
   onboarding: "/onboarding",
   workspaces: "/workspaces",
   today: "/today",
+  team: "/team",
+  connections: "/connections",
   channels: "/channels",
   instances: "/instances",
   sessions: "/sessions",
@@ -167,8 +174,12 @@ export function iconForTab(tab: Tab): IconName {
       return "messageSquare";
     case "today":
       return "calendar";
+    case "team":
+      return "users";
     case "workspaces":
       return "folder";
+    case "connections":
+      return "link";
     case "channels":
       return "link";
     case "instances":
@@ -210,8 +221,12 @@ export function titleForTab(tab: Tab) {
       return "Chat";
     case "today":
       return "Today";
+    case "team":
+      return "Team";
     case "workspaces":
-      return "Work";
+      return "Workspaces";
+    case "connections":
+      return "Connections";
     case "channels":
       return "Integrations";
     case "instances":
@@ -253,8 +268,12 @@ export function emojiForTab(tab: Tab): string {
       return "\u{1F4AC}";
     case "today":
       return "\u{2600}\uFE0F";
+    case "team":
+      return "\u{1F916}";
     case "workspaces":
       return "\u{1F4C2}";
+    case "connections":
+      return "\u{1F50C}";
     case "channels":
       return "\u{1F517}";
     case "instances":
@@ -298,6 +317,8 @@ export function subtitleForTab(tab: Tab) {
       return "Calendar, brief, tasks, and schedule for the day.";
     case "workspaces":
       return "Projects, clients, and personal operating context.";
+    case "connections":
+      return "All your data sources and third-party integrations in one place.";
     case "channels":
       return "Connected apps — iMessage, Slack, email, calendar, and more.";
     case "instances":
@@ -320,6 +341,8 @@ export function subtitleForTab(tab: Tab) {
       return "Your Second Brain — identity, knowledge, and live AI context. Stores what your ally needs to act on your behalf.";
     case "dashboards":
       return "Custom data views built by your AI ally — remix anything.";
+    case "team":
+      return "Your AI agent team — orchestrated by Paperclip.";
     case "config":
       return "Core settings — model, plugins, and API configuration.";
     case "debug":

@@ -290,12 +290,12 @@ export async function runGatewayStart(
     ensureSkillCards(pluginRoot);
   } catch { /* non-fatal */ }
 
-  // Honcho memory
+  // Memory provider (Honcho or none)
   try {
-    const { initHoncho } = await import("../services/honcho-client.js");
-    const honchoOk = await initHoncho();
-    if (honchoOk) {
-      logger.info("[GodMode] Honcho memory initialized");
+    const { initMemory, getMemoryProvider } = await import("../lib/memory.js");
+    const memoryOk = await initMemory();
+    if (memoryOk) {
+      logger.info(`[GodMode] Memory initialized (provider: ${getMemoryProvider()})`);
 
       // Periodic vault sync every 6 hours (gateway runs indefinitely)
       const HONCHO_SYNC_INTERVAL_MS = 6 * 60 * 60 * 1000;
@@ -309,10 +309,25 @@ export async function runGatewayStart(
         }
       }, HONCHO_SYNC_INTERVAL_MS);
     } else {
-      logger.warn("[GodMode] Honcho memory not available (missing HONCHO_API_KEY or init failed)");
+      logger.warn("[GodMode] Memory not available (missing provider key or init failed)");
     }
   } catch (err) {
-    logger.warn(`[GodMode] Honcho memory init failed (non-fatal): ${String(err)}`);
+    logger.warn(`[GodMode] Memory init failed (non-fatal): ${String(err)}`);
+  }
+
+  // Session search (FTS5 local index)
+  try {
+    const { initSessionSearch, isSessionSearchReady, pruneOldMessages, closeSessionSearch } = await import("../lib/session-search.js");
+    initSessionSearch();
+    if (isSessionSearchReady()) {
+      logger.info("[GodMode] Session search (FTS5) initialized");
+      // Prune old messages on startup
+      const pruned = pruneOldMessages();
+      if (pruned > 0) logger.info(`[GodMode] Session search: pruned ${pruned} messages older than 90 days`);
+      serviceCleanup.push({ name: "session-search", fn: () => closeSessionSearch() });
+    }
+  } catch (err) {
+    logger.warn(`[GodMode] Session search init failed (non-fatal): ${String(err)}`);
   }
 
   // Identity graph
@@ -327,6 +342,19 @@ export async function runGatewayStart(
     }
   } catch (err) {
     logger.warn(`[GodMode] Identity graph init failed (non-fatal): ${String(err)}`);
+  }
+
+  // QMD binary check (#25) — warn if missing so users know search is degraded
+  try {
+    const { execFileSync } = await import("node:child_process");
+    execFileSync("qmd", ["--version"], { timeout: 3000, stdio: "pipe" });
+    logger.info("[GodMode] qmd binary found — full-text vault search available");
+  } catch {
+    logger.warn(
+      "[GodMode] qmd binary not found — Second Brain search will use file-walk fallback. " +
+      "Install qmd for faster hybrid search: https://github.com/quadratic-ai/qmd",
+    );
+    health.signal("qmd.binary", false, { warning: "qmd not installed — using file-walk fallback" });
   }
 
   // Image cache cleanup

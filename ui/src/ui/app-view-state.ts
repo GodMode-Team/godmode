@@ -32,7 +32,6 @@ import type { ToolExecutionInfo } from "./types/chat-types";
 import type { ChatAttachment, ChatQueueItem, CronFormState, FileTreeNode } from "./ui-types";
 import type { NostrProfileFormState } from "./views/channels.nostr-profile-form";
 import type { AllyChatMessage } from "./views/ally-chat";
-import type { Project } from "./views/work";
 
 export type AppViewState = {
   settings: UiSettings;
@@ -216,9 +215,6 @@ export type AppViewState = {
   logsLevelFilters: Record<LogLevel, boolean>;
   logsAutoFollow: boolean;
   logsTruncated: boolean;
-  // Workspaces state — owned by <gm-work>
-  // My Day state — owned by <gm-today>
-  // Universal Inbox state — owned by <gm-today>
   // Ally side-chat state
   allyPanelOpen?: boolean;
   allyMessages?: AllyChatMessage[];
@@ -228,21 +224,10 @@ export type AppViewState = {
   allySending?: boolean;
   allyWorking?: boolean;
   allyAttachments?: import("./ui-types").ChatAttachment[];
-  // todayQueueResults, dailyBrief*, agentLog* — owned by <gm-today>
   // Private mode (no memory/learning from this chat)
   chatPrivateMode?: boolean;
   /** Maps private session keys → expiry timestamp (ms). */
   privateSessions?: Map<string, number>;
-  // Work tab state
-  workProjects?: Project[];
-  workLoading?: boolean;
-  workError?: string | null;
-  workExpandedProjects?: Set<string>;
-  workProjectFiles?: Record<string, unknown[]>;
-  workDetailLoading?: Set<string>;
-  workResources?: import("./views/work").Resource[];
-  workResourcesLoading?: boolean;
-  workResourceFilter?: import("./views/work").ResourceFilter;
   // Onboarding experience state (6-phase flow)
   onboardingActive?: boolean;
   onboardingPhase?: number;
@@ -295,8 +280,6 @@ export type AppViewState = {
   updateLoading: boolean;
   updateError: string | null;
   updateLastChecked: number | null;
-  // Dashboards state — owned by <gm-dashboards>
-  // SecondBrain state — owned by <gm-second-brain>
   // Onboarding integrations state
   onboardingIntegrations: unknown[] | null;
   onboardingCoreProgress: { connected: number; total: number } | null;
@@ -430,7 +413,6 @@ export type AppViewState = {
     duration?: number,
   ) => void;
   dismissToast: (id: string) => void;
-  // My Day, Date, Daily Brief, Today view mode handlers — moved to <gm-today>
   handlePrivateModeToggle: () => void;
   // Ally side-chat handlers
   handleAllyToggle: () => void;
@@ -439,21 +421,15 @@ export type AppViewState = {
   handleAllyOpenFull: () => void;
   handleAllyAttachmentsChange: (attachments: import("./ui-types").ChatAttachment[]) => void;
   handleAllyAction: (action: string, target?: string, method?: string, params?: Record<string, unknown>) => Promise<void>;
-  // Decision card handlers — moved to <gm-today>
   // File open handler
   handleOpenFile: (filePath: string) => Promise<void>;
   // Inner Work handlers
   handleSendToSage: (message: string) => Promise<void>;
   handleBackToSessions: () => void;
   // Work tab handlers
-  handleWorkRefresh: () => Promise<void>;
-  handleWorkToggleProject: (projectId: string) => void;
   handleWorkFileClick: (path: string) => void;
   handleWorkSkillClick: (skill: string, projectName: string) => void;
-  handleResourceFilterChange: (filter: import("./views/work").ResourceFilter) => void;
   handleResourceClick: (resource: import("./views/work").Resource) => void;
-  handleResourcePin: (id: string, pinned: boolean) => Promise<void>;
-  handleResourceDelete: (id: string) => Promise<void>;
   // Session resources (Manus-style chat strip)
   sessionResources: Array<{ id: string; title: string; type: string; path?: string; url?: string }>;
   sessionResourcesCollapsed: boolean;
@@ -461,8 +437,6 @@ export type AppViewState = {
   handleSessionResourceClick: (resource: { path?: string; url?: string }) => void;
   handleToggleSessionResources: () => void;
   handleViewAllResources: () => void;
-  // People tab handlers
-  // Workspaces handlers — moved to <gm-work>
   handleStartChatWithPrompt: (prompt: string) => void;
   // User profile handlers
   handleUpdateUserProfile: (name: string, avatar: string) => void;
@@ -486,9 +460,6 @@ export type AppViewState = {
   handleWizardGenerate?: () => Promise<void>;
   handleWizardFileToggle?: (path: string, checked: boolean) => void;
   handleWizardConfigToggle?: (path: string, checked: boolean) => void;
-  // SecondBrain handlers — moved to <gm-second-brain>
-  // Dashboards handlers — moved to <gm-dashboards>
-  // Inbox handlers — moved to <gm-today>
   // Proof sidebar handlers
   handleOpenProofDoc: (slug: string) => Promise<void>;
   handleCloseProofDoc: () => void;

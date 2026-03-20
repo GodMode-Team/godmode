@@ -70,7 +70,6 @@ import { ALLY_SESSION_KEY, buildAllyContext } from "./controllers/ally.js";
 import type { DevicePairingList } from "./controllers/devices";
 import type { ExecApprovalRequest } from "./controllers/exec-approval";
 import type { ExecApprovalsFile, ExecApprovalsSnapshot } from "./controllers/exec-approvals";
-// Focus Pulse controller removed (v3 slim)
 import {
   loadTrustTracker as loadTrustTrackerInternal,
   addTrustWorkflow as addTrustWorkflowInternal,
@@ -81,13 +80,6 @@ import {
 import type { GuardrailsViewData } from "./controllers/guardrails";
 import { startMeetingNotifications, stopMeetingNotifications } from "./controllers/meeting-notify";
 // GodMode view controllers
-import {
-  loadWork as loadWorkInternal,
-  loadProjectDetails as loadProjectDetailsInternal,
-  loadResources as loadResourcesInternal,
-  pinResource as pinResourceInternal,
-  deleteResource as deleteResourceInternal,
-} from "./controllers/work";
 import type { GatewayBrowserClient, GatewayHelloOk } from "./gateway";
 import type { Tab } from "./navigation";
 import { loadSettings, type UiSettings } from "./storage";
@@ -518,20 +510,6 @@ export class GodModeApp extends LitElement {
   @state() onboardingConfigValues: Record<string, string> = {};
   @state() onboardingProgress: number | null = null;
 
-  // Workspaces state — owned by <gm-work> tab component
-  // (declarations removed: workspaces, selectedWorkspace, workspacesSearchQuery,
-  //  workspaceItemSearchQuery, workspacesLoading, workspacesCreateLoading,
-  //  workspacesError, workspaceExpandedFolders, allTasks, taskFilter, taskSort,
-  //  taskSearch, showCompletedTasks, editingTaskId, workspaceBrowsePath,
-  //  workspaceBrowseEntries, workspaceBreadcrumbs, workspaceBrowseSearchQuery,
-  //  workspaceBrowseSearchResults)
-
-  // My Day / Daily Brief / Today tasks state — owned by <gm-today> tab component
-  // (declarations removed: myDayLoading, myDayError, todaySelectedDate,
-  //  todayViewMode, dailyBrief, dailyBriefLoading, dailyBriefError, agentLog,
-  //  agentLogLoading, agentLogError, briefNotes, todayTasks, todayTasksLoading,
-  //  todayEditingTaskId, todayShowCompleted)
-
   // Ally side-chat state
   @state() allyPanelOpen = false;
   @state() allyMessages: AllyChatMessage[] = [];
@@ -541,11 +519,6 @@ export class GodModeApp extends LitElement {
   @state() allySending = false;
   @state() allyWorking = false;
   @state() allyAttachments: import("./ui-types").ChatAttachment[] = [];
-  // Today queue/inbox/trust state — owned by <gm-today> tab component
-  // (declarations removed: todayQueueResults, inboxItems, inboxLoading,
-  //  inboxCount, inboxScoringId, inboxScoringValue, inboxFeedbackText,
-  //  inboxSortOrder, trustSummary)
-
   @state() chatPrivateMode = false;
   /** Maps private session keys → expiry timestamp (ms). Ephemeral sessions auto-delete. */
   @state() privateSessions: Map<string, number> = new Map();
@@ -554,16 +527,6 @@ export class GodModeApp extends LitElement {
   // Dynamic HTML slots (AI-generated tab content)
   @state() dynamicSlots: Record<string, string> = {};
 
-  // Work tab state
-  @state() workProjects?: import("./views/work").Project[];
-  @state() workLoading = false;
-  @state() workError: string | null = null;
-  @state() workExpandedProjects: Set<string> = new Set();
-  @state() workProjectFiles: Record<string, unknown[]> = {};
-  @state() workDetailLoading: Set<string> = new Set();
-  @state() workResources?: import("./views/work").Resource[];
-  @state() workResourcesLoading = false;
-  @state() workResourceFilter: import("./views/work").ResourceFilter = "all";
   // Session-level resources (Manus-style strip in chat)
   @state() sessionResources: Array<{ id: string; title: string; type: string; path?: string; url?: string }> = [];
   @state() sessionResourcesCollapsed = false;
@@ -617,7 +580,6 @@ export class GodModeApp extends LitElement {
   client: GatewayBrowserClient | null = null;
   private chatScrollFrame: number | null = null;
   private chatScrollTimeout: number | null = null;
-  private chatHasAutoScrolled = false;
   @state() private chatUserNearBottom = true;
   private chatIsAutoScrolling = false;
   @state() private chatNewMessagesBelow = false;
@@ -632,21 +594,8 @@ export class GodModeApp extends LitElement {
   @state() guardrailsLoading = false;
   @state() guardrailsShowAddForm = false;
 
-  // Dashboards state — owned by <gm-dashboards> tab component
-  // (declarations removed: dashboardsList, dashboardsLoading, dashboardsError,
-  //  activeDashboardId, activeDashboardHtml, activeDashboardManifest,
-  //  dashboardChatOpen, dashboardCategoryFilter)
   /** Stashed session key to restore when leaving an active dashboard */
   dashboardPreviousSessionKey: string | null = null;
-
-  // Second Brain state — owned by <gm-second-brain> tab component
-  // (declarations removed: secondBrainSubtab, secondBrainLoading,
-  //  secondBrainError, secondBrainIdentity, secondBrainMemoryBank,
-  //  secondBrainAiPacket, secondBrainSourcesData, secondBrainResearchData,
-  //  secondBrainSelectedEntry, secondBrainSearchQuery, secondBrainSyncing,
-  //  secondBrainBrowsingFolder, secondBrainFolderEntries, secondBrainFolderName,
-  //  secondBrainVaultHealth, secondBrainFileTree, secondBrainFileTreeLoading,
-  //  secondBrainFileSearchQuery, secondBrainFileSearchResults)
 
   private nodesPollInterval: number | null = null;
   private logsPollInterval: number | null = null;
@@ -687,8 +636,6 @@ export class GodModeApp extends LitElement {
     }
 
     handleConnected(this as unknown as Parameters<typeof handleConnected>[0]);
-
-    // todaySelectedDate auto-advance moved to <gm-today>
 
     // Start meeting notifications (polls every 60s, fires toast 15 min before)
     startMeetingNotifications(this);
@@ -857,8 +804,6 @@ export class GodModeApp extends LitElement {
       if (this.consciousnessStatus !== "loading") {this.consciousnessStatus = "idle";}
     }, 3000);
   }
-
-  // Focus Pulse removed (v3 slim) — morning set now handled via chat
 
   // Trust Tracker handlers
   async handleTrustLoad() {
@@ -1268,10 +1213,6 @@ export class GodModeApp extends LitElement {
     }
   }
 
-  // Decision Card Handlers — moved to <gm-today> tab component
-
-  // handleDecisionViewOutput, handleDecisionOpenChat, handleTodayOpenChatToEdit — moved to <gm-today>
-
   /**
    * Seeds a newly opened session with agent output context.
    * Opens the sidebar with the full output (zero token cost) and sends
@@ -1318,10 +1259,6 @@ export class GodModeApp extends LitElement {
       this.showToast("Failed to add to queue", "error");
     }
   }
-
-  // Dashboards handlers — moved to <gm-dashboards>
-
-  // Second Brain handlers — moved to <gm-second-brain>
 
   removeQueuedMessage(id: string) {
     removeQueuedMessageInternal(
@@ -2267,8 +2204,6 @@ export class GodModeApp extends LitElement {
     this.toasts = [];
   }
 
-  // My Day / Today handlers — moved to <gm-today> tab component
-
   handlePrivateModeToggle() {
     if (this.chatPrivateMode) {
       // Turning off — destroy the private session entirely
@@ -2327,7 +2262,9 @@ export class GodModeApp extends LitElement {
         lastActiveSessionKey: fallback,
       });
       this.sessionKey = fallback;
-      void (await import("./controllers/chat.js")).loadChatHistory(this);
+      await (await import("./controllers/chat.js")).loadChatHistory(this);
+      const { scheduleChatScroll } = await import("./app-scroll.js");
+      scheduleChatScroll(this as unknown as Parameters<typeof scheduleChatScroll>[0], true);
     } else {
       // Just remove from tabs
       this.applySettings({
@@ -2412,25 +2349,7 @@ export class GodModeApp extends LitElement {
     }
   }
 
-  // handleBriefSave, handleBriefToggleCheckbox — moved to <gm-today>
-
-
   // Work tab handlers
-  async handleWorkRefresh() {
-    await Promise.all([loadWorkInternal(this), loadResourcesInternal(this)]);
-  }
-
-  async handleResourcePin(id: string, pinned: boolean) {
-    await pinResourceInternal(this, id, pinned);
-  }
-
-  async handleResourceDelete(id: string) {
-    await deleteResourceInternal(this, id);
-  }
-
-  handleResourceFilterChange(filter: import("./views/work").ResourceFilter) {
-    this.workResourceFilter = filter;
-  }
 
   handleResourceClick(resource: import("./views/work").Resource) {
     if (resource.path) {
@@ -2501,20 +2420,6 @@ export class GodModeApp extends LitElement {
     this.setTab("work" as import("./navigation.js").Tab);
   }
 
-  handleWorkToggleProject(projectId: string) {
-    const next = new Set(this.workExpandedProjects);
-    if (next.has(projectId)) {
-      next.delete(projectId);
-    } else {
-      next.add(projectId);
-      // Lazy-load project details on first expand
-      if (!this.workProjectFiles[projectId]) {
-        void loadProjectDetailsInternal(this, projectId);
-      }
-    }
-    this.workExpandedProjects = next;
-  }
-
   async handleWorkFileClick(filePath: string) {
     if (!this.client || !this.connected) {
       this.showToast("Not connected to gateway", "error");
@@ -2559,8 +2464,6 @@ export class GodModeApp extends LitElement {
         : "Import my contacts from Google Contacts and organize them into categories.";
     this.handleStartChatWithPrompt(prompt);
   }
-
-  // Workspaces handlers — moved to <gm-work>
 
 
   // ── Onboarding handlers ──────────────────────────────────────
@@ -2955,8 +2858,6 @@ export class GodModeApp extends LitElement {
       console.error("[onboarding] Failed to mark complete:", err);
     }
   }
-
-  // Universal Inbox + Trust Daily Rate handlers — moved to <gm-today>
 
   // ── Proof sidebar handlers ──────────────────────────────────
 

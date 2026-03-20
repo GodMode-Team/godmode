@@ -388,6 +388,60 @@ const messagingChannel: IntegrationProvider = {
   },
 };
 
+const honchoMemory: IntegrationProvider = {
+  id: "honcho-memory",
+  name: "Honcho Memory",
+  description: "Persistent conversational memory — your ally remembers across sessions",
+  tier: "core",
+  platforms: ["darwin", "linux", "win32"],
+  envVars: [{
+    key: "HONCHO_API_KEY",
+    label: "Honcho API Key",
+    description: "Get your key at app.honcho.dev — without Honcho, GodMode works fine but won't have persistent memory across sessions",
+    secret: true,
+    target: "env",
+  }],
+  cliDeps: [],
+  detect: async () => {
+    const key = getEnvVar("HONCHO_API_KEY");
+    let working = false;
+    if (key) {
+      try {
+        const { isMemoryReady } = await import("./memory.js");
+        working = isMemoryReady();
+      } catch { /* non-fatal */ }
+    }
+    return {
+      configured: !!key,
+      cliInstalled: true,
+      authenticated: !!key,
+      working,
+      details: key
+        ? working ? "Memory connected and operational" : "API key configured, initializing..."
+        : "HONCHO_API_KEY not set — chat works fine without it",
+    };
+  },
+  test: async () => {
+    const key = getEnvVar("HONCHO_API_KEY");
+    if (!key) return { success: false, message: "HONCHO_API_KEY not set — chat works fine without it" };
+    try {
+      const { initMemory, isMemoryReady } = await import("./memory.js");
+      if (!isMemoryReady()) {
+        const ok = await initMemory();
+        if (!ok) return { success: false, message: "Honcho initialization failed — check your API key" };
+      }
+      return { success: true, message: "Honcho memory connected and operational" };
+    } catch (err) {
+      return { success: false, message: `Connection failed: ${err instanceof Error ? err.message : String(err)}` };
+    }
+  },
+  setupSteps: {
+    darwin: "1. Go to [app.honcho.dev](https://app.honcho.dev) and create an account\n2. Generate an API key\n3. Paste your key below\n\n**Without Honcho, GodMode works fine — you just won't have persistent memory across sessions.**",
+    linux: "1. Go to [app.honcho.dev](https://app.honcho.dev) and create an account\n2. Generate an API key\n3. Paste your key below\n\n**Without Honcho, GodMode works fine — you just won't have persistent memory across sessions.**",
+    win32: "1. Go to [app.honcho.dev](https://app.honcho.dev) and create an account\n2. Generate an API key\n3. Paste your key below\n\n**Without Honcho, GodMode works fine — you just won't have persistent memory across sessions.**",
+  },
+};
+
 // ── Deep Integrations (optional) ───────────────────────────────────────
 
 const ouraRing: IntegrationProvider = {
@@ -562,22 +616,67 @@ const rescueTime: IntegrationProvider = {
   },
 };
 
+const composio: IntegrationProvider = {
+  id: "composio",
+  name: "Composio (Optional)",
+  description: "Managed OAuth for 850+ tools — optional, your existing integrations work without it",
+  tier: "deep",
+  platforms: ["darwin", "linux", "win32"],
+  envVars: [{
+    key: "COMPOSIO_API_KEY",
+    label: "Composio API Key",
+    description: "Optional — get your key at composio.dev. Your existing OpenClaw integrations continue to work without Composio.",
+    secret: true,
+    target: "env",
+  }],
+  cliDeps: [],
+  detect: async () => {
+    const key = getEnvVar("COMPOSIO_API_KEY");
+    return {
+      configured: !!key,
+      cliInstalled: true,
+      authenticated: !!key,
+      working: false, // requires live test
+      details: key ? "API key configured" : "COMPOSIO_API_KEY not set (optional)",
+    };
+  },
+  test: async () => {
+    const key = getEnvVar("COMPOSIO_API_KEY");
+    if (!key) return { success: false, message: "COMPOSIO_API_KEY not set — this is optional, your existing integrations work without it" };
+    try {
+      const { getStatus } = await import("../services/composio-client.js");
+      const status = await getStatus();
+      if (status?.ready) return { success: true, message: "Composio connected" };
+      return { success: false, message: "Composio configured but not yet initialized — it will connect on next startup" };
+    } catch (err) {
+      return { success: false, message: `Connection check failed: ${err instanceof Error ? err.message : String(err)}` };
+    }
+  },
+  setupSteps: {
+    darwin: "1. Go to [composio.dev](https://composio.dev) and create an account\n2. Generate an API key\n3. Paste your key below\n\n**This is optional.** Your existing OpenClaw integrations continue to work without Composio.",
+    linux: "1. Go to [composio.dev](https://composio.dev) and create an account\n2. Generate an API key\n3. Paste your key below\n\n**This is optional.** Your existing OpenClaw integrations continue to work without Composio.",
+    win32: "1. Go to [composio.dev](https://composio.dev) and create an account\n2. Generate an API key\n3. Paste your key below\n\n**This is optional.** Your existing OpenClaw integrations continue to work without Composio.",
+  },
+};
+
 // ── Registry ───────────────────────────────────────────────────────────
 
 /** All available integrations. Core first, then deep. */
 export const INTEGRATIONS: IntegrationProvider[] = [
-  // Core (6)
+  // Core (7)
   xIntelligence,
   tailscale,
   googleCalendar,
   obsidianVault,
   githubCli,
   messagingChannel,
-  // Deep (4)
+  honchoMemory,
+  // Deep (5)
   ouraRing,
   weather,
   obsidianSync,
   rescueTime,
+  composio,
 ];
 
 /** Get integrations filtered by tier. */

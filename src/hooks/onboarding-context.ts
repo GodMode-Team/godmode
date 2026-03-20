@@ -10,6 +10,7 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { DATA_DIR } from "../data-paths.js";
+import { getAllyName } from "../lib/ally-identity.js";
 import type { OnboardingState } from "../methods/onboarding-types.js";
 
 const ONBOARDING_FILE = join(DATA_DIR, "onboarding.json");
@@ -60,6 +61,19 @@ The user is starting GodMode onboarding. Run the assessment first:
 Be encouraging — even a low score means there's a lot of value to unlock.`;
   }
 
+  // Detect existing install — adapt the greeting
+  const isExistingUser = assessment.healthScore >= 40
+    || assessment.soulMdExists
+    || assessment.agentRosterCount > 0
+    || assessment.hermesDetected;
+
+  const existingContext: string[] = [];
+  if (assessment.hermesDetected) existingContext.push("Hermes agent setup detected");
+  if (assessment.soulMdExists) existingContext.push("existing soul profile found");
+  if (assessment.agentRosterCount > 0) existingContext.push(`${assessment.agentRosterCount} agent personas already on roster`);
+  if (assessment.queueCompletedCount > 0) existingContext.push(`${assessment.queueCompletedCount} completed queue items`);
+  if (assessment.channelsConnected.length > 0) existingContext.push(`${assessment.channelsConnected.length} channels connected`);
+
   const score = assessment.healthScore;
   const gaps: string[] = [];
   if (assessment.authMethod === "none") gaps.push("No auth configured");
@@ -69,6 +83,22 @@ Be encouraging — even a low score means there's a lot of value to unlock.`;
   const disabledFeatures = assessment.features.filter((f) => !f.enabled);
   if (disabledFeatures.length > 0) {
     gaps.push(`Disabled features: ${disabledFeatures.map((f) => f.label).join(", ")}`);
+  }
+
+  if (isExistingUser) {
+    return `## GodMode Onboarding — Phase 0: Assessment Complete (Existing Setup Detected)
+
+Health score: ${score}/100
+Existing state: ${existingContext.join(", ") || "basic config present"}
+${gaps.length > 0 ? `Gaps to fill:\n${gaps.map((g) => `- ${g}`).join("\n")}` : "Looking good! No major gaps."}
+
+**IMPORTANT — EXISTING USER GREETING:**
+This person already has a working setup. Do NOT start from scratch. Your name is "${getAllyName()}" (if it's just "Ally", ask them what they'd like to call you — save via \`onboarding.update { allyName: "..." }\`).
+Greet them naturally: "Hey, I'm ${getAllyName()}. I can see you've already been working with ${assessment.hermesDetected ? "Hermes" : "OpenClaw"} — nice setup.
+I'm here to supercharge what you've got. Let me get to know you better so I can be truly useful."
+
+Present the score. Acknowledge what's already working. Focus on what GodMode adds on top.
+When ready, advance to Phase 1 with \`onboarding.update { phase: 1 }\`.`;
   }
 
   return `## GodMode Onboarding — Phase 0: Assessment Complete
@@ -114,11 +144,16 @@ function buildPhase1Prompt(state: OnboardingState): string {
   const totalFields = 22; // name + role + 20 soul fields
   const progress = Math.round((answered.length / totalFields) * 100);
 
+  const allyName = getAllyName();
+  const allyIsDefault = allyName === "Ally";
+
   return `## GodMode Onboarding — Phase 1: Soul Interview
 
 You are conducting a deep, conversational onboarding — not a form. These questions shape the user's SOUL.md,
 the file that defines how their AI ally sees them, speaks to them, and serves them. This is the most important
 conversation you'll ever have with this person.
+
+Your name is "${allyName}".${allyIsDefault ? ` Since it's still the default, early in the conversation ask what they'd like to call you. When they give you a name, save it with \`onboarding.update { allyName: "..." }\`. Use your new name from that point forward.` : ""}
 
 **Tone:** Warm, direct, no corporate energy. Like a trusted advisor getting to know someone for real.
 **Pace:** One question at a time. Let them talk. Follow up naturally. Don't rush through blocks.
@@ -132,7 +167,7 @@ Current block: ${currentBlock}
 
 ### The 6 Blocks
 
-**Start by getting their name if you don't have it yet.** Then move through these blocks in order.
+**Start by getting their name if you don't have it yet.** Then ask what they'd like to call you (their ally). Then move through these blocks in order.
 
 **Block 1: The Ground** ${hasBlock1(interview, sp) ? "(COMPLETE)" : currentBlock === "block1" ? "(CURRENT)" : ""}
 *This is where the foundation gets laid — what they're really here for, not their job title.*

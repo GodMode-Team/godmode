@@ -82,6 +82,10 @@ export function initQueueProcessor(logger: Logger): QueueProcessor {
 
 const INBOX_DIR = path.join(MEMORY_DIR, "inbox");
 const LEARNINGS_DIR = path.join(MEMORY_DIR, "learnings");
+const AGENT_LOGS_DIR = path.join(DATA_DIR, "agent-logs");
+
+/** Cache for pre-flight binary checks — avoids re-running on every spawn */
+const _preflightCache: Map<string, boolean> = new Map();
 function outputPathForItem(itemId: string): string {
   return path.join(INBOX_DIR, `${itemId}.md`);
 }
@@ -333,7 +337,10 @@ class QueueProcessor {
       return { spawned: false };
     }
 
-    const { bin: agentBin, args: agentArgs } = buildSpawnArgs(effectiveEngine, prompt);
+    const { bin: agentBin, args: agentArgs } = buildSpawnArgs(effectiveEngine, prompt, {
+      model: item.model,
+      maxBudgetUsd: item.type === "coding" ? 10 : 5,
+    });
     const env = buildChildEnv();
 
     // Codex needs OPENAI_API_KEY; Gemini needs GEMINI_API_KEY
@@ -359,11 +366,19 @@ class QueueProcessor {
       }
     } catch (e) { this.logger.warn(`[GodMode][Queue] Toolkit token creation failed: ${(e as Error).message}`); }
 
+    // Ensure agent logs directory exists
+    try { await fs.mkdir(AGENT_LOGS_DIR, { recursive: true }); } catch { /* ok */ }
+
+    // Create log file for agent stdout/stderr — critical for debugging failures
+    const logPath = path.join(AGENT_LOGS_DIR, `${item.id}.log`);
+    let logFd: import("node:fs/promises").FileHandle | null = null;
+    try { logFd = await fs.open(logPath, "a"); } catch { /* fallback to ignore */ }
+
     try {
       const child = spawn(agentBin, agentArgs, {
         cwd: os.homedir(),
         detached: true,
-        stdio: "ignore",
+        stdio: logFd ? ["ignore", logFd.fd, logFd.fd] : "ignore",
         env,
       });
 
@@ -437,6 +452,8 @@ class QueueProcessor {
         exited = true;
         clearTimeout(killTimer);
         livenessChecks.forEach(clearTimeout);
+        // Close the log file handle
+        if (logFd) logFd.close().catch(() => {});
         audit(code === 0 ? "agent.complete" : "agent.fail", {
           itemId: item.id,
           title: item.title,
@@ -457,6 +474,7 @@ class QueueProcessor {
         exited = true;
         clearTimeout(killTimer);
         livenessChecks.forEach(clearTimeout);
+        if (logFd) logFd.close().catch(() => {});
         this.logger.error(
           `[GodMode][Queue] Agent spawn error for item ${item.id}: ${String(err)}`,
         );
@@ -1073,6 +1091,21 @@ class QueueProcessor {
     };
 
     const now = Date.now();
+
+    // Cap retries: mark items with too many retries as failed (prevents infinite loops)
+    const MAX_RETRIES = 3;
+    for (const item of state.items) {
+      if (item.status === "pending" && (item.retryCount ?? 0) >= MAX_RETRIES) {
+        this.logger.warn(
+          `[GodMode][Queue] Item "${item.title}" (${item.id}) exceeded max retries (${item.retryCount}) — marking as failed`,
+        );
+        item.status = "failed";
+        item.error = `Exceeded maximum retry count (${MAX_RETRIES})`;
+        item.completedAt = Date.now();
+        this.broadcast("queue:update", { itemId: item.id, status: "failed" });
+      }
+    }
+
     const pending = state.items
       .filter((i) => i.status === "pending" && (!i.scheduledAt || i.scheduledAt <= now))
       .sort((a, b) => {

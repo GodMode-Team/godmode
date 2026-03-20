@@ -1,3 +1,4 @@
+import { sessionKeysMatch } from "../../lib/session-key-utils.js";
 import { extractText } from "../chat/message-extract";
 import type { GatewayBrowserClient } from "../gateway";
 import { resetStreamingCache } from "../markdown-streaming";
@@ -154,9 +155,10 @@ export async function loadChatHistory(state: ChatState): Promise<void> {
       state.lastError = String(retryErr);
     }
   } finally {
-    if (generation === _chatLoadGeneration) {
-      state.chatLoading = false;
-    }
+    // Always clear loading — even if a newer load was initiated, the newer
+    // call will set chatLoading=true again when it starts. Leaving it stuck
+    // on true causes "Loading chat..." to persist indefinitely.
+    state.chatLoading = false;
   }
 }
 
@@ -482,7 +484,7 @@ export function handleChatEvent(state: ChatState, payload?: ChatEventPayload) {
   if (!payload) {
     return null;
   }
-  if (payload.sessionKey !== state.sessionKey) {
+  if (!sessionKeysMatch(payload.sessionKey, state.sessionKey)) {
     return null;
   }
 

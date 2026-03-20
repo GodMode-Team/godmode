@@ -92,6 +92,7 @@ import { createQueueActionTool } from "./src/tools/queue-action.js";
 import { createTrustRateTool } from "./src/tools/trust-rate.js";
 import { createXReadTool } from "./src/tools/x-read.js";
 import { createHonchoQueryTool } from "./src/tools/honcho-query.js";
+import { createMemorySearchShimTool } from "./src/tools/memory-search-shim.js";
 import { createSelfRepairTool } from "./src/tools/self-repair.js";
 import { createTasksCreateTool, createTasksListTool, createTasksUpdateTool } from "./src/tools/tasks-tool.js";
 // REMOVED (v2 slim): proof-tool — not using Proof
@@ -133,6 +134,7 @@ import {
   handleLlmOutputAgentLog,
   handleAfterToolCall,
   handleAfterCompaction,
+  handleAgentEnd,
 } from "./src/hooks/lifecycle-hooks.js";
 import { registerCliCommands } from "./src/cli/commands.js";
 // ── Version ───────────────────────────────────────────────────────────
@@ -164,6 +166,7 @@ const ungatedMethods = new Set([
   "integrations.setupGuide", "integrations.platformInfo",
   "support.diagnostics", "support.logExchange", "support.escalate",
   "auth.status", "auth.login", "auth.loginPoll", "auth.logout", "auth.account",
+  "paperclip.dashboardUrl",
 ]);
 
 // ── Plugin definition ──────────────────────────────────────────────
@@ -515,6 +518,10 @@ const godmodePlugin = {
       await handleAfterToolCall(event, ctx, api);
     });
 
+    api.on("agent_end", async (event: any, ctx: any) => {
+      await handleAgentEnd(event, ctx, api);
+    });
+
     // ── 6. Tools ──────────────────────────────────────────────────
     api.registerTool((ctx: { sessionKey?: string; agentId?: string }) => createTeamMessageTool(ctx));
     api.registerTool((ctx: { sessionKey?: string; agentId?: string }) => createTeamMemoryWriteTool(ctx));
@@ -527,6 +534,7 @@ const godmodePlugin = {
     api.registerTool((ctx: { sessionKey?: string; agentId?: string }) => createTrustRateTool(ctx));
     api.registerTool((ctx: { sessionKey?: string; agentId?: string }) => createXReadTool(ctx));
     api.registerTool((ctx: { sessionKey?: string; agentId?: string }) => createHonchoQueryTool(ctx));
+    api.registerTool((ctx: { sessionKey?: string }) => createMemorySearchShimTool(ctx));
     api.registerTool(() => createSelfRepairTool());
     api.registerTool(() => createTasksCreateTool());
     api.registerTool(() => createTasksListTool());

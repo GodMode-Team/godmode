@@ -4,7 +4,8 @@
 
 .toast-container {
   position: fixed;
-  top: 80px;
+  /* Position below topbar + tab bar, in upper-right of chat area */
+  top: calc(var(--topbar-height, 56px) + 52px);
   right: 20px;
   z-index: 9999;
   display: flex;
@@ -137,7 +138,7 @@
 /* Mobile adjustments */
 @media (max-width: 640px) {
   .toast-container {
-    top: 60px;
+    top: calc(var(--topbar-height, 48px) + 44px);
     right: 12px;
     left: 12px;
     max-width: none;

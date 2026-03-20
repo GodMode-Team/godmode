@@ -32,8 +32,35 @@ import type {
   CalendarEvent,
 } from "../types/plugin-api.js";
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk";
+import { sanitizeForPrompt } from "../lib/prompt-sanitizer.js";
 
 type Logger = { warn: (msg: string) => void; info: (msg: string) => void };
+
+// ── Per-session TTL cache for expensive async results ───────────────
+// Prevents redundant calls when multiple turns fire within seconds.
+
+type CachedResult<T> = { value: T; expiresAt: number };
+const _promptCache = new Map<string, CachedResult<unknown>>();
+const PROMPT_CACHE_MAX = 100; // max entries to prevent unbounded growth
+
+function getCached<T>(key: string): T | undefined {
+  const entry = _promptCache.get(key);
+  if (!entry) return undefined;
+  if (Date.now() > entry.expiresAt) {
+    _promptCache.delete(key);
+    return undefined;
+  }
+  return entry.value as T;
+}
+
+function setCache<T>(key: string, value: T, ttlMs: number): void {
+  // Evict oldest entries if map is full
+  if (_promptCache.size >= PROMPT_CACHE_MAX) {
+    const first = _promptCache.keys().next().value;
+    if (first) _promptCache.delete(first);
+  }
+  _promptCache.set(key, { value, expiresAt: Date.now() + ttlMs });
+}
 
 export async function handleBeforePromptBuild(
   event: PromptBuildEvent,
@@ -119,7 +146,7 @@ export async function handleBeforePromptBuild(
         };
       }
     }
-  } catch { /* non-fatal */ }
+  } catch (e) { logger?.warn?.(`[GodMode] ACP provenance extraction error: ${(e as Error).message}`); }
 
   // P0: Identity anchor
   let identityAnchor: string | null = null;
@@ -168,39 +195,55 @@ export async function handleBeforePromptBuild(
 
   // P0: Honcho context retrieval (skip in light mode)
   // Honcho provides persistent user modeling with async reasoning.
-  // getContext() is free and fast (~200ms).
+  // getContext() is free and fast (~200ms). Cached 30s per session.
   let memoryBlock: string | null = null;
   let memoryStatus: "ready" | "degraded" | "offline" = "offline";
   if (provenance?.kind !== "inter_session" && !lightMode && sessionKey) {
-    try {
-      const { isHonchoReady, getContext, getHonchoStatus } = await import("../services/honcho-client.js");
-      memoryStatus = getHonchoStatus();
-      if (isHonchoReady()) {
-        const ctx = await getContext(sessionKey);
-        if (ctx) memoryBlock = ctx;
-        memoryStatus = getHonchoStatus();
+    const memoryCacheKey = `memory:${sessionKey}`;
+    const cached = getCached<{ block: string | null; status: "ready" | "degraded" | "offline" }>(memoryCacheKey);
+    if (cached) {
+      memoryBlock = cached.block;
+      memoryStatus = cached.status;
+    } else {
+      try {
+        const { isMemoryReady, getContext, getMemoryStatus } = await import("../lib/memory.js");
+        memoryStatus = getMemoryStatus();
+        if (isMemoryReady()) {
+          const ctx = await getContext(sessionKey);
+          if (ctx) memoryBlock = sanitizeForPrompt(ctx, "honcho-context");
+          memoryStatus = getMemoryStatus();
+        }
+        setCache(memoryCacheKey, { block: memoryBlock, status: memoryStatus }, 30_000);
+      } catch (err) {
+        logger.warn(`[GodMode] Honcho context error (non-fatal): ${String(err)}`);
+        memoryStatus = "degraded";
       }
-    } catch (err) {
-      logger.warn(`[GodMode] Honcho context error (non-fatal): ${String(err)}`);
-      memoryStatus = "degraded";
     }
   } else if (lightMode) {
     memoryStatus = "degraded"; // Signal to ally that memory was skipped
   }
 
-  // P0: Identity graph (skip in light mode)
+  // P0: Identity graph (skip in light mode, cached 60s)
   let graphBlock: string | null = null;
   if (provenance?.kind !== "inter_session" && !lightMode) {
-    try {
-      const { isGraphReady, queryGraph, formatGraphContext } = await import("../lib/identity-graph.js");
-      if (isGraphReady()) {
-        const graphInput = memoryBlock ? `${userQuery}\n${memoryBlock}` : userQuery;
-        if (graphInput.length >= 5) {
-          const graphResults = queryGraph(graphInput);
-          graphBlock = formatGraphContext(graphResults);
+    const graphCacheKey = `graph:${sessionKey ?? "global"}`;
+    const cachedGraph = getCached<string | null>(graphCacheKey);
+    if (cachedGraph !== undefined) {
+      graphBlock = cachedGraph;
+    } else {
+      try {
+        const { isGraphReady, queryGraph, formatGraphContext } = await import("../lib/identity-graph.js");
+        if (isGraphReady()) {
+          const graphInput = memoryBlock ? `${userQuery}\n${memoryBlock}` : userQuery;
+          if (graphInput.length >= 5) {
+            const graphResults = queryGraph(graphInput);
+            const rawGraph = formatGraphContext(graphResults);
+            graphBlock = rawGraph ? sanitizeForPrompt(rawGraph, "identity-graph") : null;
+          }
         }
-      }
-    } catch (e) { logger.warn?.(`[GodMode] Identity graph query failed: ${(e as Error).message}`); }
+        setCache(graphCacheKey, graphBlock, 60_000);
+      } catch (e) { logger.warn?.(`[GodMode] Identity graph query failed: ${(e as Error).message}`); }
+    }
   }
 
   // ── P1: Operational context — TOOL HINTS, not pre-injected facts ──
@@ -222,49 +265,62 @@ export async function handleBeforePromptBuild(
     // Schedule: tool hint instead of pre-injected event list
     schedule = "The user has calendar events today. Use `calendar.events.today` to check their schedule when relevant.";
 
-    // Meeting prep: still pre-inject for upcoming meetings (proactive surfacing)
-    try {
-      const { fetchCalendarEvents } = await import("../methods/brief-generator.js");
-      const result = await fetchCalendarEvents();
-      const now = Date.now();
-      const upcoming = result.events.filter((e: CalendarEvent) => {
-        const start = new Date(e.startTime).getTime();
-        return start > now && start - now <= 2 * 60 * 60 * 1000;
-      });
-      if (upcoming.length > 0) {
-        const next = upcoming[0];
-        const time = new Date(next.startTime).toLocaleTimeString("en-US", {
-          hour: "numeric", minute: "2-digit", hour12: true,
+    // Meeting prep: still pre-inject for upcoming meetings (proactive surfacing, cached 60s)
+    const calCacheKey = "calendar:meetingPrep";
+    const cachedMeetingPrep = getCached<string | null>(calCacheKey);
+    if (cachedMeetingPrep !== undefined) {
+      meetingPrep = cachedMeetingPrep;
+    } else {
+      try {
+        const { fetchCalendarEvents } = await import("../methods/brief-generator.js");
+        const result = await fetchCalendarEvents();
+        const now = Date.now();
+        const upcoming = result.events.filter((e: CalendarEvent) => {
+          const start = new Date(e.startTime).getTime();
+          return start > now && start - now <= 2 * 60 * 60 * 1000;
         });
-        const parts = [`## Upcoming: **${next.title}** at ${time}`];
-        if (next.attendees && next.attendees.length > 0) {
-          parts.push(`Attendees: ${next.attendees.slice(0, 5).join(", ")}`);
+        if (upcoming.length > 0) {
+          const next = upcoming[0];
+          const time = new Date(next.startTime).toLocaleTimeString("en-US", {
+            hour: "numeric", minute: "2-digit", hour12: true,
+          });
+          const parts = [`## Upcoming: **${next.title}** at ${time}`];
+          if (next.attendees && next.attendees.length > 0) {
+            parts.push(`Attendees: ${next.attendees.slice(0, 5).join(", ")}`);
+          }
+          parts.push("Offer meeting prep if not already discussed.");
+          meetingPrep = parts.join("\n");
         }
-        parts.push("Offer meeting prep if not already discussed.");
-        meetingPrep = parts.join("\n");
-      }
-    } catch { /* calendar unavailable */ }
+        setCache(calCacheKey, meetingPrep, 60_000);
+      } catch (e) { logger?.warn?.(`[GodMode] Calendar fetch for meeting prep error: ${(e as Error).message}`); }
+    }
 
-    // Tasks: tool hint, but flag overdue count (urgent surfacing)
-    try {
-      const { localDateString: lds } = await import("../data-paths.js");
-      const today = lds();
-      const { readTasks } = await import("../methods/tasks.js");
-      const data = await readTasks();
-      const pending = data.tasks.filter((t: { status: string }) => t.status === "pending");
-      const overdue = pending.filter(
-        (t: { dueDate?: string | null }) => t.dueDate != null && t.dueDate <= today,
-      );
-      overdueCount = overdue.length;
-      if (overdueCount > 0) {
-        // Overdue = urgent, pre-inject the count to force surfacing
-        operationalCounts = `${overdueCount} OVERDUE task(s). Surface these early. Use \`tasks_list\` for details.`;
-      } else {
-        // Normal: tool hint only
+    // Tasks: tool hint, but flag overdue count (urgent surfacing, cached 30s)
+    const tasksCacheKey = "tasks:counts";
+    const cachedTasks = getCached<{ overdueCount: number; operationalCounts: string }>(tasksCacheKey);
+    if (cachedTasks) {
+      overdueCount = cachedTasks.overdueCount;
+      operationalCounts = cachedTasks.operationalCounts;
+    } else {
+      try {
+        const { localDateString: lds } = await import("../data-paths.js");
+        const today = lds();
+        const { readTasks } = await import("../methods/tasks.js");
+        const data = await readTasks();
+        const pending = data.tasks.filter((t: { status: string }) => t.status === "pending");
+        const overdue = pending.filter(
+          (t: { dueDate?: string | null }) => t.dueDate != null && t.dueDate <= today,
+        );
+        overdueCount = overdue.length;
+        if (overdueCount > 0) {
+          operationalCounts = `${overdueCount} OVERDUE task(s). Surface these early. Use \`tasks_list\` for details.`;
+        } else {
+          operationalCounts = "Use `tasks_list` and `queue_check` when the user asks about tasks, priorities, or progress.";
+        }
+        setCache(tasksCacheKey, { overdueCount, operationalCounts }, 30_000);
+      } catch {
         operationalCounts = "Use `tasks_list` and `queue_check` when the user asks about tasks, priorities, or progress.";
       }
-    } catch {
-      operationalCounts = "Use `tasks_list` and `queue_check` when the user asks about tasks, priorities, or progress.";
     }
 
     // Priorities: tool hint — the model should read the daily brief itself
@@ -325,7 +381,7 @@ export async function handleBeforePromptBuild(
           teamStatus = "## Agent Team\n" + lines.join("\n");
         }
       }
-    } catch { /* non-fatal */ }
+    } catch (e) { logger?.warn?.(`[GodMode] Agent team status error: ${(e as Error).message}`); }
   }
 
   // P2: Paperclip deliverables pending review — check inbox for unreviewed agent completions
@@ -350,7 +406,7 @@ export async function handleBeforePromptBuild(
         // Append to teamStatus or create new
         teamStatus = teamStatus ? teamStatus + "\n\n" + block : block;
       }
-    } catch { /* non-fatal */ }
+    } catch (e) { logger?.warn?.(`[GodMode] Paperclip deliverables check error: ${(e as Error).message}`); }
   }
 
   // Extract user message for skill card + routing lesson matching
@@ -438,7 +494,7 @@ export async function handleBeforePromptBuild(
       const { actionItemBuffer, formatActionItemsForContext } = await import("../lib/action-items.js");
       const items = actionItemBuffer.drain(sessionKey);
       actionItemsBlock = formatActionItemsForContext(items);
-    } catch { /* non-fatal */ }
+    } catch (e) { logger?.warn?.(`[GodMode] Action items extraction error: ${(e as Error).message}`); }
   }
 
   // P1.5: Skill card (skip in light mode)
@@ -452,7 +508,7 @@ export async function handleBeforePromptBuild(
           skillCard = formatSkillCard(matched);
         }
       }
-    } catch { /* non-fatal */ }
+    } catch (e) { logger?.warn?.(`[GodMode] Skill card match error: ${(e as Error).message}`); }
   }
 
   // P2: Skill drafts pending review (session distiller)
@@ -460,7 +516,7 @@ export async function handleBeforePromptBuild(
   try {
     const { countPendingDrafts } = await import("../lib/session-distiller.js");
     skillDraftCount = countPendingDrafts();
-  } catch { /* non-fatal */ }
+  } catch (e) { logger?.warn?.(`[GodMode] Skill draft count error: ${(e as Error).message}`); }
 
   // P2: Routing lessons (skip in light mode)
   let routingLessons: string | null = null;
@@ -470,7 +526,7 @@ export async function handleBeforePromptBuild(
       const lessons = await getRoutingLessons();
       const formatted = formatRoutingLessons(lessons, currentUserMessage);
       if (formatted) routingLessons = formatted;
-    } catch { /* non-fatal */ }
+    } catch (e) { logger?.warn?.(`[GodMode] Routing lessons error: ${(e as Error).message}`); }
   }
 
   // P3: Safety nudges
@@ -523,12 +579,12 @@ export async function handleBeforePromptBuild(
     const { handleTeamBootstrap } = await import("./team-bootstrap.js");
     const teamResult = await handleTeamBootstrap(event as { prompt: string; messages: unknown[] }, ctx);
     if (teamResult?.prependContext) safetyNudges.push(teamResult.prependContext);
-  } catch { /* non-fatal */ }
+  } catch (e) { logger?.warn?.(`[GodMode] Team bootstrap error: ${(e as Error).message}`); }
   try {
     const { loadOnboardingContext } = await import("./onboarding-context.js");
     const onboardingResult = await loadOnboardingContext();
     if (onboardingResult?.prependContext) safetyNudges.push(onboardingResult.prependContext);
-  } catch { /* non-fatal */ }
+  } catch (e) { logger?.warn?.(`[GodMode] Onboarding context error: ${(e as Error).message}`); }
 
   let isPrivate = false;
   try {
@@ -546,7 +602,7 @@ export async function handleBeforePromptBuild(
   let contextPressure = 0;
   try {
     contextPressure = getContextPressureLevel(sessionKey);
-  } catch { /* default to 0 */ }
+  } catch (e) { logger?.warn?.(`[GodMode] Context pressure level error: ${(e as Error).message}`); }
 
   // Escalation: inject health warnings so the ally knows when to be transparent
   try {
@@ -570,7 +626,7 @@ export async function handleBeforePromptBuild(
       );
       clearLastRestart(); // One-shot injection
     }
-  } catch { /* non-fatal */ }
+  } catch (e) { logger?.warn?.(`[GodMode] Restart sentinel error: ${(e as Error).message}`); }
 
   // Turn-level errors: surface failures that happened since the last message
   try {
@@ -607,7 +663,7 @@ export async function handleBeforePromptBuild(
         `or you can restart now when you're at a good stopping point."`,
       );
     }
-  } catch { /* non-fatal */ }
+  } catch (e) { logger?.warn?.(`[GodMode] Pending deploy check error: ${(e as Error).message}`); }
 
   // ── Assemble with budget management ──
   const assembled = assembleContext({

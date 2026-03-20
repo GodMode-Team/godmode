@@ -801,6 +801,16 @@
   gap: 2px;
 }
 
+/* Tab components rendered as custom elements need to participate in the
+   flex column layout so content-header (session tabs) stays visible. */
+.content--chat > gm-chat {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
 /* Content header */
 .content-header {
   display: flex;

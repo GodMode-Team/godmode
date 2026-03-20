@@ -2,15 +2,10 @@
   "id": "godmode",
   "name": "GodMode",
   "description": "Personal AI Operating System for entrepreneurs",
-  "version": "1.7.2",
+  "version": "1.8.0",
   "configSchema": {
     "type": "object",
     "properties": {
-      "licenseKey": {
-        "type": "string",
-        "default": "",
-        "description": "GodMode subscription license key (starts with GM-)"
-      },
       "workspaceRoot": {
         "type": "string",
         "default": "~/godmode",

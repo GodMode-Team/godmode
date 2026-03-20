@@ -826,7 +826,7 @@ function countNodes(nodes: BrainTreeNode[]): number {
 
 const execFileAsync = promisify(execFile);
 
-type QmdJsonResult = {
+export type QmdJsonResult = {
   docid: string;
   score: number;
   file: string;
@@ -866,7 +866,7 @@ function cleanQmdSnippet(snippet: string): string {
  * causing native GPU OOM that eats the full 15s timeout before falling back).
  * Throws if qmd is not installed.
  */
-async function runQmdSearch(
+export async function runQmdSearch(
   query: string,
   collection: string | null,
   limit: number,

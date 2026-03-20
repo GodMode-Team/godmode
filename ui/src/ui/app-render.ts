@@ -95,8 +95,10 @@ import { renderGuardrails } from "./views/guardrails";
 const _tabLoaders: Record<string, () => Promise<unknown>> = {
   "gm-work": () => import("./tabs/work-tab.js"),
   "gm-today": () => import("./tabs/today-tab.js"),
+  "gm-team": () => import("./tabs/team-tab.js"),
   "gm-second-brain": () => import("./tabs/second-brain-tab.js"),
   "gm-dashboards": () => import("./tabs/dashboards-tab.js"),
+  "gm-connections": () => import("./tabs/connections-tab.js"),
 };
 const _tabLoaded = new Set<string>();
 function ensureTab(tag: string) {
@@ -441,7 +443,7 @@ export function renderApp(state: AppViewState) {
               }
               <div class="nav-group__items">
                 ${
-                  !group.label
+                  !group.label && state.showSetupTab
                     ? html`
                         <a
                           class="nav-item ${state.tab === "onboarding" ? "active" : ""}"
@@ -493,13 +495,23 @@ export function renderApp(state: AppViewState) {
           <div class="nav-group__items">
             <a
               class="nav-item nav-item--external"
-              href="https://docs.clawd.bot"
+              href="https://docs.lifeongodmode.com"
               target="_blank"
               rel="noreferrer"
-              title="Docs (opens in new tab)"
+              title="GodMode Documentation"
             >
               <span class="nav-item__icon" aria-hidden="true">${icons.book}</span>
               <span class="nav-item__text">Docs</span>
+            </a>
+            <a
+              class="nav-item nav-item--external"
+              href="https://community.lifeongodmode.com"
+              target="_blank"
+              rel="noreferrer"
+              title="Join the GodMode Community"
+            >
+              <span class="nav-item__icon" aria-hidden="true">${icons.globe}</span>
+              <span class="nav-item__text">Community</span>
             </a>
           </div>
         </div>
@@ -509,7 +521,8 @@ export function renderApp(state: AppViewState) {
           <div>
             ${
               state.tab !== "chat" &&
-              state.tab !== "onboarding"
+              state.tab !== "onboarding" &&
+              state.tab !== "team"
                 ? html`
               <div class="page-title">${titleForTab(state.tab)}</div>
               <div class="page-sub">${subtitleForTab(state.tab)}</div>
@@ -1085,20 +1098,31 @@ export function renderApp(state: AppViewState) {
 
         ${
           state.tab === "setup" || state.tab === "onboarding"
-            ? html`<div class="my-day-container">
-                <div class="my-day-card">
-                  <div class="my-day-card-content">
-                    <p>Use the onboarding wizard to get started.</p>
-                    <button class="retry-button" @click=${() => state.handleWizardOpen?.()}>Open Wizard</button>
+            ? (() => {
+                // Auto-launch the wizard when navigating to the setup tab
+                if (!state.wizardActive && state.handleWizardOpen) {
+                  requestAnimationFrame(() => state.handleWizardOpen?.());
+                }
+                return html`<div class="my-day-container">
+                  <div class="my-day-card">
+                    <div class="my-day-card-content">
+                      <p>Loading onboarding wizard...</p>
+                    </div>
                   </div>
-                </div>
-              </div>`
+                </div>`;
+              })()
             : nothing
         }
 
         ${
           state.tab === "workspaces"
             ? (ensureTab("gm-work"), html`<gm-work></gm-work>`)
+            : nothing
+        }
+
+        ${
+          state.tab === "team"
+            ? (ensureTab("gm-team"), html`<gm-team .host=${state}></gm-team>`)
             : nothing
         }
 
@@ -1695,6 +1719,12 @@ export function renderApp(state: AppViewState) {
         ${
           state.tab === "dashboards"
             ? (ensureTab("gm-dashboards"), html`<gm-dashboards></gm-dashboards>`)
+            : nothing
+        }
+
+        ${
+          state.tab === "connections"
+            ? (ensureTab("gm-connections"), html`<gm-connections></gm-connections>`)
             : nothing
         }
 

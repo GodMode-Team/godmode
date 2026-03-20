@@ -9,7 +9,7 @@ import { loadChatHistory } from "./controllers/chat";
 import { autoTitleCache, loadSessions } from "./controllers/sessions";
 import { formatAgoShort } from "./format";
 import { icons } from "./icons";
-import { emojiForTab, pathForTab, titleForTab, type Tab } from "./navigation";
+import { emojiForTab, EXTERNAL_TABS, pathForTab, titleForTab, type Tab } from "./navigation";
 import type { ThemeMode } from "./theme";
 import type { ThemeTransitionContext } from "./theme-transition";
 import { generateUUID } from "./uuid.js";
@@ -69,6 +69,9 @@ export function createNewSession(state: AppViewState): void {
 }
 
 export function renderTab(state: AppViewState, tab: Tab) {
+  if (EXTERNAL_TABS.has(tab)) {
+    return renderExternalTab(state, tab);
+  }
   const href = pathForTab(tab, state.basePath);
   return html`
     <a
@@ -92,6 +95,42 @@ export function renderTab(state: AppViewState, tab: Tab) {
     >
       <span class="nav-item__emoji" aria-hidden="true">${emojiForTab(tab)}</span>
       <span class="nav-item__text">${titleForTab(tab)}</span>
+    </a>
+  `;
+}
+
+function renderExternalTab(state: AppViewState, tab: Tab) {
+  return html`
+    <a
+      href="#"
+      class="nav-item nav-item--external"
+      @click=${async (event: MouseEvent) => {
+        event.preventDefault();
+        if (tab === "team") {
+          try {
+            const res = await state.client?.request<{ url: string; ready: boolean }>(
+              "paperclip.dashboardUrl",
+              {},
+            );
+            if (res?.ready && res.url) {
+              window.open(res.url, "_blank", "noopener");
+            } else {
+              window.alert(
+                "Paperclip is not configured yet. Set PAPERCLIP_URL in your .env file to connect your AI team.",
+              );
+            }
+          } catch {
+            window.alert(
+              "Could not reach Paperclip. Check your connection and PAPERCLIP_URL setting.",
+            );
+          }
+        }
+      }}
+      title="${titleForTab(tab)} (opens in new tab)"
+    >
+      <span class="nav-item__emoji" aria-hidden="true">${emojiForTab(tab)}</span>
+      <span class="nav-item__text">${titleForTab(tab)}</span>
+      <span class="nav-item__external-icon" aria-hidden="true">\u2197\uFE0F</span>
     </a>
   `;
 }

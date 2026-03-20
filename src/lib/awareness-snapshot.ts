@@ -312,20 +312,23 @@ export async function generateSnapshot(): Promise<string> {
     // No trust data yet — skip
   }
 
-  // Honcho memory status
+  // Memory status
   try {
-    const { getHonchoStatus, getStatus: getHonchoStats } = await import("../services/honcho-client.js");
-    const status = getHonchoStatus();
-    const stats = getHonchoStats();
+    const { getMemoryProvider, getMemoryStatus, getMemoryStats } = await import("./memory.js");
+    const provider = getMemoryProvider();
+    const status = getMemoryStatus();
+    const stats = getMemoryStats();
     if (status === "ready") {
       reportConnected("honcho");
+    } else if (provider === "none") {
+      reportUnavailable("honcho", "Memory offline", "Configure a memory provider in Settings");
     } else {
-      reportDegraded("honcho", `Honcho ${status}`, "Check Honcho configuration in Settings");
+      reportDegraded("honcho", `Memory ${status}`, "Check memory configuration in Settings");
     }
-    lines.push(`## Memory: Honcho ${status} (${stats.sessionCount} sessions tracked)`);
+    lines.push(`## Memory: ${provider} ${status} (${stats.sessionCount} sessions tracked)`);
   } catch {
-    reportUnavailable("honcho", "Honcho offline", "Set HONCHO_API_KEY in Settings");
-    lines.push("## Memory: Honcho offline (HONCHO_API_KEY not configured)");
+    reportUnavailable("honcho", "Memory offline", "Configure a memory provider in Settings");
+    lines.push("## Memory: offline (no provider configured)");
   }
 
   // Memory search engine status

@@ -1,7 +1,7 @@
-import{A as r,b as a}from"./lit-core-CTInmNPB.js";import{f as B,aa as Q}from"./ctrl-settings-yPdxnkF_.js";function it(t){return!Number.isFinite(t)||t<=0?"0 B":t<1024?`${t} B`:t<1024*1024?`${(t/1024).toFixed(1)} KB`:`${(t/(1024*1024)).toFixed(1)} MB`}function z(t){switch(t){case"markdown":return"📄";case"html":return"🌐";case"image":return"🖼️";case"json":return"🧩";case"folder":return"📁";default:return"📄"}}function et(t){return t==="running"?"ws-session-dot ws-session-dot--running":t==="blocked"?"ws-session-dot ws-session-dot--blocked":"ws-session-dot ws-session-dot--complete"}function ot(t){return`ws-task-priority ws-task-priority--${t}`}function rt(t){return t==="high"?"High":t==="low"?"Low":"Med"}function ct(t){if(!t)return"";const e=Q();return t===e?"Today":t<e?`Overdue (${t})`:t}function lt(t){if(!t)return"ws-task-due";const e=Q();return t<e?"ws-task-due ws-task-due--overdue":t===e?"ws-task-due ws-task-due--today":"ws-task-due"}function V(t,e="due"){const s={high:0,medium:1,low:2};return[...t].sort((n,i)=>{if(e==="priority"){const l=s[n.priority]-s[i.priority];return l!==0?l:n.dueDate&&i.dueDate?n.dueDate.localeCompare(i.dueDate):n.dueDate&&!i.dueDate?-1:!n.dueDate&&i.dueDate?1:0}if(e==="newest")return(i.createdAt||"").localeCompare(n.createdAt||"");if(n.dueDate&&i.dueDate){const l=n.dueDate.localeCompare(i.dueDate);if(l!==0)return l}else{if(n.dueDate&&!i.dueDate)return-1;if(!n.dueDate&&i.dueDate)return 1}return s[n.priority]-s[i.priority]})}function st(t,e,s,n,i,l,u){const c=t.status==="complete";return n===t.id?a`
+import{A as r,b as a}from"./lit-core-CTInmNPB.js";import{f as I,aa as Q}from"./ctrl-settings-WnDhxjfx.js";function it(t){return!Number.isFinite(t)||t<=0?"0 B":t<1024?`${t} B`:t<1024*1024?`${(t/1024).toFixed(1)} KB`:`${(t/(1024*1024)).toFixed(1)} MB`}function z(t){switch(t){case"markdown":return"📄";case"html":return"🌐";case"image":return"🖼️";case"json":return"🧩";case"folder":return"📁";default:return"📄"}}function et(t){return t==="running"?"ws-session-dot ws-session-dot--running":t==="blocked"?"ws-session-dot ws-session-dot--blocked":"ws-session-dot ws-session-dot--complete"}function ot(t){return`ws-task-priority ws-task-priority--${t}`}function rt(t){return t==="high"?"High":t==="low"?"Low":"Med"}function ct(t){if(!t)return"";const e=Q();return t===e?"Today":t<e?`Overdue (${t})`:t}function lt(t){if(!t)return"ws-task-due";const e=Q();return t<e?"ws-task-due ws-task-due--overdue":t===e?"ws-task-due ws-task-due--today":"ws-task-due"}function M(t,e="due"){const s={high:0,medium:1,low:2};return[...t].sort((n,i)=>{if(e==="priority"){const l=s[n.priority]-s[i.priority];return l!==0?l:n.dueDate&&i.dueDate?n.dueDate.localeCompare(i.dueDate):n.dueDate&&!i.dueDate?-1:!n.dueDate&&i.dueDate?1:0}if(e==="newest")return(i.createdAt||"").localeCompare(n.createdAt||"");if(n.dueDate&&i.dueDate){const l=n.dueDate.localeCompare(i.dueDate);if(l!==0)return l}else{if(n.dueDate&&!i.dueDate)return-1;if(!n.dueDate&&i.dueDate)return 1}return s[n.priority]-s[i.priority]})}function st(t,e,s,n,i,l,u){const c=t.status==="complete";return n===t.id?a`
       <form
         class="ws-list-row ws-task-row ws-task-edit-row"
-        @submit=${d=>{d.preventDefault();const m=d.currentTarget,p=m.querySelector(".ws-task-edit-input"),$=m.querySelector(".ws-task-date-input"),k=p.value.trim();k&&(l?.(t.id,{title:k,dueDate:$.value||null}),i?.(null))}}
+        @submit=${d=>{d.preventDefault();const k=d.currentTarget,p=k.querySelector(".ws-task-edit-input"),$=k.querySelector(".ws-task-date-input"),m=p.value.trim();m&&(l?.(t.id,{title:m,dueDate:$.value||null}),i?.(null))}}
       >
         <input
           type="text"
@@ -65,7 +65,7 @@ import{A as r,b as a}from"./lit-core-CTInmNPB.js";import{f as B,aa as Q}from"./c
   `}function mt(t,e,s,n,i,l,u){const c=t.status==="complete";return n===t.id?a`
       <form
         class="ws-list-row ws-task-row ws-task-edit-row"
-        @submit=${d=>{d.preventDefault();const m=d.currentTarget,p=m.querySelector(".ws-task-edit-input"),$=m.querySelector(".ws-task-date-input"),k=p.value.trim();k&&(l?.(t.id,{title:k,dueDate:$.value||null}),i?.(null))}}
+        @submit=${d=>{d.preventDefault();const k=d.currentTarget,p=k.querySelector(".ws-task-edit-input"),$=k.querySelector(".ws-task-date-input"),m=p.value.trim();m&&(l?.(t.id,{title:m,dueDate:$.value||null}),i?.(null))}}
       >
         <input
           type="text"
@@ -127,7 +127,7 @@ import{A as r,b as a}from"./lit-core-CTInmNPB.js";import{f as B,aa as Q}from"./c
                   title="Start working on this task"
                 >Start</button>`:r}
     </div>
-  `}function kt(t,e){return t.trim()?e.toLowerCase().includes(t.trim().toLowerCase()):!0}function at(t,e){if(!t.trim())return e;const s=t.trim().toLowerCase();return e.filter(n=>n.name.toLowerCase().includes(s)||n.path.toLowerCase().includes(s)||n.type.toLowerCase().includes(s)||(n.searchText??"").toLowerCase().includes(s))}function nt(t,e){if(!t.trim())return e;const s=t.trim().toLowerCase();return e.filter(n=>n.title.toLowerCase().includes(s)||n.key.toLowerCase().includes(s))}function pt(t,e){if(!t.trim())return e;const s=t.trim().toLowerCase();return e.reduce((n,i)=>{if(i.type==="file")(i.name.toLowerCase().includes(s)||i.path.toLowerCase().includes(s))&&n.push(i);else{const l=pt(t,i.children??[]);l.length>0&&n.push({...i,children:l})}return n},[])}function ut(t){let e=0;for(const s of t)s.type==="file"?e++:s.children&&(e+=ut(s.children));return e}const $t=10;function ft(t){if(!t.searchText)return null;const e=t.searchText.trim();if(!e)return null;const s=e.match(/#+ (.+?)(?:\s#|$)/);return s?s[1].trim().slice(0,120):(e.startsWith("---")?e.replace(/^---.*?---\s*/s,""):e).slice(0,120)||null}function ht(t,e=$t){return[...t].sort((s,n)=>n.modified.getTime()-s.modified.getTime()).slice(0,e)}function dt(t,e,s){if(t.type==="file"){const u=s.pinnedPaths.has(t.path);return a`
+  `}function $t(t,e){return t.trim()?e.toLowerCase().includes(t.trim().toLowerCase()):!0}function at(t,e){if(!t.trim())return e;const s=t.trim().toLowerCase();return e.filter(n=>n.name.toLowerCase().includes(s)||n.path.toLowerCase().includes(s)||n.type.toLowerCase().includes(s)||(n.searchText??"").toLowerCase().includes(s))}function nt(t,e){if(!t.trim())return e;const s=t.trim().toLowerCase();return e.filter(n=>n.title.toLowerCase().includes(s)||n.key.toLowerCase().includes(s))}function pt(t,e){if(!t.trim())return e;const s=t.trim().toLowerCase();return e.reduce((n,i)=>{if(i.type==="file")(i.name.toLowerCase().includes(s)||i.path.toLowerCase().includes(s))&&n.push(i);else{const l=pt(t,i.children??[]);l.length>0&&n.push({...i,children:l})}return n},[])}function ut(t){let e=0;for(const s of t)s.type==="file"?e++:s.children&&(e+=ut(s.children));return e}const ft=10;function ht(t){if(!t.searchText)return null;const e=t.searchText.trim();if(!e)return null;const s=e.match(/#+ (.+?)(?:\s#|$)/);return s?s[1].trim().slice(0,120):(e.startsWith("---")?e.replace(/^---.*?---\s*/s,""):e).slice(0,120)||null}function bt(t,e=ft){return[...t].sort((s,n)=>n.modified.getTime()-s.modified.getTime()).slice(0,e)}function dt(t,e,s){if(t.type==="file"){const u=s.pinnedPaths.has(t.path);return a`
       <div class="ws-folder-file-row" style="padding-left: ${12+e*16}px">
         <button
           class="ws-folder-file"
@@ -136,7 +136,7 @@ import{A as r,b as a}from"./lit-core-CTInmNPB.js";import{f as B,aa as Q}from"./c
           <span class="ws-list-icon">${z(t.fileType??"text")}</span>
           <span class="ws-list-title">${t.name}</span>
           ${t.size!=null?a`<span class="ws-list-meta">${it(t.size)}</span>`:r}
-          ${t.modified?a`<span class="ws-list-meta">${B(t.modified.getTime())}</span>`:r}
+          ${t.modified?a`<span class="ws-list-meta">${I(t.modified.getTime())}</span>`:r}
         </button>
         <button
           class="ws-pin-btn ${u?"active":""}"
@@ -164,7 +164,7 @@ import{A as r,b as a}from"./lit-core-CTInmNPB.js";import{f as B,aa as Q}from"./c
             </div>
           `:r}
     </div>
-  `}function bt(t,e,s){return a`
+  `}function vt(t,e,s){return a`
     <div class="workspace-card-wrapper">
       <button
         class="workspace-card"
@@ -179,7 +179,7 @@ import{A as r,b as a}from"./lit-core-CTInmNPB.js";import{f as B,aa as Q}from"./c
             <span class="workspace-card-separator">•</span>
             <span>${t.sessionCount} sessions</span>
             <span class="workspace-card-separator">•</span>
-            <span>${B(t.lastUpdated.getTime())}</span>
+            <span>${I(t.lastUpdated.getTime())}</span>
           </div>
         </div>
       </button>
@@ -189,13 +189,13 @@ import{A as r,b as a}from"./lit-core-CTInmNPB.js";import{f as B,aa as Q}from"./c
             @click=${n=>{n.stopPropagation(),confirm(`Delete workspace "${t.name}"? This removes it from your list but does not delete any files.`)&&s(t)}}
           >&times;</button>`:r}
     </div>
-  `}function M(t){const{workspaceId:e,entry:s,pinned:n,onOpen:i,onPinToggle:l}=t;return a`
+  `}function V(t){const{workspaceId:e,entry:s,pinned:n,onOpen:i,onPinToggle:l}=t;return a`
     <div class="ws-list-row">
       <button class="ws-list-main" @click=${()=>i?.(s)}>
         <span class="ws-list-icon">${z(s.type)}</span>
         <span class="ws-list-title">${s.name}</span>
         <span class="ws-list-meta">${it(s.size)}</span>
-        <span class="ws-list-meta">${B(s.modified.getTime())}</span>
+        <span class="ws-list-meta">${I(s.modified.getTime())}</span>
       </button>
       <button
         class="ws-pin-btn ${n?"active":""}"
@@ -205,12 +205,12 @@ import{A as r,b as a}from"./lit-core-CTInmNPB.js";import{f as B,aa as Q}from"./c
         ${n?"Unpin":"Pin"}
       </button>
     </div>
-  `}function vt(t){const{workspaceId:e,entry:s,pinned:n,onOpen:i,onPinToggle:l}=t,u=ft(s);return a`
+  `}function gt(t){const{workspaceId:e,entry:s,pinned:n,onOpen:i,onPinToggle:l}=t,u=ht(s);return a`
     <div class="ws-list-row">
       <button class="ws-list-main" @click=${()=>i?.(s)}>
         <span class="ws-list-icon">${z(s.type)}</span>
         <span class="ws-list-title">${s.name}</span>
-        <span class="ws-list-meta">${B(s.modified.getTime())}</span>
+        <span class="ws-list-meta">${I(s.modified.getTime())}</span>
         ${u?a`<span class="ws-list-desc">${u}</span>`:r}
       </button>
       <button
@@ -221,7 +221,7 @@ import{A as r,b as a}from"./lit-core-CTInmNPB.js";import{f as B,aa as Q}from"./c
         ${n?"Unpin":"Pin"}
       </button>
     </div>
-  `}function gt(t,e){return a`
+  `}function yt(t,e){return a`
     <div class="workspace-breadcrumbs">
       ${t.map((s,n)=>a`
           ${n>0?a`<span class="breadcrumb-sep">/</span>`:r}
@@ -231,13 +231,13 @@ import{A as r,b as a}from"./lit-core-CTInmNPB.js";import{f as B,aa as Q}from"./c
           >${s.name}</button>
         `)}
     </div>
-  `}function yt(t){const{browseEntries:e,breadcrumbs:s,browseSearchQuery:n,browseSearchResults:i,onBrowseFolder:l,onBrowseSearch:u,onBrowseBack:c,onCreateFolder:f,onItemClick:d}=t,m=i??e??[];return a`
+  `}function Tt(t){const{browseEntries:e,breadcrumbs:s,browseSearchQuery:n,browseSearchResults:i,onBrowseFolder:l,onBrowseSearch:u,onBrowseBack:c,onCreateFolder:f,onItemClick:d}=t,k=i??e??[];return a`
     <div class="workspace-browser">
       <div class="workspace-browser-toolbar">
         <button class="workspace-browse-back" @click=${()=>c?.()}>
           &larr; Back
         </button>
-        ${s?gt(s,p=>l?.(p)):r}
+        ${s?yt(s,p=>l?.(p)):r}
         <input
           type="text"
           class="workspace-browse-search"
@@ -252,7 +252,7 @@ import{A as r,b as a}from"./lit-core-CTInmNPB.js";import{f as B,aa as Q}from"./c
       </div>
 
       <div class="workspace-browse-list">
-        ${m.length===0?a`<div class="workspace-browse-empty">No files found</div>`:m.map(p=>a`
+        ${k.length===0?a`<div class="workspace-browse-empty">No files found</div>`:k.map(p=>a`
               <button
                 class="workspace-browse-entry"
                 @click=${()=>{p.type==="folder"?l?.(p.path):d&&d({path:p.path,name:p.name,type:p.fileType??"text",size:p.size??0,modified:new Date})}}
@@ -264,7 +264,7 @@ import{A as r,b as a}from"./lit-core-CTInmNPB.js";import{f as B,aa as Q}from"./c
             `)}
       </div>
     </div>
-  `}function Tt(t){const{workspace:e,itemSearchQuery:s,expandedFolders:n=new Set,showCompletedTasks:i=!1,onItemSearch:l,onBack:u,onItemClick:c,onSessionClick:f,onPinToggle:d,onPinSessionToggle:m,onToggleFolder:p,onToggleTaskComplete:$,onCreateTask:k,onToggleCompletedTasks:h,onStartTask:b,editingTaskId:y,onEditTask:w,onUpdateTask:v,onBatchPushToDrive:D}=t,P=at(s,e.pinned).toSorted((o,C)=>C.modified.getTime()-o.modified.getTime()),S=nt(s,e.pinnedSessions),T=at(s,e.outputs).filter(o=>!e.pinned.some(C=>C.path===o.path)),I=(e.folderTree?.length??0)>0,O=I?pt(s,e.folderTree):[],F=nt(s,e.sessions),x=new Set(e.pinnedSessions.map(o=>o.key)),L=new Set(e.pinned.map(o=>o.path)),A=s.trim().length>0,_=P.length>0||S.length>0,j=F.length>0||e.sessions.length===0||A,N=ht(e.outputs),R=N.length>0&&!A,U={expandedFolders:n,pinnedPaths:L,workspaceId:e.id,onToggleFolder:p,onItemClick:c,onPinToggle:d};return a`
+  `}function St(t){const{workspace:e,itemSearchQuery:s,expandedFolders:n=new Set,showCompletedTasks:i=!1,onItemSearch:l,onBack:u,onItemClick:c,onSessionClick:f,onPinToggle:d,onPinSessionToggle:k,onToggleFolder:p,onToggleTaskComplete:$,onCreateTask:m,onToggleCompletedTasks:h,onStartTask:D,editingTaskId:b,onEditTask:T,onUpdateTask:w,onBatchPushToDrive:v}=t,S=at(s,e.pinned).toSorted((o,C)=>C.modified.getTime()-o.modified.getTime()),P=nt(s,e.pinnedSessions),g=at(s,e.outputs).filter(o=>!e.pinned.some(C=>C.path===o.path)),F=(e.folderTree?.length??0)>0,O=F?pt(s,e.folderTree):[],x=nt(s,e.sessions),B=new Set(e.pinnedSessions.map(o=>o.key)),L=new Set(e.pinned.map(o=>o.path)),A=s.trim().length>0,_=S.length>0||P.length>0,j=x.length>0||e.sessions.length===0||A,N=bt(e.outputs),R=N.length>0&&!A,U={expandedFolders:n,pinnedPaths:L,workspaceId:e.id,onToggleFolder:p,onItemClick:c,onPinToggle:d};return a`
     <div class="workspaces-container">
       <div class="workspaces-header">
         <div class="workspaces-title">
@@ -291,37 +291,37 @@ import{A as r,b as a}from"./lit-core-CTInmNPB.js";import{f as B,aa as Q}from"./c
       </div>
 
       <div class="workspace-content">
-        ${t.browsePath!=null?yt(t):r}
+        ${t.browsePath!=null?Tt(t):r}
 
         ${_?a`
                 <section class="ws-section">
                   <div class="ws-section__header">
                     <h3>Pinned</h3>
-                    <span>${P.length+S.length}</span>
+                    <span>${S.length+P.length}</span>
                   </div>
                   <div class="ws-list">
-                    ${S.map(o=>a`
+                    ${P.map(o=>a`
                         <div class="ws-list-row">
                           <button class="ws-list-main" @click=${()=>f?.(o)}>
                             <span class=${et(o.status)}></span>
                             <span class="ws-list-title">${o.title}</span>
-                            <span class="ws-list-meta">${B(o.created.getTime())}</span>
+                            <span class="ws-list-meta">${I(o.created.getTime())}</span>
                           </button>
                           <button
                             class="ws-pin-btn active"
-                            @click=${()=>m?.(e.id,o.key,!0)}
+                            @click=${()=>k?.(e.id,o.key,!0)}
                             title="Unpin"
                           >
                             Unpin
                           </button>
                         </div>
                       `)}
-                    ${P.map(o=>M({workspaceId:e.id,entry:o,pinned:!0,onOpen:c,onPinToggle:d}))}
+                    ${S.map(o=>V({workspaceId:e.id,entry:o,pinned:!0,onOpen:c,onPinToggle:d}))}
                   </div>
                 </section>
               `:r}
 
-        ${St({tasks:e.tasks??[],workspaceName:e.name,showCompleted:i,onToggleTaskComplete:$,onCreateTask:k,onToggleCompletedTasks:h,onStartTask:b,onViewTaskOutput,editingTaskId:y,onEditTask:w,onUpdateTask:v})}
+        ${Ct({tasks:e.tasks??[],workspaceName:e.name,showCompleted:i,onToggleTaskComplete:$,onCreateTask:m,onToggleCompletedTasks:h,onStartTask:D,onViewTaskOutput,editingTaskId:b,onEditTask:T,onUpdateTask:w})}
 
         ${R?a`
               <section class="ws-section">
@@ -330,7 +330,7 @@ import{A as r,b as a}from"./lit-core-CTInmNPB.js";import{f as B,aa as Q}from"./c
                   <span>${N.length}</span>
                 </div>
                 <div class="ws-list">
-                  ${N.map(o=>vt({workspaceId:e.id,entry:o,pinned:L.has(o.path),onOpen:c,onPinToggle:d}))}
+                  ${N.map(o=>gt({workspaceId:e.id,entry:o,pinned:L.has(o.path),onOpen:c,onPinToggle:d}))}
                 </div>
               </section>
             `:r}
@@ -338,15 +338,15 @@ import{A as r,b as a}from"./lit-core-CTInmNPB.js";import{f as B,aa as Q}from"./c
         <section class="ws-section">
           <div class="ws-section__header">
             <h3>Artifacts</h3>
-            <span>${I?O.length:T.length}</span>
-            ${D&&T.length>0?a`<button class="ws-export-drive-btn" @click=${()=>{const o=T.map(C=>C.path);D(o)}}>Export to Drive</button>`:r}
+            <span>${F?O.length:g.length}</span>
+            ${v&&g.length>0?a`<button class="ws-export-drive-btn" @click=${()=>{const o=g.map(C=>C.path);v(o)}}>Export to Drive</button>`:r}
           </div>
           <div class="ws-list ws-list--scroll">
-            ${I?O.length===0?a`<div class="ws-empty">
+            ${F?O.length===0?a`<div class="ws-empty">
                       <span class="ws-empty-hint">No artifacts yet. Ask your ally to create a document, plan, or analysis — it'll appear here.</span>
-                    </div>`:O.map(o=>dt(o,0,U)):T.length===0?a`<div class="ws-empty">
+                    </div>`:O.map(o=>dt(o,0,U)):g.length===0?a`<div class="ws-empty">
                       <span class="ws-empty-hint">No artifacts yet. Ask your ally to create a document, plan, or analysis — it'll appear here.</span>
-                    </div>`:T.map(o=>M({workspaceId:e.id,entry:o,pinned:!1,onOpen:c,onPinToggle:d}))}
+                    </div>`:g.map(o=>V({workspaceId:e.id,entry:o,pinned:!1,onOpen:c,onPinToggle:d}))}
           </div>
         </section>
 
@@ -354,26 +354,26 @@ import{A as r,b as a}from"./lit-core-CTInmNPB.js";import{f as B,aa as Q}from"./c
                 <section class="ws-section">
                   <div class="ws-section__header">
                     <h3>Sessions</h3>
-                    <span>${F.length}</span>
+                    <span>${x.length}</span>
                   </div>
                   <div class="ws-list ws-list--scroll">
-                    ${F.length===0?a`
+                    ${x.length===0?a`
                             <div class="ws-empty">
                               <span class="ws-empty-hint">No sessions yet. Sessions are saved conversations with your ally — start a chat to create one.</span>
                             </div>
-                          `:F.map(o=>a`
+                          `:x.map(o=>a`
                               <div class="ws-list-row">
                                 <button class="ws-list-main ws-list-row--button" @click=${()=>f?.(o)}>
                                   <span class=${et(o.status)}></span>
                                   <span class="ws-list-title">${o.title}</span>
-                                  <span class="ws-list-meta">${B(o.created.getTime())}</span>
+                                  <span class="ws-list-meta">${I(o.created.getTime())}</span>
                                 </button>
                                 <button
-                                  class="ws-pin-btn ${x.has(o.key)?"active":""}"
-                                  @click=${()=>m?.(e.id,o.key,x.has(o.key))}
-                                  title=${x.has(o.key)?"Unpin":"Pin"}
+                                  class="ws-pin-btn ${B.has(o.key)?"active":""}"
+                                  @click=${()=>k?.(e.id,o.key,B.has(o.key))}
+                                  title=${B.has(o.key)?"Unpin":"Pin"}
                                 >
-                                  ${x.has(o.key)?"Unpin":"Pin"}
+                                  ${B.has(o.key)?"Unpin":"Pin"}
                                 </button>
                               </div>
                             `)}
@@ -388,32 +388,32 @@ import{A as r,b as a}from"./lit-core-CTInmNPB.js";import{f as B,aa as Q}from"./c
                   <span>${e.memory.length}</span>
                 </div>
                 <div class="ws-list ws-list--scroll">
-                  ${e.memory.map(o=>M({workspaceId:e.id,entry:o,pinned:L.has(o.path),onOpen:c,onPinToggle:d}))}
+                  ${e.memory.map(o=>V({workspaceId:e.id,entry:o,pinned:L.has(o.path),onOpen:c,onPinToggle:d}))}
                 </div>
               </section>
             `:r}
       </div>
     </div>
-  `}function St(t){const{tasks:e,workspaceName:s,showCompleted:n,onToggleTaskComplete:i,onCreateTask:l,onToggleCompletedTasks:u,onStartTask:c,onViewTaskOutput:f,editingTaskId:d,onEditTask:m,onUpdateTask:p}=t,$=V(e.filter(h=>h.status==="pending")),k=V(e.filter(h=>h.status==="complete"));return a`
+  `}function Ct(t){const{tasks:e,workspaceName:s,showCompleted:n,onToggleTaskComplete:i,onCreateTask:l,onToggleCompletedTasks:u,onStartTask:c,onViewTaskOutput:f,editingTaskId:d,onEditTask:k,onUpdateTask:p}=t,$=M(e.filter(h=>h.status==="pending")),m=M(e.filter(h=>h.status==="complete"));return a`
     <section class="ws-section">
       <div class="ws-section__header">
         <h3>Tasks</h3>
-        <span>${$.length} open${k.length>0?`, ${k.length} done`:""}</span>
+        <span>${$.length} open${m.length>0?`, ${m.length} done`:""}</span>
       </div>
       <div class="ws-list ws-list--scroll">
-        ${$.length===0&&k.length===0?a`<div class="ws-empty">No tasks</div>`:r}
-        ${$.map(h=>st(h,i,c,d,m,p,f))}
-        ${k.length>0?a`
+        ${$.length===0&&m.length===0?a`<div class="ws-empty">No tasks</div>`:r}
+        ${$.map(h=>st(h,i,c,d,k,p,f))}
+        ${m.length>0?a`
               <button class="ws-task-completed-toggle" @click=${()=>u?.()}>
-                ${n?"Hide":"Show"} ${k.length} completed
+                ${n?"Hide":"Show"} ${m.length} completed
               </button>
-              ${n?k.map(h=>st(h,i,c,d,m,p,f)):r}
+              ${n?m.map(h=>st(h,i,c,d,k,p,f)):r}
             `:r}
       </div>
       ${l?a`
             <form
               class="ws-task-create-form"
-              @submit=${h=>{h.preventDefault();const y=h.currentTarget.querySelector("input"),w=y.value.trim();w&&(l(w,s),y.value="")}}
+              @submit=${h=>{h.preventDefault();const b=h.currentTarget.querySelector("input"),T=b.value.trim();T&&(l(T,s),b.value="")}}
             >
               <input
                 type="text"
@@ -424,12 +424,12 @@ import{A as r,b as a}from"./lit-core-CTInmNPB.js";import{f as B,aa as Q}from"./c
             </form>
           `:r}
     </section>
-  `}function Bt(t){const{connected:e,workspaces:s,selectedWorkspace:n,searchQuery:i,itemSearchQuery:l,expandedFolders:u,loading:c,createLoading:f,error:d,allTasks:m=[],taskFilter:p="outstanding",taskSort:$="due",taskSearch:k="",showCompletedTasks:h=!1,editingTaskId:b,workspaceNames:y=[],onSearch:w,onItemSearch:v,onSelectWorkspace:D,onBack:P,onItemClick:S,onSessionClick:T,onPinToggle:I,onPinSessionToggle:O,onCreateWorkspace:F,onDeleteWorkspace:x,onToggleFolder:L,onTeamSetup:A,onToggleTaskComplete:_,onCreateTask:j,onSetTaskFilter:N,onSetTaskSort:R,onSetTaskSearch:U,onToggleCompletedTasks:o,onStartTask:C,onViewTaskOutput:Dt,onEditTask:H,onUpdateTask:K}=t,q=s.filter(g=>kt(i,`${g.name} ${g.path} ${g.type}`));return n?Tt({workspace:n,itemSearchQuery:l??"",expandedFolders:u,showCompletedTasks:h,onItemSearch:v,onBack:P,onItemClick:S,onSessionClick:T,onPinToggle:I,onPinSessionToggle:O,onToggleFolder:L,onToggleTaskComplete:_,onCreateTask:j,onToggleCompletedTasks:o,onStartTask:C,editingTaskId:b,onEditTask:H,onUpdateTask:K,browsePath:t.browsePath,browseEntries:t.browseEntries,breadcrumbs:t.breadcrumbs,browseSearchQuery:t.browseSearchQuery,browseSearchResults:t.browseSearchResults,onBrowseFolder:t.onBrowseFolder,onBrowseSearch:t.onBrowseSearch,onBrowseBack:t.onBrowseBack,onCreateFolder:t.onCreateFolder,onBatchPushToDrive:t.onBatchPushToDrive}):a`
+  `}function Bt(t){const{connected:e,workspaces:s,selectedWorkspace:n,searchQuery:i,itemSearchQuery:l,expandedFolders:u,loading:c,createLoading:f,error:d,allTasks:k=[],taskFilter:p="outstanding",taskSort:$="due",taskSearch:m="",showCompletedTasks:h=!1,editingTaskId:D,workspaceNames:b=[],onSearch:T,onItemSearch:w,onSelectWorkspace:v,onBack:S,onItemClick:P,onSessionClick:g,onPinToggle:F,onPinSessionToggle:O,onCreateWorkspace:x,onDeleteWorkspace:B,onToggleFolder:L,onTeamSetup:A,onToggleTaskComplete:_,onCreateTask:j,onSetTaskFilter:N,onSetTaskSort:R,onSetTaskSearch:U,onToggleCompletedTasks:o,onStartTask:C,onViewTaskOutput:wt,onEditTask:H,onUpdateTask:K}=t,q=s.filter(y=>$t(i,`${y.name} ${y.path} ${y.type}`));return n?St({workspace:n,itemSearchQuery:l??"",expandedFolders:u,showCompletedTasks:h,onItemSearch:w,onBack:S,onItemClick:P,onSessionClick:g,onPinToggle:F,onPinSessionToggle:O,onToggleFolder:L,onToggleTaskComplete:_,onCreateTask:j,onToggleCompletedTasks:o,onStartTask:C,editingTaskId:D,onEditTask:H,onUpdateTask:K,browsePath:t.browsePath,browseEntries:t.browseEntries,breadcrumbs:t.breadcrumbs,browseSearchQuery:t.browseSearchQuery,browseSearchResults:t.browseSearchResults,onBrowseFolder:t.onBrowseFolder,onBrowseSearch:t.onBrowseSearch,onBrowseBack:t.onBrowseBack,onCreateFolder:t.onCreateFolder,onBatchPushToDrive:t.onBatchPushToDrive}):a`
     <div class="workspaces-container">
       <div class="workspaces-toolbar">
         <form
             class="workspaces-create-form"
-            @submit=${async g=>{if(g.preventDefault(),f||!F)return;const X=g.currentTarget,W=new FormData(X),G=W.get("name"),J=(typeof G=="string"?G:"").trim();if(!J)return;const Y=W.get("type"),E=(typeof Y=="string"?Y:"project").trim().toLowerCase(),wt=E==="team"||E==="personal"?E:"project",Z=W.get("path"),tt=(typeof Z=="string"?Z:"").trim();await F({name:J,type:wt,...tt?{path:tt}:{}})!==!1&&X.reset()}}
+            @submit=${async y=>{if(y.preventDefault(),f||!x)return;const X=y.currentTarget,W=new FormData(X),G=W.get("name"),J=(typeof G=="string"?G:"").trim();if(!J)return;const Y=W.get("type"),E=(typeof Y=="string"?Y:"project").trim().toLowerCase(),kt=E==="team"||E==="personal"?E:"project",Z=W.get("path"),tt=(typeof Z=="string"?Z:"").trim();await x({name:J,type:kt,...tt?{path:tt}:{}})!==!1&&X.reset()}}
           >
             <input
               type="text"
@@ -462,7 +462,7 @@ import{A as r,b as a}from"./lit-core-CTInmNPB.js";import{f as B,aa as Q}from"./c
             class="workspaces-search-input"
             placeholder="Search workspaces..."
             .value=${i}
-            @input=${g=>w?.(g.target.value)}
+            @input=${y=>T?.(y.target.value)}
           />
           <span class="workspaces-count">${q.length} workspaces</span>
           <span class="workspaces-status ${e?"online":"offline"}">
@@ -487,14 +487,14 @@ import{A as r,b as a}from"./lit-core-CTInmNPB.js";import{f as B,aa as Q}from"./c
                             <span>${e?"No workspaces yet":"Connect to gateway to see workspaces"}</span>
                             ${e?a`<span class="workspaces-empty-hint">Workspaces organize your projects. Ask your ally to create one, or start a focused session in chat.</span>`:r}
                           </div>
-                        `:q.map(g=>bt(g,D,x))}
+                        `:q.map(y=>vt(y,v,B))}
                 </div>
 
-                ${Ct({tasks:m,taskFilter:p,taskSort:$,taskSearch:k,onToggleTaskComplete:_,onSetTaskFilter:N,onSetTaskSort:R,onSetTaskSearch:U,onCreateTask:j,workspaceNames:y,onStartTask:C,editingTaskId:b,onEditTask:H,onUpdateTask:K})}
+                ${Dt({tasks:k,taskFilter:p,taskSort:$,taskSearch:m,onToggleTaskComplete:_,onSetTaskFilter:N,onSetTaskSort:R,onSetTaskSearch:U,onCreateTask:j,workspaceNames:b,onStartTask:C,editingTaskId:D,onEditTask:H,onUpdateTask:K,onViewTaskOutput:wt})}
               </div>
             `}
     </div>
-  `}function Ct(t){const{tasks:e,taskFilter:s,taskSort:n="due",taskSearch:i="",onToggleTaskComplete:l,onSetTaskFilter:u,onSetTaskSort:c,onSetTaskSearch:f,onCreateTask:d,workspaceNames:m=[],onStartTask:p,editingTaskId:$,onEditTask:k,onUpdateTask:h}=t;if(e.length===0&&!d)return a``;let b;if(s==="outstanding")b=e.filter(w=>w.status==="pending");else if(s==="today"){const w=Q();b=e.filter(v=>v.status==="pending"&&v.dueDate!=null&&v.dueDate<=w)}else s==="complete"?b=e.filter(w=>w.status==="complete"):b=e;if(i){const w=i.toLowerCase();b=b.filter(v=>v.title.toLowerCase().includes(w)||v.project?.toLowerCase().includes(w))}const y=V(b,n);return a`
+  `}function Dt(t){const{tasks:e,taskFilter:s,taskSort:n="due",taskSearch:i="",onToggleTaskComplete:l,onSetTaskFilter:u,onSetTaskSort:c,onSetTaskSearch:f,onCreateTask:d,workspaceNames:k=[],onStartTask:p,editingTaskId:$,onEditTask:m,onUpdateTask:h,onViewTaskOutput:D}=t;if(e.length===0&&!d)return a``;let b;if(s==="outstanding")b=e.filter(w=>w.status==="pending");else if(s==="today"){const w=Q();b=e.filter(v=>v.status==="pending"&&v.dueDate!=null&&v.dueDate<=w)}else s==="complete"?b=e.filter(w=>w.status==="complete"):b=e;if(i){const w=i.toLowerCase();b=b.filter(v=>v.title.toLowerCase().includes(w)||v.project?.toLowerCase().includes(w))}const T=M(b,n);return a`
     <div class="ws-all-tasks-section">
       <section class="ws-section">
         <div class="ws-section__header">
@@ -541,24 +541,24 @@ import{A as r,b as a}from"./lit-core-CTInmNPB.js";import{f as B,aa as Q}from"./c
         ${d?a`
               <form
                 class="ws-task-create-form"
-                @submit=${w=>{w.preventDefault();const v=w.currentTarget,D=v.querySelector(".ws-task-create-input"),P=v.querySelector(".ws-task-create-project"),S=D.value.trim();if(!S)return;const T=P?.value||m[0]||"";d(S,T),D.value=""}}
+                @submit=${w=>{w.preventDefault();const v=w.currentTarget,S=v.querySelector(".ws-task-create-input"),P=v.querySelector(".ws-task-create-project"),g=S.value.trim();if(!g)return;const F=P?.value||k[0]||"";d(g,F),S.value=""}}
               >
                 <input
                   type="text"
                   class="ws-task-create-input"
                   placeholder="Add a task..."
                 />
-                ${m.length>0?a`
+                ${k.length>0?a`
                       <select class="ws-task-create-project">
-                        ${m.map(w=>a`<option value=${w}>${w}</option>`)}
+                        ${k.map(w=>a`<option value=${w}>${w}</option>`)}
                       </select>
                     `:r}
                 <button type="submit" class="ws-task-create-btn">Add</button>
               </form>
             `:r}
         <div class="ws-list ws-list--scroll">
-          ${y.length===0?a`<div class="ws-empty">No tasks</div>`:y.map(w=>mt(w,l,p,$,k,h,onViewTaskOutput))}
+          ${T.length===0?a`<div class="ws-empty">No tasks</div>`:T.map(w=>mt(w,l,p,$,m,h,D))}
         </div>
       </section>
     </div>
-  `}export{mt as a,Bt as r,V as s};
+  `}export{mt as a,Bt as r,M as s};

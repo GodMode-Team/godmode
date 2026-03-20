@@ -1,9 +1,9 @@
 {
   "name": "@godmode-team/godmode",
-  "version": "1.7.2",
+  "version": "1.8.0",
   "private": false,
   "description": "GodMode - Personal AI Operating System plugin for OpenClaw",
-  "license": "SEE LICENSE IN LICENSE",
+  "license": "AGPL-3.0-only",
   "author": "GodMode Team <support@lifeongodmode.com>",
   "homepage": "https://lifeongodmode.com",
   "repository": {
@@ -55,6 +55,8 @@
     "build:code": "tsup",
     "build:ui": "vite build --config ui/vite.config.ts",
     "bundle:ui": "node scripts/bundle-ui.mjs",
+    "start": "node dist/standalone.js",
+    "dev": "pnpm build && node dist/standalone.js",
     "dev:ui": "vite --config ui/vite.config.ts",
     "test:ui": "vitest run --config ui/vitest.config.ts",
     "ui:sync": "node scripts/sync-ui-from-repo.mjs",

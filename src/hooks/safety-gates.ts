@@ -1086,9 +1086,25 @@ const DEPLOYMENT_HARD_BLOCK_PATTERNS = [
 
 /** Approval-gatable — blocked by default, user can approve in chat */
 const DEPLOYMENT_APPROVAL_PATTERNS = [
+  // Production deploys
+  /vercel\s+deploy\s+--prod/i,
+  /vercel\s+promote/i,
+  /netlify\s+deploy\s+--prod/i,
+  /firebase\s+deploy/i,
+  /flyctl\s+deploy/i,
+  /railway\s+up/i,
+  /heroku\s+.*push/i,
+
   // Push to protected branches
   /git\s+push\s+(?:\S+\s+)?(?:main|master|production|prod)\b/i,
   /git\s+push\s+origin\s+(?:main|master|production|prod)\b/i,
+
+  // PR merges
+  /gh\s+pr\s+merge/i,
+  /git\s+merge\s+(?:\S+\s+)?(?:main|master|production)\b/i,
+
+  // Release creation (non-draft)
+  /gh\s+release\s+create(?!.*--draft)/i,
 ];
 
 const DEPLOYMENT_HARD_BLOCK_MESSAGE = [
@@ -1256,6 +1272,227 @@ export async function checkDestructiveWriteGate(
   return undefined;
 }
 
+// ── Client-Facing Gate ─────────────────────────────────────────────
+//
+// Problem: Agent executed Circle API calls (creating spaces, sending
+// invites, managing members) without user approval. User explicitly said
+// "don't do anything yet, just plan" — agent ignored it.
+//
+// Approach: APPROVAL GATE — first attempt is blocked with instructions
+// to ask the user. Once the user grants approval in chat, subsequent
+// attempts within the same session pass through. This lets agents do
+// real work while keeping humans in the loop.
+//
+// Covers:
+// - API calls to external services (curl POST/PUT/PATCH/DELETE)
+// - Email/messaging sends
+// - Invite creation, member management
+// - Public content publishing
+// - Any HTTP mutation to external domains
+//
+// READ operations (GET, search, fetch) are ALLOWED.
+
+/** Domains that are internal/safe — never block */
+const INTERNAL_DOMAINS = [
+  "localhost",
+  "127.0.0.1",
+  "0.0.0.0",
+  ".local",
+  ".internal",
+  ".tailnet",
+  ".ts.net",
+];
+
+/** HTTP methods that are read-only — never block */
+const SAFE_HTTP_METHODS = ["get", "head", "options"];
+
+/**
+ * Patterns that indicate a client-facing/public/outbound action.
+ * These catch both exec/bash commands AND tool parameters.
+ */
+const CLIENT_FACING_PATTERNS = [
+  // curl/wget/httpie mutations to external APIs
+  /curl\s+.*-X\s*(POST|PUT|PATCH|DELETE)/i,
+  /curl\s+.*--request\s*(POST|PUT|PATCH|DELETE)/i,
+  /curl\s+.*-d\s/i, // curl with data = POST
+  /curl\s+.*--data/i,
+  /wget\s+.*--post/i,
+  /http\s+(POST|PUT|PATCH|DELETE)\s/i, // httpie
+
+  // Email/messaging
+  /sendmail\b/i,
+  /mail\s+-s\b/i,
+  /smtp/i,
+  /send.*email/i,
+  /send.*invite/i,
+  /send.*notification/i,
+
+  // Circle API mutations
+  /circle\.so.*\/(members|invitations|spaces|posts|events|comments)/i,
+
+  // Common SaaS API mutations
+  /api\.\S+\.\S+.*-X\s*(POST|PUT|PATCH|DELETE)/i,
+
+  // Git push — handled by deploymentGate (blocks main/master/prod/force only)
+  // Feature-branch pushes are allowed here; deployment gate catches the rest.
+
+  // npm/package publishing
+  /npm\s+publish/i,
+  /pnpm\s+publish/i,
+
+  // Social media posting
+  /twurl\b/i,
+  /twitter.*\/statuses/i,
+];
+
+const CLIENT_FACING_BLOCK_MESSAGE = [
+  "\u{1F6D1} APPROVAL REQUIRED: This action needs user approval before executing.",
+  "",
+  "This tool call would perform a client-facing or public action:",
+  "- Sending invites, emails, or notifications",
+  "- Creating/modifying content on external platforms",
+  "- Publishing or posting to public systems",
+  "- Mutating data via external API calls",
+  "",
+  "You MUST:",
+  "1. Present the EXACT action you want to take",
+  "2. Show the specific API call, recipients, or content",
+  "3. Wait for the user to say 'approved', 'go ahead', 'do it', or similar",
+  "4. Only then retry the action — it will go through after approval",
+  "",
+  "Planning, reading, and searching are fine. Executing requires a green light.",
+].join("\n");
+
+/**
+ * Check if a tool call would perform a client-facing or public action.
+ * Covers exec/bash commands AND higher-level tools like web_fetch with POST.
+ *
+ * First attempt: returns BLOCK reason string (ally must ask for approval).
+ * After user approves in chat: returns undefined (allowed).
+ * Returns undefined if the action is safe.
+ */
+export async function checkClientFacingGate(
+  toolName: string,
+  params: Record<string, unknown>,
+  sessionKey?: string,
+): Promise<string | undefined> {
+  const config = await readGuardrailsStateCached();
+  if (!config.gates.clientFacingGate?.enabled) return undefined;
+
+  const name = toolName.trim().toLowerCase();
+
+  // ── exec/bash/shell: check the command text ──
+  if (name === "exec" || name === "bash" || name === "shell") {
+    const command =
+      typeof params.command === "string"
+        ? params.command
+        : typeof params.cmd === "string"
+          ? params.cmd
+          : "";
+    if (!command) return undefined;
+
+    // Allow read-only commands
+    if (/^curl\s/.test(command) && !CLIENT_FACING_PATTERNS.some((p) => p.test(command))) {
+      // Plain curl GET — safe
+      return undefined;
+    }
+
+    if (CLIENT_FACING_PATTERNS.some((p) => p.test(command))) {
+      // Check if it's hitting an internal domain
+      const isInternal = INTERNAL_DOMAINS.some((d) => command.includes(d));
+      if (isInternal) return undefined;
+
+      // Check if user already approved
+      if (hasApproval(sessionKey)) {
+        void logGateActivity(
+          "clientFacingGate",
+          "approved",
+          `Client-facing action APPROVED (user granted): ${command.slice(0, 150)}`,
+          sessionKey,
+        );
+        return undefined;
+      }
+
+      markPendingApproval(sessionKey);
+      void logGateActivity(
+        "clientFacingGate",
+        "blocked",
+        `Client-facing action GATED: ${command.slice(0, 150)}`,
+        sessionKey,
+      );
+      return CLIENT_FACING_BLOCK_MESSAGE;
+    }
+  }
+
+  // ── web_fetch with mutation method ──
+  if (name === "web_fetch" || name === "fetch" || name === "http") {
+    const method = (typeof params.method === "string" ? params.method : "GET").toLowerCase();
+    const url = typeof params.url === "string" ? params.url : "";
+
+    if (!SAFE_HTTP_METHODS.includes(method)) {
+      const isInternal = INTERNAL_DOMAINS.some((d) => url.includes(d));
+      if (!isInternal) {
+        if (hasApproval(sessionKey)) {
+          void logGateActivity(
+            "clientFacingGate",
+            "approved",
+            `Client-facing fetch APPROVED (user granted): ${method.toUpperCase()} ${url.slice(0, 120)}`,
+            sessionKey,
+          );
+          return undefined;
+        }
+
+        markPendingApproval(sessionKey);
+        void logGateActivity(
+          "clientFacingGate",
+          "blocked",
+          `Client-facing fetch GATED: ${method.toUpperCase()} ${url.slice(0, 120)}`,
+          sessionKey,
+        );
+        return CLIENT_FACING_BLOCK_MESSAGE;
+      }
+    }
+  }
+
+  // ── Slack/Discord/email tools ──
+  if (
+    name.startsWith("slack.") ||
+    name.startsWith("discord.") ||
+    name.startsWith("email.") ||
+    name === "send_email" ||
+    name === "send_message" ||
+    name === "team_message"
+  ) {
+    // team_message to internal workspaces is allowed if type is not "invite"
+    if (name === "team_message") {
+      const msgType = typeof params.type === "string" ? params.type : "";
+      if (msgType !== "invite") return undefined; // internal team comms OK
+    }
+
+    // Check if user already approved comms actions for this session
+    if (hasApproval(sessionKey)) {
+      void logGateActivity(
+        "clientFacingGate",
+        "approved",
+        `Client-facing comms APPROVED (user granted): ${name}`,
+        sessionKey,
+      );
+      return undefined;
+    }
+
+    markPendingApproval(sessionKey);
+    void logGateActivity(
+      "clientFacingGate",
+      "blocked",
+      `Client-facing comms GATED: ${name}`,
+      sessionKey,
+    );
+    return CLIENT_FACING_BLOCK_MESSAGE;
+  }
+
+  return undefined;
+}
+
 /**
  * Reset prompt shield and output shield tracking for a session.
  */
@@ -1281,6 +1518,8 @@ type ContextPressureState = {
   tier: "ok" | "warning" | "critical";
   nudgeQueued: boolean;
   lastWarnedAt: number;
+  /** When a single turn spikes >30% usage, defer critical by one turn */
+  spikeDeferred?: boolean;
 };
 
 const contextPressure = new Map<string, ContextPressureState>();
@@ -1319,9 +1558,26 @@ export async function trackContextPressure(
 
   const existing = contextPressure.get(key);
 
+  // Spike detection: if a single turn jumps >30% of max context (e.g. images),
+  // defer the critical tier by one turn to avoid premature compaction.
+  // On the next turn, if still critical, proceed normally.
+  const SPIKE_THRESHOLD_PCT = 30;
+  const prevTokens = existing?.lastInputTokens ?? 0;
+  const deltaTokens = inputTokens - prevTokens;
+  const deltaPct = maxTokens > 0 ? (deltaTokens / maxTokens) * 100 : 0;
+  const isSpike = deltaPct >= SPIKE_THRESHOLD_PCT && prevTokens > 0;
+
   let tier: "ok" | "warning" | "critical" = "ok";
   if (utilization >= criticalPct) tier = "critical";
   else if (utilization >= warningPct) tier = "warning";
+
+  // If this is a spike and we haven't deferred yet, downgrade critical → warning
+  // so we don't auto-compact just because one large image was sent.
+  let spikeDeferred = false;
+  if (tier === "critical" && isSpike && !existing?.spikeDeferred) {
+    tier = "warning";
+    spikeDeferred = true;
+  }
 
   const shouldNudge =
     tier !== "ok" &&
@@ -1342,6 +1598,7 @@ export async function trackContextPressure(
     tier,
     nudgeQueued: shouldNudge || (existing?.nudgeQueued ?? false),
     lastWarnedAt: shouldNudge ? now : (existing?.lastWarnedAt ?? 0),
+    spikeDeferred,
   });
 
   return tier;

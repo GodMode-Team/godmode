@@ -97,7 +97,8 @@ function formatArgsForDisplay(toolName: string, args: unknown): string {
         return truncateDisplay(safeStr(a.url || ""), 50);
       }
     case "memory_search":
-      return a.query ? `"${truncateDisplay(safeStr(a.query), 45)}"` : "";
+    case "honcho_query":
+      return a.query || a.question ? `"${truncateDisplay(safeStr(a.query || a.question), 45)}"` : "";
     case "browser":
       const action = safeStr(a.action);
       const ref = a.ref ? ` #${safeStr(a.ref)}` : "";
@@ -155,7 +156,7 @@ function formatResultSummary(toolName: string, output: string | null | undefined
   }
 
   // Searches: try to count results
-  if (["web_search", "memory_search"].includes(lower)) {
+  if (["web_search", "memory_search", "honcho_query"].includes(lower)) {
     try {
       const parsed = JSON.parse(output);
       const count = parsed.results?.length ?? parsed.count ?? 0;

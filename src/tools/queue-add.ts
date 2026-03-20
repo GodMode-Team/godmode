@@ -67,6 +67,12 @@ export function createQueueAddTool(_ctx: ToolContext): AnyAgentTool {
             "Which AI engine to use. Defaults to persona's engine or 'claude'. " +
             "Use 'codex' for complex backend/multi-file work, 'claude' for speed/frontend.",
         },
+        model: {
+          type: "string",
+          description:
+            "Which model to use (e.g. 'opus', 'sonnet', 'claude-opus-4-6'). " +
+            "Defaults to 'opus'. Only applies to claude engine.",
+        },
         scheduled_at: {
           type: "string",
           description:
@@ -105,6 +111,7 @@ export function createQueueAddTool(_ctx: ToolContext): AnyAgentTool {
       const successCriteria = params.success_criteria ? String(params.success_criteria) : undefined;
       const priority = (params.priority as "high" | "normal" | "low") || "normal";
       const engine = params.engine ? String(params.engine) : persona?.engine ?? "claude";
+      const model = params.model ? String(params.model) : undefined;
       const scheduledAt = params.scheduled_at
         ? new Date(String(params.scheduled_at)).getTime() || undefined
         : undefined;
@@ -119,6 +126,7 @@ export function createQueueAddTool(_ctx: ToolContext): AnyAgentTool {
             type,
             persona: personaName,
             engine,
+            model: model ?? "(default: opus)",
             priority,
             description: description ?? "(none)",
             successCriteria: successCriteria ?? "(not specified — consider adding one)",
@@ -168,6 +176,7 @@ export function createQueueAddTool(_ctx: ToolContext): AnyAgentTool {
           sessionId: _ctx.sessionKey ?? undefined,
           personaHint: personaSlug ?? persona?.slug,
           engine: params.engine ? (String(params.engine) as "claude" | "codex" | "gemini") : undefined,
+          model,
           scheduledAt,
           handoff,
         };

@@ -1,66 +1,165 @@
 /**
- * memory.ts — LEGACY stub. Mem0 has been replaced by Honcho (src/services/honcho-client.ts).
+ * memory.ts — Provider-routing facade for GodMode memory.
  *
- * This file exports stub functions so that dynamic-import callers
- * (self-heal, agent-toolkit-server, before-prompt-build, lifecycle-hooks,
- * system-update) don't crash.
+ * This is the ONLY import for memory operations across the codebase.
+ * Routes to the active provider (honcho or none) based on env config.
  *
- * All real memory operations now go through honcho-client.ts.
- * This file can be fully removed once all callers are migrated.
+ * Adding a future provider: add a new service file + new case here.
+ * No other files need to change.
  */
 
-// ── Stub exports — always return "offline" / empty / no-op ──────────
+// ── Provider Detection ──────────────────────────────────────────────
 
-export async function initMemory(): Promise<void> {
-  // no-op — Honcho is initialized in gateway-start via honcho-client.ts
+export type MemoryProvider = "honcho" | "none";
+
+/**
+ * Auto-detect the active memory provider.
+ * - If GODMODE_MEMORY_PROVIDER is set, use that.
+ * - If HONCHO_API_KEY exists → "honcho".
+ * - Otherwise → "none".
+ */
+export function getMemoryProvider(): MemoryProvider {
+  const override = process.env.GODMODE_MEMORY_PROVIDER;
+  if (override === "none") return "none";
+  if (override === "honcho") return "honcho";
+  if (process.env.HONCHO_API_KEY) return "honcho";
+  return "none";
 }
 
-export function isMemoryReady(): boolean {
-  return false;
-}
+// ── Status ──────────────────────────────────────────────────────────
 
 export type MemoryStatus = "ready" | "degraded" | "offline";
 
+export function isMemoryReady(): boolean {
+  if (getMemoryProvider() === "none") return false;
+  // Lazy check — avoid top-level import of honcho-client
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const mod = _honchoModule;
+    return mod ? mod.isHonchoReady() : false;
+  } catch {
+    return false;
+  }
+}
+
 export function getMemoryStatus(): MemoryStatus {
-  return "offline";
+  if (getMemoryProvider() === "none") return "offline";
+  try {
+    const mod = _honchoModule;
+    return mod ? mod.getHonchoStatus() : "offline";
+  } catch {
+    return "offline";
+  }
 }
 
-export function resetSearchCircuitBreaker(): void {
-  // no-op
+export function getMemoryStats(): { ready: boolean; sessionCount: number } {
+  if (getMemoryProvider() === "none") return { ready: false, sessionCount: 0 };
+  try {
+    const mod = _honchoModule;
+    return mod ? mod.getStatus() : { ready: false, sessionCount: 0 };
+  } catch {
+    return { ready: false, sessionCount: 0 };
+  }
 }
 
-export interface MemoryResult {
-  memory: string;
-  score?: number;
+// ── Init ────────────────────────────────────────────────────────────
+
+/**
+ * Initialize the memory provider. Returns true if ready.
+ * Safe to call at startup — never throws.
+ */
+export async function initMemory(): Promise<boolean> {
+  const provider = getMemoryProvider();
+  if (provider === "none") return false;
+
+  if (provider === "honcho") {
+    try {
+      const mod = await import("../services/honcho-client.js");
+      _honchoModule = mod;
+      return await mod.initHoncho();
+    } catch (err) {
+      console.warn(`[GodMode] Memory init failed (non-fatal): ${String(err)}`);
+      return false;
+    }
+  }
+
+  return false;
 }
 
-export async function searchMemories(
-  _query: string,
-  _userId: string,
-  _limit = 10,
-): Promise<MemoryResult[]> {
-  return [];
-}
+// ── Message Forwarding ──────────────────────────────────────────────
 
-export function formatMemoriesForContext(_memories: MemoryResult[]): string {
-  return "";
-}
-
-export async function ingestConversation(
-  _content: string,
-  _userId: string,
+/**
+ * Forward a user or assistant message to the memory provider.
+ * Fire-and-forget — never blocks the conversation.
+ */
+export async function forwardMessage(
+  role: "user" | "assistant",
+  content: string,
+  sessionKey: string,
 ): Promise<void> {
-  // no-op — ingestion handled by Honcho
+  const provider = getMemoryProvider();
+  if (provider === "none") return;
+
+  if (provider === "honcho") {
+    try {
+      const mod = _honchoModule ?? await import("../services/honcho-client.js");
+      _honchoModule = mod;
+      await mod.forwardMessage(role, content, sessionKey);
+    } catch {
+      // Fire-and-forget — never crash
+    }
+  }
 }
 
-export async function processRetryQueue(): Promise<number> {
-  return 0;
-}
+// ── Context Retrieval ───────────────────────────────────────────────
 
-export async function getMemoryStats(_userId: string): Promise<{ count: number } | null> {
+/**
+ * Get the memory provider's context for the current session.
+ * Returns a formatted string for context injection, or null if unavailable.
+ */
+export async function getContext(sessionKey: string): Promise<string | null> {
+  const provider = getMemoryProvider();
+  if (provider === "none") return null;
+
+  if (provider === "honcho") {
+    try {
+      const mod = _honchoModule ?? await import("../services/honcho-client.js");
+      _honchoModule = mod;
+      return await mod.getContext(sessionKey);
+    } catch {
+      return null;
+    }
+  }
+
   return null;
 }
 
-export async function seedFromVault(_userId: string): Promise<void> {
-  // no-op — Honcho handles its own seeding
+// ── Peer Query ──────────────────────────────────────────────────────
+
+/**
+ * Query the memory provider's user model with a specific question.
+ * Used by vault sync and skills that need deep memory recall.
+ */
+export async function queryPeer(
+  question: string,
+  sessionKey: string,
+): Promise<string | null> {
+  const provider = getMemoryProvider();
+  if (provider === "none") return null;
+
+  if (provider === "honcho") {
+    try {
+      const mod = _honchoModule ?? await import("../services/honcho-client.js");
+      _honchoModule = mod;
+      return await mod.queryPeer(question, sessionKey);
+    } catch {
+      return null;
+    }
+  }
+
+  return null;
 }
+
+// ── Cached module reference (avoid repeated dynamic imports) ────────
+
+let _honchoModule: typeof import("../services/honcho-client.js") | null = null;

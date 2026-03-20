@@ -86,13 +86,14 @@ export async function registerGodMode(
 
   // ── 2. Inline RPC methods ─────────────────────────────────────
 
-  // Agent identity — the UI calls this to resolve "Prosper" name + avatar.
+  // Agent identity — the UI calls this to resolve the ally name + avatar.
   // On OpenClaw this is a core RPC; standalone runtimes need it registered here.
   adapter.registerMethod("agent.identity.get", (async ({ respond }) => {
+    const { getAllyName, getAllyNameLower } = await import("../lib/ally-identity.js");
     respond(true, {
-      name: "Prosper",
+      name: getAllyName(),
       avatar: null,
-      agentId: "prosper",
+      agentId: getAllyNameLower(),
     });
   }) as StandaloneRequestHandler);
   methodCount++;
@@ -177,6 +178,71 @@ export async function registerGodMode(
   }) as StandaloneRequestHandler);
   methodCount++;
 
+  // sessions.list — the UI calls this to populate the session picker + context badge.
+  // Hermes standalone doesn't have a native session registry, so we synthesize one
+  // from chat-proxy session files + context-pressure data from safety gates.
+  adapter.registerMethod("sessions.list", (async ({ respond }) => {
+    try {
+      const { readdirSync, readFileSync: readFs, existsSync: exists } = await import("node:fs");
+      const { join: joinPath } = await import("node:path");
+      const { homedir } = await import("node:os");
+      // Use explicit path instead of dynamic import (tsup bundling can break relative imports)
+      const dataDir = process.env.GODMODE_ROOT
+        ? joinPath(process.env.GODMODE_ROOT, "data")
+        : joinPath(homedir(), "godmode", "data");
+      const sessionsDir = joinPath(dataDir, "hermes-sessions");
+
+      let rawSessions: Array<{ id: string; createdAt: number; inputTokens: number; outputTokens: number; lastInputTokens: number }> = [];
+      if (exists(sessionsDir)) {
+        const files = readdirSync(sessionsDir).filter((f: string) => f.endsWith(".json"));
+        for (const f of files) {
+          try {
+            const raw = JSON.parse(readFs(joinPath(sessionsDir, f), "utf-8"));
+            rawSessions.push({
+              id: raw.id ?? f.replace(".json", ""),
+              createdAt: raw.createdAt ?? 0,
+              inputTokens: raw.inputTokens ?? 0,
+              outputTokens: raw.outputTokens ?? 0,
+              lastInputTokens: raw.lastInputTokens ?? 0,
+            });
+          } catch { /* skip corrupt */ }
+        }
+        rawSessions.sort((a, b) => b.createdAt - a.createdAt);
+      }
+
+      // Map to GatewaySessionRow shape.
+      // totalTokens = last turn's prompt_tokens (actual context window size),
+      // NOT cumulative sum. The UI uses totalTokens/contextTokens to compute
+      // context pressure percentage — cumulative sum caused false overflows.
+      const sessions = rawSessions.map((s) => ({
+        key: s.id,
+        kind: "direct" as const,
+        updatedAt: s.createdAt,
+        totalTokens: s.lastInputTokens > 0 ? s.lastInputTokens : Math.min(s.inputTokens, 200000),
+        contextTokens: 200000,
+      }));
+
+      respond(true, {
+        ts: Date.now(),
+        path: sessionsDir,
+        count: sessions.length,
+        defaults: { contextTokens: 200000 },
+        sessions,
+      });
+    } catch (err) {
+      logger.warn(`[GodMode] sessions.list error: ${String(err)}`);
+      respond(true, {
+        ts: Date.now(),
+        path: "",
+        count: 0,
+        defaults: { contextTokens: 200000 },
+        sessions: [],
+        error: String(err),
+      });
+    }
+  }) as StandaloneRequestHandler);
+  methodCount++;
+
   adapter.registerMethod("sessions.generateTitle", (async ({ params, respond }) => {
     const userMessage = typeof params.userMessage === "string" ? params.userMessage : "";
     const assistantMessage = typeof params.assistantMessage === "string" ? params.assistantMessage : "";
@@ -190,6 +256,66 @@ export async function registerGodMode(
       respond(true, { title: title ?? null });
     } catch (err) {
       respond(true, { title: null, error: String(err) });
+    }
+  }) as StandaloneRequestHandler);
+  methodCount++;
+
+  // sessions.searchContent — full-text search across Hermes session history.
+  adapter.registerMethod("sessions.searchContent", (async ({ params, respond }) => {
+    const query = typeof params.query === "string" ? params.query.trim() : "";
+    if (!query) {
+      respond(true, { ts: Date.now(), results: [] });
+      return;
+    }
+    const limit = Math.min(Math.max(1, typeof params.limit === "number" ? params.limit : 20), 50);
+    const queryLower = query.toLowerCase();
+
+    try {
+      const { readdirSync, readFileSync: readFs, existsSync: exists } = await import("node:fs");
+      const { join: joinPath } = await import("node:path");
+      const { homedir } = await import("node:os");
+      const dataDir = process.env.GODMODE_ROOT
+        ? joinPath(process.env.GODMODE_ROOT, "data")
+        : joinPath(homedir(), "godmode", "data");
+      const sessionsDir = joinPath(dataDir, "hermes-sessions");
+
+      type MatchEntry = { role: string; text: string };
+      type SearchResult = { key: string; displayName?: string; matches: MatchEntry[] };
+      const results: SearchResult[] = [];
+
+      if (exists(sessionsDir)) {
+        const files = readdirSync(sessionsDir).filter((f: string) => f.endsWith(".json") && f !== "__compat_probe__.json");
+        for (const f of files) {
+          if (results.length >= limit) break;
+          try {
+            const raw = JSON.parse(readFs(joinPath(sessionsDir, f), "utf-8"));
+            const matches: MatchEntry[] = [];
+            if (Array.isArray(raw.messages)) {
+              for (const m of raw.messages) {
+                if (matches.length >= 3) break;
+                const role = m.role;
+                if (role !== "user" && role !== "assistant") continue;
+                const text = typeof m.content === "string" ? m.content
+                  : Array.isArray(m.content) ? m.content.filter((b: any) => b.type === "text").map((b: any) => b.text).join(" ") : "";
+                const idx = text.toLowerCase().indexOf(queryLower);
+                if (idx === -1) continue;
+                const start = Math.max(0, idx - 80);
+                const end = Math.min(text.length, idx + queryLower.length + 120);
+                let excerpt = text.slice(start, end).replace(/\s+/g, " ").trim();
+                if (start > 0) excerpt = "..." + excerpt;
+                if (end < text.length) excerpt += "...";
+                matches.push({ role, text: excerpt });
+              }
+            }
+            if (matches.length > 0) {
+              results.push({ key: raw.id ?? f.replace(".json", ""), matches });
+            }
+          } catch { /* skip */ }
+        }
+      }
+      respond(true, { ts: Date.now(), results });
+    } catch (err) {
+      respond(true, { ts: Date.now(), results: [], error: String(err) });
     }
   }) as StandaloneRequestHandler);
   methodCount++;
@@ -217,6 +343,7 @@ export async function registerGodMode(
     () => import("../tools/queue-steer.js").then((m) => m.createQueueSteerTool),
     () => import("../tools/delegate-tool.js").then((m) => m.createDelegateTool),
     () => import("../tools/composio-tool.js").then((m) => m.createComposioExecuteTool),
+    () => import("../tools/memory-search-shim.js").then((m) => m.createMemorySearchShimTool),
   ];
 
   let toolCount = 0;
@@ -276,14 +403,14 @@ export async function registerGodMode(
 
   if (adapter.onAfterChat) {
     adapter.onAfterChat(async (_sessionKey: string, userMsg: string, assistantMsg: string) => {
-      // Honcho memory ingest — learn from the conversation
+      // Memory ingest — learn from the conversation
       try {
-        const { forwardMessage } = await import("../services/honcho-client.js");
+        const { forwardMessage } = await import("../lib/memory.js");
         await forwardMessage("user", userMsg, _sessionKey);
         await forwardMessage("assistant", assistantMsg, _sessionKey);
       } catch {
         const { reportDegraded } = await import("../lib/service-health.js");
-        reportDegraded("honcho", "Honcho message forwarding failed", "Check HONCHO_API_KEY in Settings");
+        reportDegraded("honcho", "Memory message forwarding failed", "Check memory provider in Settings");
       }
 
       // Identity graph — extract entities from the response
@@ -291,6 +418,53 @@ export async function registerGodMode(
         const { extractAndStore } = await import("../lib/identity-graph.js");
         await extractAndStore(assistantMsg);
       } catch { /* non-fatal */ }
+
+      // Auto-title — Hermes has no llm_output hook, so we title here
+      if (_sessionKey && userMsg && userMsg.length >= 10 && assistantMsg && assistantMsg.length >= 10) {
+        void (async () => {
+          try {
+            const { generateSessionTitle, titledSessions, evictTitledSessions } = await import("../lib/auto-title.js");
+            if (titledSessions.has(_sessionKey)) return;
+
+            // Check if session already has a title in the store
+            const { loadConfig: loadSessCfg, loadCombinedSessionStoreForGateway, updateSessionStore, resolveAgentStorePath } = await import("../lib/workspace-session-store.js");
+            const cfg = await loadSessCfg();
+            const { store } = await loadCombinedSessionStoreForGateway(cfg);
+            const normalizedKey = _sessionKey.trim().toLowerCase();
+            const entry = store[normalizedKey];
+            if (entry) {
+              const existingTitle = (entry.displayName || entry.label || entry.subject || "").trim();
+              if (existingTitle) {
+                titledSessions.add(_sessionKey);
+                return;
+              }
+            }
+
+            const title = await generateSessionTitle(userMsg, assistantMsg);
+            if (!title) {
+              titledSessions.add(_sessionKey);
+              return;
+            }
+
+            const storePath = resolveAgentStorePath(_sessionKey, cfg);
+            await updateSessionStore(storePath, (storeData) => {
+              const existing = storeData[normalizedKey] ?? {};
+              storeData[normalizedKey] = {
+                ...existing,
+                displayName: title,
+                updatedAt: Date.now(),
+              };
+            });
+
+            titledSessions.add(_sessionKey);
+            evictTitledSessions();
+            logger.info(`[GodMode][AutoTitle] Hermes: titled "${_sessionKey}" → "${title}"`);
+            adapter.broadcast("sessions:updated", { sessionKey: _sessionKey, title });
+          } catch (err) {
+            logger.warn(`[GodMode][AutoTitle] Hermes auto-title error: ${String(err)}`);
+          }
+        })();
+      }
     });
   }
 

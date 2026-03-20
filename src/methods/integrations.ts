@@ -368,6 +368,33 @@ const autoInstall: GatewayRequestHandler = async ({ params, respond }) => {
   }
 };
 
+// ── Paperclip dashboard URL ──────────────────────────────────────────
+
+const paperclipDashboardUrl: GatewayRequestHandler = async ({ respond }) => {
+  try {
+    const { isPaperclipReady, getPaperclipStatus, getAgents } = await import(
+      "../services/paperclip-client.js"
+    );
+    const ready = isPaperclipReady();
+    if (!ready) {
+      respond(true, { ready: false, url: null });
+      return;
+    }
+    const [status, agents] = await Promise.all([
+      getPaperclipStatus(),
+      getAgents().catch(() => []),
+    ]);
+    respond(true, {
+      ready: true,
+      url: status.url,
+      taskCount: status.taskCount,
+      agents,
+    });
+  } catch {
+    respond(true, { ready: false, url: null });
+  }
+};
+
 // ── Export ──────────────────────────────────────────────────────────────
 
 export const integrationsHandlers: GatewayRequestHandlers = {
@@ -377,4 +404,5 @@ export const integrationsHandlers: GatewayRequestHandlers = {
   "integrations.setupGuide": setupGuide,
   "integrations.platformInfo": platformInfo,
   "integrations.autoInstall": autoInstall,
+  "paperclip.dashboardUrl": paperclipDashboardUrl,
 };

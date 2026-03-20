@@ -75,10 +75,8 @@ try {
 // ── UI Stubs (OpenClaw-core methods the UI expects) ────────────
 
 function registerOcStubs(adapter: { registerMethod: (name: string, handler: StandaloneRequestHandler) => void }) {
-  // Sessions — managed by Hermes, stub for UI compatibility
-  adapter.registerMethod("sessions.list", async ({ respond }) => {
-    respond(true, { sessions: [] });
-  });
+  // Sessions — sessions.list is a real handler in register-all.ts.
+  // Only stub patch/delete/archived which don't have real implementations yet.
   adapter.registerMethod("sessions.patch", async ({ respond }) => {
     respond(true, { ok: true });
   });

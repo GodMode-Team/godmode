@@ -12,13 +12,16 @@ const DEFAULT_USER = "godmode-user";
 
 export function createComposioExecuteTool(): AnyAgentTool {
   return {
-    label: "Integrations",
+    label: "Composio",
     name: "composio_execute",
     description:
-      "Execute an action on a connected third-party service via Composio. " +
-      "Use this to interact with external tools the user has connected " +
-      "(e.g. GitHub, Slack, Google, HubSpot). " +
-      "Call composio.status RPC first to see what's connected.",
+      "Execute an action on a third-party service connected ONLY through Composio. " +
+      "IMPORTANT: Do NOT use this for services that already have direct API integrations — " +
+      "Front (use FRONT_API_TOKEN), Fathom (use FATHOM_API_KEY), GitHub (use gh CLI), " +
+      "Google Calendar (use gog CLI), X/Twitter (use x_read tool), or any service with " +
+      "its own env var or tool. Only use composio_execute for services the user has " +
+      "explicitly connected through Composio that have no other integration path. " +
+      "Call composio.status RPC first to see what's connected via Composio.",
     parameters: {
       type: "object" as const,
       properties: {

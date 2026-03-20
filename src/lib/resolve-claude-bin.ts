@@ -135,15 +135,26 @@ export function resolveAgentBin(engine: AgentEngine): string {
 export function buildSpawnArgs(
   engine: AgentEngine,
   prompt: string,
+  options?: { model?: string; maxBudgetUsd?: number },
 ): { bin: string; args: string[] } {
   const bin = resolveEngineBin(engine);
 
   switch (engine) {
-    case "claude":
+    case "claude": {
+      const model = options?.model ?? "opus";
+      const budget = options?.maxBudgetUsd ?? 5;
       return {
         bin,
-        args: ["-p", prompt, "--verbose", "--dangerously-skip-permissions"],
+        args: [
+          "-p", prompt,
+          "--model", model,
+          "--output-format", "text",
+          "--max-budget-usd", String(budget),
+          "--verbose",
+          "--dangerously-skip-permissions",
+        ],
       };
+    }
     case "codex":
       return {
         bin,

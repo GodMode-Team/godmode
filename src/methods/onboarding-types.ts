@@ -43,6 +43,14 @@ export type AssessmentResult = {
   gatewayTokenSet: boolean;
   /** Integration status from the integration registry */
   integrationsStatus?: Record<string, { configured: boolean; working: boolean }>;
+  /** SOUL.md already exists in ~/godmode/memory/ */
+  soulMdExists: boolean;
+  /** Number of agent persona .md files found in roster dirs */
+  agentRosterCount: number;
+  /** Hermes state dir (~/.hermes/) detected */
+  hermesDetected: boolean;
+  /** Queue items with status "done" or "review" — indicates prior delegation */
+  queueCompletedCount: number;
   timestamp: string;
 };
 
@@ -157,6 +165,8 @@ export type OnboardingState = {
   phase: OnboardingPhase;
   startedAt: string;
   completedPhases: number[];
+  /** User-chosen name for their AI ally (persisted, read by getAllyName()) */
+  allyName?: string;
 
   // Phase data
   assessment: AssessmentResult | null;

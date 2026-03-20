@@ -413,31 +413,29 @@ function checkApiKeys(logger: Logger): void {
 async function checkAndRepairMemory(logger: Logger): Promise<void> {
   const id: SubsystemId = "memory";
   try {
-    // Check Honcho first (primary memory system)
+    // Check memory via provider facade
     try {
-      const { isHonchoReady, initHoncho } = await import("./honcho-client.js");
-      if (isHonchoReady()) {
-        markHealthy(id, "Honcho memory operational");
+      const { isMemoryReady, initMemory, getMemoryProvider } = await import("../lib/memory.js");
+      const provider = getMemoryProvider();
+      if (isMemoryReady()) {
+        markHealthy(id, `Memory operational (provider: ${provider})`);
         return;
       }
 
-      // Not ready — try to init if key is available
-      const hasHonchoKey = !!process.env.HONCHO_API_KEY;
-      if (hasHonchoKey) {
-        logger.info("[SelfHeal] Honcho offline but key available — attempting re-init...");
-        const ok = await initHoncho();
+      if (provider !== "none") {
+        logger.info(`[SelfHeal] Memory offline but provider "${provider}" configured — attempting re-init...`);
+        const ok = await initMemory();
         if (ok) {
-          markRepaired(id, "Re-initialized Honcho memory");
+          markRepaired(id, `Re-initialized memory (provider: ${provider})`);
           health.signal("memory.repair", true);
         } else {
-          markDegraded(id, "Honcho re-init failed");
+          markDegraded(id, `Memory re-init failed (provider: ${provider})`);
         }
       } else {
-        // No Honcho key — memory is simply unavailable, not broken
-        markDegraded(id, "HONCHO_API_KEY not configured — memory features disabled but chat works fine");
+        // No provider configured — memory is simply unavailable, not broken
+        markDegraded(id, "No memory provider configured — memory features disabled but chat works fine");
       }
     } catch {
-      // Honcho client not available
       markDegraded(id, "Memory service not available — chat works fine without it");
     }
   } catch (err) {

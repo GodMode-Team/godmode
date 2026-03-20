@@ -459,8 +459,8 @@ async function runPostUpdateSmokeTests(
 
   // 2. Memory system
   try {
-    const { isHonchoReady } = await import("../services/honcho-client.js");
-    const ready = isHonchoReady();
+    const { isMemoryReady } = await import("../lib/memory.js");
+    const ready = isMemoryReady();
     results.push({
       name: "memory",
       status: ready ? "pass" : "warn",
