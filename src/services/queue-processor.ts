@@ -96,8 +96,11 @@ function buildChildEnv(): Record<string, string> {
     LANG: process.env.LANG ?? "en_US.UTF-8",
     TERM: process.env.TERM ?? "xterm-256color",
   };
-  // ANTHROPIC_API_KEY intentionally NOT forwarded — agents should use
-  // OAuth/Max subscription via CLI auth, not the direct API account.
+  // Forward ANTHROPIC_API_KEY if available — needed for Claude CLI auth
+  // when OAuth/Max subscription isn't configured on this machine.
+  if (process.env.ANTHROPIC_API_KEY) {
+    childEnv.ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
+  }
   return childEnv;
 }
 
