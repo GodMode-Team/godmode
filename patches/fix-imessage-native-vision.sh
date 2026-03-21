@@ -17,6 +17,13 @@
 
 set -euo pipefail
 
+# Platform-aware sed in-place: macOS requires '' arg, Linux does not
+if [ "$(uname)" = "Darwin" ]; then
+  sedi() { sed -i '' "$@"; }
+else
+  sedi() { sed -i "$@"; }
+fi
+
 OC_DIST="node_modules/openclaw/dist"
 
 # Find the active local-roots file (imported by ir-B9Vab0HN.js)
@@ -29,8 +36,8 @@ for roots_file in "$OC_DIST"/local-roots-*.js; do
     fi
 
     # Replace the simple function with one that includes iMessage roots
-    sed -i '' 's/function getDefaultMediaLocalRoots() {/function getDefaultMediaLocalRoots() { \/\/ patched for iMessage/g' "$roots_file"
-    sed -i '' '/function getDefaultMediaLocalRoots.*patched/,/^}/ {
+    sedi 's/function getDefaultMediaLocalRoots() {/function getDefaultMediaLocalRoots() { \/\/ patched for iMessage/g' "$roots_file"
+    sedi '/function getDefaultMediaLocalRoots.*patched/,/^}/ {
       /^}/i\
 	\/\/ Patch: include iMessage attachment roots for native vision image loading\
 	const home = process.env.HOME || process.env.USERPROFILE || "";\
@@ -38,7 +45,7 @@ for roots_file in "$OC_DIST"/local-roots-*.js; do
     }' "$roots_file"
 
     # Also need to change "return buildMediaLocalRoots" to capture into variable
-    sed -i '' 's/return buildMediaLocalRoots(resolveStateDir());/const roots = buildMediaLocalRoots(resolveStateDir()); return roots;/g' "$roots_file"
+    sedi 's/return buildMediaLocalRoots(resolveStateDir());/const roots = buildMediaLocalRoots(resolveStateDir()); return roots;/g' "$roots_file"
 
     echo "[patch] Patched $roots_file with iMessage attachment roots"
   fi
