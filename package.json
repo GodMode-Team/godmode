@@ -83,7 +83,7 @@
   "devDependencies": {
     "@types/node": "^24.3.3",
     "@types/ws": "^8.18.1",
-    "openclaw": "^2026.2.23",
+    "openclaw": "^2026.3.13",
     "tsup": "^8.5.1",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3",
