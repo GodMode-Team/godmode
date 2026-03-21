@@ -11,6 +11,7 @@
 import { readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
+import { GODMODE_ROOT } from "../data-paths.js";
 
 const DEFAULT_ALLY_NAME = "Ally";
 const CACHE_TTL_MS = 30 * 60 * 1000;
@@ -52,10 +53,7 @@ export function getAllyName(): string {
 
   // 2. Onboarding state (user named their ally during setup)
   try {
-    const dataDir = join(
-      process.env.GODMODE_ROOT || join(homedir(), "godmode"),
-      "data",
-    );
+    const dataDir = join(GODMODE_ROOT, "data");
     const raw = readFileSync(join(dataDir, "onboarding.json"), "utf-8");
     const ob = JSON.parse(raw) as { allyName?: string; identity?: { allyName?: string } };
     const name = ob.allyName || ob.identity?.allyName;
@@ -105,10 +103,7 @@ export function getOwnerName(): string {
   }
 
   try {
-    const dataDir = join(
-      process.env.GODMODE_ROOT || join(homedir(), "godmode"),
-      "data",
-    );
+    const dataDir = join(GODMODE_ROOT, "data");
     const raw = readFileSync(join(dataDir, "onboarding.json"), "utf-8");
     const ob = JSON.parse(raw) as {
       interview?: { name?: string };

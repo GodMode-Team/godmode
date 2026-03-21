@@ -14,6 +14,7 @@ import { execFile } from "node:child_process";
 import { join } from "node:path";
 import { readFileSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
+import { GODMODE_ROOT } from "../data-paths.js";
 
 // ── Constants ──────────────────────────────────────────────────────────
 
@@ -47,7 +48,7 @@ let _lastHealthCheck: { valid: boolean; ts: number } | null = null;
 let _twitterBin: string | null = null;
 
 function godmodeRoot(): string {
-  return process.env.GODMODE_ROOT || join(process.env.HOME || "", "godmode");
+  return GODMODE_ROOT;
 }
 
 // ── Cookie / env helpers ───────────────────────────────────────────────

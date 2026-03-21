@@ -7,6 +7,7 @@ import type { GatewayRequestHandler } from "openclaw/plugin-sdk";
 import { readQueueState } from "../lib/queue-state.js";
 import { isAllowedPath } from "../lib/vault-paths.js";
 import { readWorkspaceConfig } from "../lib/workspaces-config.js";
+import { GODMODE_ROOT } from "../data-paths.js";
 
 const execFile = promisify(execFileCb);
 
@@ -37,10 +38,9 @@ async function resolveFilePath(filePath: string): Promise<string | null> {
   }
 
   // Try godmode roots first, then all workspace directories
-  const godmodeRoot = process.env.GODMODE_ROOT ?? path.join(process.env.HOME ?? "", "godmode");
   const candidates = [
-    path.join(godmodeRoot, resolved),
-    path.join(godmodeRoot, "data", resolved),
+    path.join(GODMODE_ROOT, resolved),
+    path.join(GODMODE_ROOT, "data", resolved),
   ];
 
   try {
@@ -310,8 +310,7 @@ const taskFiles: GatewayRequestHandler = async ({ params, respond }) => {
     }
 
     // Scan inbox for files prefixed with the item ID
-    const godmodeRoot = process.env.GODMODE_ROOT ?? path.join(process.env.HOME ?? "", "godmode");
-    const inboxDir = path.join(godmodeRoot, "memory", "inbox");
+    const inboxDir = path.join(GODMODE_ROOT, "memory", "inbox");
     try {
       const entries = await fs.readdir(inboxDir);
       for (const entry of entries) {
@@ -415,14 +414,13 @@ const resolveFile: GatewayRequestHandler = async ({ params, respond }) => {
   }
 
   const home = process.env.HOME ?? "";
-  const godmodeRoot = process.env.GODMODE_ROOT ?? path.join(home, "godmode");
   const vaultPath = process.env.OBSIDIAN_VAULT_PATH ?? path.join(home, "Documents", "VAULT");
 
   // Directories to search, ordered by likelihood
   const searchDirs = [
-    path.join(godmodeRoot, "memory", "inbox"),
-    path.join(godmodeRoot, "data"),
-    path.join(godmodeRoot, "memory"),
+    path.join(GODMODE_ROOT, "memory", "inbox"),
+    path.join(GODMODE_ROOT, "data"),
+    path.join(GODMODE_ROOT, "memory"),
     vaultPath,
   ];
 
@@ -448,8 +446,8 @@ const resolveFile: GatewayRequestHandler = async ({ params, respond }) => {
 
   // Recursive search in inbox and data (queue outputs often have subdirectories)
   const recursiveDirs = [
-    path.join(godmodeRoot, "memory", "inbox"),
-    path.join(godmodeRoot, "data"),
+    path.join(GODMODE_ROOT, "memory", "inbox"),
+    path.join(GODMODE_ROOT, "data"),
   ];
 
   for (const dir of recursiveDirs) {

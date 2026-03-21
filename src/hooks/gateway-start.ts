@@ -9,7 +9,7 @@ import { existsSync, readFileSync, readdirSync, mkdirSync, copyFileSync } from "
 import { basename, dirname, join } from "node:path";
 import { homedir } from "node:os";
 import { fileURLToPath } from "node:url";
-import { DATA_DIR, MEMORY_DIR } from "../data-paths.js";
+import { DATA_DIR, GODMODE_ROOT, MEMORY_DIR } from "../data-paths.js";
 import { detectHostContext, safeBroadcast } from "../lib/host-context.js";
 import { notifySession } from "../lib/session-notifier.js";
 import { killZombieGateways } from "../lib/zombie-guard.js";
@@ -109,7 +109,7 @@ export async function runGatewayStart(
   try {
     const homeDir = process.env.HOME || process.env.USERPROFILE || "";
     const envPaths = [
-      join(process.env.GODMODE_ROOT || join(homeDir, "godmode"), ".env"),
+      join(GODMODE_ROOT, ".env"),
       join(process.env.OPENCLAW_STATE_DIR || join(homeDir, ".openclaw"), ".env"),
     ];
     let loaded = 0;
@@ -145,10 +145,7 @@ export async function runGatewayStart(
   try {
     const { randomBytes } = await import("node:crypto");
     const { appendFile } = await import("node:fs/promises");
-    const godmodeEnvPath = join(
-      process.env.GODMODE_ROOT || join(process.env.HOME || process.env.USERPROFILE || "", "godmode"),
-      ".env",
-    );
+    const godmodeEnvPath = join(GODMODE_ROOT, ".env");
     const secrets: { key: string; label: string }[] = [
       { key: "GODMODE_WEBHOOK_SECRET", label: "Webhook HMAC signing secret" },
       { key: "GOG_KEYRING_PASSWORD", label: "gog CLI keyring password" },
