@@ -613,7 +613,7 @@ async function handleWorkspaceHistory(
     );
     // Filter by workspace if scoped
     if (tokenMeta.workspaceId) {
-      items = items.filter((i) => (i as any).workspaceId === tokenMeta.workspaceId);
+      items = items.filter((i) => i.workspaceId === tokenMeta.workspaceId);
     }
     items.sort((a, b) => (b.completedAt ?? 0) - (a.completedAt ?? 0));
     const history = items.slice(0, limit).map((i) => ({
@@ -698,7 +698,7 @@ async function handleAgentsHistory(url: URL, res: http.ServerResponse): Promise<
       (i) => i.status === "done" || i.status === "failed",
     );
     if (workspaceFilter) {
-      items = items.filter((i) => (i as any).workspaceId === workspaceFilter);
+      items = items.filter((i) => i.workspaceId === workspaceFilter);
     }
     items.sort((a, b) => (b.completedAt ?? 0) - (a.completedAt ?? 0));
     const history = items.slice(0, limit).map((i) => ({

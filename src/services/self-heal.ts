@@ -592,10 +592,10 @@ export async function cleanOrphanedAgents(logger: Logger): Promise<number> {
     const state = await readQueueState();
     let cleaned = 0;
 
-    const processing = state.items.filter((i) => i.status === "processing" && (i as any).pid);
+    const processing = state.items.filter((i) => i.status === "processing" && i.pid);
 
     for (const item of processing) {
-      const pid = (item as any).pid as number;
+      const pid = item.pid!;
       try {
         // Check if process is alive (signal 0 = check only)
         process.kill(pid, 0);
@@ -607,8 +607,8 @@ export async function cleanOrphanedAgents(logger: Logger): Promise<number> {
           const qi = s.items.find((i) => i.id === item.id);
           if (qi && qi.status === "processing") {
             qi.status = "pending";
-            (qi as any).pid = undefined;
-            (qi as any).retryCount = ((qi as any).retryCount ?? 0) + 1;
+            qi.pid = undefined;
+            qi.retryCount = (qi.retryCount ?? 0) + 1;
           }
         });
         cleaned++;
