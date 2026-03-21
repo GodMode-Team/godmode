@@ -77,6 +77,9 @@ export function getQueueProcessor(): QueueProcessor | null {
 
 export function initQueueProcessor(logger: Logger): QueueProcessor {
   instance = new QueueProcessor(logger);
+  if (!resolveAnthropicKeyForAgents()) {
+    logger.warn("[QueueProcessor] No Anthropic API key found — agent tasks will fail until a key is configured");
+  }
   return instance;
 }
 

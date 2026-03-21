@@ -50,7 +50,7 @@ const disconnect: GatewayRequestHandler = async ({ params, respond }) => {
     return;
   }
   // TODO: Wire actual SDK revocation when Composio supports it
-  respond(true, { appName, disconnected: false, note: "Disconnect not yet implemented — revoke access directly in the app's settings" });
+  respond(false, null, { code: "NOT_IMPLEMENTED", message: `Disconnect not yet implemented for ${appName} — revoke access directly in the app's settings` });
 };
 
 export const composioSetupHandlers: GatewayRequestHandlers = {
