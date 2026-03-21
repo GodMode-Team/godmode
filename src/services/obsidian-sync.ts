@@ -174,7 +174,7 @@ class ObsidianSyncService {
           if (msg.includes("synced") || msg.includes("up to date")) {
             this.config.lastSync = new Date().toISOString();
             this.config.lastError = null;
-            this.saveConfig().catch(() => {});
+            this.saveConfig().catch((err) => this.logger.warn(`[ObsidianSync] config save failed: ${err.message}`));
             this.broadcast("obsidianSync:synced", {
               lastSync: this.config.lastSync,
             });

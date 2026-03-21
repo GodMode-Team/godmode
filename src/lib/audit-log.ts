@@ -52,5 +52,5 @@ export function audit(event: AuditEvent, detail: Record<string, unknown>): void 
   // Fire-and-forget — audit logging must never crash the host
   ensureDir()
     .then(() => appendFile(AUDIT_LOG_PATH, line))
-    .catch(() => {});
+    .catch((err) => console.error("[audit] write failed:", err.message));
 }

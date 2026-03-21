@@ -357,7 +357,7 @@ export class HermesAdapter implements HostAdapter {
 
           // Hook: message_sending — Honcho ingest, identity graph update
           if (this.afterChatHandler) {
-            this.afterChatHandler(sessionKey, message, cumulative).catch(() => {});
+            this.afterChatHandler(sessionKey, message, cumulative).catch((err) => this.logger.warn(`[afterChat] hook failed: ${err.message}`));
           }
         },
         onError: (error) => {
