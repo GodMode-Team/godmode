@@ -78,7 +78,7 @@ Be encouraging — even a low score means there's a lot of value to unlock.`;
   const score = assessment.healthScore;
   const gaps: string[] = [];
   if (assessment.authMethod === "none") gaps.push("No auth configured");
-  if (!assessment.memoryStatus.hasMemoryMd) gaps.push("No MEMORY.md");
+  if (!assessment.memoryStatus.hasMemoryMd) gaps.push("Memory not seeded");
   if (assessment.channelsConnected.length === 0) gaps.push("No channels connected");
   if (assessment.skillsInstalled.length === 0) gaps.push("No skills installed");
   const disabledFeatures = assessment.features.filter((f) => !f.enabled);
@@ -360,8 +360,8 @@ Status:
 ${brain?.obsidianPath ? `- Obsidian vault: ${brain.obsidianPath}` : "- No Obsidian vault linked"}
 
 Tasks:
-1. Check if ~/godmode/memory/MEMORY.md exists and has content
-2. If sparse, seed it with everything from the interview — name, role, mission, communication style, priorities
+1. Check if ~/godmode/data/.mem0-seeded exists
+2. If not, initialize memory using everything from the interview — name, role, mission, communication style, priorities
 3. Ask if they use Obsidian — if yes, set OBSIDIAN_VAULT_PATH. This becomes the permanent vault for daily briefs, agent outputs, and knowledge
 4. Generate their first daily brief to show the system working — this is the "wow" moment
 

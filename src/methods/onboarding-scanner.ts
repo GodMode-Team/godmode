@@ -6,11 +6,12 @@
  */
 
 import { execFile } from "node:child_process";
+import { existsSync } from "node:fs";
 import { readFile, readdir, stat } from "node:fs/promises";
 import { join, extname } from "node:path";
 import { homedir } from "node:os";
 import type { AssessmentResult, FeatureCheck } from "./onboarding-types.js";
-import { GODMODE_ROOT, MEMORY_DIR } from "../data-paths.js";
+import { DATA_DIR, GODMODE_ROOT, MEMORY_DIR } from "../data-paths.js";
 // resolveVaultPath not used directly — checkObsidianVault() checks for real Obsidian presence
 
 const OC_DIR = join(homedir(), ".openclaw");
@@ -18,6 +19,7 @@ const OC_CONFIG = join(OC_DIR, "openclaw.json");
 const AUTH_PROFILES = join(OC_DIR, "auth-profiles.json");
 const HERMES_DIR = join(homedir(), ".hermes");
 const SOUL_MD = join(MEMORY_DIR, "SOUL.md");
+const MEMORY_SEED_SENTINEL = join(DATA_DIR, ".mem0-seeded");
 
 // ── Helpers ──────────────────────────────────────────────────────
 
@@ -265,7 +267,7 @@ function calculateHealthScore(result: Omit<AssessmentResult, "healthScore" | "ti
   if (result.configExists) score += 8;
   if (result.authMethod !== "none") score += 7;
 
-  // Memory dir + MEMORY.md + >3 files: 10 pts
+  // Memory dir + seed sentinel + >3 files: 10 pts
   if (result.memoryStatus.dirExists) score += 3;
   if (result.memoryStatus.hasMemoryMd) score += 4;
   if (result.memoryStatus.fileCount > 3) score += 3;
@@ -636,8 +638,7 @@ export async function runAssessment(): Promise<AssessmentResult> {
   const authMethod = await detectAuthMethod();
 
   const memDirExists = await dirExists(MEMORY_DIR);
-  const hasMemoryMd = await fileExists(join(GODMODE_ROOT, "data", ".mem0-seeded"))
-    || await fileExists(join(MEMORY_DIR, "MEMORY.md"));
+  const hasMemoryMd = existsSync(MEMORY_SEED_SENTINEL);
   const { count: fileCount, totalBytes } = await countFilesAndSize(MEMORY_DIR);
 
   const channelsConnected = await detectChannels(config);
