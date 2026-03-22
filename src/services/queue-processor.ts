@@ -1272,7 +1272,7 @@ class QueueProcessor {
       }
 
       // Circuit breaker: skip items whose engine is paused
-      const itemEngine = item.engine ?? "claude";
+      const itemEngine = item.engine ?? resolvePersona(item.type, item.personaHint)?.engine ?? "claude";
       if (this.isEngineCircuitOpen(itemEngine)) {
         skipped++;
         continue;
