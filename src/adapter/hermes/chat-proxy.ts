@@ -191,6 +191,11 @@ export class HermesChatProxy {
     let fullResponse = "";
     let lastUsage: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number } | null = null;
 
+    // Abort controller with 2-minute timeout to prevent zombie streams (BUG-007).
+    // If Hermes hangs or becomes unreachable, the fetch aborts cleanly.
+    const controller = new AbortController();
+    const abortTimeout = setTimeout(() => controller.abort(), 120_000);
+
     try {
       const res = await fetch(`${this.hermesUrl}/v1/chat/completions`, {
         method: "POST",
@@ -200,6 +205,7 @@ export class HermesChatProxy {
           messages,
           stream: true,
         }),
+        signal: controller.signal,
       });
 
       if (!res.ok) {
@@ -238,6 +244,7 @@ export class HermesChatProxy {
 
           if (data === "[DONE]") {
             // Stream complete — save response and token usage
+            clearTimeout(abortTimeout);
             session.messages.push({ role: "assistant", content: fullResponse });
             if (lastUsage) {
               session.inputTokens = (session.inputTokens ?? 0) + (lastUsage.prompt_tokens ?? 0);
@@ -298,6 +305,7 @@ export class HermesChatProxy {
             ? trimmedLine.slice(6).trim()
             : trimmedLine.slice(5).trim();
           if (data === "[DONE]") {
+            clearTimeout(abortTimeout);
             session.messages.push({ role: "assistant", content: fullResponse });
             if (lastUsage) {
               session.inputTokens = (session.inputTokens ?? 0) + (lastUsage.prompt_tokens ?? 0);
@@ -329,9 +337,17 @@ export class HermesChatProxy {
         callbacks.onDone(fullResponse);
       }
     } catch (err) {
-      this.logger.error(`[Hermes Chat] Error: ${err}`);
-      callbacks.onError(err instanceof Error ? err : new Error(String(err)));
+      clearTimeout(abortTimeout);
+      if (err instanceof DOMException && err.name === "AbortError") {
+        this.logger.error("[Hermes Chat] Request timed out after 120s");
+        callbacks.onError(new Error("Request timed out — Hermes may be unreachable"));
+      } else {
+        this.logger.error(`[Hermes Chat] Error: ${err}`);
+        callbacks.onError(err instanceof Error ? err : new Error(String(err)));
+      }
+      return;
     }
+    clearTimeout(abortTimeout);
   }
 
   /**
