@@ -4,6 +4,19 @@ This file tracks recent development changes so Atlas and other agents can quickl
 
 ---
 
+## Fix: Persist Third-Party API Credentials Across Restarts (2026-03-16)
+
+### What Landed
+- Added a plugin-local credential store at `~/godmode/data/credentials.json` with owner-only `0600` permissions.
+- Secret integration values now persist to that store during setup/configure flows while preserving the existing `.env` write path for compatibility.
+- Startup now hydrates `process.env` from OpenClaw `.env`, GodMode `.env`, and the persisted credential store before the rest of the plugin initializes, so restart-time imports can see saved keys.
+- Hardened sensitive-file shielding to treat `credentials.json` as a protected config file and expanded key-leak detection for stored third-party secrets, including GHL credentials.
+
+### Verification
+- `pnpm typecheck`
+- `pnpm build`
+- `rg "\\.\\./\\.\\./\\.\\./\\.\\./src/" -n`
+
 ## Linux systemd gateway service template (2026-03-21)
 
 ### What Landed

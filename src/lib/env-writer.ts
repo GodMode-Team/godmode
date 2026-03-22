@@ -10,6 +10,7 @@ import { join, dirname } from "node:path";
 import { randomBytes } from "node:crypto";
 import { resolveStateDir } from "./openclaw-state.js";
 import { GODMODE_ROOT } from "../data-paths.js";
+import { readPersistedCredential } from "./credentials-store.js";
 
 /** Default env file path: ~/.openclaw/.env */
 function primaryEnvPath(): string {
@@ -113,9 +114,11 @@ export function removeEnvVar(key: string, filePath?: string): void {
   renameSync(tmpPath, target);
 }
 
-/** Read a single env var: checks process.env, then primary .env, then fallback .env. */
+/** Read a single env var: checks process.env, credentials store, then .env files. */
 export function getEnvVar(key: string): string {
   if (process.env[key]) return process.env[key]!;
+  const persisted = readPersistedCredential(key);
+  if (persisted) return persisted;
   const vars = readEnvFile();
   return vars[key] ?? "";
 }

@@ -5,7 +5,7 @@
  * zombie cleanup, host compat, content seeding, and service startup.
  */
 
-import { existsSync, readFileSync, readdirSync, mkdirSync, copyFileSync } from "node:fs";
+import { existsSync, readdirSync, mkdirSync, copyFileSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
 import { homedir } from "node:os";
 import { fileURLToPath } from "node:url";
@@ -158,39 +158,19 @@ export async function runGatewayStart(
     initAllowedPaths();
   } catch { /* non-fatal */ }
 
-  // Load workspace .env into process.env
+  // Load env files + persisted credentials into process.env
   try {
-    const homeDir = process.env.HOME || process.env.USERPROFILE || "";
-    const envPaths = [
-      join(GODMODE_ROOT, ".env"),
-      join(process.env.OPENCLAW_STATE_DIR || join(homeDir, ".openclaw"), ".env"),
-    ];
-    let loaded = 0;
-    for (const envPath of envPaths) {
-      if (!existsSync(envPath)) continue;
-      const raw = readFileSync(envPath, "utf-8");
-      for (const line of raw.split("\n")) {
-        const trimmed = line.trim();
-        if (!trimmed || trimmed.startsWith("#")) continue;
-        const cleaned = trimmed.replace(/^export\s+/, "");
-        const eqIdx = cleaned.indexOf("=");
-        if (eqIdx < 1) continue;
-        const key = cleaned.slice(0, eqIdx).trim();
-        let val = cleaned.slice(eqIdx + 1).trim();
-        if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
-          val = val.slice(1, -1);
-        }
-        if (!process.env[key]) {
-          process.env[key] = val;
-          loaded++;
-        }
-      }
-    }
-    if (loaded > 0) {
-      logger.info(`[GodMode] Loaded ${loaded} env var(s) from workspace .env`);
+    const { hydrateProcessEnvFromDisk } = await import("../lib/bootstrap-env.js");
+    const hydrated = hydrateProcessEnvFromDisk();
+    const totalLoaded = hydrated.envFileKeysLoaded + hydrated.persistedKeysLoaded;
+    if (totalLoaded > 0) {
+      logger.info(
+        `[GodMode] Hydrated ${totalLoaded} startup secret(s) ` +
+        `(${hydrated.envFileKeysLoaded} from .env, ${hydrated.persistedKeysLoaded} from credentials store)`,
+      );
     }
   } catch (err) {
-    logger.warn(`[GodMode] Failed to load workspace .env: ${String(err)}`);
+    logger.warn(`[GodMode] Failed to hydrate startup secrets: ${String(err)}`);
   }
 
   // ── Auto-generate security secrets if not set ─────────────────────
