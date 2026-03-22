@@ -174,9 +174,11 @@ export class HermesChatProxy {
       messages.push({ role: "user", content: userMessage });
     }
 
-    // Save user message to session (text-only for history serialization)
+    // Save user message to session — text-only for history serialization.
+    // Include filenames for image references so resumed sessions have context
+    // about what was attached (BUG-012: previously lost all image reference info).
     const historyLabel = hasImages
-      ? `${userMessage}\n\n[${attachments.length} image(s) attached]`
+      ? `${userMessage}\n\n[${attachments.length} image(s) attached: ${attachments.map(a => a.fileName || "image").join(", ")}]`
       : userMessage;
     session.messages.push({ role: "user", content: historyLabel });
 
