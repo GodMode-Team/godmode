@@ -484,17 +484,47 @@ export async function runGatewayStart(
     logger.warn(`[GodMode] Identity graph init failed (non-fatal): ${String(err)}`);
   }
 
-  // QMD binary check (#25) — warn if missing so users know search is degraded
+  // QMD binary check (#25) — fail loudly once at startup, then degrade cleanly
   try {
-    const { execFileSync } = await import("node:child_process");
-    execFileSync("qmd", ["--version"], { timeout: 3000, stdio: "pipe" });
-    logger.info("[GodMode] qmd binary found — full-text vault search available");
-  } catch {
-    logger.warn(
-      "[GodMode] qmd binary not found — Second Brain search will use file-walk fallback. " +
-      "Install qmd for faster hybrid search: https://github.com/quadratic-ai/qmd",
-    );
-    health.signal("qmd.binary", false, { warning: "qmd not installed — using file-walk fallback" });
+    const { getQmdStatus } = await import("../lib/qmd-status.js");
+    const qmdStatus = await getQmdStatus({ refresh: true });
+
+    if (qmdStatus.available) {
+      logger.info(
+        `[GodMode] qmd binary found${qmdStatus.version ? ` (${qmdStatus.version})` : ""} — full-text vault search available`,
+      );
+      health.signal("qmd.binary", true, {
+        backend: qmdStatus.backend,
+        path: qmdStatus.path,
+        version: qmdStatus.version,
+      });
+    } else if (qmdStatus.backendConfigured) {
+      logger.error(`[GodMode] ${qmdStatus.warning}`);
+      logger.warn("[GodMode] QMD-backed memory search disabled — using file-walk fallback until qmd is installed");
+      health.signal("qmd.binary", false, {
+        error: qmdStatus.warning,
+        backend: qmdStatus.backend,
+        installCommand: qmdStatus.installCommand,
+        fallback: qmdStatus.fallbackMode,
+      });
+      turnErrors.capture("qmd.binary", qmdStatus.warning ?? "qmd binary missing", {
+        backend: qmdStatus.backend,
+        installCommand: qmdStatus.installCommand,
+      });
+      safeBroadcast(api, "ally:notification", {
+        type: "health-alert",
+        summary:
+          `QMD search is unavailable. ${qmdStatus.warning}. ` +
+          `GodMode will use slower file-walk search until qmd is installed.`,
+      });
+    } else {
+      health.signal("qmd.binary", true, {
+        backend: qmdStatus.backend,
+        note: "qmd not required for current memory backend",
+      });
+    }
+  } catch (err) {
+    logger.warn(`[GodMode] qmd startup check failed: ${String(err)}`);
   }
 
   // Image cache cleanup

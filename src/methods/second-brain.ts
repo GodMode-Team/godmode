@@ -855,17 +855,23 @@ function cleanQmdSnippet(snippet: string): string {
  * `qmd query` (hybrid + reranking) is disabled until the local embedding model
  * context-size crash is resolved (embeddinggemma-300M chokes on long docs,
  * causing native GPU OOM that eats the full 15s timeout before falling back).
- * Throws if qmd is not installed.
+ * Throws with an actionable message if qmd is unavailable.
  */
 export async function runQmdSearch(
   query: string,
   collection: string | null,
   limit: number,
 ): Promise<QmdJsonResult[]> {
+  const { getQmdStatus, getQmdMissingMessage } = await import("../lib/qmd-status.js");
+  const qmdStatus = await getQmdStatus();
+  if (!qmdStatus.available) {
+    throw new Error(qmdStatus.warning ?? getQmdMissingMessage());
+  }
+
   const baseArgs = ["-n", String(Math.min(limit, 50)), "--json"];
   if (collection) baseArgs.push("-c", collection);
 
-  const { stdout } = await execFileAsync("qmd", ["search", query, ...baseArgs], {
+  const { stdout } = await execFileAsync(qmdStatus.path ?? "qmd", ["search", query, ...baseArgs], {
     timeout: 10_000,
   });
   return JSON.parse(stdout) as QmdJsonResult[];

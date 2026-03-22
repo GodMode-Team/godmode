@@ -31,6 +31,15 @@ export type AssessmentResult = {
     fileCount: number;
     totalSizeKb: number;
   };
+  qmdStatus?: {
+    available: boolean;
+    backend: string;
+    backendConfigured: boolean;
+    path: string | null;
+    version: string | null;
+    warning: string | null;
+    installCommand: string;
+  };
   channelsConnected: string[];
   skillsInstalled: string[];
   features: FeatureCheck[];

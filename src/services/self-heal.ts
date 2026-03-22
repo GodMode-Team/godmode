@@ -16,11 +16,13 @@ import { join } from "node:path";
 import { homedir } from "node:os";
 import { DATA_DIR } from "../data-paths.js";
 import { health, repairLog } from "../lib/health-ledger.js";
+import { getCachedQmdStatus } from "../lib/qmd-status.js";
 
 // ── Types ────────────────────────────────────────────────────────────
 
 export type SubsystemId =
   | "memory"
+  | "qmd"
   | "identity-graph"
   | "identity-cache"
   | "queue-processor"
@@ -245,6 +247,22 @@ export async function runSelfHeal(
  */
 export function getHealthReport(): HealthReport {
   const subsystems = Array.from(registry.values());
+  const cachedQmd = getCachedQmdStatus();
+  if (cachedQmd && !subsystems.some((s) => s.id === "qmd")) {
+    subsystems.push({
+      id: "qmd",
+      state: cachedQmd.available || !cachedQmd.backendConfigured ? "healthy" : "degraded",
+      message: cachedQmd.available
+        ? `QMD available${cachedQmd.version ? ` (${cachedQmd.version})` : ""}`
+        : cachedQmd.backendConfigured
+          ? cachedQmd.warning ?? "QMD unavailable"
+          : `QMD not required (memory.backend=${cachedQmd.backend})`,
+      lastCheck: Date.parse(cachedQmd.checkedAt) || Date.now(),
+      lastRepair: null,
+      repairCount: 0,
+      consecutiveFailures: cachedQmd.available || !cachedQmd.backendConfigured ? 0 : 1,
+    });
+  }
   const overall: HealthState = subsystems.every((s) => s.state === "healthy" || s.state === "repaired")
     ? "healthy"
     : subsystems.some((s) => s.state === "offline")

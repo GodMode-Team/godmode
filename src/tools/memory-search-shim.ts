@@ -57,7 +57,7 @@ export function createMemorySearchShimTool(ctx: ToolContext): AnyAgentTool {
       if (honchoResult.status === "fulfilled" && honchoResult.value) {
         results.push({ source: "honcho", content: honchoResult.value });
       } else if (honchoResult.status === "rejected") {
-        warnings.push(`honcho: ${String(honchoResult.reason)}`);
+        warnings.push(`honcho: ${formatReason(honchoResult.reason)}`);
       }
 
       // Collect QMD results
@@ -66,7 +66,7 @@ export function createMemorySearchShimTool(ctx: ToolContext): AnyAgentTool {
           results.push(hit);
         }
       } else if (qmdResult.status === "rejected") {
-        warnings.push(`vault: ${String(qmdResult.reason)}`);
+        warnings.push(`vault: ${formatReason(qmdResult.reason)}`);
       }
 
       // Collect FTS5 session search results
@@ -75,7 +75,7 @@ export function createMemorySearchShimTool(ctx: ToolContext): AnyAgentTool {
           results.push(hit);
         }
       } else if (ftsResult.status === "rejected") {
-        warnings.push(`sessions: ${String(ftsResult.reason)}`);
+        warnings.push(`sessions: ${formatReason(ftsResult.reason)}`);
       }
 
       // Collect Screenpipe results
@@ -108,6 +108,10 @@ export function createMemorySearchShimTool(ctx: ToolContext): AnyAgentTool {
       });
     },
   };
+}
+
+function formatReason(reason: unknown): string {
+  return reason instanceof Error ? reason.message : String(reason);
 }
 
 /** Query Honcho for conversational memory. Returns answer text or null. */

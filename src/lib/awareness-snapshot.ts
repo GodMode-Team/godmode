@@ -333,12 +333,18 @@ export async function generateSnapshot(): Promise<string> {
 
   // Memory search engine status
   try {
-    const { execFile: ef } = await import("node:child_process");
-    const { promisify: pfy } = await import("node:util");
-    const execAsync = pfy(ef);
-    const { stdout } = await execAsync("qmd", ["--version"], { timeout: 3_000 });
-    const ver = stdout.trim();
-    lines.push(`## Search Engine: QMD ${ver} (hybrid semantic + BM25 + reranking)`);
+    const { getQmdStatus } = await import("./qmd-status.js");
+    const qmdStatus = await getQmdStatus();
+    if (qmdStatus.available) {
+      lines.push(
+        `## Search Engine: QMD ${qmdStatus.version ?? qmdStatus.path ?? "available"} ` +
+        "(hybrid semantic + BM25 + reranking)",
+      );
+    } else {
+      lines.push(
+        `## Search Engine: File walk fallback (${qmdStatus.warning ?? "qmd not available"})`,
+      );
+    }
   } catch {
     lines.push("## Search Engine: File walk fallback (QMD not available)");
   }
