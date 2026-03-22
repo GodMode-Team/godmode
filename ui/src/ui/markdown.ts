@@ -18,11 +18,11 @@ const FILE_EXT_RE = /\.(html?|css|js|ts|tsx|jsx|json|md|txt|csv|py|sh|yaml|yml|x
 // Negative lookbehind avoids matching paths already inside markdown links.
 const FILE_PATH_RE = /(?<![(\[`])(?:~\/|\/(?:Users|home|tmp|var|opt|etc|godmode)\/)[\w/.+@-]+(?:\.\w+|\/)(?=\s|[),;:!?]|$)/g;
 
-// Match bare filenames with known extensions (e.g. "my-report-abc123.md").
-// Must contain at least one hyphen or underscore (to avoid matching plain words like "file.md")
-// and must NOT already be inside a markdown link or code span.
-// Negative lookbehind: not preceded by ( [ ` / ~ to avoid double-matching paths.
-const BARE_FILENAME_RE = /(?<![(\[`/~\w])(?:[\w][\w.-]*[-_][\w.-]*\.(?:html?|css|js|ts|tsx|jsx|json|md|txt|csv|py|sh|yaml|yml|xml|svg|png|jpe?g|gif|webp|pdf|log|mp4|mov|mkv|avi|webm|mp3|wav|aac|ogg|flac|zip|tar|gz|bz2|dmg|iso|doc|docx|xls|xlsx|ppt|pptx))(?=\s|[),;:!?|]|$)/gi;
+// Match bare filenames with known extensions (e.g. "report.md", "my-report.md").
+// Matches ANY filename (word chars, hyphens, dots) with a recognized extension.
+// Does NOT require hyphens or underscores — plain names like "report.md" match.
+// Negative lookbehind: not preceded by ( [ ` / ~ or word char to avoid double-matching paths.
+const BARE_FILENAME_RE = /(?<![(\[`/~\w])(?:[\w][\w.-]*\.(?:html?|css|js|ts|tsx|jsx|json|md|txt|csv|py|sh|yaml|yml|xml|svg|png|jpe?g|gif|webp|pdf|log|mp4|mov|mkv|avi|webm|mp3|wav|aac|ogg|flac|zip|tar|gz|bz2|dmg|iso|doc|docx|xls|xlsx|ppt|pptx))(?=\s|[),;:!?|]|$)/gi;
 
 /**
  * Pre-process markdown to wrap bare file paths in clickable links.
