@@ -742,6 +742,16 @@ class QueueProcessor {
 
   // ── Failure + retry handler ────────────────────────────────────
 
+  /**
+   * Calculate exponential backoff delay for retries.
+   * Retry 1: 30s, Retry 2: 120s (2min), capped at 5min.
+   */
+  private retryDelayMs(retryCount: number): number {
+    const BASE_DELAY = 30_000; // 30 seconds
+    const MAX_DELAY = 300_000; // 5 minutes
+    return Math.min(BASE_DELAY * Math.pow(2, retryCount), MAX_DELAY);
+  }
+
   async handleItemFailed(itemId: string, errorMsg: string, skipDecrement = false): Promise<void> {
     if (!skipDecrement) {
       this.activeCount = Math.max(0, this.activeCount - 1);
@@ -890,11 +900,16 @@ class QueueProcessor {
           improvedContext = "";
         }
 
-        // Reset item to pending for retry
+        // Reset item to pending for retry with exponential backoff
+        const retryCount = item.retryCount ?? 0;
+        const delayMs = this.retryDelayMs(retryCount);
+        const scheduledAt = Date.now() + delayMs;
+
         await updateQueueState((state) => {
           const qi = state.items.find((i) => i.id === item.id);
           if (qi) {
             qi.status = "pending";
+            qi.scheduledAt = scheduledAt;
             if (improvedContext.trim()) {
               qi.description =
                 (qi.description ?? "") +
@@ -910,7 +925,7 @@ class QueueProcessor {
         });
 
         this.logger.info(
-          `[GodMode][Queue] Item ${item.id} reset to pending for retry`,
+          `[GodMode][Queue] Item ${item.id} reset to pending for retry (backoff: ${Math.round(delayMs / 1000)}s)`,
         );
         this.broadcast("queue:update", { itemId: item.id, status: "pending" });
       });
@@ -920,11 +935,14 @@ class QueueProcessor {
           `[GodMode][Queue] Diagnostic agent spawn error for ${item.id}: ${String(err)}`,
         );
 
-        // Fall back: just reset to pending with error context
+        // Fall back: just reset to pending with error context + backoff
+        const fbRetryCount = item.retryCount ?? 0;
+        const fbDelayMs = this.retryDelayMs(fbRetryCount);
         await updateQueueState((state) => {
           const qi = state.items.find((i) => i.id === item.id);
           if (qi) {
             qi.status = "pending";
+            qi.scheduledAt = Date.now() + fbDelayMs;
             qi.description =
               (qi.description ?? "") +
               "\n\n---\n[Previous attempt failed]: " +
