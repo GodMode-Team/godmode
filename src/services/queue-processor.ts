@@ -212,6 +212,20 @@ function extractArtifacts(content: string): string[] {
 const QUEUE_POLL_MS = 10 * 60 * 1000; // 10 minutes — faster than hourly heartbeat
 const AGENT_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes max runtime per agent
 
+// ── Circuit Breaker ─────────────────────────────────────────────
+//
+// If an engine fails CIRCUIT_BREAKER_THRESHOLD times consecutively,
+// pause it for CIRCUIT_BREAKER_COOLDOWN_MS. Prevents burning credits
+// when an engine is down or misconfigured.
+
+const CIRCUIT_BREAKER_THRESHOLD = 3;
+const CIRCUIT_BREAKER_COOLDOWN_MS = 600_000; // 10 minutes
+
+interface CircuitState {
+  consecutiveFailures: number;
+  pausedUntil: number; // epoch ms, 0 = not paused
+}
+
 class QueueProcessor {
   private logger: Logger;
   private broadcastFn: BroadcastFn | null = null;
@@ -222,6 +236,8 @@ class QueueProcessor {
   private pollTimer: ReturnType<typeof setInterval> | null = null;
   /** Toolkit tokens issued to agents — keyed by item ID for revocation on completion */
   private toolkitTokens = new Map<string, string>();
+  /** Circuit breaker state per engine */
+  private circuitBreakers = new Map<string, CircuitState>();
 
   constructor(logger: Logger) {
     this.logger = logger;
@@ -255,6 +271,47 @@ class QueueProcessor {
   /** Check if the polling loop is active. Used by self-heal. */
   isPolling(): boolean {
     return this.pollTimer !== null && !this.stopped;
+  }
+
+  /** Check if an engine's circuit breaker is open (paused). */
+  private isEngineCircuitOpen(engine: string): boolean {
+    const state = this.circuitBreakers.get(engine);
+    if (!state) return false;
+    if (state.pausedUntil > Date.now()) return true;
+    // Cooldown expired — reset
+    if (state.pausedUntil > 0) {
+      state.pausedUntil = 0;
+      state.consecutiveFailures = 0;
+      this.logger.info(`[GodMode][Queue] Circuit breaker reset for engine "${engine}"`);
+    }
+    return false;
+  }
+
+  /** Record a failure for an engine. Trips the breaker after N consecutive failures. */
+  private recordEngineFailure(engine: string): void {
+    const state = this.circuitBreakers.get(engine) ?? { consecutiveFailures: 0, pausedUntil: 0 };
+    state.consecutiveFailures++;
+    if (state.consecutiveFailures >= CIRCUIT_BREAKER_THRESHOLD) {
+      state.pausedUntil = Date.now() + CIRCUIT_BREAKER_COOLDOWN_MS;
+      this.logger.warn(
+        `[GodMode][Queue] Circuit breaker OPEN for engine "${engine}" — ${state.consecutiveFailures} consecutive failures. Paused for ${CIRCUIT_BREAKER_COOLDOWN_MS / 60000}min.`,
+      );
+      this.broadcast("ally:notification", {
+        type: "circuit-breaker",
+        title: `Engine "${engine}" paused`,
+        summary: `Engine "${engine}" failed ${state.consecutiveFailures} times in a row. Paused for ${CIRCUIT_BREAKER_COOLDOWN_MS / 60000} minutes.`,
+      });
+    }
+    this.circuitBreakers.set(engine, state);
+  }
+
+  /** Record a success for an engine. Resets its circuit breaker. */
+  private recordEngineSuccess(engine: string): void {
+    const state = this.circuitBreakers.get(engine);
+    if (state && state.consecutiveFailures > 0) {
+      state.consecutiveFailures = 0;
+      state.pausedUntil = 0;
+    }
   }
 
   private async pollTick(): Promise<void> {
@@ -544,13 +601,20 @@ class QueueProcessor {
       return;
     }
 
+    // Record success for circuit breaker (only on exitCode 0)
+    const successState = await readQueueState();
+    const successItem = successState.items.find((i) => i.id === itemId);
+    if (successItem) {
+      this.recordEngineSuccess(successItem.engine ?? "claude");
+    }
+
     const outPath = outputPathForItem(itemId);
     let summary = "";
     let outputContent = "";
     let artifacts: string[] = [];
 
-    const currentState = await readQueueState();
-    const currentItem = currentState.items.find((i) => i.id === itemId);
+    const currentState = successState;
+    const currentItem = successItem;
 
     try {
       outputContent = await fs.readFile(outPath, "utf-8");
@@ -774,6 +838,9 @@ class QueueProcessor {
       );
       return;
     }
+
+    // Record failure for circuit breaker
+    this.recordEngineFailure(item.engine ?? "claude");
 
     // Engine fallback: if item used a non-claude engine, retry with claude
     if (item.engine && item.engine !== "claude" && (item.retryCount ?? 0) === 1) {
@@ -1198,6 +1265,13 @@ class QueueProcessor {
           skipped++;
           continue;
         }
+      }
+
+      // Circuit breaker: skip items whose engine is paused
+      const itemEngine = item.engine ?? "claude";
+      if (this.isEngineCircuitOpen(itemEngine)) {
+        skipped++;
+        continue;
       }
 
       const result = await this.processItem(item);
