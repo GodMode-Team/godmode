@@ -15,8 +15,8 @@ marked.setOptions({
 const FILE_EXT_RE = /\.(html?|css|js|ts|tsx|jsx|json|md|txt|csv|py|sh|yaml|yml|xml|svg|png|jpe?g|gif|webp|pdf|log|mp4|mov|mkv|avi|webm|mp3|wav|aac|ogg|flac|zip|tar|gz|bz2|dmg|iso|doc|docx|xls|xlsx|ppt|pptx)$/i;
 
 // Match absolute paths like /Users/... or ~/... with a file extension OR trailing slash (directory).
-// Negative lookbehind avoids matching paths already inside markdown links.
-const FILE_PATH_RE = /(?<![(\[`])(?:~\/|\/(?:Users|home|tmp|var|opt|etc|godmode)\/)[\w/.+@-]+(?:\.\w+|\/)(?=\s|[),;:!?]|$)/g;
+// Negative lookbehind avoids matching paths already inside markdown links or URLs (://path).
+const FILE_PATH_RE = /(?<![(\[`]|:\/\/)(?:~\/|\/(?:Users|home|tmp|var|opt|etc|godmode)\/)[\w/.+@-]+(?:\.\w+|\/)(?=\s|[),;:!?]|$)/g;
 
 // Match bare filenames with known extensions (e.g. "report.md", "my-report.md").
 // Matches ANY filename (word chars, hyphens, dots) with a recognized extension.
@@ -37,7 +37,13 @@ export function linkifyFilePaths(markdown: string): string {
     if (i % 2 !== 0) continue;
 
     // First pass: absolute paths → file:// links
-    parts[i] = parts[i].replace(FILE_PATH_RE, (match) => {
+    parts[i] = parts[i].replace(FILE_PATH_RE, (match, offset, str) => {
+      // Don't linkify if the match appears inside a URL (preceded by ://)
+      const before = str.slice(Math.max(0, offset - 3), offset);
+      if (before.includes("://")) return match;
+      // Don't linkify inside markdown link targets: ](path)
+      const before2 = str.slice(Math.max(0, offset - 2), offset);
+      if (before2.includes("](")) return match;
       const isDir = match.endsWith("/");
       if (!isDir && !FILE_EXT_RE.test(match)) return match;
       // Expand ~ to a placeholder that the click handler resolves
