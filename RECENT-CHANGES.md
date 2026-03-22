@@ -4,6 +4,19 @@ This file tracks recent development changes so Atlas and other agents can quickl
 
 ---
 
+## Linux systemd gateway service template (2026-03-21)
+
+### What Landed
+- Added `scripts/godmode-gateway.service`, a documented systemd user unit for running `openclaw gateway run` with restart-on-failure and journal logging.
+- Added `scripts/install-systemd.sh` to template the absolute `openclaw` path into `~/.config/systemd/user/`, reload systemd, and enable/start the user service.
+- Updated npm packaging rules so both Linux service files ship with published installs instead of being excluded with the rest of `scripts/`.
+- Updated the deployment guide to point Linux VPS users at the new systemd flow instead of the old daemon/tmux workaround.
+
+### Verification
+- `sh -n scripts/install-systemd.sh`
+- `npm pack --dry-run --cache /tmp/godmode-npm-cache`
+- `pnpm build` attempted but blocked in this sandbox because local `node_modules` is absent and `vite` is unavailable
+
 ## v1.7.0 Release — Customer-Ready Patch (2026-03-16)
 
 ### What Landed

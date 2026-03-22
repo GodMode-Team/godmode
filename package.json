@@ -46,6 +46,8 @@
     "skill-cards/**/*.md",
     "dist/assets/**/*.json",
     "dist/assets/**/*.md",
+    "scripts/install-systemd.sh",
+    "scripts/godmode-gateway.service",
     "openclaw.plugin.json",
     "LICENSE",
     "README.md"

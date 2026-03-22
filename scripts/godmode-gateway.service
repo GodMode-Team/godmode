@@ -1,0 +1,41 @@
+# GodMode OpenClaw Gateway systemd user service.
+#
+# Install with:
+#   ./scripts/install-systemd.sh
+#
+# Manage the service with:
+#   systemctl --user start godmode-gateway.service
+#   systemctl --user stop godmode-gateway.service
+#   systemctl --user restart godmode-gateway.service
+#   systemctl --user status godmode-gateway.service
+#
+# Follow logs with:
+#   journalctl --user -u godmode-gateway.service -f
+#
+# On headless Linux, enable lingering if you want the user service to keep
+# running after logout and come back on reboot:
+#   sudo loginctl enable-linger $USER
+#
+# If the `openclaw` or `node` install path changes, rerun the installer so the
+# absolute ExecStart path and PATH environment stay current.
+
+[Unit]
+Description=GodMode OpenClaw Gateway
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+Environment=HOME=${GODMODE_HOME_DIR}
+Environment=PATH=${GODMODE_PATH}
+Environment=NODE_ENV=production
+WorkingDirectory=${GODMODE_WORKING_DIRECTORY}
+ExecStart=${GODMODE_OPENCLAW_BIN} gateway run
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=godmode-gateway
+
+[Install]
+WantedBy=default.target
