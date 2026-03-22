@@ -289,6 +289,39 @@ export class HermesChatProxy {
         }
       }
 
+      // Flush any remaining data in the buffer after the stream reader is done.
+      // A chunk boundary may have split a "data: [DONE]" or final JSON chunk.
+      if (buffer.trim()) {
+        const trimmedLine = buffer.replace(/\r$/, "");
+        if (trimmedLine.startsWith("data:")) {
+          const data = trimmedLine.startsWith("data: ")
+            ? trimmedLine.slice(6).trim()
+            : trimmedLine.slice(5).trim();
+          if (data === "[DONE]") {
+            session.messages.push({ role: "assistant", content: fullResponse });
+            if (lastUsage) {
+              session.inputTokens = (session.inputTokens ?? 0) + (lastUsage.prompt_tokens ?? 0);
+              session.outputTokens = (session.outputTokens ?? 0) + (lastUsage.completion_tokens ?? 0);
+              session.lastInputTokens = lastUsage.prompt_tokens ?? 0;
+            }
+            await saveSession(session);
+            callbacks.onDone(fullResponse);
+            return;
+          }
+          try {
+            const chunk = JSON.parse(data);
+            if (chunk.usage) lastUsage = chunk.usage;
+            const delta = chunk.choices?.[0]?.delta?.content;
+            if (delta) {
+              fullResponse += delta;
+              callbacks.onToken(delta);
+            }
+          } catch {
+            // Skip malformed trailing chunk
+          }
+        }
+      }
+
       // Stream ended without [DONE] — still save what we got
       if (fullResponse) {
         session.messages.push({ role: "assistant", content: fullResponse });
