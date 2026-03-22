@@ -269,19 +269,16 @@ export class HermesChatProxy {
 
             const delta = choice?.delta?.content;
             if (delta) {
-              // After a tool call boundary, or when the previous text ends
-              // with sentence punctuation and new text starts with a capital
-              // letter (no leading whitespace), insert a paragraph break.
+              // After a tool call boundary, insert a paragraph break so
+              // text from different tool-call sections doesn't run together.
+              // NOTE: We no longer insert breaks based on sentence punctuation
+              // heuristics — the model produces its own paragraph breaks and
+              // the heuristic caused spurious whitespace depending on chunk
+              // boundaries (BUG-002).
               let separator = "";
               if (sawToolCall && fullResponse.length > 0) {
                 separator = "\n\n";
                 sawToolCall = false;
-              } else if (
-                fullResponse.length > 0 &&
-                /[.!?:]\s*$/.test(fullResponse) &&
-                /^[A-Z]/.test(delta)
-              ) {
-                separator = "\n\n";
               }
               fullResponse += separator + delta;
               callbacks.onToken(separator + delta);

@@ -9,7 +9,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { createHmac, timingSafeEqual } from "node:crypto";
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { MEMORY_DIR } from "../data-paths.js";
+import { MEMORY_DIR, ARTIFACTS_DIR } from "../data-paths.js";
 import { handleMeetingWebhookHttp } from "../methods/meeting-webhook.js";
 import { handlePaperclipWebhookHttp } from "../methods/paperclip-webhook.js";
 import type { LicenseState } from "../lib/license.js";

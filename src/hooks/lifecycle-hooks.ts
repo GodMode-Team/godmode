@@ -451,7 +451,8 @@ export async function handleMessageSending(
 ): Promise<{ cancel: true } | { content: string } | undefined> {
   const logger: Logger = api.logger;
   const sessionKey = extractSessionKey(ctx);
-  const content = event.content ?? "";
+  let content = event.content ?? "";
+  const originalContent = content;
 
   // ── API Error Shield — catch raw API errors and show friendly messages ──
   // The gateway sometimes surfaces raw JSON error payloads or plain-text
@@ -464,6 +465,43 @@ export async function handleMessageSending(
   if (friendly) {
     logger.warn(`[GodMode][ErrorShield] Caught raw API error — replacing with friendly message`);
     return { content: friendly };
+  }
+
+  // ── Reports URL Rewriter ──────────────────────────────────────────
+  // The ally repeatedly invents /reports/ URLs that don't exist.
+  // Rewrite them to bare file paths that the UI can auto-link and open in the sidebar.
+  {
+    let didRewrite = false;
+
+    // Rewrite markdown links like [text](/reports/foo.html) → bare path
+    content = content.replace(
+      /\[([^\]]+)\]\(\/reports\/([^)]+)\)/g,
+      (_match, _text, filename) => {
+        didRewrite = true;
+        return `~/godmode/artifacts/${filename}`;
+      },
+    );
+    // Rewrite bare /reports/ URLs (not already inside markdown link parens)
+    content = content.replace(
+      /(?<![(/])\/reports\/([^\s)>\]]+)/g,
+      (_match, filename) => {
+        didRewrite = true;
+        return `~/godmode/artifacts/${filename}`;
+      },
+    );
+    // Rewrite markdown links with [text](~/path) → just the bare path
+    // (markdown links to file:// paths are not clickable in chat, but bare paths are)
+    content = content.replace(
+      /\[([^\]]+)\]\((~\/[^)]+)\)/g,
+      (_match, _text, filePath) => {
+        didRewrite = true;
+        return filePath;
+      },
+    );
+
+    if (didRewrite) {
+      logger.info(`[GodMode][ReportsRewriter] Rewrote /reports/ URLs or markdown file links to bare paths`);
+    }
   }
 
   // Enforcer gates
@@ -539,6 +577,11 @@ export async function handleMessageSending(
         });
       }
     } catch { /* non-fatal */ }
+  }
+
+  // If content was rewritten (e.g. /reports/ URLs → bare paths), return the new version
+  if (content !== originalContent) {
+    return { content };
   }
 
   return undefined;

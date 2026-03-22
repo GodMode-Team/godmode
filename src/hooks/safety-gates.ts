@@ -794,7 +794,7 @@ const EPHEMERAL_WRITE_PATTERNS = [
 const EPHEMERAL_BLOCK_MESSAGE = [
   "🚫 BLOCKED: Writing to /tmp is not allowed. Files in /tmp are deleted by the OS on reboot.",
   "Use one of these permanent locations instead:",
-  "• ~/godmode/artifacts/ — for HTML reports, generated files, and agent output",
+  "• ~/godmode/artifacts/ — for HTML reports, generated files, and agent output (served at /godmode/artifacts/)",
   "• ~/godmode/data/dashboards/{id}/ — for dashboard HTML (use dashboards.save RPC)",
   "• ~/godmode/memory/inbox/ — for queue agent output (served at /godmode/artifacts/)",
   "• A GitHub repo — for websites or code projects",

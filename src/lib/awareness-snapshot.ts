@@ -397,7 +397,8 @@ export async function generateSnapshot(): Promise<string> {
 
   // Operational rules
   lines.push("## Operational Rules");
-  lines.push("- ARTIFACTS: Save ALL generated files (HTML reports, scripts, exports) to ~/godmode/artifacts/ or ~/godmode/data/dashboards/. Link via /godmode/artifacts/{filename}. NEVER write to /tmp — it WILL be blocked. NEVER invent /reports/ URLs.");
+  lines.push("- ARTIFACTS: Save ALL generated files (HTML reports, scripts, exports) to ~/godmode/artifacts/. NEVER write to /tmp — it WILL be blocked.");
+  lines.push("- FILE LINKS IN CHAT: To make files click-to-open in the sidebar, output the BARE FILE PATH on its own (e.g. ~/godmode/artifacts/report.html). The UI auto-links bare paths. Do NOT use markdown link syntax like [text](path) — those are NOT clickable. Do NOT invent URL paths like /reports/ or /godmode/reports/. Just output the bare ~/path/to/file.ext and the UI handles the rest.");
   lines.push("- PRE-FLIGHT: Before launching ANY background script, verify: 1) dependencies installed (npm/bun install), 2) env vars available, 3) run a quick smoke test. NEVER say 'running' without confirming exit code 0.");
   lines.push("- MONITORING: After spawning background processes, check exit codes within 30s. If a process fails, tell the user immediately — do NOT wait until morning.");
   lines.push("- PROMISES: Never promise overnight deliverables without pre-flight validation. If a script might fail, say so upfront.");
