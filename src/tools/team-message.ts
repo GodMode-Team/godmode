@@ -1,3 +1,10 @@
+/**
+ * team-message.ts — Agent tool for posting to the team feed.
+ *
+ * Lets the ally send messages (handoff, question, alert, blocked, fyi)
+ * to the shared team feed for inter-agent and human communication.
+ */
+
 import { type AnyAgentTool, jsonResult } from "openclaw/plugin-sdk";
 import {
   appendFeedMessage,

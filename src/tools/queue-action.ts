@@ -1,6 +1,14 @@
+/**
+ * queue-action.ts — Agent tool for acting on queue items.
+ *
+ * Allows the ally to approve, reject, retry, or remove items
+ * from the background agent queue during conversation.
+ */
+
 import { type AnyAgentTool, jsonResult } from "openclaw/plugin-sdk";
 import { updateQueueState, type QueueItem } from "../lib/queue-state.js";
 
+/** Create the queue_action tool that lets the ally manage queue item lifecycle. */
 export function createQueueActionTool(): AnyAgentTool {
   return {
     label: "Queue",

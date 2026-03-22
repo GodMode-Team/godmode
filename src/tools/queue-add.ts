@@ -1,3 +1,11 @@
+/**
+ * queue-add.ts — Agent tool for adding items to the background queue.
+ *
+ * The ally uses this to delegate work to specialist agents. Supports
+ * a two-phase flow: first call previews a scoped brief, second call
+ * (with confirmed=true) actually enqueues the item.
+ */
+
 import { type AnyAgentTool, jsonResult } from "openclaw/plugin-sdk";
 import { updateQueueState, newQueueItemId, type QueueItemType } from "../lib/queue-state.js";
 import { resolvePersona } from "../lib/agent-roster.js";
@@ -8,6 +16,7 @@ type ToolContext = {
   agentId?: string;
 };
 
+/** Create the queue_add tool for enqueueing background agent tasks. */
 export function createQueueAddTool(_ctx: ToolContext): AnyAgentTool {
   return {
     label: "Queue",
