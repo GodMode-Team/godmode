@@ -35,7 +35,9 @@ let initialized = false;
 
 async function ensureDir(): Promise<void> {
   if (initialized) return;
-  await mkdir(DATA_DIR, { recursive: true }).catch(() => {});
+  await mkdir(DATA_DIR, { recursive: true }).catch((err) => {
+    console.warn("[audit] Failed to create data dir:", String(err));
+  });
   initialized = true;
 }
 

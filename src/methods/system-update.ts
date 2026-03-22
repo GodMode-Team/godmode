@@ -332,7 +332,9 @@ export function runPostUpdateHealthAudit(
       for (const r of phase1) {
         h.signal(`update.${r.name}`, r.status === "pass", { detail: r.detail });
       }
-    }).catch(() => { /* health ledger not available yet */ });
+    }).catch((err) => {
+      logger.warn(`[GodMode] Health ledger signal failed: ${String(err)}`);
+    });
 
     const phase1Fails = phase1.filter(r => r.status === "fail").length;
     const phase1Warns = phase1.filter(r => r.status === "warn").length;

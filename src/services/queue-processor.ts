@@ -546,7 +546,9 @@ class QueueProcessor {
           `[GodMode][Queue] Agent spawn error for item ${item.id}: ${String(err)}`,
         );
         this.handleItemFailed(item.id, `spawn error: ${String(err)}`).catch(
-          () => {},
+          (failErr) => {
+            this.logger.error(`[GodMode][Queue] handleItemFailed also failed for ${item.id}: ${String(failErr)}`);
+          },
         );
       });
 
@@ -581,7 +583,9 @@ class QueueProcessor {
     this.toolkitTokens.delete(itemId);
     import("./agent-toolkit-server.js")
       .then(({ revokeAgentToken }) => revokeAgentToken(token))
-      .catch(() => {});
+      .catch((err) => {
+        this.logger.warn(`[GodMode][Queue] Token revocation failed for ${itemId}: ${String(err)}`);
+      });
   }
 
   async handleItemCompleted(

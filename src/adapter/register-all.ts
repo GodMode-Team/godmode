@@ -452,8 +452,12 @@ export async function registerGodMode(
 
   // Init Composio (non-blocking)
   import("../services/composio-client.js")
-    .then(({ init }) => init(process.env.COMPOSIO_API_KEY, logger).catch(() => {}))
-    .catch(() => {});
+    .then(({ init }) => init(process.env.COMPOSIO_API_KEY, logger).catch((err) => {
+      logger.warn(`[GodMode] Composio init failed: ${String(err)}`);
+    }))
+    .catch((err) => {
+      logger.warn(`[GodMode] Composio module import failed: ${String(err)}`);
+    });
 
   // ── 5. Wire lifecycle hooks (capability-aware) ────────────────
   // Only hooks that add value alongside the host's capabilities.
