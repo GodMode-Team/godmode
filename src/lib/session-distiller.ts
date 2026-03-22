@@ -143,7 +143,7 @@ async function extractFromTranscript(transcript: string): Promise<DistillerExtra
     );
 
     if (!response.ok) return null;
-    const json = await response.json() as any;
+    const json = (await response.json()) as { content?: Array<{ text?: string }> };
     const content = json?.content?.[0]?.text;
     if (!content) return null;
 
@@ -321,7 +321,7 @@ export async function distillIdleSessions(
               if (pref.rule) {
                 await addLesson({
                   rule: pref.rule,
-                  category: (pref.category as any) || "other",
+                  category: (pref.category ?? "other") as import("./agent-lessons.js").LessonCategory,
                   sourceTaskId: `distiller:${sessionKey}`,
                   sourceTaskTitle: pref.context || "session distillation",
                 });

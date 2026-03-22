@@ -63,8 +63,9 @@ async function readTasksUnsafe(): Promise<TasksData> {
     const data = JSON.parse(raw) as TasksData;
     // Strip legacy fields for backward compat
     for (const task of data.tasks) {
-      delete (task as any).carryOver;
-      delete (task as any).userEdited;
+      const legacy = task as Record<string, unknown>;
+      delete legacy.carryOver;
+      delete legacy.userEdited;
     }
     data.archived = data.archived ?? [];
     return data;

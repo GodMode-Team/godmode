@@ -118,9 +118,13 @@ export async function getContext(sessionKey: string): Promise<string | null> {
     if (!session) return null;
 
     const ctx = await session.context();
-    const content = typeof ctx === "string"
-      ? ctx
-      : (ctx as any)?.peerRepresentation ?? (ctx as any)?.summary ?? (ctx as any)?.content ?? (typeof ctx === "string" ? ctx : JSON.stringify(ctx));
+    const ctxObj = ctx as unknown as Record<string, unknown> | string | null;
+    const content = typeof ctxObj === "string"
+      ? ctxObj
+      : ctxObj?.peerRepresentation as string
+        ?? ctxObj?.summary as string
+        ?? ctxObj?.content as string
+        ?? JSON.stringify(ctxObj);
     if (!content || content.trim().length < 10) return null;
 
     return `## Memory (Honcho)\n${content}`;
@@ -145,7 +149,7 @@ export async function queryPeer(question: string, sessionKey: string): Promise<s
       session: session ?? undefined,
     });
 
-    return typeof response === "string" ? response : (response as any)?.content ?? String(response);
+    return typeof response === "string" ? response : (response as unknown as Record<string, unknown>)?.content as string ?? String(response);
   } catch (err) {
     console.warn(`[GodMode] Honcho queryPeer error: ${String(err)}`);
     return null;

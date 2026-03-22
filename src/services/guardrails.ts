@@ -395,7 +395,7 @@ export async function readGuardrailsState(): Promise<GuardrailsState> {
       gates: { ...GATE_DEFAULTS, ...(parsed.gates ?? {}) },
       activity: parsed.activity ?? [],
       custom,
-      toolGrounding: { ...TOOL_GROUNDING_STATE_DEFAULTS, ...((parsed as any).toolGrounding ?? {}) },
+      toolGrounding: { ...TOOL_GROUNDING_STATE_DEFAULTS, ...((parsed as Record<string, unknown>).toolGrounding as Record<string, unknown> ?? {}) },
       updatedAt: parsed.updatedAt ?? new Date().toISOString(),
     };
   } catch {
