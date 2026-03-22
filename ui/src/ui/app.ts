@@ -1624,7 +1624,46 @@ export class GodModeApp extends LitElement {
         this.showToast(`Opened truncated file: ${title}`, "warning");
       }
     } catch (err) {
-      console.error("[Chat] Failed to open file:", err);
+      console.error("[Chat] Failed to open file via gateway:", err);
+
+      // Fallback 1: Try HTTP artifact endpoint for inbox files
+      const inboxMatch = resolvedPath.match(/\/inbox\/([^/]+)$/);
+      if (inboxMatch) {
+        try {
+          const resp = await fetch(`${this.basePath}/godmode/artifacts/${encodeURIComponent(inboxMatch[1])}`);
+          if (resp.ok) {
+            const content = await resp.text();
+            const ext = resolvedPath.split(".").pop()?.toLowerCase() ?? "";
+            const FALLBACK_MIME: Record<string, string> = {
+              md: "text/markdown", markdown: "text/markdown", mdx: "text/markdown",
+              json: "application/json", yaml: "text/yaml", yml: "text/yaml",
+              csv: "text/csv", html: "text/html", htm: "text/html",
+            };
+            const mime = FALLBACK_MIME[ext] ?? resp.headers.get("content-type") ?? null;
+            const title = resolvedPath.split("/").pop() ?? resolvedPath;
+            this.handleOpenSidebar(content, { mimeType: mime, filePath: resolvedPath, title });
+            return;
+          }
+        } catch {
+          // Fall through to fallback content or error
+        }
+      }
+
+      // Fallback 2: Use cached content from tool result if available
+      if (fallbackContent) {
+        const ext = filePath.split(".").pop()?.toLowerCase() ?? "";
+        const FALLBACK_MIME: Record<string, string> = {
+          md: "text/markdown", markdown: "text/markdown", mdx: "text/markdown",
+          json: "application/json", yaml: "text/yaml", yml: "text/yaml",
+          csv: "text/csv", html: "text/html", htm: "text/html",
+        };
+        const mime = FALLBACK_MIME[ext] ?? null;
+        const title = filePath.split("/").pop() ?? filePath;
+        this.showToast("Opening cached version (file read failed)", "warning");
+        this.handleOpenSidebar(fallbackContent, { mimeType: mime, filePath, title });
+        return;
+      }
+
       this.showToast(`Failed to open file: ${filePath}`, "error");
     }
   }
