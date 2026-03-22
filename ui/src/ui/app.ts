@@ -1586,7 +1586,16 @@ export class GodModeApp extends LitElement {
       }>("files.read", { path: resolvedPath });
 
       const ext = resolvedPath.split(".").pop()?.toLowerCase() ?? "";
-      const mime = result.contentType ?? result.mime ?? (ext === "md" ? "text/markdown" : null);
+      // Force correct MIME for known text-based extensions regardless of what
+      // the gateway reports (it may default to application/octet-stream).
+      const FORCED_MIME: Record<string, string> = {
+        md: "text/markdown", markdown: "text/markdown", mdx: "text/markdown",
+        json: "application/json", json5: "application/json",
+        yaml: "text/yaml", yml: "text/yaml",
+        csv: "text/csv", tsv: "text/tab-separated-values",
+        html: "text/html", htm: "text/html",
+      };
+      const mime = FORCED_MIME[ext] ?? result.contentType ?? result.mime ?? null;
       const title = resolvedPath.split("/").pop() ?? resolvedPath;
 
       this.handleOpenSidebar(result.content, {
