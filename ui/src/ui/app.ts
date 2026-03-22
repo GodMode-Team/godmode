@@ -1992,6 +1992,14 @@ export class GodModeApp extends LitElement {
       return [];
     }
 
+    // Handle godmode-file:// URLs — bare filenames wrapped by linkifyFilePaths (BUG-009)
+    if (href.startsWith("godmode-file://")) {
+      let filename = href.slice("godmode-file://".length);
+      try { filename = decodeURIComponent(filename); } catch { /* keep as-is */ }
+      candidates.push(filename);
+      return candidates;
+    }
+
     // Handle file:// URLs — extract the local path directly
     if (href.startsWith("file://")) {
       let filePath = href.slice("file://".length);
