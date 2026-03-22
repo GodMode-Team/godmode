@@ -473,6 +473,8 @@ export function handleUpdated(host: LifecycleHost, changed: Map<PropertyKey, unk
   // chat history. This catches race conditions where the initial load was
   // skipped AND stale-message scenarios where the previous connection's
   // data is still in state (which previously bypassed the length===0 check).
+  // Delay slightly so the gateway's onReady handler has time to fire first,
+  // which prevents double-loading chat history (BUG-005).
   if (
     changed.has("connected") &&
     changed.get("connected") === false &&
@@ -480,9 +482,14 @@ export function handleUpdated(host: LifecycleHost, changed: Map<PropertyKey, unk
     host.tab === "chat" &&
     !host.chatLoading
   ) {
-    void loadChatHistory(host as unknown as Parameters<typeof loadChatHistory>[0]).then(() => {
-      triggerImageResolve(host as unknown as import("./app").GodModeApp);
-    });
+    setTimeout(() => {
+      const h = host as unknown as Parameters<typeof loadChatHistory>[0];
+      if (h.tab === "chat" && !h.chatLoading) {
+        void loadChatHistory(h).then(() => {
+          triggerImageResolve(host as unknown as import("./app").GodModeApp);
+        });
+      }
+    }, 500);
   }
 
   // Safety net: when gateway connects while on a non-chat tab, load its data.
