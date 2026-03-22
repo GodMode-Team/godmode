@@ -4,6 +4,19 @@ This file tracks recent development changes so Atlas and other agents can quickl
 
 ---
 
+## Slack Onboarding Status Detection Fix (2026-03-16)
+
+### What Landed
+- Added a shared channel-configuration detector so onboarding and integration status both recognize channel config saved under `channels.<id>` as well as legacy top-level channel keys.
+- Taught the detector to treat Slack OAuth/token-source markers plus saved DM/channel policy config as a real configured state, so onboarding can show Slack as connected after setup even without a live runtime probe.
+- Wired the shared detector into both `src/lib/integration-registry.ts` and `src/methods/onboarding-scanner.ts` to keep setup badges and onboarding assessment in sync.
+
+### Verification
+- `rg "\.\./\.\./\.\./\.\./src/" -n` — clean
+- `pnpm typecheck` — blocked in this workspace because `node_modules` is missing and `tsc` is unavailable
+- `pnpm build` — blocked in this workspace because `node_modules` is missing and `vite` is unavailable
+- `pnpm install` — attempted, but failed with `ENOTFOUND registry.npmjs.org` under sandboxed network restrictions
+
 ## Linux systemd gateway service template (2026-03-21)
 
 ### What Landed
