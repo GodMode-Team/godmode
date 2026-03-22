@@ -78,7 +78,7 @@ function extractFilePathFromText(text: string | undefined): string | null {
 export function renderToolCardSidebar(
   card: ToolCard,
   onOpenSidebar?: (content: string) => void,
-  onOpenFile?: (filePath: string) => void,
+  onOpenFile?: (filePath: string, fallbackContent?: string) => void,
   onOpenProof?: (slug: string) => void,
   onPushToDrive?: (filePath: string) => void,
 ) {
@@ -127,7 +127,7 @@ export function renderToolCardSidebar(
         </div>
         <div class="chat-artifact-card__actions">
           ${onOpenFile
-            ? html`<button class="chat-artifact-card__btn" @click=${(e: Event) => { e.stopPropagation(); onOpenFile(filePath); }}>Open</button>`
+            ? html`<button class="chat-artifact-card__btn" @click=${(e: Event) => { e.stopPropagation(); onOpenFile(filePath, card.text ?? undefined); }}>Open</button>`
             : onOpenSidebar && hasText
               ? html`<button class="chat-artifact-card__btn" @click=${(e: Event) => { e.stopPropagation(); onOpenSidebar(formatToolOutputForSidebar(card.text!)); }}>View</button>`
               : nothing}
@@ -145,7 +145,7 @@ export function renderToolCardSidebar(
         e.stopPropagation();
         // For file-oriented tools, open the actual file in the sidebar viewer
         if (onOpenFile && filePath) {
-          onOpenFile(filePath);
+          onOpenFile(filePath, card.text ?? undefined);
           return;
         }
         if (onOpenSidebar && hasText) {

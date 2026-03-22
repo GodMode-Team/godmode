@@ -1554,8 +1554,25 @@ export class GodModeApp extends LitElement {
     }, 200);
   }
 
-  async handleOpenFile(filePath: string) {
+  async handleOpenFile(filePath: string, fallbackContent?: string) {
     if (!this.client || !this.connected) {
+      // When gateway is unavailable, use fallback content if provided
+      // (tool cards carry the file content in the message text)
+      if (fallbackContent) {
+        const ext = filePath.split(".").pop()?.toLowerCase() ?? "";
+        const FORCED_MIME: Record<string, string> = {
+          md: "text/markdown", markdown: "text/markdown", mdx: "text/markdown",
+          json: "application/json", json5: "application/json",
+          yaml: "text/yaml", yml: "text/yaml",
+          csv: "text/csv", tsv: "text/tab-separated-values",
+          html: "text/html", htm: "text/html",
+        };
+        const mime = FORCED_MIME[ext] ?? null;
+        const title = filePath.split("/").pop() ?? filePath;
+        this.showToast("Opening cached version (gateway offline)", "warning");
+        this.handleOpenSidebar(fallbackContent, { mimeType: mime, filePath, title });
+        return;
+      }
       this.showToast("Not connected to gateway", "error");
       return;
     }
