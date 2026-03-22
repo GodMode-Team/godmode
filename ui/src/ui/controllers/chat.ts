@@ -65,6 +65,8 @@ export type ChatState = {
   chatStream: string | null;
   chatStreamStartedAt: number | null;
   lastError: string | null;
+  /** Flag to reload history when a sub-agent final event arrives during streaming (BUG-008). */
+  refreshSessionsAfterChat: boolean;
 };
 
 export type ChatEventPayload = {
@@ -451,8 +453,10 @@ export function handleChatEvent(state: ChatState, payload?: ChatEventPayload) {
       // Don't trigger history reload while the user's current run is actively
       // streaming — loadChatHistoryAfterFinal would replace the optimistic user
       // message with server history that may not include it yet (race condition).
-      // The user's own "final" will reload history when the stream ends.
+      // Instead of dropping the event entirely, flag for reload when the
+      // current stream ends (BUG-008: sub-agent results were silently lost).
       if (state.chatStream !== null) {
+        state.refreshSessionsAfterChat = true;
         return null;
       }
       return "final";
