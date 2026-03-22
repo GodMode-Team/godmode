@@ -16,6 +16,7 @@ import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { join, dirname, basename } from "node:path";
 import { fileURLToPath } from "node:url";
 import { homedir } from "node:os";
+import { loadMem0Oss } from "../scripts/load-mem0-oss.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_DIR = join(__dirname, "..");
@@ -220,7 +221,7 @@ try {
   const hasOpenAI = !!process.env.OPENAI_API_KEY;
   const hasAnthropic = !!process.env.ANTHROPIC_API_KEY;
   if (hasOpenAI && hasAnthropic) {
-    const { Memory } = await import("mem0ai/oss");
+    const { Memory } = await loadMem0Oss();
     const testDbPath = join(homedir(), "godmode", "data", "mem0-eval-vectors.db");
     const testHistoryPath = join(homedir(), "godmode", "data", "mem0-eval-history.db");
     memoryInstance = new Memory({
@@ -241,7 +242,8 @@ try {
     console.log("Mem0 not available (missing API keys). Running synthetic mode.\n");
   }
 } catch (err) {
-  console.log(`Mem0 init failed: ${err.message}\nRunning synthetic mode.\n`);
+  const message = err instanceof Error ? err.message : String(err);
+  console.log(`Mem0 init failed: ${message}\nRunning synthetic mode.\n`);
 }
 
 if (mem0Available && memoryInstance) {

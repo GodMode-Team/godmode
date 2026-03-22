@@ -14,6 +14,7 @@
 import { readFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
+import { loadMem0Oss } from "../scripts/load-mem0-oss.mjs";
 
 // ── Setup: resolve API keys the same way memory.ts does ─────────────
 
@@ -124,12 +125,12 @@ async function main() {
 
   let Memory;
   try {
-    const mod = await import("mem0ai/oss");
+    const mod = await loadMem0Oss();
     Memory = mod.Memory;
     check("mem0ai/oss importable", true);
   } catch (err) {
-    check("mem0ai/oss importable", false, String(err).slice(0, 80));
-    console.log("\n❌ mem0ai not installed. Run: pnpm install\n");
+    check("mem0ai/oss importable", false, String(err).slice(0, 120));
+    console.log(`\n❌ ${err instanceof Error ? err.message : String(err)}\n`);
     process.exit(1);
   }
 

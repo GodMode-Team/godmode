@@ -80,6 +80,7 @@
     "json5": "2.2.3",
     "lit": "3.3.2",
     "marked": "17.0.3",
+    "mem0ai": "^2.3.0",
     "ws": "8.19.0"
   },
   "devDependencies": {

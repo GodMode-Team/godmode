@@ -4,6 +4,19 @@ This file tracks recent development changes so Atlas and other agents can quickl
 
 ---
 
+## QMD Missing Binary Guardrail (2026-03-16)
+
+### What Landed
+- Added a shared qmd status detector so startup, health checks, onboarding audit, and Second Brain search all agree on whether the qmd CLI is actually available.
+- Startup now logs the actionable install command `npm install -g @tobilu/qmd`, raises a health warning, and broadcasts a visible degraded-search notification instead of failing silently.
+- QMD-backed search now degrades cleanly to file-walk fallback without repeatedly hitting `spawn qmd ENOENT`.
+- `/godmode/health`, onboarding assessment/config audit, and Setup capability state now surface qmd availability and the missing-binary warning.
+
+### Verification
+- `pnpm typecheck`
+- `pnpm build`
+- `rg "\.\./\.\./\.\./\.\./src/" -n`
+
 ## Linux systemd gateway service template (2026-03-21)
 
 ### What Landed
