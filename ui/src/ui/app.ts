@@ -323,6 +323,7 @@ export class GodModeApp extends LitElement {
   @state() currentModel: string | null = null;
   @state() availableModels: { id: string; name: string; provider: string }[] = [];
   @state() modelPickerOpen = false;
+  @state() modelCacheTs = 0;
 
   @state() sessionKey = this.settings.sessionKey;
   @state() sessionPickerOpen = false;

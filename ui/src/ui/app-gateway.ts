@@ -1330,20 +1330,27 @@ function handleGatewayEventUnsafe(host: GatewayHost, evt: GatewayEventFrame) {
   }
 }
 
+const MODEL_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
 async function loadCurrentModel(host: GatewayHost) {
   if (!host.client) return;
+  const app = host as unknown as {
+    currentModel: string | null;
+    availableModels: { id: string; name: string; provider: string }[];
+    modelCacheTs: number;
+  };
+  if (app.availableModels.length > 0 && Date.now() - app.modelCacheTs < MODEL_CACHE_TTL) {
+    return;
+  }
   try {
     const res = await host.client.request("godmode.config.model", {});
-    const app = host as unknown as {
-      currentModel: string | null;
-      availableModels: { id: string; name: string; provider: string }[];
-    };
     if (res?.primary) {
       app.currentModel = res.primary;
     }
     if (Array.isArray(res?.available)) {
       app.availableModels = res.available;
     }
+    app.modelCacheTs = Date.now();
   } catch { /* non-critical */ }
 }
 
@@ -1357,6 +1364,7 @@ export async function switchModelFromChat(host: GatewayHost, modelId: string) {
     await host.client.request("godmode.config.model.set", { primary: modelId });
     app.currentModel = modelId;
     app.modelPickerOpen = false;
+    (host as unknown as { modelCacheTs: number }).modelCacheTs = 0;
   } catch (err) {
     console.error("[model-switch]", err);
   }
