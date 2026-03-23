@@ -53,6 +53,36 @@ export async function runGatewayStart(
   }
   g.__godmodeInstanceId = pluginRoot;
 
+  // ── Global Crash Handlers — write diagnostics before process death ──
+  if (!g.__godmodeCrashHandlersRegistered) {
+    const { writeCrashSentinel } = await import("../lib/restart-sentinel.js");
+
+    process.on("uncaughtException", (err) => {
+      logger.error(`[GodMode] CRASH: Uncaught exception: ${err.message}`);
+      const activeKeys = sessions.activeKeys();
+      writeCrashSentinel(
+        err.message,
+        err.stack ?? "no stack",
+        "uncaughtException",
+        activeKeys,
+      );
+      const serviceNames = serviceCleanup.map((s) => s.name);
+      writeSentinel(activeKeys, serviceNames, "unknown");
+    });
+
+    process.on("unhandledRejection", (reason) => {
+      const msg = reason instanceof Error ? reason.message : String(reason);
+      const stack = reason instanceof Error ? (reason.stack ?? "no stack") : "no stack";
+      logger.error(`[GodMode] CRASH: Unhandled rejection: ${msg}`);
+      const activeKeys = sessions.activeKeys();
+      writeCrashSentinel(msg, stack, "unhandledRejection", activeKeys);
+      const serviceNames = serviceCleanup.map((s) => s.name);
+      writeSentinel(activeKeys, serviceNames, "unknown");
+    });
+
+    g.__godmodeCrashHandlersRegistered = true;
+  }
+
   // ── Part C: Config Shield — detect stale npm duplicate ────────────
   // Even if only one copy loaded, warn if the extensions dir still exists
   // (it could cause a duplicate on the next restart/update).
@@ -94,6 +124,29 @@ export async function runGatewayStart(
         previousSessionCount: restartInfo.previousSessions.length,
         reason: restartInfo.reason,
       });
+    }
+  } catch { /* non-fatal */ }
+
+  // ── Crash Sentinel — detect if previous shutdown was a crash ─────
+  try {
+    const { consumeCrashSentinel } = await import("../lib/restart-sentinel.js");
+    const crashInfo = consumeCrashSentinel();
+    if (crashInfo) {
+      const downtimeSec = Math.round(crashInfo.downtimeMs / 1000);
+      logger.warn(
+        `[GodMode] Recovered from CRASH (downtime: ${downtimeSec}s, ` +
+        `type: ${crashInfo.type}, error: ${crashInfo.error})`,
+      );
+      health.signal("gateway.crash-recovery", true, {
+        downtimeMs: crashInfo.downtimeMs,
+        type: crashInfo.type,
+        error: crashInfo.error,
+        previousSessionCount: crashInfo.previousSessions.length,
+      });
+      turnErrors.capture(
+        "gateway-crash",
+        `GodMode crashed ${downtimeSec}s ago (${crashInfo.type}: ${crashInfo.error}). Now recovered.`,
+      );
     }
   } catch { /* non-fatal */ }
 

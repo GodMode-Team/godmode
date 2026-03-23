@@ -1068,10 +1068,15 @@ export function renderApp(state: AppViewState) {
           <div class="page-meta">
             ${
               state.reconnecting
-                ? html`<div class="pill warning reconnecting">
-                  <span class="reconnect-spinner"></span>
-                  Reconnecting${state.reconnectAttempt > 1 ? ` (attempt ${state.reconnectAttempt})` : ""}...
-                </div>`
+                ? (state.reconnectAttempt ?? 0) > 10
+                  ? html`<div class="pill danger gateway-offline">
+                      Gateway offline — retrying every 60s (attempt ${state.reconnectAttempt}).
+                      Try: <code>oc gateway restart</code>
+                    </div>`
+                  : html`<div class="pill warning reconnecting">
+                      <span class="reconnect-spinner"></span>
+                      Reconnecting${state.reconnectAttempt > 1 ? ` (attempt ${state.reconnectAttempt})` : ""}...
+                    </div>`
                 : state.lastError
                   ? html`<div class="pill ${state.lastError.startsWith("✓") ? "success" : "danger"}">${state.lastError}</div>`
                   : nothing

@@ -268,7 +268,7 @@ type GatewayHost = {
 
 // Reconnection state (module-level to persist across calls)
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
-const MAX_RECONNECT_ATTEMPTS = 10;
+const FAST_RECONNECT_ATTEMPTS = 10;
 const BASE_RECONNECT_DELAY = 1000; // 1 second
 
 // Debounced working session clearing - prevents indicator flicker during multi-tool turns
@@ -350,20 +350,16 @@ function scheduleReconnect(host: GatewayHost) {
 
   // Initialize or increment attempt counter
   const attempt = (host.reconnectAttempt ?? 0) + 1;
-  if (attempt > MAX_RECONNECT_ATTEMPTS) {
-    host.lastError = "Connection lost. Please refresh the page.";
-    host.reconnecting = false;
-    return;
-  }
-
   host.reconnectAttempt = attempt;
   host.reconnecting = true;
 
-  // Exponential backoff: 1s, 2s, 4s, 8s, ... capped at 30s
-  const delay = Math.min(BASE_RECONNECT_DELAY * Math.pow(2, attempt - 1), 30000);
+  // Fast backoff for first 10 attempts (1s→30s), then slow poll every 60s
+  const delay = attempt <= FAST_RECONNECT_ATTEMPTS
+    ? Math.min(BASE_RECONNECT_DELAY * Math.pow(2, attempt - 1), 30000)
+    : 60_000;
 
   // Debug logging disabled in production
-  // console.log(`[gateway] Reconnecting in ${delay}ms (attempt ${attempt}/${MAX_RECONNECT_ATTEMPTS})`);
+  // console.log(`[gateway] Reconnecting in ${delay}ms (attempt ${attempt})`);
 
   reconnectTimer = setTimeout(() => {
     reconnectTimer = null;
@@ -595,7 +591,7 @@ export function connectGateway(host: GatewayHost) {
     password: host.password.trim() ? host.password : undefined,
     clientName: "openclaw-control-ui",
     mode: "webchat",
-    onHello: (hello) => {
+    onHello: async (hello) => {
       const wasReconnecting = host.reconnecting;
       host.connected = true;
       host.lastError = null;
@@ -606,10 +602,20 @@ export function connectGateway(host: GatewayHost) {
       // Show toast notification if we were reconnecting
       if (wasReconnecting) {
         const app = host as unknown as GodModeApp;
+        // Check if recovery was from a crash
+        let toastMsg = "Gateway reconnected";
+        try {
+          const healthResult = await host.client!.request<{
+            crashRecovery?: { error?: string; downtimeMs?: number };
+          }>("godmode.health", {});
+          if (healthResult?.crashRecovery) {
+            const secs = Math.round((healthResult.crashRecovery.downtimeMs ?? 0) / 1000);
+            toastMsg = `Recovered from crash (${secs}s downtime). Everything is back online.`;
+          }
+        } catch { /* health RPC may not exist — that's fine */ }
         if (typeof app.showToast === "function") {
-          app.showToast("Gateway reconnected", "success", 4000);
+          app.showToast(toastMsg, "success", 6000);
         }
-        // Also show brief inline message for backward compatibility
         host.lastError = "✓ Reconnected";
         setTimeout(() => {
           if (host.lastError === "✓ Reconnected") {

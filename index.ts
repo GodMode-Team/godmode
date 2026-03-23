@@ -465,11 +465,19 @@ const godmodePlugin = {
       try {
         const { getHealthReport } = await import("./src/services/self-heal.js");
         const { sessions } = await import("./src/lib/health-ledger.js");
+        const { getLastCrash } = await import("./src/lib/restart-sentinel.js");
         const report = getHealthReport();
+        const crash = getLastCrash();
         respond(true, {
           ...report,
           activeSessions: sessions.activeCount(),
           activeSessionKeys: sessions.activeKeys(),
+          crashRecovery: crash ? {
+            error: crash.error,
+            downtimeMs: crash.downtimeMs,
+            type: crash.type,
+            previousSessions: crash.previousSessions,
+          } : undefined,
         });
       } catch (err) {
         respond(true, { ts: Date.now(), overall: "offline", subsystems: [], lastRepairSummary: null, activeSessions: 0, error: String(err) });

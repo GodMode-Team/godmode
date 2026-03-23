@@ -448,6 +448,26 @@ export async function gatherContextInputs(opts: GatherContextOptions): Promise<C
     }
   } catch (e) { logger.warn(`[GodMode][gather] Restart sentinel error: ${(e as Error).message}`); }
 
+  // Crash recovery awareness
+  try {
+    const { getLastCrash, clearLastCrash } = await import("./restart-sentinel.js");
+    const crash = getLastCrash();
+    if (crash && crash.downtimeMs < 30 * 60 * 1000) {
+      const downtimeSec = Math.round(crash.downtimeMs / 1000);
+      safetyNudges.push(
+        `## Crash Recovery\n` +
+        `GodMode crashed ${downtimeSec}s ago and has recovered.\n` +
+        `- Type: ${crash.type}\n` +
+        `- Error: ${crash.error}\n` +
+        `- Sessions affected: ${crash.previousSessions.length}\n\n` +
+        `Tell the user proactively: "I crashed a moment ago — [brief explanation of the error]. ` +
+        `Everything is back online now. Let me know if anything seems off."\n` +
+        `Do NOT hide the crash. Users trust transparency.`,
+      );
+      clearLastCrash();
+    }
+  } catch (e) { logger.warn(`[GodMode][gather] Crash sentinel error: ${(e as Error).message}`); }
+
   // Turn-level errors
   try {
     const { turnErrors } = await import("./health-ledger.js");

@@ -11,6 +11,7 @@ import { join } from "node:path";
 import { DATA_DIR } from "../data-paths.js";
 
 const SENTINEL_PATH = join(DATA_DIR, "restart-sentinel.json");
+const CRASH_SENTINEL_PATH = join(DATA_DIR, "crash-sentinel.json");
 
 export interface RestartSentinel {
   ts: number;
@@ -26,6 +27,25 @@ export interface RestartInfo {
   previousServices: string[];
   reason: string;
 }
+
+export interface CrashSentinel {
+  ts: number;
+  pid: number;
+  error: string;
+  stack: string;
+  type: "uncaughtException" | "unhandledRejection";
+  activeSessions: string[];
+}
+
+export interface CrashInfo {
+  downtimeMs: number;
+  error: string;
+  stack: string;
+  type: string;
+  previousSessions: string[];
+}
+
+let lastCrash: CrashInfo | null = null;
 
 let lastRestart: RestartInfo | null = null;
 
@@ -51,6 +71,30 @@ export function writeSentinel(
 }
 
 /**
+ * Write crash sentinel before process death. Called from global error handlers.
+ * Synchronous — must complete before process exits.
+ */
+export function writeCrashSentinel(
+  error: string,
+  stack: string,
+  type: CrashSentinel["type"],
+  activeSessions: string[] = [],
+): void {
+  try {
+    mkdirSync(DATA_DIR, { recursive: true });
+    const sentinel: CrashSentinel = {
+      ts: Date.now(),
+      pid: process.pid,
+      error,
+      stack,
+      type,
+      activeSessions,
+    };
+    writeFileSync(CRASH_SENTINEL_PATH, JSON.stringify(sentinel, null, 2), "utf-8");
+  } catch { /* last-resort — if we can't write, at least we tried */ }
+}
+
+/**
  * Read and consume sentinel on startup. Call from runGatewayStart().
  */
 export function consumeSentinel(): RestartInfo | null {
@@ -70,6 +114,37 @@ export function consumeSentinel(): RestartInfo | null {
   } catch {
     return null;
   }
+}
+
+/**
+ * Read and consume crash sentinel on startup.
+ */
+export function consumeCrashSentinel(): CrashInfo | null {
+  try {
+    if (!existsSync(CRASH_SENTINEL_PATH)) return null;
+    const raw = readFileSync(CRASH_SENTINEL_PATH, "utf-8");
+    unlinkSync(CRASH_SENTINEL_PATH);
+    const sentinel: CrashSentinel = JSON.parse(raw);
+    const info: CrashInfo = {
+      downtimeMs: Date.now() - sentinel.ts,
+      error: sentinel.error,
+      stack: sentinel.stack,
+      type: sentinel.type,
+      previousSessions: sentinel.activeSessions,
+    };
+    lastCrash = info;
+    return info;
+  } catch {
+    return null;
+  }
+}
+
+export function getLastCrash(): CrashInfo | null {
+  return lastCrash;
+}
+
+export function clearLastCrash(): void {
+  lastCrash = null;
 }
 
 /**
