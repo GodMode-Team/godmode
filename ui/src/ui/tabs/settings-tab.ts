@@ -90,7 +90,14 @@ import {
 } from "../controllers/skills.js";
 import { loadRoster } from "../controllers/agents.js";
 import { loadGuardrails } from "../controllers/guardrails.js";
-import { getEventLogSnapshot } from "../app-gateway.js";
+import {
+  getEventLogSnapshot,
+  loadSecrets,
+  loadWebFetchConfig,
+  setWebFetchProvider,
+  loadSearchConfig,
+  setSearchProvider,
+} from "../app-gateway.js";
 import { scheduleLogsScroll } from "../app-scroll.js";
 import {
   setTab,
@@ -273,6 +280,17 @@ export class GmSettings extends LitElement {
             s.handleUpdateUserProfile(name, avatar),
           onModelSwitch: (primary: string, fallbacks?: string[]) =>
             switchModel(s, primary, fallbacks),
+          secrets: s.secrets ?? [],
+          secretsLoading: s.secretsLoading ?? false,
+          onSecretsRefresh: () => loadSecrets(s),
+          webFetchProvider: s.webFetchProvider ?? "default",
+          webFetchLoading: s.webFetchLoading ?? false,
+          onWebFetchChange: (provider: string) => setWebFetchProvider(s, provider),
+          searchProvider: s.searchProvider ?? "tavily",
+          searchExaConfigured: s.searchExaConfigured ?? false,
+          searchTavilyConfigured: s.searchTavilyConfigured ?? false,
+          searchLoading: s.searchLoading ?? false,
+          onSearchProviderChange: (provider: string) => setSearchProvider(s, provider),
         });
 
       case "channels":
@@ -662,8 +680,13 @@ export class GmSettings extends LitElement {
     try {
       switch (subtab) {
         case "config":
-          await loadConfigSchema(s);
-          await loadConfig(s);
+          await Promise.all([
+            loadConfigSchema(s),
+            loadConfig(s),
+            loadSecrets(s),
+            loadWebFetchConfig(s),
+            loadSearchConfig(s),
+          ]);
           break;
         case "channels":
           await Promise.all([

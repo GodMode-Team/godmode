@@ -34,12 +34,21 @@ export type XBrowserHealth = {
   error?: string;
 };
 
+export type TweetMediaItem = {
+  type: string; // "photo" | "video" | "animated_gif"
+  url: string;
+  width?: number;
+  height?: number;
+};
+
 export type ExtractedTweet = {
   author: string;
   handle: string;
   text: string;
   url?: string;
   timestamp?: string;
+  media?: TweetMediaItem[];
+  urls?: string[];
 };
 
 // ── State ──────────────────────────────────────────────────────────────
