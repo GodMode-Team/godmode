@@ -411,4 +411,15 @@ export const inboxHandlers: Record<string, Function> = {
       respond(false, null, { code: "INBOX_ERROR", message: String(err) });
     }
   },
+
+  "inbox.purgeStale": async ({ respond }: { params: Record<string, unknown>; respond: Function }) => {
+    try {
+      // Force sweep by resetting cooldown
+      _lastSweep = 0;
+      const swept = await sweepStaleItems();
+      respond(true, { swept });
+    } catch (err) {
+      respond(false, null, { code: "INBOX_ERROR", message: String(err) });
+    }
+  },
 };
