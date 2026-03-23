@@ -1036,6 +1036,9 @@ const _pendingApproval = new Map<string, string>();
 /** sessionKey → description of the action that was just approved (consumed by before_prompt_build) */
 const _approvalNudge = new Map<string, string>();
 
+/** sessionKey → timestamp of last gate block (for rapid-retry detection) */
+const _lastGateBlock = new Map<string, number>();
+
 /** TTL for approvals — 10 minutes */
 const APPROVAL_TTL_MS = 10 * 60 * 1000;
 
@@ -1043,9 +1046,17 @@ const APPROVAL_TTL_MS = 10 * 60 * 1000;
  * Called by gates when they block an action. Marks the session as
  * having a pending approval request, along with a description of
  * what was blocked so the ally knows what to retry.
+ *
+ * Returns "rapid-retry" if the ally is retrying within the same turn
+ * (< 60s since last block) so the caller can give a stronger message.
  */
-export function markPendingApproval(sessionKey: string | undefined, actionDescription?: string): void {
-  if (sessionKey) _pendingApproval.set(sessionKey, actionDescription || "a blocked action");
+export function markPendingApproval(sessionKey: string | undefined, actionDescription?: string): "rapid-retry" | "first" {
+  if (!sessionKey) return "first";
+  const lastBlock = _lastGateBlock.get(sessionKey);
+  const isRapidRetry = !!lastBlock && Date.now() - lastBlock < 60_000;
+  _lastGateBlock.set(sessionKey, Date.now());
+  _pendingApproval.set(sessionKey, actionDescription || "a blocked action");
+  return isRapidRetry ? "rapid-retry" : "first";
 }
 
 /**
@@ -1058,6 +1069,9 @@ export function processUserMessage(
   _userMessage: string,
 ): boolean {
   if (!sessionKey) return false;
+
+  // New user message = new turn, reset rapid-retry tracker
+  _lastGateBlock.delete(sessionKey);
 
   // If a gate blocked since last user message, any response = approval
   const blockedAction = _pendingApproval.get(sessionKey);
@@ -1140,11 +1154,12 @@ const DEPLOYMENT_HARD_BLOCK_MESSAGE = [
 ].join("\n");
 
 const DEPLOYMENT_APPROVAL_MESSAGE = [
-  "\u{1F6A8} TEMPORARY BLOCK — approval needed for this deploy/push action.",
+  "APPROVAL GATE — this deploy/push needs user approval first.",
   "",
-  "Tell the user exactly what you want to do and ask for their OK.",
-  "Once they respond, you will receive an APPROVED nudge — then retry the EXACT same command.",
-  "This is NOT a permanent block. It WILL succeed after user approval.",
+  "STOP. Do NOT retry this command again in this turn.",
+  "Instead: tell the user what you want to deploy/push and ask for their OK.",
+  "When the user sends their next message, you will get an ACTION APPROVED nudge.",
+  "ONLY retry after you see that nudge. This WILL succeed after approval.",
 ].join("\n");
 
 /**
@@ -1193,13 +1208,16 @@ export async function checkDeploymentGate(
       return undefined;
     }
 
-    markPendingApproval(sessionKey, `deploy/push: ${command.slice(0, 100)}`);
+    const retryType = markPendingApproval(sessionKey, `deploy/push: ${command.slice(0, 100)}`);
     void logGateActivity(
       "deploymentGate",
       "blocked",
       `Deployment GATED (needs approval): ${command.slice(0, 120)}`,
       sessionKey,
     );
+    if (retryType === "rapid-retry") {
+      return "STOP RETRYING. You already tried this and it was blocked. You MUST wait for the user to respond. Tell them what you need to do and STOP. Do not call this tool again until you see an ACTION APPROVED nudge.";
+    }
     return DEPLOYMENT_APPROVAL_MESSAGE;
   }
 
@@ -1367,12 +1385,15 @@ const CLIENT_FACING_PATTERNS = [
   /twitter.*\/statuses/i,
 ];
 
+const RAPID_RETRY_MESSAGE = "STOP RETRYING. You already tried this and it was blocked. You MUST wait for the user to respond. Tell them what you need to do and STOP. Do not call this tool again until you see an ACTION APPROVED nudge.";
+
 const CLIENT_FACING_BLOCK_MESSAGE = [
-  "\u{1F6D1} TEMPORARY BLOCK — approval needed for this client-facing action.",
+  "APPROVAL GATE — this client-facing action needs user approval first.",
   "",
-  "Tell the user exactly what you want to do (API call, recipient, content) and ask for their OK.",
-  "Once they respond, you will receive an APPROVED nudge — then retry the EXACT same tool call.",
-  "This is NOT a permanent block. It WILL succeed after user approval.",
+  "STOP. Do NOT retry this command again in this turn.",
+  "Instead: tell the user the exact API call/recipient/content and ask for their OK.",
+  "When the user sends their next message, you will get an ACTION APPROVED nudge.",
+  "ONLY retry after you see that nudge. This WILL succeed after approval.",
 ].join("\n");
 
 /**
@@ -1425,14 +1446,14 @@ export async function checkClientFacingGate(
         return undefined;
       }
 
-      markPendingApproval(sessionKey, `client-facing command: ${command.slice(0, 100)}`);
+      const rt1 = markPendingApproval(sessionKey, `client-facing command: ${command.slice(0, 100)}`);
       void logGateActivity(
         "clientFacingGate",
         "blocked",
         `Client-facing action GATED: ${command.slice(0, 150)}`,
         sessionKey,
       );
-      return CLIENT_FACING_BLOCK_MESSAGE;
+      return rt1 === "rapid-retry" ? RAPID_RETRY_MESSAGE : CLIENT_FACING_BLOCK_MESSAGE;
     }
   }
 
@@ -1454,14 +1475,14 @@ export async function checkClientFacingGate(
           return undefined;
         }
 
-        markPendingApproval(sessionKey, `client-facing fetch: ${method.toUpperCase()} ${url.slice(0, 100)}`);
+        const rt2 = markPendingApproval(sessionKey, `client-facing fetch: ${method.toUpperCase()} ${url.slice(0, 100)}`);
         void logGateActivity(
           "clientFacingGate",
           "blocked",
           `Client-facing fetch GATED: ${method.toUpperCase()} ${url.slice(0, 120)}`,
           sessionKey,
         );
-        return CLIENT_FACING_BLOCK_MESSAGE;
+        return rt2 === "rapid-retry" ? RAPID_RETRY_MESSAGE : CLIENT_FACING_BLOCK_MESSAGE;
       }
     }
   }
@@ -1492,14 +1513,14 @@ export async function checkClientFacingGate(
       return undefined;
     }
 
-    markPendingApproval(sessionKey, `client-facing comms: ${name}`);
+    const rt3 = markPendingApproval(sessionKey, `client-facing comms: ${name}`);
     void logGateActivity(
       "clientFacingGate",
       "blocked",
       `Client-facing comms GATED: ${name}`,
       sessionKey,
     );
-    return CLIENT_FACING_BLOCK_MESSAGE;
+    return rt3 === "rapid-retry" ? RAPID_RETRY_MESSAGE : CLIENT_FACING_BLOCK_MESSAGE;
   }
 
   return undefined;
