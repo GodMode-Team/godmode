@@ -1035,49 +1035,88 @@ export async function checkArchitectureGate(
  */
 function approvalKey(sessionKey: string | undefined): string | undefined {
   if (!sessionKey) return undefined;
-  // "agent:main:webchat-c1d6e375" → "agent:main:webchat"
-  // "agent:main:support" → "agent:main:support" (unchanged)
-  // "imessage:+19166987764" → "imessage:+19166987764" (unchanged)
   return sessionKey.replace(/(webchat|chat)-[a-f0-9]+$/i, "$1");
 }
 
-/** approvalKey → timestamp of approval */
-const _approvals = new Map<string, number>();
+// ── Disk-persisted approval state ────────────────────────────────────
+//
+// Previous approach used in-memory Maps, which broke on:
+//   1. Gateway restarts (deploys wipe all state)
+//   2. Multiple sessions with different random suffixes
+//
+// Now persists to ~/godmode/data/approval-state.json so approvals
+// survive restarts and work across all sessions.
 
-/** approvalKey → description of what was blocked (so we can tell the ally what to retry) */
-const _pendingApproval = new Map<string, string>();
+import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 
-/** approvalKey → description of the action that was just approved (consumed by before_prompt_build) */
-const _approvalNudge = new Map<string, string>();
-
-/** approvalKey → timestamp of last gate block (for rapid-retry detection) */
-const _lastGateBlock = new Map<string, number>();
+const APPROVAL_STATE_PATH = path.join(GODMODE_ROOT, "data", "approval-state.json");
 
 /** TTL for approvals — 10 minutes */
 const APPROVAL_TTL_MS = 10 * 60 * 1000;
 
+interface ApprovalState {
+  /** channel → { action description, timestamp } */
+  pending: Record<string, { action: string; ts: number }>;
+  /** channel → timestamp of approval grant */
+  approved: Record<string, number>;
+  /** channel → { action description } — consumed by before_prompt_build */
+  nudges: Record<string, string>;
+  /** channel → timestamp of last gate block (rapid-retry detection) */
+  lastBlock: Record<string, number>;
+}
+
+function readState(): ApprovalState {
+  try {
+    const raw = readFileSync(APPROVAL_STATE_PATH, "utf-8");
+    return JSON.parse(raw) as ApprovalState;
+  } catch {
+    return { pending: {}, approved: {}, nudges: {}, lastBlock: {} };
+  }
+}
+
+function writeState(state: ApprovalState): void {
+  try {
+    mkdirSync(path.join(GODMODE_ROOT, "data"), { recursive: true });
+    writeFileSync(APPROVAL_STATE_PATH, JSON.stringify(state, null, 2));
+  } catch { /* non-fatal */ }
+}
+
+/** Evict expired entries to keep the file small */
+function cleanState(state: ApprovalState): void {
+  const now = Date.now();
+  for (const k of Object.keys(state.approved)) {
+    if (now - state.approved[k] > APPROVAL_TTL_MS) delete state.approved[k];
+  }
+  for (const k of Object.keys(state.pending)) {
+    if (now - state.pending[k].ts > APPROVAL_TTL_MS) delete state.pending[k];
+  }
+  for (const k of Object.keys(state.lastBlock)) {
+    if (now - state.lastBlock[k] > APPROVAL_TTL_MS) delete state.lastBlock[k];
+  }
+}
+
 /**
- * Called by gates when they block an action. Marks the session as
- * having a pending approval request, along with a description of
- * what was blocked so the ally knows what to retry.
+ * Called by gates when they block an action. Marks the channel as
+ * having a pending approval request.
  *
- * Returns "rapid-retry" if the ally is retrying within the same turn
- * (< 60s since last block) so the caller can give a stronger message.
+ * Returns "rapid-retry" if the ally is retrying within 60s.
  */
 export function markPendingApproval(sessionKey: string | undefined, actionDescription?: string): "rapid-retry" | "first" {
   const key = approvalKey(sessionKey);
   if (!key) return "first";
-  const lastBlock = _lastGateBlock.get(key);
+  const state = readState();
+  const lastBlock = state.lastBlock[key];
   const isRapidRetry = !!lastBlock && Date.now() - lastBlock < 60_000;
-  _lastGateBlock.set(key, Date.now());
-  _pendingApproval.set(key, actionDescription || "a blocked action");
+  state.lastBlock[key] = Date.now();
+  state.pending[key] = { action: actionDescription || "a blocked action", ts: Date.now() };
+  cleanState(state);
+  writeState(state);
   return isRapidRetry ? "rapid-retry" : "first";
 }
 
 /**
- * Called from message_received. If a gate blocked in this session since
- * the user's last message, the user's new message = implicit approval.
- * Stores a nudge for before_prompt_build to inject.
+ * Called from message_received. If a gate blocked since the user's
+ * last message, any new message = implicit approval.
  */
 export function processUserMessage(
   sessionKey: string | undefined,
@@ -1085,48 +1124,52 @@ export function processUserMessage(
 ): boolean {
   const key = approvalKey(sessionKey);
   if (!key) return false;
+  const state = readState();
 
   // New user message = new turn, reset rapid-retry tracker
-  _lastGateBlock.delete(key);
+  delete state.lastBlock[key];
 
-  // If a gate blocked since last user message, any response = approval.
-  // Uses normalized key so webchat-abc approval matches webchat-xyz block.
-  const blockedAction = _pendingApproval.get(key);
-  if (blockedAction) {
-    _pendingApproval.delete(key);
-    _approvals.set(key, Date.now());
-    // Store nudge under BOTH the normalized key and the raw session key,
-    // so before_prompt_build finds it regardless of which session renders next.
-    _approvalNudge.set(key, blockedAction);
-    if (sessionKey && sessionKey !== key) _approvalNudge.set(sessionKey, blockedAction);
+  // If a gate blocked since last user message, grant approval
+  const pending = state.pending[key];
+  if (pending) {
+    delete state.pending[key];
+    state.approved[key] = Date.now();
+    state.nudges[key] = pending.action;
+    // Also store nudge under raw session key for before_prompt_build
+    if (sessionKey && sessionKey !== key) state.nudges[sessionKey] = pending.action;
+    cleanState(state);
+    writeState(state);
     return true;
   }
 
+  writeState(state);
   return false;
 }
 
-/** Check if user has granted approval for this session recently */
+/** Check if user has granted approval recently */
 function hasApproval(sessionKey: string | undefined): boolean {
   const key = approvalKey(sessionKey);
   if (!key) return false;
-  const ts = _approvals.get(key);
+  const state = readState();
+  const ts = state.approved[key];
   return !!ts && Date.now() - ts < APPROVAL_TTL_MS;
 }
 
 /**
- * Consume the approval nudge for a session (called by before_prompt_build).
- * Returns a context string telling the ally to retry, or undefined if nothing pending.
+ * Consume the approval nudge (called by before_prompt_build).
+ * Returns context telling the ally to retry, or undefined.
  */
 export function consumeApprovalNudge(sessionKey: string | undefined): string | undefined {
   if (!sessionKey) return undefined;
-  // Check both raw key and normalized key
   const key = approvalKey(sessionKey);
-  const action = _approvalNudge.get(sessionKey) ?? (key ? _approvalNudge.get(key) : undefined);
+  const state = readState();
+  const action = state.nudges[sessionKey] ?? (key ? state.nudges[key] : undefined);
   if (!action) return undefined;
-  _approvalNudge.delete(sessionKey);
-  if (key) _approvalNudge.delete(key);
+  delete state.nudges[sessionKey];
+  if (key) delete state.nudges[key];
+  writeState(state);
   return [
-    "## ✅ ACTION APPROVED",
+    "## ACTION APPROVED",
     "",
     `The user has approved your previous blocked action: **${action}**`,
     "",
