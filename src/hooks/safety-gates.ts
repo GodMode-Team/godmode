@@ -1030,24 +1030,28 @@ export async function checkArchitectureGate(
 /** sessionKey → timestamp of approval */
 const _approvals = new Map<string, number>();
 
-/** sessionKey → true if a gate blocked since the user's last message */
-const _pendingApproval = new Map<string, boolean>();
+/** sessionKey → description of what was blocked (so we can tell the ally what to retry) */
+const _pendingApproval = new Map<string, string>();
+
+/** sessionKey → description of the action that was just approved (consumed by before_prompt_build) */
+const _approvalNudge = new Map<string, string>();
 
 /** TTL for approvals — 10 minutes */
 const APPROVAL_TTL_MS = 10 * 60 * 1000;
 
 /**
  * Called by gates when they block an action. Marks the session as
- * having a pending approval request.
+ * having a pending approval request, along with a description of
+ * what was blocked so the ally knows what to retry.
  */
-export function markPendingApproval(sessionKey: string | undefined): void {
-  if (sessionKey) _pendingApproval.set(sessionKey, true);
+export function markPendingApproval(sessionKey: string | undefined, actionDescription?: string): void {
+  if (sessionKey) _pendingApproval.set(sessionKey, actionDescription || "a blocked action");
 }
 
 /**
  * Called from message_received. If a gate blocked in this session since
  * the user's last message, the user's new message = implicit approval.
- * Also detects explicit approval phrases for immediate grant.
+ * Stores a nudge for before_prompt_build to inject.
  */
 export function processUserMessage(
   sessionKey: string | undefined,
@@ -1056,9 +1060,11 @@ export function processUserMessage(
   if (!sessionKey) return false;
 
   // If a gate blocked since last user message, any response = approval
-  if (_pendingApproval.get(sessionKey)) {
+  const blockedAction = _pendingApproval.get(sessionKey);
+  if (blockedAction) {
     _pendingApproval.delete(sessionKey);
     _approvals.set(sessionKey, Date.now());
+    _approvalNudge.set(sessionKey, blockedAction);
     return true;
   }
 
@@ -1070,6 +1076,25 @@ function hasApproval(sessionKey: string | undefined): boolean {
   if (!sessionKey) return false;
   const ts = _approvals.get(sessionKey);
   return !!ts && Date.now() - ts < APPROVAL_TTL_MS;
+}
+
+/**
+ * Consume the approval nudge for a session (called by before_prompt_build).
+ * Returns a context string telling the ally to retry, or undefined if nothing pending.
+ */
+export function consumeApprovalNudge(sessionKey: string | undefined): string | undefined {
+  if (!sessionKey) return undefined;
+  const action = _approvalNudge.get(sessionKey);
+  if (!action) return undefined;
+  _approvalNudge.delete(sessionKey);
+  return [
+    "## ✅ ACTION APPROVED",
+    "",
+    `The user has approved your previous blocked action: **${action}**`,
+    "",
+    "You MUST now retry the exact same tool call. The approval gate will let it through this time.",
+    "Do NOT ask again — just execute it immediately.",
+  ].join("\n");
 }
 
 // ── Deployment Gate ────────────────────────────────────────────────
@@ -1115,14 +1140,11 @@ const DEPLOYMENT_HARD_BLOCK_MESSAGE = [
 ].join("\n");
 
 const DEPLOYMENT_APPROVAL_MESSAGE = [
-  "\u{1F6A8} APPROVAL REQUIRED: This is a production/deploy action.",
+  "\u{1F6A8} TEMPORARY BLOCK — approval needed for this deploy/push action.",
   "",
-  "This would push to a protected branch, deploy to production, or merge a PR.",
-  "",
-  "You MUST:",
-  "1. Tell the user EXACTLY what you're about to do",
-  "2. Wait for them to say 'approved', 'go ahead', 'do it', or similar",
-  "3. Only then retry — it will go through after approval",
+  "Tell the user exactly what you want to do and ask for their OK.",
+  "Once they respond, you will receive an APPROVED nudge — then retry the EXACT same command.",
+  "This is NOT a permanent block. It WILL succeed after user approval.",
 ].join("\n");
 
 /**
@@ -1171,7 +1193,7 @@ export async function checkDeploymentGate(
       return undefined;
     }
 
-    markPendingApproval(sessionKey);
+    markPendingApproval(sessionKey, `deploy/push: ${command.slice(0, 100)}`);
     void logGateActivity(
       "deploymentGate",
       "blocked",
@@ -1346,21 +1368,11 @@ const CLIENT_FACING_PATTERNS = [
 ];
 
 const CLIENT_FACING_BLOCK_MESSAGE = [
-  "\u{1F6D1} APPROVAL REQUIRED: This action needs user approval before executing.",
+  "\u{1F6D1} TEMPORARY BLOCK — approval needed for this client-facing action.",
   "",
-  "This tool call would perform a client-facing or public action:",
-  "- Sending invites, emails, or notifications",
-  "- Creating/modifying content on external platforms",
-  "- Publishing or posting to public systems",
-  "- Mutating data via external API calls",
-  "",
-  "You MUST:",
-  "1. Present the EXACT action you want to take",
-  "2. Show the specific API call, recipients, or content",
-  "3. Wait for the user to say 'approved', 'go ahead', 'do it', or similar",
-  "4. Only then retry the action — it will go through after approval",
-  "",
-  "Planning, reading, and searching are fine. Executing requires a green light.",
+  "Tell the user exactly what you want to do (API call, recipient, content) and ask for their OK.",
+  "Once they respond, you will receive an APPROVED nudge — then retry the EXACT same tool call.",
+  "This is NOT a permanent block. It WILL succeed after user approval.",
 ].join("\n");
 
 /**
@@ -1413,7 +1425,7 @@ export async function checkClientFacingGate(
         return undefined;
       }
 
-      markPendingApproval(sessionKey);
+      markPendingApproval(sessionKey, `client-facing command: ${command.slice(0, 100)}`);
       void logGateActivity(
         "clientFacingGate",
         "blocked",
@@ -1442,7 +1454,7 @@ export async function checkClientFacingGate(
           return undefined;
         }
 
-        markPendingApproval(sessionKey);
+        markPendingApproval(sessionKey, `client-facing fetch: ${method.toUpperCase()} ${url.slice(0, 100)}`);
         void logGateActivity(
           "clientFacingGate",
           "blocked",
@@ -1480,7 +1492,7 @@ export async function checkClientFacingGate(
       return undefined;
     }
 
-    markPendingApproval(sessionKey);
+    markPendingApproval(sessionKey, `client-facing comms: ${name}`);
     void logGateActivity(
       "clientFacingGate",
       "blocked",

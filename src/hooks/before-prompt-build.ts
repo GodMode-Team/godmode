@@ -10,6 +10,7 @@ import {
   consumePromptShieldNudge,
   consumeOutputShieldNudge,
   consumeContextPressureNudge,
+  consumeApprovalNudge,
   getContextPressureLevel,
 } from "./safety-gates.js";
 import { isRecentlyOverloaded } from "./lifecycle-hooks.js";
@@ -237,6 +238,8 @@ export async function handleBeforePromptBuild(
       if (outputNudge) nudges.push(outputNudge);
       const contextNudge = consumeContextPressureNudge(sk);
       if (contextNudge) nudges.push(contextNudge);
+      const approvalNudge = consumeApprovalNudge(sk);
+      if (approvalNudge) nudges.push(approvalNudge);
       try {
         const { consumeEnforcerNudge } = require("./safety-gates.js") as { consumeEnforcerNudge: (k: string | null) => string | null };
         const enforcerNudge = consumeEnforcerNudge(sessionKeyOrNull);
