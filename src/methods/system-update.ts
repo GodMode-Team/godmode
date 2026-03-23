@@ -55,10 +55,11 @@ function runCommand(
   timeoutMs: number,
 ): Promise<{ code: number; stdout: string; stderr: string }> {
   return new Promise((resolve) => {
-    nodeExec(
+    const child = nodeExec(
       command,
       {
         timeout: timeoutMs,
+        killSignal: "SIGKILL", // SIGTERM leaves zombies on macOS — use SIGKILL
         env: { ...process.env, HOME: process.env.HOME },
         maxBuffer: 1024 * 1024,
       },
@@ -67,6 +68,16 @@ function runCommand(
         resolve({ code, stdout: String(stdout), stderr: String(stderr) });
       },
     );
+    // Safety net: if the child is still alive after timeout + 2s grace, force-kill it.
+    // This prevents zombie process accumulation when exec's built-in timeout
+    // fails to fully reap the child (observed on macOS with `openclaw update status`).
+    const safetyTimer = setTimeout(() => {
+      if (child.pid && !child.killed) {
+        try { process.kill(child.pid, "SIGKILL"); } catch { /* already dead */ }
+      }
+    }, timeoutMs + 2_000);
+    // Don't let the safety timer keep the Node process alive
+    if (safetyTimer.unref) safetyTimer.unref();
   });
 }
 
@@ -89,9 +100,12 @@ async function getNpmLatestVersion(pkg: string): Promise<string | null> {
 const check: GatewayRequestHandler = async ({ respond }) => {
   try {
     // Run openclaw update status --json
+    // Timeout raised to 20s — this command regularly takes 16–17s due to
+    // npm registry lookups; a 15s timeout caused it to always be killed,
+    // leaving zombie processes on macOS (133+ orphans observed in production).
     const { code, stdout, stderr } = await runCommand(
       "openclaw update status --json 2>/dev/null",
-      15_000,
+      20_000,
     );
 
     let openclawVersion = "unknown";

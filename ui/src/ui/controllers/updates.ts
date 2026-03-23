@@ -1,7 +1,10 @@
 import type { GodModeApp } from "../app.js";
 
-/** How often to check for updates in the background (30 minutes). */
-const UPDATE_POLL_INTERVAL_MS = 30 * 60 * 1000;
+/** How often to check for updates in the background (4 hours).
+ *  Previously 30 minutes, but each check spawns `openclaw update status`
+ *  which takes ~16s. On macOS, timed-out child processes were not reaped,
+ *  accumulating 130+ zombie processes per day and ~1 GB of leaked memory. */
+const UPDATE_POLL_INTERVAL_MS = 4 * 60 * 60 * 1000;
 
 type GodModeUpdateCheckResult = {
   openclaw: {
