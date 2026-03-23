@@ -38,12 +38,21 @@ export function scheduleChatScroll(host: ScrollHost, force = false) {
     }
     return (document.scrollingElement ?? document.documentElement) as HTMLElement | null;
   };
-  // Wait for Lit render to complete, then scroll
+  // Wait for Lit render to complete, then scroll.
+  // When switching tabs, the .chat-thread container may not be in the DOM yet
+  // on the first animation frame. Retry once after a short delay if not found.
   void host.updateComplete.then(() => {
     host.chatScrollFrame = requestAnimationFrame(() => {
       host.chatScrollFrame = null;
-      const target = pickScrollTarget();
-      if (!target) {
+      let target = pickScrollTarget();
+      if (!target || target === document.scrollingElement || target === document.documentElement) {
+        // Container not rendered yet — wait one more frame
+        requestAnimationFrame(() => {
+          target = pickScrollTarget();
+          if (target && target !== document.scrollingElement && target !== document.documentElement) {
+            target.scrollTop = target.scrollHeight;
+          }
+        });
         return;
       }
       // When force=true (tab switch, load complete, user message), always scroll.
