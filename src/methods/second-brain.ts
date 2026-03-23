@@ -19,7 +19,7 @@ import {
 import { homedir } from "node:os";
 import { basename, extname, join, relative } from "node:path";
 import { promisify } from "node:util";
-import type { GatewayRequestHandler } from "openclaw/plugin-sdk";
+import type { GatewayRequestHandler } from "../types/plugin-api.js";
 import { DATA_DIR, GODMODE_ROOT, MEMORY_DIR } from "../data-paths.js";
 import {
   getVaultPath,

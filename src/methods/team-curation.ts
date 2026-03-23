@@ -1,6 +1,6 @@
 import fs from "node:fs/promises";
 import path from "node:path";
-import type { GatewayRequestHandler } from "openclaw/plugin-sdk";
+import type { GatewayRequestHandler } from "../types/plugin-api.js";
 import { getCurationAgentService } from "../services/curation-agent.js";
 import { findWorkspaceById, readWorkspaceConfig } from "../lib/workspaces-config.js";
 

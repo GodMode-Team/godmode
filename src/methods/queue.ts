@@ -12,7 +12,7 @@ import {
   type QueueItemStatus,
 } from "../lib/queue-state.js";
 import { updateTasks } from "./tasks.js";
-import type { GatewayRequestHandler } from "openclaw/plugin-sdk";
+import type { GatewayRequestHandler } from "../types/plugin-api.js";
 import type { LessonCategory } from "../lib/agent-lessons.js";
 
 const execFile = promisify(execFileCb);

@@ -4,7 +4,7 @@
  * All auth methods are ungated (must work before a valid license/token exists).
  */
 
-import type { GatewayRequestHandler } from "openclaw/plugin-sdk";
+import type { GatewayRequestHandler } from "../types/plugin-api.js";
 import {
   loadAuthTokens,
   validateTokenOffline,

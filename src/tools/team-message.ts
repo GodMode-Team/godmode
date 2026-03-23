@@ -5,7 +5,8 @@
  * to the shared team feed for inter-agent and human communication.
  */
 
-import { type AnyAgentTool, jsonResult } from "openclaw/plugin-sdk";
+import { type AnyAgentTool } from "openclaw/plugin-sdk";
+import { jsonResult } from "openclaw/plugin-sdk/agent-runtime";
 import {
   appendFeedMessage,
   createFeedMessage,

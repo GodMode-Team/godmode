@@ -5,7 +5,7 @@
  * All methods are license-ungated (needed during onboarding).
  */
 
-import type { GatewayRequestHandler } from "openclaw/plugin-sdk";
+import type { GatewayRequestHandler } from "../types/plugin-api.js";
 import {
   detectAllIntegrations,
   getIntegrationsForPlatform,

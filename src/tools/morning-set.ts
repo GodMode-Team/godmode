@@ -7,7 +7,8 @@
  * Called by the agent after discussing priorities with the user.
  */
 
-import { type AnyAgentTool, jsonResult } from "openclaw/plugin-sdk";
+import { type AnyAgentTool } from "openclaw/plugin-sdk";
+import { jsonResult } from "openclaw/plugin-sdk/agent-runtime";
 import {
   rewriteWinTheDay,
   scopeTasksToWinTheDay,

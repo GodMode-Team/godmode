@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import { join, extname } from "node:path";
 import { DATA_DIR } from "../data-paths.js";
 import { secureWriteFile, secureMkdir } from "../lib/secure-fs.js";
-import type { GatewayRequestHandler } from "openclaw/plugin-sdk";
+import type { GatewayRequestHandler } from "../types/plugin-api.js";
 
 type GatewayRequestHandlers = Record<string, GatewayRequestHandler>;
 

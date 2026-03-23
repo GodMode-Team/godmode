@@ -2,7 +2,7 @@ import { execFile as execFileCb } from "node:child_process";
 import { rm } from "node:fs/promises";
 import path from "node:path";
 import { promisify } from "node:util";
-import type { GatewayRequestHandler } from "openclaw/plugin-sdk";
+import type { GatewayRequestHandler } from "../types/plugin-api.js";
 import {
   addMemberToWorkspace,
   readWorkspaceMetadata,

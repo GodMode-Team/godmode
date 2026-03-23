@@ -5,7 +5,7 @@
  * ally functionality. Tools, queue, and safety gates still work.
  */
 
-import type { GatewayRequestHandler } from "openclaw/plugin-sdk";
+import type { GatewayRequestHandler } from "../types/plugin-api.js";
 import {
   setSessionPrivate,
   getPrivateStatus,

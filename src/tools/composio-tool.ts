@@ -5,7 +5,8 @@
  * (e.g. GITHUB_CREATE_ISSUE, SLACK_SEND_MESSAGE) via Composio.
  */
 
-import { type AnyAgentTool, jsonResult } from "openclaw/plugin-sdk";
+import { type AnyAgentTool } from "openclaw/plugin-sdk";
+import { jsonResult } from "openclaw/plugin-sdk/agent-runtime";
 import * as composio from "../services/composio-client.js";
 
 const DEFAULT_USER = "godmode-user";

@@ -5,7 +5,8 @@
  * Routes to XAI x_search for search and Brave CDP for everything else.
  */
 
-import { type AnyAgentTool, jsonResult } from "openclaw/plugin-sdk";
+import { type AnyAgentTool } from "openclaw/plugin-sdk";
+import { jsonResult } from "openclaw/plugin-sdk/agent-runtime";
 
 type ToolContext = {
   sessionKey?: string;

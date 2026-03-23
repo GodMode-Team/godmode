@@ -4,7 +4,7 @@
  * Exposes connect, status, and disconnect methods to the UI and agent.
  */
 
-import type { GatewayRequestHandler } from "openclaw/plugin-sdk";
+import type { GatewayRequestHandler } from "../types/plugin-api.js";
 import * as composio from "../services/composio-client.js";
 
 type GatewayRequestHandlers = Record<string, GatewayRequestHandler>;

@@ -17,7 +17,7 @@ import {
 } from "../lib/agent-log.js";
 import { localDateString } from "../data-paths.js";
 // claude-code-sync removed in lean audit
-import type { GatewayRequestHandler } from "openclaw/plugin-sdk";
+import type { GatewayRequestHandler } from "../types/plugin-api.js";
 
 type GatewayRequestHandlers = Record<string, GatewayRequestHandler>;
 

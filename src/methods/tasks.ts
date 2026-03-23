@@ -11,8 +11,8 @@ import {
   detectWorkspaceFromText,
   type WorkspaceConfigEntry,
 } from "../lib/workspaces-config.js";
-import { withFileLock } from "openclaw/plugin-sdk";
-import type { GatewayRequestHandler } from "openclaw/plugin-sdk";
+import { withFileLock } from "openclaw/plugin-sdk/infra-runtime";
+import type { GatewayRequestHandler } from "../types/plugin-api.js";
 
 const execFile = promisify(execFileCb);
 
