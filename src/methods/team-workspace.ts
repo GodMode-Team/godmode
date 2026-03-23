@@ -496,7 +496,7 @@ const provisionTeam: GatewayRequestHandler = async ({ params, respond }) => {
  * content directories at assets/workspace-templates/{slug}/.
  *
  * Params:
- * - template (string, required) — template slug (godmode-dev, trp, patient-autopilot)
+ * - template (string, required) — template slug (e.g. godmode-dev, project-a, project-b)
  * - github (string, optional) — override git remote
  * - branch (string, optional, default "main")
  * - path (string, optional) — override workspace path

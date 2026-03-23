@@ -165,7 +165,7 @@ describe("Config Shield", () => {
   it("allows reading normal files", async () => {
     const result = await checkConfigAccess(
       "read",
-      { file_path: "/Users/caleb/godmode/memory/notes.md" },
+      { file_path: "/tmp/test-godmode/memory/notes.md" },
       SESSION,
     );
     expect(result).toBeUndefined();
@@ -199,7 +199,7 @@ describe("Ephemeral Path Shield", () => {
     const session = `ephemeral-ok-${Date.now()}`;
     const result = checkEphemeralWrite(
       "files.write",
-      { path: "/Users/caleb/godmode/artifacts/report.html" },
+      { path: "/tmp/test-godmode/artifacts/report.html" },
       session,
     );
     expect(result).toBeUndefined();

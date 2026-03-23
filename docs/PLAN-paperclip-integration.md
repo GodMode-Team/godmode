@@ -110,7 +110,7 @@ curl -X PATCH http://localhost:3100/api/agents/{agentId} \
     "adapterType": "claude_local",
     "adapterConfig": {
       "command": "claude",
-      "cwd": "/Users/calebhodges",
+      "cwd": "~",
       "model": "claude-sonnet-4-20250514",
       "promptTemplate": "You are {{agent.name}}. Your task:\n\n{{context.issueDescription}}\n\n{{context.issueTitle}}",
       "dangerouslySkipPermissions": true,

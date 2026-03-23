@@ -75,7 +75,7 @@ export function createDefaultAppContext(): AppContext {
     connected: false,
     reconnecting: false,
     sessionKey: "main",
-    assistantName: "Prosper",
+    assistantName: "Assistant",
     assistantAvatar: null,
     userName: "",
     userAvatar: null,

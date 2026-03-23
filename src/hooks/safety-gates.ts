@@ -878,7 +878,7 @@ export function checkEphemeralWrite(
 
 // ── Architecture Gate ──────────────────────────────────────────────
 //
-// Problem: Prosper created an hourly bash cron watcher + iMessage alerts
+// Problem: The ally created an hourly bash cron watcher + iMessage alerts
 // to detect OpenClaw update breakage — functionality already handled by
 // the TypeScript post-update health audit in system-update.ts.
 // Cost: iMessage spam, redundant systems, fragile count-based diffing.

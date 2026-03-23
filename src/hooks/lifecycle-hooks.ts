@@ -892,10 +892,10 @@ export async function handleAgentEnd(
 
   // Broadcast a toast so the UI shows something instead of going dark
   const friendlyMsg = error.includes("overloaded")
-    ? "Prosper paused — AI service is overloaded. Send another message to retry."
+    ? "Assistant paused — AI service is overloaded. Send another message to retry."
     : error.includes("rate_limit") || error.includes("429")
-      ? "Prosper paused — rate limit hit. Wait a moment and send another message."
-      : `Prosper stopped unexpectedly: ${error.slice(0, 100)}. Send another message to retry.`;
+      ? "Assistant paused — rate limit hit. Wait a moment and send another message."
+      : `Assistant stopped unexpectedly: ${error.slice(0, 100)}. Send another message to retry.`;
 
   try {
     await safeBroadcast(api, "toast", {

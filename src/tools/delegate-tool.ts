@@ -1,5 +1,5 @@
 /**
- * Delegate Tool — Prosper delegates complex work to the agent team.
+ * Delegate Tool — The ally delegates complex work to the agent team.
  *
  * Backed by native projects-state (JSON) + queue-processor (CLI spawn).
  * No external orchestration framework — just project grouping + execution.

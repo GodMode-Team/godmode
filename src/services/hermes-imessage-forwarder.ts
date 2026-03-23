@@ -4,7 +4,7 @@
  * When OC receives an iMessage, this fires a request to Hermes's API,
  * then sends Hermes's reply back via `imsg send`.
  *
- * This gives both Prosper (OC) and Hermes independent replies to every iMessage.
+ * This gives both the ally (OC) and Hermes independent replies to every iMessage.
  */
 
 import { execFile } from "node:child_process";
@@ -69,7 +69,7 @@ export async function forwardToHermes(
         {
           role: "system",
           content:
-            "You are Hermes, replying to an iMessage from Caleb. " +
+            "You are Hermes, replying to an iMessage from the user. " +
             "HARD RULES for text messages: " +
             "NEVER use tables, markdown headers, bold, italic, code blocks, or any rich formatting. " +
             "NEVER wrap links in markdown or bold — just paste the raw URL. Markdown links are NOT clickable in texts. " +
