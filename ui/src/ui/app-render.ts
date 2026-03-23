@@ -1661,6 +1661,10 @@ export function renderApp(state: AppViewState) {
                     state.chatNewMessagesBelow = false;
                   }
                 },
+                onClearNewMessages: () => {
+                  state.chatNewMessagesBelow = false;
+                  state.chatUserNearBottom = true;
+                },
                 // Ally inline panel (split sidebar)
                 allyPanelOpen: state.allyPanelOpen ?? false,
                 allyProps: state.allyPanelOpen ? {
