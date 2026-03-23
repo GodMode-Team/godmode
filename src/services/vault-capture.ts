@@ -25,8 +25,37 @@ import {
   BRAIN_SUBFOLDERS,
   ensureVaultStructure,
 } from "../lib/vault-paths.js";
-import { readScoutState, type ScoutFinding } from "./scout.js";
-import { localDateString } from "../data-paths.js";
+import { localDateString, DATA_DIR as GM_DATA_DIR } from "../data-paths.js";
+
+// ── Scout types (inlined from deleted scout.ts) ─────────────────────
+
+type ScoutSourceId = "openclaw-docs" | "godmode-docs" | "x-intel" | "clawhub";
+
+type ScoutFinding = {
+  id: string;
+  source: ScoutSourceId;
+  title: string;
+  summary: string;
+  url?: string;
+  keywords: string[];
+  discoveredAt: number;
+  acknowledged: boolean;
+};
+
+type ScoutState = {
+  lastCheckAt: Record<string, number>;
+  lastContentHash: Record<string, string>;
+  findings: ScoutFinding[];
+};
+
+async function readScoutState(): Promise<ScoutState> {
+  try {
+    const raw = await readFile(join(GM_DATA_DIR, "scout-state.json"), "utf-8");
+    return JSON.parse(raw) as ScoutState;
+  } catch {
+    return { lastCheckAt: {}, lastContentHash: {}, findings: [] };
+  }
+}
 
 // ── Types ──────────────────────────────────────────────────────────────
 
