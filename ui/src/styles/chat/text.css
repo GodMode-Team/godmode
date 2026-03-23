@@ -162,3 +162,24 @@
   border-color: rgba(16, 24, 40, 0.25);
   background: rgba(16, 24, 40, 0.04);
 }
+
+/* Expand button for oversized messages */
+.chat-expand-marker {
+  padding: 12px 0 4px;
+  text-align: center;
+}
+.chat-expand-btn {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--accent);
+  padding: 6px 16px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 150ms ease, color 150ms ease;
+}
+.chat-expand-btn:hover {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}

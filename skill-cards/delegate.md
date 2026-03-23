@@ -2,6 +2,12 @@
 domain: delegation
 triggers: delegate, team, assign, hand off, agents, build this, create this, put the team on, send to team, project, multi-step, campaign, funnel, website, presentation, dashboard, research project, ad campaign, landing page, content plan
 tools: delegate
+name: godmode-delegate
+version: 1.0.0
+description: "Orchestrates multi-agent delegation for complex multi-step projects"
+keywords: ["delegate", "team", "assign", "hand off", "agents"]
+author: godmode-team
+clawhub: true
 ---
 ## When to Delegate vs. Handle Inline
 

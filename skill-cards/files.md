@@ -2,6 +2,12 @@
 domain: files
 triggers: file, read file, write file, save, artifact, document, export, drive, google drive, readme, push to, save to, create an artifact
 tools: files.read, files.listDriveAccounts, files.pushToDrive
+name: godmode-files
+version: 1.0.0
+description: "Reads, writes, and manages files and Google Drive artifacts"
+keywords: ["file", "read file", "write file", "save", "artifact"]
+author: godmode-team
+clawhub: true
 ---
 ## When to Use
 - User asks to read, write, or manage files

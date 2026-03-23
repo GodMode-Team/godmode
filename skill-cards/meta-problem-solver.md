@@ -1,6 +1,12 @@
 ---
 domain: strategy
 triggers: big project, complex request, strategic decision, help me think through, first principles, break this down, what should I do about, hard problem, tricky situation, figure out
+name: godmode-meta-problem-solver
+version: 1.0.0
+description: "Breaks down complex problems using first-principles thinking"
+keywords: ["big project", "complex request", "strategic decision", "help me think through", "first principles"]
+author: godmode-team
+clawhub: true
 ---
 ## When to Use
 

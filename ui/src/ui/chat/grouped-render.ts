@@ -1,7 +1,7 @@
 import { html, nothing } from "lit";
 import { unsafeHTML } from "lit/directives/unsafe-html.js";
 import type { AssistantIdentity } from "../assistant-identity";
-import { toSanitizedMarkdownHtml } from "../markdown";
+import { toSanitizedMarkdownHtml, expandFullMarkdown } from "../markdown";
 import { toStreamingMarkdownHtml } from "../markdown-streaming";
 import type { MessageGroup, ToolExecutionInfo } from "../types/chat-types";
 import { renderCopyAsMarkdownButton } from "./copy-as-markdown";
@@ -17,6 +17,29 @@ import type { LightboxImage } from "./lightbox";
 import { getFileIcon, getFileTypeLabel } from "./file-utils";
 import { extractToolCards, renderToolCardSidebar } from "./tool-cards";
 import { handleChatFileClick } from "./file-click";
+
+/**
+ * Delegated click handler for the "Show more" expand button in oversized messages.
+ * Replaces the partial render with the full markdown output.
+ */
+function handleExpandClick(e: Event) {
+  const target = e.target as HTMLElement;
+  const btn = target.closest(".chat-expand-btn") as HTMLElement | null;
+  if (!btn) return;
+  const marker = btn.closest(".chat-expand-marker") as HTMLElement | null;
+  if (!marker) return;
+  const expandId = marker.dataset.expandId;
+  if (!expandId) return;
+  e.preventDefault();
+  e.stopPropagation();
+  const fullHtml = expandFullMarkdown(expandId);
+  if (!fullHtml) return;
+  // Replace the entire .chat-text content with the full render
+  const chatText = marker.closest(".chat-text") as HTMLElement | null;
+  if (chatText) {
+    chatText.innerHTML = fullHtml;
+  }
+}
 
 // Fun verbs for different tool types
 const WORKING_VERBS: Record<string, string[]> = {
@@ -904,7 +927,10 @@ function renderGroupedMessageUnsafe(
       }
       ${
         markdown
-          ? html`<div class="chat-text" @click=${(e: Event) => handleChatFileClick(e, onOpenFile)}>${unsafeHTML(
+          ? html`<div class="chat-text" @click=${(e: Event) => {
+              handleChatFileClick(e, onOpenFile);
+              handleExpandClick(e);
+            }}>${unsafeHTML(
               opts.isStreaming
                 ? toStreamingMarkdownHtml(markdown)
                 : toSanitizedMarkdownHtml(markdown),

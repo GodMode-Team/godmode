@@ -92,6 +92,7 @@ export type ChatProps = {
   showScrollButton?: boolean;
   showNewMessages?: boolean;
   onScrollToBottom?: () => void;
+  onClearNewMessages?: () => void;
   // Image attachments
   attachments?: ChatAttachment[];
   onAttachmentsChange?: (attachments: ChatAttachment[]) => void;
@@ -871,7 +872,10 @@ export function renderChat(props: ChatProps) {
                   type="button"
                   aria-label="Scroll to bottom"
                   title="Scroll to bottom"
-                  @click=${() => props.onScrollToBottom?.()}
+                  @click=${() => {
+                    props.onScrollToBottom?.();
+                    props.onClearNewMessages?.();
+                  }}
                 >
                   ${
                     props.showNewMessages

@@ -2,6 +2,12 @@
 domain: tasks
 triggers: task, todo, to-do, remind, reminder, overdue, priority, priorities, what should i, what do i need, i need to, need to get done, focus on, save
 tools: tasks.list, tasks.add, tasks.update
+name: godmode-tasks
+version: 1.0.0
+description: "Manages tasks, to-dos, reminders, and priorities"
+keywords: ["task", "todo", "to-do", "remind", "reminder"]
+author: godmode-team
+clawhub: true
 ---
 ## When to Use
 - User asks about their tasks, to-dos, priorities, what to work on

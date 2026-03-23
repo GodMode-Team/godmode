@@ -2,6 +2,12 @@
 domain: files
 triggers: write a doc, collaborative doc, proof, co-edit, watch me write, live document, share document
 tools: proof_editor, queue_steer
+name: godmode-proof-editor
+version: 1.0.0
+description: "Collaborative document co-editing with provenance tracking"
+keywords: ["write a doc", "collaborative doc", "proof", "co-edit", "watch me write"]
+author: godmode-team
+clawhub: true
 ---
 ## When to Use
 - The user wants to watch the document take shape live

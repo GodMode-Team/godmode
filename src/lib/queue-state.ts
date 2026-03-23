@@ -18,7 +18,7 @@ export type QueueItemType =
   | "idea"
   | "optimize";
 
-export type QueueItemStatus = "pending" | "processing" | "review" | "needs-review" | "done" | "failed";
+export type QueueItemStatus = "pending" | "processing" | "hitl-pending" | "review" | "needs-review" | "done" | "failed";
 
 /** Human-readable agent role names shown on MC badges */
 export const AGENT_ROLE_NAMES: Record<QueueItemType, string> = {
@@ -102,6 +102,20 @@ export type QueueState = {
   version: 1;
   items: QueueItem[];
   updatedAt: number;
+};
+
+// ── HITL (Human-in-the-Loop) Checkpoint ─────────────────────────
+
+export type HitlAction = "continue" | "modify" | "abort";
+
+export type HitlCheckpoint = {
+  id: string;
+  queueItemId: string;
+  agentName: string;
+  stage: string;
+  summary: string;
+  options: { label: string; action: HitlAction }[];
+  timestamp: number;
 };
 
 // ── File paths + lock config ─────────────────────────────────────

@@ -1,0 +1,125 @@
+{
+  "publisher": "godmode-team",
+  "skills": [
+    {
+      "file": "adversarial-board.md",
+      "slug": "godmode-adversarial-board"
+    },
+    {
+      "file": "autoresearch.md",
+      "slug": "godmode-autoresearch"
+    },
+    {
+      "file": "bill-review.md",
+      "slug": "godmode-bill-review"
+    },
+    {
+      "file": "calendar.md",
+      "slug": "godmode-calendar"
+    },
+    {
+      "file": "code-quality.md",
+      "slug": "godmode-code-quality"
+    },
+    {
+      "file": "competitor-scan.md",
+      "slug": "godmode-competitor-scan"
+    },
+    {
+      "file": "content-generation.md",
+      "slug": "godmode-content-generation"
+    },
+    {
+      "file": "context-deep-dive.md",
+      "slug": "godmode-context-deep-dive"
+    },
+    {
+      "file": "cron-workflows.md",
+      "slug": "godmode-cron-workflows"
+    },
+    {
+      "file": "dashboards.md",
+      "slug": "godmode-dashboards"
+    },
+    {
+      "file": "delegate.md",
+      "slug": "godmode-delegate"
+    },
+    {
+      "file": "files.md",
+      "slug": "godmode-files"
+    },
+    {
+      "file": "godmode-builder.md",
+      "slug": "godmode-godmode-builder"
+    },
+    {
+      "file": "inbox-sweep.md",
+      "slug": "godmode-inbox-sweep"
+    },
+    {
+      "file": "integrations.md",
+      "slug": "godmode-integrations"
+    },
+    {
+      "file": "life-admin.md",
+      "slug": "godmode-life-admin"
+    },
+    {
+      "file": "meetings.md",
+      "slug": "godmode-meetings"
+    },
+    {
+      "file": "meta-problem-solver.md",
+      "slug": "godmode-meta-problem-solver"
+    },
+    {
+      "file": "people.md",
+      "slug": "godmode-people"
+    },
+    {
+      "file": "personal-brand.md",
+      "slug": "godmode-personal-brand"
+    },
+    {
+      "file": "project-orchestrator.md",
+      "slug": "godmode-project-orchestrator"
+    },
+    {
+      "file": "project-pipeline.md",
+      "slug": "godmode-project-pipeline"
+    },
+    {
+      "file": "proof-editor.md",
+      "slug": "godmode-proof-editor"
+    },
+    {
+      "file": "quality-gate.md",
+      "slug": "godmode-quality-gate"
+    },
+    {
+      "file": "quarterly-review.md",
+      "slug": "godmode-quarterly-review"
+    },
+    {
+      "file": "queue.md",
+      "slug": "godmode-queue"
+    },
+    {
+      "file": "second-brain.md",
+      "slug": "godmode-second-brain"
+    },
+    {
+      "file": "standup-prep.md",
+      "slug": "godmode-standup-prep"
+    },
+    {
+      "file": "tasks.md",
+      "slug": "godmode-tasks"
+    },
+    {
+      "file": "x-twitter.md",
+      "slug": "godmode-x-twitter"
+    }
+  ]
+}

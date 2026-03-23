@@ -86,7 +86,15 @@ import { renderSessions } from "./views/sessions";
 import { renderSkills } from "./views/skills";
 import { renderAgents } from "./views/agents";
 import { renderLightbox } from "./chat/lightbox";
-import { getResolvedImageUrl, triggerImageResolve } from "./app-gateway";
+import {
+  getResolvedImageUrl,
+  triggerImageResolve,
+  loadSecrets,
+  loadWebFetchConfig,
+  setWebFetchProvider,
+  loadSearchConfig,
+  setSearchProvider,
+} from "./app-gateway";
 import { renderToasts } from "./views/toast";
 import { renderOnboardingWizard, type WizardStep } from "./views/onboarding-wizard";
 import { renderTrustTracker } from "./views/trust-tracker";
@@ -290,16 +298,27 @@ export function renderApp(state: AppViewState) {
     getRenderableSessionTabState(state);
 
   return html`
-    <div class="shell ${isChat ? "shell--chat" : ""} ${chatFocus ? "shell--chat-focus" : ""} ${state.settings.navCollapsed ? "shell--nav-collapsed" : ""} ${state.onboarding ? "shell--onboarding" : ""}">
+    <div class="shell ${isChat ? "shell--chat" : ""} ${chatFocus ? "shell--chat-focus" : ""} ${state.settings.navCollapsed ? "shell--nav-collapsed" : ""} ${state.onboarding ? "shell--onboarding" : ""} ${window.innerWidth <= 600 ? "shell--nav-drawer" : ""} ${state.navDrawerOpen ? "shell--nav-drawer-open" : ""}">
+      <div
+        class="nav-drawer-backdrop ${state.navDrawerOpen ? "nav-drawer-backdrop--visible" : ""}"
+        @click=${() => state.closeNavDrawer()}
+      ></div>
       <header class="topbar">
         <div class="topbar-left">
           <button
             class="nav-collapse-toggle"
-            @click=${() =>
-              state.applySettings({
-                ...state.settings,
-                navCollapsed: !state.settings.navCollapsed,
-              })}
+            @click=${() => {
+              if (window.innerWidth <= 600) {
+                // Mobile: toggle drawer overlay
+                state.navDrawerOpen = !state.navDrawerOpen;
+              } else {
+                // Desktop: toggle sidebar collapse
+                state.applySettings({
+                  ...state.settings,
+                  navCollapsed: !state.settings.navCollapsed,
+                });
+              }
+            }}
             title="${state.settings.navCollapsed ? "Expand sidebar" : "Collapse sidebar"}"
             aria-label="${state.settings.navCollapsed ? "Expand sidebar" : "Collapse sidebar"}"
           >
@@ -451,6 +470,7 @@ export function renderApp(state: AppViewState) {
                           @click=${(e: Event) => {
                             e.preventDefault();
                             state.handleWizardOpen?.();
+                            state.closeNavDrawer();
                           }}
                           title="Power up your GodMode ally."
                         >
@@ -1649,6 +1669,10 @@ export function renderApp(state: AppViewState) {
                     state.chatNewMessagesBelow = false;
                   }
                 },
+                onClearNewMessages: () => {
+                  state.chatNewMessagesBelow = false;
+                  state.chatUserNearBottom = true;
+                },
                 // Ally inline panel (split sidebar)
                 allyPanelOpen: state.allyPanelOpen ?? false,
                 allyProps: state.allyPanelOpen ? {
@@ -1670,6 +1694,7 @@ export function renderApp(state: AppViewState) {
                   onOpenFullChat: () => state.handleAllyOpenFull(),
                   onAttachmentsChange: (attachments) => state.handleAllyAttachmentsChange(attachments),
                   onAction: (action, target, method, params) => state.handleAllyAction(action, target, method, params),
+                  onHitlAction: (checkpointId, action, modifiedInstructions) => state.handleHitlAction(checkpointId, action, modifiedInstructions),
                 } : null,
                 // Session resources strip (Manus-style)
                 sessionResources: state.sessionResources,
@@ -1788,6 +1813,17 @@ export function renderApp(state: AppViewState) {
                 userAvatar: state.userAvatar,
                 onUserProfileUpdate: (name, avatar) => state.handleUpdateUserProfile(name, avatar),
                 onModelSwitch: (primary, fallbacks) => switchModel(state, primary, fallbacks),
+                secrets: state.secrets ?? [],
+                secretsLoading: state.secretsLoading ?? false,
+                onSecretsRefresh: () => loadSecrets(state),
+                webFetchProvider: state.webFetchProvider ?? "default",
+                webFetchLoading: state.webFetchLoading ?? false,
+                onWebFetchChange: (provider) => setWebFetchProvider(state, provider),
+                searchProvider: state.searchProvider ?? "tavily",
+                searchExaConfigured: state.searchExaConfigured ?? false,
+                searchTavilyConfigured: state.searchTavilyConfigured ?? false,
+                searchLoading: state.searchLoading ?? false,
+                onSearchProviderChange: (provider) => setSearchProvider(state, provider),
               })
             : nothing
         }
@@ -1855,6 +1891,7 @@ export function renderApp(state: AppViewState) {
         onOpenFullChat: () => state.handleAllyOpenFull(),
         onAttachmentsChange: (attachments) => state.handleAllyAttachmentsChange(attachments),
         onAction: (action, target, method, params) => state.handleAllyAction(action, target, method, params),
+        onHitlAction: (checkpointId, action, modifiedInstructions) => state.handleHitlAction(checkpointId, action, modifiedInstructions),
       }) : nothing}
       ${renderExecApprovalPrompt(state)}
       ${renderGatewayUrlConfirmation(state)}

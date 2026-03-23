@@ -2,6 +2,12 @@
 domain: bill-review
 triggers: bills, expenses, spending, subscriptions, charges, financial review, bill review, monthly expenses, recurring charges, budget, money
 tools: queue_add
+name: godmode-bill-review
+version: 1.0.0
+description: "Reviews bills, subscriptions, and recurring charges for savings opportunities"
+keywords: ["bills", "expenses", "spending", "subscriptions", "charges"]
+author: godmode-team
+clawhub: true
 ---
 
 # Bill Review — Monthly Expense Analysis

@@ -2,6 +2,12 @@
 domain: quarterly-review
 triggers: quarterly review, quarter goals, quarterly, how did the quarter go, quarter recap, quarterly report, quarter priorities, next quarter, q1, q2, q3, q4
 tools: queue_add
+name: godmode-quarterly-review
+version: 1.0.0
+description: "Runs quarterly goal reviews, recaps, and priority planning"
+keywords: ["quarterly review", "quarter goals", "quarterly", "how did the quarter go", "quarter recap"]
+author: godmode-team
+clawhub: true
 ---
 
 # Quarterly Review — Goals, Metrics & Priorities

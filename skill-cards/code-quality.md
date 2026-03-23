@@ -2,6 +2,12 @@
 domain: code-quality
 triggers: bug hunt, find bugs, code review, review my code, check for bugs, audit code, error handling, silent failures, simplify code, clean up code, refactor, code quality
 tools: queue_add
+name: godmode-code-quality
+version: 1.0.0
+description: "Audits code for bugs, silent failures, and quality improvements"
+keywords: ["bug hunt", "find bugs", "code review", "review my code", "check for bugs"]
+author: godmode-team
+clawhub: true
 ---
 
 # Code Quality — Bug Hunting, Review & Simplification

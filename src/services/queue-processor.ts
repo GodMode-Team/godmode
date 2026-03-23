@@ -14,12 +14,15 @@ import { GODMODE_ROOT, MEMORY_DIR, DATA_DIR, localDateString } from "../data-pat
 import { resolveAnthropicKey } from "../lib/anthropic-auth.js";
 import { formatGuardrailsForPrompt } from "./guardrails.js";
 import { resolveClaudeBin, buildSpawnArgs, isEngineAvailable } from "../lib/resolve-claude-bin.js";
+import crypto from "node:crypto";
 import {
   readQueueState,
   updateQueueState,
   AGENT_ROLE_NAMES,
   type QueueItem,
   type QueueItemType,
+  type HitlCheckpoint,
+  type HitlAction,
 } from "../lib/queue-state.js";
 import { audit } from "../lib/audit-log.js";
 import { sanitizeForPrompt } from "../lib/prompt-sanitizer.js";
@@ -190,6 +193,8 @@ class QueueProcessor {
   private toolkitTokens = new Map<string, string>();
   /** Circuit breaker state per engine */
   private circuitBreakers = new Map<string, CircuitState>();
+  /** Active HITL checkpoints awaiting user response — keyed by checkpoint ID */
+  private hitlCheckpoints = new Map<string, HitlCheckpoint>();
 
   constructor(logger: Logger) {
     this.logger = logger;
@@ -223,6 +228,77 @@ class QueueProcessor {
   /** Check if the polling loop is active. Used by self-heal. */
   isPolling(): boolean {
     return this.pollTimer !== null && !this.stopped;
+  }
+
+  // ── HITL checkpoint response handler ────────────────────────────
+
+  /** Handle a user's response to a HITL checkpoint. */
+  async respondToHitlCheckpoint(
+    checkpointId: string,
+    action: HitlAction,
+    modifiedInstructions?: string,
+  ): Promise<{ ok: boolean; error?: string }> {
+    const checkpoint = this.hitlCheckpoints.get(checkpointId);
+    if (!checkpoint) {
+      return { ok: false, error: `Checkpoint "${checkpointId}" not found or already resolved` };
+    }
+
+    this.hitlCheckpoints.delete(checkpointId);
+    const { queueItemId } = checkpoint;
+
+    if (action === "abort") {
+      await updateQueueState((state) => {
+        const qi = state.items.find((i) => i.id === queueItemId);
+        if (qi) {
+          qi.status = "failed";
+          qi.error = "Aborted by user at HITL checkpoint";
+          qi.completedAt = Date.now();
+        }
+      });
+      this.broadcast("queue:update", { itemId: queueItemId, status: "failed" });
+      this.broadcast("ally:notification", {
+        type: "hitl-aborted",
+        title: checkpoint.agentName,
+        summary: `"${checkpoint.agentName}" task aborted at checkpoint.`,
+      });
+      this.logger.info(`[GodMode][Queue] HITL checkpoint "${checkpointId}" — user aborted`);
+      return { ok: true };
+    }
+
+    if (action === "modify" && modifiedInstructions) {
+      await updateQueueState((state) => {
+        const qi = state.items.find((i) => i.id === queueItemId);
+        if (qi) {
+          qi.description = (qi.description ?? "") + `\n\n---\n[User modification]: ${modifiedInstructions}`;
+          qi.status = "pending";
+          qi.needsApproval = false; // Don't re-gate after modification
+        }
+      });
+      this.broadcast("queue:update", { itemId: queueItemId, status: "pending" });
+      this.logger.info(`[GodMode][Queue] HITL checkpoint "${checkpointId}" — user modified instructions, re-queued`);
+      // Trigger immediate processing
+      void this.processAllPending();
+      return { ok: true };
+    }
+
+    // action === "continue"
+    await updateQueueState((state) => {
+      const qi = state.items.find((i) => i.id === queueItemId);
+      if (qi) {
+        qi.status = "pending";
+        qi.needsApproval = false; // Clear the gate so it proceeds
+      }
+    });
+    this.broadcast("queue:update", { itemId: queueItemId, status: "pending" });
+    this.logger.info(`[GodMode][Queue] HITL checkpoint "${checkpointId}" — user approved, resuming`);
+    // Trigger immediate processing
+    void this.processAllPending();
+    return { ok: true };
+  }
+
+  /** Get all active HITL checkpoints (for UI polling). */
+  getActiveHitlCheckpoints(): HitlCheckpoint[] {
+    return Array.from(this.hitlCheckpoints.values());
   }
 
   /** Check if an engine's circuit breaker is open (paused). */
@@ -309,6 +385,38 @@ class QueueProcessor {
       // post-completion handling (auto-approve vs manual review)
     } catch {
       reportDegraded("queue", "Trust tracker unavailable during queue dispatch");
+    }
+
+    // HITL gate — if item requires approval, broadcast a checkpoint and pause
+    if (item.needsApproval) {
+      const persona = resolvePersona(item.type, item.personaHint);
+      const agentName = persona?.name ?? AGENT_ROLE_NAMES[item.type] ?? "Agent";
+      const checkpoint: HitlCheckpoint = {
+        id: crypto.randomUUID(),
+        queueItemId: item.id,
+        agentName,
+        stage: "pre-execution",
+        summary: `${agentName} is ready to start "${item.title}". Approve to proceed.`,
+        options: [
+          { label: "Continue", action: "continue" },
+          { label: "Modify Instructions", action: "modify" },
+          { label: "Abort", action: "abort" },
+        ],
+        timestamp: Date.now(),
+      };
+      this.hitlCheckpoints.set(checkpoint.id, checkpoint);
+
+      // Set item to hitl-pending so it won't be re-picked by the poll loop
+      await updateQueueState((state) => {
+        const qi = state.items.find((i) => i.id === item.id);
+        if (qi) qi.status = "hitl-pending";
+      });
+
+      this.broadcast("hitl:checkpoint", checkpoint);
+      this.logger.info(
+        `[GodMode][Queue] HITL checkpoint "${checkpoint.id}" created for "${item.title}" — awaiting user response`,
+      );
+      return { spawned: false };
     }
 
     // Link a session to the source task so opening the task always hits the
