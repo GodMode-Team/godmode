@@ -4,7 +4,8 @@
  * Steering is recorded in queue state for the agent to pick up on next check.
  */
 
-import { type AnyAgentTool, jsonResult } from "openclaw/plugin-sdk";
+import { type AnyAgentTool } from "openclaw/plugin-sdk";
+import { jsonResult } from "openclaw/plugin-sdk/agent-runtime";
 import { readQueueState } from "../lib/queue-state.js";
 
 export function createQueueSteerTool(): AnyAgentTool {

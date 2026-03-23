@@ -22,7 +22,7 @@ import { secureWriteFile, secureMkdir } from "../lib/secure-fs.js";
 import { existsSync } from "node:fs";
 import { invalidateIdentityCache } from "../lib/awareness-snapshot.js";
 import { generateRosterConfig } from "../lib/agent-roster.js";
-import type { GatewayRequestHandler } from "openclaw/plugin-sdk";
+import type { GatewayRequestHandler } from "../types/plugin-api.js";
 import {
   type OnboardingState,
   type OnboardingPhase,

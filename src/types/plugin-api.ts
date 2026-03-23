@@ -165,6 +165,29 @@ export interface ResourceRegistry {
   resources: ResourceEntry[];
 }
 
+// ── Gateway Request Handler ───────────────────────────────────────
+// GatewayRequestHandler was removed from `openclaw/plugin-sdk` in 2026.3.22.
+// Define a compatible local type matching the handler signature we use.
+
+export type RespondFn = (ok: boolean, payload?: unknown, error?: { code?: string; message?: string; [key: string]: unknown }, meta?: Record<string, unknown>) => void;
+
+export interface GatewayRequestHandlerOptions {
+  req?: unknown;
+  params: Record<string, unknown>;
+  client?: unknown;
+  isWebchatConnect?: (params: unknown) => boolean;
+  respond: RespondFn;
+  context: {
+    broadcast: (event: string, payload: unknown, opts?: { dropIfSlow?: boolean }) => void;
+    deps?: unknown;
+    cron?: unknown;
+    [key: string]: unknown;
+  };
+}
+
+export type GatewayRequestHandler = (opts: GatewayRequestHandlerOptions) => Promise<void> | void;
+export type GatewayRequestHandlers = Record<string, GatewayRequestHandler>;
+
 // ── HTTP Handler Types ─────────────────────────────────────────────
 
 import type { IncomingMessage, ServerResponse } from "node:http";

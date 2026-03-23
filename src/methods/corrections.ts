@@ -5,7 +5,7 @@
  * list proposed guardrails, and approve/dismiss proposals.
  */
 
-import type { GatewayRequestHandler } from "openclaw/plugin-sdk";
+import type { GatewayRequestHandler } from "../types/plugin-api.js";
 import {
   readCorrectionLog,
   logCorrection,

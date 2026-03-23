@@ -1,6 +1,6 @@
 import { readFile, writeFile, stat } from "node:fs/promises";
 import { join } from "node:path";
-import type { GatewayRequestHandler } from "openclaw/plugin-sdk";
+import type { GatewayRequestHandler } from "../types/plugin-api.js";
 import { DATA_DIR, MEMORY_DIR, resolveVaultPath, DAILY_FOLDER, localDateString } from "../data-paths.js";
 
 type GatewayRequestHandlers = Record<string, GatewayRequestHandler>;

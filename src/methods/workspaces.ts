@@ -28,7 +28,7 @@ import {
   writeWorkspaceConfig,
 } from "../lib/workspaces-config.js";
 import { readTasks, type NativeTask } from "./tasks.js";
-import type { GatewayRequestHandler } from "openclaw/plugin-sdk";
+import type { GatewayRequestHandler } from "../types/plugin-api.js";
 
 type GatewayRequestHandlers = Record<string, GatewayRequestHandler>;
 

@@ -1,7 +1,7 @@
 import { exec } from "node:child_process";
 import { promisify } from "node:util";
 import { localDateString } from "../data-paths.js";
-import type { GatewayRequestHandler } from "openclaw/plugin-sdk";
+import type { GatewayRequestHandler } from "../types/plugin-api.js";
 
 type GatewayRequestHandlers = Record<string, GatewayRequestHandler>;
 

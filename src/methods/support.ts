@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { join, dirname } from "node:path";
 import { platform, arch } from "node:os";
-import type { GatewayRequestHandler } from "openclaw/plugin-sdk";
+import type { GatewayRequestHandler } from "../types/plugin-api.js";
 import { GODMODE_ROOT, localDateString } from "../data-paths.js";
 import { secureWriteFile, secureMkdir, sanitizeError } from "../lib/secure-fs.js";
 

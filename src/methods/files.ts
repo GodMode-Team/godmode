@@ -3,7 +3,7 @@ import { readFileSync, statSync } from "node:fs";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { promisify } from "node:util";
-import type { GatewayRequestHandler } from "openclaw/plugin-sdk";
+import type { GatewayRequestHandler } from "../types/plugin-api.js";
 import { readQueueState } from "../lib/queue-state.js";
 import { isAllowedPath } from "../lib/vault-paths.js";
 import { readWorkspaceConfig } from "../lib/workspaces-config.js";

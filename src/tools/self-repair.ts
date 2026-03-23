@@ -11,7 +11,8 @@
  * This replaces the user → screenshot → Claude Code → fix cycle.
  */
 
-import { type AnyAgentTool, jsonResult } from "openclaw/plugin-sdk";
+import { type AnyAgentTool } from "openclaw/plugin-sdk";
+import { jsonResult } from "openclaw/plugin-sdk/agent-runtime";
 import { health, turnErrors, repairLog, type RepairEntry } from "../lib/health-ledger.js";
 
 export function createSelfRepairTool(): AnyAgentTool {

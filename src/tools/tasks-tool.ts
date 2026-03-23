@@ -13,7 +13,9 @@
 import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { type AnyAgentTool, jsonResult, withFileLock } from "openclaw/plugin-sdk";
+import { type AnyAgentTool } from "openclaw/plugin-sdk";
+import { jsonResult } from "openclaw/plugin-sdk/agent-runtime";
+import { withFileLock } from "openclaw/plugin-sdk/infra-runtime";
 import { DATA_DIR } from "../data-paths.js";
 import { secureMkdir, secureWriteFile } from "../lib/secure-fs.js";
 

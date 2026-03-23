@@ -13,7 +13,8 @@
  *   team     — Show the agent team roster
  */
 
-import { type AnyAgentTool, jsonResult } from "openclaw/plugin-sdk";
+import { type AnyAgentTool } from "openclaw/plugin-sdk";
+import { jsonResult } from "openclaw/plugin-sdk/agent-runtime";
 import { isPaperclipReady, createTask as paperclipCreateTask, findOrCreateProject as paperclipFindOrCreateProject, resolveAgentId as paperclipResolveAgent, wakeupAgent as paperclipWakeup } from "../services/paperclip-client.js";
 import {
   type ProjectBrief,

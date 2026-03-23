@@ -5,7 +5,8 @@
  * Wraps queryPeer() from honcho-client.ts.
  */
 
-import { type AnyAgentTool, jsonResult } from "openclaw/plugin-sdk";
+import { type AnyAgentTool } from "openclaw/plugin-sdk";
+import { jsonResult } from "openclaw/plugin-sdk/agent-runtime";
 
 type ToolContext = {
   sessionKey?: string;

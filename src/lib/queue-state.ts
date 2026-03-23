@@ -1,7 +1,7 @@
 import crypto from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
-import { withFileLock } from "openclaw/plugin-sdk";
+import { withFileLock } from "openclaw/plugin-sdk/infra-runtime";
 import { DATA_DIR } from "../data-paths.js";
 
 // ── Curated agent type taxonomy ──────────────────────────────────

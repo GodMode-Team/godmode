@@ -5,7 +5,8 @@
  * from the background agent queue during conversation.
  */
 
-import { type AnyAgentTool, jsonResult } from "openclaw/plugin-sdk";
+import { type AnyAgentTool } from "openclaw/plugin-sdk";
+import { jsonResult } from "openclaw/plugin-sdk/agent-runtime";
 import { updateQueueState, type QueueItem } from "../lib/queue-state.js";
 
 /** Create the queue_action tool that lets the ally manage queue item lifecycle. */
