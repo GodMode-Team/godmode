@@ -23,6 +23,18 @@ export function resolveAnthropicKey(): string | null {
   const envKey = process.env.ANTHROPIC_API_KEY;
   if (envKey) return envKey;
 
+  // GodMode .env (~/godmode/.env)
+  const gmRoot = process.env.GODMODE_ROOT || join(homedir(), "godmode");
+  try {
+    const raw = readFileSync(join(gmRoot, ".env"), "utf-8");
+    for (const line of raw.split("\n")) {
+      if (line.startsWith("ANTHROPIC_API_KEY=")) {
+        const val = line.slice("ANTHROPIC_API_KEY=".length).trim();
+        if (val && !val.startsWith("#")) return val;
+      }
+    }
+  } catch { /* not found */ }
+
   // Piggyback on Claude Code's Max subscription OAuth token.
   // This is intentional: GodMode reuses the existing Claude Code credential
   // so users don't need a separate API key. OSS users without Claude Code

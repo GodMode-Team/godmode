@@ -20,11 +20,8 @@ export type AdapterLogger = Logger;
 
 // ── RPC Method Types ────────────────────────────────────────────
 
-export type RespondFn = (
-  ok: boolean,
-  payload?: unknown,
-  error?: { code: string; message: string },
-) => void;
+import type { RespondFn as _RespondFn } from "../types/plugin-api.js";
+export type RespondFn = _RespondFn;
 
 export interface GatewayContext {
   broadcast?: (event: string, data: unknown, opts?: { dropIfSlow?: boolean }) => void;
