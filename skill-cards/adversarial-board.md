@@ -1,6 +1,12 @@
 ---
 domain: strategy
 triggers: advisory board, devil's advocate, debate this, opposing views, what could go wrong, challenge my thinking, stress test, second opinion, poke holes, critique
+name: godmode-adversarial-board
+version: 1.0.0
+description: "Simulates a 5-person advisory board to stress-test decisions and strategies"
+keywords: ["advisory board", "devil's advocate", "debate this", "opposing views", "what could go wrong"]
+author: godmode-team
+clawhub: true
 ---
 ## When to Use
 

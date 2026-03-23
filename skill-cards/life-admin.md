@@ -2,6 +2,12 @@
 domain: life-admin
 triggers: life admin, upcoming week, weekly prep, bills due, birthdays, errands, personal logistics, what's coming up, week ahead, sunday prep
 tools: queue_add, calendar.events.today
+name: godmode-life-admin
+version: 1.0.0
+description: "Handles personal logistics, weekly prep, and life administration"
+keywords: ["life admin", "upcoming week", "weekly prep", "bills due", "birthdays"]
+author: godmode-team
+clawhub: true
 ---
 
 # Life Admin — Weekly Personal Logistics Review

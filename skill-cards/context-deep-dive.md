@@ -1,6 +1,12 @@
 ---
 domain: strategy
 triggers: gather context, what do we know, deep dive, before we decide, pull everything, context check, what am I missing, full picture, background on
+name: godmode-context-deep-dive
+version: 1.0.0
+description: "Gathers and synthesizes all available context before a decision"
+keywords: ["gather context", "what do we know", "deep dive", "before we decide", "pull everything"]
+author: godmode-team
+clawhub: true
 ---
 ## When to Use
 

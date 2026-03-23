@@ -2,6 +2,12 @@
 domain: calendar
 triggers: meeting, schedule, calendar, event, availability, free, busy, when am i, what's next, upcoming, standup, reschedule, block off, coming up, tomorrow
 tools: calendar.events.today, calendar.events.range
+name: godmode-calendar
+version: 1.0.0
+description: "Manages schedule, meetings, availability, and calendar events"
+keywords: ["meeting", "schedule", "calendar", "event", "availability"]
+author: godmode-team
+clawhub: true
 ---
 ## When to Use
 - User asks about schedule, meetings, availability, "what's next"

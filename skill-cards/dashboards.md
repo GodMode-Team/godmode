@@ -2,6 +2,12 @@
 domain: dashboards
 triggers: dashboard, dashboards, chart, charts, visualization, visualize, report, analytics, data view, overview, metrics, stats, statistics, scorecard, leaderboard, tracker, tracking, breakdown, summary view, show me my, build me a
 tools: dashboards.save, dashboards.widgetData, dashboards.list
+name: godmode-dashboards
+version: 1.0.0
+description: "Creates data visualizations, charts, and metric dashboards"
+keywords: ["dashboard", "dashboards", "chart", "charts", "visualization"]
+author: godmode-team
+clawhub: true
 ---
 ## When to Use
 - User asks for ANY dashboard, chart, report, visualization, overview, or data view

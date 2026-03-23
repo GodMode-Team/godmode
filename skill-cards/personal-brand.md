@@ -1,6 +1,12 @@
 ---
 domain: creative
 triggers: personal brand, positioning, content strategy, content pillars, storytelling, brand framework, build my brand, thought leadership, content plan, audience building
+name: godmode-personal-brand
+version: 1.0.0
+description: "Develops personal brand strategy, content pillars, and positioning"
+keywords: ["personal brand", "positioning", "content strategy", "content pillars", "storytelling"]
+author: godmode-team
+clawhub: true
 ---
 ## When to Use
 

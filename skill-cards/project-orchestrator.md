@@ -1,6 +1,12 @@
 ---
 domain: strategy
 triggers: big project, orchestrate, full pipeline, end to end, multi-phase, ambitious project, complex deliverable, complete solution, start to finish
+name: godmode-project-orchestrator
+version: 1.0.0
+description: "Plans and orchestrates multi-phase ambitious projects end to end"
+keywords: ["big project", "orchestrate", "full pipeline", "end to end", "multi-phase"]
+author: godmode-team
+clawhub: true
 ---
 ## When to Use
 

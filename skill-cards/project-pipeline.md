@@ -2,6 +2,12 @@
 domain: projects
 triggers: build me, create a website, landing page, project, app, full project, end to end, design and build, need a site, new product, launch
 tools: queue_add, queue_check, queue_action, proof_editor, queue_steer
+name: godmode-project-pipeline
+version: 1.0.0
+description: "Builds full projects like websites, landing pages, and apps"
+keywords: ["build me", "create a website", "landing page", "project", "app"]
+author: godmode-team
+clawhub: true
 ---
 ## When to Use
 - User asks for a multi-disciplinary project (website, app, campaign, product launch)

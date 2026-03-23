@@ -2,6 +2,12 @@
 domain: inbox-sweep
 triggers: inbox, sweep inbox, process inbox, new items, unread, inbox review, check inbox, what's new, organize inbox
 tools: queue_add
+name: godmode-inbox-sweep
+version: 1.0.0
+description: "Processes and organizes the universal inbox queue"
+keywords: ["inbox", "sweep inbox", "process inbox", "new items", "unread"]
+author: godmode-team
+clawhub: true
 ---
 
 # Inbox Sweep — Daily Inbox Processing
