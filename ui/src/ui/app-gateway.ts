@@ -440,6 +440,11 @@ async function checkOnboardingStatus(host: GatewayHost) {
         setupQuickDone?: boolean;
       };
       setupApp.showSetupTab = true;
+      // Load unified setup progress for the Setup Bar
+      try {
+        const setupProgress = await host.client.request("onboarding.setupProgress", {});
+        (host as unknown as { setupProgress: unknown }).setupProgress = setupProgress;
+      } catch { /* setupProgress endpoint may not exist yet */ }
       // If identity already exists, quick setup is already done
       if (res.identity?.name) {
         setupApp.setupQuickDone = true;

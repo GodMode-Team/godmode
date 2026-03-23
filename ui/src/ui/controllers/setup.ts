@@ -2,6 +2,7 @@
  * Setup controller — RPC helpers for the Setup tab (progressive onboarding).
  */
 import type { GodModeApp } from "../app.js";
+import type { SetupProgress } from "../views/setup-bar.js";
 
 type CapabilityCard = {
   id: string;
@@ -25,6 +26,35 @@ type OnboardingState = {
   completedAt: string | null;
   [key: string]: unknown;
 };
+
+// ── Setup Progress (new unified flow) ──────────────────────────
+
+export async function loadSetupProgress(host: GodModeApp): Promise<void> {
+  if (!host.client || !host.connected) return;
+  const app = host as unknown as { setupProgress: SetupProgress | null };
+  try {
+    const result = await host.client.request<SetupProgress>(
+      "onboarding.setupProgress",
+      {},
+    );
+    app.setupProgress = result;
+  } catch {
+    // setupProgress endpoint may not exist on older gateways — silent fail
+  }
+}
+
+export async function dismissSetupBar(host: GodModeApp): Promise<void> {
+  if (!host.client) return;
+  try {
+    await host.client.request("onboarding.setupDismiss", {});
+    const app = host as unknown as { setupBarDismissed: boolean };
+    app.setupBarDismissed = true;
+    host.showToast("Setup hidden — continue anytime from Settings.", "success", 3000);
+  } catch {
+    // Fall back to options-based hide
+    void hideSetup(host);
+  }
+}
 
 export async function loadCapabilities(host: GodModeApp): Promise<void> {
   if (!host.client || !host.connected) return;

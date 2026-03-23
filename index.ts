@@ -162,6 +162,8 @@ const ungatedMethods = new Set([
   "onboarding.recommend", "onboarding.configAudit",
   "onboarding.wizard.status", "onboarding.wizard.preview",
   "onboarding.wizard.diff", "onboarding.wizard.generate",
+  "onboarding.setupProgress", "onboarding.setupConfigure",
+  "onboarding.setupDismiss", "onboarding.setupTest",
   "integrations.status", "integrations.test", "integrations.configure",
   "integrations.setupGuide", "integrations.platformInfo",
   "support.diagnostics", "support.logExchange", "support.escalate",

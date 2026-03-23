@@ -12,6 +12,7 @@ import { join } from "node:path";
 import { DATA_DIR } from "../data-paths.js";
 import { getAllyName } from "../lib/ally-identity.js";
 import type { OnboardingState } from "../methods/onboarding-types.js";
+import type { SetupProgress } from "../methods/onboarding-types.js";
 
 const ONBOARDING_FILE = join(DATA_DIR, "onboarding.json");
 
@@ -508,11 +509,117 @@ If they say yes, the soul interview questions from Phase 1 can be used conversat
 When done, advance to Phase 6 with \`onboarding.complete\`.`;
 }
 
+// ── Setup Flow Prompt Builder ────────────────────────────────────
+
+/**
+ * Build a SHORT, conversational setup prompt for the current setup step.
+ * This replaces the old phase prompts when the new setup flow is active.
+ */
+export function buildSetupPrompt(progress: SetupProgress): string | null {
+  // If setup is complete or dismissed, no prompt needed
+  if (progress.completedAt || progress.dismissed) return null;
+
+  const allyName = getAllyName();
+  const step = progress.currentStep;
+
+  switch (step) {
+    case "welcome":
+      return `## GodMode Setup — Welcome
+
+You are ${allyName}, the user's new AI ally. They just started GodMode for the first time.
+
+Ask their name warmly. Keep it brief — one question: "Hey! I'm ${allyName}. What should I call you?"
+If they give a name, also ask their timezone (or detect it). Then save with \`onboarding.setupConfigure { step: "welcome", values: { name: "...", timezone: "..." } }\`.
+
+This should take 30 seconds. Don't overthink it.`;
+
+    case "api-key":
+      return `## GodMode Setup — AI Connection
+
+${progress.name ? `${progress.name} needs` : "The user needs"} to connect their Anthropic API key. This is the critical gate — once set, chat works.
+
+Guide them:
+1. Go to https://console.anthropic.com/settings/keys
+2. Create a new key (or copy an existing one)
+3. Paste it here
+
+When they provide the key, save with: \`onboarding.setupConfigure { step: "api-key", values: { ANTHROPIC_API_KEY: "..." } }\`
+Then test it with: \`onboarding.setupTest { step: "api-key" }\`
+
+Once this works, celebrate briefly — this is the AHA moment. Chat is live.`;
+
+    case "memory":
+      return `## GodMode Setup — Memory
+
+Offer to set up persistent memory with Honcho. This lets you remember things across sessions — facts, preferences, context.
+
+"Want me to remember things between our conversations? It takes 30 seconds to set up."
+
+If yes:
+1. Get their Honcho API key from https://app.honcho.dev
+2. Save with: \`onboarding.setupConfigure { step: "memory", values: { HONCHO_API_KEY: "..." } }\`
+3. Prove it works by remembering something they told you.
+
+If they want to skip, that's fine — say "No problem, we can set it up later." and move on.`;
+
+    case "integrations":
+      return `## GodMode Setup — Integrations
+
+Suggest connecting their tools via Composio. This handles OAuth for Google Calendar, Gmail, GitHub, and more.
+
+"Want to connect your Google Calendar, Gmail, or GitHub? Composio handles the OAuth — one key connects everything."
+
+If yes:
+1. Get their Composio API key from https://app.composio.dev
+2. Save with: \`onboarding.setupConfigure { step: "integrations", values: { COMPOSIO_API_KEY: "..." } }\`
+3. Walk them through connecting individual services.
+
+If they skip, that's totally fine.`;
+
+    case "second-brain":
+      return `## GodMode Setup — Second Brain
+
+Ask if they use Obsidian for notes. If yes, get their vault path.
+
+"Do you use Obsidian? If so, I can connect to your vault and build a shared knowledge base."
+
+If yes:
+1. Ask for their vault path (e.g., ~/Documents/VAULT or ~/Obsidian)
+2. Save with: \`onboarding.setupConfigure { step: "second-brain", values: { OBSIDIAN_VAULT_PATH: "..." } }\`
+
+If no:
+"No worries — GodMode creates a local knowledge base at ~/godmode/memory/ automatically. Your Second Brain is already working."
+
+This is the last setup step. After this, setup is complete — transition to normal conversation.`;
+
+    default:
+      return null;
+  }
+}
+
 /**
  * Loads onboarding context for injection into the agent system prompt.
  * Returns void if onboarding is complete or no state exists.
+ *
+ * Priority: New setup flow (5-step) takes precedence if setup is incomplete.
+ * Falls back to legacy phase prompts for users mid-way through old onboarding.
  */
 export async function loadOnboardingContext(): Promise<{ prependContext?: string } | void> {
+  // Check new setup flow first
+  try {
+    const { deriveSetupProgressForContext } = await import("../methods/onboarding.js");
+    const progress = await deriveSetupProgressForContext();
+    if (progress && !progress.completedAt && !progress.dismissed) {
+      const setupPrompt = buildSetupPrompt(progress);
+      if (setupPrompt) {
+        return { prependContext: setupPrompt };
+      }
+    }
+  } catch {
+    // Setup flow not available — fall through to legacy
+  }
+
+  // Legacy phase-based onboarding
   const state = await readOnboardingState();
   if (!state) return;
 

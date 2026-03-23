@@ -87,6 +87,7 @@ import { renderSkills } from "./views/skills";
 import { renderAgents } from "./views/agents";
 import { renderLightbox } from "./chat/lightbox";
 import { getResolvedImageUrl, triggerImageResolve } from "./app-gateway";
+import { renderSetupBar } from "./views/setup-bar";
 import { renderToasts } from "./views/toast";
 import { renderOnboardingWizard, type WizardStep } from "./views/onboarding-wizard";
 import { renderTrustTracker } from "./views/trust-tracker";
@@ -410,6 +411,18 @@ export function renderApp(state: AppViewState) {
           })()
         : nothing}
       <aside class="nav ${state.settings.navCollapsed ? "nav--collapsed" : ""}">
+
+        ${renderSetupBar(
+          {
+            setupProgress: (state as any).setupProgress ?? null,
+            setupBarDismissed: state.setupBarDismissed ?? false,
+          },
+          {
+            onContinueSetup: () => state.continueSetup?.(),
+            onDismissSetup: () => state.dismissSetup?.(),
+            onStepClick: (stepId: string) => state.handleSetupStepClick?.(stepId),
+          },
+        )}
 
         ${TAB_GROUPS.map((group) => {
           const isGroupCollapsed = state.settings.navGroupsCollapsed[group.label] ?? false;
@@ -1134,6 +1147,12 @@ export function renderApp(state: AppViewState) {
         ${
           state.tab === "today" || state.tab === "my-day"
             ? (ensureTab("gm-today"), html`<gm-today
+                @today-start-task=${(e: CustomEvent<{ taskId: string }>) => {
+                  // Navigate to chat with a message about the task
+                  const taskId = e.detail.taskId;
+                  state.setTab("chat");
+                  state.setChatMessage(`Let's work on task ${taskId}. Pull up the details and let's discuss an approach.`);
+                }}
                 @today-open-file=${(e: CustomEvent<{ path: string }>) => {
                   void state.handleOpenFile(e.detail.path);
                 }}

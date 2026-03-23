@@ -194,6 +194,35 @@ export type OnboardingState = {
   completedAt: string | null;
 };
 
+// ── Setup Flow (5-step simplified onboarding) ──────────────────
+
+export type SetupStep = 'welcome' | 'api-key' | 'memory' | 'integrations' | 'second-brain';
+
+export interface SetupProgress {
+  currentStep: SetupStep;
+  completedSteps: SetupStep[];
+  name?: string;
+  timezone?: string;
+  allyName?: string;
+  apiKeyConfigured: boolean;
+  honchoConfigured: boolean;
+  composioConfigured: boolean;
+  composioIntegrations: Record<string, { id: string; name: string; connected: boolean; icon?: string }>;
+  obsidianConfigured: boolean;
+  obsidianPath?: string;
+  startedAt?: string;
+  completedAt?: string;
+  dismissed?: boolean;
+}
+
+export const SETUP_STEPS: { step: SetupStep; title: string; description: string; required: boolean }[] = [
+  { step: 'welcome', title: 'Welcome', description: 'Tell me your name', required: true },
+  { step: 'api-key', title: 'AI Connection', description: 'Connect your Anthropic API key', required: true },
+  { step: 'memory', title: 'Memory', description: 'Enable persistent memory with Honcho', required: false },
+  { step: 'integrations', title: 'Integrations', description: 'Connect your tools via Composio', required: false },
+  { step: 'second-brain', title: 'Second Brain', description: 'Link your Obsidian vault', required: false },
+];
+
 export function emptyOnboardingState(): OnboardingState {
   return {
     phase: 0,
