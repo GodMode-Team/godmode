@@ -23,7 +23,10 @@ export function resolveAnthropicKey(): string | null {
   const envKey = process.env.ANTHROPIC_API_KEY;
   if (envKey) return envKey;
 
-  // Check Claude Code OAuth credentials (fresh tokens with refresh support)
+  // Piggyback on Claude Code's Max subscription OAuth token.
+  // This is intentional: GodMode reuses the existing Claude Code credential
+  // so users don't need a separate API key. OSS users without Claude Code
+  // should set ANTHROPIC_API_KEY directly.
   try {
     const credsPath = join(homedir(), ".claude", ".credentials.json");
     const creds = JSON.parse(readFileSync(credsPath, "utf-8"));
