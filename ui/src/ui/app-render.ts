@@ -1154,12 +1154,6 @@ export function renderApp(state: AppViewState) {
         ${
           state.tab === "today" || state.tab === "my-day"
             ? (ensureTab("gm-today"), html`<gm-today
-                @today-start-task=${(e: CustomEvent<{ taskId: string }>) => {
-                  // Navigate to chat with a message about the task
-                  const taskId = e.detail.taskId;
-                  state.setTab("chat");
-                  state.setChatMessage(`Let's work on task ${taskId}. Pull up the details and let's discuss an approach.`);
-                }}
                 @today-open-file=${(e: CustomEvent<{ path: string }>) => {
                   void state.handleOpenFile(e.detail.path);
                 }}

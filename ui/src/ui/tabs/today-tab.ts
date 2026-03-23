@@ -15,6 +15,7 @@ import { localDateString } from "../format.js";
 import { toSanitizedMarkdownHtml } from "../markdown.js";
 import { extractOpenablePathFromEventTarget } from "../openable-file-path.js";
 import { appEventBus } from "../context/event-bus.js";
+import type { Tab } from "../navigation.js";
 import type { DailyBriefData, DailyBriefProps } from "../views/daily-brief.js";
 import { renderDailyBrief } from "../views/daily-brief.js";
 import { renderInboxSection, type InboxViewItem } from "../views/inbox.js";
@@ -1133,14 +1134,41 @@ export class GmToday extends LitElement {
     }
   }
 
-  private _handleStartTask(taskId: string) {
-    // Task session opening requires chat tab navigation + session management
-    // which is complex app-level state. Dispatch an event for the parent to handle.
-    this.dispatchEvent(new CustomEvent("today-start-task", {
-      detail: { taskId },
-      bubbles: true,
-      composed: true,
-    }));
+  private async _handleStartTask(taskId: string) {
+    const gateway = this.ctx?.gateway;
+    if (!gateway || !this.ctx?.connected) return;
+
+    try {
+      const result = await gateway.request<{
+        sessionId: string;
+        created: boolean;
+        task?: { title?: string; project?: string };
+        queueOutput?: string | null;
+      }>("tasks.openSession", { taskId });
+
+      if (!result?.sessionId) {
+        this.ctx?.addToast?.("Failed to open session for task", "error");
+        return;
+      }
+
+      // Build a starter message only for brand-new sessions with no agent output
+      let message = "";
+      if (result.created && !result.queueOutput) {
+        const task = this.todayTasks?.find((t) => t.id === taskId);
+        const projectCtx = task?.project ? ` (project: ${task.project})` : "";
+        message = "Let's work on: " + (task?.title ?? "this task") + projectCtx;
+      }
+
+      // Navigate to the task-linked chat session
+      appEventBus.emit("chat-navigate", {
+        sessionKey: result.sessionId,
+        tab: "chat" as Tab,
+        message,
+      });
+    } catch (err) {
+      console.error("[GmToday] Start task failed:", err);
+      this.ctx?.addToast?.("Failed to start task session", "error");
+    }
   }
 
   // ── Decision card handlers ─────────────────────────────────────────

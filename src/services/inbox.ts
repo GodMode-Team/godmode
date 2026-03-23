@@ -65,6 +65,53 @@ export type InboxState = {
   updatedAt: string;
 };
 
+// ── Inbox triage gate ───────────────────────────────────────────
+
+/** Queue item types that always need human review (subjective quality). */
+const ALWAYS_INBOX_QUEUE_TYPES = new Set([
+  "creative", "research", "analysis", "idea", "review", "coding",
+]);
+
+/** Queue item types that can skip inbox when persona is high-trust. */
+const ROUTINE_QUEUE_TYPES = new Set(["ops", "task", "url", "optimize"]);
+
+/** Minimum trust score to skip inbox for routine work. */
+const TRUST_SKIP_THRESHOLD = 8;
+
+export type ShouldInboxInput = {
+  type: InboxItemType;
+  queueItemType?: string;
+  personaSlug?: string;
+  trustScore: number | null;
+};
+
+/**
+ * Decide whether a completed item should land in the inbox.
+ * Conservative: when in doubt, inbox it. Only skips routine work
+ * from high-trust personas.
+ */
+export function shouldInbox(input: ShouldInboxInput): boolean {
+  // Project completions and skill runs always go to inbox
+  if (input.type === "project-completion" || input.type === "skill-run") return true;
+
+  // No persona → can't evaluate trust → inbox it
+  if (!input.personaSlug) return true;
+
+  // No trust score yet (< 10 ratings) → inbox it
+  if (input.trustScore === null) return true;
+
+  // Low trust → inbox it
+  if (input.trustScore < TRUST_SKIP_THRESHOLD) return true;
+
+  // High-trust persona — check if this is routine work
+  if (input.queueItemType && ROUTINE_QUEUE_TYPES.has(input.queueItemType)) {
+    return false; // Skip inbox — auto-complete
+  }
+
+  // Creative/research/analysis/idea/review/coding or unknown type → inbox
+  return true;
+}
+
 // ── File paths ───────────────────────────────────────────────────
 
 const INBOX_FILE = join(DATA_DIR, "inbox.json");
@@ -190,6 +237,9 @@ export async function listInboxItems(opts?: {
   status?: InboxItemStatus | "all";
   limit?: number;
 }): Promise<{ items: InboxItem[]; total: number; pendingCount: number }> {
+  // Lazy stale sweep — runs at most once per hour
+  await sweepStaleItems();
+
   const state = await readInboxState();
   const statusFilter = opts?.status ?? "pending";
   const limit = opts?.limit ?? 50;
@@ -251,6 +301,40 @@ export async function markReviewedInSession(queueItemId: string): Promise<void> 
 
 function pendingCount(state: InboxState): number {
   return state.items.filter((i) => i.status === "pending").length;
+}
+
+// ── Stale sweep ─────────────────────────────────────────────────
+
+const STALE_DAYS = 7;
+let _lastSweep = 0;
+const SWEEP_COOLDOWN_MS = 60 * 60 * 1000; // 1 hour — don't sweep on every list call
+
+/**
+ * Auto-dismiss pending items older than STALE_DAYS.
+ * Runs lazily (called from listInboxItems), throttled to once per hour.
+ */
+export async function sweepStaleItems(): Promise<number> {
+  const now = Date.now();
+  if (now - _lastSweep < SWEEP_COOLDOWN_MS) return 0;
+  _lastSweep = now;
+
+  const state = await readInboxState();
+  const cutoff = now - STALE_DAYS * 24 * 60 * 60 * 1000;
+  let swept = 0;
+
+  for (const item of state.items) {
+    if (item.status === "pending" && new Date(item.createdAt).getTime() < cutoff) {
+      item.status = "dismissed";
+      swept++;
+    }
+  }
+
+  if (swept > 0) {
+    await writeInboxState(state);
+    broadcast("inbox:update", { action: "sweep", swept, count: pendingCount(state) });
+  }
+
+  return swept;
 }
 
 // ── RPC Handlers ─────────────────────────────────────────────────
@@ -323,6 +407,17 @@ export const inboxHandlers: Record<string, Function> = {
     try {
       const count = await markAllComplete();
       respond(true, { marked: count });
+    } catch (err) {
+      respond(false, null, { code: "INBOX_ERROR", message: String(err) });
+    }
+  },
+
+  "inbox.purgeStale": async ({ respond }: { params: Record<string, unknown>; respond: Function }) => {
+    try {
+      // Force sweep by resetting cooldown
+      _lastSweep = 0;
+      const swept = await sweepStaleItems();
+      respond(true, { swept });
     } catch (err) {
       respond(false, null, { code: "INBOX_ERROR", message: String(err) });
     }

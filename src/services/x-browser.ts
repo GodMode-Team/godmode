@@ -257,12 +257,30 @@ function normalizeTweets(data: unknown, maxCount: number): ExtractedTweet[] {
     const id = t.id ? String(t.id) : undefined;
     const screenName = (t.author as Record<string, unknown> | undefined)?.screenName;
     const url = id && screenName ? `https://x.com/${screenName}/status/${id}` : undefined;
+
+    // Extract media items (photos, videos, GIFs)
+    const rawMedia = t.media as Array<Record<string, unknown>> | undefined;
+    const media: TweetMediaItem[] | undefined = Array.isArray(rawMedia) && rawMedia.length > 0
+      ? rawMedia.map((m) => ({
+          type: String(m.type ?? "unknown"),
+          url: String(m.url ?? ""),
+          ...(m.width != null ? { width: Number(m.width) } : {}),
+          ...(m.height != null ? { height: Number(m.height) } : {}),
+        })).filter((m) => m.url)
+      : undefined;
+
+    // Extract linked URLs
+    const rawUrls = t.urls as string[] | undefined;
+    const urls = Array.isArray(rawUrls) && rawUrls.length > 0 ? rawUrls : undefined;
+
     return {
       author,
       handle,
       text: String(t.text ?? t.full_text ?? ""),
       url,
       timestamp: t.createdAt ? String(t.createdAt) : (t.created_at ? String(t.created_at) : undefined),
+      ...(media ? { media } : {}),
+      ...(urls ? { urls } : {}),
     };
   };
 
