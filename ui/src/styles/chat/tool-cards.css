@@ -292,6 +292,81 @@
   background: rgba(0, 255, 136, 0.18);
 }
 
+/* ── HITL Checkpoint Card ── */
+.hitl-card {
+  background: var(--panel, var(--card));
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin: 8px 0;
+}
+.hitl-card__header {
+  font-weight: 600;
+  margin-bottom: 8px;
+  color: var(--accent);
+}
+.hitl-card__summary {
+  font-size: 14px;
+  margin-bottom: 12px;
+  color: var(--muted);
+}
+.hitl-card__actions {
+  display: flex;
+  gap: 8px;
+}
+.hitl-card__btn {
+  padding: 6px 14px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--panel, var(--card));
+  color: var(--text);
+  cursor: pointer;
+  font-size: 13px;
+  transition: all 150ms ease;
+}
+.hitl-card__btn:hover {
+  background: var(--bg-hover);
+  border-color: var(--border-strong);
+}
+.hitl-card__btn--continue {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+.hitl-card__btn--continue:hover {
+  opacity: 0.9;
+}
+.hitl-card__btn--abort {
+  border-color: var(--danger, #e53e3e);
+  color: var(--danger, #e53e3e);
+}
+.hitl-card__btn--abort:hover {
+  background: rgba(229, 62, 62, 0.08);
+}
+.hitl-card__btn--modify {
+  border-color: var(--warning, #d69e2e);
+  color: var(--warning, #d69e2e);
+}
+.hitl-card__btn--modify:hover {
+  background: rgba(214, 158, 46, 0.08);
+}
+.hitl-card__modify-input {
+  width: 100%;
+  margin-top: 8px;
+  padding: 8px 10px;
+  font-size: 13px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--secondary, var(--card));
+  color: var(--text);
+  resize: vertical;
+  min-height: 60px;
+}
+.hitl-card__modify-input:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
 /* Reading Indicator */
 .chat-reading-indicator {
   background: transparent;

@@ -86,7 +86,15 @@ import { renderSessions } from "./views/sessions";
 import { renderSkills } from "./views/skills";
 import { renderAgents } from "./views/agents";
 import { renderLightbox } from "./chat/lightbox";
-import { getResolvedImageUrl, triggerImageResolve } from "./app-gateway";
+import {
+  getResolvedImageUrl,
+  triggerImageResolve,
+  loadSecrets,
+  loadWebFetchConfig,
+  setWebFetchProvider,
+  loadSearchConfig,
+  setSearchProvider,
+} from "./app-gateway";
 import { renderToasts } from "./views/toast";
 import { renderOnboardingWizard, type WizardStep } from "./views/onboarding-wizard";
 import { renderTrustTracker } from "./views/trust-tracker";
@@ -1686,6 +1694,7 @@ export function renderApp(state: AppViewState) {
                   onOpenFullChat: () => state.handleAllyOpenFull(),
                   onAttachmentsChange: (attachments) => state.handleAllyAttachmentsChange(attachments),
                   onAction: (action, target, method, params) => state.handleAllyAction(action, target, method, params),
+                  onHitlAction: (checkpointId, action, modifiedInstructions) => state.handleHitlAction(checkpointId, action, modifiedInstructions),
                 } : null,
                 // Session resources strip (Manus-style)
                 sessionResources: state.sessionResources,
@@ -1804,6 +1813,17 @@ export function renderApp(state: AppViewState) {
                 userAvatar: state.userAvatar,
                 onUserProfileUpdate: (name, avatar) => state.handleUpdateUserProfile(name, avatar),
                 onModelSwitch: (primary, fallbacks) => switchModel(state, primary, fallbacks),
+                secrets: state.secrets ?? [],
+                secretsLoading: state.secretsLoading ?? false,
+                onSecretsRefresh: () => loadSecrets(state),
+                webFetchProvider: state.webFetchProvider ?? "default",
+                webFetchLoading: state.webFetchLoading ?? false,
+                onWebFetchChange: (provider) => setWebFetchProvider(state, provider),
+                searchProvider: state.searchProvider ?? "tavily",
+                searchExaConfigured: state.searchExaConfigured ?? false,
+                searchTavilyConfigured: state.searchTavilyConfigured ?? false,
+                searchLoading: state.searchLoading ?? false,
+                onSearchProviderChange: (provider) => setSearchProvider(state, provider),
               })
             : nothing
         }
@@ -1871,6 +1891,7 @@ export function renderApp(state: AppViewState) {
         onOpenFullChat: () => state.handleAllyOpenFull(),
         onAttachmentsChange: (attachments) => state.handleAllyAttachmentsChange(attachments),
         onAction: (action, target, method, params) => state.handleAllyAction(action, target, method, params),
+        onHitlAction: (checkpointId, action, modifiedInstructions) => state.handleHitlAction(checkpointId, action, modifiedInstructions),
       }) : nothing}
       ${renderExecApprovalPrompt(state)}
       ${renderGatewayUrlConfirmation(state)}

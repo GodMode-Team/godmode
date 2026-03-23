@@ -1185,6 +1185,55 @@ function handleGatewayEventUnsafe(host: GatewayHost, evt: GatewayEventFrame) {
     return;
   }
 
+  // HITL checkpoint events — agent is paused, waiting for user decision
+  if (evt.event === "hitl:checkpoint") {
+    const checkpoint = evt.payload as {
+      id?: string;
+      queueItemId?: string;
+      agentName?: string;
+      stage?: string;
+      summary?: string;
+      options?: Array<{ label: string; action: string }>;
+      timestamp?: number;
+    } | undefined;
+    if (checkpoint?.id) {
+      const hitlHost = host as unknown as {
+        hitlCheckpoints?: Array<Record<string, unknown>>;
+        requestUpdate?: () => void;
+      };
+      hitlHost.hitlCheckpoints = [
+        ...(hitlHost.hitlCheckpoints ?? []),
+        checkpoint as Record<string, unknown>,
+      ];
+      hitlHost.requestUpdate?.();
+
+      // Also push an ally notification so the user sees it in chat
+      const allyHost = host as unknown as {
+        allyMessages?: Array<Record<string, unknown>>;
+        allyPanelOpen?: boolean;
+        allyUnread?: number;
+        tab?: string;
+        requestUpdate?: () => void;
+      };
+      const msg = {
+        role: "assistant" as const,
+        content: checkpoint.summary || `Agent checkpoint: ${checkpoint.agentName ?? "Agent"} is awaiting approval.`,
+        timestamp: Date.now(),
+        isNotification: true,
+        hitlCheckpoint: checkpoint,
+        actions: [
+          { label: "Review", action: "navigate", target: "today" },
+        ],
+      };
+      allyHost.allyMessages = [...(allyHost.allyMessages ?? []), msg];
+      if (!allyHost.allyPanelOpen && host.tab !== "chat") {
+        allyHost.allyUnread = (allyHost.allyUnread ?? 0) + 1;
+      }
+    }
+    appEventBus.emit("refresh-requested", { target: "today" });
+    return;
+  }
+
   if (evt.event === "queue:update") {
     const payload = evt.payload as
       | { status?: string; proofDocSlug?: string | null }
@@ -1400,6 +1449,91 @@ async function handleOpenTaskParam(host: GodModeApp) {
     }
   } catch (err) {
     console.error("[GodMode] Failed to open task session:", err);
+  }
+}
+
+// ── Secrets / WebFetch / Search config loaders ────────────────────
+
+export async function loadSecrets(host: GatewayHost) {
+  if (!host.client) return;
+  const app = host as unknown as {
+    secrets: string[];
+    secretsLoading: boolean;
+  };
+  app.secretsLoading = true;
+  try {
+    const res = await host.client.request<{ keys: string[] }>("godmode.secrets.list", {});
+    app.secrets = res?.keys ?? [];
+  } catch {
+    app.secrets = [];
+  } finally {
+    app.secretsLoading = false;
+  }
+}
+
+export async function loadWebFetchConfig(host: GatewayHost) {
+  if (!host.client) return;
+  const app = host as unknown as {
+    webFetchProvider: string;
+    webFetchLoading: boolean;
+  };
+  app.webFetchLoading = true;
+  try {
+    const res = await host.client.request<{ provider: string }>("godmode.config.webfetch", {});
+    app.webFetchProvider = res?.provider ?? "default";
+  } catch {
+    app.webFetchProvider = "default";
+  } finally {
+    app.webFetchLoading = false;
+  }
+}
+
+export async function setWebFetchProvider(host: GatewayHost, provider: string) {
+  if (!host.client) return;
+  const app = host as unknown as { webFetchProvider: string };
+  try {
+    await host.client.request("godmode.config.webfetch.set", { provider });
+    app.webFetchProvider = provider;
+  } catch (err) {
+    console.error("[webfetch-set]", err);
+  }
+}
+
+export async function loadSearchConfig(host: GatewayHost) {
+  if (!host.client) return;
+  const app = host as unknown as {
+    searchProvider: string;
+    searchExaConfigured: boolean;
+    searchTavilyConfigured: boolean;
+    searchLoading: boolean;
+  };
+  app.searchLoading = true;
+  try {
+    const res = await host.client.request<{
+      defaultProvider: string;
+      exaConfigured: boolean;
+      tavilyConfigured: boolean;
+    }>("godmode.config.search", {});
+    app.searchProvider = res?.defaultProvider ?? "tavily";
+    app.searchExaConfigured = res?.exaConfigured ?? false;
+    app.searchTavilyConfigured = res?.tavilyConfigured ?? false;
+  } catch {
+    app.searchProvider = "tavily";
+    app.searchExaConfigured = false;
+    app.searchTavilyConfigured = false;
+  } finally {
+    app.searchLoading = false;
+  }
+}
+
+export async function setSearchProvider(host: GatewayHost, defaultProvider: string) {
+  if (!host.client) return;
+  const app = host as unknown as { searchProvider: string };
+  try {
+    await host.client.request("godmode.config.search.set", { defaultProvider });
+    app.searchProvider = defaultProvider;
+  } catch (err) {
+    console.error("[search-set]", err);
   }
 }
 
