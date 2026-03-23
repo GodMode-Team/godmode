@@ -707,23 +707,44 @@ class QueueProcessor {
 
     // REMOVED (v2 slim): impact-ledger logging
 
-    // Push to universal inbox — every completed item gets an entry
+    // Push to universal inbox — only if triage gate says it's worth reviewing
     const projectId = completedItem?.meta?.projectId ?? completedItem?.meta?.paperclipProjectId;
     try {
-      const { addInboxItem } = await import("./inbox.js");
-      await addInboxItem({
+      const { addInboxItem, shouldInbox } = await import("./inbox.js");
+      let trustScore: number | null = null;
+      if (personaSlug) {
+        try {
+          const { getTrustScore } = await import("../methods/trust-tracker.js");
+          trustScore = await getTrustScore(personaSlug);
+        } catch { /* trust tracker unavailable — conservative: null → will inbox */ }
+      }
+
+      const shouldAdd = shouldInbox({
         type: "agent-execution",
-        title: completedItem?.title ?? itemId,
-        summary: summary.slice(0, 300),
-        source: {
-          persona: personaSlug,
-          queueItemId: itemId,
-          taskId: completedItem?.sourceTaskId,
-          projectId,
-        },
-        outputPath: outPath,
-        sessionId: completedItem?.sessionId,
+        queueItemType: completedItem?.type,
+        personaSlug,
+        trustScore,
       });
+
+      if (shouldAdd) {
+        await addInboxItem({
+          type: "agent-execution",
+          title: completedItem?.title ?? itemId,
+          summary: summary.slice(0, 300),
+          source: {
+            persona: personaSlug,
+            queueItemId: itemId,
+            taskId: completedItem?.sourceTaskId,
+            projectId,
+          },
+          outputPath: outPath,
+          sessionId: completedItem?.sessionId,
+        });
+      } else {
+        this.logger.info(
+          `[GodMode][Queue] Skipped inbox for ${itemId} (${personaSlug} trust=${trustScore}, type=${completedItem?.type})`,
+        );
+      }
     } catch (err) {
       this.logger.warn(`[GodMode][Queue] Inbox push failed for ${itemId}: ${String(err)}`);
     }
