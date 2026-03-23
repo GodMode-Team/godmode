@@ -46,13 +46,6 @@ import {
 
 type Logger = { warn: (msg: string) => void; info: (msg: string) => void };
 
-// ── Session impact tracking ──────────────────────────────────────────
-// Tracks when sessions start so we can log impact on session end.
-// Key: sessionKey, Value: { startedAt, messageCount }
-const _sessionTracker = new Map<string, { startedAt: number; messageCount: number }>();
-const SESSION_TRACKER_MAX = 200; // prevent unbounded growth
-const SESSION_MIN_MESSAGES = 2; // need at least a back-and-forth to count
-
 // ── Auto-title first message buffer ──────────────────────────────────
 // message_received has the user's content but no sessionKey.
 // before_prompt_build has the sessionKey but no content on the first turn.
@@ -192,18 +185,6 @@ export async function handleMessageReceived(
       sessions.touch(sessionKey);
     } catch { /* non-fatal */ }
 
-    // Track session start time + message count for impact logging
-    const existing = _sessionTracker.get(sessionKey);
-    if (existing) {
-      existing.messageCount++;
-    } else {
-      // Evict oldest entries if map is full
-      if (_sessionTracker.size >= SESSION_TRACKER_MAX) {
-        const oldest = _sessionTracker.keys().next().value;
-        if (oldest) _sessionTracker.delete(oldest);
-      }
-      _sessionTracker.set(sessionKey, { startedAt: Date.now(), messageCount: 1 });
-    }
   }
 
   // Reset per-turn tool usage tracker
@@ -308,17 +289,6 @@ export async function handleBeforeReset(
     logger.warn(`[GodMode] team memory route hook error: ${String(err)}`);
   }
 
-  // Log impact for this chat session (fire and forget)
-  if (sessionKey) {
-    const tracked = _sessionTracker.get(sessionKey);
-    _sessionTracker.delete(sessionKey);
-
-    // Only log if there was a real conversation (not just a single message)
-    // and skip cron sessions (they're logged separately via queue-processor)
-    if (tracked && tracked.messageCount >= SESSION_MIN_MESSAGES && !sessionKey.includes(":cron:")) {
-      // REMOVED (v2 slim): impact-ledger logging
-    }
-  }
 }
 
 // ── before_tool_call ──────────────────────────────────────────────────

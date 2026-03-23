@@ -343,6 +343,7 @@ async function refreshOAuthToken(
         // Client ID for Claude Code
         client_id: "9d1c250a-e61b-44e4-8ed0-2de2c8e0ed33",
       }),
+      signal: AbortSignal.timeout(10_000),
     });
 
     if (!resp.ok) {

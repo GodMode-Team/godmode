@@ -153,9 +153,9 @@ function resolveAnthropicKeyForAgents(): string | null {
 function buildChildEnv(): Record<string, string> {
   const parentPath = process.env.PATH ?? "";
   const childEnv: Record<string, string> = {
-    PATH: parentPath.includes("/opt/homebrew/bin")
-      ? parentPath
-      : `/opt/homebrew/bin:${parentPath}`,
+    PATH: process.platform === "darwin" && !parentPath.includes("/opt/homebrew/bin")
+      ? `/opt/homebrew/bin:${parentPath}`
+      : parentPath,
     HOME: process.env.HOME ?? "",
     USER: process.env.USER ?? "",
     SHELL: process.env.SHELL ?? "/bin/sh",
