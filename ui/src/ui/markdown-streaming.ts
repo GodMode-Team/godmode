@@ -15,20 +15,27 @@ import { toSanitizedMarkdownHtml } from "./markdown";
 /** Minimum text length to benefit from block-level caching. */
 const MIN_CACHE_LENGTH = 500;
 
-// Single-entry cache (only one message streams at a time).
-let cachedPrefixText = "";
-let cachedPrefixHtml = "";
+// Per-session streaming cache. Keyed by session to prevent cross-session
+// contamination when multiple streams are active (e.g. ally overlay + main chat).
+const cacheMap = new Map<string, { prefixText: string; prefixHtml: string }>();
+
+// Fallback key for callers that don't provide a session key.
+const DEFAULT_KEY = "__default__";
 
 /**
  * Render markdown with block-level memoization for streaming.
  * For short text (<500 chars) or text without safe split points,
  * falls through to `toSanitizedMarkdownHtml()`.
+ *
+ * @param sessionKey - Optional session identifier to isolate cache per stream.
  */
-export function toStreamingMarkdownHtml(markdown: string): string {
+export function toStreamingMarkdownHtml(markdown: string, sessionKey?: string): string {
   const input = markdown.trim();
   if (!input) {
     return "";
   }
+
+  const key = sessionKey ?? DEFAULT_KEY;
 
   // Short text: caching overhead not worthwhile
   if (input.length < MIN_CACHE_LENGTH) {
@@ -44,30 +51,43 @@ export function toStreamingMarkdownHtml(markdown: string): string {
   const prefixText = input.slice(0, splitIdx);
   const tailText = input.slice(splitIdx);
 
+  let entry = cacheMap.get(key);
+  if (!entry) {
+    entry = { prefixText: "", prefixHtml: "" };
+    cacheMap.set(key, entry);
+  }
+
   // Exact cache hit: same prefix text
-  if (prefixText === cachedPrefixText) {
-    return cachedPrefixHtml + toSanitizedMarkdownHtml(tailText);
+  if (prefixText === entry.prefixText) {
+    return entry.prefixHtml + toSanitizedMarkdownHtml(tailText);
   }
 
   // Incremental hit: new prefix extends the cached prefix
   // (common during streaming since text grows monotonically)
-  if (prefixText.startsWith(cachedPrefixText) && cachedPrefixText.length > 0) {
-    const newBlocksText = prefixText.slice(cachedPrefixText.length);
-    cachedPrefixHtml = cachedPrefixHtml + toSanitizedMarkdownHtml(newBlocksText);
-    cachedPrefixText = prefixText;
-    return cachedPrefixHtml + toSanitizedMarkdownHtml(tailText);
+  if (prefixText.startsWith(entry.prefixText) && entry.prefixText.length > 0) {
+    const newBlocksText = prefixText.slice(entry.prefixText.length);
+    entry.prefixHtml = entry.prefixHtml + toSanitizedMarkdownHtml(newBlocksText);
+    entry.prefixText = prefixText;
+    return entry.prefixHtml + toSanitizedMarkdownHtml(tailText);
   }
 
   // Full cache miss: re-render entire prefix
-  cachedPrefixHtml = toSanitizedMarkdownHtml(prefixText);
-  cachedPrefixText = prefixText;
-  return cachedPrefixHtml + toSanitizedMarkdownHtml(tailText);
+  entry.prefixHtml = toSanitizedMarkdownHtml(prefixText);
+  entry.prefixText = prefixText;
+  return entry.prefixHtml + toSanitizedMarkdownHtml(tailText);
 }
 
-/** Clear the streaming cache. Call on stream end or session change. */
-export function resetStreamingCache(): void {
-  cachedPrefixText = "";
-  cachedPrefixHtml = "";
+/**
+ * Clear the streaming cache. Call on stream end or session change.
+ * If sessionKey is provided, only that session's cache is cleared.
+ * If omitted, all caches are cleared.
+ */
+export function resetStreamingCache(sessionKey?: string): void {
+  if (sessionKey) {
+    cacheMap.delete(sessionKey);
+  } else {
+    cacheMap.clear();
+  }
 }
 
 /**

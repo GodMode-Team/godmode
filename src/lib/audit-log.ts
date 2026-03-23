@@ -35,7 +35,9 @@ let initialized = false;
 
 async function ensureDir(): Promise<void> {
   if (initialized) return;
-  await mkdir(DATA_DIR, { recursive: true }).catch(() => {});
+  await mkdir(DATA_DIR, { recursive: true }).catch((err) => {
+    console.warn("[audit] Failed to create data dir:", String(err));
+  });
   initialized = true;
 }
 
@@ -52,5 +54,5 @@ export function audit(event: AuditEvent, detail: Record<string, unknown>): void 
   // Fire-and-forget — audit logging must never crash the host
   ensureDir()
     .then(() => appendFile(AUDIT_LOG_PATH, line))
-    .catch(() => {});
+    .catch((err: unknown) => console.error("[audit] write failed:", err instanceof Error ? err.message : String(err)));
 }

@@ -755,11 +755,7 @@ async function fetchXIntelligence(): Promise<{
     try {
       const { readFile } = await import("node:fs/promises");
       const { join } = await import("node:path");
-      const optionsPath = join(
-        process.env.GODMODE_ROOT || join((await import("node:os")).homedir(), "godmode"),
-        "data",
-        "godmode-options.json",
-      );
+      const optionsPath = join(DATA_DIR, "godmode-options.json");
       const raw = JSON.parse(await readFile(optionsPath, "utf-8")) as Record<string, unknown>;
       if (typeof raw["dailyIntel.topics"] === "string" && raw["dailyIntel.topics"].trim()) {
         topics = raw["dailyIntel.topics"].trim();

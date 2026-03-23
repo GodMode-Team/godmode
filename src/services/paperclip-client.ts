@@ -424,7 +424,10 @@ export function startCompletionPoller(
   // Seed the seen set with already-completed issues to avoid re-firing on startup
   void listCompletedIssues()
     .then((issues) => issues.forEach((i) => _seenCompleted.add(i.id)))
-    .catch(() => {});
+    .catch((err) => {
+      // Non-critical: first poll will catch up
+      if (typeof console !== "undefined") console.warn("[paperclip] initial seed failed:", String(err));
+    });
 }
 
 /** Stop the completion poller. */

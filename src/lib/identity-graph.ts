@@ -183,7 +183,7 @@ ${truncated}`,
     );
 
     if (!response.ok) return;
-    const json = await response.json() as any;
+    const json = (await response.json()) as { content?: Array<{ text?: string }> };
     const content = json?.content?.[0]?.text;
     if (!content) return;
 
@@ -339,8 +339,8 @@ export function formatGraphContext(results: GraphNode[]): string | null {
 export function getGraphStats(): { entities: number; edges: number } | null {
   if (!db) return null;
   try {
-    const entities = (db.prepare("SELECT COUNT(*) as c FROM entities").get() as any)?.c ?? 0;
-    const edges = (db.prepare("SELECT COUNT(*) as c FROM edges").get() as any)?.c ?? 0;
+    const entities = (db.prepare("SELECT COUNT(*) as c FROM entities").get() as { c: number } | undefined)?.c ?? 0;
+    const edges = (db.prepare("SELECT COUNT(*) as c FROM edges").get() as { c: number } | undefined)?.c ?? 0;
     return { entities, edges };
   } catch {
     return null;

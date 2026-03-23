@@ -18,7 +18,7 @@
 
 import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { join, dirname } from "node:path";
-import { DATA_DIR } from "../data-paths.js";
+import { DATA_DIR, GODMODE_ROOT } from "../data-paths.js";
 
 // ── Types ──────────────────────────────────────────────────────────
 
@@ -92,10 +92,7 @@ function refreshKnownNames(): void {
     try {
       const { existsSync, readFileSync } = require("node:fs") as typeof import("node:fs");
       const { join } = require("node:path") as typeof import("node:path");
-      const dbPath = join(
-        process.env.GODMODE_ROOT || join(require("node:os").homedir(), "godmode"),
-        "data", "identity-graph.db",
-      );
+      const dbPath = join(GODMODE_ROOT, "data", "identity-graph.db");
       if (existsSync(dbPath)) {
         const Database = require("better-sqlite3");
         const db = new Database(dbPath, { readonly: true });

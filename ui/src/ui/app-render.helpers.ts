@@ -8,6 +8,7 @@ import { exportConversationAsMarkdown } from "./chat/export-conversation";
 import { loadChatHistory } from "./controllers/chat";
 import { autoTitleCache, loadSessions } from "./controllers/sessions";
 import { formatAgoShort } from "./format";
+import { resetStreamingCache } from "./markdown-streaming";
 import { icons } from "./icons";
 import { emojiForTab, EXTERNAL_TABS, pathForTab, titleForTab, type Tab } from "./navigation";
 import type { ThemeMode } from "./theme";
@@ -58,6 +59,7 @@ export function createNewSession(state: AppViewState): void {
   state.chatStream = null;
   state.chatStreamStartedAt = null;
   state.chatRunId = null;
+  resetStreamingCache(); // Clear stale streaming cache from previous session (BUG-010)
   state.resetToolStream();
   state.resetChatScroll();
   void state.loadAssistantIdentity();

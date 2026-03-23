@@ -1,3 +1,10 @@
+/**
+ * team-memory.ts — Agent tool for writing to shared team workspace memory.
+ *
+ * Persists knowledge entries (discoveries, decisions, learnings) as
+ * markdown files in the team's shared memory directory, synced via git.
+ */
+
 import fs from "node:fs/promises";
 import path from "node:path";
 import { type AnyAgentTool, jsonResult } from "openclaw/plugin-sdk";

@@ -1,3 +1,11 @@
+/**
+ * queue-add.ts — Agent tool for adding items to the background queue.
+ *
+ * The ally uses this to delegate work to specialist agents. Supports
+ * a two-phase flow: first call previews a scoped brief, second call
+ * (with confirmed=true) actually enqueues the item.
+ */
+
 import { type AnyAgentTool, jsonResult } from "openclaw/plugin-sdk";
 import { updateQueueState, newQueueItemId, type QueueItemType } from "../lib/queue-state.js";
 import { resolvePersona } from "../lib/agent-roster.js";
@@ -8,6 +16,7 @@ type ToolContext = {
   agentId?: string;
 };
 
+/** Create the queue_add tool for enqueueing background agent tasks. */
 export function createQueueAddTool(_ctx: ToolContext): AnyAgentTool {
   return {
     label: "Queue",
@@ -89,9 +98,16 @@ export function createQueueAddTool(_ctx: ToolContext): AnyAgentTool {
       required: ["type", "title"],
     },
     execute: async (_toolCallId: string, params: Record<string, unknown>) => {
+      const VALID_TYPES: readonly string[] = ["coding", "research", "analysis", "creative", "review", "ops", "task", "url", "idea", "optimize"];
       const type = (params.type as QueueItemType) || "task";
+      if (!VALID_TYPES.includes(type)) {
+        return jsonResult({ error: true, message: `Invalid type "${type}". Must be one of: ${VALID_TYPES.join(", ")}` });
+      }
       const title = String(params.title || "").trim();
       if (!title) return jsonResult({ error: true, message: "title is required" });
+      if (type === "url" && !params.url) {
+        return jsonResult({ error: true, message: "url is required when type is 'url'" });
+      }
 
       // Guard: reject titles that look like auto-generated IDs instead of real topics
       const ID_PATTERN = /^(concurrent|batch|item|task)-\d{10,}-\d+$/;

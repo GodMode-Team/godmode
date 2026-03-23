@@ -174,9 +174,11 @@ export class HermesChatProxy {
       messages.push({ role: "user", content: userMessage });
     }
 
-    // Save user message to session (text-only for history serialization)
+    // Save user message to session — text-only for history serialization.
+    // Include filenames for image references so resumed sessions have context
+    // about what was attached (BUG-012: previously lost all image reference info).
     const historyLabel = hasImages
-      ? `${userMessage}\n\n[${attachments.length} image(s) attached]`
+      ? `${userMessage}\n\n[${attachments.length} image(s) attached: ${attachments.map(a => a.fileName || "image").join(", ")}]`
       : userMessage;
     session.messages.push({ role: "user", content: historyLabel });
 
@@ -191,6 +193,11 @@ export class HermesChatProxy {
     let fullResponse = "";
     let lastUsage: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number } | null = null;
 
+    // Abort controller with 2-minute timeout to prevent zombie streams (BUG-007).
+    // If Hermes hangs or becomes unreachable, the fetch aborts cleanly.
+    const controller = new AbortController();
+    const abortTimeout = setTimeout(() => controller.abort(), 120_000);
+
     try {
       const res = await fetch(`${this.hermesUrl}/v1/chat/completions`, {
         method: "POST",
@@ -200,6 +207,7 @@ export class HermesChatProxy {
           messages,
           stream: true,
         }),
+        signal: controller.signal,
       });
 
       if (!res.ok) {
@@ -238,6 +246,7 @@ export class HermesChatProxy {
 
           if (data === "[DONE]") {
             // Stream complete — save response and token usage
+            clearTimeout(abortTimeout);
             session.messages.push({ role: "assistant", content: fullResponse });
             if (lastUsage) {
               session.inputTokens = (session.inputTokens ?? 0) + (lastUsage.prompt_tokens ?? 0);
@@ -269,25 +278,56 @@ export class HermesChatProxy {
 
             const delta = choice?.delta?.content;
             if (delta) {
-              // After a tool call boundary, or when the previous text ends
-              // with sentence punctuation and new text starts with a capital
-              // letter (no leading whitespace), insert a paragraph break.
+              // After a tool call boundary, insert a paragraph break so
+              // text from different tool-call sections doesn't run together.
+              // NOTE: We no longer insert breaks based on sentence punctuation
+              // heuristics — the model produces its own paragraph breaks and
+              // the heuristic caused spurious whitespace depending on chunk
+              // boundaries (BUG-002).
               let separator = "";
               if (sawToolCall && fullResponse.length > 0) {
                 separator = "\n\n";
                 sawToolCall = false;
-              } else if (
-                fullResponse.length > 0 &&
-                /[.!?:]\s*$/.test(fullResponse) &&
-                /^[A-Z]/.test(delta)
-              ) {
-                separator = "\n\n";
               }
               fullResponse += separator + delta;
               callbacks.onToken(separator + delta);
             }
           } catch {
             // Skip malformed chunks
+          }
+        }
+      }
+
+      // Flush any remaining data in the buffer after the stream reader is done.
+      // A chunk boundary may have split a "data: [DONE]" or final JSON chunk.
+      if (buffer.trim()) {
+        const trimmedLine = buffer.replace(/\r$/, "");
+        if (trimmedLine.startsWith("data:")) {
+          const data = trimmedLine.startsWith("data: ")
+            ? trimmedLine.slice(6).trim()
+            : trimmedLine.slice(5).trim();
+          if (data === "[DONE]") {
+            clearTimeout(abortTimeout);
+            session.messages.push({ role: "assistant", content: fullResponse });
+            if (lastUsage) {
+              session.inputTokens = (session.inputTokens ?? 0) + (lastUsage.prompt_tokens ?? 0);
+              session.outputTokens = (session.outputTokens ?? 0) + (lastUsage.completion_tokens ?? 0);
+              session.lastInputTokens = lastUsage.prompt_tokens ?? 0;
+            }
+            await saveSession(session);
+            callbacks.onDone(fullResponse);
+            return;
+          }
+          try {
+            const chunk = JSON.parse(data);
+            if (chunk.usage) lastUsage = chunk.usage;
+            const delta = chunk.choices?.[0]?.delta?.content;
+            if (delta) {
+              fullResponse += delta;
+              callbacks.onToken(delta);
+            }
+          } catch {
+            // Skip malformed trailing chunk
           }
         }
       }
@@ -299,9 +339,17 @@ export class HermesChatProxy {
         callbacks.onDone(fullResponse);
       }
     } catch (err) {
-      this.logger.error(`[Hermes Chat] Error: ${err}`);
-      callbacks.onError(err instanceof Error ? err : new Error(String(err)));
+      clearTimeout(abortTimeout);
+      if (err instanceof DOMException && err.name === "AbortError") {
+        this.logger.error("[Hermes Chat] Request timed out after 120s");
+        callbacks.onError(new Error("Request timed out — Hermes may be unreachable"));
+      } else {
+        this.logger.error(`[Hermes Chat] Error: ${err}`);
+        callbacks.onError(err instanceof Error ? err : new Error(String(err)));
+      }
+      return;
     }
+    clearTimeout(abortTimeout);
   }
 
   /**

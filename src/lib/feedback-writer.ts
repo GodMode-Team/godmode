@@ -50,7 +50,7 @@ export async function writeFeedbackToSource(
         title: item.title,
       }) + "\n",
       "utf-8",
-    ).catch(() => {});
+    ).catch((err: unknown) => console.warn("[feedback-writer] append failed:", err instanceof Error ? err.message : String(err)));
     await addLesson(
       {
         rule: feedback,

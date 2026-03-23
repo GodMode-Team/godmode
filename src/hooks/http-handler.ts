@@ -9,7 +9,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { createHmac, timingSafeEqual } from "node:crypto";
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { MEMORY_DIR } from "../data-paths.js";
+import { MEMORY_DIR, ARTIFACTS_DIR } from "../data-paths.js";
 import { handleMeetingWebhookHttp } from "../methods/meeting-webhook.js";
 import { handlePaperclipWebhookHttp } from "../methods/paperclip-webhook.js";
 import type { LicenseState } from "../lib/license.js";
@@ -190,31 +190,47 @@ export function createGodmodeHttpHandler(deps: HttpHandlerDeps) {
       return true;
     }
 
-    // Artifact file server
+    // Artifact file server — serves from ~/godmode/artifacts/ (primary)
+    // and ~/godmode/memory/inbox/ (fallback for queue agent output).
     if (pathname.startsWith("/godmode/artifacts/")) {
-      const fileName = pathname.slice("/godmode/artifacts/".length);
-      if (!fileName || fileName.includes("..") || fileName.includes("/")) {
+      const relativePath = pathname.slice("/godmode/artifacts/".length);
+      if (!relativePath || relativePath.includes("..")) {
         res.writeHead(400, { "Content-Type": "text/plain" });
         res.end("Bad Request");
         return true;
       }
-      const inboxDir = join(MEMORY_DIR, "inbox");
-      const filePath = join(inboxDir, decodeURIComponent(fileName));
-      if (!filePath.startsWith(inboxDir) || !existsSync(filePath)) {
+      const decoded = decodeURIComponent(relativePath);
+      const searchDirs = [ARTIFACTS_DIR, join(MEMORY_DIR, "inbox")];
+      let resolvedPath: string | null = null;
+      for (const dir of searchDirs) {
+        const candidate = join(dir, decoded);
+        if (candidate.startsWith(dir) && existsSync(candidate)) {
+          resolvedPath = candidate;
+          break;
+        }
+      }
+      if (!resolvedPath) {
         res.writeHead(404, { "Content-Type": "text/plain" });
         res.end("Not Found");
         return true;
       }
       try {
-        const content = readFileSync(filePath);
-        const ext = filePath.split(".").pop()?.toLowerCase() ?? "";
+        const content = readFileSync(resolvedPath);
+        const ext = resolvedPath.split(".").pop()?.toLowerCase() ?? "";
         const mimeMap: Record<string, string> = {
           html: "text/html; charset=utf-8",
+          htm: "text/html; charset=utf-8",
           json: "application/json; charset=utf-8",
           md: "text/plain; charset=utf-8",
           txt: "text/plain; charset=utf-8",
           csv: "text/csv; charset=utf-8",
           pdf: "application/pdf",
+          png: "image/png",
+          jpg: "image/jpeg",
+          jpeg: "image/jpeg",
+          gif: "image/gif",
+          svg: "image/svg+xml",
+          webp: "image/webp",
         };
         res.writeHead(200, {
           "Content-Type": mimeMap[ext] || "application/octet-stream",

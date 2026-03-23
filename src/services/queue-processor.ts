@@ -77,6 +77,9 @@ export function getQueueProcessor(): QueueProcessor | null {
 
 export function initQueueProcessor(logger: Logger): QueueProcessor {
   instance = new QueueProcessor(logger);
+  if (!resolveAnthropicKeyForAgents()) {
+    logger.warn("[QueueProcessor] No Anthropic API key found — agent tasks will fail until a key is configured");
+  }
   return instance;
 }
 
@@ -209,6 +212,20 @@ function extractArtifacts(content: string): string[] {
 const QUEUE_POLL_MS = 10 * 60 * 1000; // 10 minutes — faster than hourly heartbeat
 const AGENT_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes max runtime per agent
 
+// ── Circuit Breaker ─────────────────────────────────────────────
+//
+// If an engine fails CIRCUIT_BREAKER_THRESHOLD times consecutively,
+// pause it for CIRCUIT_BREAKER_COOLDOWN_MS. Prevents burning credits
+// when an engine is down or misconfigured.
+
+const CIRCUIT_BREAKER_THRESHOLD = 3;
+const CIRCUIT_BREAKER_COOLDOWN_MS = 600_000; // 10 minutes
+
+interface CircuitState {
+  consecutiveFailures: number;
+  pausedUntil: number; // epoch ms, 0 = not paused
+}
+
 class QueueProcessor {
   private logger: Logger;
   private broadcastFn: BroadcastFn | null = null;
@@ -219,6 +236,8 @@ class QueueProcessor {
   private pollTimer: ReturnType<typeof setInterval> | null = null;
   /** Toolkit tokens issued to agents — keyed by item ID for revocation on completion */
   private toolkitTokens = new Map<string, string>();
+  /** Circuit breaker state per engine */
+  private circuitBreakers = new Map<string, CircuitState>();
 
   constructor(logger: Logger) {
     this.logger = logger;
@@ -252,6 +271,47 @@ class QueueProcessor {
   /** Check if the polling loop is active. Used by self-heal. */
   isPolling(): boolean {
     return this.pollTimer !== null && !this.stopped;
+  }
+
+  /** Check if an engine's circuit breaker is open (paused). */
+  private isEngineCircuitOpen(engine: string): boolean {
+    const state = this.circuitBreakers.get(engine);
+    if (!state) return false;
+    if (state.pausedUntil > Date.now()) return true;
+    // Cooldown expired — reset
+    if (state.pausedUntil > 0) {
+      state.pausedUntil = 0;
+      state.consecutiveFailures = 0;
+      this.logger.info(`[GodMode][Queue] Circuit breaker reset for engine "${engine}"`);
+    }
+    return false;
+  }
+
+  /** Record a failure for an engine. Trips the breaker after N consecutive failures. */
+  private recordEngineFailure(engine: string): void {
+    const state = this.circuitBreakers.get(engine) ?? { consecutiveFailures: 0, pausedUntil: 0 };
+    state.consecutiveFailures++;
+    if (state.consecutiveFailures >= CIRCUIT_BREAKER_THRESHOLD) {
+      state.pausedUntil = Date.now() + CIRCUIT_BREAKER_COOLDOWN_MS;
+      this.logger.warn(
+        `[GodMode][Queue] Circuit breaker OPEN for engine "${engine}" — ${state.consecutiveFailures} consecutive failures. Paused for ${CIRCUIT_BREAKER_COOLDOWN_MS / 60000}min.`,
+      );
+      this.broadcast("ally:notification", {
+        type: "circuit-breaker",
+        title: `Engine "${engine}" paused`,
+        summary: `Engine "${engine}" failed ${state.consecutiveFailures} times in a row. Paused for ${CIRCUIT_BREAKER_COOLDOWN_MS / 60000} minutes.`,
+      });
+    }
+    this.circuitBreakers.set(engine, state);
+  }
+
+  /** Record a success for an engine. Resets its circuit breaker. */
+  private recordEngineSuccess(engine: string): void {
+    const state = this.circuitBreakers.get(engine);
+    if (state && state.consecutiveFailures > 0) {
+      state.consecutiveFailures = 0;
+      state.pausedUntil = 0;
+    }
   }
 
   private async pollTick(): Promise<void> {
@@ -486,7 +546,9 @@ class QueueProcessor {
           `[GodMode][Queue] Agent spawn error for item ${item.id}: ${String(err)}`,
         );
         this.handleItemFailed(item.id, `spawn error: ${String(err)}`).catch(
-          () => {},
+          (failErr) => {
+            this.logger.error(`[GodMode][Queue] handleItemFailed also failed for ${item.id}: ${String(failErr)}`);
+          },
         );
       });
 
@@ -521,7 +583,9 @@ class QueueProcessor {
     this.toolkitTokens.delete(itemId);
     import("./agent-toolkit-server.js")
       .then(({ revokeAgentToken }) => revokeAgentToken(token))
-      .catch(() => {});
+      .catch((err) => {
+        this.logger.warn(`[GodMode][Queue] Token revocation failed for ${itemId}: ${String(err)}`);
+      });
   }
 
   async handleItemCompleted(
@@ -541,13 +605,20 @@ class QueueProcessor {
       return;
     }
 
+    // Record success for circuit breaker (only on exitCode 0)
+    const successState = await readQueueState();
+    const successItem = successState.items.find((i) => i.id === itemId);
+    if (successItem) {
+      this.recordEngineSuccess(successItem.engine ?? "claude");
+    }
+
     const outPath = outputPathForItem(itemId);
     let summary = "";
     let outputContent = "";
     let artifacts: string[] = [];
 
-    const currentState = await readQueueState();
-    const currentItem = currentState.items.find((i) => i.id === itemId);
+    const currentState = successState;
+    const currentItem = successItem;
 
     try {
       outputContent = await fs.readFile(outPath, "utf-8");
@@ -739,6 +810,16 @@ class QueueProcessor {
 
   // ── Failure + retry handler ────────────────────────────────────
 
+  /**
+   * Calculate exponential backoff delay for retries.
+   * Retry 1: 30s, Retry 2: 120s (2min), capped at 5min.
+   */
+  private retryDelayMs(retryCount: number): number {
+    const BASE_DELAY = 30_000; // 30 seconds
+    const MAX_DELAY = 300_000; // 5 minutes
+    return Math.min(BASE_DELAY * Math.pow(2, retryCount), MAX_DELAY);
+  }
+
   async handleItemFailed(itemId: string, errorMsg: string, skipDecrement = false): Promise<void> {
     if (!skipDecrement) {
       this.activeCount = Math.max(0, this.activeCount - 1);
@@ -761,6 +842,9 @@ class QueueProcessor {
       );
       return;
     }
+
+    // Record failure for circuit breaker
+    this.recordEngineFailure(item.engine ?? "claude");
 
     // Engine fallback: if item used a non-claude engine, retry with claude
     if (item.engine && item.engine !== "claude" && (item.retryCount ?? 0) === 1) {
@@ -887,11 +971,16 @@ class QueueProcessor {
           improvedContext = "";
         }
 
-        // Reset item to pending for retry
+        // Reset item to pending for retry with exponential backoff
+        const retryCount = item.retryCount ?? 0;
+        const delayMs = this.retryDelayMs(retryCount);
+        const scheduledAt = Date.now() + delayMs;
+
         await updateQueueState((state) => {
           const qi = state.items.find((i) => i.id === item.id);
           if (qi) {
             qi.status = "pending";
+            qi.scheduledAt = scheduledAt;
             if (improvedContext.trim()) {
               qi.description =
                 (qi.description ?? "") +
@@ -907,7 +996,7 @@ class QueueProcessor {
         });
 
         this.logger.info(
-          `[GodMode][Queue] Item ${item.id} reset to pending for retry`,
+          `[GodMode][Queue] Item ${item.id} reset to pending for retry (backoff: ${Math.round(delayMs / 1000)}s)`,
         );
         this.broadcast("queue:update", { itemId: item.id, status: "pending" });
       });
@@ -917,11 +1006,14 @@ class QueueProcessor {
           `[GodMode][Queue] Diagnostic agent spawn error for ${item.id}: ${String(err)}`,
         );
 
-        // Fall back: just reset to pending with error context
+        // Fall back: just reset to pending with error context + backoff
+        const fbRetryCount = item.retryCount ?? 0;
+        const fbDelayMs = this.retryDelayMs(fbRetryCount);
         await updateQueueState((state) => {
           const qi = state.items.find((i) => i.id === item.id);
           if (qi) {
             qi.status = "pending";
+            qi.scheduledAt = Date.now() + fbDelayMs;
             qi.description =
               (qi.description ?? "") +
               "\n\n---\n[Previous attempt failed]: " +
@@ -1177,6 +1269,13 @@ class QueueProcessor {
           skipped++;
           continue;
         }
+      }
+
+      // Circuit breaker: skip items whose engine is paused
+      const itemEngine = item.engine ?? resolvePersona(item.type, item.personaHint)?.engine ?? "claude";
+      if (this.isEngineCircuitOpen(itemEngine)) {
+        skipped++;
+        continue;
       }
 
       const result = await this.processItem(item);

@@ -144,7 +144,7 @@ export async function getLessonsForPrompt(personaSlug?: string): Promise<Lesson[
   for (const l of lessons) {
     l.appliedCount++;
   }
-  await writeLessonsState(state).catch(() => {});
+  await writeLessonsState(state).catch((err: unknown) => console.warn("[agent-lessons] write-back failed:", err instanceof Error ? err.message : String(err)));
 
   return lessons;
 }

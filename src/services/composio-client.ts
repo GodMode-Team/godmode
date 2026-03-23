@@ -9,6 +9,7 @@
  */
 
 import { Composio } from "@composio/core";
+import type { ComposioSession, ComposioConnectedAccount, ComposioTool } from "../types/composio.js";
 
 type Logger = { info: (msg: string) => void; warn: (msg: string) => void; error: (msg: string) => void };
 
@@ -42,10 +43,10 @@ export async function getConnections(userId: string): Promise<
 > {
   if (!client) return [];
   try {
-    const session = await client.create(userId);
-    const accounts = await (session as any).connectedAccounts?.() ?? [];
+    const session = await client.create(userId) as unknown as ComposioSession;
+    const accounts = await session.connectedAccounts?.() ?? [];
     return Array.isArray(accounts)
-      ? accounts.map((a: any) => ({
+      ? accounts.map((a: ComposioConnectedAccount) => ({
           id: String(a.id ?? a.connectionId ?? ""),
           appName: String(a.appName ?? a.app ?? "unknown"),
           status: String(a.status ?? "unknown"),
@@ -66,10 +67,10 @@ export async function initiateConnection(
 ): Promise<{ redirectUrl?: string; connectionId?: string; error?: string }> {
   if (!client) return { error: "Composio not configured" };
   try {
-    const session = await client.create(userId);
+    const session = await client.create(userId) as unknown as ComposioSession;
     // The SDK exposes connection initiation through the session or via REST
-    const result = await (session as any).initiateConnection?.({ appName, callbackUrl }) ??
-      await (session as any).connect?.({ appName, redirectUrl: callbackUrl });
+    const result = await session.initiateConnection?.({ appName, callbackUrl }) ??
+      await session.connect?.({ appName, redirectUrl: callbackUrl });
 
     if (!result) return { error: "Connection initiation not supported by SDK version" };
 
@@ -90,8 +91,8 @@ export async function executeAction(
 ): Promise<{ success: boolean; data?: unknown; error?: string }> {
   if (!client) return { success: false, error: "Composio not configured" };
   try {
-    const session = await client.create(userId);
-    const result = await (session as any).executeAction?.({
+    const session = await client.create(userId) as unknown as ComposioSession;
+    const result = await session.executeAction?.({
       toolName: actionName,
       params: args,
     });
@@ -107,10 +108,10 @@ export async function getAvailableTools(userId: string): Promise<
 > {
   if (!client) return [];
   try {
-    const session = await client.create(userId);
-    const tools = await (session as any).tools?.() ?? [];
+    const session = await client.create(userId) as unknown as ComposioSession;
+    const tools = await session.tools?.() ?? [];
     return Array.isArray(tools)
-      ? tools.map((t: any) => ({
+      ? tools.map((t: ComposioTool) => ({
           name: String(t.name ?? t.toolName ?? ""),
           description: String(t.description ?? ""),
           appName: String(t.appName ?? t.app ?? ""),

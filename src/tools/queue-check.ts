@@ -1,7 +1,15 @@
+/**
+ * queue-check.ts — Agent tool for inspecting queue status.
+ *
+ * Lets the ally check pending, processing, completed, or failed
+ * queue items. Includes output content when results are few enough.
+ */
+
 import { readFile } from "node:fs/promises";
 import { type AnyAgentTool, jsonResult } from "openclaw/plugin-sdk";
 import { readQueueState } from "../lib/queue-state.js";
 
+/** Create the queue_check tool for reading queue item status and output. */
 export function createQueueCheckTool(): AnyAgentTool {
   return {
     label: "Queue",

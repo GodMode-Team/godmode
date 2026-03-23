@@ -484,7 +484,7 @@ export function renderMessageGroup(
   group: MessageGroup,
   opts: {
     onOpenSidebar?: (content: string) => void;
-    onOpenFile?: (filePath: string) => void;
+    onOpenFile?: (filePath: string, fallbackContent?: string) => void;
     onOpenProof?: (slug: string) => void;
     onPushToDrive?: (filePath: string) => void;
     onImageClick?: (url: string, allImages: LightboxImage[], index: number) => void;
@@ -714,7 +714,7 @@ function renderGroupedMessage(
   message: unknown,
   opts: { isStreaming: boolean; showReasoning: boolean },
   onOpenSidebar?: (content: string) => void,
-  onOpenFile?: (filePath: string) => void,
+  onOpenFile?: (filePath: string, fallbackContent?: string) => void,
   onOpenProof?: (slug: string) => void,
   onImageClick?: (url: string, allImages: LightboxImage[], index: number) => void,
   resolveImageUrl?: (messageIndex: number, imageIndex: number) => string | null,
@@ -745,7 +745,7 @@ function renderGroupedMessageUnsafe(
   message: unknown,
   opts: { isStreaming: boolean; showReasoning: boolean },
   onOpenSidebar?: (content: string) => void,
-  onOpenFile?: (filePath: string) => void,
+  onOpenFile?: (filePath: string, fallbackContent?: string) => void,
   onOpenProof?: (slug: string) => void,
   onImageClick?: (url: string, allImages: LightboxImage[], index: number) => void,
   resolveImageUrl?: (messageIndex: number, imageIndex: number) => string | null,

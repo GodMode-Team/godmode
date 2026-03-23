@@ -9,6 +9,7 @@ import { existsSync, mkdirSync } from "node:fs";
 import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { queryPeer, isMemoryReady } from "../lib/memory.js";
+import { GODMODE_ROOT } from "../data-paths.js";
 
 /**
  * Sync Honcho's user model insights to the vault as markdown files.
@@ -22,15 +23,9 @@ export async function syncHonchoToVault(sessionKey = "system:honcho-sync"): Prom
   try {
     const { resolveIdentityDir } = await import("../lib/vault-paths.js");
     const identityResult = resolveIdentityDir();
-    outDir = identityResult?.path ?? join(
-      process.env.GODMODE_ROOT ?? join(process.env.HOME ?? "", "godmode"),
-      "memory", "honcho",
-    );
+    outDir = identityResult?.path ?? join(GODMODE_ROOT, "memory", "honcho");
   } catch {
-    outDir = join(
-      process.env.GODMODE_ROOT ?? join(process.env.HOME ?? "", "godmode"),
-      "memory", "honcho",
-    );
+    outDir = join(GODMODE_ROOT, "memory", "honcho");
   }
 
   if (!existsSync(outDir)) {

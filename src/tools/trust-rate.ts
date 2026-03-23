@@ -1,3 +1,11 @@
+/**
+ * trust-rate.ts — Agent tool for recording trust ratings.
+ *
+ * After completing a tracked workflow (daily brief, email triage, etc.),
+ * the ally records a 1-10 rating. After 10 ratings, the running average
+ * becomes the trust score. Scores below 7 trigger feedback collection.
+ */
+
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { secureWriteFile, secureMkdir } from "../lib/secure-fs.js";

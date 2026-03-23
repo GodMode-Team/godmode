@@ -10,13 +10,12 @@ import { readFile, readdir, stat } from "node:fs/promises";
 import { join, extname } from "node:path";
 import { homedir } from "node:os";
 import type { AssessmentResult, FeatureCheck } from "./onboarding-types.js";
+import { GODMODE_ROOT, MEMORY_DIR } from "../data-paths.js";
 // resolveVaultPath not used directly — checkObsidianVault() checks for real Obsidian presence
 
 const OC_DIR = join(homedir(), ".openclaw");
 const OC_CONFIG = join(OC_DIR, "openclaw.json");
 const AUTH_PROFILES = join(OC_DIR, "auth-profiles.json");
-const GODMODE_ROOT = process.env.GODMODE_ROOT || join(homedir(), "godmode");
-const MEMORY_DIR = join(GODMODE_ROOT, "memory");
 const HERMES_DIR = join(homedir(), ".hermes");
 const SOUL_MD = join(MEMORY_DIR, "SOUL.md");
 

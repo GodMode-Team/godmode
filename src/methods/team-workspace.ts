@@ -776,10 +776,10 @@ const resolveConflict: GatewayRequestHandler = async ({ params, respond }) => {
     if (strategy === "ours") {
       // "ours" = keep local HEAD as-is (rebase --abort already restored it)
       // Pull remote and force-resolve any remaining conflicts to ours
-      await execFile("git", ["pull", "--no-rebase", "-X", "ours"], opts).catch(() => {});
+      await execFile("git", ["pull", "--no-rebase", "-X", "ours"], opts).catch((err: unknown) => console.warn("[team-workspace] git pull (ours) failed:", err instanceof Error ? err.message : String(err)));
     } else {
       // "theirs" = accept remote changes
-      await execFile("git", ["pull", "--no-rebase", "-X", "theirs"], opts).catch(() => {});
+      await execFile("git", ["pull", "--no-rebase", "-X", "theirs"], opts).catch((err: unknown) => console.warn("[team-workspace] git pull (theirs) failed:", err instanceof Error ? err.message : String(err)));
     }
     // Stage anything left over and commit if needed
     await execFile("git", ["add", "-A"], opts);

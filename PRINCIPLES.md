@@ -75,4 +75,12 @@ When you're ready to move, the system moves with you. When something can be done
 
 ---
 
+## 10. The Socket Board
+
+GodMode is the OS — every subsystem is a module with a standard interface that can be swapped, extended, or replaced.
+
+Memory, task systems, model providers, mission control, dashboards — none of these are GodMode's job to own forever. GodMode's job is to make each layer pluggable. The default stack is carefully chosen and it works out of the box. But when a better memory system ships, users swap the module. When a team prefers ClickUp over the built-in task system, they plug it in. When Venice or Ollama fits a user's privacy requirements better than Anthropic, they configure it. The socket board doesn't lock anyone in — to our implementation, our vendor choices, or our defaults. This is what makes GodMode the last AI product you install: everything else plugs in.
+
+---
+
 *If a feature doesn't serve at least one of these principles, we don't build it.*
