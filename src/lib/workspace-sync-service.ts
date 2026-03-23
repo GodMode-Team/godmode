@@ -9,11 +9,7 @@ import { readWorkspaceConfig } from "./workspaces-config.js";
 
 const execFile = promisify(execFileCb);
 
-type Logger = {
-  info: (message: string) => void;
-  warn: (message: string) => void;
-  error: (message: string) => void;
-};
+import type { Logger } from "../types/plugin-api.js";
 
 export type WorkspaceSyncState =
   | "synced"

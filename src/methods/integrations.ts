@@ -224,9 +224,17 @@ const platformInfo: GatewayRequestHandler = async ({ respond }) => {
 // ── integrations.autoInstall ───────────────────────────────────────────
 
 /** Run a shell command and return the output. */
-function runShell(cmd: string, timeoutMs = 60_000): Promise<{ code: number; stdout: string; stderr: string }> {
+function runShell(
+  cmd: string,
+  timeoutMs = 60_000,
+  extraEnv?: Record<string, string>,
+): Promise<{ code: number; stdout: string; stderr: string }> {
   return new Promise((resolve) => {
-    exec(cmd, { timeout: timeoutMs, env: { ...process.env, HOME: homedir() }, maxBuffer: 1024 * 1024 }, (err, stdout, stderr) => {
+    exec(cmd, {
+      timeout: timeoutMs,
+      env: { ...process.env, HOME: homedir(), ...extraEnv },
+      maxBuffer: 1024 * 1024,
+    }, (err, stdout, stderr) => {
       const code = err && "code" in err ? (err.code as number) ?? 1 : err ? 1 : 0;
       resolve({ code, stdout: String(stdout), stderr: String(stderr) });
     });
@@ -296,10 +304,13 @@ const autoInstall: GatewayRequestHandler = async ({ params, respond }) => {
           return;
         }
         const client = "godmode";
-        const envPrefix = process.platform === "darwin" ? `GOG_KEYRING_PASSWORD=${gogPass} ` : "";
+        const extraEnv = process.platform === "darwin" && gogPass
+          ? { GOG_KEYRING_PASSWORD: gogPass }
+          : undefined;
         const { code, stdout, stderr } = await runShell(
-          `${envPrefix}gog auth add ${email} --services calendar --client ${client} 2>&1`,
+          `gog auth add ${email} --services calendar --client ${client} 2>&1`,
           30_000,
+          extraEnv,
         );
         if (code === 0) {
           // gog auth outputs an OAuth URL — extract it

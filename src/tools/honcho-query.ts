@@ -27,7 +27,7 @@ export function createHonchoQueryTool(ctx: ToolContext): AnyAgentTool {
           description:
             "A natural language question about the user. Examples: " +
             "'What are the user\\'s top priorities right now?', " +
-            "'What has the user said about Patient Autopilot?', " +
+            "'What has the user said about Project X?', " +
             "'Who does the user work with most closely?'",
         },
       },

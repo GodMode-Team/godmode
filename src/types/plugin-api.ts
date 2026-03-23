@@ -107,6 +107,9 @@ export interface PluginLogger {
   error: (msg: string) => void;
 }
 
+/** Canonical Logger type — use this everywhere instead of local redefinitions. */
+export type Logger = PluginLogger;
+
 /**
  * Minimal API shape for contexts that don't have access to the full
  * OpenClawPluginApi (e.g., Hermes standalone, adapter shims, gateway-start).

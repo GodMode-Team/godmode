@@ -528,7 +528,7 @@ const pluginRun: GatewayRequestHandler = async ({ respond }) => {
     // Prefer re-running the install script as it handles both + config
     const updateCmd = isPluginInstall()
       ? "rm -rf ~/.openclaw/extensions/godmode && openclaw plugins install @godmode-team/godmode 2>&1"
-      : 'bash -c "curl -fsSL https://lifeongodmode.com/install.sh | sh" 2>&1';
+      : "npm install -g @godmode-team/godmode 2>&1";
 
     const { code, stdout, stderr } = await runCommand(updateCmd, 120_000);
 

@@ -15,8 +15,8 @@ import { fileURLToPath } from "node:url";
 import type { HostAdapter, StandaloneRequestHandler } from "./types.js";
 
 
+import type { Logger } from "../types/plugin-api.js";
 type CleanupEntry = { name: string; fn: () => void | Promise<void> };
-type Logger = { info: (msg: string) => void; warn: (msg: string) => void; error: (msg: string) => void };
 
 export interface RegisterResult {
   methodCount: number;

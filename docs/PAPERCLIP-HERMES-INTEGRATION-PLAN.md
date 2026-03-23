@@ -157,7 +157,7 @@ export async function triggerWakeup(agentId: string): Promise<void> {
 ```
 
 **First verify the API endpoint exists** — check Paperclip's route definitions at:
-`/Users/calebhodges/.npm/_npx/43414d9b790239bb/node_modules/@paperclipai/server/dist/routes/agents.js`
+`~/.npm/_npx/43414d9b790239bb/node_modules/@paperclipai/server/dist/routes/agents.js`
 
 If no explicit wakeup endpoint exists, check if the heartbeat service exposes a manual trigger. Alternative: the `agentWakeupRequests` table in the DB suggests you can insert a wakeup request that the heartbeat timer picks up on next tick.
 
@@ -174,7 +174,7 @@ The `hermes-paperclip-adapter` spawns `hermes chat -q` as a child process. Verif
 3. Required env vars are available (API keys for Anthropic/OpenRouter)
 4. Test manually: `hermes chat -q "What is 2+2?" --model anthropic/claude-sonnet-4-20250514`
 
-If Hermes isn't on Paperclip's PATH, set `hermesCommand` in each agent's `adapterConfig` to the full path (e.g., `/Users/calebhodges/.local/bin/hermes` or wherever it's installed).
+If Hermes isn't on Paperclip's PATH, set `hermesCommand` in each agent's `adapterConfig` to the full path (e.g., `~/.local/bin/hermes` or wherever it's installed).
 
 ---
 

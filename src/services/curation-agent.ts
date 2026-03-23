@@ -3,11 +3,7 @@ import path from "node:path";
 import { getWorkspaceSyncService } from "../lib/workspace-sync-service.js";
 import { readWorkspaceConfig, type WorkspaceConfigEntry } from "../lib/workspaces-config.js";
 
-type Logger = {
-  info: (message: string) => void;
-  warn: (message: string) => void;
-  error: (message: string) => void;
-};
+import type { Logger } from "../types/plugin-api.js";
 
 type CurationState = {
   lastRunAt?: number;

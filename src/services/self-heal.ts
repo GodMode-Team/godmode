@@ -98,11 +98,7 @@ function markRepaired(id: SubsystemId, message: string): void {
 
 // ── Public API ───────────────────────────────────────────────────────
 
-type Logger = {
-  info: (msg: string) => void;
-  warn: (msg: string) => void;
-  error: (msg: string) => void;
-};
+import type { Logger } from "../types/plugin-api.js";
 type BroadcastFn = (event: string, payload: unknown) => void;
 
 /**
@@ -343,6 +339,7 @@ async function refreshOAuthToken(
         // Client ID for Claude Code
         client_id: "9d1c250a-e61b-44e4-8ed0-2de2c8e0ed33",
       }),
+      signal: AbortSignal.timeout(10_000),
     });
 
     if (!resp.ok) {

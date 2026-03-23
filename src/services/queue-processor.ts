@@ -11,6 +11,7 @@ import os from "node:os";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { GODMODE_ROOT, MEMORY_DIR, DATA_DIR, localDateString } from "../data-paths.js";
+import { resolveAnthropicKey } from "../lib/anthropic-auth.js";
 import { formatGuardrailsForPrompt } from "./guardrails.js";
 import { resolveClaudeBin, buildSpawnArgs, isEngineAvailable } from "../lib/resolve-claude-bin.js";
 import {
@@ -62,11 +63,7 @@ const PROMPT_TEMPLATES: Record<QueueItemType, string> = {
 
 // ── Singleton ──────────────────────────────────────────────────────
 
-type Logger = {
-  info(m: string): void;
-  warn(m: string): void;
-  error(m: string): void;
-};
+import type { Logger } from "../types/plugin-api.js";
 type BroadcastFn = (event: string, data: unknown) => void;
 
 let instance: QueueProcessor | null = null;
@@ -100,62 +97,17 @@ function outputPathForItem(itemId: string): string {
  * Resolution order: env var → godmode .env → OpenClaw .env → OpenClaw auth-profiles (OAuth token).
  * Mirrors the resolution chain in brief-generator.ts so agents authenticate consistently.
  */
+/** Resolve Anthropic key — delegates to canonical resolver in anthropic-auth.ts */
 function resolveAnthropicKeyForAgents(): string | null {
-  // 1. Environment variable (direct)
-  if (process.env.ANTHROPIC_API_KEY) return process.env.ANTHROPIC_API_KEY;
-
-  // 2. GodMode .env file
-  const gmEnv = path.join(GODMODE_ROOT, ".env");
-  try {
-    const raw = readFileSync(gmEnv, "utf-8");
-    for (const line of raw.split("\n")) {
-      if (line.startsWith("ANTHROPIC_API_KEY=")) {
-        const val = line.slice("ANTHROPIC_API_KEY=".length).trim();
-        if (val && !val.startsWith("#")) return val;
-      }
-    }
-  } catch { /* not found */ }
-
-  // 3. OpenClaw .env file
-  try {
-    const oclawEnv = path.join(os.homedir(), ".openclaw", ".env");
-    const raw = readFileSync(oclawEnv, "utf-8");
-    for (const line of raw.split("\n")) {
-      if (line.startsWith("ANTHROPIC_API_KEY=")) {
-        const val = line.slice("ANTHROPIC_API_KEY=".length).trim();
-        if (val && !val.startsWith("#")) return val;
-      }
-    }
-  } catch { /* not found */ }
-
-  // 4. OpenClaw auth-profiles.json (OAuth token — works as API bearer token)
-  try {
-    const profilesPath = path.join(os.homedir(), ".openclaw", "auth-profiles.json");
-    const raw = JSON.parse(readFileSync(profilesPath, "utf-8")) as {
-      profiles?: Record<string, { token?: string }>;
-    };
-    const oauthProfile = raw.profiles?.["anthropic:oauth"];
-    if (oauthProfile?.token) return oauthProfile.token;
-  } catch { /* not found */ }
-
-  // 5. Hermes config (if using OpenRouter or other provider)
-  try {
-    const hermesConfig = path.join(os.homedir(), ".hermes", "config.yaml");
-    const raw = readFileSync(hermesConfig, "utf-8");
-    // Simple YAML parse for api_key under providers
-    const keyMatch = raw.match(/ANTHROPIC_API_KEY[=:]\s*(.+)/i);
-    if (keyMatch?.[1]?.trim()) return keyMatch[1].trim();
-  } catch { /* not found */ }
-
-  return null;
+  return resolveAnthropicKey();
 }
 
 function buildChildEnv(): Record<string, string> {
   const parentPath = process.env.PATH ?? "";
   const childEnv: Record<string, string> = {
-    PATH: parentPath.includes("/opt/homebrew/bin")
-      ? parentPath
-      : `/opt/homebrew/bin:${parentPath}`,
+    PATH: process.platform === "darwin" && !parentPath.includes("/opt/homebrew/bin")
+      ? `/opt/homebrew/bin:${parentPath}`
+      : parentPath,
     HOME: process.env.HOME ?? "",
     USER: process.env.USER ?? "",
     SHELL: process.env.SHELL ?? "/bin/sh",

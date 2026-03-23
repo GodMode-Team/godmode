@@ -30,6 +30,7 @@ import {
 } from "../data-paths.js";
 import { getUserTimezone, getUserLocation, getTempUnit } from "../lib/user-config.js";
 import { loadLatestReflection } from "../lib/evening-reflection.js";
+import { resolveAnthropicKey } from "../lib/anthropic-auth.js";
 
 type GatewayRequestHandlers = Record<string, GatewayRequestHandler>;
 
@@ -66,35 +67,9 @@ function getEnv(key: string): string {
 
 // ── LLM helpers ──────────────────────────────────────────────────────────────
 
-/** Resolve Anthropic API key: env var → godmode .env → OpenClaw auth profiles */
+/** Resolve Anthropic API key — delegates to canonical resolver */
 function resolveAnthropicAuth(): string | null {
-  // 1. Environment variable
-  const envKey = process.env.ANTHROPIC_API_KEY || loadEnv().ANTHROPIC_API_KEY;
-  if (envKey) return envKey;
-
-  // 2. OpenClaw .env
-  try {
-    const oclawEnv = join(homedir(), ".openclaw", ".env");
-    const raw = readFileSync(oclawEnv, "utf-8");
-    for (const line of raw.split("\n")) {
-      if (line.startsWith("ANTHROPIC_API_KEY=")) {
-        const val = line.slice("ANTHROPIC_API_KEY=".length).trim();
-        if (val && !val.startsWith("#")) return val;
-      }
-    }
-  } catch { /* not found */ }
-
-  // 3. OpenClaw auth-profiles.json (OAuth token)
-  try {
-    const profilesPath = join(homedir(), ".openclaw", "auth-profiles.json");
-    const raw = JSON.parse(readFileSync(profilesPath, "utf-8")) as {
-      profiles?: Record<string, { token?: string }>;
-    };
-    const oauthProfile = raw.profiles?.["anthropic:oauth"];
-    if (oauthProfile?.token) return oauthProfile.token;
-  } catch { /* not found */ }
-
-  return null;
+  return resolveAnthropicKey();
 }
 
 /** Call Claude via `claude` CLI (OAuth/Claude Max). Always uses Max subscription. */

@@ -9,3 +9,10 @@ coverage/
 .worktrees/
 .claude/worktrees/
 experiments/
+
+# Environment files
+.env
+.env.*
+.env.local
+.env.*.local
+!.env.example

@@ -116,7 +116,7 @@ function getPersonPatterns(): RegExp[] {
   refreshKnownNames();
   return [
     // Known names — word-boundary match to avoid false positives
-    ...KNOWN_NAMES.map((name) => new RegExp(`\\b${name}\\b`, "i")),
+    ...KNOWN_NAMES.map((name) => new RegExp(`\\b${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "i")),
     // Generic person-reference phrases
     /\bwho is\b/i,
   /\bwho was\b/i,

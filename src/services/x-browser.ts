@@ -111,7 +111,7 @@ async function findTwitterBin(): Promise<string | null> {
     "twitter",
     join(process.env.HOME || "", ".local", "bin", "twitter"),
     "/usr/local/bin/twitter",
-    "/opt/homebrew/bin/twitter",
+    ...(process.platform === "darwin" ? ["/opt/homebrew/bin/twitter"] : []),
   ];
 
   for (const bin of candidates) {

@@ -176,12 +176,12 @@ export class GodModeWsServer {
     id: string,
     ok: boolean,
     payload?: unknown,
-    error?: { code: string; message: string },
+    error?: { code?: string; message?: string; [key: string]: unknown },
   ): void {
     if (ws.readyState !== ws.OPEN) return;
     const frame: OutboundResFrame = { type: "res", id, ok };
     if (ok) frame.payload = payload;
-    else frame.error = error;
+    else frame.error = error as { code: string; message: string };
     ws.send(JSON.stringify(frame));
   }
 }

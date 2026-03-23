@@ -96,6 +96,25 @@ async function saveSession(session: SessionHistory): Promise<void> {
   await writeFile(filePath, JSON.stringify(session, null, 2));
 }
 
+/** Finalize a streaming response: accumulate tokens, save session, call onDone. */
+async function finalizeStream(
+  session: SessionHistory,
+  fullResponse: string,
+  lastUsage: { prompt_tokens?: number; completion_tokens?: number } | null,
+  callbacks: StreamCallbacks,
+  abortTimeout?: ReturnType<typeof setTimeout>,
+): Promise<void> {
+  if (abortTimeout) clearTimeout(abortTimeout);
+  session.messages.push({ role: "assistant", content: fullResponse });
+  if (lastUsage) {
+    session.inputTokens = (session.inputTokens ?? 0) + (lastUsage.prompt_tokens ?? 0);
+    session.outputTokens = (session.outputTokens ?? 0) + (lastUsage.completion_tokens ?? 0);
+    session.lastInputTokens = lastUsage.prompt_tokens ?? 0;
+  }
+  await saveSession(session);
+  callbacks.onDone(fullResponse);
+}
+
 // ── Chat Proxy ───────────────────────────────────────────────────
 
 export class HermesChatProxy {
@@ -245,18 +264,7 @@ export class HermesChatProxy {
             : trimmedLine.slice(5).trim();
 
           if (data === "[DONE]") {
-            // Stream complete — save response and token usage
-            clearTimeout(abortTimeout);
-            session.messages.push({ role: "assistant", content: fullResponse });
-            if (lastUsage) {
-              session.inputTokens = (session.inputTokens ?? 0) + (lastUsage.prompt_tokens ?? 0);
-              session.outputTokens = (session.outputTokens ?? 0) + (lastUsage.completion_tokens ?? 0);
-              // Track the last turn's prompt tokens — this is the actual current
-              // context window size, not the cumulative sum across all turns.
-              session.lastInputTokens = lastUsage.prompt_tokens ?? 0;
-            }
-            await saveSession(session);
-            callbacks.onDone(fullResponse);
+            await finalizeStream(session, fullResponse, lastUsage, callbacks, abortTimeout);
             return;
           }
 
@@ -307,15 +315,7 @@ export class HermesChatProxy {
             ? trimmedLine.slice(6).trim()
             : trimmedLine.slice(5).trim();
           if (data === "[DONE]") {
-            clearTimeout(abortTimeout);
-            session.messages.push({ role: "assistant", content: fullResponse });
-            if (lastUsage) {
-              session.inputTokens = (session.inputTokens ?? 0) + (lastUsage.prompt_tokens ?? 0);
-              session.outputTokens = (session.outputTokens ?? 0) + (lastUsage.completion_tokens ?? 0);
-              session.lastInputTokens = lastUsage.prompt_tokens ?? 0;
-            }
-            await saveSession(session);
-            callbacks.onDone(fullResponse);
+            await finalizeStream(session, fullResponse, lastUsage, callbacks, abortTimeout);
             return;
           }
           try {
@@ -334,9 +334,7 @@ export class HermesChatProxy {
 
       // Stream ended without [DONE] — still save what we got
       if (fullResponse) {
-        session.messages.push({ role: "assistant", content: fullResponse });
-        await saveSession(session);
-        callbacks.onDone(fullResponse);
+        await finalizeStream(session, fullResponse, lastUsage, callbacks);
       }
     } catch (err) {
       clearTimeout(abortTimeout);
