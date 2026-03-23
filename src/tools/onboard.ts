@@ -11,7 +11,7 @@
  */
 
 import { type AnyAgentTool } from "openclaw/plugin-sdk";
-import { jsonResult } from "openclaw/plugin-sdk/agent-runtime";
+import { jsonResult } from "../lib/sdk-helpers.js";
 import { GODMODE_ROOT } from "../data-paths.js";
 import {
   generateWorkspaceFiles,

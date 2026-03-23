@@ -7,7 +7,7 @@
 
 import { readFile } from "node:fs/promises";
 import { type AnyAgentTool } from "openclaw/plugin-sdk";
-import { jsonResult } from "openclaw/plugin-sdk/agent-runtime";
+import { jsonResult } from "../lib/sdk-helpers.js";
 import { readQueueState } from "../lib/queue-state.js";
 
 /** Create the queue_check tool for reading queue item status and output. */

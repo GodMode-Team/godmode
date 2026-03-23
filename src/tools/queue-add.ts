@@ -7,7 +7,7 @@
  */
 
 import { type AnyAgentTool } from "openclaw/plugin-sdk";
-import { jsonResult } from "openclaw/plugin-sdk/agent-runtime";
+import { jsonResult } from "../lib/sdk-helpers.js";
 import { updateQueueState, newQueueItemId, type QueueItemType } from "../lib/queue-state.js";
 import { resolvePersona } from "../lib/agent-roster.js";
 import { getQueueProcessor } from "../services/queue-processor.js";

@@ -11,7 +11,7 @@ import { join } from "node:path";
 import { secureWriteFile, secureMkdir } from "../lib/secure-fs.js";
 import { randomUUID } from "node:crypto";
 import { type AnyAgentTool } from "openclaw/plugin-sdk";
-import { jsonResult } from "openclaw/plugin-sdk/agent-runtime";
+import { jsonResult } from "../lib/sdk-helpers.js";
 import { DATA_DIR } from "../data-paths.js";
 import { MAX_WORKFLOWS, SCORE_THRESHOLD, FEEDBACK_THRESHOLD } from "../methods/trust-tracker.js";
 import type { TrustRating, TrustTrackerState } from "../methods/trust-tracker.js";

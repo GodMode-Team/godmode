@@ -6,7 +6,7 @@
  */
 
 import { type AnyAgentTool } from "openclaw/plugin-sdk";
-import { jsonResult } from "openclaw/plugin-sdk/agent-runtime";
+import { jsonResult } from "../lib/sdk-helpers.js";
 import * as composio from "../services/composio-client.js";
 
 const DEFAULT_USER = "godmode-user";

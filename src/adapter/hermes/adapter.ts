@@ -86,7 +86,7 @@ export class HermesAdapter implements HostAdapter {
   private uiBasePath = "/godmode";
 
   // Hook handlers — wired by register-all.ts
-  private beforeChatHandler: ((sessionKey: string) => Promise<string | null>) | null = null;
+  private beforeChatHandler: ((sessionKey: string, userMessage: string) => Promise<string | null>) | null = null;
   private afterChatHandler: ((sessionKey: string, userMsg: string, assistantMsg: string) => Promise<void>) | null = null;
   private messageReceivedHandler: ((sessionKey: string, message: string) => Promise<void>) | null = null;
 
@@ -135,7 +135,7 @@ export class HermesAdapter implements HostAdapter {
 
   // ── HostAdapter: Hooks ───────────────────────────────────
 
-  onBeforeChat(handler: (sessionKey: string) => Promise<string | null>): void {
+  onBeforeChat(handler: (sessionKey: string, userMessage: string) => Promise<string | null>): void {
     this.beforeChatHandler = handler;
   }
 
@@ -323,7 +323,7 @@ export class HermesAdapter implements HostAdapter {
       // Hook: before_prompt_build — inject workspace context into chat proxy
       if (this.beforeChatHandler) {
         try {
-          const ctx = await this.beforeChatHandler(sessionKey);
+          const ctx = await this.beforeChatHandler(sessionKey, message ?? "");
           if (ctx) {
             this.chatProxy.setWorkspaceContext(ctx);
           }

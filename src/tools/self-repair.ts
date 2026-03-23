@@ -12,7 +12,7 @@
  */
 
 import { type AnyAgentTool } from "openclaw/plugin-sdk";
-import { jsonResult } from "openclaw/plugin-sdk/agent-runtime";
+import { jsonResult } from "../lib/sdk-helpers.js";
 import { health, turnErrors, repairLog, type RepairEntry } from "../lib/health-ledger.js";
 
 export function createSelfRepairTool(): AnyAgentTool {

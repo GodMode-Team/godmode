@@ -8,7 +8,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { type AnyAgentTool } from "openclaw/plugin-sdk";
-import { jsonResult } from "openclaw/plugin-sdk/agent-runtime";
+import { jsonResult } from "../lib/sdk-helpers.js";
 // REMOVED (v2 slim): curation-agent import
 import { getWorkspaceSyncService } from "../lib/workspace-sync-service.js";
 import {

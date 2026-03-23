@@ -5,7 +5,7 @@
  */
 
 import { type AnyAgentTool } from "openclaw/plugin-sdk";
-import { jsonResult } from "openclaw/plugin-sdk/agent-runtime";
+import { jsonResult } from "../lib/sdk-helpers.js";
 import { readQueueState } from "../lib/queue-state.js";
 
 export function createQueueSteerTool(): AnyAgentTool {

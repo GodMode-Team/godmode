@@ -110,8 +110,8 @@ export interface HostAdapter {
   // ── Hooks ──────────────────────────────────────────────────
 
   /** Called before each chat message is sent to the host LLM.
-   *  Returns workspace context to inject, or null to skip. */
-  onBeforeChat?(handler: (sessionKey: string) => Promise<string | null>): void;
+   *  Returns context to inject, or null to skip. */
+  onBeforeChat?(handler: (sessionKey: string, userMessage: string) => Promise<string | null>): void;
 
   /** Called after the host LLM responds — for memory ingest, identity graph, etc. */
   onAfterChat?(handler: (sessionKey: string, userMsg: string, assistantMsg: string) => Promise<void>): void;
