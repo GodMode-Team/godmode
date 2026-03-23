@@ -258,6 +258,43 @@ export async function runGatewayStart(
     logger.warn(`[GodMode] Host compat scan failed: ${String(err)}`);
   }
 
+  // Bootstrap core directories so Second Brain file-walk works out of the box
+  try {
+    const coreDirs = [
+      DATA_DIR,
+      MEMORY_DIR,
+      join(MEMORY_DIR, "research"),
+      join(MEMORY_DIR, "bank", "people"),
+      join(MEMORY_DIR, "bank", "companies"),
+      join(MEMORY_DIR, "projects"),
+      join(MEMORY_DIR, "identity"),
+      join(MEMORY_DIR, "inbox"),
+    ];
+    for (const dir of coreDirs) {
+      if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+    }
+    // Seed starter MEMORY.md if missing — gives file-walk something to find
+    const memoryMdPath = join(MEMORY_DIR, "MEMORY.md");
+    if (!existsSync(memoryMdPath)) {
+      const { writeFileSync } = await import("node:fs");
+      writeFileSync(memoryMdPath, [
+        "# GodMode Memory",
+        "",
+        "This is your personal knowledge base. GodMode stores memories,",
+        "research, and notes here. Search works automatically.",
+        "",
+        "## Getting Started",
+        "- Ask your ally to remember things — they'll be stored here",
+        "- Drop markdown files into subdirectories for instant search",
+        "- Connect Obsidian for a richer Second Brain experience",
+        "",
+      ].join("\n"), "utf-8");
+      logger.info("[GodMode] Bootstrapped ~/godmode/memory/ for Second Brain");
+    }
+  } catch (err) {
+    logger.warn(`[GodMode] Directory bootstrap failed: ${String(err)}`);
+  }
+
   // Seed starter personas + skills
   try {
     const seedModuleDir = dirname(fileURLToPath(import.meta.url));

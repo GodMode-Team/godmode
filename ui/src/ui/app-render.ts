@@ -87,7 +87,6 @@ import { renderSkills } from "./views/skills";
 import { renderAgents } from "./views/agents";
 import { renderLightbox } from "./chat/lightbox";
 import { getResolvedImageUrl, triggerImageResolve } from "./app-gateway";
-import { renderSetupBar } from "./views/setup-bar";
 import { renderToasts } from "./views/toast";
 import { renderOnboardingWizard, type WizardStep } from "./views/onboarding-wizard";
 import { renderTrustTracker } from "./views/trust-tracker";
@@ -412,18 +411,6 @@ export function renderApp(state: AppViewState) {
         : nothing}
       <aside class="nav ${state.settings.navCollapsed ? "nav--collapsed" : ""}">
 
-        ${renderSetupBar(
-          {
-            setupProgress: (state as any).setupProgress ?? null,
-            setupBarDismissed: state.setupBarDismissed ?? false,
-          },
-          {
-            onContinueSetup: () => state.continueSetup?.(),
-            onDismissSetup: () => state.dismissSetup?.(),
-            onStepClick: (stepId: string) => state.handleSetupStepClick?.(stepId),
-          },
-        )}
-
         ${TAB_GROUPS.map((group) => {
           const isGroupCollapsed = state.settings.navGroupsCollapsed[group.label] ?? false;
           const hasActiveTab = group.tabs.some((tab) => tab === state.tab);
@@ -455,24 +442,7 @@ export function renderApp(state: AppViewState) {
               `
               }
               <div class="nav-group__items">
-                ${
-                  !group.label && state.showSetupTab
-                    ? html`
-                        <a
-                          class="nav-item ${state.tab === "onboarding" ? "active" : ""}"
-                          href="#"
-                          @click=${(e: Event) => {
-                            e.preventDefault();
-                            state.handleWizardOpen?.();
-                          }}
-                          title="Power up your GodMode ally."
-                        >
-                          <span class="nav-item__emoji" aria-hidden="true">\u{1F9ED}</span>
-                          <span class="nav-item__text">Setup</span>
-                        </a>
-                      `
-                    : nothing
-                }
+                ${/* Old Setup compass link removed — Setup Bar is now the default onboarding entry point */ nothing}
                 ${group.tabs.map((tab) => renderTab(state, tab))}
               </div>
             </div>
@@ -1116,19 +1086,13 @@ export function renderApp(state: AppViewState) {
 
         ${
           state.tab === "setup" || state.tab === "onboarding"
-            ? (() => {
-                // Auto-launch the wizard when navigating to the setup tab
-                if (!state.wizardActive && state.handleWizardOpen) {
-                  requestAnimationFrame(() => state.handleWizardOpen?.());
-                }
-                return html`<div class="my-day-container">
-                  <div class="my-day-card">
-                    <div class="my-day-card-content">
-                      <p>Loading onboarding wizard...</p>
-                    </div>
+            ? html`<div class="my-day-container">
+                <div class="my-day-card">
+                  <div class="my-day-card-content">
+                    <p>Use the Setup Bar in the left navigation to continue setup, or go to Settings to run the full wizard.</p>
                   </div>
-                </div>`;
-              })()
+                </div>
+              </div>`
             : nothing
         }
 
@@ -1763,7 +1727,7 @@ export function renderApp(state: AppViewState) {
 
         ${
           state.tab === "config"
-            ? renderConfig({
+            ? html`${renderConfig({
                 raw: state.configRaw,
                 originalRaw: state.configRawOriginal,
                 valid: state.configValid,
@@ -1801,7 +1765,18 @@ export function renderApp(state: AppViewState) {
                 userAvatar: state.userAvatar,
                 onUserProfileUpdate: (name, avatar) => state.handleUpdateUserProfile(name, avatar),
                 onModelSwitch: (primary, fallbacks) => switchModel(state, primary, fallbacks),
-              })
+              })}
+              <div style="margin-top: 24px; padding: 16px; border-top: 1px solid var(--border, #333);">
+                <button
+                  class="btn btn--secondary"
+                  style="font-size: 13px; opacity: 0.8;"
+                  @click=${() => state.handleWizardOpen?.()}
+                >
+                  Run Setup Wizard
+                </button>
+                <span style="margin-left: 8px; font-size: 12px; opacity: 0.5;">Full 8-step onboarding form</span>
+              </div>
+            `
             : nothing
         }
 

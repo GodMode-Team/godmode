@@ -10,7 +10,9 @@ export const POWER_USER_GROUPS = [
 ] as const;
 
 /** Tabs that can be dynamically inserted but aren't in static groups. */
-export const DYNAMIC_TABS = ["onboarding"] as const;
+// "onboarding" removed — Setup Bar is now the default entry point for onboarding.
+// The old wizard is still accessible from Settings > "Run Setup Wizard".
+export const DYNAMIC_TABS = [] as const;
 
 /** Tabs that open an external URL instead of rendering a view. */
 export const EXTERNAL_TABS: ReadonlySet<Tab> = new Set<Tab>([]);
