@@ -1027,16 +1027,30 @@ export async function checkArchitectureGate(
 //   2. User sends ANY response (even "ok") → auto-approves for 10 min
 //   3. Ally retries → passes through
 
-/** sessionKey → timestamp of approval */
+/**
+ * Normalize session keys for approval tracking.
+ * Webchat creates a new random suffix per tab/refresh (e.g. "agent:main:webchat-c1d6e375").
+ * The gate blocks in one session, but the user's approval arrives from a different session.
+ * Strip the random suffix so all webchat sessions share one approval bucket.
+ */
+function approvalKey(sessionKey: string | undefined): string | undefined {
+  if (!sessionKey) return undefined;
+  // "agent:main:webchat-c1d6e375" → "agent:main:webchat"
+  // "agent:main:support" → "agent:main:support" (unchanged)
+  // "imessage:+19166987764" → "imessage:+19166987764" (unchanged)
+  return sessionKey.replace(/(webchat|chat)-[a-f0-9]+$/i, "$1");
+}
+
+/** approvalKey → timestamp of approval */
 const _approvals = new Map<string, number>();
 
-/** sessionKey → description of what was blocked (so we can tell the ally what to retry) */
+/** approvalKey → description of what was blocked (so we can tell the ally what to retry) */
 const _pendingApproval = new Map<string, string>();
 
-/** sessionKey → description of the action that was just approved (consumed by before_prompt_build) */
+/** approvalKey → description of the action that was just approved (consumed by before_prompt_build) */
 const _approvalNudge = new Map<string, string>();
 
-/** sessionKey → timestamp of last gate block (for rapid-retry detection) */
+/** approvalKey → timestamp of last gate block (for rapid-retry detection) */
 const _lastGateBlock = new Map<string, number>();
 
 /** TTL for approvals — 10 minutes */
@@ -1051,11 +1065,12 @@ const APPROVAL_TTL_MS = 10 * 60 * 1000;
  * (< 60s since last block) so the caller can give a stronger message.
  */
 export function markPendingApproval(sessionKey: string | undefined, actionDescription?: string): "rapid-retry" | "first" {
-  if (!sessionKey) return "first";
-  const lastBlock = _lastGateBlock.get(sessionKey);
+  const key = approvalKey(sessionKey);
+  if (!key) return "first";
+  const lastBlock = _lastGateBlock.get(key);
   const isRapidRetry = !!lastBlock && Date.now() - lastBlock < 60_000;
-  _lastGateBlock.set(sessionKey, Date.now());
-  _pendingApproval.set(sessionKey, actionDescription || "a blocked action");
+  _lastGateBlock.set(key, Date.now());
+  _pendingApproval.set(key, actionDescription || "a blocked action");
   return isRapidRetry ? "rapid-retry" : "first";
 }
 
@@ -1068,17 +1083,22 @@ export function processUserMessage(
   sessionKey: string | undefined,
   _userMessage: string,
 ): boolean {
-  if (!sessionKey) return false;
+  const key = approvalKey(sessionKey);
+  if (!key) return false;
 
   // New user message = new turn, reset rapid-retry tracker
-  _lastGateBlock.delete(sessionKey);
+  _lastGateBlock.delete(key);
 
-  // If a gate blocked since last user message, any response = approval
-  const blockedAction = _pendingApproval.get(sessionKey);
+  // If a gate blocked since last user message, any response = approval.
+  // Uses normalized key so webchat-abc approval matches webchat-xyz block.
+  const blockedAction = _pendingApproval.get(key);
   if (blockedAction) {
-    _pendingApproval.delete(sessionKey);
-    _approvals.set(sessionKey, Date.now());
-    _approvalNudge.set(sessionKey, blockedAction);
+    _pendingApproval.delete(key);
+    _approvals.set(key, Date.now());
+    // Store nudge under BOTH the normalized key and the raw session key,
+    // so before_prompt_build finds it regardless of which session renders next.
+    _approvalNudge.set(key, blockedAction);
+    if (sessionKey && sessionKey !== key) _approvalNudge.set(sessionKey, blockedAction);
     return true;
   }
 
@@ -1087,8 +1107,9 @@ export function processUserMessage(
 
 /** Check if user has granted approval for this session recently */
 function hasApproval(sessionKey: string | undefined): boolean {
-  if (!sessionKey) return false;
-  const ts = _approvals.get(sessionKey);
+  const key = approvalKey(sessionKey);
+  if (!key) return false;
+  const ts = _approvals.get(key);
   return !!ts && Date.now() - ts < APPROVAL_TTL_MS;
 }
 
@@ -1098,9 +1119,12 @@ function hasApproval(sessionKey: string | undefined): boolean {
  */
 export function consumeApprovalNudge(sessionKey: string | undefined): string | undefined {
   if (!sessionKey) return undefined;
-  const action = _approvalNudge.get(sessionKey);
+  // Check both raw key and normalized key
+  const key = approvalKey(sessionKey);
+  const action = _approvalNudge.get(sessionKey) ?? (key ? _approvalNudge.get(key) : undefined);
   if (!action) return undefined;
   _approvalNudge.delete(sessionKey);
+  if (key) _approvalNudge.delete(key);
   return [
     "## ✅ ACTION APPROVED",
     "",
