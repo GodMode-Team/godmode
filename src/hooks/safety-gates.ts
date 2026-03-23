@@ -1181,9 +1181,9 @@ const DEPLOYMENT_APPROVAL_MESSAGE = [
   "APPROVAL GATE — this deploy/push needs user approval first.",
   "",
   "STOP. Do NOT retry this command again in this turn.",
-  "Instead: tell the user what you want to deploy/push and ask for their OK.",
-  "When the user sends their next message, you will get an ACTION APPROVED nudge.",
-  "ONLY retry after you see that nudge. This WILL succeed after approval.",
+  "Tell the user what you want to deploy/push and ask them to type 'approve' in chat.",
+  "There is NO /approve command. Just ask naturally and wait for their chat reply.",
+  "When they reply, you will get an ACTION APPROVED nudge — then retry.",
 ].join("\n");
 
 /**
@@ -1415,9 +1415,9 @@ const CLIENT_FACING_BLOCK_MESSAGE = [
   "APPROVAL GATE — this client-facing action needs user approval first.",
   "",
   "STOP. Do NOT retry this command again in this turn.",
-  "Instead: tell the user the exact API call/recipient/content and ask for their OK.",
-  "When the user sends their next message, you will get an ACTION APPROVED nudge.",
-  "ONLY retry after you see that nudge. This WILL succeed after approval.",
+  "Tell the user the exact API call/recipient/content and ask them to type 'approve' in chat.",
+  "There is NO /approve command. Just ask naturally and wait for their chat reply.",
+  "When they reply, you will get an ACTION APPROVED nudge — then retry.",
 ].join("\n");
 
 /**
