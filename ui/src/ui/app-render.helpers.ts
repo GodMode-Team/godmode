@@ -92,6 +92,7 @@ export function renderTab(state: AppViewState, tab: Tab) {
         }
         event.preventDefault();
         state.setTab(tab);
+        state.closeNavDrawer();
       }}
       title=${titleForTab(tab)}
     >
@@ -108,6 +109,7 @@ function renderExternalTab(state: AppViewState, tab: Tab) {
       class="nav-item nav-item--external"
       @click=${async (event: MouseEvent) => {
         event.preventDefault();
+        state.closeNavDrawer();
         if (tab === "team") {
           try {
             const res = await state.client?.request<{ url: string; ready: boolean }>(

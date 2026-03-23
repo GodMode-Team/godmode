@@ -342,6 +342,8 @@ export class GodModeApp extends LitElement {
   @state() profileEditName = "";
   @state() profileEditAvatar = "";
   @state() editingTabKey: string | null = null;
+  @state() navDrawerOpen = false;
+  closeNavDrawer = () => { this.navDrawerOpen = false; };
   @state() chatLoading = false;
   @state() chatSending = false;
   @state() chatSendingSessionKey: string | null = null;

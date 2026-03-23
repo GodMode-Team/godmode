@@ -290,16 +290,27 @@ export function renderApp(state: AppViewState) {
     getRenderableSessionTabState(state);
 
   return html`
-    <div class="shell ${isChat ? "shell--chat" : ""} ${chatFocus ? "shell--chat-focus" : ""} ${state.settings.navCollapsed ? "shell--nav-collapsed" : ""} ${state.onboarding ? "shell--onboarding" : ""}">
+    <div class="shell ${isChat ? "shell--chat" : ""} ${chatFocus ? "shell--chat-focus" : ""} ${state.settings.navCollapsed ? "shell--nav-collapsed" : ""} ${state.onboarding ? "shell--onboarding" : ""} ${window.innerWidth <= 600 ? "shell--nav-drawer" : ""} ${state.navDrawerOpen ? "shell--nav-drawer-open" : ""}">
+      <div
+        class="nav-drawer-backdrop ${state.navDrawerOpen ? "nav-drawer-backdrop--visible" : ""}"
+        @click=${() => state.closeNavDrawer()}
+      ></div>
       <header class="topbar">
         <div class="topbar-left">
           <button
             class="nav-collapse-toggle"
-            @click=${() =>
-              state.applySettings({
-                ...state.settings,
-                navCollapsed: !state.settings.navCollapsed,
-              })}
+            @click=${() => {
+              if (window.innerWidth <= 600) {
+                // Mobile: toggle drawer overlay
+                state.navDrawerOpen = !state.navDrawerOpen;
+              } else {
+                // Desktop: toggle sidebar collapse
+                state.applySettings({
+                  ...state.settings,
+                  navCollapsed: !state.settings.navCollapsed,
+                });
+              }
+            }}
             title="${state.settings.navCollapsed ? "Expand sidebar" : "Collapse sidebar"}"
             aria-label="${state.settings.navCollapsed ? "Expand sidebar" : "Collapse sidebar"}"
           >
@@ -451,6 +462,7 @@ export function renderApp(state: AppViewState) {
                           @click=${(e: Event) => {
                             e.preventDefault();
                             state.handleWizardOpen?.();
+                            state.closeNavDrawer();
                           }}
                           title="Power up your GodMode ally."
                         >
