@@ -14,6 +14,18 @@ import {
   resetPromptShieldTracking,
   trackContextPressure,
   resetContextPressure,
+  resetTurnToolUsage,
+  processUserMessage,
+  resetEnforcerFlags,
+  resetSessionToolUsage,
+  checkEphemeralWrite,
+  checkRestartAttempt,
+  checkArchitectureGate,
+  checkDeploymentGate,
+  checkDestructiveWriteGate,
+  checkClientFacingGate,
+  recordToolUsage,
+  checkEnforcerGates,
 } from "./safety-gates.js";
 import { checkCustomGuardrails, logGateActivity } from "../services/guardrails.js";
 import type {
@@ -189,7 +201,6 @@ export async function handleMessageReceived(
 
   // Reset per-turn tool usage tracker
   try {
-    const { resetTurnToolUsage } = await import("./safety-gates.js");
     resetTurnToolUsage(sessionKey);
   } catch { /* non-fatal */ }
 
@@ -225,7 +236,6 @@ export async function handleMessageReceived(
     // any new user message = implicit approval (user saw the block and responded).
     if (sessionKey) {
       try {
-        const { processUserMessage } = await import("./safety-gates.js");
         if (processUserMessage(sessionKey, content)) {
           logger.info(`[GodMode][SafetyGate] approval granted for session "${sessionKey}"`);
         }
@@ -277,7 +287,6 @@ export async function handleBeforeReset(
   resetContextPressure(sessionKey);
 
   try {
-    const { resetEnforcerFlags, resetSessionToolUsage } = await import("./safety-gates.js");
     resetEnforcerFlags(sessionKey);
     resetSessionToolUsage(sessionKey);
   } catch { /* non-fatal */ }
@@ -338,7 +347,6 @@ export async function handleBeforeToolCall(
 
   // Gate 1d: Ephemeral Path Shield — HARD BLOCK /tmp writes
   try {
-    const { checkEphemeralWrite } = await import("./safety-gates.js");
     const ephemeralBlock = checkEphemeralWrite(name, (event.params ?? {}) as Record<string, unknown>, sessionKey);
     if (ephemeralBlock) {
       logger.warn(`[GodMode][SafetyGate] ephemeral path shield BLOCKED: ${name}`);
@@ -348,7 +356,6 @@ export async function handleBeforeToolCall(
 
   // Gate 1e: Restart Gate — HARD BLOCK any gateway restart attempt
   try {
-    const { checkRestartAttempt } = await import("./safety-gates.js");
     const restartBlock = await checkRestartAttempt(name, (event.params ?? {}) as Record<string, unknown>, sessionKey);
     if (restartBlock) {
       logger.warn(`[GodMode][SafetyGate] restart gate BLOCKED: ${name}`);
@@ -358,7 +365,6 @@ export async function handleBeforeToolCall(
 
   // Gate 1f: Architecture Gate — HARD BLOCK new infrastructure without architecture review
   try {
-    const { checkArchitectureGate } = await import("./safety-gates.js");
     const archBlock = await checkArchitectureGate(name, (event.params ?? {}) as Record<string, unknown>, sessionKey);
     if (archBlock) {
       logger.warn(`[GodMode][SafetyGate] architecture gate BLOCKED: ${name}`);
@@ -368,7 +374,6 @@ export async function handleBeforeToolCall(
 
   // Gate 1g: Deployment Gate — force push hard-blocked, other deploys approval-gated
   try {
-    const { checkDeploymentGate } = await import("./safety-gates.js");
     const deployBlock = await checkDeploymentGate(name, (event.params ?? {}) as Record<string, unknown>, sessionKey);
     if (deployBlock) {
       logger.warn(`[GodMode][SafetyGate] deployment gate GATED: ${name}`);
@@ -378,7 +383,6 @@ export async function handleBeforeToolCall(
 
   // Gate 1h: Destructive Write Gate — HARD BLOCK rm -rf, git reset --hard, DROP TABLE
   try {
-    const { checkDestructiveWriteGate } = await import("./safety-gates.js");
     const destructiveBlock = await checkDestructiveWriteGate(name, (event.params ?? {}) as Record<string, unknown>, sessionKey);
     if (destructiveBlock) {
       logger.warn(`[GodMode][SafetyGate] destructive write gate BLOCKED: ${name}`);
@@ -390,7 +394,6 @@ export async function handleBeforeToolCall(
   // First attempt: blocks and tells ally to ask user. After user approves
   // in chat ("go ahead", "approved", etc.), retries pass through.
   try {
-    const { checkClientFacingGate } = await import("./safety-gates.js");
     const clientBlock = await checkClientFacingGate(name, (event.params ?? {}) as Record<string, unknown>, sessionKey);
     if (clientBlock) {
       logger.warn(`[GodMode][SafetyGate] client-facing gate GATED: ${name}`);
@@ -400,7 +403,6 @@ export async function handleBeforeToolCall(
 
   // Record tool usage for enforcer gates
   try {
-    const { recordToolUsage } = await import("./safety-gates.js");
     recordToolUsage(sessionKey, name);
   } catch { /* non-fatal */ }
 
@@ -476,7 +478,6 @@ export async function handleMessageSending(
 
   // Enforcer gates
   try {
-    const { checkEnforcerGates } = await import("./safety-gates.js");
     const enforcerResult = await checkEnforcerGates(sessionKey, content);
     if (enforcerResult?.cancel) {
       logger.warn(`[GodMode][SafetyGate] enforcer gate fired: ${enforcerResult.gate}`);
