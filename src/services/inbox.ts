@@ -65,6 +65,53 @@ export type InboxState = {
   updatedAt: string;
 };
 
+// ── Inbox triage gate ───────────────────────────────────────────
+
+/** Queue item types that always need human review (subjective quality). */
+const ALWAYS_INBOX_QUEUE_TYPES = new Set([
+  "creative", "research", "analysis", "idea", "review", "coding",
+]);
+
+/** Queue item types that can skip inbox when persona is high-trust. */
+const ROUTINE_QUEUE_TYPES = new Set(["ops", "task", "url", "optimize"]);
+
+/** Minimum trust score to skip inbox for routine work. */
+const TRUST_SKIP_THRESHOLD = 8;
+
+export type ShouldInboxInput = {
+  type: InboxItemType;
+  queueItemType?: string;
+  personaSlug?: string;
+  trustScore: number | null;
+};
+
+/**
+ * Decide whether a completed item should land in the inbox.
+ * Conservative: when in doubt, inbox it. Only skips routine work
+ * from high-trust personas.
+ */
+export function shouldInbox(input: ShouldInboxInput): boolean {
+  // Project completions and skill runs always go to inbox
+  if (input.type === "project-completion" || input.type === "skill-run") return true;
+
+  // No persona → can't evaluate trust → inbox it
+  if (!input.personaSlug) return true;
+
+  // No trust score yet (< 10 ratings) → inbox it
+  if (input.trustScore === null) return true;
+
+  // Low trust → inbox it
+  if (input.trustScore < TRUST_SKIP_THRESHOLD) return true;
+
+  // High-trust persona — check if this is routine work
+  if (input.queueItemType && ROUTINE_QUEUE_TYPES.has(input.queueItemType)) {
+    return false; // Skip inbox — auto-complete
+  }
+
+  // Creative/research/analysis/idea/review/coding or unknown type → inbox
+  return true;
+}
+
 // ── File paths ───────────────────────────────────────────────────
 
 const INBOX_FILE = join(DATA_DIR, "inbox.json");
