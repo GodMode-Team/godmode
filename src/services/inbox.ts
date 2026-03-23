@@ -237,6 +237,9 @@ export async function listInboxItems(opts?: {
   status?: InboxItemStatus | "all";
   limit?: number;
 }): Promise<{ items: InboxItem[]; total: number; pendingCount: number }> {
+  // Lazy stale sweep — runs at most once per hour
+  await sweepStaleItems();
+
   const state = await readInboxState();
   const statusFilter = opts?.status ?? "pending";
   const limit = opts?.limit ?? 50;
@@ -298,6 +301,40 @@ export async function markReviewedInSession(queueItemId: string): Promise<void> 
 
 function pendingCount(state: InboxState): number {
   return state.items.filter((i) => i.status === "pending").length;
+}
+
+// ── Stale sweep ─────────────────────────────────────────────────
+
+const STALE_DAYS = 7;
+let _lastSweep = 0;
+const SWEEP_COOLDOWN_MS = 60 * 60 * 1000; // 1 hour — don't sweep on every list call
+
+/**
+ * Auto-dismiss pending items older than STALE_DAYS.
+ * Runs lazily (called from listInboxItems), throttled to once per hour.
+ */
+export async function sweepStaleItems(): Promise<number> {
+  const now = Date.now();
+  if (now - _lastSweep < SWEEP_COOLDOWN_MS) return 0;
+  _lastSweep = now;
+
+  const state = await readInboxState();
+  const cutoff = now - STALE_DAYS * 24 * 60 * 60 * 1000;
+  let swept = 0;
+
+  for (const item of state.items) {
+    if (item.status === "pending" && new Date(item.createdAt).getTime() < cutoff) {
+      item.status = "dismissed";
+      swept++;
+    }
+  }
+
+  if (swept > 0) {
+    await writeInboxState(state);
+    broadcast("inbox:update", { action: "sweep", swept, count: pendingCount(state) });
+  }
+
+  return swept;
 }
 
 // ── RPC Handlers ─────────────────────────────────────────────────

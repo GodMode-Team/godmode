@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { shouldInbox } from "../src/services/inbox.js";
+import { shouldInbox, sweepStaleItems } from "../src/services/inbox.js";
 
 describe("shouldInbox gate", () => {
   // --- Always inbox ---
@@ -149,5 +149,11 @@ describe("shouldInbox gate", () => {
     it("documented: queue processor should check shouldInbox before addInboxItem", () => {
       expect(typeof shouldInbox).toBe("function");
     });
+  });
+});
+
+describe("sweepStaleItems", () => {
+  it("is exported as a function", () => {
+    expect(typeof sweepStaleItems).toBe("function");
   });
 });
