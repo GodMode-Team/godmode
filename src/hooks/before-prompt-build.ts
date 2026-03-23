@@ -5,7 +5,6 @@
  * budget system, and returns the prependContext string.
  */
 
-import { join } from "node:path";
 import { extractSessionKey } from "../lib/host-context.js";
 import {
   consumePromptShieldNudge,
@@ -29,38 +28,11 @@ import type {
   HookContext,
   ChatMessage,
   MessageContentBlock,
-  CalendarEvent,
 } from "../types/plugin-api.js";
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk";
-import { sanitizeForPrompt } from "../lib/prompt-sanitizer.js";
 
 type Logger = { warn: (msg: string) => void; info: (msg: string) => void };
 
-// ── Per-session TTL cache for expensive async results ───────────────
-// Prevents redundant calls when multiple turns fire within seconds.
-
-type CachedResult<T> = { value: T; expiresAt: number };
-const _promptCache = new Map<string, CachedResult<unknown>>();
-const PROMPT_CACHE_MAX = 100; // max entries to prevent unbounded growth
-
-function getCached<T>(key: string): T | undefined {
-  const entry = _promptCache.get(key);
-  if (!entry) return undefined;
-  if (Date.now() > entry.expiresAt) {
-    _promptCache.delete(key);
-    return undefined;
-  }
-  return entry.value as T;
-}
-
-function setCache<T>(key: string, value: T, ttlMs: number): void {
-  // Evict oldest entries if map is full
-  if (_promptCache.size >= PROMPT_CACHE_MAX) {
-    const first = _promptCache.keys().next().value;
-    if (first) _promptCache.delete(first);
-  }
-  _promptCache.set(key, { value, expiresAt: Date.now() + ttlMs });
-}
 
 export async function handleBeforePromptBuild(
   event: PromptBuildEvent,
@@ -125,11 +97,45 @@ export async function handleBeforePromptBuild(
     }
   }
 
-  // ── Collect context inputs for the budget assembler ──
-  const { assembleContext, getIdentityAnchor } = await import("../lib/context-budget.js");
-  type InputProvenance = import("../lib/context-budget.js").InputProvenance;
+  // ── OC-specific: Extract user message from event.messages ──
+  // Prefer lastReceivedMessage (clean user input from message_received hook)
+  // over event.messages, which may contain system-context injected turns.
+  let currentUserMessage = "";
+  let isFirstTurn = false;
+  if (lastReceivedMessage && Date.now() - lastReceivedMessage.capturedAt < 5_000) {
+    currentUserMessage = lastReceivedMessage.content;
+  } else {
+    const _messages = (event.messages ?? []) as ChatMessage[];
+    const _lastUserMsg = [..._messages].reverse().find((m) => m.role === "user");
+    if (typeof _lastUserMsg?.content === "string") {
+      currentUserMessage = _lastUserMsg.content;
+    } else if (Array.isArray(_lastUserMsg?.content)) {
+      const _textBlock = _lastUserMsg.content.find((b: MessageContentBlock) => b.type === "text");
+      currentUserMessage = typeof _textBlock?.text === "string" ? _textBlock.text : "";
+    }
+    // Strip system-context tags that may have been injected in prior turns
+    if (currentUserMessage.includes("<system-context")) {
+      const stripped = currentUserMessage.replace(/<system-context[\s\S]*?<\/system-context>/g, "").trim();
+      if (stripped.length >= 5) currentUserMessage = stripped;
+    }
+  }
 
-  // ACP Provenance
+  // First turn detection
+  try {
+    const msgs = (event.messages ?? []) as ChatMessage[];
+    const userMsgCount = msgs.filter((m) => m.role === "user").length;
+    isFirstTurn = userMsgCount <= 1;
+  } catch (e) { logger.warn?.(`[GodMode] Message count detection error: ${(e as Error).message}`); }
+
+  // On the first turn, event.messages is empty — pull from lastReceivedMessage
+  if (!currentUserMessage && sessionKey && lastReceivedMessage) {
+    if (Date.now() - lastReceivedMessage.capturedAt < 30_000) {
+      currentUserMessage = lastReceivedMessage.content;
+    }
+  }
+
+  // ── OC-specific: ACP Provenance ──
+  type InputProvenance = import("../lib/context-budget.js").InputProvenance;
   let provenance: InputProvenance | null = null;
   try {
     const allMessages = (event.messages ?? []) as ChatMessage[];
@@ -148,293 +154,7 @@ export async function handleBeforePromptBuild(
     }
   } catch (e) { logger?.warn?.(`[GodMode] ACP provenance extraction error: ${(e as Error).message}`); }
 
-  // P0: Identity anchor
-  let identityAnchor: string | null = null;
-  try {
-    identityAnchor = await getIdentityAnchor();
-    if (personaContext?.includes("New User Welcome") && identityAnchor) {
-      const welcomeIdx = personaContext.indexOf("## New User Welcome");
-      if (welcomeIdx >= 0) {
-        identityAnchor = identityAnchor + "\n\n" + personaContext.slice(welcomeIdx);
-      }
-    }
-  } catch (err) {
-    logger.warn(`[GodMode] identity anchor error: ${String(err)}`);
-  }
-
-  // Extract user's latest message for memory search + graph query.
-  // Prefer lastReceivedMessage (clean user input from message_received hook)
-  // over event.messages, which may contain system-context injected turns.
-  let userQuery = "";
-  if (lastReceivedMessage && Date.now() - lastReceivedMessage.capturedAt < 5_000) {
-    userQuery = lastReceivedMessage.content;
-  } else {
-    const _messages = (event.messages ?? []) as ChatMessage[];
-    const _lastUserMsg = [..._messages].reverse().find((m) => m.role === "user");
-    if (typeof _lastUserMsg?.content === "string") {
-      userQuery = _lastUserMsg.content;
-    } else if (Array.isArray(_lastUserMsg?.content)) {
-      const _textBlock = _lastUserMsg.content.find((b: MessageContentBlock) => b.type === "text");
-      userQuery = typeof _textBlock?.text === "string" ? _textBlock.text : "";
-    }
-    // Strip system-context tags that may have been injected in prior turns
-    if (userQuery.includes("<system-context")) {
-      const stripped = userQuery.replace(/<system-context[\s\S]*?<\/system-context>/g, "").trim();
-      if (stripped.length >= 5) userQuery = stripped;
-    }
-  }
-
-  // ── Overload-aware lightweight mode ──
-  // When the API has recently returned overloaded_error, skip expensive
-  // async operations (memory search, calendar, tasks, cron, queue) to
-  // reduce request size and API pressure. Only inject P0 essentials.
-  const lightMode = isRecentlyOverloaded();
-  if (lightMode) {
-    logger.info(`[GodMode] Light mode active — skipping P1+ context gathering due to recent API overload`);
-  }
-
-  // P0: Honcho context retrieval (skip in light mode)
-  // Honcho provides persistent user modeling with async reasoning.
-  // getContext() is free and fast (~200ms). Cached 30s per session.
-  let memoryBlock: string | null = null;
-  let memoryStatus: "ready" | "degraded" | "offline" = "offline";
-  if (provenance?.kind !== "inter_session" && !lightMode && sessionKey) {
-    const memoryCacheKey = `memory:${sessionKey}`;
-    const cached = getCached<{ block: string | null; status: "ready" | "degraded" | "offline" }>(memoryCacheKey);
-    if (cached) {
-      memoryBlock = cached.block;
-      memoryStatus = cached.status;
-    } else {
-      try {
-        const { isMemoryReady, getContext, getMemoryStatus } = await import("../lib/memory.js");
-        memoryStatus = getMemoryStatus();
-        if (isMemoryReady()) {
-          const ctx = await getContext(sessionKey);
-          if (ctx) memoryBlock = sanitizeForPrompt(ctx, "honcho-context");
-          memoryStatus = getMemoryStatus();
-        }
-        setCache(memoryCacheKey, { block: memoryBlock, status: memoryStatus }, 30_000);
-      } catch (err) {
-        logger.warn(`[GodMode] Honcho context error (non-fatal): ${String(err)}`);
-        memoryStatus = "degraded";
-      }
-    }
-  } else if (lightMode) {
-    memoryStatus = "degraded"; // Signal to ally that memory was skipped
-  }
-
-  // P0: Identity graph (skip in light mode, cached 60s)
-  let graphBlock: string | null = null;
-  if (provenance?.kind !== "inter_session" && !lightMode) {
-    const graphCacheKey = `graph:${sessionKey ?? "global"}`;
-    const cachedGraph = getCached<string | null>(graphCacheKey);
-    if (cachedGraph !== undefined) {
-      graphBlock = cachedGraph;
-    } else {
-      try {
-        const { isGraphReady, queryGraph, formatGraphContext } = await import("../lib/identity-graph.js");
-        if (isGraphReady()) {
-          const graphInput = memoryBlock ? `${userQuery}\n${memoryBlock}` : userQuery;
-          if (graphInput.length >= 5) {
-            const graphResults = queryGraph(graphInput);
-            const rawGraph = formatGraphContext(graphResults);
-            graphBlock = rawGraph ? sanitizeForPrompt(rawGraph, "identity-graph") : null;
-          }
-        }
-        setCache(graphCacheKey, graphBlock, 60_000);
-      } catch (e) { logger.warn?.(`[GodMode] Identity graph query failed: ${(e as Error).message}`); }
-    }
-  }
-
-  // ── P1: Operational context — TOOL HINTS, not pre-injected facts ──
-  // 2026-03-14: Architectural change. Instead of pre-computing schedule/tasks/priorities
-  // and injecting them as text (which lets the model parrot facts without tool calls),
-  // inject lightweight tool hints that force the model to call the tool itself.
-  //
-  // EXCEPTION: Meeting prep still pre-injects when a meeting is <2hrs away,
-  // because the model needs to proactively surface this without being asked.
-  // Overdue tasks still flag because they need urgent surfacing.
-
-  let schedule: string | null = null;
-  let meetingPrep: string | null = null;
-  let operationalCounts: string | null = null;
-  let overdueCount = 0;
-  let priorities: string | null = null;
-
-  if (!lightMode) {
-    // Schedule: tool hint instead of pre-injected event list
-    schedule = "The user has calendar events today. Use `calendar.events.today` to check their schedule when relevant.";
-
-    // Meeting prep: still pre-inject for upcoming meetings (proactive surfacing, cached 60s)
-    const calCacheKey = "calendar:meetingPrep";
-    const cachedMeetingPrep = getCached<string | null>(calCacheKey);
-    if (cachedMeetingPrep !== undefined) {
-      meetingPrep = cachedMeetingPrep;
-    } else {
-      try {
-        const { fetchCalendarEvents } = await import("../methods/brief-generator.js");
-        const result = await fetchCalendarEvents();
-        const now = Date.now();
-        const upcoming = result.events.filter((e: CalendarEvent) => {
-          const start = new Date(e.startTime).getTime();
-          return start > now && start - now <= 2 * 60 * 60 * 1000;
-        });
-        if (upcoming.length > 0) {
-          const next = upcoming[0];
-          const time = new Date(next.startTime).toLocaleTimeString("en-US", {
-            hour: "numeric", minute: "2-digit", hour12: true,
-          });
-          const parts = [`## Upcoming: **${next.title}** at ${time}`];
-          if (next.attendees && next.attendees.length > 0) {
-            parts.push(`Attendees: ${next.attendees.slice(0, 5).join(", ")}`);
-          }
-          parts.push("Offer meeting prep if not already discussed.");
-          meetingPrep = parts.join("\n");
-        }
-        setCache(calCacheKey, meetingPrep, 60_000);
-      } catch (e) { logger?.warn?.(`[GodMode] Calendar fetch for meeting prep error: ${(e as Error).message}`); }
-    }
-
-    // Tasks: tool hint, but flag overdue count (urgent surfacing, cached 30s)
-    const tasksCacheKey = "tasks:counts";
-    const cachedTasks = getCached<{ overdueCount: number; operationalCounts: string }>(tasksCacheKey);
-    if (cachedTasks) {
-      overdueCount = cachedTasks.overdueCount;
-      operationalCounts = cachedTasks.operationalCounts;
-    } else {
-      try {
-        const { localDateString: lds } = await import("../data-paths.js");
-        const today = lds();
-        const { readTasks } = await import("../methods/tasks.js");
-        const data = await readTasks();
-        const pending = data.tasks.filter((t: { status: string }) => t.status === "pending");
-        const overdue = pending.filter(
-          (t: { dueDate?: string | null }) => t.dueDate != null && t.dueDate <= today,
-        );
-        overdueCount = overdue.length;
-        if (overdueCount > 0) {
-          operationalCounts = `${overdueCount} OVERDUE task(s). Surface these early. Use \`tasks_list\` for details.`;
-        } else {
-          operationalCounts = "Use `tasks_list` and `queue_check` when the user asks about tasks, priorities, or progress.";
-        }
-        setCache(tasksCacheKey, { overdueCount, operationalCounts }, 30_000);
-      } catch {
-        operationalCounts = "Use `tasks_list` and `queue_check` when the user asks about tasks, priorities, or progress.";
-      }
-    }
-
-    // Priorities: tool hint — the model should read the daily brief itself
-    priorities = null; // Removed: model will use tools to check priorities when asked
-  }
-
-  // P2: Cron failures (skip in light mode)
-  let cronFailures: string | null = null;
-  if (!lightMode) {
-    try {
-      const { scanForFailures, formatFailuresForSnapshot } = await import("../services/failure-notify.js");
-      const failures = await scanForFailures();
-      cronFailures = formatFailuresForSnapshot(failures) || null;
-    } catch (e) { logger.warn?.(`[GodMode] Cron failure scan error: ${(e as Error).message}`); }
-  }
-
-  // P2: Queue review prompt (skip in light mode)
-  let queueReview: string | null = null;
-  if (!lightMode) {
-    try {
-      const { readQueueState } = await import("../lib/queue-state.js");
-      const qs = await readQueueState();
-      const review = qs.items.filter((i: { status: string }) => i.status === "review").length;
-      if (review > 0) {
-        queueReview = `${review} queue item(s) ready for review. Prompt the user.`;
-      }
-    } catch (e) { logger.warn?.(`[GodMode] Queue review count error: ${(e as Error).message}`); }
-  }
-
-  // P2: Agent team status — surface active/completed projects
-  let teamStatus: string | null = null;
-  if (!lightMode) {
-    try {
-      const { readProjects } = await import("../lib/projects-state.js");
-      const { readQueueState: readQS } = await import("../lib/queue-state.js");
-      const [ps, queueState] = await Promise.all([readProjects(), readQS()]);
-      const activeProjects = ps.projects.filter(p => p.status === "active").slice(0, 3);
-
-      if (activeProjects.length > 0) {
-        const lines: string[] = [];
-        for (const p of activeProjects) {
-          const projectItems = queueState.items.filter(
-            qi => (qi.meta?.projectId ?? qi.meta?.paperclipProjectId) === p.projectId,
-          );
-          const done = projectItems.filter(qi => qi.status === "done" || qi.status === "review" || qi.status === "needs-review");
-          const failed = projectItems.filter(qi => qi.status === "failed");
-          const active = projectItems.filter(qi => qi.status === "processing");
-
-          if (done.length > 0 && done.length + failed.length === projectItems.length) {
-            lines.push(`READY FOR REVIEW: ${done.length} issue(s) in "${p.title}" — output files are in ~/godmode/memory/inbox/. Present the results to the user in chat.`);
-          } else if (failed.length > 0) {
-            lines.push(`AT RISK: "${p.title}" — ${failed.length} issue(s) failed. ${active.length} still running.`);
-          } else if (active.length > 0) {
-            lines.push(`IN PROGRESS: "${p.title}" — ${active.length} issue(s) being worked on.`);
-          }
-        }
-        if (lines.length > 0) {
-          teamStatus = "## Agent Team\n" + lines.join("\n");
-        }
-      }
-    } catch (e) { logger?.warn?.(`[GodMode] Agent team status error: ${(e as Error).message}`); }
-  }
-
-  // P2: Paperclip deliverables pending review — check inbox for unreviewed agent completions
-  if (!lightMode) {
-    try {
-      const { listInboxItems } = await import("../services/inbox.js");
-      const inbox = await listInboxItems({ status: "pending", limit: 10 });
-      const pending = inbox.items.filter(
-        (i) => i.status === "pending" && i.source?.persona === "paperclip",
-      );
-      if (pending.length > 0) {
-        const deliverableLines = pending.slice(0, 5).map(
-          (i) => `- "${i.title}" → ${i.outputPath || "inbox"}`,
-        );
-        const block =
-          `## Deliverables Ready (${pending.length})\n` +
-          `Paperclip agents completed work that needs your review:\n` +
-          deliverableLines.join("\n") +
-          `\n\nPresent each deliverable to the user. Read the output file, summarize key findings, ` +
-          `and ask for approval or edits. The file can be opened in the sidebar for detailed review. ` +
-          `After the user reviews, mark the inbox item as reviewed.`;
-        // Append to teamStatus or create new
-        teamStatus = teamStatus ? teamStatus + "\n\n" + block : block;
-      }
-    } catch (e) { logger?.warn?.(`[GodMode] Paperclip deliverables check error: ${(e as Error).message}`); }
-  }
-
-  // Extract user message for skill card + routing lesson matching
-  let currentUserMessage = "";
-  let isFirstTurn = false;
-  try {
-    const msgs = (event.messages ?? []) as ChatMessage[];
-    const lastMsg = [...msgs].reverse().find((m) => m.role === "user");
-    if (typeof lastMsg?.content === "string") {
-      currentUserMessage = lastMsg.content;
-    } else if (Array.isArray(lastMsg?.content)) {
-      const textBlock = lastMsg.content.find((b: MessageContentBlock) => b.type === "text");
-      currentUserMessage = typeof textBlock?.text === "string" ? textBlock.text : "";
-    }
-    const userMsgCount = msgs.filter((m) => m.role === "user").length;
-    isFirstTurn = userMsgCount <= 1;
-  } catch (e) { logger.warn?.(`[GodMode] Message count detection error: ${(e as Error).message}`); }
-
-  // On the first turn, event.messages is empty — pull from lastReceivedMessage
-  // populated by message_received (which fires immediately before this hook).
-  if (!currentUserMessage && sessionKey && lastReceivedMessage) {
-    if (Date.now() - lastReceivedMessage.capturedAt < 30_000) {
-      currentUserMessage = lastReceivedMessage.content;
-    }
-  }
-
-  // Auto-title: generate title on the first turn using just the user message.
-  // Fire-and-forget — don't block prompt build.
+  // ── OC-specific: Auto-title (fire-and-forget) ──
   if (
     sessionKey &&
     currentUserMessage.length >= 10 &&
@@ -442,10 +162,7 @@ export async function handleBeforePromptBuild(
     !pendingAutoTitles.has(sessionKey) &&
     !isCronSessionKey(sessionKey)
   ) {
-    // Mark as pending to prevent duplicate attempts
     pendingAutoTitles.set(sessionKey, { message: currentUserMessage, attempts: 0, capturedAt: Date.now() });
-
-    // Fire-and-forget — don't block prompt build
     void (async () => {
       try {
         const cfg = await loadSessionConfig();
@@ -487,209 +204,58 @@ export async function handleBeforePromptBuild(
     })();
   }
 
-  // P1.5: Action items extracted from user brain dumps
-  let actionItemsBlock: string | null = null;
-  if (sessionKey) {
-    try {
-      const { actionItemBuffer, formatActionItemsForContext } = await import("../lib/action-items.js");
-      const items = actionItemBuffer.drain(sessionKey);
-      actionItemsBlock = formatActionItemsForContext(items);
-    } catch (e) { logger?.warn?.(`[GodMode] Action items extraction error: ${(e as Error).message}`); }
+  // ── OC-specific: Context pressure + light mode ──
+  const lightMode = isRecentlyOverloaded();
+  if (lightMode) {
+    logger.info(`[GodMode] Light mode active — skipping P1+ context gathering due to recent API overload`);
   }
-
-  // P1.5: Skill card (skip in light mode)
-  let skillCard: string | null = null;
-  if (!lightMode) {
-    try {
-      if (currentUserMessage.length >= 3) {
-        const { matchSkillCard, formatSkillCard } = await import("../lib/skill-cards.js");
-        const matched = matchSkillCard(currentUserMessage);
-        if (matched) {
-          skillCard = formatSkillCard(matched);
-        }
-      }
-    } catch (e) { logger?.warn?.(`[GodMode] Skill card match error: ${(e as Error).message}`); }
-  }
-
-  // P2: Skill drafts pending review (session distiller)
-  let skillDraftCount = 0;
-  try {
-    const { countPendingDrafts } = await import("../lib/session-distiller.js");
-    skillDraftCount = countPendingDrafts();
-  } catch (e) { logger?.warn?.(`[GodMode] Skill draft count error: ${(e as Error).message}`); }
-
-  // P2: Routing lessons (skip in light mode)
-  let routingLessons: string | null = null;
-  if (!lightMode) {
-    try {
-      const { getRoutingLessons, formatRoutingLessons } = await import("../lib/agent-lessons.js");
-      const lessons = await getRoutingLessons();
-      const formatted = formatRoutingLessons(lessons, currentUserMessage);
-      if (formatted) routingLessons = formatted;
-    } catch (e) { logger?.warn?.(`[GodMode] Routing lessons error: ${(e as Error).message}`); }
-  }
-
-  // P3: Safety nudges
-  const safetyNudges: string[] = [];
-  const promptNudge = consumePromptShieldNudge(sessionKey);
-  if (promptNudge) safetyNudges.push(promptNudge);
-  const outputNudge = consumeOutputShieldNudge(sessionKey);
-  if (outputNudge) safetyNudges.push(outputNudge);
-  const contextNudge = consumeContextPressureNudge(sessionKey);
-  if (contextNudge) safetyNudges.push(contextNudge);
-  try {
-    const { consumeEnforcerNudge } = await import("./safety-gates.js");
-    const enforcerNudge = consumeEnforcerNudge(sessionKey);
-    if (enforcerNudge) safetyNudges.push(enforcerNudge);
-  } catch (e) { logger.warn?.(`[GodMode] Safety enforcer nudge error: ${(e as Error).message}`); }
-
-  // P3: Tool-grounding gate — inject per-turn grounding instructions
-  // when the user message requires tool-backed verification.
-  if (currentUserMessage.length >= 3 && !lightMode) {
-    try {
-      const { generateGroundingInstruction, logGroundingEvent, TOOL_GROUNDING_DEFAULTS } =
-        await import("./tool-grounding-gate.js");
-      const guardrailState = await import("../services/guardrails.js").then(
-        (m) => m.readGuardrailsStateCached(),
-      );
-      const tgConfig = {
-        ...TOOL_GROUNDING_DEFAULTS,
-        ...((guardrailState as Record<string, unknown>).toolGrounding ?? {}),
-      };
-      const result = generateGroundingInstruction(currentUserMessage, tgConfig);
-      if (result) {
-        safetyNudges.push(result.instruction);
-        // Best-effort async logging — don't block context assembly
-        if (tgConfig.logViolations) {
-          void logGroundingEvent({
-            timestamp: new Date().toISOString(),
-            sessionKey: sessionKey ?? "unknown",
-            userMessage: currentUserMessage.slice(0, 200),
-            classification: result.classification.category,
-            requiredTools: result.classification.requiredTools,
-            injectedInstruction: true,
-          });
-        }
-      }
-    } catch (e) { logger.warn?.(`[GodMode] Tool-grounding gate error: ${(e as Error).message}`); }
-  }
-
-  // Conditional: Team bootstrap, onboarding, private session
-  try {
-    const { handleTeamBootstrap } = await import("./team-bootstrap.js");
-    const teamResult = await handleTeamBootstrap(event as { prompt: string; messages: unknown[] }, ctx);
-    if (teamResult?.prependContext) safetyNudges.push(teamResult.prependContext);
-  } catch (e) { logger?.warn?.(`[GodMode] Team bootstrap error: ${(e as Error).message}`); }
-  try {
-    const { loadOnboardingContext } = await import("./onboarding-context.js");
-    const onboardingResult = await loadOnboardingContext();
-    if (onboardingResult?.prependContext) safetyNudges.push(onboardingResult.prependContext);
-  } catch (e) { logger?.warn?.(`[GodMode] Onboarding context error: ${(e as Error).message}`); }
-
-  let isPrivate = false;
-  try {
-    const { isPrivateSession } = await import("../lib/private-session.js");
-    isPrivate = await isPrivateSession(sessionKey ?? "");
-  } catch (e) { logger.warn?.(`[GodMode] Private session detection error: ${(e as Error).message}`); }
-  if (isPrivate) {
-    safetyNudges.push(
-      "[Private Session] Nothing from this session is saved to vault or memory. " +
-      "Tools and queue still work normally.",
-    );
-  }
-
-  // Get context pressure level
   let contextPressure = 0;
   try {
     contextPressure = getContextPressureLevel(sessionKey);
   } catch (e) { logger?.warn?.(`[GodMode] Context pressure level error: ${(e as Error).message}`); }
 
-  // Escalation: inject health warnings so the ally knows when to be transparent
-  try {
-    const { getEscalationContext } = await import("../services/self-heal.js");
-    const escalation = getEscalationContext();
-    if (escalation) safetyNudges.push(escalation);
-  } catch (e) { logger.warn?.(`[GodMode] Self-heal escalation context error: ${(e as Error).message}`); }
+  // ── Shared context gathering (PARITY: same code path as Hermes) ──
+  const { gatherContextInputs } = await import("../lib/gather-context-inputs.js");
+  const { assembleContext } = await import("../lib/context-budget.js");
 
-  // Restart awareness: if GodMode just restarted, tell the ally
-  try {
-    const { getLastRestart, clearLastRestart } = await import("../lib/restart-sentinel.js");
-    const restart = getLastRestart();
-    if (restart && restart.downtimeMs < 10 * 60 * 1000) {
-      const downtimeSec = Math.round(restart.downtimeMs / 1000);
-      safetyNudges.push(
-        `## System Restart\n` +
-        `GodMode just restarted (downtime: ~${downtimeSec}s, reason: ${restart.reason}). ` +
-        `${restart.previousSessions.length} session(s) were active before shutdown.\n` +
-        `OpenClaw handles message delivery recovery automatically.\n` +
-        `Check in with the user: "I just came back online — did I miss anything?"`,
-      );
-      clearLastRestart(); // One-shot injection
-    }
-  } catch (e) { logger?.warn?.(`[GodMode] Restart sentinel error: ${(e as Error).message}`); }
-
-  // Turn-level errors: surface failures that happened since the last message
-  try {
-    const { turnErrors } = await import("../lib/health-ledger.js");
-    const recentErrors = turnErrors.drain();
-    if (recentErrors.length > 0) {
-      const errorLines = recentErrors.map((e) => `- ${e.operation}: ${e.error}`);
-      safetyNudges.push([
-        "## Recent System Errors",
-        "The following errors occurred since the last message. Be transparent with the user.",
-        "Use the `godmode_repair` tool to diagnose and attempt auto-repair.",
-        "Tell the user what happened and what you're doing about it.",
-        ...errorLines,
-      ].join("\n"));
-    }
-  } catch (e) { logger.warn?.(`[GodMode] Turn-level errors surface failed: ${(e as Error).message}`); }
-
-  // Pending builder deploy: let the ally know a fix is staged
-  try {
-    const fsP = await import("node:fs/promises");
-    const { DATA_DIR } = await import("../data-paths.js");
-    const pendingPath = join(DATA_DIR, "pending-deploy.json");
-    const raw = await fsP.readFile(pendingPath, "utf-8").catch(() => "");
-    if (raw) {
-      const deploy = JSON.parse(raw);
-      const age = Date.now() - (deploy.ts || 0);
-      const mins = Math.round(age / 60000);
-      safetyNudges.push(
-        `## Pending Fix Deploy\n` +
-        `A builder agent fixed a bug ${mins} minute(s) ago: **${deploy.summary ?? "unknown"}**\n` +
-        `Files changed: ${(deploy.files ?? []).join(", ") || "unknown"}\n` +
-        `The fix is built and merged but needs a gateway restart to go live.\n` +
-        `Tell the user: "A fix is staged. It'll go live next time the gateway restarts, ` +
-        `or you can restart now when you're at a good stopping point."`,
-      );
-    }
-  } catch (e) { logger?.warn?.(`[GodMode] Pending deploy check error: ${(e as Error).message}`); }
-
-  // ── Assemble with budget management ──
-  const assembled = assembleContext({
-    identityAnchor,
-    memoryBlock,
-    memoryStatus,
-    graphBlock,
-    schedule,
-    operationalCounts,
-    priorities,
-    meetingPrep,
-    cronFailures,
-    queueReview,
-    teamStatus,
-    actionItemsBlock,
-    skillCard,
-    skillDraftCount,
-    routingLessons,
-    safetyNudges,
-    contextPressure,
-    provenance,
+  const sessionKeyOrNull = sessionKey ?? null;
+  const inputs = await gatherContextInputs({
+    sessionKey: sessionKeyOrNull,
     userMessage: currentUserMessage,
+    logger,
+    pluginRoot,
+    provenance,
+    contextPressure,
+    lightMode,
     isFirstTurn,
-    overdueCount,
+    // OC-specific safety gate nudges from hook state
+    safetyNudgeProvider: () => {
+      const nudges: string[] = [];
+      const sk = sessionKeyOrNull ?? undefined;
+      const promptNudge = consumePromptShieldNudge(sk);
+      if (promptNudge) nudges.push(promptNudge);
+      const outputNudge = consumeOutputShieldNudge(sk);
+      if (outputNudge) nudges.push(outputNudge);
+      const contextNudge = consumeContextPressureNudge(sk);
+      if (contextNudge) nudges.push(contextNudge);
+      try {
+        const { consumeEnforcerNudge } = require("./safety-gates.js") as { consumeEnforcerNudge: (k: string | null) => string | null };
+        const enforcerNudge = consumeEnforcerNudge(sessionKeyOrNull);
+        if (enforcerNudge) nudges.push(enforcerNudge);
+      } catch { /* non-fatal */ }
+      return nudges;
+    },
   });
 
+  // OC-specific: Append new user welcome to identity anchor if persona has it
+  if (personaContext?.includes("New User Welcome") && inputs.identityAnchor) {
+    const welcomeIdx = personaContext.indexOf("## New User Welcome");
+    if (welcomeIdx >= 0) {
+      inputs.identityAnchor = inputs.identityAnchor + "\n\n" + personaContext.slice(welcomeIdx);
+    }
+  }
+
+  const assembled = assembleContext(inputs);
   if (!assembled) return;
   return { prependContext: assembled };
 }

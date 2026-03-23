@@ -13,7 +13,7 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, basename } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { HostAdapter, StandaloneRequestHandler } from "./types.js";
-import type { TaskItem, QueueItem } from "../types/plugin-api.js";
+
 
 type CleanupEntry = { name: string; fn: () => void | Promise<void> };
 type Logger = { info: (msg: string) => void; warn: (msg: string) => void; error: (msg: string) => void };
@@ -459,19 +459,32 @@ export async function registerGodMode(
       logger.warn(`[GodMode] Composio module import failed: ${String(err)}`);
     });
 
-  // ── 5. Wire lifecycle hooks (capability-aware) ────────────────
-  // Only hooks that add value alongside the host's capabilities.
-  // Hermes handles: memory, personality, skills, compression, tool execution.
-  // GodMode adds: workspace context, action items, Honcho ingest, identity graph.
+  // ── 5. Wire lifecycle hooks (full context parity) ─────────────
+  // Hermes gets the SAME context pipeline as OpenClaw via the shared gatherer.
+  // Both runtimes call gatherContextInputs() → assembleContext().
+  // PARITY RULE: New context sources go in gather-context-inputs.ts, not here.
 
   if (adapter.onBeforeChat) {
-    adapter.onBeforeChat(async (_sessionKey: string) => {
+    adapter.onBeforeChat(async (_sessionKey: string, userMessage: string) => {
       try {
-        const { assembleWorkspaceContext } = await import("../lib/context-budget.js");
-        const inputs = await gatherWorkspaceInputs(logger);
-        return assembleWorkspaceContext(inputs);
+        const { gatherContextInputs } = await import("../lib/gather-context-inputs.js");
+        const { assembleContext } = await import("../lib/context-budget.js");
+        const inputs = await gatherContextInputs({
+          sessionKey: _sessionKey,
+          userMessage,
+          logger,
+          pluginRoot,
+          // Hermes has no OC-specific safety gate hooks — provider returns []
+          safetyNudgeProvider: () => [],
+          contextPressure: 0,
+          lightMode: false,
+          // Hermes has native memory (MEMORY.md/USER.md) — don't warn about
+          // Honcho being offline on standalone installs without HONCHO_API_KEY
+          suppressMemoryOfflineWarning: true,
+        });
+        return assembleContext(inputs);
       } catch (err) {
-        logger.warn(`[GodMode] Workspace context assembly failed: ${String(err)}`);
+        logger.warn(`[GodMode] Context assembly failed: ${String(err)}`);
         return null;
       }
     });
@@ -555,90 +568,6 @@ export async function registerGodMode(
   }
 
   return { methodCount, cleanup };
-}
-
-// ── Context Gathering ─────────────────────────────────────────────
-
-/**
- * Gather workspace-level context inputs for Hermes context injection.
- * Reuses the same data sources as before-prompt-build.ts but skips
- * memory/identity (Hermes handles those).
- */
-async function gatherWorkspaceInputs(logger: Logger): Promise<Record<string, unknown>> {
-  const inputs: Record<string, unknown> = {};
-
-  // Schedule (calendar)
-  try {
-    // Light approach: read today's schedule via gog CLI
-    const { execSync } = await import("node:child_process");
-    const today = new Date().toISOString().slice(0, 10);
-    const account = process.env.GOG_CALENDAR_ACCOUNT;
-    if (account) {
-      const cmd = `gog events list --account "${account}" --from "${today}" --to "${today}" --format json 2>/dev/null || echo "[]"`;
-      const raw = execSync(cmd, { timeout: 5000 }).toString().trim();
-      const events = JSON.parse(raw);
-      if (Array.isArray(events) && events.length > 0) {
-        const lines = events.slice(0, 5).map((e: { start?: string; summary?: string }) =>
-          `- ${e.start?.slice(11, 16) ?? "?"} ${e.summary ?? "Event"}`,
-        );
-        inputs.schedule = `## Today's Schedule\n${lines.join("\n")}`;
-      }
-    }
-  } catch { /* calendar unavailable — non-fatal */ }
-
-  // Task and queue counts
-  try {
-    const { readFile } = await import("node:fs/promises");
-    const { DATA_DIR } = await import("../data-paths.js");
-    const { join } = await import("node:path");
-
-    const tasksRaw = await readFile(join(DATA_DIR, "tasks.json"), "utf-8").catch(() => "[]");
-    const tasks = JSON.parse(tasksRaw);
-    const pending = Array.isArray(tasks) ? tasks.filter((t: TaskItem) => t.status === "pending") : [];
-    const overdue = pending.filter((t: TaskItem) => t.dueDate && new Date(t.dueDate!) < new Date());
-
-    const queueRaw = await readFile(join(DATA_DIR, "queue-state.json"), "utf-8").catch(() => '{"items":[]}');
-    const queue = JSON.parse(queueRaw);
-    const queueItems = Array.isArray(queue.items) ? queue.items : [];
-    const queuePending = queueItems.filter((i: QueueItem) => i.status === "pending" || i.status === "approved");
-    const queueDone = queueItems.filter((i: QueueItem) => i.status === "done");
-
-    const counts = [];
-    if (pending.length > 0) counts.push(`${pending.length} task(s) pending`);
-    if (overdue.length > 0) counts.push(`${overdue.length} OVERDUE`);
-    if (queuePending.length > 0) counts.push(`${queuePending.length} queue item(s) waiting`);
-    if (queueDone.length > 0) counts.push(`${queueDone.length} queue item(s) done — ready for review`);
-    if (counts.length > 0) {
-      inputs.operationalCounts = `## Workspace: ${counts.join(", ")}`;
-    }
-
-    // Queue review items
-    if (queueDone.length > 0) {
-      const reviewLines = queueDone.slice(0, 3).map((i: QueueItem) => `- "${i.title}" (${i.type})`);
-      inputs.queueReview = `## Queue Items Ready for Review\n${reviewLines.join("\n")}`;
-    }
-
-    // Priorities (top 3 tasks by due date)
-    if (pending.length > 0) {
-      const sorted = [...pending].sort((a: TaskItem, b: TaskItem) => {
-        if (!a.dueDate) return 1;
-        if (!b.dueDate) return -1;
-        return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
-      });
-      const top = sorted.slice(0, 3).map((t: TaskItem) =>
-        `- ${t.title}${t.dueDate ? ` (due: ${t.dueDate})` : ""}`,
-      );
-      inputs.priorities = `## Top Priorities\n${top.join("\n")}`;
-    }
-  } catch { /* task/queue read failed — non-fatal */ }
-
-  // Skill card (lightweight — just load if keyword matches)
-  try {
-    const { matchSkillCard } = await import("../lib/skill-cards.js");
-    // No user message in this context — skip keyword matching
-  } catch { /* non-fatal */ }
-
-  return inputs;
 }
 
 // ── Helpers ───────────────────────────────────────────────────────
