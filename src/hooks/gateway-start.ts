@@ -17,7 +17,7 @@ import { refreshLicenseOnStart } from "../lib/license.js";
 import { health, turnErrors, sessions } from "../lib/health-ledger.js";
 import { writeSentinel, consumeSentinel } from "../lib/restart-sentinel.js";
 
-type Logger = { warn: (msg: string) => void; info: (msg: string) => void; error: (msg: string) => void };
+import type { Logger } from "../types/plugin-api.js";
 type CleanupEntry = { name: string; fn: () => void | Promise<void> };
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- accepts both OpenClawPluginApi and Hermes adapter shim

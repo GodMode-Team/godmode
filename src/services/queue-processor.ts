@@ -62,11 +62,7 @@ const PROMPT_TEMPLATES: Record<QueueItemType, string> = {
 
 // ── Singleton ──────────────────────────────────────────────────────
 
-type Logger = {
-  info(m: string): void;
-  warn(m: string): void;
-  error(m: string): void;
-};
+import type { Logger } from "../types/plugin-api.js";
 type BroadcastFn = (event: string, data: unknown) => void;
 
 let instance: QueueProcessor | null = null;

@@ -35,7 +35,7 @@ import { join, dirname, resolve, basename, extname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { DATA_DIR } from "../data-paths.js";
 
-type Logger = { info(m: string): void; warn(m: string): void; error(m: string): void };
+import type { Logger } from "../types/plugin-api.js";
 
 // ── Token Management ────────────────────────────────────────────────
 

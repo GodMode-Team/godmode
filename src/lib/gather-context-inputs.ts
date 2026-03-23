@@ -13,7 +13,7 @@
 import { join } from "node:path";
 import type { ContextInputs, InputProvenance } from "./context-budget.js";
 
-type Logger = { warn: (msg: string) => void; info: (msg: string) => void };
+import type { Logger } from "../types/plugin-api.js";
 
 // ── Per-session TTL cache for expensive async results ───────────────
 // Shared across both runtimes. Prevents redundant calls within seconds.

@@ -28,10 +28,9 @@ import type {
   HookContext,
   ChatMessage,
   MessageContentBlock,
+  Logger,
 } from "../types/plugin-api.js";
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk";
-
-type Logger = { warn: (msg: string) => void; info: (msg: string) => void };
 
 
 export async function handleBeforePromptBuild(

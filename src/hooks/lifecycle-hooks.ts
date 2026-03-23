@@ -44,7 +44,7 @@ import {
   isCronSessionKey,
 } from "../lib/workspace-session-store.js";
 
-type Logger = { warn: (msg: string) => void; info: (msg: string) => void };
+import type { Logger } from "../types/plugin-api.js";
 
 // ── Auto-title first message buffer ──────────────────────────────────
 // message_received has the user's content but no sessionKey.

@@ -98,11 +98,7 @@ function markRepaired(id: SubsystemId, message: string): void {
 
 // ── Public API ───────────────────────────────────────────────────────
 
-type Logger = {
-  info: (msg: string) => void;
-  warn: (msg: string) => void;
-  error: (msg: string) => void;
-};
+import type { Logger } from "../types/plugin-api.js";
 type BroadcastFn = (event: string, payload: unknown) => void;
 
 /**

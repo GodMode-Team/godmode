@@ -11,11 +11,12 @@
 
 // ── Logger ──────────────────────────────────────────────────────
 
-export interface AdapterLogger {
-  info(msg: string): void;
-  warn(msg: string): void;
-  error(msg: string): void;
-}
+import type { Logger } from "../types/plugin-api.js";
+
+export type { Logger };
+
+/** @deprecated Use `Logger` from `../types/plugin-api.js` instead. */
+export type AdapterLogger = Logger;
 
 // ── RPC Method Types ────────────────────────────────────────────
 
