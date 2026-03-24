@@ -21,8 +21,9 @@ const FILE_PATH_RE = /(?<![(\[`]|:\/\/)(?:~\/|\/(?:Users|home|tmp|var|opt|etc|go
 // Match bare filenames with known extensions (e.g. "report.md", "my-report.md").
 // Matches ANY filename (word chars, hyphens, dots) with a recognized extension.
 // Does NOT require hyphens or underscores — plain names like "report.md" match.
-// Negative lookbehind: not preceded by ( [ ` / ~ or word char to avoid double-matching paths.
-const BARE_FILENAME_RE = /(?<![(\[`/~\w])(?:[\w][\w.-]*\.(?:html?|css|js|ts|tsx|jsx|json|md|txt|csv|py|sh|yaml|yml|xml|svg|png|jpe?g|gif|webp|pdf|log|mp4|mov|mkv|avi|webm|mp3|wav|aac|ogg|flac|zip|tar|gz|bz2|dmg|iso|doc|docx|xls|xlsx|ppt|pptx))(?=\s|[),;:!?|]|$)/gi;
+// Negative lookbehind: not preceded by ( [ ` / ~ - or word char to avoid double-matching paths
+// and matching partial fragments of hyphenated filenames inside markdown links.
+const BARE_FILENAME_RE = /(?<![(\[`/~\w-])(?:[\w][\w.-]*\.(?:html?|css|js|ts|tsx|jsx|json|md|txt|csv|py|sh|yaml|yml|xml|svg|png|jpe?g|gif|webp|pdf|log|mp4|mov|mkv|avi|webm|mp3|wav|aac|ogg|flac|zip|tar|gz|bz2|dmg|iso|doc|docx|xls|xlsx|ppt|pptx))(?=\s|[),;:!?|]|$)/gi;
 
 /**
  * Pre-process markdown to wrap bare file paths in clickable links.
@@ -60,7 +61,15 @@ export function linkifyFilePaths(markdown: string): string {
 
     // Second pass: bare filenames → godmode-file:// links
     // Skip if already inside a markdown link [...](...)
-    parts[i] = parts[i].replace(BARE_FILENAME_RE, (match) => {
+    parts[i] = parts[i].replace(BARE_FILENAME_RE, (match, offset, str) => {
+      // Don't linkify inside markdown link text [text](url) or URL parts
+      const before = str.slice(0, offset);
+      const lastOpen = before.lastIndexOf("[");
+      const lastClose = before.lastIndexOf("]");
+      if (lastOpen > lastClose) return match; // Inside [...] part
+      const lastParen = before.lastIndexOf("(");
+      const lastParenClose = before.lastIndexOf(")");
+      if (lastParen > lastParenClose) return match; // Inside (...) part
       return `[${match}](godmode-file://${encodeURIComponent(match)})`;
     });
   }
