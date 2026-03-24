@@ -678,7 +678,7 @@ export const onboardingHandlers: GatewayRequestHandlers = {
     } catch (err) {
       respond(false, undefined, {
         code: "CAPABILITIES_ERROR",
-        message: err instanceof Error ? err.message : String(err),
+        message: `Failed to load onboarding capabilities (${err instanceof Error ? err.message : String(err)})`,
       });
     }
   },
@@ -1182,7 +1182,7 @@ export const onboardingHandlers: GatewayRequestHandlers = {
     } catch (err) {
       respond(false, undefined, {
         code: "SETUP_PROGRESS_ERROR",
-        message: err instanceof Error ? err.message : String(err),
+        message: `Failed to derive setup progress (${err instanceof Error ? err.message : String(err)})`,
       });
     }
   },
@@ -1330,7 +1330,7 @@ export const onboardingHandlers: GatewayRequestHandlers = {
     } catch (err) {
       respond(false, undefined, {
         code: "SETUP_CONFIGURE_ERROR",
-        message: err instanceof Error ? err.message : String(err),
+        message: `Failed to configure setup step (${err instanceof Error ? err.message : String(err)})`,
       });
     }
   },
@@ -1350,7 +1350,7 @@ export const onboardingHandlers: GatewayRequestHandlers = {
     } catch (err) {
       respond(false, undefined, {
         code: "DISMISS_ERROR",
-        message: err instanceof Error ? err.message : String(err),
+        message: `Failed to dismiss setup wizard (${err instanceof Error ? err.message : String(err)})`,
       });
     }
   },

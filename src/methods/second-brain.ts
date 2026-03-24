@@ -354,10 +354,10 @@ const sync: GatewayRequestHandler = async ({ respond, context }) => {
   } catch (err) {
     context?.broadcast?.(
       "secondBrain:sync-status",
-      { status: "error", message: String(err) },
+      { status: "error", message: `Failed to regenerate awareness snapshot (${String(err)})` },
       { dropIfSlow: true },
     );
-    respond(false, undefined, { code: "UNAVAILABLE", message: String(err) });
+    respond(false, undefined, { code: "UNAVAILABLE", message: `Failed to regenerate awareness snapshot (${String(err)})` });
   }
 };
 
@@ -1235,7 +1235,7 @@ const migrateToVaultRpc: GatewayRequestHandler = async ({ respond }) => {
   } catch (err) {
     respond(false, undefined, {
       code: "MIGRATION_ERROR",
-      message: err instanceof Error ? err.message : String(err),
+      message: `Failed to migrate files to vault (${err instanceof Error ? err.message : String(err)})`,
     });
   }
 };
@@ -1263,7 +1263,7 @@ const obsidianSyncStatus: GatewayRequestHandler = async ({ respond }) => {
   } catch (err) {
     respond(false, undefined, {
       code: "SYNC_ERROR",
-      message: err instanceof Error ? err.message : String(err),
+      message: `Failed to retrieve Obsidian sync status (${err instanceof Error ? err.message : String(err)})`,
     });
   }
 };
@@ -1284,7 +1284,7 @@ const obsidianSyncTrigger: GatewayRequestHandler = async ({ params, respond }) =
   } catch (err) {
     respond(false, undefined, {
       code: "SYNC_ERROR",
-      message: err instanceof Error ? err.message : String(err),
+      message: `Failed to trigger Obsidian sync (${err instanceof Error ? err.message : String(err)})`,
     });
   }
 };
@@ -1316,7 +1316,7 @@ const obsidianSyncSetMode: GatewayRequestHandler = async ({ params, respond }) =
   } catch (err) {
     respond(false, undefined, {
       code: "SYNC_ERROR",
-      message: err instanceof Error ? err.message : String(err),
+      message: `Failed to set Obsidian sync mode (${err instanceof Error ? err.message : String(err)})`,
     });
   }
 };
@@ -1338,7 +1338,7 @@ const vaultCaptureStatus: GatewayRequestHandler = async ({ respond }) => {
   } catch (err) {
     respond(false, undefined, {
       code: "CAPTURE_ERROR",
-      message: err instanceof Error ? err.message : String(err),
+      message: `Failed to read vault capture status (${err instanceof Error ? err.message : String(err)})`,
     });
   }
 };
@@ -1576,7 +1576,7 @@ const identityCard: GatewayRequestHandler = async ({ respond }) => {
       lastUpdated: health?.lastActivity ?? null,
     });
   } catch (err) {
-    respond(false, undefined, { code: "IDENTITY_CARD_ERROR", message: String(err) });
+    respond(false, undefined, { code: "IDENTITY_CARD_ERROR", message: `Failed to build identity card (${String(err)})` });
   }
 };
 
@@ -1611,7 +1611,7 @@ const recentPeople: GatewayRequestHandler = async ({ params, respond }) => {
     const total = listEntries(peoplePath).filter(e => !e.isDirectory).length;
     respond(true, { people: entries, total });
   } catch (err) {
-    respond(false, undefined, { code: "RECENT_PEOPLE_ERROR", message: String(err) });
+    respond(false, undefined, { code: "RECENT_PEOPLE_ERROR", message: `Failed to load recent people (${String(err)})` });
   }
 };
 

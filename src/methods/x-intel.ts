@@ -47,7 +47,7 @@ const searchHandler: GatewayRequestHandler = async ({ params, respond }) => {
   } catch (err) {
     respond(false, null, {
       code: "SEARCH_FAILED",
-      message: err instanceof Error ? err.message : String(err),
+      message: `Failed to search X (${err instanceof Error ? err.message : String(err)})`,
     });
   }
 };
@@ -68,7 +68,7 @@ const readTweetHandler: GatewayRequestHandler = async ({ params, respond }) => {
   } catch (err) {
     respond(false, null, {
       code: "TWEET_READ_FAILED",
-      message: err instanceof Error ? err.message : String(err),
+      message: `Failed to read tweet (${err instanceof Error ? err.message : String(err)})`,
     });
   }
 };
@@ -89,7 +89,7 @@ const readThreadHandler: GatewayRequestHandler = async ({ params, respond }) => 
   } catch (err) {
     respond(false, null, {
       code: "THREAD_READ_FAILED",
-      message: err instanceof Error ? err.message : String(err),
+      message: `Failed to read thread (${err instanceof Error ? err.message : String(err)})`,
     });
   }
 };
@@ -110,7 +110,7 @@ const userTimelineHandler: GatewayRequestHandler = async ({ params, respond }) =
   } catch (err) {
     respond(false, null, {
       code: "TIMELINE_READ_FAILED",
-      message: err instanceof Error ? err.message : String(err),
+      message: `Failed to read user timeline (${err instanceof Error ? err.message : String(err)})`,
     });
   }
 };
@@ -131,7 +131,7 @@ const readArticleHandler: GatewayRequestHandler = async ({ params, respond }) =>
   } catch (err) {
     respond(false, null, {
       code: "ARTICLE_READ_FAILED",
-      message: err instanceof Error ? err.message : String(err),
+      message: `Failed to read article (${err instanceof Error ? err.message : String(err)})`,
     });
   }
 };
@@ -148,7 +148,7 @@ const bookmarksHandler: GatewayRequestHandler = async ({ params, respond }) => {
   } catch (err) {
     respond(false, null, {
       code: "BOOKMARKS_FAILED",
-      message: err instanceof Error ? err.message : String(err),
+      message: `Failed to fetch bookmarks (${err instanceof Error ? err.message : String(err)})`,
     });
   }
 };
@@ -160,7 +160,7 @@ const healthHandler: GatewayRequestHandler = async ({ respond }) => {
   } catch (err) {
     respond(false, null, {
       code: "HEALTH_CHECK_FAILED",
-      message: err instanceof Error ? err.message : String(err),
+      message: `X integration health check failed (${err instanceof Error ? err.message : String(err)})`,
     });
   }
 };
@@ -176,7 +176,7 @@ const setupHandler: GatewayRequestHandler = async ({ respond }) => {
   } catch (err) {
     respond(false, null, {
       code: "SETUP_FAILED",
-      message: err instanceof Error ? err.message : String(err),
+      message: `X integration setup failed (${err instanceof Error ? err.message : String(err)})`,
     });
   }
 };

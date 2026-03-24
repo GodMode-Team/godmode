@@ -63,7 +63,7 @@ const status: GatewayRequestHandler = async ({ respond }) => {
   } catch (err) {
     respond(false, undefined, {
       code: "INTEGRATIONS_ERROR",
-      message: err instanceof Error ? err.message : String(err),
+      message: `Failed to list integrations (${err instanceof Error ? err.message : String(err)})`,
     });
   }
 };
@@ -92,7 +92,7 @@ const test: GatewayRequestHandler = async ({ params, respond }) => {
   } catch (err) {
     respond(true, {
       success: false,
-      message: err instanceof Error ? err.message : String(err),
+      message: `Integration test failed (${err instanceof Error ? err.message : String(err)})`,
     });
   }
 };
@@ -188,7 +188,7 @@ const configure: GatewayRequestHandler = async ({ params, respond }) => {
   } catch (err) {
     respond(false, undefined, {
       code: "CONFIGURE_ERROR",
-      message: err instanceof Error ? err.message : String(err),
+      message: `Failed to configure integration (${err instanceof Error ? err.message : String(err)})`,
     });
   }
 };
@@ -393,7 +393,7 @@ const autoInstall: GatewayRequestHandler = async ({ params, respond }) => {
   } catch (err) {
     respond(false, undefined, {
       code: "INSTALL_ERROR",
-      message: err instanceof Error ? err.message : String(err),
+      message: `Failed to install integration (${err instanceof Error ? err.message : String(err)})`,
     });
   }
 };
@@ -681,7 +681,7 @@ const paperclipSetup: GatewayRequestHandler = async ({ params, respond }) => {
   } catch (err) {
     respond(false, undefined, {
       code: "SETUP_ERROR",
-      message: err instanceof Error ? err.message : String(err),
+      message: `Failed to run integration setup action (${err instanceof Error ? err.message : String(err)})`,
     });
   }
 };
