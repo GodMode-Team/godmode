@@ -1352,7 +1352,7 @@ class QueueProcessor {
     }
 
     const pending = state.items
-      .filter((i) => i.status === "pending" && (!i.scheduledAt || i.scheduledAt <= now))
+      .filter((i) => i.status === "pending" && (!i.scheduledAt || i.scheduledAt <= now) && i.source !== "test")
       .sort((a, b) => {
         const pa = priorityOrder[a.priority] ?? 1;
         const pb = priorityOrder[b.priority] ?? 1;
