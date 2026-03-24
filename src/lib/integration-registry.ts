@@ -442,6 +442,56 @@ const honchoMemory: IntegrationProvider = {
   },
 };
 
+const screenpipe: IntegrationProvider = {
+  id: "screenpipe",
+  name: "Screenpipe",
+  description: "Ambient memory — captures screen text and audio transcriptions locally. Powers context recall.",
+  tier: "core",
+  platforms: ["darwin", "linux", "win32"],
+  envVars: [],
+  cliDeps: ["screenpipe"],
+  detect: async () => {
+    // Check CLI
+    const cliResult = await execCheck("screenpipe", ["--version"]);
+    // Check REST API
+    let apiReachable = false;
+    try {
+      const resp = await fetch("http://localhost:3030/health", {
+        signal: AbortSignal.timeout(2_000),
+      });
+      apiReachable = resp.ok;
+    } catch { /* not running */ }
+
+    return {
+      configured: cliResult.ok || apiReachable,
+      cliInstalled: cliResult.ok,
+      authenticated: true, // local — no auth needed
+      working: apiReachable,
+      details: apiReachable
+        ? "Screenpipe running (localhost:3030)"
+        : cliResult.ok
+          ? "CLI installed but service not running"
+          : "Screenpipe not installed",
+    };
+  },
+  test: async () => {
+    try {
+      const resp = await fetch("http://localhost:3030/health", {
+        signal: AbortSignal.timeout(3_000),
+      });
+      if (resp.ok) return { success: true, message: "Screenpipe running and healthy" };
+      return { success: false, message: `Screenpipe API returned ${resp.status}` };
+    } catch {
+      return { success: false, message: "Screenpipe not running — start it with `screenpipe`" };
+    }
+  },
+  setupSteps: {
+    darwin: "1. Install: `brew install screenpipe` or download from [screenpi.pe](https://screenpi.pe)\n2. Start: `screenpipe`\n3. Optional: enable Obsidian sync pipe to auto-index screen history in your vault",
+    linux: "1. Install from [github.com/screenpipe/screenpipe](https://github.com/screenpipe/screenpipe)\n2. Start: `screenpipe`\n3. Optional: enable Obsidian sync pipe to auto-index screen history in your vault",
+    win32: "1. Download from [screenpi.pe](https://screenpi.pe)\n2. Start Screenpipe\n3. Optional: enable Obsidian sync pipe to auto-index screen history in your vault",
+  },
+};
+
 // ── Deep Integrations (optional) ───────────────────────────────────────
 
 const ouraRing: IntegrationProvider = {
@@ -663,7 +713,7 @@ const composio: IntegrationProvider = {
 
 /** All available integrations. Core first, then deep. */
 export const INTEGRATIONS: IntegrationProvider[] = [
-  // Core (7)
+  // Core (8)
   xIntelligence,
   tailscale,
   googleCalendar,
@@ -671,6 +721,7 @@ export const INTEGRATIONS: IntegrationProvider[] = [
   githubCli,
   messagingChannel,
   honchoMemory,
+  screenpipe,
   // Deep (5)
   ouraRing,
   weather,

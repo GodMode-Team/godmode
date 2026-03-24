@@ -104,6 +104,7 @@ const _tabLoaders: Record<string, () => Promise<unknown>> = {
   "gm-work": () => import("./tabs/work-tab.js"),
   "gm-today": () => import("./tabs/today-tab.js"),
   "gm-team": () => import("./tabs/team-tab.js"),
+  "gm-brain": () => import("./tabs/brain-tab.js"),
   "gm-second-brain": () => import("./tabs/second-brain-tab.js"),
   "gm-dashboards": () => import("./tabs/dashboards-tab.js"),
   "gm-connections": () => import("./tabs/connections-tab.js"),
@@ -461,25 +462,7 @@ export function renderApp(state: AppViewState) {
               `
               }
               <div class="nav-group__items">
-                ${
-                  !group.label && state.showSetupTab
-                    ? html`
-                        <a
-                          class="nav-item ${state.tab === "onboarding" ? "active" : ""}"
-                          href="#"
-                          @click=${(e: Event) => {
-                            e.preventDefault();
-                            state.handleWizardOpen?.();
-                            state.closeNavDrawer();
-                          }}
-                          title="Power up your GodMode ally."
-                        >
-                          <span class="nav-item__emoji" aria-hidden="true">\u{1F9ED}</span>
-                          <span class="nav-item__text">Setup</span>
-                        </a>
-                      `
-                    : nothing
-                }
+                ${/* Setup compass link removed — Setup Bar is now the default onboarding entry point */ nothing}
                 ${group.tabs.map((tab) => renderTab(state, tab))}
               </div>
             </div>
@@ -1123,19 +1106,13 @@ export function renderApp(state: AppViewState) {
 
         ${
           state.tab === "setup" || state.tab === "onboarding"
-            ? (() => {
-                // Auto-launch the wizard when navigating to the setup tab
-                if (!state.wizardActive && state.handleWizardOpen) {
-                  requestAnimationFrame(() => state.handleWizardOpen?.());
-                }
-                return html`<div class="my-day-container">
-                  <div class="my-day-card">
-                    <div class="my-day-card-content">
-                      <p>Loading onboarding wizard...</p>
-                    </div>
+            ? html`<div class="my-day-container">
+                <div class="my-day-card">
+                  <div class="my-day-card-content">
+                    <p>Use the Setup Bar in the left navigation to continue setup, or go to Settings to run the full wizard.</p>
                   </div>
-                </div>`;
-              })()
+                </div>
+              </div>`
             : nothing
         }
 
@@ -1750,8 +1727,8 @@ export function renderApp(state: AppViewState) {
         }
 
         ${
-          state.tab === "second-brain"
-            ? (ensureTab("gm-second-brain"), html`<gm-second-brain></gm-second-brain>`)
+          state.tab === "brain" || state.tab === "second-brain"
+            ? (ensureTab("gm-brain"), html`<gm-brain></gm-brain>`)
             : nothing
         }
 
@@ -1769,7 +1746,7 @@ export function renderApp(state: AppViewState) {
 
         ${
           state.tab === "config"
-            ? renderConfig({
+            ? html`${renderConfig({
                 raw: state.configRaw,
                 originalRaw: state.configRawOriginal,
                 valid: state.configValid,
@@ -1818,7 +1795,18 @@ export function renderApp(state: AppViewState) {
                 searchTavilyConfigured: state.searchTavilyConfigured ?? false,
                 searchLoading: state.searchLoading ?? false,
                 onSearchProviderChange: (provider) => setSearchProvider(state, provider),
-              })
+              })}
+              <div style="margin-top: 24px; padding: 16px; border-top: 1px solid var(--border, #333);">
+                <button
+                  class="btn btn--secondary"
+                  style="font-size: 13px; opacity: 0.8;"
+                  @click=${() => state.handleWizardOpen?.()}
+                >
+                  Run Setup Wizard
+                </button>
+                <span style="margin-left: 8px; font-size: 12px; opacity: 0.5;">Full 8-step onboarding form</span>
+              </div>
+            `
             : nothing
         }
 

@@ -26,6 +26,9 @@ import type { GatewayRequestHandler } from "../types/plugin-api.js";
 import {
   type OnboardingState,
   type OnboardingPhase,
+  type SetupStep,
+  type SetupProgress,
+  SETUP_STEPS,
   emptyOnboardingState,
 } from "./onboarding-types.js";
 import { runAssessment, generateConfigRecommendations } from "./onboarding-scanner.js";
@@ -42,6 +45,7 @@ import {
   sanitizeAnswers,
   type OnboardingAnswers,
 } from "../services/onboarding.js";
+import { readEnvFile, writeEnvVar, getEnvVar } from "../lib/env-writer.js";
 
 // ── Checklist Types ─────────────────────────────────────────────
 
@@ -92,6 +96,85 @@ async function readOnboarding(): Promise<OnboardingState> {
 async function writeOnboarding(state: OnboardingState): Promise<void> {
   await secureMkdir(DATA_DIR);
   await secureWriteFile(ONBOARDING_FILE, JSON.stringify(state, null, 2) + "\n");
+}
+
+/**
+ * Public export of deriveSetupProgress for use in onboarding-context.ts.
+ * Named differently to avoid confusion with the internal helper.
+ */
+export async function deriveSetupProgressForContext(): Promise<SetupProgress> {
+  return deriveSetupProgress();
+}
+
+/** Derive current setup progress by checking actual system state. */
+async function deriveSetupProgress(): Promise<SetupProgress> {
+  const state = await readOnboarding();
+  const envVars = readEnvFile();
+
+  // Check name from onboarding state
+  const name = state.interview?.name || state.identity?.name || undefined;
+  const allyName = state.allyName || undefined;
+
+  // Check API keys from process.env first, then .env file
+  const apiKeyConfigured = Boolean(
+    process.env.ANTHROPIC_API_KEY || envVars["ANTHROPIC_API_KEY"],
+  );
+  const honchoConfigured = Boolean(
+    process.env.HONCHO_API_KEY || envVars["HONCHO_API_KEY"],
+  );
+  const composioConfigured = Boolean(
+    process.env.COMPOSIO_API_KEY || envVars["COMPOSIO_API_KEY"],
+  );
+
+  // Check Obsidian vault
+  const obsidianPathValue = process.env.OBSIDIAN_VAULT_PATH || envVars["OBSIDIAN_VAULT_PATH"] || state.secondBrain?.obsidianPath;
+  const obsidianConfigured = Boolean(obsidianPathValue && existsSync(obsidianPathValue));
+
+  // Derive completed steps
+  const completedSteps: SetupStep[] = [];
+  if (name) completedSteps.push("welcome");
+  if (apiKeyConfigured) completedSteps.push("api-key");
+  if (honchoConfigured) completedSteps.push("memory");
+  if (composioConfigured) completedSteps.push("integrations");
+  if (obsidianConfigured) completedSteps.push("second-brain");
+
+  // Derive current step (first incomplete step)
+  const stepOrder: SetupStep[] = ["welcome", "api-key", "memory", "integrations", "second-brain"];
+  const currentStep = stepOrder.find((s) => !completedSteps.includes(s)) ?? "second-brain";
+
+  // Check dismissed flag
+  let dismissed = false;
+  try {
+    const dismissedPath = join(DATA_DIR, "setup-dismissed.json");
+    const raw = await readFile(dismissedPath, "utf-8");
+    const parsed = JSON.parse(raw) as { dismissed?: boolean };
+    dismissed = parsed.dismissed === true;
+  } catch { /* not dismissed */ }
+
+  // Composio integrations (empty for now — populated when Composio is configured)
+  const composioIntegrations: Record<string, { id: string; name: string; connected: boolean; icon?: string }> = {};
+
+  // Determine if setup is complete (all required steps done)
+  const requiredSteps = SETUP_STEPS.filter((s) => s.required).map((s) => s.step);
+  const allRequiredComplete = requiredSteps.every((s) => completedSteps.includes(s));
+  const completedAt = allRequiredComplete ? (state.completedAt ?? new Date().toISOString()) : undefined;
+
+  return {
+    currentStep,
+    completedSteps,
+    name,
+    timezone: process.env.TZ || envVars["TZ"] || undefined,
+    allyName,
+    apiKeyConfigured,
+    honchoConfigured,
+    composioConfigured,
+    composioIntegrations,
+    obsidianConfigured,
+    obsidianPath: obsidianPathValue || undefined,
+    startedAt: state.startedAt || undefined,
+    completedAt,
+    dismissed,
+  };
 }
 
 /** Deep merge helper for nested objects. Arrays are replaced, not merged. */
@@ -1083,6 +1166,297 @@ export const onboardingHandlers: GatewayRequestHandlers = {
         code: "WRITE_FAILED",
         message: `Failed to write config: ${err instanceof Error ? err.message : "unknown error"}. Try running: openclaw godmode activate ${key}`,
       });
+    }
+  },
+
+  // ── Setup Flow (5-step simplified onboarding) ──────────────────
+
+  /**
+   * Get setup progress by checking actual system state.
+   * Derives currentStep, completedSteps, and integration status.
+   */
+  "onboarding.setupProgress": async ({ respond }) => {
+    try {
+      const progress = await deriveSetupProgress();
+      respond(true, progress);
+    } catch (err) {
+      respond(false, undefined, {
+        code: "SETUP_PROGRESS_ERROR",
+        message: err instanceof Error ? err.message : String(err),
+      });
+    }
+  },
+
+  /**
+   * Configure a specific setup step.
+   * Writes values to onboarding.json and/or .env as appropriate.
+   */
+  "onboarding.setupConfigure": async ({ params, respond, context }) => {
+    const step = params.step as SetupStep | undefined;
+    const values = (params.values as Record<string, string>) ?? {};
+
+    if (!step || !SETUP_STEPS.some((s) => s.step === step)) {
+      respond(false, undefined, {
+        code: "INVALID_STEP",
+        message: `Invalid setup step: ${String(step)}. Valid steps: ${SETUP_STEPS.map((s) => s.step).join(", ")}`,
+      });
+      return;
+    }
+
+    try {
+      const state = await readOnboarding();
+
+      switch (step) {
+        case "welcome": {
+          const name = values.name?.trim();
+          const timezone = values.timezone?.trim();
+          if (!name) {
+            respond(false, undefined, { code: "MISSING_NAME", message: "name is required for the welcome step" });
+            return;
+          }
+          // Save to onboarding state
+          state.interview = {
+            ...state.interview,
+            name,
+            completed: state.interview?.completed ?? false,
+          };
+          state.identity = {
+            name,
+            mission: state.identity?.mission ?? "",
+            emoji: state.identity?.emoji ?? "\u{1F680}",
+          };
+          if (!state.startedAt) state.startedAt = new Date().toISOString();
+
+          // Write USER.md for awareness snapshot
+          try {
+            const userMdPath = join(GODMODE_ROOT, "USER.md");
+            if (!existsSync(userMdPath)) {
+              await secureMkdir(GODMODE_ROOT);
+              await secureWriteFile(
+                userMdPath,
+                `# USER.md - About Your Human\n\n- **Name:** ${name}\n${timezone ? `- **Timezone:** ${timezone}\n` : ""}`,
+              );
+            }
+            invalidateIdentityCache();
+          } catch { /* non-fatal */ }
+
+          // Save timezone to .env if provided
+          if (timezone) {
+            writeEnvVar("TZ", timezone);
+          }
+
+          // Ally name
+          if (values.allyName?.trim()) {
+            state.allyName = values.allyName.trim();
+            try {
+              const { clearAllyNameCache } = await import("../lib/ally-identity.js");
+              clearAllyNameCache();
+            } catch { /* best-effort */ }
+          }
+          break;
+        }
+
+        case "api-key": {
+          const apiKey = values.ANTHROPIC_API_KEY?.trim();
+          if (!apiKey) {
+            respond(false, undefined, { code: "MISSING_KEY", message: "ANTHROPIC_API_KEY is required" });
+            return;
+          }
+          writeEnvVar("ANTHROPIC_API_KEY", apiKey);
+          break;
+        }
+
+        case "memory": {
+          const honchoKey = values.HONCHO_API_KEY?.trim();
+          if (!honchoKey) {
+            respond(false, undefined, { code: "MISSING_KEY", message: "HONCHO_API_KEY is required" });
+            return;
+          }
+          writeEnvVar("HONCHO_API_KEY", honchoKey);
+          break;
+        }
+
+        case "integrations": {
+          const composioKey = values.COMPOSIO_API_KEY?.trim();
+          if (!composioKey) {
+            respond(false, undefined, { code: "MISSING_KEY", message: "COMPOSIO_API_KEY is required" });
+            return;
+          }
+          writeEnvVar("COMPOSIO_API_KEY", composioKey);
+          break;
+        }
+
+        case "screenpipe": {
+          // Screenpipe is auto-detected — configure just marks it acknowledged
+          // No env var needed; detection happens via localhost:3030 health check
+          break;
+        }
+
+        case "second-brain": {
+          const vaultPath = values.OBSIDIAN_VAULT_PATH?.trim();
+          if (!vaultPath) {
+            respond(false, undefined, { code: "MISSING_PATH", message: "OBSIDIAN_VAULT_PATH is required" });
+            return;
+          }
+          // Validate the path exists
+          if (!existsSync(vaultPath)) {
+            respond(false, undefined, { code: "INVALID_PATH", message: `Path does not exist: ${vaultPath}` });
+            return;
+          }
+          writeEnvVar("OBSIDIAN_VAULT_PATH", vaultPath);
+          state.secondBrain = {
+            ...state.secondBrain,
+            obsidianPath: vaultPath,
+            memorySeeded: state.secondBrain?.memorySeeded ?? false,
+            dailyBriefConfigured: state.secondBrain?.dailyBriefConfigured ?? false,
+            completed: state.secondBrain?.completed ?? false,
+          };
+          break;
+        }
+      }
+
+      await writeOnboarding(state);
+
+      try {
+        context?.broadcast?.("onboarding:update", state);
+      } catch { /* broadcast best-effort */ }
+
+      // Re-derive progress after the update
+      const progress = await deriveSetupProgress();
+      respond(true, progress);
+    } catch (err) {
+      respond(false, undefined, {
+        code: "SETUP_CONFIGURE_ERROR",
+        message: err instanceof Error ? err.message : String(err),
+      });
+    }
+  },
+
+  /**
+   * Dismiss the setup flow — user wants to do it later.
+   */
+  "onboarding.setupDismiss": async ({ respond }) => {
+    try {
+      const state = await readOnboarding();
+      // Store dismissed flag — we'll use a custom field on the state
+      // Store in a way that deriveSetupProgress can read it
+      const dismissedPath = join(DATA_DIR, "setup-dismissed.json");
+      await secureMkdir(DATA_DIR);
+      await secureWriteFile(dismissedPath, JSON.stringify({ dismissed: true, at: new Date().toISOString() }) + "\n");
+      respond(true, { dismissed: true });
+    } catch (err) {
+      respond(false, undefined, {
+        code: "DISMISS_ERROR",
+        message: err instanceof Error ? err.message : String(err),
+      });
+    }
+  },
+
+  /**
+   * Test a specific setup integration to verify it works.
+   */
+  "onboarding.setupTest": async ({ params, respond }) => {
+    const step = params.step as SetupStep | undefined;
+    if (!step || !SETUP_STEPS.some((s) => s.step === step)) {
+      respond(false, undefined, {
+        code: "INVALID_STEP",
+        message: `Invalid setup step: ${String(step)}`,
+      });
+      return;
+    }
+
+    try {
+      switch (step) {
+        case "api-key": {
+          const key = getEnvVar("ANTHROPIC_API_KEY");
+          if (!key) {
+            respond(true, { success: false, message: "No ANTHROPIC_API_KEY found in environment or .env file." });
+            return;
+          }
+          // Validate key format (sk-ant-...)
+          if (key.startsWith("sk-ant-") || key.startsWith("sk-")) {
+            respond(true, { success: true, message: "Anthropic API key is configured and has valid format." });
+          } else {
+            respond(true, { success: false, message: "ANTHROPIC_API_KEY exists but doesn't match expected format (sk-ant-... or sk-...)." });
+          }
+          return;
+        }
+
+        case "memory": {
+          const key = getEnvVar("HONCHO_API_KEY");
+          if (!key) {
+            respond(true, { success: false, message: "No HONCHO_API_KEY found in environment or .env file." });
+            return;
+          }
+          respond(true, { success: true, message: "Honcho API key is configured." });
+          return;
+        }
+
+        case "integrations": {
+          const key = getEnvVar("COMPOSIO_API_KEY");
+          if (!key) {
+            respond(true, { success: false, message: "No COMPOSIO_API_KEY found in environment or .env file." });
+            return;
+          }
+          // Try initializing Composio client
+          try {
+            const { init } = await import("../services/composio-client.js");
+            await init(key);
+            respond(true, { success: true, message: "Composio API key is valid and client initialized." });
+          } catch (err) {
+            respond(true, { success: false, message: `Composio key found but init failed: ${err instanceof Error ? err.message : String(err)}` });
+          }
+          return;
+        }
+
+        case "screenpipe": {
+          try {
+            const resp = await fetch("http://localhost:3030/health", { signal: AbortSignal.timeout(3_000) });
+            if (resp.ok) {
+              respond(true, { success: true, message: "Screenpipe is running and healthy. Screen & audio memory active." });
+            } else {
+              respond(true, { success: false, message: `Screenpipe returned status ${resp.status}. Try restarting it with \`screenpipe\`.` });
+            }
+          } catch {
+            respond(true, { success: false, message: "Screenpipe not running. Install with `brew install screenpipe` (macOS) then run `screenpipe` to start." });
+          }
+          return;
+        }
+
+        case "second-brain": {
+          const vaultPath = getEnvVar("OBSIDIAN_VAULT_PATH");
+          if (!vaultPath) {
+            respond(true, { success: false, message: "No OBSIDIAN_VAULT_PATH configured." });
+            return;
+          }
+          if (!existsSync(vaultPath)) {
+            respond(true, { success: false, message: `Path does not exist: ${vaultPath}` });
+            return;
+          }
+          // Check for .md files
+          try {
+            const { readdirSync } = await import("node:fs");
+            const files = readdirSync(vaultPath);
+            const mdFiles = files.filter((f: string) => f.endsWith(".md"));
+            if (mdFiles.length > 0) {
+              respond(true, { success: true, message: `Obsidian vault found with ${mdFiles.length} markdown files.` });
+            } else {
+              respond(true, { success: true, message: "Vault path exists but contains no .md files yet. That's OK — GodMode will create them." });
+            }
+          } catch {
+            respond(true, { success: false, message: `Cannot read directory: ${vaultPath}` });
+          }
+          return;
+        }
+
+        case "welcome": {
+          // Welcome step doesn't need testing — it's just name/timezone
+          respond(true, { success: true, message: "Welcome step doesn't require a connectivity test." });
+          return;
+        }
+      }
+    } catch (err) {
+      respond(true, { success: false, message: `Test failed: ${err instanceof Error ? err.message : String(err)}` });
     }
   },
 

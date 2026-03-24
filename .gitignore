@@ -8,6 +8,7 @@ coverage/
 .tmp/
 .worktrees/
 .claude/worktrees/
+.godmode/
 experiments/
 
 # Environment files
@@ -16,3 +17,5 @@ experiments/
 .env.local
 .env.*.local
 !.env.example
+.qa-reports/
+.gstack/

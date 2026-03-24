@@ -248,6 +248,26 @@ export async function runGatewayStart(
     }
   } catch { /* no pending deploy — normal */ }
 
+  // Seed deploy project registry (only if empty — don't overwrite user data)
+  try {
+    const { loadRegistry, registerProject } = await import("../lib/project-registry.js");
+    const existing = await loadRegistry();
+    if (existing.length === 0) {
+      await registerProject({
+        domain: "lifeongodmode.com",
+        repo: "GodMode-Team/lifeongodmode",
+        localDir: "~/godmode/private/sites/lifeongodmode",
+        platform: "vercel",
+        projectName: "lifeongodmode",
+        branch: "main",
+        updatedAt: new Date().toISOString(),
+      });
+      logger.info("[GodMode] Seeded deploy project registry with lifeongodmode.com");
+    }
+  } catch (err) {
+    logger.warn(`[GodMode] Deploy registry seed failed (non-fatal): ${String(err)}`);
+  }
+
   // Host compatibility scan
   try {
     const { changes } = await detectHostContext(api, pluginVersion);
@@ -256,6 +276,43 @@ export async function runGatewayStart(
     }
   } catch (err) {
     logger.warn(`[GodMode] Host compat scan failed: ${String(err)}`);
+  }
+
+  // Bootstrap core directories so Second Brain file-walk works out of the box
+  try {
+    const coreDirs = [
+      DATA_DIR,
+      MEMORY_DIR,
+      join(MEMORY_DIR, "research"),
+      join(MEMORY_DIR, "bank", "people"),
+      join(MEMORY_DIR, "bank", "companies"),
+      join(MEMORY_DIR, "projects"),
+      join(MEMORY_DIR, "identity"),
+      join(MEMORY_DIR, "inbox"),
+    ];
+    for (const dir of coreDirs) {
+      if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+    }
+    // Seed starter MEMORY.md if missing — gives file-walk something to find
+    const memoryMdPath = join(MEMORY_DIR, "MEMORY.md");
+    if (!existsSync(memoryMdPath)) {
+      const { writeFileSync } = await import("node:fs");
+      writeFileSync(memoryMdPath, [
+        "# GodMode Memory",
+        "",
+        "This is your personal knowledge base. GodMode stores memories,",
+        "research, and notes here. Search works automatically.",
+        "",
+        "## Getting Started",
+        "- Ask your ally to remember things — they'll be stored here",
+        "- Drop markdown files into subdirectories for instant search",
+        "- Connect Obsidian for a richer Second Brain experience",
+        "",
+      ].join("\n"), "utf-8");
+      logger.info("[GodMode] Bootstrapped ~/godmode/memory/ for Second Brain");
+    }
+  } catch (err) {
+    logger.warn(`[GodMode] Directory bootstrap failed: ${String(err)}`);
   }
 
   // Seed starter personas + skills
@@ -598,6 +655,76 @@ export async function runGatewayStart(
     logger.info("[GodMode] Meeting webhook broadcast wired");
   } catch (err) {
     logger.warn(`[GodMode] Meeting webhook broadcast wiring failed: ${String(err)}`);
+  }
+
+  // ── Ingestion pipelines (Screenpipe funnel + structured sources) ──
+  try {
+    // Screenpipe hourly summary — every 60 minutes
+    const screenpipeHourlyTimer = setInterval(async () => {
+      try {
+        const { loadConfig } = await import("../services/ingestion/screenpipe-config.js");
+        const cfg = await loadConfig();
+        if (!cfg.enabled) return;
+        const { runHourlySummary } = await import("../services/ingestion/screenpipe-funnel.js");
+        const result = await runHourlySummary();
+        if (result.filtered > 0) {
+          logger.info(`[GodMode] Screenpipe hourly: captured=${result.captured}, summarized=${result.filtered}, promoted=${result.promoted}`);
+        }
+      } catch (err) {
+        logger.warn(`[GodMode] Screenpipe hourly failed: ${String(err)}`);
+      }
+    }, 60 * 60_000); // 60 min
+    serviceCleanup.push({ name: "screenpipe-hourly", fn: () => clearInterval(screenpipeHourlyTimer) });
+
+    // Screenpipe daily digest — every 24 hours (runs at next interval from startup)
+    const screenpipeDailyTimer = setInterval(async () => {
+      try {
+        const { loadConfig } = await import("../services/ingestion/screenpipe-config.js");
+        const cfg = await loadConfig();
+        if (!cfg.enabled) return;
+        const { runDailyDigest } = await import("../services/ingestion/screenpipe-funnel.js");
+        const result = await runDailyDigest();
+        if (result.hourlyFilesProcessed > 0) {
+          logger.info(`[GodMode] Screenpipe daily digest: processed ${result.hourlyFilesProcessed} hourly files`);
+        }
+      } catch (err) {
+        logger.warn(`[GodMode] Screenpipe daily digest failed: ${String(err)}`);
+      }
+    }, 24 * 60 * 60_000); // 24 hours
+    serviceCleanup.push({ name: "screenpipe-daily", fn: () => clearInterval(screenpipeDailyTimer) });
+
+    // Screenpipe retention cleanup — every 12 hours
+    const screenpipeCleanupTimer = setInterval(async () => {
+      try {
+        const { runRetentionCleanup } = await import("../services/ingestion/screenpipe-funnel.js");
+        const result = await runRetentionCleanup();
+        if (result.deleted > 0) {
+          logger.info(`[GodMode] Screenpipe cleanup: deleted ${result.deleted} expired files`);
+        }
+      } catch (err) {
+        logger.warn(`[GodMode] Screenpipe cleanup failed: ${String(err)}`);
+      }
+    }, 12 * 60 * 60_000); // 12 hours
+    serviceCleanup.push({ name: "screenpipe-cleanup", fn: () => clearInterval(screenpipeCleanupTimer) });
+
+    // Calendar enrichment — every 60 minutes
+    const calendarTimer = setInterval(async () => {
+      try {
+        if (!process.env.GOG_CALENDAR_ACCOUNT) return;
+        const { runCalendarEnrichment } = await import("../services/ingestion/calendar-enrichment.js");
+        const result = await runCalendarEnrichment();
+        if (result.eventsProcessed > 0) {
+          logger.info(`[GodMode] Calendar enrichment: ${result.eventsProcessed} events, ${result.peopleUpdated} people updated`);
+        }
+      } catch (err) {
+        logger.warn(`[GodMode] Calendar enrichment failed: ${String(err)}`);
+      }
+    }, 60 * 60_000); // 60 min
+    serviceCleanup.push({ name: "calendar-enrichment", fn: () => clearInterval(calendarTimer) });
+
+    logger.info("[GodMode] Ingestion pipelines registered (screenpipe hourly/daily/cleanup, calendar)");
+  } catch (err) {
+    logger.warn(`[GodMode] Ingestion pipeline registration failed: ${String(err)}`);
   }
 
   logger.info(`[GodMode] Gateway startup complete — ${serviceCleanup.length} service(s) registered for cleanup`);

@@ -9,6 +9,7 @@
 export { GmChat } from "./chat-tab.js";
 export { GmToday } from "./today-tab.js";
 export { GmWork } from "./work-tab.js";
+export { GmBrain } from "./brain-tab.js";
 export { GmSecondBrain } from "./second-brain-tab.js";
 export { GmDashboards } from "./dashboards-tab.js";
 export { GmSettings } from "./settings-tab.js";

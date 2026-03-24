@@ -232,14 +232,15 @@ export async function handleMessageReceived(
       } catch { /* non-fatal */ }
     }
 
-    // Approval gate: if a gate blocked since the user's last message,
-    // any new user message = implicit approval (user saw the block and responded).
+    // Approval gate: user must say "I approve" to unlock gated actions.
     if (sessionKey) {
       try {
         if (processUserMessage(sessionKey, content)) {
-          logger.info(`[GodMode][SafetyGate] approval granted for session "${sessionKey}"`);
+          logger.info(`[GodMode][SafetyGate] approval GRANTED for session "${sessionKey}"`);
         }
-      } catch { /* non-fatal */ }
+      } catch (err) {
+        logger.warn(`[GodMode][SafetyGate] processUserMessage error: ${err}`);
+      }
     }
 
     // Auto-title: buffer the user message for before_prompt_build to pick up.

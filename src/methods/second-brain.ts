@@ -1353,6 +1353,286 @@ const vaultCaptureRunNow: GatewayRequestHandler = async ({ respond }) => {
   });
 };
 
+// ── Memory Pulse (system health) ──────────────────────────────────
+
+type MemorySystemStatus = {
+  id: string;
+  name: string;
+  status: "ready" | "degraded" | "offline";
+  detail: string;
+  count?: number;
+};
+
+const memoryPulse: GatewayRequestHandler = async ({ respond }) => {
+  const systems: MemorySystemStatus[] = [];
+
+  // 1. Honcho
+  try {
+    const { isMemoryReady } = await import("../lib/memory.js");
+    const ready = isMemoryReady();
+    systems.push({
+      id: "honcho",
+      name: "Honcho",
+      status: ready ? "ready" : "offline",
+      detail: ready ? "Connected" : "Not configured",
+    });
+  } catch {
+    systems.push({ id: "honcho", name: "Honcho", status: "offline", detail: "Not available" });
+  }
+
+  // 2. Vault
+  const vault = getVaultPath();
+  const vaultHealthData = vault ? getVaultHealth() : null;
+  systems.push({
+    id: "vault",
+    name: "Vault",
+    status: vault && vaultHealthData ? "ready" : vault ? "degraded" : "offline",
+    detail: vaultHealthData ? `${vaultHealthData.totalNotes} notes` : vault ? "No PARA folders" : "Not configured",
+    count: vaultHealthData?.totalNotes,
+  });
+
+  // 3. Session Search (FTS5)
+  try {
+    const { isSessionSearchReady } = await import("../lib/session-search.js");
+    const ready = isSessionSearchReady();
+    systems.push({
+      id: "sessions",
+      name: "Sessions",
+      status: ready ? "ready" : "offline",
+      detail: ready ? "Indexed" : "Not initialized",
+    });
+  } catch {
+    systems.push({ id: "sessions", name: "Sessions", status: "offline", detail: "Not available" });
+  }
+
+  // 4. Screenpipe
+  try {
+    const resp = await fetch("http://localhost:3030/health", {
+      signal: AbortSignal.timeout(2_000),
+    });
+    systems.push({
+      id: "screenpipe",
+      name: "Screenpipe",
+      status: resp.ok ? "ready" : "degraded",
+      detail: resp.ok ? "Running" : `API ${resp.status}`,
+    });
+  } catch {
+    systems.push({ id: "screenpipe", name: "Screenpipe", status: "offline", detail: "Not running" });
+  }
+
+  const readyCount = systems.filter(s => s.status === "ready").length;
+  respond(true, { systems, readyCount, totalCount: systems.length });
+};
+
+// ── Activity Feed (recent memory events) ─────────────────────────
+
+type ActivityEvent = {
+  type: "vault-capture" | "identity-update" | "calendar-enrichment" | "search" | "file-modified";
+  title: string;
+  detail?: string;
+  timestamp: string;
+  source: string;
+};
+
+const activityFeed: GatewayRequestHandler = async ({ params, respond }) => {
+  const p = params as { limit?: number };
+  const limit = typeof p.limit === "number" ? Math.min(p.limit, 50) : 20;
+  const events: ActivityEvent[] = [];
+
+  // 1. Recent vault file modifications
+  const vaultPath = getVaultPath();
+  if (vaultPath) {
+    const scanDirs = [
+      { dir: join(vaultPath, "00-Inbox"), source: "inbox" },
+      { dir: join(vaultPath, "01-Daily"), source: "daily" },
+      { dir: join(vaultPath, "Brain", "People"), source: "people" },
+      { dir: join(vaultPath, "Brain", "Companies"), source: "companies" },
+      { dir: join(vaultPath, "Brain", "Knowledge"), source: "knowledge" },
+    ];
+
+    for (const { dir, source } of scanDirs) {
+      if (!existsSync(dir)) continue;
+      try {
+        const entries = readdirSync(dir, { withFileTypes: true });
+        for (const e of entries) {
+          if (e.name.startsWith(".") || e.name.startsWith("_") || e.isDirectory()) continue;
+          if (!e.name.endsWith(".md")) continue;
+          const fullPath = join(dir, e.name);
+          try {
+            const st = statSync(fullPath);
+            events.push({
+              type: source === "people" || source === "companies" ? "calendar-enrichment" : "vault-capture",
+              title: basename(e.name, ".md"),
+              detail: source,
+              timestamp: st.mtime.toISOString(),
+              source,
+            });
+          } catch { /* skip */ }
+        }
+      } catch { /* skip */ }
+    }
+  }
+
+  // 2. Recent retrieval log entries (searches)
+  try {
+    const logPath = join(DATA_DIR, "retrieval-log.jsonl");
+    if (existsSync(logPath)) {
+      const raw = readFileSync(logPath, "utf-8");
+      const lines = raw.trim().split("\n").filter(Boolean);
+      const recent = lines.slice(-10).reverse();
+      for (const line of recent) {
+        try {
+          const entry = JSON.parse(line) as { ts: string; source: string; query: string; resultCount: number };
+          events.push({
+            type: "search",
+            title: `Searched: "${entry.query}"`,
+            detail: `${entry.resultCount} results via ${entry.source}`,
+            timestamp: entry.ts,
+            source: entry.source,
+          });
+        } catch { /* skip malformed */ }
+      }
+    }
+  } catch { /* skip */ }
+
+  // 3. Identity file modifications
+  for (const spec of IDENTITY_FILE_SPECS) {
+    const filePath = resolveIdentityFilePath(spec);
+    const mtime = safeFileMtime(filePath);
+    if (mtime) {
+      events.push({
+        type: "identity-update",
+        title: `${spec.label} updated`,
+        timestamp: mtime,
+        source: "identity",
+      });
+    }
+  }
+
+  // Sort newest first and limit
+  events.sort((a, b) => b.timestamp.localeCompare(a.timestamp));
+  respond(true, { events: events.slice(0, limit), total: events.length });
+};
+
+// ── Identity Card (Honcho peer representation) ──────────────────────
+
+const identityCard: GatewayRequestHandler = async ({ respond }) => {
+  try {
+    // 1. Honcho peer representation
+    let peerRepresentation: string | null = null;
+    let currentFocus: string | null = null;
+    try {
+      const { queryPeer, isHonchoReady } = await import("../services/honcho-client.js");
+      if (isHonchoReady()) {
+        peerRepresentation = await queryPeer(
+          "Give a concise 2-3 paragraph description of who the user is — their role, responsibilities, working style, and key priorities. Write in third person.",
+          "system:identity-card",
+        );
+        currentFocus = await queryPeer(
+          "What is the user currently focused on? List their top 2-3 priorities in one sentence.",
+          "system:identity-card",
+        );
+      }
+    } catch { /* Honcho not available */ }
+
+    // 2. Basic identity from files (fallback / supplement)
+    const userMdPath = resolveIdentityFilePath(IDENTITY_FILE_SPECS.find(s => s.key === "user")!);
+    const userMd = safeReadFile(userMdPath);
+
+    // 3. Memory stats
+    const health = getVaultHealth();
+    const peoplePath = resolvePeoplePath().path;
+    let peopleCount = 0;
+    try {
+      peopleCount = existsSync(peoplePath)
+        ? readdirSync(peoplePath).filter(f => !f.startsWith(".") && !f.startsWith("_")).length
+        : 0;
+    } catch { /* empty */ }
+
+    const dailyDir = getVaultPath()
+      ? join(getVaultPath()!, "01-Daily")
+      : join(MEMORY_DIR, "daily");
+    let dailyCount = 0;
+    try {
+      dailyCount = existsSync(dailyDir)
+        ? readdirSync(dailyDir).filter(f => f.endsWith(".md")).length
+        : 0;
+    } catch { /* empty */ }
+
+    // 4. Extract name/tagline from USER.md
+    const name = userMd ? extractNameFromUserMd(userMd) : "User";
+    const tagline = userMd ? extractTaglineFromUserMd(userMd) : "";
+
+    respond(true, {
+      peerRepresentation,
+      currentFocus,
+      name,
+      tagline,
+      stats: {
+        peopleTracked: peopleCount,
+        dailyNotes: dailyCount,
+        totalNotes: health?.totalNotes ?? 0,
+      },
+      lastUpdated: health?.lastActivity ?? null,
+    });
+  } catch (err) {
+    respond(false, undefined, { code: "IDENTITY_CARD_ERROR", message: String(err) });
+  }
+};
+
+function extractNameFromUserMd(content: string): string {
+  const match = content.match(/\*\*Name:\*\*\s*(.+)/) || content.match(/^#\s+(.+)/m);
+  return match?.[1]?.trim() ?? "User";
+}
+
+function extractTaglineFromUserMd(content: string): string {
+  const match = content.match(/\*\*Vision:\*\*\s*(.+)/) || content.match(/\*\*Tagline:\*\*\s*(.+)/);
+  return match?.[1]?.trim() ?? "";
+}
+
+// ── Recent People (sorted by last interaction) ──────────────────────
+
+const recentPeople: GatewayRequestHandler = async ({ params, respond }) => {
+  try {
+    const limit = Number((params as Record<string, unknown>).limit) || 8;
+    const peoplePath = resolvePeoplePath().path;
+    const entries = listEntries(peoplePath)
+      .filter(e => !e.isDirectory)
+      .sort((a, b) => {
+        if (!a.updatedAt || !b.updatedAt) return 0;
+        return b.updatedAt.localeCompare(a.updatedAt);
+      })
+      .slice(0, limit)
+      .map(e => ({
+        ...e,
+        role: extractRoleFromExcerpt(e.excerpt),
+      }));
+
+    const total = listEntries(peoplePath).filter(e => !e.isDirectory).length;
+    respond(true, { people: entries, total });
+  } catch (err) {
+    respond(false, undefined, { code: "RECENT_PEOPLE_ERROR", message: String(err) });
+  }
+};
+
+function extractRoleFromExcerpt(excerpt: string): string {
+  const roleMatch = excerpt.match(/(?:role|title|position)[:\s]*([^\n|]+)/i)
+    || excerpt.match(/(?:CEO|CTO|VP|Director|Manager|Founder|Partner)\s+(?:of|at)\s+([^\n|]+)/i);
+  return roleMatch?.[1]?.trim().slice(0, 60) ?? "";
+}
+
+// ── MCP Status ──────────────────────────────────────────────────────
+
+const mcpStatus: GatewayRequestHandler = async ({ respond }) => {
+  // MCP is always stdio-based; report basic availability
+  respond(true, {
+    enabled: true,
+    transport: "stdio",
+    connectedClients: 0,
+    url: null,
+  });
+};
+
 // ── Export ────────────────────────────────────────────────────────────
 
 export const secondBrainHandlers: GatewayRequestHandlers = {
@@ -1373,4 +1653,9 @@ export const secondBrainHandlers: GatewayRequestHandlers = {
   "secondBrain.obsidianSyncSetMode": obsidianSyncSetMode,
   "secondBrain.captureStatus": vaultCaptureStatus,
   "secondBrain.captureRunNow": vaultCaptureRunNow,
+  "secondBrain.memoryPulse": memoryPulse,
+  "secondBrain.activity": activityFeed,
+  "secondBrain.identityCard": identityCard,
+  "secondBrain.recentPeople": recentPeople,
+  "secondBrain.mcpStatus": mcpStatus,
 };

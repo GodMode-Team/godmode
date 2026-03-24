@@ -1,4 +1,4 @@
-import { isAllySessionKey } from "../lib/session-key-utils.js";
+import { isAllySessionKey, sessionKeysMatch } from "../lib/session-key-utils.js";
 import { GodModeApp } from "./app";
 import { appEventBus } from "./context/event-bus.js";
 import { flushChatQueueForEvent } from "./app-chat";
@@ -440,6 +440,11 @@ async function checkOnboardingStatus(host: GatewayHost) {
         setupQuickDone?: boolean;
       };
       setupApp.showSetupTab = true;
+      // Load unified setup progress for the Setup Bar
+      try {
+        const setupProgress = await host.client.request("onboarding.setupProgress", {});
+        (host as unknown as { setupProgress: unknown }).setupProgress = setupProgress;
+      } catch { /* setupProgress endpoint may not exist yet */ }
       // If identity already exists, quick setup is already done
       if (res.identity?.name) {
         setupApp.setupQuickDone = true;
@@ -627,7 +632,9 @@ export function connectGateway(host: GatewayHost) {
         // The 90-second safety timeout (line ~820) already handles truly lost
         // final events. Clearing the stream here caused visible disappear/reappear
         // whenever the WebSocket briefly disconnected mid-stream.
-        // Only clear chatRunId so the next delta/final can re-establish if needed.
+        // Clear chatRunId — it will be re-adopted from the first incoming
+        // delta or tool event for this session (see handleChatEvent and
+        // handleAgentEvent re-adoption logic).
         host.chatRunId = null;
 
         // todaySelectedDate auto-advance moved to <gm-today>
@@ -686,15 +693,17 @@ export function connectGateway(host: GatewayHost) {
       if ("chatSendingSessionKey" in chatHost) {
         chatHost.chatSendingSessionKey = null;
       }
+      // Preserve chatStream and chatRunId across disconnects so the loading
+      // indicator stays visible while reconnecting. The 90-second safety
+      // timeout (below) handles truly lost final events. Only clear chatRunId
+      // so it can be re-adopted from incoming deltas after reconnect.
       if ("chatRunId" in chatHost) {
         chatHost.chatRunId = null;
       }
-      if ("chatStream" in chatHost) {
-        chatHost.chatStream = null;
-      }
-      if ("chatStreamStartedAt" in chatHost) {
-        chatHost.chatStreamStartedAt = null;
-      }
+      // Do NOT clear chatStream here — it causes the typing indicator to
+      // vanish during brief disconnects, making the chat look frozen.
+      // chatStream is preserved and will be cleared by the final/error/aborted
+      // event when it arrives, or by the 90-second safety timeout.
 
       // Reset loading states to prevent stuck loaders on reconnect
       // This is a defensive reset - the finally blocks in loaders should handle this,
@@ -813,8 +822,25 @@ function handleGatewayEventUnsafe(host: GatewayHost, evt: GatewayEventFrame) {
             workingSessionClearTimers.delete(safetyKey);
             if (host.workingSessions.has(payload.sessionKey)) {
               host.workingSessions.delete(payload.sessionKey);
-              (host as unknown as { requestUpdate?: () => void }).requestUpdate?.();
             }
+            // Also clear stuck stream state if the final event was truly lost —
+            // without this, the ellipsis/stream bubble persists indefinitely.
+            const chatHost = host as unknown as {
+              sessionKey: string;
+              chatRunId: string | null;
+              chatStream: string | null;
+              chatStreamStartedAt: number | null;
+              requestUpdate?: () => void;
+            };
+            if (
+              sessionKeysMatch(payload.sessionKey, chatHost.sessionKey) &&
+              chatHost.chatStream !== null &&
+              chatHost.chatRunId === null
+            ) {
+              chatHost.chatStream = null;
+              chatHost.chatStreamStartedAt = null;
+            }
+            chatHost.requestUpdate?.();
           }, 90_000),
         );
       } else if (

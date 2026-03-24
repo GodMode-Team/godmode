@@ -1,0 +1,63 @@
+/**
+ * memory-get-mcp.ts — MCP tool to read specific memory files by path.
+ *
+ * Supports reading files from ~/godmode/memory/ with line-range slicing.
+ * Security: validates all paths against isAllowedPath before reading.
+ */
+
+import { type AnyAgentTool } from "openclaw/plugin-sdk";
+import { readFile } from "node:fs/promises";
+import { existsSync } from "node:fs";
+import { resolve } from "node:path";
+import { MEMORY_DIR } from "../data-paths.js";
+import { isAllowedPath } from "../lib/vault-paths.js";
+import { jsonResult } from "../lib/sdk-helpers.js";
+
+export function createMemoryGetMcpTool(): AnyAgentTool {
+  return {
+    label: "Memory Get",
+    name: "memory_get",
+    description:
+      "Read a specific memory file by path. Supports memory/*.md and vault files.",
+    parameters: {
+      type: "object" as const,
+      properties: {
+        path: {
+          type: "string",
+          description:
+            "Relative path within memory/ (e.g. 'daily/2026-03-23.md', 'people/thomas.md')",
+        },
+        from: { type: "number", description: "Start line (1-indexed)" },
+        lines: { type: "number", description: "Max lines to return" },
+      },
+      required: ["path"],
+    },
+    execute: async (_id: string, params: Record<string, unknown>) => {
+      const relPath = String(params.path ?? "");
+      if (!relPath) return jsonResult({ error: "path is required" });
+
+      const fullPath = resolve(MEMORY_DIR, relPath);
+
+      // Security: must be within allowed paths
+      if (!isAllowedPath(fullPath)) {
+        return jsonResult({ error: "Path outside allowed roots" });
+      }
+      if (!existsSync(fullPath)) {
+        return jsonResult({ text: "", path: relPath, exists: false });
+      }
+
+      let text = await readFile(fullPath, "utf8");
+      const fromLine = Number(params.from) || 1;
+      const maxLines = Number(params.lines) || 0;
+
+      if (fromLine > 1 || maxLines > 0) {
+        const allLines = text.split("\n");
+        const start = Math.max(0, fromLine - 1);
+        const end = maxLines > 0 ? start + maxLines : allLines.length;
+        text = allLines.slice(start, end).join("\n");
+      }
+
+      return jsonResult({ text, path: relPath, exists: true });
+    },
+  } as AnyAgentTool;
+}

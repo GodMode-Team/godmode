@@ -27,6 +27,8 @@ export type WorkspaceSummary = {
   path: string;
   artifactCount: number;
   sessionCount: number;
+  connectionCount: number;
+  feedCount: number;
   lastUpdated: Date;
 };
 
@@ -59,6 +61,24 @@ export type FolderTreeNode = {
   children?: FolderTreeNode[];
 };
 
+export type WorkspaceConnectionSummary = {
+  id: string;
+  type: string;
+  name: string;
+  status: "connected" | "error" | "unconfigured";
+  lastSync?: string;
+  error?: string;
+};
+
+export type FeedEntry = {
+  ts: string;
+  author: string;
+  type: string;
+  text: string;
+  ref?: string | null;
+  workspace: string;
+};
+
 export type WorkspaceDetail = WorkspaceSummary & {
   pinned: WorkspaceFileEntry[];
   pinnedSessions: WorkspaceSessionEntry[];
@@ -67,6 +87,10 @@ export type WorkspaceDetail = WorkspaceSummary & {
   sessions: WorkspaceSessionEntry[];
   tasks: WorkspaceTask[];
   memory?: WorkspaceFileEntry[];
+  connections?: WorkspaceConnectionSummary[];
+  feedEntries?: FeedEntry[];
+  feedCount?: number;
+  members?: Array<{ name: string; role: string }>;
 };
 
 export type WorkspaceCreateRequest = {
@@ -127,6 +151,12 @@ export type WorkspacesProps = {
   onBrowseBack?: () => void;
   onCreateFolder?: (path: string) => void;
   onBatchPushToDrive?: (filePaths: string[]) => void;
+  // Feed callbacks
+  onPostToFeed?: (text: string, type: string) => void;
+  onLoadMoreFeed?: () => void;
+  // Connection callbacks
+  onTestConnection?: (connectionId: string) => void;
+  onRemoveConnection?: (connectionId: string) => void;
 };
 
 function formatFileSize(size: number): string {
@@ -638,16 +668,25 @@ function renderWorkspaceCard(
     <div class="workspace-card-wrapper">
       <button
         class="workspace-card"
-        @click=${() => onSelect?.(workspace)}
+        @click=${() => {
+          console.log("[workspace-card] click:", workspace.name, "onSelect:", typeof onSelect);
+          onSelect?.(workspace);
+        }}
         title="Open workspace"
       >
         <div class="workspace-card-emoji">${workspace.emoji}</div>
         <div class="workspace-card-content">
           <div class="workspace-card-name">${workspace.name}</div>
           <div class="workspace-card-meta">
+            ${workspace.connectionCount > 0
+              ? html`<span>${workspace.connectionCount} connections</span><span class="workspace-card-separator">•</span>`
+              : nothing}
             <span>${workspace.artifactCount} artifacts</span>
             <span class="workspace-card-separator">•</span>
             <span>${workspace.sessionCount} sessions</span>
+            ${workspace.feedCount > 0
+              ? html`<span class="workspace-card-separator">•</span><span>${workspace.feedCount} feed</span>`
+              : nothing}
             <span class="workspace-card-separator">•</span>
             <span>${formatAgo(workspace.lastUpdated.getTime())}</span>
           </div>
@@ -861,6 +900,10 @@ function renderWorkspaceDetail(props: {
   onBrowseBack?: () => void;
   onCreateFolder?: (path: string) => void;
   onBatchPushToDrive?: (filePaths: string[]) => void;
+  onPostToFeed?: (text: string, type: string) => void;
+  onLoadMoreFeed?: () => void;
+  onTestConnection?: (connectionId: string) => void;
+  onRemoveConnection?: (connectionId: string) => void;
 }) {
   const {
     workspace,
@@ -1126,8 +1169,194 @@ function renderWorkspaceDetail(props: {
             `
           : nothing
         }
+
+        ${renderFeedSection({
+          entries: workspace.feedEntries ?? [],
+          onPost: props.onPostToFeed,
+          onLoadMore: props.onLoadMoreFeed,
+        })}
+
+        ${renderConnectionsSection({
+          connections: workspace.connections ?? [],
+          onTest: props.onTestConnection,
+          onRemove: props.onRemoveConnection,
+        })}
+
+        ${renderMembersSection(workspace.members ?? [])}
       </div>
     </div>
+  `;
+}
+
+// ── Feed Section ────────────────────────────────────────────────────
+
+function renderFeedSection(props: {
+  entries: FeedEntry[];
+  onPost?: (text: string, type: string) => void;
+  onLoadMore?: () => void;
+}): ReturnType<typeof html> {
+  const { entries, onPost, onLoadMore } = props;
+
+  function feedTypeIcon(type: string): string {
+    switch (type) {
+      case "decision": return "📝";
+      case "request": return "❓";
+      case "artifact": return "📦";
+      case "sop": return "📋";
+      case "alert": return "🚨";
+      default: return "💬";
+    }
+  }
+
+  function authorIcon(author: string): string {
+    if (author.includes("agent") || author.includes(":agent")) return "🤖";
+    if (author === "system") return "⚙️";
+    return "👤";
+  }
+
+  return html`
+    <section class="ws-section">
+      <div class="ws-section__header">
+        <h3>Activity Feed</h3>
+        <span>${entries.length}</span>
+      </div>
+      <div class="ws-list ws-list--scroll" style="max-height: 400px;">
+        ${entries.length === 0
+          ? html`<div class="ws-empty">
+              <span class="ws-empty-hint">No activity yet. Post updates, decisions, or requests to the feed.</span>
+            </div>`
+          : entries.map((entry) => html`
+              <div class="ws-list-row ws-feed-entry">
+                <div class="ws-list-main" style="flex-direction: column; align-items: flex-start; gap: 4px; padding: 8px 12px;">
+                  <div style="display: flex; align-items: center; gap: 8px; width: 100%;">
+                    <span>${authorIcon(entry.author)}</span>
+                    <span class="ws-list-title" style="font-weight: 500;">${entry.author}</span>
+                    <span style="margin-left: auto;">${feedTypeIcon(entry.type)}</span>
+                    <span class="ws-list-meta">${formatAgo(new Date(entry.ts).getTime())}</span>
+                  </div>
+                  <div style="padding-left: 28px; opacity: 0.9; font-size: 0.9em;">${entry.text}</div>
+                </div>
+              </div>
+            `)
+        }
+      </div>
+      ${entries.length >= 50 && onLoadMore
+        ? html`<button class="ws-task-completed-toggle" @click=${() => onLoadMore()}>Load more...</button>`
+        : nothing}
+      ${onPost
+        ? html`
+            <form
+              class="ws-task-create-form"
+              @submit=${(e: Event) => {
+                e.preventDefault();
+                const form = e.currentTarget as HTMLFormElement;
+                const input = form.querySelector(".ws-feed-input") as HTMLInputElement;
+                const select = form.querySelector(".ws-feed-type") as HTMLSelectElement;
+                const text = input.value.trim();
+                if (!text) return;
+                onPost(text, select.value);
+                input.value = "";
+              }}
+            >
+              <input
+                type="text"
+                class="ws-task-create-input ws-feed-input"
+                placeholder="Post to feed..."
+              />
+              <select class="ws-task-create-project ws-feed-type">
+                <option value="update">Update</option>
+                <option value="decision">Decision</option>
+                <option value="request">Request</option>
+                <option value="sop">SOP</option>
+                <option value="artifact">Artifact</option>
+              </select>
+              <button type="submit" class="ws-task-create-btn">Post</button>
+            </form>
+          `
+        : nothing}
+    </section>
+  `;
+}
+
+// ── Connections Section ─────────────────────────────────────────────
+
+function renderConnectionsSection(props: {
+  connections: WorkspaceConnectionSummary[];
+  onTest?: (connectionId: string) => void;
+  onRemove?: (connectionId: string) => void;
+}): ReturnType<typeof html> {
+  const { connections, onTest, onRemove } = props;
+
+  function statusBadge(status: string): ReturnType<typeof html> {
+    if (status === "connected") return html`<span class="ws-conn-status ws-conn-status--ok">Connected</span>`;
+    if (status === "error") return html`<span class="ws-conn-status ws-conn-status--error">Error</span>`;
+    return html`<span class="ws-conn-status ws-conn-status--unconfigured">Not configured</span>`;
+  }
+
+  if (connections.length === 0) {
+    return html`
+      <section class="ws-section">
+        <div class="ws-section__header">
+          <h3>Connections</h3>
+          <span>0</span>
+        </div>
+        <div class="ws-empty">
+          <span class="ws-empty-hint">No tools connected. Connect Google Drive, ClickUp, HubSpot, or other shared tools via Settings.</span>
+        </div>
+      </section>
+    `;
+  }
+
+  return html`
+    <section class="ws-section">
+      <div class="ws-section__header">
+        <h3>Connections</h3>
+        <span>${connections.length}</span>
+      </div>
+      <div class="ws-list">
+        ${connections.map((conn) => html`
+          <div class="ws-list-row">
+            <div class="ws-list-main" style="gap: 8px;">
+              <span class="ws-list-title">${conn.name}</span>
+              ${statusBadge(conn.status)}
+              ${conn.lastSync ? html`<span class="ws-list-meta">Synced ${formatAgo(new Date(conn.lastSync).getTime())}</span>` : nothing}
+              ${conn.error ? html`<span class="ws-list-meta" style="color: var(--danger-color, #e74c3c);">${conn.error}</span>` : nothing}
+            </div>
+            <div style="display: flex; gap: 4px;">
+              ${onTest ? html`<button class="ws-pin-btn" @click=${() => onTest(conn.id)} title="Test connection">Test</button>` : nothing}
+              ${onRemove ? html`<button class="ws-pin-btn" @click=${() => {
+                if (confirm(`Remove connection "${conn.name}"?`)) onRemove(conn.id);
+              }} title="Remove connection">Remove</button>` : nothing}
+            </div>
+          </div>
+        `)}
+      </div>
+    </section>
+  `;
+}
+
+// ── Members Section ─────────────────────────────────────────────────
+
+function renderMembersSection(members: Array<{ name: string; role: string }>): ReturnType<typeof html> {
+  if (members.length === 0) return html``;
+  return html`
+    <section class="ws-section">
+      <div class="ws-section__header">
+        <h3>Members</h3>
+        <span>${members.length}</span>
+      </div>
+      <div class="ws-list">
+        ${members.map((m) => html`
+          <div class="ws-list-row">
+            <div class="ws-list-main">
+              <span>👤</span>
+              <span class="ws-list-title">${m.name}</span>
+              <span class="ws-list-meta">${m.role}</span>
+            </div>
+          </div>
+        `)}
+      </div>
+    </section>
   `;
 }
 
@@ -1274,6 +1503,10 @@ export function renderWorkspaces(props: WorkspacesProps) {
       onBrowseBack: props.onBrowseBack,
       onCreateFolder: props.onCreateFolder,
       onBatchPushToDrive: props.onBatchPushToDrive,
+      onPostToFeed: props.onPostToFeed,
+      onLoadMoreFeed: props.onLoadMoreFeed,
+      onTestConnection: props.onTestConnection,
+      onRemoveConnection: props.onRemoveConnection,
     });
   }
 

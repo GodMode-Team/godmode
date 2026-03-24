@@ -41,6 +41,10 @@ import {
   browseWorkspaceFolder,
   searchWorkspaceFiles,
   createWorkspaceFolder,
+  postToFeed,
+  testConnection,
+  removeConnection,
+  loadConnections,
   type WorkspacesState,
   type BrowseEntry,
 } from "../controllers/workspaces.js";
@@ -94,6 +98,7 @@ export class GmWork extends LitElement {
   // -- Event-bus subscription cleanup ---------------------------------------
 
   private _unsubs: Array<() => void> = [];
+  private _lastConnected = false;
 
   // -- Light DOM (no shadow root) so existing CSS classes work ---------------
 
@@ -125,7 +130,7 @@ export class GmWork extends LitElement {
       }),
     );
 
-    // Auto-load initial data
+    // Auto-load initial data (may fail if context hasn't synced yet — updated() retries)
     void this._refresh();
   }
 
@@ -133,6 +138,19 @@ export class GmWork extends LitElement {
     for (const unsub of this._unsubs) unsub();
     this._unsubs = [];
     super.disconnectedCallback();
+  }
+
+  /** Re-fetch when gateway connection arrives after initial mount. */
+  protected override updated(changed: Map<PropertyKey, unknown>) {
+    super.updated?.(changed);
+    const nowConnected = this.ctx?.connected ?? false;
+    if (nowConnected && !this._lastConnected) {
+      // Context just became connected — retry load if we have no data or an error
+      if (!this.workspaces?.length || this.workspacesError) {
+        void this._refresh();
+      }
+    }
+    this._lastConnected = nowConnected;
   }
 
   // -- Render ---------------------------------------------------------------
@@ -207,23 +225,61 @@ export class GmWork extends LitElement {
       onBrowseBack: () => this._onBrowseBack(),
       onCreateFolder: (path) => this._onCreateFolder(path),
       onBatchPushToDrive: (paths) => this._onBatchPushToDrive(paths),
+      // Feed
+      onPostToFeed: (text, type) => this._onPostToFeed(text, type),
+      // Connections
+      onTestConnection: (connectionId) => this._onTestConnection(connectionId),
+      onRemoveConnection: (connectionId) => this._onRemoveConnection(connectionId),
     });
   }
 
   // -- Handlers -------------------------------------------------------------
 
   private async _refresh(): Promise<void> {
-    await loadWorkspaces(this as unknown as WorkspacesState);
-    this.allTasks = await loadAllTasksWithQueueStatus(
-      this as unknown as WorkspacesState,
-    );
+    try {
+      await loadWorkspaces(this as unknown as WorkspacesState);
+      this.allTasks = await loadAllTasksWithQueueStatus(
+        this as unknown as WorkspacesState,
+      );
+    } catch (err) {
+      console.error("[GmWork] refresh failed:", err);
+    }
     this.requestUpdate();
   }
 
   private async _onSelectWorkspace(workspace: WorkspaceSummary): Promise<void> {
     this.workspaceItemSearchQuery = "";
-    await selectWorkspace(this as unknown as WorkspacesState, workspace);
+    this.workspacesLoading = true;
     this.requestUpdate();
+    try {
+      const timeout = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error("Workspace load timed out")), 10_000),
+      );
+      await Promise.race([
+        selectWorkspace(this as unknown as WorkspacesState, workspace),
+        timeout,
+      ]);
+    } catch (err) {
+      console.error("[GmWork] workspace select failed:", err);
+      // On timeout/error, use fallback so user still sees the workspace
+      if (!this.selectedWorkspace) {
+        this.selectedWorkspace = {
+          ...workspace,
+          pinned: [],
+          pinnedSessions: [],
+          outputs: [],
+          sessions: [],
+          tasks: [],
+        };
+      }
+      this.ctx.addToast(
+        err instanceof Error ? err.message : "Failed to open " + workspace.name,
+        "error",
+      );
+    } finally {
+      this.workspacesLoading = false;
+      this.requestUpdate();
+    }
   }
 
   private _onBack(): void {
@@ -546,6 +602,70 @@ export class GmWork extends LitElement {
     if (ok) {
       this.ctx.addToast("Folder created", "success");
     }
+  }
+
+  private async _onPostToFeed(text: string, type: string): Promise<void> {
+    if (!this.selectedWorkspace) return;
+    const entry = await postToFeed(
+      this as unknown as WorkspacesState,
+      this.selectedWorkspace.id,
+      text,
+      type,
+    );
+    if (!entry) {
+      this.ctx.addToast("Failed to post to feed", "error");
+      return;
+    }
+    // Prepend to local feed entries
+    if (this.selectedWorkspace.feedEntries) {
+      this.selectedWorkspace = {
+        ...this.selectedWorkspace,
+        feedEntries: [entry, ...this.selectedWorkspace.feedEntries],
+      };
+    }
+    this.requestUpdate();
+  }
+
+  private async _onTestConnection(connectionId: string): Promise<void> {
+    if (!this.selectedWorkspace) return;
+    this.ctx.addToast("Testing connection...", "info");
+    const result = await testConnection(
+      this as unknown as WorkspacesState,
+      this.selectedWorkspace.id,
+      connectionId,
+    );
+    if (result.ok) {
+      this.ctx.addToast("Connection OK", "success");
+      // Refresh connections
+      const connections = await loadConnections(
+        this as unknown as WorkspacesState,
+        this.selectedWorkspace.id,
+      );
+      this.selectedWorkspace = { ...this.selectedWorkspace, connections };
+    } else {
+      this.ctx.addToast("Connection failed: " + (result.error ?? "unknown"), "error");
+    }
+    this.requestUpdate();
+  }
+
+  private async _onRemoveConnection(connectionId: string): Promise<void> {
+    if (!this.selectedWorkspace) return;
+    const ok = await removeConnection(
+      this as unknown as WorkspacesState,
+      this.selectedWorkspace.id,
+      connectionId,
+    );
+    if (!ok) {
+      this.ctx.addToast("Failed to remove connection", "error");
+      return;
+    }
+    this.ctx.addToast("Connection removed", "success");
+    // Update local state
+    this.selectedWorkspace = {
+      ...this.selectedWorkspace,
+      connections: (this.selectedWorkspace.connections ?? []).filter(c => c.id !== connectionId),
+    };
+    this.requestUpdate();
   }
 
   private async _onBatchPushToDrive(filePaths: string[]): Promise<void> {

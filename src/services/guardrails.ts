@@ -37,7 +37,8 @@ export type GuardrailGateId =
   | "architectureGate"
   | "deploymentGate"
   | "destructiveWriteGate"
-  | "clientFacingGate";
+  | "clientFacingGate"
+  | "frontDraftGate";
 
 export type GateConfig = {
   enabled: boolean;
@@ -119,6 +120,7 @@ export const GATE_DEFAULTS: Record<GuardrailGateId, GateConfig> = {
   deploymentGate: { enabled: true },
   destructiveWriteGate: { enabled: true },
   clientFacingGate: { enabled: true },
+  frontDraftGate: { enabled: true },
 };
 
 /** Default config for the tool-grounding gate (top-level, not a gate). */
@@ -319,6 +321,14 @@ export const GATE_DESCRIPTORS: Record<GuardrailGateId, GateDescriptor> = {
       "social media posts. First attempt blocks and asks ally to get user approval. " +
       "After user says 'approved'/'go ahead'/etc., retries pass through for 10 minutes.",
     icon: "\u{1F6A6}",
+    hook: "before_tool_call",
+  },
+  frontDraftGate: {
+    name: "Front Draft Gate",
+    description:
+      "Hard gate: all Front API email mutations must include draft_mode: \"shared\". " +
+      "Cannot be bypassed by approval. Emails are always created as shared drafts.",
+    icon: "\u{1F4DD}",
     hook: "before_tool_call",
   },
 };

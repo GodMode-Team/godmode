@@ -37,6 +37,9 @@ async function main() {
     () => import("./src/tools/x-read.js").then((m) => m.createXReadTool),
     () => import("./src/tools/honcho-query.js").then((m) => m.createHonchoQueryTool),
     () => import("./src/tools/composio-tool.js").then((m) => m.createComposioExecuteTool),
+    () => import("./src/tools/memory-get-mcp.js").then((m) => m.createMemoryGetMcpTool),
+    () => import("./src/tools/memory-search-shim.js").then((m) => m.createMemorySearchShimTool),
+    () => import("./src/tools/capture-thought.js").then((m) => m.createCaptureThoughtTool),
   ];
 
   let loaded = 0;

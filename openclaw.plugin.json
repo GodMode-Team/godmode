@@ -1,8 +1,42 @@
 {
   "id": "godmode",
   "name": "GodMode",
-  "description": "Personal AI Operating System for entrepreneurs",
+  "description": "Personal AI Operating System — your deeply contextual AI ally that manages tasks, memory, integrations, and a swarm of agents",
   "version": "1.8.0",
+  "license": "AGPL-3.0-only",
+  "author": {
+    "name": "GodMode Team",
+    "url": "https://lifeongodmode.com"
+  },
+  "repository": "https://github.com/GodMode-Team/godmode-plugin",
+  "homepage": "https://lifeongodmode.com",
+  "keywords": ["ai", "personal-ai", "agent", "memory", "productivity", "second-brain", "automation"],
+  "categories": ["productivity", "ai-agents", "automation", "memory"],
+  "icon": "assets/icon.png",
+  "screenshots": [],
+  "capabilities": {
+    "hooks": [
+      "before_prompt_build",
+      "message_received",
+      "message_sending",
+      "gateway_start"
+    ],
+    "tools": true,
+    "ui": true,
+    "rpc": true,
+    "mcp": true,
+    "standalone": true
+  },
+  "requirements": {
+    "node": ">=22",
+    "openclaw": ">=2026.2.0 <2027.0.0"
+  },
+  "quickStart": {
+    "install": "openclaw plugins install @godmode-team/godmode",
+    "alternative": "npx create-godmode",
+    "requiredEnv": ["ANTHROPIC_API_KEY"],
+    "optionalEnv": ["HONCHO_API_KEY", "COMPOSIO_API_KEY", "OBSIDIAN_VAULT_PATH"]
+  },
   "configSchema": {
     "type": "object",
     "properties": {

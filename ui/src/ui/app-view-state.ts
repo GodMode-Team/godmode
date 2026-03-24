@@ -452,6 +452,12 @@ export type AppViewState = {
   handleCapabilityAction?: (id: string) => void;
   handleHideSetup?: () => void;
   handleRunAssessment?: () => void;
+  // Setup bar state (sidebar onboarding stepper)
+  setupBarDismissed?: boolean;
+  setupProgress?: import("./views/setup-bar").SetupProgress | null;
+  continueSetup?: () => void;
+  dismissSetup?: () => void;
+  handleSetupStepClick?: (stepId: string) => void;
   // Memory wizard handlers
   handleWizardOpen?: () => void;
   handleWizardClose?: () => void;

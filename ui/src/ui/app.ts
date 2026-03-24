@@ -496,6 +496,9 @@ export class GodModeApp extends LitElement {
 
   // Setup tab state (80/20 fast onboarding)
   @state() showSetupTab = false;
+  // Setup bar state (sidebar onboarding stepper)
+  @state() setupBarDismissed = false;
+  @state() setupProgress: import("./views/setup-bar").SetupProgress | null = null;
   @state() setupCapabilities: { capabilities: Array<{ id: string; title: string; description: string; icon: string; status: "active" | "available" | "coming-soon"; detail?: string; action?: string }>; percentComplete: number } | null = null;
   @state() setupCapabilitiesLoading = false;
   @state() setupQuickDone = false;
@@ -2825,6 +2828,40 @@ export class GodModeApp extends LitElement {
     void this.client.request("onboarding.assess", {}).then(() => {
       this.handleLoadCapabilities();
     });
+  }
+
+  // ── Setup bar handlers (sidebar onboarding stepper) ──────────
+
+  continueSetup() {
+    const currentStep = this.setupProgress?.currentStep ?? "welcome";
+    this._navigateToSetupStep(currentStep);
+  }
+
+  dismissSetup() {
+    this.setupBarDismissed = true;
+    void import("./controllers/setup.js").then(({ dismissSetupBar }) => dismissSetupBar(this));
+  }
+
+  handleSetupStepClick(stepId: string) {
+    this._navigateToSetupStep(stepId);
+  }
+
+  /** Load setup progress from the unified RPC endpoint */
+  async loadSetupProgress() {
+    const mod = await import("./controllers/setup.js");
+    await mod.loadSetupProgress(this);
+  }
+
+  private _navigateToSetupStep(stepId: string) {
+    const prompts: Record<string, string> = {
+      "welcome": "Let's get started! What should I call you?",
+      "api-key": "Help me connect my Anthropic API key so you can work at full power.",
+      "memory": "Help me set up persistent memory with Honcho so you remember our conversations.",
+      "integrations": "Help me connect my tools via Composio — starting with Google and GitHub.",
+      "second-brain": "Help me link my Obsidian vault as my Second Brain.",
+    };
+    const prompt = prompts[stepId] ?? "Help me continue setting up GodMode.";
+    this.handleStartChatWithPrompt(prompt);
   }
 
   // User profile handlers

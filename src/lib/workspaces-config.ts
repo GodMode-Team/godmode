@@ -32,6 +32,16 @@ export type WorkspaceCurationConfig = {
   threshold?: number;
 };
 
+export type WorkspaceConnection = {
+  id: string;
+  type: string;
+  name: string;
+  status: "connected" | "error" | "unconfigured";
+  config: Record<string, string>;
+  lastSync?: string;
+  error?: string;
+};
+
 export type WorkspaceConfigEntry = {
   id: string;
   name: string;
@@ -43,6 +53,8 @@ export type WorkspaceConfigEntry = {
   pinnedSessions: string[];
   /** Directories (relative to path) scanned for artifacts. Defaults to ["outputs"]. */
   artifactDirs: string[];
+  /** Shared tool connections (Google Drive, ClickUp, HubSpot, etc.). */
+  connections?: WorkspaceConnection[];
   sync?: WorkspaceGitSyncConfig;
   team?: TeamWorkspaceConfig;
   curation?: WorkspaceCurationConfig;
@@ -582,11 +594,13 @@ export async function ensureWorkspaceFolders(
   await fs.mkdir(path.join(workspacePath, "sessions"), { recursive: true });
   await fs.mkdir(path.join(workspacePath, "outputs"), { recursive: true });
 
+  // All workspace types get a memory dir for scoped thoughts/captures
+  await fs.mkdir(path.join(workspacePath, "memory"), { recursive: true });
+
   if (type === "team") {
     const teamDirs = [
       ".godmode",
       ".godmode/local",
-      "memory",
       "skills",
       "tools",
       "comms",

@@ -929,33 +929,54 @@ async function findSessionKeyFromSessionId(sessionId: string): Promise<string | 
 }
 
 const list: GatewayRequestHandler = async ({ respond }) => {
-  const config = await readWorkspaceConfig();
+  try {
+    const config = await readWorkspaceConfig();
 
-  const summaries = await Promise.all(
-    config.workspaces.map(async (workspace) => {
-      const outputs = await listWorkspaceOutputs(workspace);
-      const sessions = await listWorkspaceSessions(workspace.id, config);
-      const summary = resolveWorkspaceSummary(workspace, outputs, sessions);
-      return {
-        id: summary.id,
-        name: summary.name,
-        emoji: summary.emoji,
-        type: summary.type,
-        path: summary.path,
-        artifactCount: summary.artifactCount,
-        sessionCount: summary.sessionCount,
-        lastUpdated: summary.lastUpdated,
-        lastScanned: summary.lastScanned,
-        legacyType: summary.legacyType,
-      };
-    }),
-  );
+    const summaries = await Promise.all(
+      config.workspaces.map(async (workspace) => {
+        try {
+          const outputs = await listWorkspaceOutputs(workspace);
+          const sessions = await listWorkspaceSessions(workspace.id, config);
+          const summary = resolveWorkspaceSummary(workspace, outputs, sessions);
+          return {
+            id: summary.id,
+            name: summary.name,
+            emoji: summary.emoji,
+            type: summary.type,
+            path: summary.path,
+            artifactCount: summary.artifactCount,
+            sessionCount: summary.sessionCount,
+            lastUpdated: summary.lastUpdated,
+            lastScanned: summary.lastScanned,
+            legacyType: summary.legacyType,
+          };
+        } catch (wsErr) {
+          console.error(`[workspaces.list] failed to load workspace ${workspace.name}:`, wsErr);
+          return {
+            id: workspace.id,
+            name: workspace.name,
+            emoji: workspace.emoji ?? "📁",
+            type: workspace.type ?? "project",
+            path: workspace.path,
+            artifactCount: 0,
+            sessionCount: 0,
+            lastUpdated: new Date().toISOString(),
+            lastScanned: Date.now(),
+            legacyType: null,
+          };
+        }
+      }),
+    );
 
-  respond(true, {
-    configPath: CANONICAL_WORKSPACES_CONFIG_PATH,
-    workspaces: summaries,
-    sources: summaries.map((workspace) => workspace.path),
-  });
+    respond(true, {
+      configPath: CANONICAL_WORKSPACES_CONFIG_PATH,
+      workspaces: summaries,
+      sources: summaries.map((workspace) => workspace.path),
+    });
+  } catch (err) {
+    console.error("[workspaces.list] handler failed:", err);
+    respond(true, { workspaces: [], sources: [], error: err instanceof Error ? err.message : "Failed to list workspaces" });
+  }
 };
 
 /**
@@ -997,74 +1018,93 @@ const get: GatewayRequestHandler = async ({ params, respond }) => {
     return;
   }
 
-  const config = await readWorkspaceConfig();
-  const workspace = findWorkspaceById(config, id);
-  if (!workspace) {
-    respond(true, { workspace: null, error: `workspace not found: ${id}` });
-    return;
-  }
-
-  const rawOutputs = await listWorkspaceOutputs(workspace);
-  const outputs = await enrichWorkspaceEntriesForSearch(workspace, rawOutputs);
-  const sessions = await listWorkspaceSessions(workspace.id, config);
-  const pinned = await getPinnedEntries(workspace, outputs);
-  const summary = resolveWorkspaceSummary(workspace, outputs, sessions);
-
-  // Resolve pinned sessions
-  const cfg = await loadConfig();
-  const combinedStore = (await loadCombinedSessionStoreForGateway(cfg)).store;
-  const pinnedSessions: WorkspaceSessionEntry[] = [];
-  for (const sessionKey of workspace.pinnedSessions) {
-    const canonicalSessionKey = sessionKey.trim().toLowerCase();
-    const entry = combinedStore[canonicalSessionKey] as Record<string, unknown> | undefined;
-    if (!entry) {
-      continue;
+  try {
+    const config = await readWorkspaceConfig();
+    const workspace = findWorkspaceById(config, id);
+    if (!workspace) {
+      respond(true, { workspace: null, error: `workspace not found: ${id}` });
+      return;
     }
-    const updatedAt = Number(entry.updatedAt ?? Date.now());
-    pinnedSessions.push({
-      id: typeof entry.sessionId === "string" ? entry.sessionId : "",
-      key: sessionKey,
-      title: resolveWorkspaceSessionTitle(sessionKey, entry),
-      created: new Date(updatedAt).toISOString(),
-      status: deriveSessionStatus(updatedAt),
-      workspaceSubfolder: null,
+
+    const rawOutputs = await listWorkspaceOutputs(workspace);
+    const outputs = await enrichWorkspaceEntriesForSearch(workspace, rawOutputs);
+    const sessions = await listWorkspaceSessions(workspace.id, config);
+    const pinned = await getPinnedEntries(workspace, outputs);
+    const summary = resolveWorkspaceSummary(workspace, outputs, sessions);
+
+    // Resolve pinned sessions (best-effort — don't block workspace load)
+    let pinnedSessions: WorkspaceSessionEntry[] = [];
+    try {
+      const cfg = await loadConfig();
+      const combinedStore = (await loadCombinedSessionStoreForGateway(cfg)).store;
+      for (const sessionKey of workspace.pinnedSessions) {
+        const canonicalSessionKey = sessionKey.trim().toLowerCase();
+        const entry = combinedStore[canonicalSessionKey] as Record<string, unknown> | undefined;
+        if (!entry) {
+          continue;
+        }
+        const updatedAt = Number(entry.updatedAt ?? Date.now());
+        pinnedSessions.push({
+          id: typeof entry.sessionId === "string" ? entry.sessionId : "",
+          key: sessionKey,
+          title: resolveWorkspaceSessionTitle(sessionKey, entry),
+          created: new Date(updatedAt).toISOString(),
+          status: deriveSessionStatus(updatedAt),
+          workspaceSubfolder: null,
+        });
+      }
+    } catch (pinErr) {
+      console.error("[workspaces.get] pinned sessions failed:", pinErr);
+    }
+
+    // Load tasks scoped to this workspace (match on name or resolved ID)
+    let workspaceTasks: NativeTask[] = [];
+    try {
+      const tasksData = await readTasks();
+      const wsId = workspace.id.toLowerCase();
+      const wsName = workspace.name.toLowerCase();
+      workspaceTasks = tasksData.tasks.filter((t) => {
+        const pid = (t as Record<string, unknown>).projectId;
+        if (pid === workspace.id) return true;
+        if (!t.project) return false;
+        const proj = t.project.toLowerCase();
+        return proj === wsName || proj === wsId || proj.includes(`— ${wsId}`) || proj.includes(`— ${wsName}`);
+      });
+    } catch (taskErr) {
+      console.error("[workspaces.get] tasks failed:", taskErr);
+    }
+
+    // Load shared memory files (team workspaces store knowledge in memory/)
+    let memoryFiles: WorkspaceFileEntry[] = [];
+    try {
+      memoryFiles = await listWorkspaceMemoryFiles(workspace);
+    } catch (memErr) {
+      console.error("[workspaces.get] memory files failed:", memErr);
+    }
+
+    respond(true, {
+      workspace: {
+        ...workspace,
+        path: summary.path,
+        artifactCount: summary.artifactCount,
+        sessionCount: summary.sessionCount,
+        lastUpdated: summary.lastUpdated,
+        type: workspace.type,
+        legacyType: summary.legacyType,
+        lastScanned: Date.now(),
+      },
+      pinned,
+      pinnedSessions,
+      outputs,
+      folderTree: buildFolderTree(outputs),
+      sessions,
+      tasks: workspaceTasks,
+      memory: memoryFiles,
     });
+  } catch (err) {
+    console.error("[workspaces.get] handler failed:", err);
+    respond(true, { workspace: null, error: err instanceof Error ? err.message : "Failed to load workspace" });
   }
-
-  // Load tasks scoped to this workspace (match on name or resolved ID)
-  const tasksData = await readTasks();
-  const wsId = workspace.id.toLowerCase();
-  const wsName = workspace.name.toLowerCase();
-  const workspaceTasks: NativeTask[] = tasksData.tasks.filter((t) => {
-    const pid = (t as Record<string, unknown>).projectId;
-    if (pid === workspace.id) return true;
-    if (!t.project) return false;
-    const proj = t.project.toLowerCase();
-    return proj === wsName || proj === wsId || proj.includes(`— ${wsId}`) || proj.includes(`— ${wsName}`);
-  });
-
-  // Load shared memory files (team workspaces store knowledge in memory/)
-  const memoryFiles = await listWorkspaceMemoryFiles(workspace);
-
-  respond(true, {
-    workspace: {
-      ...workspace,
-      path: summary.path,
-      artifactCount: summary.artifactCount,
-      sessionCount: summary.sessionCount,
-      lastUpdated: summary.lastUpdated,
-      type: workspace.type,
-      legacyType: summary.legacyType,
-      lastScanned: Date.now(),
-    },
-    pinned,
-    pinnedSessions,
-    outputs,
-    folderTree: buildFolderTree(outputs),
-    sessions,
-    tasks: workspaceTasks,
-    memory: memoryFiles,
-  });
 };
 
 const readFile: GatewayRequestHandler = async ({ params, respond }) => {

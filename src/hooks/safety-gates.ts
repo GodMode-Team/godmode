@@ -1027,49 +1027,151 @@ export async function checkArchitectureGate(
 //   2. User sends ANY response (even "ok") → auto-approves for 10 min
 //   3. Ally retries → passes through
 
-/** sessionKey → timestamp of approval */
-const _approvals = new Map<string, number>();
+// ── Approval Gate v3 ──────────────────────────────────────────────
+//
+// v1/v2 failed: message_received NEVER fires for webchat, in-memory
+// Maps wiped on restart, session keys differ per tab.
+//
+// v3 uses ONLY before_tool_call + before_prompt_build (both fire for
+// ALL channels). Flow:
+//   1. before_tool_call: gated action → BLOCK, write to disk
+//   2. before_prompt_build (next turn): block >2s old → approve + nudge
+//   3. before_tool_call: gated action + approval → ALLOW
+//
+// "Next turn" = before_prompt_build fires >2s after block. Disk state
+// survives restarts. Channel key strips webchat random suffix.
 
-/** sessionKey → true if a gate blocked since the user's last message */
-const _pendingApproval = new Map<string, boolean>();
+import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 
-/** TTL for approvals — 10 minutes */
+const APPROVAL_STATE_PATH = path.join(GODMODE_ROOT, "data", "approval-state.json");
 const APPROVAL_TTL_MS = 10 * 60 * 1000;
 
+interface ApprovalState {
+  blocked: Record<string, { action: string; ts: number }>;
+  approved: Record<string, { action: string; ts: number }>;
+}
+
+function readApprovalState(): ApprovalState {
+  try {
+    return JSON.parse(readFileSync(APPROVAL_STATE_PATH, "utf-8")) as ApprovalState;
+  } catch {
+    return { blocked: {}, approved: {} };
+  }
+}
+
+function writeApprovalState(s: ApprovalState): void {
+  try {
+    mkdirSync(path.join(GODMODE_ROOT, "data"), { recursive: true });
+    const now = Date.now();
+    for (const k of Object.keys(s.blocked)) if (now - s.blocked[k].ts > APPROVAL_TTL_MS) delete s.blocked[k];
+    for (const k of Object.keys(s.approved)) {
+      const v = s.approved[k];
+      const ts = typeof v === "number" ? v : v.ts; // backwards compat with old format
+      if (now - ts > APPROVAL_TTL_MS) delete s.approved[k];
+    }
+    writeFileSync(APPROVAL_STATE_PATH, JSON.stringify(s, null, 2));
+  } catch { /* non-fatal */ }
+}
+
+/** Strip random suffix: "agent:main:webchat-abc123" → "agent:main:webchat" */
+function approvalChannel(sk: string | undefined): string | undefined {
+  if (!sk) return undefined;
+  return sk.replace(/(webchat|chat)-[a-f0-9]+$/i, "$1");
+}
+
+/** Called by gates when they block. Returns "rapid-retry" if <60s since last. */
+export function markPendingApproval(sk: string | undefined, action?: string): "rapid-retry" | "first" {
+  const ch = approvalChannel(sk);
+  if (!ch) return "first";
+  const s = readApprovalState();
+  const prev = s.blocked[ch];
+  const rapid = !!prev && Date.now() - prev.ts < 60_000;
+  if (!rapid) {
+    // First block — record timestamp. DON'T overwrite on rapid retries
+    // or the timestamp keeps refreshing and consumeApprovalNudge never
+    // sees it as >2s old.
+    s.blocked[ch] = { action: action || "a blocked action", ts: Date.now() };
+    writeApprovalState(s);
+  }
+  return rapid ? "rapid-retry" : "first";
+}
+
+/** The ONE phrase that grants approval */
+const EXPLICIT_APPROVAL_PHRASE = /\bI\s+approve\b/i;
+
 /**
- * Called by gates when they block an action. Marks the session as
- * having a pending approval request.
+ * Called from before_prompt_build (fires for ALL channels incl webchat).
+ * If a block exists from a previous turn (>2s old), promote to approval.
+ * A new turn means the user sent a message → implicit approval.
  */
-export function markPendingApproval(sessionKey: string | undefined): void {
-  if (sessionKey) _pendingApproval.set(sessionKey, true);
+export function consumeApprovalNudge(sk: string | undefined): string | undefined {
+  const ch = approvalChannel(sk);
+  if (!ch) return undefined;
+  const s = readApprovalState();
+  const blocked = s.blocked[ch];
+  if (!blocked) return undefined;
+  if (Date.now() - blocked.ts < 2_000) return undefined; // same turn
+  delete s.blocked[ch];
+  s.approved[ch] = { action: blocked.action, ts: Date.now() };
+  writeApprovalState(s);
+  return [
+    "## ACTION APPROVED",
+    `The user approved: **${blocked.action}**`,
+    "Retry the exact same tool call now. It will go through.",
+    "NOTE: This approval is scoped to this specific action only.",
+  ].join("\n");
 }
 
 /**
- * Called from message_received. If a gate blocked in this session since
- * the user's last message, the user's new message = implicit approval.
- * Also detects explicit approval phrases for immediate grant.
+ * Check if approval exists for this channel, optionally scoped to an action.
+ * If actionHint is provided, the approved action must share a common prefix
+ * (e.g., both "client-facing command: curl POST https://api2.frontapp.com/...")
+ * to prevent "approved to deploy" from granting "approved to send email".
  */
-export function processUserMessage(
-  sessionKey: string | undefined,
-  _userMessage: string,
-): boolean {
-  if (!sessionKey) return false;
+function hasApproval(sk: string | undefined, actionHint?: string): boolean {
+  const ch = approvalChannel(sk);
+  if (!ch) return false;
+  const s = readApprovalState();
+  const entry = s.approved[ch];
+  if (!entry) return false;
+  // Backwards compat: old format stored just a number
+  const ts = typeof entry === "number" ? entry : entry.ts;
+  if (Date.now() - ts >= APPROVAL_TTL_MS) return false;
+  // If no action hint, any valid approval matches (backwards compat)
+  if (!actionHint) return true;
+  // Scoped check: approved action must share the same category prefix
+  const approvedAction = typeof entry === "number" ? "" : entry.action;
+  if (!approvedAction) return true; // old-format entry, allow for compat
+  return approvalActionsMatch(approvedAction, actionHint);
+}
 
-  // If a gate blocked since last user message, any response = approval
-  if (_pendingApproval.get(sessionKey)) {
-    _pendingApproval.delete(sessionKey);
-    _approvals.set(sessionKey, Date.now());
+/**
+ * Check if two action descriptions are in the same scope.
+ * Matches on the action category prefix (e.g., "client-facing command:",
+ * "client-facing comms:", "deployment:") so that approving a curl POST
+ * doesn't also approve a Slack message.
+ */
+function approvalActionsMatch(approved: string, requested: string): boolean {
+  // Extract category prefix: everything before the first ":"
+  const approvedCat = approved.split(":")[0]?.trim().toLowerCase() ?? "";
+  const requestedCat = requested.split(":")[0]?.trim().toLowerCase() ?? "";
+  if (!approvedCat || !requestedCat) return true; // can't determine → allow
+  return approvedCat === requestedCat;
+}
+
+/** Legacy — Slack/iMessage still use message_received */
+export function processUserMessage(sk: string | undefined, _msg: string): boolean {
+  const ch = approvalChannel(sk);
+  if (!ch) return false;
+  const s = readApprovalState();
+  if (s.blocked[ch]) {
+    const action = s.blocked[ch].action;
+    delete s.blocked[ch];
+    s.approved[ch] = { action, ts: Date.now() };
+    writeApprovalState(s);
     return true;
   }
-
   return false;
-}
-
-/** Check if user has granted approval for this session recently */
-function hasApproval(sessionKey: string | undefined): boolean {
-  if (!sessionKey) return false;
-  const ts = _approvals.get(sessionKey);
-  return !!ts && Date.now() - ts < APPROVAL_TTL_MS;
 }
 
 // ── Deployment Gate ────────────────────────────────────────────────
@@ -1115,14 +1217,12 @@ const DEPLOYMENT_HARD_BLOCK_MESSAGE = [
 ].join("\n");
 
 const DEPLOYMENT_APPROVAL_MESSAGE = [
-  "\u{1F6A8} APPROVAL REQUIRED: This is a production/deploy action.",
+  "APPROVAL GATE — this deploy/push needs user approval first.",
   "",
-  "This would push to a protected branch, deploy to production, or merge a PR.",
-  "",
-  "You MUST:",
-  "1. Tell the user EXACTLY what you're about to do",
-  "2. Wait for them to say 'approved', 'go ahead', 'do it', or similar",
-  "3. Only then retry — it will go through after approval",
+  "STOP. Do NOT retry this command again in this turn.",
+  "Tell the user what you want to deploy/push and ask them to type 'approve' in chat.",
+  "There is NO /approve command. Just ask naturally and wait for their chat reply.",
+  "When they reply, you will get an ACTION APPROVED nudge — then retry.",
 ].join("\n");
 
 /**
@@ -1159,9 +1259,10 @@ export async function checkDeploymentGate(
     return DEPLOYMENT_HARD_BLOCK_MESSAGE;
   }
 
-  // Other deploy actions — approval-gated
+  // Other deploy actions — approval-gated (scoped)
   if (DEPLOYMENT_APPROVAL_PATTERNS.some((p) => p.test(command))) {
-    if (hasApproval(sessionKey)) {
+    const deployAction = `deployment: ${command.slice(0, 100)}`;
+    if (hasApproval(sessionKey, deployAction)) {
       void logGateActivity(
         "deploymentGate",
         "fired",
@@ -1171,13 +1272,16 @@ export async function checkDeploymentGate(
       return undefined;
     }
 
-    markPendingApproval(sessionKey);
+    const retryType = markPendingApproval(sessionKey, deployAction);
     void logGateActivity(
       "deploymentGate",
       "blocked",
       `Deployment GATED (needs approval): ${command.slice(0, 120)}`,
       sessionKey,
     );
+    if (retryType === "rapid-retry") {
+      return "STOP RETRYING. You already tried this and it was blocked. You MUST wait for the user to respond. Tell them what you need to do and STOP. Do not call this tool again until you see an ACTION APPROVED nudge.";
+    }
     return DEPLOYMENT_APPROVAL_MESSAGE;
   }
 
@@ -1345,22 +1449,64 @@ const CLIENT_FACING_PATTERNS = [
   /twitter.*\/statuses/i,
 ];
 
+const RAPID_RETRY_MESSAGE = "STOP RETRYING. You already tried this and it was blocked. You MUST wait for the user to respond. Tell them what you need to do and STOP. Do not call this tool again until you see an ACTION APPROVED nudge.";
+
+// ── Front Draft Hard Gate ───────────────────────────────────────────
+// Hard block: Front API POST/PATCH calls MUST include draft_mode.
+// No approval override. The ally must rewrite with draft_mode: "shared".
+// Modeled after force-push hard block — code-level, not approval-gated.
+
+const FRONT_API_PATTERN = /api2\.frontapp\.com/i;
+const FRONT_DRAFT_PRESENT = /["']?draft_mode["']?\s*:\s*["']shared["']/i;
+
+const FRONT_DRAFT_BLOCK_MESSAGE = [
+  "HARD BLOCK — Front emails MUST be created as drafts.",
+  "",
+  "Your curl command hits api2.frontapp.com but does NOT include `\"draft_mode\": \"shared\"` in the JSON body.",
+  "This is a hard safety gate — no approval can override it.",
+  "",
+  "Rewrite your command to include `\"draft_mode\": \"shared\"` in the JSON body, then retry.",
+  "The email will be created as a shared draft in Front. Tell the user it's ready for review.",
+  "",
+  "Example: curl ... -d '{\"to\": [...], \"body\": \"...\", \"draft_mode\": \"shared\"}'",
+].join("\n");
+
+/**
+ * Hard gate: Front API mutations must include draft_mode: "shared".
+ * Returns block message if Front POST/PATCH without draft_mode, undefined otherwise.
+ * Cannot be bypassed by approval state — this is a code-level enforcement.
+ */
+export function enforceFrontDraftMode(
+  command: string,
+  sessionKey?: string,
+): string | undefined {
+  // Only applies to Front API calls
+  if (!FRONT_API_PATTERN.test(command)) return undefined;
+
+  // Only applies to mutations (POST/PATCH via -d, --data, -X POST, etc.)
+  const isMutation = CLIENT_FACING_PATTERNS.some((p) => p.test(command));
+  if (!isMutation) return undefined;
+
+  // Check if draft_mode is already present
+  if (FRONT_DRAFT_PRESENT.test(command)) return undefined;
+
+  // Hard block — no approval override
+  void logGateActivity(
+    "frontDraftGate",
+    "blocked",
+    `HARD BLOCK: Front API mutation without draft_mode: ${command.slice(0, 150)}`,
+    sessionKey,
+  );
+  return FRONT_DRAFT_BLOCK_MESSAGE;
+}
+
 const CLIENT_FACING_BLOCK_MESSAGE = [
-  "\u{1F6D1} APPROVAL REQUIRED: This action needs user approval before executing.",
+  "APPROVAL GATE — this client-facing action needs user approval first.",
   "",
-  "This tool call would perform a client-facing or public action:",
-  "- Sending invites, emails, or notifications",
-  "- Creating/modifying content on external platforms",
-  "- Publishing or posting to public systems",
-  "- Mutating data via external API calls",
-  "",
-  "You MUST:",
-  "1. Present the EXACT action you want to take",
-  "2. Show the specific API call, recipients, or content",
-  "3. Wait for the user to say 'approved', 'go ahead', 'do it', or similar",
-  "4. Only then retry the action — it will go through after approval",
-  "",
-  "Planning, reading, and searching are fine. Executing requires a green light.",
+  "STOP. Do NOT retry this command again in this turn.",
+  "Tell the user the exact API call/recipient/content and ask them to type 'approve' in chat.",
+  "There is NO /approve command. Just ask naturally and wait for their chat reply.",
+  "When they reply, you will get an ACTION APPROVED nudge — then retry.",
 ].join("\n");
 
 /**
@@ -1402,8 +1548,13 @@ export async function checkClientFacingGate(
       const isInternal = INTERNAL_DOMAINS.some((d) => command.includes(d));
       if (isInternal) return undefined;
 
-      // Check if user already approved
-      if (hasApproval(sessionKey)) {
+      // HARD GATE: Front API must use draft_mode (no approval override)
+      const frontBlock = enforceFrontDraftMode(command, sessionKey);
+      if (frontBlock) return frontBlock;
+
+      // Check if user already approved (scoped to action category)
+      const actionDesc1 = `client-facing command: ${command.slice(0, 100)}`;
+      if (hasApproval(sessionKey, actionDesc1)) {
         void logGateActivity(
           "clientFacingGate",
           "approved",
@@ -1413,14 +1564,14 @@ export async function checkClientFacingGate(
         return undefined;
       }
 
-      markPendingApproval(sessionKey);
+      const rt1 = markPendingApproval(sessionKey, actionDesc1);
       void logGateActivity(
         "clientFacingGate",
         "blocked",
         `Client-facing action GATED: ${command.slice(0, 150)}`,
         sessionKey,
       );
-      return CLIENT_FACING_BLOCK_MESSAGE;
+      return rt1 === "rapid-retry" ? RAPID_RETRY_MESSAGE : CLIENT_FACING_BLOCK_MESSAGE;
     }
   }
 
@@ -1432,7 +1583,22 @@ export async function checkClientFacingGate(
     if (!SAFE_HTTP_METHODS.includes(method)) {
       const isInternal = INTERNAL_DOMAINS.some((d) => url.includes(d));
       if (!isInternal) {
-        if (hasApproval(sessionKey)) {
+        // HARD GATE: Front API via fetch must include draft_mode in body
+        if (FRONT_API_PATTERN.test(url)) {
+          const body = typeof params.body === "string" ? params.body : JSON.stringify(params.body ?? "");
+          if (!FRONT_DRAFT_PRESENT.test(body)) {
+            void logGateActivity(
+              "frontDraftGate",
+              "blocked",
+              `HARD BLOCK: Front fetch without draft_mode: ${method.toUpperCase()} ${url.slice(0, 120)}`,
+              sessionKey,
+            );
+            return FRONT_DRAFT_BLOCK_MESSAGE;
+          }
+        }
+
+        const actionDesc2 = `client-facing fetch: ${method.toUpperCase()} ${url.slice(0, 100)}`;
+        if (hasApproval(sessionKey, actionDesc2)) {
           void logGateActivity(
             "clientFacingGate",
             "approved",
@@ -1442,14 +1608,14 @@ export async function checkClientFacingGate(
           return undefined;
         }
 
-        markPendingApproval(sessionKey);
+        const rt2 = markPendingApproval(sessionKey, actionDesc2);
         void logGateActivity(
           "clientFacingGate",
           "blocked",
           `Client-facing fetch GATED: ${method.toUpperCase()} ${url.slice(0, 120)}`,
           sessionKey,
         );
-        return CLIENT_FACING_BLOCK_MESSAGE;
+        return rt2 === "rapid-retry" ? RAPID_RETRY_MESSAGE : CLIENT_FACING_BLOCK_MESSAGE;
       }
     }
   }
@@ -1469,8 +1635,9 @@ export async function checkClientFacingGate(
       if (msgType !== "invite") return undefined; // internal team comms OK
     }
 
-    // Check if user already approved comms actions for this session
-    if (hasApproval(sessionKey)) {
+    // Check if user already approved comms actions for this session (scoped)
+    const actionDesc3 = `client-facing comms: ${name}`;
+    if (hasApproval(sessionKey, actionDesc3)) {
       void logGateActivity(
         "clientFacingGate",
         "approved",
@@ -1480,14 +1647,14 @@ export async function checkClientFacingGate(
       return undefined;
     }
 
-    markPendingApproval(sessionKey);
+    const rt3 = markPendingApproval(sessionKey, actionDesc3);
     void logGateActivity(
       "clientFacingGate",
       "blocked",
       `Client-facing comms GATED: ${name}`,
       sessionKey,
     );
-    return CLIENT_FACING_BLOCK_MESSAGE;
+    return rt3 === "rapid-retry" ? RAPID_RETRY_MESSAGE : CLIENT_FACING_BLOCK_MESSAGE;
   }
 
   return undefined;

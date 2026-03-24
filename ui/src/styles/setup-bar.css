@@ -1,0 +1,253 @@
+/* ── Setup Bar — persistent sidebar onboarding stepper ────────── */
+
+.setup-bar {
+  padding: 12px 12px 8px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-elevated);
+}
+
+.setup-bar__header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.setup-bar__header-icon {
+  font-size: 14px;
+  line-height: 1;
+}
+
+.setup-bar__header-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-strong);
+  letter-spacing: 0.01em;
+}
+
+/* ── Progress bar ───────────────────────────────────────────── */
+
+.setup-bar__progress {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.setup-bar__progress-track {
+  flex: 1;
+  height: 4px;
+  background: var(--border);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.setup-bar__progress-fill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 2px;
+  transition: width 0.4s ease;
+}
+
+.setup-bar__progress-label {
+  font-size: 11px;
+  color: var(--muted);
+  min-width: 24px;
+  text-align: right;
+}
+
+/* ── Step list ──────────────────────────────────────────────── */
+
+.setup-bar__steps {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 10px;
+}
+
+.setup-bar__step {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 8px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  cursor: pointer;
+  transition: background 0.15s ease, opacity 0.15s ease;
+  text-align: left;
+  width: 100%;
+  font-family: inherit;
+}
+
+.setup-bar__step:hover:not(:disabled) {
+  background: var(--bg-hover);
+}
+
+.setup-bar__step:disabled {
+  cursor: default;
+}
+
+/* Completed step */
+.setup-bar__step--completed {
+  opacity: 0.65;
+}
+
+.setup-bar__step--completed .setup-bar__step-title {
+  color: var(--ok);
+  text-decoration: line-through;
+  text-decoration-color: rgba(34, 197, 94, 0.3);
+}
+
+/* Current step */
+.setup-bar__step--current {
+  background: var(--accent-subtle);
+}
+
+.setup-bar__step--current .setup-bar__step-title {
+  color: var(--accent);
+  font-weight: 500;
+}
+
+.setup-bar__step--current .setup-bar__step-arrow {
+  color: var(--accent);
+  margin-left: auto;
+  font-size: 12px;
+}
+
+/* Pulse animation on current step */
+.setup-bar__step--current::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 3px;
+  height: 16px;
+  background: var(--accent);
+  border-radius: 2px;
+  animation: setup-bar-pulse 2s ease-in-out infinite;
+}
+
+.setup-bar__step--current {
+  position: relative;
+  padding-left: 14px;
+}
+
+@keyframes setup-bar-pulse {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 1; }
+}
+
+/* Upcoming step */
+.setup-bar__step--upcoming {
+  opacity: 0.4;
+}
+
+.setup-bar__step--upcoming .setup-bar__step-title {
+  color: var(--muted);
+}
+
+/* Step icon */
+.setup-bar__step-icon {
+  font-size: 13px;
+  line-height: 1;
+  flex-shrink: 0;
+  width: 18px;
+  text-align: center;
+}
+
+/* Step title */
+.setup-bar__step-title {
+  font-size: 12px;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ── Actions ────────────────────────────────────────────────── */
+
+.setup-bar__actions {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: stretch;
+}
+
+.setup-bar__continue {
+  padding: 6px 12px;
+  border: none;
+  border-radius: 6px;
+  background: var(--accent);
+  color: var(--accent-foreground);
+  font-size: 12px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.1s ease;
+  text-align: center;
+}
+
+.setup-bar__continue:hover {
+  background: var(--accent-hover);
+}
+
+.setup-bar__continue:active {
+  transform: scale(0.98);
+}
+
+.setup-bar__dismiss {
+  padding: 4px 8px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 11px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: color 0.15s ease;
+  text-align: center;
+}
+
+.setup-bar__dismiss:hover {
+  color: var(--text);
+}
+
+/* ── Collapsed nav: hide text, keep compact ─────────────────── */
+
+.nav--collapsed .setup-bar {
+  padding: 8px 4px;
+}
+
+.nav--collapsed .setup-bar__header-title,
+.nav--collapsed .setup-bar__progress-label,
+.nav--collapsed .setup-bar__step-title,
+.nav--collapsed .setup-bar__step-arrow,
+.nav--collapsed .setup-bar__dismiss {
+  display: none;
+}
+
+.nav--collapsed .setup-bar__continue {
+  font-size: 0;
+  padding: 6px;
+  min-width: 0;
+}
+
+.nav--collapsed .setup-bar__continue::after {
+  content: "\u2192";
+  font-size: 14px;
+}
+
+.nav--collapsed .setup-bar__step {
+  justify-content: center;
+  padding: 4px;
+}
+
+.nav--collapsed .setup-bar__step--current {
+  padding-left: 4px;
+}
+
+.nav--collapsed .setup-bar__step--current::before {
+  display: none;
+}

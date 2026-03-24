@@ -4,5 +4,7 @@
 @import "./chat/tool-cards.css";
 @import "./chat/sidebar.css";
 @import "./chat/file-viewer.css";
+@import "./chat/resource-strip.css";
+@import "./chat/artifact-sidebar.css";
 @import "./chat/parallel.css";
 @import "./chat/lightbox.css";
