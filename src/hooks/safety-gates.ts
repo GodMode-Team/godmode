@@ -1027,155 +1027,109 @@ export async function checkArchitectureGate(
 //   2. User sends ANY response (even "ok") → auto-approves for 10 min
 //   3. Ally retries → passes through
 
-/**
- * Normalize session keys for approval tracking.
- * Webchat creates a new random suffix per tab/refresh (e.g. "agent:main:webchat-c1d6e375").
- * The gate blocks in one session, but the user's approval arrives from a different session.
- * Strip the random suffix so all webchat sessions share one approval bucket.
- */
-function approvalKey(sessionKey: string | undefined): string | undefined {
-  if (!sessionKey) return undefined;
-  return sessionKey.replace(/(webchat|chat)-[a-f0-9]+$/i, "$1");
-}
-
-// ── Disk-persisted approval state ────────────────────────────────────
+// ── Approval Gate v3 ──────────────────────────────────────────────
 //
-// Previous approach used in-memory Maps, which broke on:
-//   1. Gateway restarts (deploys wipe all state)
-//   2. Multiple sessions with different random suffixes
+// v1/v2 failed: message_received NEVER fires for webchat, in-memory
+// Maps wiped on restart, session keys differ per tab.
 //
-// Now persists to ~/godmode/data/approval-state.json so approvals
-// survive restarts and work across all sessions.
+// v3 uses ONLY before_tool_call + before_prompt_build (both fire for
+// ALL channels). Flow:
+//   1. before_tool_call: gated action → BLOCK, write to disk
+//   2. before_prompt_build (next turn): block >2s old → approve + nudge
+//   3. before_tool_call: gated action + approval → ALLOW
+//
+// "Next turn" = before_prompt_build fires >2s after block. Disk state
+// survives restarts. Channel key strips webchat random suffix.
 
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 
 const APPROVAL_STATE_PATH = path.join(GODMODE_ROOT, "data", "approval-state.json");
-
-/** TTL for approvals — 10 minutes */
 const APPROVAL_TTL_MS = 10 * 60 * 1000;
 
 interface ApprovalState {
-  /** channel → { action description, timestamp } */
-  pending: Record<string, { action: string; ts: number }>;
-  /** channel → timestamp of approval grant */
+  blocked: Record<string, { action: string; ts: number }>;
   approved: Record<string, number>;
-  /** channel → { action description } — consumed by before_prompt_build */
-  nudges: Record<string, string>;
-  /** channel → timestamp of last gate block (rapid-retry detection) */
-  lastBlock: Record<string, number>;
 }
 
-function readState(): ApprovalState {
+function readApprovalState(): ApprovalState {
   try {
-    const raw = readFileSync(APPROVAL_STATE_PATH, "utf-8");
-    return JSON.parse(raw) as ApprovalState;
+    return JSON.parse(readFileSync(APPROVAL_STATE_PATH, "utf-8")) as ApprovalState;
   } catch {
-    return { pending: {}, approved: {}, nudges: {}, lastBlock: {} };
+    return { blocked: {}, approved: {} };
   }
 }
 
-function writeState(state: ApprovalState): void {
+function writeApprovalState(s: ApprovalState): void {
   try {
     mkdirSync(path.join(GODMODE_ROOT, "data"), { recursive: true });
-    writeFileSync(APPROVAL_STATE_PATH, JSON.stringify(state, null, 2));
+    const now = Date.now();
+    for (const k of Object.keys(s.blocked)) if (now - s.blocked[k].ts > APPROVAL_TTL_MS) delete s.blocked[k];
+    for (const k of Object.keys(s.approved)) if (now - s.approved[k] > APPROVAL_TTL_MS) delete s.approved[k];
+    writeFileSync(APPROVAL_STATE_PATH, JSON.stringify(s, null, 2));
   } catch { /* non-fatal */ }
 }
 
-/** Evict expired entries to keep the file small */
-function cleanState(state: ApprovalState): void {
-  const now = Date.now();
-  for (const k of Object.keys(state.approved)) {
-    if (now - state.approved[k] > APPROVAL_TTL_MS) delete state.approved[k];
-  }
-  for (const k of Object.keys(state.pending)) {
-    if (now - state.pending[k].ts > APPROVAL_TTL_MS) delete state.pending[k];
-  }
-  for (const k of Object.keys(state.lastBlock)) {
-    if (now - state.lastBlock[k] > APPROVAL_TTL_MS) delete state.lastBlock[k];
-  }
+/** Strip random suffix: "agent:main:webchat-abc123" → "agent:main:webchat" */
+function approvalChannel(sk: string | undefined): string | undefined {
+  if (!sk) return undefined;
+  return sk.replace(/(webchat|chat)-[a-f0-9]+$/i, "$1");
+}
+
+/** Called by gates when they block. Returns "rapid-retry" if <60s since last. */
+export function markPendingApproval(sk: string | undefined, action?: string): "rapid-retry" | "first" {
+  const ch = approvalChannel(sk);
+  if (!ch) return "first";
+  const s = readApprovalState();
+  const prev = s.blocked[ch];
+  const rapid = !!prev && Date.now() - prev.ts < 60_000;
+  s.blocked[ch] = { action: action || "a blocked action", ts: Date.now() };
+  writeApprovalState(s);
+  return rapid ? "rapid-retry" : "first";
 }
 
 /**
- * Called by gates when they block an action. Marks the channel as
- * having a pending approval request.
- *
- * Returns "rapid-retry" if the ally is retrying within 60s.
+ * Called from before_prompt_build (fires for ALL channels incl webchat).
+ * If a block exists from a previous turn (>2s old), promote to approval.
+ * A new turn means the user sent a message → implicit approval.
  */
-export function markPendingApproval(sessionKey: string | undefined, actionDescription?: string): "rapid-retry" | "first" {
-  const key = approvalKey(sessionKey);
-  if (!key) return "first";
-  const state = readState();
-  const lastBlock = state.lastBlock[key];
-  const isRapidRetry = !!lastBlock && Date.now() - lastBlock < 60_000;
-  state.lastBlock[key] = Date.now();
-  state.pending[key] = { action: actionDescription || "a blocked action", ts: Date.now() };
-  cleanState(state);
-  writeState(state);
-  return isRapidRetry ? "rapid-retry" : "first";
+export function consumeApprovalNudge(sk: string | undefined): string | undefined {
+  const ch = approvalChannel(sk);
+  if (!ch) return undefined;
+  const s = readApprovalState();
+  const blocked = s.blocked[ch];
+  if (!blocked) return undefined;
+  if (Date.now() - blocked.ts < 2_000) return undefined; // same turn
+  delete s.blocked[ch];
+  s.approved[ch] = Date.now();
+  writeApprovalState(s);
+  return [
+    "## ACTION APPROVED",
+    `The user approved: **${blocked.action}**`,
+    "Retry the exact same tool call now. It will go through.",
+  ].join("\n");
 }
 
-/**
- * Called from message_received. If a gate blocked since the user's
- * last message, any new message = implicit approval.
- */
-export function processUserMessage(
-  sessionKey: string | undefined,
-  _userMessage: string,
-): boolean {
-  const key = approvalKey(sessionKey);
-  if (!key) return false;
-  const state = readState();
-
-  // New user message = new turn, reset rapid-retry tracker
-  delete state.lastBlock[key];
-
-  // If a gate blocked since last user message, grant approval
-  const pending = state.pending[key];
-  if (pending) {
-    delete state.pending[key];
-    state.approved[key] = Date.now();
-    state.nudges[key] = pending.action;
-    // Also store nudge under raw session key for before_prompt_build
-    if (sessionKey && sessionKey !== key) state.nudges[sessionKey] = pending.action;
-    cleanState(state);
-    writeState(state);
-    return true;
-  }
-
-  writeState(state);
-  return false;
-}
-
-/** Check if user has granted approval recently */
-function hasApproval(sessionKey: string | undefined): boolean {
-  const key = approvalKey(sessionKey);
-  if (!key) return false;
-  const state = readState();
-  const ts = state.approved[key];
+/** Check if approval exists for this channel */
+function hasApproval(sk: string | undefined): boolean {
+  const ch = approvalChannel(sk);
+  if (!ch) return false;
+  const s = readApprovalState();
+  const ts = s.approved[ch];
   return !!ts && Date.now() - ts < APPROVAL_TTL_MS;
 }
 
-/**
- * Consume the approval nudge (called by before_prompt_build).
- * Returns context telling the ally to retry, or undefined.
- */
-export function consumeApprovalNudge(sessionKey: string | undefined): string | undefined {
-  if (!sessionKey) return undefined;
-  const key = approvalKey(sessionKey);
-  const state = readState();
-  const action = state.nudges[sessionKey] ?? (key ? state.nudges[key] : undefined);
-  if (!action) return undefined;
-  delete state.nudges[sessionKey];
-  if (key) delete state.nudges[key];
-  writeState(state);
-  return [
-    "## ACTION APPROVED",
-    "",
-    `The user has approved your previous blocked action: **${action}**`,
-    "",
-    "You MUST now retry the exact same tool call. The approval gate will let it through this time.",
-    "Do NOT ask again — just execute it immediately.",
-  ].join("\n");
+/** Legacy — Slack/iMessage still use message_received */
+export function processUserMessage(sk: string | undefined, _msg: string): boolean {
+  const ch = approvalChannel(sk);
+  if (!ch) return false;
+  const s = readApprovalState();
+  if (s.blocked[ch]) {
+    delete s.blocked[ch];
+    s.approved[ch] = Date.now();
+    writeApprovalState(s);
+    return true;
+  }
+  return false;
 }
 
 // ── Deployment Gate ────────────────────────────────────────────────
