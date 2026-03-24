@@ -1321,7 +1321,10 @@ function handleGatewayEventUnsafe(host: GatewayHost, evt: GatewayEventFrame) {
       }
 
       // Queue / Paperclip completions: inject into the originating chat session
-      // so the ally can present the deliverable for review
+      // so the user sees results without having to ask.
+      // enqueueSystemEvent only queues for the NEXT user-initiated turn — it does
+      // not trigger a proactive LLM response. So we inject a notification directly
+      // into chatMessages for immediate visibility.
       const completionTypes = ["queue-complete", "queue-needs-review", "paperclip-completion"];
       if (payload.type && completionTypes.includes(payload.type)) {
         const compPayload = payload as {
@@ -1337,13 +1340,25 @@ function handleGatewayEventUnsafe(host: GatewayHost, evt: GatewayEventFrame) {
           requestUpdate?: () => void;
           loadChatHistory?: () => Promise<unknown>;
         };
-        // If this is the session that initiated the delegation, reload history
-        // so the ally's response about the completed work appears naturally
-        if (compPayload.sessionKey && chatHost.sessionKey === compPayload.sessionKey) {
-          chatHost.loadChatHistory?.().catch(() => {});
-        }
         // Use the message field for the notification content
         msg.content = compPayload.message || msg.content;
+
+        // Inject deliverable notification directly into the chat stream
+        // for the originating session so the user sees it immediately
+        if (compPayload.sessionKey && chatHost.sessionKey === compPayload.sessionKey && chatHost.chatMessages) {
+          const preview = compPayload.outputPreview
+            ? `\n\n${compPayload.outputPreview.slice(0, 800)}${compPayload.outputPreview.length > 800 ? "…" : ""}`
+            : "";
+          const outputNote = compPayload.outputPath
+            ? `\n\nFull output: \`${compPayload.outputPath}\``
+            : "";
+          chatHost.chatMessages = [...chatHost.chatMessages, {
+            role: "assistant",
+            content: `**Agent completed: "${compPayload.title || "Queue item"}"**${preview}${outputNote}\n\n_Reply to review, approve, or ask follow-up questions._`,
+            timestamp: Date.now(),
+            isNotification: true,
+          }];
+        }
       }
       allyHost.requestUpdate?.();
     }
