@@ -17,7 +17,7 @@
  * Persistence: ~/godmode/data/inbox.json
  */
 
-import { readFile, writeFile, mkdir } from "node:fs/promises";
+import { readFile, writeFile, rename, mkdir } from "node:fs/promises";
 import { join, dirname } from "node:path";
 import { randomUUID } from "node:crypto";
 import { DATA_DIR } from "../data-paths.js";
@@ -137,7 +137,10 @@ async function readInboxState(): Promise<InboxState> {
 async function writeInboxState(state: InboxState): Promise<void> {
   state.updatedAt = new Date().toISOString();
   await mkdir(dirname(INBOX_FILE), { recursive: true });
-  await writeFile(INBOX_FILE, JSON.stringify(state, null, 2), "utf-8");
+  // Atomic write: temp file + rename to prevent corruption on crash
+  const tmpPath = INBOX_FILE + ".tmp";
+  await writeFile(tmpPath, JSON.stringify(state, null, 2), "utf-8");
+  await rename(tmpPath, INBOX_FILE);
 }
 
 // ── Broadcast hook (set by gateway-start) ────────────────────────

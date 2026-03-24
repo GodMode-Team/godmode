@@ -9,7 +9,7 @@
  * Source of truth: ~/godmode/data/agent-lessons.json
  */
 
-import { readFile, writeFile, mkdir } from "node:fs/promises";
+import { readFile, writeFile, rename, mkdir } from "node:fs/promises";
 import { join, dirname } from "node:path";
 import { randomUUID } from "node:crypto";
 import { DATA_DIR } from "../data-paths.js";
@@ -65,7 +65,10 @@ export async function readLessonsState(): Promise<AgentLessonsState> {
 async function writeLessonsState(state: AgentLessonsState): Promise<void> {
   state.updatedAt = new Date().toISOString();
   await mkdir(dirname(LESSONS_FILE), { recursive: true });
-  await writeFile(LESSONS_FILE, JSON.stringify(state, null, 2), "utf-8");
+  // Atomic write: temp file + rename to prevent corruption on crash
+  const tmpPath = LESSONS_FILE + ".tmp";
+  await writeFile(tmpPath, JSON.stringify(state, null, 2), "utf-8");
+  await rename(tmpPath, LESSONS_FILE);
 }
 
 // ── Core API ──────────────────────────────────────────────────────
