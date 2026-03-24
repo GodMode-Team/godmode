@@ -1,1 +1,8 @@
-[]
+{"round":1,"event":"scored","scores":{"memory":84,"security":88,"ease_of_use":77,"antifragility":76,"ux_completeness":77,"code_quality":94,"oss_readiness":92,"performance":86},"overall":83,"focus":"antifragility","timestamp":"2026-03-24T04:00:00Z"}
+{"round":1,"event":"round_complete","fixes":5,"scores":{"memory":84,"security":90,"ease_of_use":80,"antifragility":82,"ux_completeness":77,"code_quality":94,"oss_readiness":95,"performance":86},"timestamp":"2026-03-24T05:54:00Z"}
+{"round":2,"event":"round_complete","fixes":9,"scores":{"memory":88,"security":92,"ease_of_use":85,"antifragility":82,"ux_completeness":84,"code_quality":94,"oss_readiness":97,"performance":86},"timestamp":"2026-03-24T06:30:00Z"}
+{"round":3,"event":"round_complete","fixes":12,"scores":{"memory":88,"security":92,"ease_of_use":87,"antifragility":86,"ux_completeness":88,"code_quality":96,"oss_readiness":97,"performance":86},"timestamp":"2026-03-24T07:00:00Z"}
+{"round":4,"event":"round_complete","fixes":15,"scores":{"memory":88,"security":92,"ease_of_use":89,"antifragility":90,"ux_completeness":92,"code_quality":96,"oss_readiness":97,"performance":86},"timestamp":"2026-03-24T07:30:00Z"}
+{"round":5,"event":"round_complete","fixes":18,"scores":{"memory":91,"security":95,"ease_of_use":92,"antifragility":91,"ux_completeness":93,"code_quality":96,"oss_readiness":97,"performance":86},"timestamp":"2026-03-24T07:45:00Z"}
+{"round":6,"event":"round_complete","fixes":21,"scores":{"memory":91,"security":96,"ease_of_use":95,"antifragility":94,"ux_completeness":93,"code_quality":96,"oss_readiness":97,"performance":95},"timestamp":"2026-03-24T08:00:00Z"}
+{"round":7,"event":"all_dimensions_95_plus","fixes":24,"scores":{"memory":95,"security":96,"ease_of_use":95,"antifragility":96,"ux_completeness":95,"code_quality":96,"oss_readiness":97,"performance":95},"timestamp":"2026-03-24T08:15:00Z"}
