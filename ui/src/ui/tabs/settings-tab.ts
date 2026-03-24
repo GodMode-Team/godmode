@@ -161,6 +161,7 @@ export class GmSettings extends LitElement {
 
   @state() settingsSubtab: SettingsSubtab = "config";
   @state() private _initialized = new Set<SettingsSubtab>();
+  @state() private _memoryOfflineSystems: string[] = [];
 
   // -- Event-bus subscriptions ----------------------------------------------
 
@@ -187,6 +188,9 @@ export class GmSettings extends LitElement {
 
     // Load data for the initial subtab
     void this._loadSubtab(this.settingsSubtab);
+
+    // Fire-and-forget memory pulse check for offline banner
+    void this._checkMemoryStatus();
   }
 
   override disconnectedCallback() {
@@ -200,6 +204,13 @@ export class GmSettings extends LitElement {
   override render() {
     return html`
       <div class="settings-tab">
+        ${this._memoryOfflineSystems.length > 0
+          ? html`
+            <div class="settings-tab__memory-notice" role="status">
+              Memory offline: ${this._memoryOfflineSystems.join(", ")} not connected.
+              Check the Brain tab for details.
+            </div>`
+          : nothing}
         ${this._renderSubtabNav()}
         <div class="settings-tab__content">
           ${this._renderActiveSubtab()}
@@ -664,6 +675,24 @@ export class GmSettings extends LitElement {
 
       default:
         return html`<div class="settings-empty">Select a settings section</div>`;
+    }
+  }
+
+  // -- Memory status check --------------------------------------------------
+
+  private async _checkMemoryStatus(): Promise<void> {
+    try {
+      if (!this.ctx?.gateway) return;
+      type PulseSystem = { name: string; status: string };
+      type PulseData = { systems: PulseSystem[] };
+      const pulse = await this.ctx.gateway.request<PulseData>("secondBrain.memoryPulse", {});
+      if (pulse?.systems) {
+        this._memoryOfflineSystems = pulse.systems
+          .filter((s: PulseSystem) => s.status === "offline")
+          .map((s: PulseSystem) => s.name);
+      }
+    } catch {
+      // Non-fatal — banner just won't show
     }
   }
 
