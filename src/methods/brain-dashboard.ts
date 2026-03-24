@@ -63,7 +63,7 @@ const people: GatewayRequestHandler = async ({ params, respond }) => {
   } catch (err) {
     respond(false, undefined, {
       code: "BRAIN_PEOPLE_ERROR",
-      message: String(err),
+      message: `Could not load people data — check that your vault is accessible. (${String(err).slice(0, 100)})`,
     });
   }
 };
@@ -108,7 +108,7 @@ const person: GatewayRequestHandler = async ({ params, respond }) => {
   } catch (err) {
     respond(false, undefined, {
       code: "BRAIN_PERSON_ERROR",
-      message: String(err),
+      message: `Could not load person profile — verify the file exists in your vault. (${String(err).slice(0, 100)})`,
     });
   }
 };
@@ -150,7 +150,7 @@ const timeline: GatewayRequestHandler = async ({ params, respond }) => {
   } catch (err) {
     respond(false, undefined, {
       code: "BRAIN_TIMELINE_ERROR",
-      message: String(err),
+      message: `Daily timeline failed to load — ensure vault daily notes directory exists. (${String(err).slice(0, 100)})`,
     });
   }
 };
@@ -196,7 +196,7 @@ const overview: GatewayRequestHandler = async ({ respond }) => {
   } catch (err) {
     respond(false, undefined, {
       code: "BRAIN_OVERVIEW_ERROR",
-      message: String(err),
+      message: `Dashboard overview failed — one or more data sources are unavailable. (${String(err).slice(0, 100)})`,
     });
   }
 };
@@ -228,7 +228,7 @@ const savePerson: GatewayRequestHandler = async ({ params, respond }) => {
   } catch (err) {
     respond(false, undefined, {
       code: "BRAIN_SAVE_ERROR",
-      message: String(err),
+      message: `Could not save person profile — check disk space and file permissions. (${String(err).slice(0, 100)})`,
     });
   }
 };

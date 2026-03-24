@@ -557,10 +557,10 @@ const hitlRespond: GatewayRequestHandler = async ({ params, respond }) => {
     if (result.ok) {
       respond(true, { status: "resolved" });
     } else {
-      respond(false, null, { code: "HITL_ERROR", message: result.error ?? "Unknown error" });
+      respond(false, null, { code: "HITL_ERROR", message: result.error ?? "Could not process your checkpoint response — please try again." });
     }
   } catch (err) {
-    respond(false, null, { code: "HITL_ERROR", message: String(err) });
+    respond(false, null, { code: "HITL_ERROR", message: `Failed to process checkpoint feedback — please try again. (${String(err).slice(0, 100)})` });
   }
 };
 

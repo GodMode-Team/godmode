@@ -49,7 +49,7 @@ export const authHandlers: GatewayRequestHandlers = {
     } catch (err) {
       respond(false, null, {
         code: "AUTH_STATUS_FAILED",
-        message: String(err),
+        message: `Authentication check failed — verify your internet connection or try logging in again. (${String(err).slice(0, 100)})`,
       });
     }
   },
@@ -66,7 +66,7 @@ export const authHandlers: GatewayRequestHandlers = {
     } catch (err) {
       respond(false, null, {
         code: "DEVICE_FLOW_FAILED",
-        message: String(err),
+        message: `Login flow could not start — the auth server may be unreachable. Try again in a moment. (${String(err).slice(0, 100)})`,
       });
     }
   },
@@ -107,7 +107,7 @@ export const authHandlers: GatewayRequestHandlers = {
     } catch (err) {
       respond(false, null, {
         code: "POLL_FAILED",
-        message: String(err),
+        message: `Login polling failed — check your network connection and try again. (${String(err).slice(0, 100)})`,
       });
     }
   },
@@ -122,7 +122,7 @@ export const authHandlers: GatewayRequestHandlers = {
     } catch (err) {
       respond(false, null, {
         code: "LOGOUT_FAILED",
-        message: String(err),
+        message: `Logout failed — your session may already be closed. (${String(err).slice(0, 100)})`,
       });
     }
   },
