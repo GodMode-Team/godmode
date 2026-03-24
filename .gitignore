@@ -8,6 +8,7 @@ coverage/
 .tmp/
 .worktrees/
 .claude/worktrees/
+.godmode/
 experiments/
 
 # Environment files

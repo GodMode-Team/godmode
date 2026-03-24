@@ -43,26 +43,57 @@ import { join } from "node:path";
 
 const PROMPT_TEMPLATES: Record<QueueItemType, string> = {
   coding:
-    "Implement this: {title}\n{description}\n\nCreate a branch, write the code, ensure it builds.\n\nEnd with: ## Next Steps — what the user should do with this.",
+    "Implement this: {title}\n\n{description}\n\nFollow the Coding Methodology above. End with: ## Results — what changed, what was verified, what the user should know.",
   research:
-    "Research this topic: {title}\n{description}\n\nWrite a structured report: Summary, Key Findings, Sources, Recommendations.\n\nBe thorough but concise. Quality over quantity.\n\nThink step by step before acting.\n\nStart with a one-sentence executive summary.\n\nIf you can't fully complete this, document what's blocking you and what you tried.\n\nIMPORTANT: Show your sources. Link to evidence.",
+    "Research this: {title}\n\n{description}\n\nFollow the Research Methodology above. End with: ## Sources — all URLs referenced.",
   analysis:
-    "Analyze this: {title}\n{description}\n\nProvide: Data Summary, Key Insights, Comparisons, Actionable Conclusions.",
+    "Analyze this: {title}\n\n{description}\n\nFollow the Research Methodology above. Focus on: Data Summary, Key Insights, Comparisons, Actionable Conclusions.",
   creative:
-    "Create this content: {title}\n{description}\n\nWrite polished, publication-ready output. Include variations if appropriate.\n\nEnd with: ## Next Steps — what the user should do with this.",
+    "Create this content: {title}\n\n{description}\n\nFollow the Creative Methodology above. Include variations if appropriate.",
   review:
-    "Review this: {title}\n{description}\n\nProvide: Summary, Issues Found, Recommendations, Severity Ratings.\n\nFormat output in markdown with clear headers.\n\nStart with a one-sentence executive summary.",
+    "Review this: {title}\n\n{description}\n\nFollow the Review Methodology above. Lead with verdict, then issues by severity.",
   ops:
-    "Handle this operational task: {title}\n{description}\n\nExecute the task, document what was done and any follow-ups needed.\n\nBe thorough but concise. Quality over quantity.",
+    "Handle this operational task: {title}\n\n{description}\n\nFollow the base methodology. Document what was done and any follow-ups needed.",
   task:
-    "Complete this task: {title}\n{description}\n\nDo whatever it takes to get this done. Show your work.\n\nInclude confidence levels for each finding.",
+    "Complete this: {title}\n\n{description}\n\nFollow the base methodology. Show your work. Include confidence levels for each finding.",
   url:
-    "Analyze this URL: {url}\n{title}\n{description}\n\nFetch the content, analyze it. Write: Source, Key Points, Relevance, Action Items.\n\nThink step by step before acting.\n\nEnd with: ## Next Steps — what the user should do with this.",
+    "Analyze this URL: {url}\n\n{title}\n\n{description}\n\nFollow the Research Methodology above. Write: Source, Key Points, Relevance, Action Items.",
   idea:
-    "Explore this idea: {title}\n{description}\n\nAnalyze feasibility, implementation approach, potential issues.\n\nIMPORTANT: Show your sources. Link to evidence.\n\nBe thorough but concise. Quality over quantity.\n\nEnd with: ## Next Steps — what the user should do with this.",
+    "Explore this idea: {title}\n\n{description}\n\nFollow the Planning Methodology above. Explore 2-3 approaches before recommending one.",
   optimize:
     "Optimize this skill/persona: {title}\n{description}\n\nFollow the AutoResearch protocol:\n1. Read the current skill/persona markdown file\n2. Generate 3-6 yes/no eval criteria from the stored trust feedback\n3. Run baseline evaluation against the criteria\n4. Make ONE targeted mutation to the markdown (clarity, examples, constraints)\n5. Test the mutation against eval criteria\n6. If improved, keep. If worse or equal, revert.\n7. Repeat up to 4 rounds.\n\nNEVER modify: name, role, core traits, communication style.\nONLY modify: instructions, examples, constraints, workflow steps.\n\nWrite results as: ## Optimization Results\n- Baseline score: X%\n- Final score: Y%\n- Rounds: N\n- Changes made: (list each kept mutation)\n- Evaluation log: (per-round scores)",
 };
+
+// ── Methodology Mapping ──────────────────────────────────────────
+// Maps queue item types to methodology files in assets/methodologies/
+const METHODOLOGY_MAP: Record<QueueItemType, string> = {
+  coding: "coding.md",
+  research: "research.md",
+  analysis: "research.md",
+  creative: "creative.md",
+  review: "review.md",
+  ops: "base.md",
+  task: "base.md",
+  url: "research.md",
+  idea: "planning.md",
+  optimize: "review.md",
+};
+
+/** Load methodology markdown from assets/methodologies/ */
+async function loadMethodology(itemType: QueueItemType): Promise<string> {
+  const fileName = METHODOLOGY_MAP[itemType] ?? "base.md";
+  try {
+    const { fileURLToPath } = await import("node:url");
+    const thisFile = fileURLToPath(import.meta.url);
+    const assetsDir = path.resolve(path.dirname(thisFile), "..", "..", "assets", "methodologies");
+    const base = await fs.readFile(path.join(assetsDir, "base.md"), "utf-8");
+    if (fileName === "base.md") return base;
+    const specific = await fs.readFile(path.join(assetsDir, fileName), "utf-8");
+    return base + "\n\n" + specific;
+  } catch {
+    return ""; // methodology files missing — non-fatal
+  }
+}
 
 // ── Singleton ──────────────────────────────────────────────────────
 
@@ -1460,6 +1491,12 @@ class QueueProcessor {
     // Inject roster persona instructions if available
     if (persona) {
       sections.push("", "## Your Role", "", persona.body);
+    }
+
+    // Inject methodology for this task type
+    const methodology = await loadMethodology(item.type);
+    if (methodology) {
+      sections.push("", "## Methodology — FOLLOW THIS PROCESS", "", methodology);
     }
 
     // Inject toolkit access instructions if token was issued
