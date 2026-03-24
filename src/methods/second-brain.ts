@@ -1514,6 +1514,125 @@ const activityFeed: GatewayRequestHandler = async ({ params, respond }) => {
   respond(true, { events: events.slice(0, limit), total: events.length });
 };
 
+// ── Identity Card (Honcho peer representation) ──────────────────────
+
+const identityCard: GatewayRequestHandler = async ({ respond }) => {
+  try {
+    // 1. Honcho peer representation
+    let peerRepresentation: string | null = null;
+    let currentFocus: string | null = null;
+    try {
+      const { queryPeer, isHonchoReady } = await import("../services/honcho-client.js");
+      if (isHonchoReady()) {
+        peerRepresentation = await queryPeer(
+          "Give a concise 2-3 paragraph description of who the user is — their role, responsibilities, working style, and key priorities. Write in third person.",
+          "system:identity-card",
+        );
+        currentFocus = await queryPeer(
+          "What is the user currently focused on? List their top 2-3 priorities in one sentence.",
+          "system:identity-card",
+        );
+      }
+    } catch { /* Honcho not available */ }
+
+    // 2. Basic identity from files (fallback / supplement)
+    const userMdPath = resolveIdentityFilePath(IDENTITY_FILE_SPECS.find(s => s.key === "user")!);
+    const userMd = safeReadFile(userMdPath);
+
+    // 3. Memory stats
+    const health = getVaultHealth();
+    const peoplePath = resolvePeoplePath().path;
+    let peopleCount = 0;
+    try {
+      peopleCount = existsSync(peoplePath)
+        ? readdirSync(peoplePath).filter(f => !f.startsWith(".") && !f.startsWith("_")).length
+        : 0;
+    } catch { /* empty */ }
+
+    const dailyDir = getVaultPath()
+      ? join(getVaultPath()!, "01-Daily")
+      : join(MEMORY_DIR, "daily");
+    let dailyCount = 0;
+    try {
+      dailyCount = existsSync(dailyDir)
+        ? readdirSync(dailyDir).filter(f => f.endsWith(".md")).length
+        : 0;
+    } catch { /* empty */ }
+
+    // 4. Extract name/tagline from USER.md
+    const name = userMd ? extractNameFromUserMd(userMd) : "User";
+    const tagline = userMd ? extractTaglineFromUserMd(userMd) : "";
+
+    respond(true, {
+      peerRepresentation,
+      currentFocus,
+      name,
+      tagline,
+      stats: {
+        peopleTracked: peopleCount,
+        dailyNotes: dailyCount,
+        totalNotes: health?.totalNotes ?? 0,
+      },
+      lastUpdated: health?.lastActivity ?? null,
+    });
+  } catch (err) {
+    respond(false, undefined, { code: "IDENTITY_CARD_ERROR", message: String(err) });
+  }
+};
+
+function extractNameFromUserMd(content: string): string {
+  const match = content.match(/\*\*Name:\*\*\s*(.+)/) || content.match(/^#\s+(.+)/m);
+  return match?.[1]?.trim() ?? "User";
+}
+
+function extractTaglineFromUserMd(content: string): string {
+  const match = content.match(/\*\*Vision:\*\*\s*(.+)/) || content.match(/\*\*Tagline:\*\*\s*(.+)/);
+  return match?.[1]?.trim() ?? "";
+}
+
+// ── Recent People (sorted by last interaction) ──────────────────────
+
+const recentPeople: GatewayRequestHandler = async ({ params, respond }) => {
+  try {
+    const limit = Number((params as Record<string, unknown>).limit) || 8;
+    const peoplePath = resolvePeoplePath().path;
+    const entries = listEntries(peoplePath)
+      .filter(e => !e.isDirectory)
+      .sort((a, b) => {
+        if (!a.updatedAt || !b.updatedAt) return 0;
+        return b.updatedAt.localeCompare(a.updatedAt);
+      })
+      .slice(0, limit)
+      .map(e => ({
+        ...e,
+        role: extractRoleFromExcerpt(e.excerpt),
+      }));
+
+    const total = listEntries(peoplePath).filter(e => !e.isDirectory).length;
+    respond(true, { people: entries, total });
+  } catch (err) {
+    respond(false, undefined, { code: "RECENT_PEOPLE_ERROR", message: String(err) });
+  }
+};
+
+function extractRoleFromExcerpt(excerpt: string): string {
+  const roleMatch = excerpt.match(/(?:role|title|position)[:\s]*([^\n|]+)/i)
+    || excerpt.match(/(?:CEO|CTO|VP|Director|Manager|Founder|Partner)\s+(?:of|at)\s+([^\n|]+)/i);
+  return roleMatch?.[1]?.trim().slice(0, 60) ?? "";
+}
+
+// ── MCP Status ──────────────────────────────────────────────────────
+
+const mcpStatus: GatewayRequestHandler = async ({ respond }) => {
+  // MCP is always stdio-based; report basic availability
+  respond(true, {
+    enabled: true,
+    transport: "stdio",
+    connectedClients: 0,
+    url: null,
+  });
+};
+
 // ── Export ────────────────────────────────────────────────────────────
 
 export const secondBrainHandlers: GatewayRequestHandlers = {
@@ -1536,4 +1655,7 @@ export const secondBrainHandlers: GatewayRequestHandlers = {
   "secondBrain.captureRunNow": vaultCaptureRunNow,
   "secondBrain.memoryPulse": memoryPulse,
   "secondBrain.activity": activityFeed,
+  "secondBrain.identityCard": identityCard,
+  "secondBrain.recentPeople": recentPeople,
+  "secondBrain.mcpStatus": mcpStatus,
 };

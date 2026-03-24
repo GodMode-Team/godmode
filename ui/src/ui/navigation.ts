@@ -1,7 +1,7 @@
 import type { IconName } from "./icons.js";
 
 export const TAB_GROUPS = [
-  { label: "", tabs: ["chat", "today", "team", "workspaces", "second-brain", "dashboards"] },
+  { label: "", tabs: ["chat", "today", "team", "workspaces", "brain", "dashboards"] },
   { label: "Settings", tabs: ["config", "connections", "skills", "agents", "trust", "guardrails"] },
 ] as const;
 
@@ -36,6 +36,7 @@ export type Tab =
   | "trust"
   | "debug"
   | "logs"
+  | "brain"
   | "second-brain"
   | "dashboards"
   // Legacy tab aliases — not in navigation, but kept for type compat
@@ -64,6 +65,7 @@ const TAB_PATHS: Partial<Record<Tab, string>> = {
   config: "/config",
   debug: "/debug",
   logs: "/logs",
+  brain: "/brain",
   "second-brain": "/second-brain",
   dashboards: "/dashboards",
 };
@@ -79,6 +81,8 @@ PATH_TO_TAB.set("/setup", "onboarding");
 PATH_TO_TAB.set("/overview", "dashboards");
 // Legacy URL support: /mission-control redirects to dashboards
 PATH_TO_TAB.set("/mission-control", "dashboards");
+// Legacy URL support: /second-brain redirects to brain
+PATH_TO_TAB.set("/second-brain", "brain");
 
 export function normalizeBasePath(basePath: string): string {
   if (!basePath) {
@@ -200,6 +204,7 @@ export function iconForTab(tab: Tab): IconName {
       return "shield";
     case "guardrails":
       return "shield";
+    case "brain":
     case "second-brain":
       return "brain";
     case "dashboards":
@@ -247,6 +252,8 @@ export function titleForTab(tab: Tab) {
       return "Trust";
     case "guardrails":
       return "Safety";
+    case "brain":
+      return "Brain";
     case "second-brain":
       return "Second Brain";
     case "dashboards":
@@ -294,6 +301,7 @@ export function emojiForTab(tab: Tab): string {
       return "\u{1F6E1}\uFE0F";
     case "guardrails":
       return "\u{1F6A7}";
+    case "brain":
     case "second-brain":
       return "\u{1F9E0}";
     case "dashboards":
@@ -339,6 +347,8 @@ export function subtitleForTab(tab: Tab) {
       return "Scores build automatically as you use and rate skills.";
     case "guardrails":
       return "Boundaries that keep agents focused, honest, and within scope.";
+    case "brain":
+      return "Your Brain — identity, people, knowledge, and live AI context.";
     case "second-brain":
       return "Your Second Brain — identity, knowledge, and live AI context. Stores what your ally needs to act on your behalf.";
     case "dashboards":

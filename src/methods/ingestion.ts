@@ -109,9 +109,49 @@ const screenpipeConfigure: GatewayRequestHandler = async ({
   }
 };
 
+const screenpipeToggle: GatewayRequestHandler = async ({ params, respond }) => {
+  const { enabled } = params as { enabled?: boolean };
+  if (typeof enabled !== "boolean") {
+    respond(false, undefined, { code: "INVALID_REQUEST", message: "enabled must be boolean" });
+    return;
+  }
+  try {
+    const { loadConfig, saveConfig } = await import(
+      "../services/ingestion/screenpipe-config.js"
+    );
+    await loadConfig(); // ensure config exists
+    const merged = await saveConfig({ enabled });
+    respond(true, { enabled: (merged as unknown as Record<string, unknown>).enabled ?? enabled });
+  } catch (err) {
+    respond(false, undefined, { code: "SCREENPIPE_ERROR", message: String(err) });
+  }
+};
+
+const runPipeline: GatewayRequestHandler = async ({ params, respond }) => {
+  const { pipeline } = params as { pipeline?: string };
+  if (!pipeline) {
+    respond(false, undefined, { code: "INVALID_REQUEST", message: "pipeline name required" });
+    return;
+  }
+  try {
+    const { runAllIngestion } = await import(
+      "../services/ingestion/runner.js"
+    );
+    const results = await runAllIngestion();
+    const match = results.find(
+      (r: { pipeline: string }) => r.pipeline === pipeline,
+    );
+    respond(true, match ?? { pipeline, status: "not_found" });
+  } catch (err) {
+    respond(false, undefined, { code: "INGESTION_ERROR", message: String(err) });
+  }
+};
+
 export const ingestionHandlers: Record<string, GatewayRequestHandler> = {
   "ingestion.status": ingestionStatus,
   "ingestion.run": ingestionRun,
   "ingestion.screenpipeStatus": screenpipeStatus,
   "ingestion.screenpipeConfigure": screenpipeConfigure,
+  "ingestion.screenpipeToggle": screenpipeToggle,
+  "ingestion.runPipeline": runPipeline,
 };

@@ -50,8 +50,10 @@ async function resolveFilePath(filePath: string): Promise<string | null> {
     try { await fs.access(resolved); return resolved; } catch { return null; }
   }
 
-  // Try godmode roots first, then all workspace directories
+  // Try CWD first (ally often writes files relative to working dir),
+  // then godmode roots, then all workspace directories
   const candidates = [
+    path.resolve(resolved),  // CWD-relative
     path.join(GODMODE_ROOT, resolved),
     path.join(GODMODE_ROOT, "data", resolved),
   ];
@@ -369,7 +371,7 @@ const readFile: GatewayRequestHandler = async ({ params, respond }) => {
   // SECURITY: Validate path is within GodMode-owned dirs, vault, workspaces,
   // or is a registered resource. Resolves symlinks before checking to prevent
   // traversal via symlink.
-  const resolvedPath = path.resolve(filePath);
+  const resolvedPath = path.resolve(expandPath(filePath));
   const realPath = await fs.realpath(resolvedPath).catch(() => resolvedPath);
   if (!isAllowedPath(realPath) && !isRegisteredResource(realPath)) {
     respond(false, null, { code: "ACCESS_DENIED", message: "Path not allowed" });
@@ -432,6 +434,7 @@ const resolveFile: GatewayRequestHandler = async ({ params, respond }) => {
 
   // Directories to search, ordered by likelihood
   const searchDirs = [
+    process.cwd(),  // CWD — ally often writes files here
     path.join(GODMODE_ROOT, "memory", "inbox"),
     path.join(GODMODE_ROOT, "data"),
     path.join(GODMODE_ROOT, "memory"),

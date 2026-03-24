@@ -96,6 +96,7 @@ const _tabLoaders: Record<string, () => Promise<unknown>> = {
   "gm-work": () => import("./tabs/work-tab.js"),
   "gm-today": () => import("./tabs/today-tab.js"),
   "gm-team": () => import("./tabs/team-tab.js"),
+  "gm-brain": () => import("./tabs/brain-tab.js"),
   "gm-second-brain": () => import("./tabs/second-brain-tab.js"),
   "gm-dashboards": () => import("./tabs/dashboards-tab.js"),
   "gm-connections": () => import("./tabs/connections-tab.js"),
@@ -1708,8 +1709,8 @@ export function renderApp(state: AppViewState) {
         }
 
         ${
-          state.tab === "second-brain"
-            ? (ensureTab("gm-second-brain"), html`<gm-second-brain></gm-second-brain>`)
+          state.tab === "brain" || state.tab === "second-brain"
+            ? (ensureTab("gm-brain"), html`<gm-brain></gm-brain>`)
             : nothing
         }
 

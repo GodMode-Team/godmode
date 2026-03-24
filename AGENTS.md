@@ -37,6 +37,63 @@ Chat → Today → Work → Second Brain → Dashboards → Settings. Everything
 ### Anti-Bloat Rule
 Nothing gets permanent context injection. New capabilities are files (personas, skills) or conditional context (state-checked, injected only when relevant). The only always-on injection: ally identity (~30 lines) + awareness snapshot (~50 lines).
 
+## Default Development Workflow — MANDATORY
+
+When the user gives a task, plan, or big prompt, follow this pipeline automatically. Do NOT skip steps. Invoke each skill via the Skill tool at the appropriate phase.
+
+### Phase 0: Understand
+- **Any creative/design work** → invoke `/brainstorming` FIRST. Explore intent before touching code.
+- **Big task or spec** → invoke `/writing-plans` to produce a plan in `docs/plans/`.
+- **Vague idea** → invoke `/gstack-office-hours` (builder mode) to shape it into a design doc.
+
+### Phase 1: Review the Plan
+- **Every plan gets reviewed.** Invoke `/gstack-plan-eng-review` for architecture, data flow, edge cases.
+- **If plan touches UI** → also invoke `/gstack-plan-design-review` for interaction states, responsive, accessibility.
+- **If plan is strategic/scope-heavy** → also invoke `/gstack-plan-ceo-review` for scope challenge.
+- Fix the plan based on review feedback before writing any code.
+
+### Phase 2: Safety Rails
+- Invoke `/gstack-guard` at session start for destructive command warnings + edit boundary enforcement.
+- If working in a specific directory, invoke `/gstack-freeze` to lock edits to that scope.
+
+### Phase 3: Implement
+- **Multiple independent tasks** → invoke `/dispatching-parallel-agents` to parallelize.
+- **Sequential tasks from a plan** → invoke `/executing-plans` or `/subagent-driven-development`.
+- **Writing new features** → follow `/test-driven-development` (failing test first, always).
+- **Hit a bug** → invoke `/systematic-debugging`. NEVER guess at fixes.
+
+### Phase 4: QA
+- After implementation, invoke `/gstack-qa` to systematically test and fix issues.
+- For report-only (no fixes), use `/gstack-qa-only`.
+- If the project has a live UI, invoke `/gstack-browse` for headless browser QA.
+
+### Phase 5: Review & Ship
+- Invoke `/gstack-review` for pre-landing code review (SQL safety, trust boundaries, side effects).
+- Invoke `/verification-before-completion` before claiming anything is done.
+- Invoke `/gstack-ship` for the full ship workflow (merge base → test → version bump → changelog → PR).
+
+### Phase 6: Post-Ship
+- Invoke `/gstack-document-release` to sync all docs to match what shipped.
+- Invoke `/gstack-retro` periodically (weekly or after big features) for retrospective.
+
+### Quick Reference — When to Use What
+| Situation | Skill |
+|---|---|
+| "Build X" / "Add Y" / new feature | brainstorming → writing-plans → plan-eng-review → implement → qa → ship |
+| "Fix this bug" / test failure | systematic-debugging → fix → qa → ship |
+| "Review this PR" / pre-merge | gstack-review → verification-before-completion |
+| "Here's a plan from Prosper" | plan-eng-review → (plan-design-review if UI) → executing-plans → qa → ship |
+| "What should we build?" / strategy | gstack-office-hours → brainstorming → writing-plans |
+| "Ship it" | gstack-ship |
+| "How'd we do this week?" | gstack-retro |
+| "Get a second opinion" | gstack-codex |
+| "Design the look and feel" | gstack-design-consultation → gstack-plan-design-review |
+
+### Override Rules
+- User can skip any phase by saying "skip review", "just code it", etc.
+- If the task is trivially small (< 5 minutes, single file), skip Phases 0-1 and go straight to implement → verify.
+- Always invoke `/verification-before-completion` before claiming done, regardless of task size.
+
 ## Mission
 
 - Keep GodMode fully self-contained.
