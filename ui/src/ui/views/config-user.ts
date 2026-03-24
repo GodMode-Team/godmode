@@ -165,12 +165,14 @@ export function renderUserSettings(props: UserSettingsProps) {
                     type="file"
                     id="user-avatar-input"
                     accept="image/*"
+                    aria-label="Upload avatar image"
                     class="user-settings__file-input"
                     @change=${handleFileSelect}
                   />
                   <button
                     type="button"
                     class="user-settings__btn user-settings__btn--upload"
+                    aria-label="Choose avatar image"
                     @click=${() => document.getElementById("user-avatar-input")?.click()}
                   >
                     Choose Image
@@ -181,6 +183,7 @@ export function renderUserSettings(props: UserSettingsProps) {
                         <button
                           type="button"
                           class="user-settings__btn user-settings__btn--clear"
+                          aria-label="Remove avatar"
                           @click=${handleClearAvatar}
                         >
                           Remove
@@ -216,6 +219,7 @@ export function renderUserSettings(props: UserSettingsProps) {
                     <button
                       type="button"
                       class="user-settings__btn user-settings__btn--cancel"
+                      aria-label="Cancel profile changes"
                       @click=${handleCancel}
                     >
                       Cancel
@@ -226,6 +230,7 @@ export function renderUserSettings(props: UserSettingsProps) {
               <button
                 type="button"
                 class="user-settings__btn user-settings__btn--save user-settings__save"
+                aria-label="Save profile"
                 ?disabled=${!hasChanges}
                 @click=${handleSave}
               >

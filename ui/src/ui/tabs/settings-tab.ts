@@ -211,17 +211,19 @@ export class GmSettings extends LitElement {
   private _renderSubtabNav() {
     let lastGroup = "";
     return html`
-      <nav class="settings-tab__nav">
+      <nav class="settings-tab__nav" aria-label="Settings sections">
         ${SETTINGS_SUBTABS.map((entry) => {
           const groupHeader =
             entry.group !== lastGroup
-              ? html`<span class="settings-tab__group-label">${entry.group}</span>`
+              ? html`<span class="settings-tab__group-label" role="separator">${entry.group}</span>`
               : nothing;
           lastGroup = entry.group;
           return html`
             ${groupHeader}
             <button
               class="settings-tab__nav-btn ${this.settingsSubtab === entry.id ? "active" : ""}"
+              aria-label="${entry.label} settings"
+              aria-current=${this.settingsSubtab === entry.id ? "page" : "false"}
               @click=${() => this._switchSubtab(entry.id)}
             >
               ${entry.label}

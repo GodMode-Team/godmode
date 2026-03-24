@@ -165,12 +165,14 @@ export function renderNode(params: {
         <div class="cfg-field">
           ${showLabel ? html`<label class="cfg-field__label">${label}</label>` : nothing}
           ${help ? html`<div class="cfg-field__help">${help}</div>` : nothing}
-          <div class="cfg-segmented">
+          <div class="cfg-segmented" role="group" aria-label=${label}>
             ${literals.map(
               (lit, _idx) => html`
               <button
                 type="button"
                 class="cfg-segmented__btn ${lit === resolvedValue || safeStr(lit) === safeStr(resolvedValue) ? "active" : ""}"
+                aria-label="${label}: ${safeStr(lit)}"
+                aria-pressed=${lit === resolvedValue || safeStr(lit) === safeStr(resolvedValue) ? "true" : "false"}
                 ?disabled=${disabled}
                 @click=${() => onPatch(path, lit)}
               >
@@ -224,12 +226,14 @@ export function renderNode(params: {
         <div class="cfg-field">
           ${showLabel ? html`<label class="cfg-field__label">${label}</label>` : nothing}
           ${help ? html`<div class="cfg-field__help">${help}</div>` : nothing}
-          <div class="cfg-segmented">
+          <div class="cfg-segmented" role="group" aria-label=${label}>
             ${options.map(
               (opt) => html`
               <button
                 type="button"
                 class="cfg-segmented__btn ${opt === resolvedValue || String(opt) === String(resolvedValue) ? "active" : ""}"
+                aria-label="${label}: ${String(opt)}"
+                aria-pressed=${opt === resolvedValue || String(opt) === String(resolvedValue) ? "true" : "false"}
                 ?disabled=${disabled}
                 @click=${() => onPatch(path, opt)}
               >
@@ -271,6 +275,8 @@ export function renderNode(params: {
         <div class="cfg-toggle">
           <input
             type="checkbox"
+            aria-label=${label}
+            role="switch"
             .checked=${displayValue}
             ?disabled=${disabled}
             @change=${(e: Event) => onPatch(path, (e.target as HTMLInputElement).checked)}
@@ -334,6 +340,7 @@ function renderTextInput(params: {
           type=${isSensitive ? "password" : inputType}
           class="cfg-input"
           placeholder=${placeholder}
+          aria-label=${label}
           .value=${safeStr(displayValue)}
           ?disabled=${disabled}
           @input=${(e: Event) => {
@@ -396,16 +403,18 @@ function renderNumberInput(params: {
     <div class="cfg-field">
       ${showLabel ? html`<label class="cfg-field__label">${label}</label>` : nothing}
       ${help ? html`<div class="cfg-field__help">${help}</div>` : nothing}
-      <div class="cfg-number">
+      <div class="cfg-number" role="group" aria-label="${label}">
         <button
           type="button"
           class="cfg-number__btn"
+          aria-label="Decrease ${label}"
           ?disabled=${disabled}
           @click=${() => onPatch(path, numValue - 1)}
         >−</button>
         <input
           type="number"
           class="cfg-number__input"
+          aria-label=${label}
           .value=${safeStr(displayValue)}
           ?disabled=${disabled}
           @input=${(e: Event) => {
@@ -417,6 +426,7 @@ function renderNumberInput(params: {
         <button
           type="button"
           class="cfg-number__btn"
+          aria-label="Increase ${label}"
           ?disabled=${disabled}
           @click=${() => onPatch(path, numValue + 1)}
         >+</button>
@@ -452,6 +462,7 @@ function renderSelect(params: {
       ${help ? html`<div class="cfg-field__help">${help}</div>` : nothing}
       <select
         class="cfg-select"
+        aria-label=${label}
         ?disabled=${disabled}
         .value=${currentIndex >= 0 ? String(currentIndex) : unset}
         @change=${(e: Event) => {
@@ -616,6 +627,7 @@ function renderArray(params: {
         <button
           type="button"
           class="cfg-array__add"
+          aria-label="Add ${label} item"
           ?disabled=${disabled}
           @click=${() => {
             const next = [...arr, defaultValue(itemsSchema)];
@@ -644,6 +656,7 @@ function renderArray(params: {
                   type="button"
                   class="cfg-array__item-remove"
                   title="Remove item"
+                  aria-label="Remove ${label} item ${idx + 1}"
                   ?disabled=${disabled}
                   @click=${() => {
                     const next = [...arr];
@@ -697,6 +710,7 @@ function renderMapField(params: {
         <button
           type="button"
           class="cfg-map__add"
+          aria-label="Add custom entry"
           ?disabled=${disabled}
           @click=${() => {
             const next = { ...value };
@@ -732,6 +746,7 @@ function renderMapField(params: {
                     type="text"
                     class="cfg-input cfg-input--sm"
                     placeholder="Key"
+                    aria-label="Entry key for ${key}"
                     .value=${key}
                     ?disabled=${disabled}
                     @change=${(e: Event) => {
@@ -756,6 +771,7 @@ function renderMapField(params: {
                         <textarea
                           class="cfg-textarea cfg-textarea--sm"
                           placeholder="JSON value"
+                          aria-label="JSON value for ${key}"
                           rows="2"
                           .value=${fallback}
                           ?disabled=${disabled}
@@ -790,6 +806,7 @@ function renderMapField(params: {
                   type="button"
                   class="cfg-map__item-remove"
                   title="Remove entry"
+                  aria-label="Remove entry ${key}"
                   ?disabled=${disabled}
                   @click=${() => {
                     const next = { ...value };
