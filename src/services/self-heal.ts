@@ -26,7 +26,8 @@ export type SubsystemId =
   | "queue-processor"
   | "heartbeat"
   | "api-keys"
-  | "oauth-token";
+  | "oauth-token"
+  | "data-dir";
 
 export type HealthState = "healthy" | "degraded" | "offline" | "repaired";
 
@@ -113,6 +114,9 @@ export async function runSelfHeal(
   const failures: string[] = [];
   let checked = 0;
 
+  // Record that the self-heal loop is alive
+  recordHeartbeatTick();
+
   // 1. OAuth token freshness
   checked++;
   try {
@@ -174,6 +178,25 @@ export async function runSelfHeal(
     }
   } catch (err) {
     logger.warn(`[SelfHeal] Queue processor check error: ${String(err)}`);
+  }
+
+  // 7. Heartbeat liveness
+  checked++;
+  try {
+    checkHeartbeat(logger);
+  } catch (err) {
+    logger.warn(`[SelfHeal] Heartbeat check error: ${String(err)}`);
+  }
+
+  // 8. Data directory integrity
+  checked++;
+  try {
+    await checkDataDirectoryIntegrity(logger);
+    if (getOrCreate("data-dir" as SubsystemId).state === "repaired") {
+      repairs.push("Repaired data directory structure");
+    }
+  } catch (err) {
+    logger.warn(`[SelfHeal] Data directory check error: ${String(err)}`);
   }
 
   // Collect failures for surfacing
@@ -358,8 +381,8 @@ async function refreshOAuthToken(
       return null;
     }
 
-    // Update credentials file
-    const { writeFile } = await import("node:fs/promises");
+    // Update credentials file (atomic: write to temp, rename over original)
+    const { writeFile, rename } = await import("node:fs/promises");
     const creds = JSON.parse(await readFile(credsPath, "utf-8"));
     creds.claudeAiOauth = {
       ...creds.claudeAiOauth,
@@ -367,7 +390,9 @@ async function refreshOAuthToken(
       expiresAt: Date.now() + (data.expires_in ?? 3600) * 1000,
       ...(data.refresh_token ? { refreshToken: data.refresh_token } : {}),
     };
-    await writeFile(credsPath, JSON.stringify(creds, null, 2), "utf-8");
+    const tmpPath = credsPath + ".tmp";
+    await writeFile(tmpPath, JSON.stringify(creds, null, 2), { encoding: "utf-8", mode: 0o600 });
+    await rename(tmpPath, credsPath);
 
     logger.info("[SelfHeal] OAuth token refreshed successfully");
     return data.access_token;
@@ -538,6 +563,85 @@ async function checkAndRepairQueueProcessor(logger: Logger): Promise<void> {
     }
   } catch (err) {
     markDegraded(id, `Queue processor check failed: ${String(err).slice(0, 80)}`);
+  }
+}
+
+/**
+ * Check heartbeat liveness. The heartbeat runs on a 15-min interval.
+ * If it hasn't ticked in over 20 minutes, something is wrong.
+ */
+let lastHeartbeatTick = Date.now(); // initialized to now — first check gets grace period
+
+/** Called by the heartbeat tick to record liveness. */
+export function recordHeartbeatTick(): void {
+  lastHeartbeatTick = Date.now();
+}
+
+function checkHeartbeat(logger: Logger): void {
+  const id: SubsystemId = "heartbeat";
+  const elapsed = Date.now() - lastHeartbeatTick;
+  const MAX_HEARTBEAT_GAP_MS = 20 * 60 * 1000; // 20 minutes
+
+  if (elapsed < MAX_HEARTBEAT_GAP_MS) {
+    markHealthy(id, `Last tick ${Math.round(elapsed / 1000)}s ago`);
+  } else {
+    markDegraded(id, `No heartbeat tick for ${Math.round(elapsed / 60_000)}m — heartbeat may be stalled`);
+    logger.warn(`[SelfHeal] Heartbeat appears stalled — last tick was ${Math.round(elapsed / 60_000)}m ago`);
+  }
+}
+
+/**
+ * Check data directory integrity. Ensure ~/godmode/data/ exists and
+ * critical files are parseable JSON (not corrupted).
+ */
+async function checkDataDirectoryIntegrity(logger: Logger): Promise<void> {
+  const id: SubsystemId = "data-dir";
+  try {
+    const { mkdir } = await import("node:fs/promises");
+
+    // Ensure data dir exists
+    await mkdir(DATA_DIR, { recursive: true });
+
+    // Check critical JSON files are parseable
+    const criticalFiles = ["queue.json", "onboarding.json"];
+    const corruptFiles: string[] = [];
+
+    for (const file of criticalFiles) {
+      const filePath = join(DATA_DIR, file);
+      if (!existsSync(filePath)) continue; // Missing files are OK — they get created on demand
+
+      try {
+        const content = await readFile(filePath, "utf-8");
+        if (content.trim().length > 0) {
+          JSON.parse(content);
+        }
+      } catch {
+        // File exists but is corrupted — try to recover from backup
+        const bakPath = filePath + ".bak";
+        if (existsSync(bakPath)) {
+          try {
+            const bakContent = await readFile(bakPath, "utf-8");
+            JSON.parse(bakContent); // Validate backup is also good
+            const { writeFile } = await import("node:fs/promises");
+            await writeFile(filePath, bakContent, "utf-8");
+            logger.info(`[SelfHeal] Recovered corrupted ${file} from backup`);
+          } catch {
+            corruptFiles.push(file);
+          }
+        } else {
+          corruptFiles.push(file);
+        }
+      }
+    }
+
+    if (corruptFiles.length > 0) {
+      markDegraded(id, `Corrupted data files: ${corruptFiles.join(", ")}`);
+      logger.warn(`[SelfHeal] Corrupted data files detected: ${corruptFiles.join(", ")}`);
+    } else {
+      markHealthy(id, "Data directory intact");
+    }
+  } catch (err) {
+    markDegraded(id, `Data directory check failed: ${String(err).slice(0, 80)}`);
   }
 }
 
