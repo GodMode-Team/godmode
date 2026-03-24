@@ -19,6 +19,7 @@ import type { ChatAttachment, ChatQueueItem } from "../ui-types";
 import { validateFilesForUpload } from "../upload-constants";
 import { renderMarkdownSidebar } from "./markdown-sidebar";
 import { renderAllyInline, type AllyChatProps } from "./ally-chat";
+import { renderResourceStrip, type ResourceItem } from "./resource-strip";
 import "../components/resizable-divider";
 
 export type CompactionIndicatorStatus = {
@@ -675,58 +676,26 @@ async function handleChatThreadLinkClick(event: MouseEvent, props: ChatProps) {
   await props.onMessageLinkClick(pathCandidate);
 }
 
-const RESOURCE_ICONS: Record<string, string> = {
-  html_report: "📊",
-  plan: "📋",
-  analysis: "🔍",
-  code: "💻",
-  doc: "📝",
-  data: "📦",
-  image: "🖼️",
-  script: "⚙️",
-};
-
 function renderSessionResourcesStrip(props: ChatProps) {
   const resources = props.sessionResources;
   if (!resources || resources.length === 0) return nothing;
-  if (props.sessionResourcesCollapsed) {
-    return html`
-      <div class="session-resources-strip">
-        <div class="session-resources-header">
-          <span class="session-resources-label">Resources (${resources.length})</span>
-          <button class="session-resources-toggle" @click=${props.onToggleSessionResources}>▲</button>
-        </div>
-      </div>
-    `;
-  }
-  const showAll = props.sessionResourcesShowAll;
-  const shown = showAll ? resources : resources.slice(0, 5);
-  return html`
-    <div class="session-resources-strip">
-      <div class="session-resources-header">
-        <span class="session-resources-label">Resources (${resources.length})</span>
-        <div style="display: flex; gap: 8px; align-items: center;">
-          ${resources.length > 5
-            ? html`<button class="session-resources-view-all" @click=${props.onViewAllResources}>${showAll ? "Show less" : "View all"}</button>`
-            : nothing}
-          <button class="session-resources-toggle" @click=${props.onToggleSessionResources}>▼</button>
-        </div>
-      </div>
-      <div class="session-resources-cards"${showAll ? html` style="flex-wrap: wrap;"` : nothing}>
-        ${shown.map(
-          (r) => html`
-            <button
-              class="session-resource-chip"
-              @click=${() => props.onSessionResourceClick?.(r)}
-            >
-              <span>${RESOURCE_ICONS[r.type] || "📄"}</span>
-              <span>${r.title}</span>
-            </button>
-          `,
-        )}
-      </div>
-    </div>
-  `;
+
+  // Map session resources to ResourceItem shape
+  const items: ResourceItem[] = resources.map((r) => ({
+    id: r.id,
+    title: r.title,
+    type: r.type,
+    path: r.path,
+    url: r.url,
+  }));
+
+  return renderResourceStrip({
+    resources: items,
+    collapsed: props.sessionResourcesCollapsed,
+    onOpen: (resource) => props.onSessionResourceClick?.({ path: resource.path, url: resource.url }),
+    onToggleCollapse: () => props.onToggleSessionResources?.(),
+    onViewAll: () => props.onViewAllResources?.(),
+  });
 }
 
 export function renderChat(props: ChatProps) {

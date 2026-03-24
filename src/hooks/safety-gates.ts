@@ -1092,6 +1092,9 @@ export function markPendingApproval(sk: string | undefined, action?: string): "r
   return rapid ? "rapid-retry" : "first";
 }
 
+/** The ONE phrase that grants approval */
+const EXPLICIT_APPROVAL_PHRASE = /\bI\s+approve\b/i;
+
 /**
  * Called from before_prompt_build (fires for ALL channels incl webchat).
  * If a block exists from a previous turn (>2s old), promote to approval.
