@@ -6,10 +6,23 @@ import { promisify } from "node:util";
 import type { GatewayRequestHandler } from "../types/plugin-api.js";
 import { readQueueState } from "../lib/queue-state.js";
 import { isAllowedPath } from "../lib/vault-paths.js";
-import { expandPath, readWorkspaceConfig } from "../lib/workspaces-config.js";
-import { GODMODE_ROOT } from "../data-paths.js";
+import { readWorkspaceConfig } from "../lib/workspaces-config.js";
+import { DATA_DIR, GODMODE_ROOT } from "../data-paths.js";
 
 const execFile = promisify(execFileCb);
+
+/** Check if a resolved path is registered in the resources registry. */
+function isRegisteredResource(resolvedPath: string): boolean {
+  try {
+    const raw = readFileSync(path.join(DATA_DIR, "resources.json"), "utf-8");
+    const registry = JSON.parse(raw) as { resources?: Array<{ path?: string }> };
+    return (registry.resources ?? []).some(
+      (r) => r.path && path.resolve(r.path) === resolvedPath,
+    );
+  } catch {
+    return false;
+  }
+}
 
 /** Environment for gog CLI calls (needs keyring password). */
 const GOG_ENV = {
@@ -353,11 +366,12 @@ const readFile: GatewayRequestHandler = async ({ params, respond }) => {
     return;
   }
 
-  // SECURITY: Validate path is within GodMode-owned dirs, vault, or workspaces.
-  // Resolves symlinks before checking to prevent traversal via symlink.
-  const resolvedPath = path.resolve(expandPath(filePath));
+  // SECURITY: Validate path is within GodMode-owned dirs, vault, workspaces,
+  // or is a registered resource. Resolves symlinks before checking to prevent
+  // traversal via symlink.
+  const resolvedPath = path.resolve(filePath);
   const realPath = await fs.realpath(resolvedPath).catch(() => resolvedPath);
-  if (!isAllowedPath(realPath)) {
+  if (!isAllowedPath(realPath) && !isRegisteredResource(realPath)) {
     respond(false, null, { code: "ACCESS_DENIED", message: "Path not allowed" });
     return;
   }

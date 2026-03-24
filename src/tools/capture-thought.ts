@@ -1,105 +1,133 @@
 /**
- * capture-thought.ts — Write a thought/fact to memory.
+ * capture-thought.ts — MCP tool for persisting thoughts/facts to memory.
  *
- * Writes to today's daily note AND forwards to Honcho for reasoning.
- * Used by external MCP clients to capture information into the brain.
+ * The ally uses this to save important information discovered during
+ * conversations. Supports scoping to personal memory or a workspace.
+ *
+ * Personal thoughts go to ~/godmode/memory/thoughts/.
+ * Workspace-scoped thoughts go to workspaces/{id}/memory/.
  */
+
+import fs from "node:fs/promises";
+import path from "node:path";
 import { type AnyAgentTool } from "openclaw/plugin-sdk";
-import { appendFileSync, existsSync, mkdirSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
-import { MEMORY_DIR, localDateString } from "../data-paths.js";
 import { jsonResult } from "../lib/sdk-helpers.js";
 
-export function createCaptureThoughtTool(): AnyAgentTool {
+export function createCaptureThoughtTool(ctx: {
+  sessionKey?: string;
+}): AnyAgentTool {
   return {
-    label: "Capture Thought",
     name: "capture_thought",
+    label: "Capture Thought",
     description:
-      "Write a thought, fact, or note to memory. Saved to today's daily note " +
-      "and processed by the reasoning engine. Optionally tags a person or company.",
+      "Save a thought, fact, or decision to memory. " +
+      "By default saves to personal memory. Use scope to save to a workspace " +
+      "(only for information appropriate to share with that team). " +
+      "Topics create or append to named files for easy browsing.",
     parameters: {
       type: "object" as const,
       properties: {
-        thought: {
-          type: "string",
-          description: "The thought, fact, or note to capture",
-        },
-        category: {
+        topic: {
           type: "string",
           description:
-            "Optional: 'person', 'company', 'decision', 'idea', 'meeting'. Defaults to general.",
+            "Topic slug for the memory file (e.g. 'meeting-notes', 'project-decisions', 'client-feedback')",
         },
-        entity: {
+        content: {
+          type: "string",
+          description: "The thought or fact to capture (markdown format)",
+        },
+        scope: {
           type: "string",
           description:
-            "Optional: person or company name if category is 'person' or 'company'",
+            "Where to save: 'personal' (default) or a workspace ID to publish to that workspace's shared memory.",
         },
       },
-      required: ["thought"],
+      required: ["topic", "content"],
     },
-    execute: async (_id: string, params: Record<string, unknown>) => {
-      const thought = String(params.thought ?? "").trim();
-      if (!thought) return jsonResult({ error: "thought is required" });
+    execute: async (_toolCallId: string, params: Record<string, unknown>) => {
+      const topic = typeof params.topic === "string" ? params.topic.trim() : "";
+      const content = typeof params.content === "string" ? params.content.trim() : "";
+      const scope = typeof params.scope === "string" ? params.scope.trim() : "personal";
 
-      const category = String(params.category ?? "general");
-      const entity = String(params.entity ?? "").trim();
-      const today = localDateString();
-      const timestamp = new Date().toLocaleTimeString("en-US", {
-        timeZone: process.env.TZ || "America/Chicago",
-        hour: "2-digit",
-        minute: "2-digit",
-      });
-
-      // 1. Append to daily note
-      const dailyDir = join(MEMORY_DIR, "daily");
-      if (!existsSync(dailyDir)) mkdirSync(dailyDir, { recursive: true });
-      const dailyPath = join(dailyDir, `${today}.md`);
-
-      if (!existsSync(dailyPath)) {
-        writeFileSync(dailyPath, `# Memory — ${today}\n\n`);
+      if (!topic || !content) {
+        return jsonResult({ error: "topic and content are required" });
       }
 
-      const entry = `- [${timestamp}] [${category}] ${thought}\n`;
-      appendFileSync(dailyPath, entry);
+      // Sanitize topic to safe filename
+      const safeTopic = topic
+        .toLowerCase()
+        .replace(/[^a-z0-9-]/g, "-")
+        .replace(/^-+|-+$/g, "")
+        .slice(0, 60);
+      if (!safeTopic) {
+        return jsonResult({ error: "Invalid topic name" });
+      }
 
-      // 2. If person/company, also update their file
-      let entityFile: string | undefined;
-      if (entity && (category === "person" || category === "company")) {
-        const subdir = category === "person" ? "people" : "bank/companies";
-        const entityDir = join(MEMORY_DIR, subdir);
-        if (!existsSync(entityDir)) mkdirSync(entityDir, { recursive: true });
-        const safeName = entity.toLowerCase().replace(/[^a-z0-9]+/g, "-");
-        const entityPath = join(entityDir, `${safeName}.md`);
+      let memoryDir: string;
 
-        if (!existsSync(entityPath)) {
-          writeFileSync(
-            entityPath,
-            `# ${entity}\n\n## Notes\n\n- [${today}] ${thought}\n`,
-          );
-        } else {
-          appendFileSync(entityPath, `\n- [${today}] ${thought}\n`);
+      if (scope === "personal") {
+        // Personal memory → ~/godmode/memory/thoughts/
+        const godmodeRoot = process.env.GODMODE_ROOT || path.join(process.env.HOME || "~", "godmode");
+        memoryDir = path.join(godmodeRoot, "memory", "thoughts");
+      } else {
+        // Workspace-scoped → resolve workspace path
+        try {
+          const { readWorkspaceConfig, findWorkspaceById } = await import("../lib/workspaces-config.js");
+          const config = await readWorkspaceConfig({ initializeIfMissing: false });
+          const workspace = findWorkspaceById(config, scope);
+          if (!workspace) {
+            return jsonResult({ error: `Workspace not found: ${scope}` });
+          }
+          memoryDir = path.join(workspace.path, "memory");
+        } catch (err) {
+          return jsonResult({ error: `Failed to resolve workspace: ${err instanceof Error ? err.message : String(err)}` });
         }
-        entityFile = `${subdir}/${safeName}.md`;
       }
 
-      // 3. Forward to Honcho for reasoning (best-effort)
+      const filePath = path.join(memoryDir, `${safeTopic}.md`);
+      const timestamp = new Date().toISOString().slice(0, 16).replace("T", " ");
+
       try {
-        const { forwardToHoncho } = await import(
-          "../services/honcho-client.js"
-        );
-        await forwardToHoncho(
-          `[Captured thought - ${category}] ${thought}`,
-          `mcp:capture`,
-        );
-      } catch {
-        /* non-fatal */
+        await fs.mkdir(memoryDir, { recursive: true });
+
+        // Always append with timestamp — thoughts accumulate
+        const entry = `\n## ${timestamp}\n\n${content}\n`;
+
+        let existing = "";
+        try {
+          existing = await fs.readFile(filePath, "utf-8");
+        } catch {
+          // File doesn't exist yet — create with header
+          existing = `# ${topic}\n`;
+        }
+
+        await fs.writeFile(filePath, existing + entry, "utf-8");
+      } catch (err) {
+        return jsonResult({ error: `Failed to write: ${err instanceof Error ? err.message : String(err)}` });
       }
+
+      // If workspace-scoped, try to sync
+      if (scope !== "personal") {
+        try {
+          const { getWorkspaceSyncService } = await import("../lib/workspace-sync-service.js");
+          const syncService = getWorkspaceSyncService();
+          await syncService.pushNow(scope);
+        } catch {
+          // Non-fatal — sync happens on next push cycle
+        }
+      }
+
+      // Signal health
+      try {
+        const { health } = await import("../lib/health-ledger.js");
+        health.signal("memory.capture", true, { topic: safeTopic, scope });
+      } catch { /* non-fatal */ }
 
       return jsonResult({
-        status: "captured",
-        dailyNote: `daily/${today}.md`,
-        ...(entityFile ? { entityFile } : {}),
+        captured: true,
+        file: `${safeTopic}.md`,
+        scope,
       });
     },
-  };
+  } as AnyAgentTool;
 }

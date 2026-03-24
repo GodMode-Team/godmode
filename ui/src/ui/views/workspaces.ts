@@ -638,7 +638,10 @@ function renderWorkspaceCard(
     <div class="workspace-card-wrapper">
       <button
         class="workspace-card"
-        @click=${() => onSelect?.(workspace)}
+        @click=${() => {
+          console.log("[workspace-card] click:", workspace.name, "onSelect:", typeof onSelect);
+          onSelect?.(workspace);
+        }}
         title="Open workspace"
       >
         <div class="workspace-card-emoji">${workspace.emoji}</div>

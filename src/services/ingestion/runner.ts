@@ -1,17 +1,17 @@
 /**
- * runner.ts — Unified ingestion pipeline runner.
+ * runner.ts — Unified ingestion runner for all data source pipelines.
  *
- * Pipelines are GENERIC TYPES (calendar, meetings, etc.) — not vendor-specific.
- * The only engine-level pipeline is Calendar (gog CLI, structured data).
- * Everything else flows through existing hooks:
- *   - Meetings: /godmode/webhooks/meeting (already generic — Fathom, Otter, etc.)
- *   - Email/Projects/Documents: ally delegates via Composio, MCP, or queue
- *
- * Meta-architecture rule: Code as little as possible. The ally does the enrichment.
- * Engine code only for: structured CLI output (calendar) + orchestration (this runner).
+ * Runs each configured pipeline in sequence, catches errors per-pipeline,
+ * and returns structured results. Also provides a status check for the UI.
  */
 
 import { runCalendarEnrichment } from "./calendar-enrichment.js";
+import { runEmailDigest } from "./email-digest.js";
+import { runFathomDigest } from "./fathom-calls.js";
+import { runDriveSync } from "./drive-sync.js";
+import { runClickUpSync } from "./clickup-sync.js";
+
+// ── Types ────────────────────────────────────────────────────────────
 
 export type IngestionResult = {
   pipeline: string;
@@ -20,40 +20,59 @@ export type IngestionResult = {
   durationMs: number;
 };
 
-/**
- * Pipeline types — generic categories, not vendor names.
- *
- * "calendar" — engine-level (gog CLI, structured JSON, auto-enrichment)
- * "meetings" — webhook-driven (already handled by /godmode/webhooks/meeting)
- * "email" / "projects" / "documents" — ally-driven (via Composio, queue, or MCP tools)
- */
-const enginePipelines = [
+// ── Pipeline Registry ────────────────────────────────────────────────
+
+interface PipelineEntry {
+  name: string;
+  run: () => Promise<Record<string, unknown>>;
+  /** If this env var is missing, the pipeline is skipped. null = always runs. */
+  requiredEnv: string | null;
+}
+
+const pipelines: PipelineEntry[] = [
   {
     name: "calendar",
-    fn: runCalendarEnrichment,
-    env: "GOG_CALENDAR_ACCOUNT",
+    run: async () => ({ ...(await runCalendarEnrichment()) }),
+    requiredEnv: null, // gog CLI is always available if installed
   },
-] as const;
+  {
+    name: "email-front",
+    run: async () => ({ ...(await runEmailDigest()) }),
+    requiredEnv: "FRONT_API_TOKEN",
+  },
+  {
+    name: "fathom",
+    run: async () => ({ ...(await runFathomDigest()) }),
+    requiredEnv: "FATHOM_API_KEY",
+  },
+  {
+    name: "drive",
+    run: async () => ({ ...(await runDriveSync()) }),
+    requiredEnv: null, // gog CLI is always available if installed
+  },
+  {
+    name: "clickup",
+    run: async () => ({ ...(await runClickUpSync()) }),
+    requiredEnv: "CLICKUP_API_TOKEN",
+  },
+];
+
+// ── Runner ───────────────────────────────────────────────────────────
 
 /**
- * Run engine-level ingestion pipelines (or a specific one).
- * Ally-driven pipelines (email, projects, documents) are NOT run here —
- * they're queue items the ally dispatches to sub-agents.
+ * Run all configured ingestion pipelines in sequence.
+ * Each pipeline is independently error-handled — one failure doesn't stop the rest.
  */
-export async function runAllIngestion(
-  only?: string,
-): Promise<IngestionResult[]> {
+export async function runAllIngestion(): Promise<IngestionResult[]> {
   const results: IngestionResult[] = [];
-  const toRun = only
-    ? enginePipelines.filter((p) => p.name === only)
-    : [...enginePipelines];
 
-  for (const p of toRun) {
-    if (!process.env[p.env]) {
+  for (const pipeline of pipelines) {
+    // Skip if required env var is missing
+    if (pipeline.requiredEnv && !process.env[pipeline.requiredEnv]) {
       results.push({
-        pipeline: p.name,
+        pipeline: pipeline.name,
         status: "skipped",
-        details: { reason: `${p.env} not set` },
+        details: { reason: `${pipeline.requiredEnv} not set` },
         durationMs: 0,
       });
       continue;
@@ -61,16 +80,16 @@ export async function runAllIngestion(
 
     const start = Date.now();
     try {
-      const details = await p.fn();
+      const details = await pipeline.run();
       results.push({
-        pipeline: p.name,
+        pipeline: pipeline.name,
         status: "ok",
-        details: details as Record<string, unknown>,
+        details,
         durationMs: Date.now() - start,
       });
     } catch (err) {
       results.push({
-        pipeline: p.name,
+        pipeline: pipeline.name,
         status: "error",
         details: { error: String(err) },
         durationMs: Date.now() - start,
@@ -78,63 +97,50 @@ export async function runAllIngestion(
     }
   }
 
-  // Signal health
-  try {
-    const { health } = await import("../../lib/health-ledger.js");
-    const okCount = results.filter((r) => r.status === "ok").length;
-    health.signal("ingestion.run", okCount > 0, {
-      results: results.map((r) => ({
-        pipeline: r.pipeline,
-        status: r.status,
-      })),
-    });
-  } catch {
-    /* non-fatal */
-  }
-
   return results;
 }
 
+// ── Status Check ─────────────────────────────────────────────────────
+
 /**
- * Get ingestion status for the UI dashboard.
- * Shows both engine-level and webhook/ally-driven pipelines.
+ * Returns configuration status for each pipeline.
+ * Used by the UI and health checks to show what's connected.
  */
 export function getIngestionStatus(): Array<{
   name: string;
-  type: "engine" | "webhook" | "ally";
   configured: boolean;
-  hint: string;
+  envVar: string;
 }> {
   return [
     {
-      name: "Calendar",
-      type: "engine",
-      configured: !!process.env.GOG_CALENDAR_ACCOUNT,
-      hint: "gog CLI — auto-enriches people files from meetings",
+      name: "Calendar (Google)",
+      configured: true, // gog CLI — always available
+      envVar: "GOG_CALENDAR_ACCOUNT",
     },
     {
-      name: "Meetings",
-      type: "webhook",
-      configured: !!process.env.GODMODE_WEBHOOK_SECRET,
-      hint: "Webhook — works with Fathom, Otter, Fireflies, etc.",
+      name: "Email (Front)",
+      configured: !!process.env.FRONT_API_TOKEN,
+      envVar: "FRONT_API_TOKEN",
     },
     {
-      name: "Email",
-      type: "ally",
-      configured: false, // ally-driven, no single env var
-      hint: "Ask your ally to digest recent email via Composio or connected tools",
+      name: "Fathom Calls",
+      configured: !!process.env.FATHOM_API_KEY,
+      envVar: "FATHOM_API_KEY",
     },
     {
-      name: "Projects",
-      type: "ally",
-      configured: false,
-      hint: "Ask your ally to sync tasks from ClickUp, Linear, Asana, etc.",
+      name: "Google Drive",
+      configured: true, // gog CLI — always available
+      envVar: "GOG_CALENDAR_ACCOUNT",
     },
     {
-      name: "Documents",
-      type: "ally",
-      configured: false,
-      hint: "Ask your ally to index files from Drive, Notion, etc.",
+      name: "ClickUp",
+      configured: !!process.env.CLICKUP_API_TOKEN,
+      envVar: "CLICKUP_API_TOKEN",
+    },
+    {
+      name: "Screenpipe",
+      configured: true, // auto-detected at runtime via localhost:3030
+      envVar: "(auto-detected)",
     },
   ];
 }

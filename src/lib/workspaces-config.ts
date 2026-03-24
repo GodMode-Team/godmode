@@ -582,11 +582,13 @@ export async function ensureWorkspaceFolders(
   await fs.mkdir(path.join(workspacePath, "sessions"), { recursive: true });
   await fs.mkdir(path.join(workspacePath, "outputs"), { recursive: true });
 
+  // All workspace types get a memory dir for scoped thoughts/captures
+  await fs.mkdir(path.join(workspacePath, "memory"), { recursive: true });
+
   if (type === "team") {
     const teamDirs = [
       ".godmode",
       ".godmode/local",
-      "memory",
       "skills",
       "tools",
       "comms",

@@ -1353,6 +1353,167 @@ const vaultCaptureRunNow: GatewayRequestHandler = async ({ respond }) => {
   });
 };
 
+// ── Memory Pulse (system health) ──────────────────────────────────
+
+type MemorySystemStatus = {
+  id: string;
+  name: string;
+  status: "ready" | "degraded" | "offline";
+  detail: string;
+  count?: number;
+};
+
+const memoryPulse: GatewayRequestHandler = async ({ respond }) => {
+  const systems: MemorySystemStatus[] = [];
+
+  // 1. Honcho
+  try {
+    const { isMemoryReady } = await import("../lib/memory.js");
+    const ready = isMemoryReady();
+    systems.push({
+      id: "honcho",
+      name: "Honcho",
+      status: ready ? "ready" : "offline",
+      detail: ready ? "Connected" : "Not configured",
+    });
+  } catch {
+    systems.push({ id: "honcho", name: "Honcho", status: "offline", detail: "Not available" });
+  }
+
+  // 2. Vault
+  const vault = getVaultPath();
+  const vaultHealthData = vault ? getVaultHealth() : null;
+  systems.push({
+    id: "vault",
+    name: "Vault",
+    status: vault && vaultHealthData ? "ready" : vault ? "degraded" : "offline",
+    detail: vaultHealthData ? `${vaultHealthData.totalNotes} notes` : vault ? "No PARA folders" : "Not configured",
+    count: vaultHealthData?.totalNotes,
+  });
+
+  // 3. Session Search (FTS5)
+  try {
+    const { isSessionSearchReady } = await import("../lib/session-search.js");
+    const ready = isSessionSearchReady();
+    systems.push({
+      id: "sessions",
+      name: "Sessions",
+      status: ready ? "ready" : "offline",
+      detail: ready ? "Indexed" : "Not initialized",
+    });
+  } catch {
+    systems.push({ id: "sessions", name: "Sessions", status: "offline", detail: "Not available" });
+  }
+
+  // 4. Screenpipe
+  try {
+    const resp = await fetch("http://localhost:3030/health", {
+      signal: AbortSignal.timeout(2_000),
+    });
+    systems.push({
+      id: "screenpipe",
+      name: "Screenpipe",
+      status: resp.ok ? "ready" : "degraded",
+      detail: resp.ok ? "Running" : `API ${resp.status}`,
+    });
+  } catch {
+    systems.push({ id: "screenpipe", name: "Screenpipe", status: "offline", detail: "Not running" });
+  }
+
+  const readyCount = systems.filter(s => s.status === "ready").length;
+  respond(true, { systems, readyCount, totalCount: systems.length });
+};
+
+// ── Activity Feed (recent memory events) ─────────────────────────
+
+type ActivityEvent = {
+  type: "vault-capture" | "identity-update" | "calendar-enrichment" | "search" | "file-modified";
+  title: string;
+  detail?: string;
+  timestamp: string;
+  source: string;
+};
+
+const activityFeed: GatewayRequestHandler = async ({ params, respond }) => {
+  const p = params as { limit?: number };
+  const limit = typeof p.limit === "number" ? Math.min(p.limit, 50) : 20;
+  const events: ActivityEvent[] = [];
+
+  // 1. Recent vault file modifications
+  const vaultPath = getVaultPath();
+  if (vaultPath) {
+    const scanDirs = [
+      { dir: join(vaultPath, "00-Inbox"), source: "inbox" },
+      { dir: join(vaultPath, "01-Daily"), source: "daily" },
+      { dir: join(vaultPath, "Brain", "People"), source: "people" },
+      { dir: join(vaultPath, "Brain", "Companies"), source: "companies" },
+      { dir: join(vaultPath, "Brain", "Knowledge"), source: "knowledge" },
+    ];
+
+    for (const { dir, source } of scanDirs) {
+      if (!existsSync(dir)) continue;
+      try {
+        const entries = readdirSync(dir, { withFileTypes: true });
+        for (const e of entries) {
+          if (e.name.startsWith(".") || e.name.startsWith("_") || e.isDirectory()) continue;
+          if (!e.name.endsWith(".md")) continue;
+          const fullPath = join(dir, e.name);
+          try {
+            const st = statSync(fullPath);
+            events.push({
+              type: source === "people" || source === "companies" ? "calendar-enrichment" : "vault-capture",
+              title: basename(e.name, ".md"),
+              detail: source,
+              timestamp: st.mtime.toISOString(),
+              source,
+            });
+          } catch { /* skip */ }
+        }
+      } catch { /* skip */ }
+    }
+  }
+
+  // 2. Recent retrieval log entries (searches)
+  try {
+    const logPath = join(DATA_DIR, "retrieval-log.jsonl");
+    if (existsSync(logPath)) {
+      const raw = readFileSync(logPath, "utf-8");
+      const lines = raw.trim().split("\n").filter(Boolean);
+      const recent = lines.slice(-10).reverse();
+      for (const line of recent) {
+        try {
+          const entry = JSON.parse(line) as { ts: string; source: string; query: string; resultCount: number };
+          events.push({
+            type: "search",
+            title: `Searched: "${entry.query}"`,
+            detail: `${entry.resultCount} results via ${entry.source}`,
+            timestamp: entry.ts,
+            source: entry.source,
+          });
+        } catch { /* skip malformed */ }
+      }
+    }
+  } catch { /* skip */ }
+
+  // 3. Identity file modifications
+  for (const spec of IDENTITY_FILE_SPECS) {
+    const filePath = resolveIdentityFilePath(spec);
+    const mtime = safeFileMtime(filePath);
+    if (mtime) {
+      events.push({
+        type: "identity-update",
+        title: `${spec.label} updated`,
+        timestamp: mtime,
+        source: "identity",
+      });
+    }
+  }
+
+  // Sort newest first and limit
+  events.sort((a, b) => b.timestamp.localeCompare(a.timestamp));
+  respond(true, { events: events.slice(0, limit), total: events.length });
+};
+
 // ── Export ────────────────────────────────────────────────────────────
 
 export const secondBrainHandlers: GatewayRequestHandlers = {
@@ -1373,4 +1534,6 @@ export const secondBrainHandlers: GatewayRequestHandlers = {
   "secondBrain.obsidianSyncSetMode": obsidianSyncSetMode,
   "secondBrain.captureStatus": vaultCaptureStatus,
   "secondBrain.captureRunNow": vaultCaptureRunNow,
+  "secondBrain.memoryPulse": memoryPulse,
+  "secondBrain.activity": activityFeed,
 };

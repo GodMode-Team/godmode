@@ -196,7 +196,7 @@ export type OnboardingState = {
 
 // ── Setup Flow (5-step simplified onboarding) ──────────────────
 
-export type SetupStep = 'welcome' | 'api-key' | 'memory' | 'integrations' | 'second-brain';
+export type SetupStep = 'welcome' | 'api-key' | 'memory' | 'integrations' | 'screenpipe' | 'second-brain';
 
 export interface SetupProgress {
   currentStep: SetupStep;
@@ -220,6 +220,7 @@ export const SETUP_STEPS: { step: SetupStep; title: string; description: string;
   { step: 'api-key', title: 'AI Connection', description: 'Connect your Anthropic API key', required: true },
   { step: 'memory', title: 'Memory', description: 'Enable persistent memory with Honcho', required: false },
   { step: 'integrations', title: 'Integrations', description: 'Connect your tools via Composio', required: false },
+  { step: 'screenpipe', title: 'Ambient Memory', description: 'Enable Screenpipe for screen & audio recall', required: false },
   { step: 'second-brain', title: 'Second Brain', description: 'Link your Obsidian vault', required: false },
 ];
 

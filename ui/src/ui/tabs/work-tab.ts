@@ -94,6 +94,7 @@ export class GmWork extends LitElement {
   // -- Event-bus subscription cleanup ---------------------------------------
 
   private _unsubs: Array<() => void> = [];
+  private _lastConnected = false;
 
   // -- Light DOM (no shadow root) so existing CSS classes work ---------------
 
@@ -125,7 +126,7 @@ export class GmWork extends LitElement {
       }),
     );
 
-    // Auto-load initial data
+    // Auto-load initial data (may fail if context hasn't synced yet — updated() retries)
     void this._refresh();
   }
 
@@ -133,6 +134,19 @@ export class GmWork extends LitElement {
     for (const unsub of this._unsubs) unsub();
     this._unsubs = [];
     super.disconnectedCallback();
+  }
+
+  /** Re-fetch when gateway connection arrives after initial mount. */
+  protected override updated(changed: Map<PropertyKey, unknown>) {
+    super.updated?.(changed);
+    const nowConnected = this.ctx?.connected ?? false;
+    if (nowConnected && !this._lastConnected) {
+      // Context just became connected — retry load if we have no data or an error
+      if (!this.workspaces?.length || this.workspacesError) {
+        void this._refresh();
+      }
+    }
+    this._lastConnected = nowConnected;
   }
 
   // -- Render ---------------------------------------------------------------
@@ -213,21 +227,46 @@ export class GmWork extends LitElement {
   // -- Handlers -------------------------------------------------------------
 
   private async _refresh(): Promise<void> {
-    await loadWorkspaces(this as unknown as WorkspacesState);
-    this.allTasks = await loadAllTasksWithQueueStatus(
-      this as unknown as WorkspacesState,
-    );
+    try {
+      await loadWorkspaces(this as unknown as WorkspacesState);
+      this.allTasks = await loadAllTasksWithQueueStatus(
+        this as unknown as WorkspacesState,
+      );
+    } catch (err) {
+      console.error("[GmWork] refresh failed:", err);
+    }
     this.requestUpdate();
   }
 
   private async _onSelectWorkspace(workspace: WorkspaceSummary): Promise<void> {
     this.workspaceItemSearchQuery = "";
     this.workspacesLoading = true;
+    this.requestUpdate();
     try {
-      await selectWorkspace(this as unknown as WorkspacesState, workspace);
+      const timeout = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error("Workspace load timed out")), 10_000),
+      );
+      await Promise.race([
+        selectWorkspace(this as unknown as WorkspacesState, workspace),
+        timeout,
+      ]);
     } catch (err) {
       console.error("[GmWork] workspace select failed:", err);
-      this.ctx.addToast("Failed to open workspace: " + workspace.name, "error");
+      // On timeout/error, use fallback so user still sees the workspace
+      if (!this.selectedWorkspace) {
+        this.selectedWorkspace = {
+          ...workspace,
+          pinned: [],
+          pinnedSessions: [],
+          outputs: [],
+          sessions: [],
+          tasks: [],
+        };
+      }
+      this.ctx.addToast(
+        err instanceof Error ? err.message : "Failed to open " + workspace.name,
+        "error",
+      );
     } finally {
       this.workspacesLoading = false;
       this.requestUpdate();

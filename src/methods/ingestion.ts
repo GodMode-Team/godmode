@@ -1,52 +1,117 @@
 /**
- * ingestion.ts — RPC handlers for ingestion pipeline management.
+ * ingestion.ts — RPC methods for the ingestion pipeline.
  *
- * Exposes pipeline status, run triggers, and history to the UI and ally.
+ * Exposes status, run, and screenpipe configuration endpoints.
+ * Uses dynamic imports so the gateway boots even if ingestion services
+ * are not yet implemented (runner.ts, screenpipe-funnel.ts).
  */
 
 import type { GatewayRequestHandler } from "../types/plugin-api.js";
-import {
-  runAllIngestion,
-  getIngestionStatus,
-} from "../services/ingestion/runner.js";
 
-type GatewayRequestHandlers = Record<string, GatewayRequestHandler>;
-
-// ── ingestion.status ──────────────────────────────────────────────────
-
-const status: GatewayRequestHandler = async ({ respond }) => {
+const ingestionStatus: GatewayRequestHandler = async ({ respond }) => {
   try {
-    const pipelines = getIngestionStatus();
-    const configured = pipelines.filter((p) => p.configured).length;
-    respond(true, { pipelines, configured, total: pipelines.length });
+    const { getIngestionStatus } = await import(
+      "../services/ingestion/runner.js"
+    );
+    const status = getIngestionStatus();
+    respond(true, { pipelines: status });
   } catch (err) {
     respond(false, undefined, {
-      code: "INGESTION_STATUS_ERROR",
+      code: "INGESTION_ERROR",
       message: String(err),
     });
   }
 };
 
-// ── ingestion.run ─────────────────────────────────────────────────────
-
-const run: GatewayRequestHandler = async ({ params, respond }) => {
+const ingestionRun: GatewayRequestHandler = async ({ params, respond }) => {
+  const p = params as { pipeline?: string };
   try {
-    const pipeline = params.pipeline
-      ? String(params.pipeline)
-      : undefined;
-    const results = await runAllIngestion(pipeline);
-    respond(true, { results });
+    const { runAllIngestion } = await import(
+      "../services/ingestion/runner.js"
+    );
+    const results = await runAllIngestion();
+    if (p.pipeline) {
+      const match = results.find(
+        (r: { pipeline: string }) => r.pipeline === p.pipeline,
+      );
+      respond(
+        true,
+        match ?? {
+          pipeline: p.pipeline,
+          status: "skipped",
+          details: { reason: "not found" },
+          durationMs: 0,
+        },
+      );
+    } else {
+      respond(true, { results });
+    }
   } catch (err) {
     respond(false, undefined, {
-      code: "INGESTION_RUN_ERROR",
+      code: "INGESTION_ERROR",
       message: String(err),
     });
   }
 };
 
-// ── Export ─────────────────────────────────────────────────────────────
+const screenpipeStatus: GatewayRequestHandler = async ({ respond }) => {
+  try {
+    const { loadConfig } = await import(
+      "../services/ingestion/screenpipe-config.js"
+    );
+    const { isScreenpipeAvailable } = await import(
+      "../services/ingestion/screenpipe-funnel.js"
+    );
+    const config = await loadConfig();
+    const available = await isScreenpipeAvailable();
+    respond(true, {
+      enabled: config.enabled,
+      available,
+      apiUrl: config.apiUrl,
+      blockedApps: config.blockedApps,
+      retention: config.retention,
+    });
+  } catch (err) {
+    respond(false, undefined, {
+      code: "SCREENPIPE_ERROR",
+      message: String(err),
+    });
+  }
+};
 
-export const ingestionHandlers: GatewayRequestHandlers = {
-  "ingestion.status": status,
-  "ingestion.run": run,
+const screenpipeConfigure: GatewayRequestHandler = async ({
+  params,
+  respond,
+}) => {
+  try {
+    const { loadConfig, saveConfig } = await import(
+      "../services/ingestion/screenpipe-config.js"
+    );
+    const updates = params as Record<string, unknown>;
+
+    const current = await loadConfig();
+    const partial: Record<string, unknown> = {};
+    if (typeof updates.enabled === "boolean") partial.enabled = updates.enabled;
+    if (typeof updates.apiUrl === "string") partial.apiUrl = updates.apiUrl;
+    if (Array.isArray(updates.blockedApps)) partial.blockedApps = updates.blockedApps;
+    if (updates.retention && typeof updates.retention === "object")
+      partial.retention = updates.retention;
+    if (updates.privacy && typeof updates.privacy === "object")
+      partial.privacy = updates.privacy;
+
+    const merged = await saveConfig(partial);
+    respond(true, { saved: true, config: merged });
+  } catch (err) {
+    respond(false, undefined, {
+      code: "SCREENPIPE_ERROR",
+      message: String(err),
+    });
+  }
+};
+
+export const ingestionHandlers: Record<string, GatewayRequestHandler> = {
+  "ingestion.status": ingestionStatus,
+  "ingestion.run": ingestionRun,
+  "ingestion.screenpipeStatus": screenpipeStatus,
+  "ingestion.screenpipeConfigure": screenpipeConfigure,
 };

@@ -657,6 +657,76 @@ export async function runGatewayStart(
     logger.warn(`[GodMode] Meeting webhook broadcast wiring failed: ${String(err)}`);
   }
 
+  // ── Ingestion pipelines (Screenpipe funnel + structured sources) ──
+  try {
+    // Screenpipe hourly summary — every 60 minutes
+    const screenpipeHourlyTimer = setInterval(async () => {
+      try {
+        const { loadConfig } = await import("../services/ingestion/screenpipe-config.js");
+        const cfg = await loadConfig();
+        if (!cfg.enabled) return;
+        const { runHourlySummary } = await import("../services/ingestion/screenpipe-funnel.js");
+        const result = await runHourlySummary();
+        if (result.filtered > 0) {
+          logger.info(`[GodMode] Screenpipe hourly: captured=${result.captured}, summarized=${result.filtered}, promoted=${result.promoted}`);
+        }
+      } catch (err) {
+        logger.warn(`[GodMode] Screenpipe hourly failed: ${String(err)}`);
+      }
+    }, 60 * 60_000); // 60 min
+    serviceCleanup.push({ name: "screenpipe-hourly", fn: () => clearInterval(screenpipeHourlyTimer) });
+
+    // Screenpipe daily digest — every 24 hours (runs at next interval from startup)
+    const screenpipeDailyTimer = setInterval(async () => {
+      try {
+        const { loadConfig } = await import("../services/ingestion/screenpipe-config.js");
+        const cfg = await loadConfig();
+        if (!cfg.enabled) return;
+        const { runDailyDigest } = await import("../services/ingestion/screenpipe-funnel.js");
+        const result = await runDailyDigest();
+        if (result.hourlyFilesProcessed > 0) {
+          logger.info(`[GodMode] Screenpipe daily digest: processed ${result.hourlyFilesProcessed} hourly files`);
+        }
+      } catch (err) {
+        logger.warn(`[GodMode] Screenpipe daily digest failed: ${String(err)}`);
+      }
+    }, 24 * 60 * 60_000); // 24 hours
+    serviceCleanup.push({ name: "screenpipe-daily", fn: () => clearInterval(screenpipeDailyTimer) });
+
+    // Screenpipe retention cleanup — every 12 hours
+    const screenpipeCleanupTimer = setInterval(async () => {
+      try {
+        const { runRetentionCleanup } = await import("../services/ingestion/screenpipe-funnel.js");
+        const result = await runRetentionCleanup();
+        if (result.deleted > 0) {
+          logger.info(`[GodMode] Screenpipe cleanup: deleted ${result.deleted} expired files`);
+        }
+      } catch (err) {
+        logger.warn(`[GodMode] Screenpipe cleanup failed: ${String(err)}`);
+      }
+    }, 12 * 60 * 60_000); // 12 hours
+    serviceCleanup.push({ name: "screenpipe-cleanup", fn: () => clearInterval(screenpipeCleanupTimer) });
+
+    // Calendar enrichment — every 60 minutes
+    const calendarTimer = setInterval(async () => {
+      try {
+        if (!process.env.GOG_CALENDAR_ACCOUNT) return;
+        const { runCalendarEnrichment } = await import("../services/ingestion/calendar-enrichment.js");
+        const result = await runCalendarEnrichment();
+        if (result.eventsProcessed > 0) {
+          logger.info(`[GodMode] Calendar enrichment: ${result.eventsProcessed} events, ${result.peopleUpdated} people updated`);
+        }
+      } catch (err) {
+        logger.warn(`[GodMode] Calendar enrichment failed: ${String(err)}`);
+      }
+    }, 60 * 60_000); // 60 min
+    serviceCleanup.push({ name: "calendar-enrichment", fn: () => clearInterval(calendarTimer) });
+
+    logger.info("[GodMode] Ingestion pipelines registered (screenpipe hourly/daily/cleanup, calendar)");
+  } catch (err) {
+    logger.warn(`[GodMode] Ingestion pipeline registration failed: ${String(err)}`);
+  }
+
   logger.info(`[GodMode] Gateway startup complete — ${serviceCleanup.length} service(s) registered for cleanup`);
 }
 

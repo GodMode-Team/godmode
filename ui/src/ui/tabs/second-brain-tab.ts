@@ -1,11 +1,9 @@
 /**
  * <gm-second-brain> — Second Brain tab component.
  *
- * Owns all 20 Second Brain @state properties (moved out of the God Component).
- * Consumes AppContext for shared state (connected, gateway, sidebar, toast, nav).
- * Render functions and types are inlined (merged from views/second-brain.ts).
- * Data loading delegated to ../controllers/second-brain.js.
- * Cross-tab actions (save via chat, add source) go through the event bus.
+ * Single-scroll dashboard replacing the old 3-subtab layout.
+ * Sections: Memory Pulse → Search → Activity Feed → Identity → People → Knowledge Browser
+ * Each section answers a user question about how their AI's memory works.
  */
 
 import { LitElement, html, nothing } from "lit";
@@ -16,19 +14,35 @@ import { appContext, type AppContext } from "../context/app-context.js";
 import { appEventBus } from "../context/event-bus.js";
 import { toSanitizedMarkdownHtml } from "../markdown.js";
 import { formatAgo } from "../format.js";
-import {
-  loadSecondBrain,
-  loadSecondBrainEntry,
-  browseFolder,
-  syncSecondBrain,
-  type SecondBrainState,
-} from "../controllers/second-brain.js";
 
 // ── Types ────────────────────────────────────────────────────────────
 
-export type SecondBrainFileData = {
-  content: string | null;
-  updatedAt: string | null;
+export type MemorySystemStatus = {
+  id: string;
+  name: string;
+  status: "ready" | "degraded" | "offline";
+  detail: string;
+  count?: number;
+};
+
+export type MemoryPulseData = {
+  systems: MemorySystemStatus[];
+  readyCount: number;
+  totalCount: number;
+};
+
+export type ActivityEvent = {
+  type: string;
+  title: string;
+  detail?: string;
+  timestamp: string;
+  source: string;
+  scope?: "personal" | string;
+};
+
+export type ActivityFeedData = {
+  events: ActivityEvent[];
+  total: number;
 };
 
 export type SecondBrainIdentityFile = {
@@ -71,82 +85,15 @@ export type SecondBrainMemoryBankData = {
   totalEntries: number;
 };
 
-export type SecondBrainAiPacketData = {
-  snapshot: {
-    content: string;
-    updatedAt?: string | null;
-    lineCount: number;
-  } | null;
-};
-
-export type SecondBrainEntryDetail = {
-  name: string;
-  content: string;
-  updatedAt: string | null;
-  relativePath?: string;
-};
-
-export type SecondBrainSourceEntry = {
-  id: string;
-  name: string;
-  type: string;
-  status: "connected" | "available";
-  icon: string;
-  description: string;
-  stats?: string;
-  lastSync?: string | null;
-};
-
-export type SecondBrainSourcesData = {
-  sources: SecondBrainSourceEntry[];
-  connectedCount: number;
-  totalCount: number;
-};
-
-export type SecondBrainSubtab = "identity" | "knowledge" | "context" | "people" | "timeline";
-
-// ── People Types ──────────────────────────────────────────────────────
-
-export type PersonEntry = {
-  name: string;
-  file: string;
+export type BrainSearchResult = {
   path: string;
-  email: string | null;
-  firstSeen: string | null;
-  lastModified: string;
-  snippet: string;
-};
-
-export type PersonDetail = {
   name: string;
-  content: string;
-  honchoSays: string | null;
-  file: string;
-};
-
-export type TimelineEntry = {
-  date: string;
-  file: string;
-  preview: string;
-  entryCount: number;
-};
-
-export type IngestionPipeline = {
-  name: string;
-  type: "engine" | "webhook" | "ally";
-  configured: boolean;
-  hint: string;
-};
-
-export type BrainOverview = {
-  health: {
-    peopleCount: number;
-    dailyNoteCount: number;
-    companyCount: number;
-    honchoStatus: string;
-    today: string;
-  };
-  ingestion: IngestionPipeline[];
+  type?: string;
+  section?: string;
+  excerpt?: string;
+  matchContext?: string;
+  source?: string;
+  scope?: "personal" | string;
 };
 
 export type BrainTreeNode = {
@@ -159,37 +106,22 @@ export type BrainTreeNode = {
   children?: BrainTreeNode[];
 };
 
-export type BrainSearchResult = {
-  path: string;
+export type ScreenpipeStatusData = {
+  enabled: boolean;
+  available: boolean;
+  apiUrl: string;
+  blockedApps: string[];
+  retention: Record<string, unknown>;
+};
+
+export type IngestionPipeline = {
   name: string;
-  type: string;
-  excerpt?: string;
-  matchContext?: string;
+  configured: boolean;
+  envVar: string;
 };
 
-export type ResearchFrontmatter = {
-  title?: string;
-  url?: string;
-  category?: string;
-  tags?: string[];
-  date?: string;
-  source?: string;
-};
-
-export type ResearchEntry = SecondBrainMemoryEntry & {
-  frontmatter?: ResearchFrontmatter;
-};
-
-export type ResearchCategory = {
-  key: string;
-  label: string;
-  path: string;
-  entries: ResearchEntry[];
-};
-
-export type SecondBrainResearchData = {
-  categories: ResearchCategory[];
-  totalEntries: number;
+export type IngestionStatusData = {
+  pipelines: IngestionPipeline[];
 };
 
 export type VaultHealthData = {
@@ -209,1068 +141,190 @@ export type VaultHealthData = {
   recentActivity: Array<{ name: string; path: string; updatedAt: string; folder: string }>;
 };
 
-export type SecondBrainProps = {
-  connected: boolean;
-  loading?: boolean;
-  error?: string | null;
-  subtab: SecondBrainSubtab;
-  // Identity
-  identity?: SecondBrainIdentityData | null;
-  // Knowledge (merged memory bank + research + files)
-  memoryBank?: SecondBrainMemoryBankData | null;
-  researchData?: SecondBrainResearchData | null;
-  fileTree?: BrainTreeNode[] | null;
-  fileTreeLoading?: boolean;
-  fileSearchQuery?: string;
-  fileSearchResults?: BrainSearchResult[] | null;
-  selectedEntry?: SecondBrainEntryDetail | null;
-  searchQuery?: string;
-  browsingFolder?: string | null;
-  folderEntries?: SecondBrainMemoryEntry[] | null;
-  folderName?: string | null;
-  // Context (merged ai packet + sources + vault health)
-  aiPacket?: SecondBrainAiPacketData | null;
-  sourcesData?: SecondBrainSourcesData | null;
-  vaultHealth?: VaultHealthData | null;
-  syncing?: boolean;
-  // Callbacks
-  onSubtabChange: (subtab: SecondBrainSubtab) => void;
-  onSelectEntry: (path: string) => void;
-  onBrowseFolder: (path: string) => void;
-  onBack: () => void;
-  onSearch: (query: string) => void;
-  onFileSearch?: (query: string) => void;
-  onFileSelect?: (path: string) => void;
-  onSync: () => void;
-  onRefresh: () => void;
-  onSaveViaChat: () => void;
-  onAddSource: () => void;
-  // People
-  peopleList?: PersonEntry[] | null;
-  selectedPerson?: PersonDetail | null;
-  onSelectPerson?: (file: string) => void;
-  onBackFromPerson?: () => void;
-  // Timeline
-  timelineEntries?: TimelineEntry[] | null;
-  // Overview / Ingestion
-  brainOverview?: BrainOverview | null;
-};
+// Keep these exports for backward compat with controller imports
+export type SecondBrainSubtab = "identity" | "knowledge" | "context";
+export type SecondBrainFileData = { content: string | null; updatedAt: string | null };
+export type SecondBrainEntryDetail = { name: string; content: string; updatedAt: string | null; relativePath?: string };
+export type SecondBrainAiPacketData = { snapshot: { content: string; updatedAt?: string | null; lineCount: number } | null };
+export type SecondBrainSourceEntry = { id: string; name: string; type: string; status: "connected" | "available"; icon: string; description: string; stats?: string; lastSync?: string | null };
+export type SecondBrainSourcesData = { sources: SecondBrainSourceEntry[]; connectedCount: number; totalCount: number };
+export type SecondBrainResearchData = { categories: Array<{ key: string; label: string; path: string; entries: SecondBrainMemoryEntry[] }>; totalEntries: number };
+export type SecondBrainProps = Record<string, unknown>;
+export type ResearchFrontmatter = Record<string, unknown>;
+export type ResearchEntry = SecondBrainMemoryEntry;
+export type ResearchCategory = { key: string; label: string; path: string; entries: SecondBrainMemoryEntry[] };
 
 // ── Render Helpers ───────────────────────────────────────────────────
 
-function fmtUpdated(isoString: string | null | undefined): string {
+function fmtAgo(isoString: string | null | undefined): string {
   if (!isoString) return "";
-  try {
-    return formatAgo(new Date(isoString).getTime());
-  } catch {
-    return "";
-  }
+  try { return formatAgo(new Date(isoString).getTime()); } catch { return ""; }
 }
 
 function renderMd(content: string) {
-  return html`<div class="second-brain-md-body">${unsafeHTML(toSanitizedMarkdownHtml(content))}</div>`;
+  return html`<div class="sb-md-body">${unsafeHTML(toSanitizedMarkdownHtml(content))}</div>`;
 }
 
-// ── Identity Panel ───────────────────────────────────────────────────
-
-function renderIdentityPanel(props: SecondBrainProps) {
-  const { identity } = props;
-  if (!identity || identity.files.length === 0) {
-    return html`
-      <div class="second-brain-panel">
-        <div class="second-brain-empty-block">
-          <div class="second-brain-empty-icon">\u{1F464}</div>
-          <div class="second-brain-empty-title">No identity files found</div>
-          <div class="second-brain-empty-hint">Tell your ally about yourself to start building your profile. Your identity helps the ally personalize everything.</div>
-          <button class="sb-chat-btn" @click=${() => props.onSaveViaChat()} style="margin-top: 12px;">
-            Tell your ally about you
-          </button>
-        </div>
-      </div>
-    `;
-  }
-
-  return html`
-    <div class="second-brain-panel">
-      <div class="sb-identity-actions" style="display: flex; gap: 8px; margin-bottom: 4px;">
-        <button class="sb-chat-btn" @click=${() => props.onSaveViaChat()}>
-          \u{1F4AC} Update via Chat
-        </button>
-      </div>
-
-      <div class="second-brain-entry-list">
-        ${identity.files.map((file) => html`
-          <div class="second-brain-entry" @click=${() => props.onSelectEntry(file.key)}>
-            <div class="second-brain-entry-icon">\u{1F4C4}</div>
-            <div class="second-brain-entry-body">
-              <div class="second-brain-entry-name">${file.label}</div>
-              <div class="second-brain-entry-excerpt">${file.content.slice(0, 120).replace(/[#\n]+/g, " ").trim()}\u{2026}</div>
-            </div>
-            ${file.updatedAt ? html`<div class="second-brain-entry-meta">${fmtUpdated(file.updatedAt)}</div>` : nothing}
-          </div>
-        `)}
-      </div>
-    </div>
-  `;
-}
-
-// ── Entry Row ────────────────────────────────────────────────────────
-
-function renderEntryRow(entry: SecondBrainMemoryEntry, props: SecondBrainProps) {
-  const isDir = entry.isDirectory;
-  const icon = isDir ? "\u{1F4C1}" : "\u{1F4C4}";
-  const handleClick = () => {
-    if (isDir) {
-      props.onBrowseFolder(entry.path);
-    } else {
-      props.onSelectEntry(entry.path);
-    }
-  };
-
-  return html`
-    <div class="second-brain-entry" @click=${handleClick}>
-      <div class="second-brain-entry-icon ${isDir ? "second-brain-entry-icon--folder" : ""}">${icon}</div>
-      <div class="second-brain-entry-body">
-        <div class="second-brain-entry-name">${entry.name}${isDir ? "/" : ""}</div>
-        ${entry.excerpt ? html`<div class="second-brain-entry-excerpt">${entry.excerpt}</div>` : nothing}
-      </div>
-      ${entry.updatedAt ? html`<div class="second-brain-entry-meta">${fmtUpdated(entry.updatedAt)}</div>` : nothing}
-    </div>
-  `;
-}
-
-// ── Research Entry Row ───────────────────────────────────────────────
-
-function renderResearchEntryRow(entry: ResearchEntry, props: SecondBrainProps) {
-  const isDir = entry.isDirectory;
-  const icon = isDir ? "\u{1F4C1}" : "\u{1F4D1}";
-  const handleClick = () => {
-    if (isDir) {
-      props.onBrowseFolder(entry.path);
-    } else {
-      props.onSelectEntry(entry.path);
-    }
-  };
-  const displayName = entry.frontmatter?.title || entry.name;
-
-  return html`
-    <div class="second-brain-entry" @click=${handleClick}>
-      <div class="second-brain-entry-icon ${isDir ? "second-brain-entry-icon--folder" : ""}">${icon}</div>
-      <div class="second-brain-entry-body">
-        <div class="second-brain-entry-name">${displayName}${isDir ? "/" : ""}</div>
-        ${entry.frontmatter?.url ? html`<div class="second-brain-research-url">${entry.frontmatter.url}</div>` : nothing}
-        ${entry.excerpt && !isDir ? html`<div class="second-brain-entry-excerpt">${entry.excerpt}</div>` : nothing}
-        ${entry.frontmatter?.tags?.length ? html`
-          <div class="second-brain-research-tags">
-            ${entry.frontmatter.tags.map(t => html`<span class="second-brain-research-tag">${t}</span>`)}
-          </div>
-        ` : nothing}
-      </div>
-      ${entry.updatedAt ? html`<div class="second-brain-entry-meta">${fmtUpdated(entry.updatedAt)}</div>` : nothing}
-    </div>
-  `;
-}
-
-// ── File Tree ────────────────────────────────────────────────────────
-
-function formatFileSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes}B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)}K`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)}M`;
-}
-
-function renderFileTree(
-  nodes: BrainTreeNode[],
-  props: SecondBrainProps,
-  depth = 0,
-) {
-  return html`
-    <div class="sb-file-tree" style="padding-left: ${depth * 16}px">
-      ${nodes.map((node) => {
-        if (node.type === "folder") {
-          return html`
-            <details class="sb-tree-folder">
-              <summary class="sb-tree-item sb-tree-folder-name">
-                <span class="sb-file-icon">\u{1F4C1}</span>
-                <span>${node.name}</span>
-                ${node.childCount != null
-                  ? html`<span class="sb-tree-count">${node.childCount}</span>`
-                  : nothing}
-              </summary>
-              ${node.children
-                ? renderFileTree(node.children, props, depth + 1)
-                : nothing}
-            </details>
-          `;
-        }
-        return html`
-          <button
-            class="sb-tree-item sb-tree-file"
-            @click=${() => props.onFileSelect?.(node.path)}
-          >
-            <span class="sb-file-icon">\u{1F4C4}</span>
-            <span class="sb-file-name">${node.name}</span>
-            ${node.size != null
-              ? html`<span class="sb-tree-size">${formatFileSize(node.size)}</span>`
-              : nothing}
-          </button>
-        `;
-      })}
-    </div>
-  `;
-}
-
-// ── Memory Bank Panel ────────────────────────────────────────────────
-
-function renderMemoryBankPanel(props: SecondBrainProps) {
-  const { memoryBank, searchQuery, browsingFolder, folderEntries, folderName } = props;
-
-  // Browsing a subfolder
-  if (browsingFolder && folderEntries) {
-    return html`
-      <div class="second-brain-panel">
-        <button class="second-brain-back-btn" @click=${() => props.onBack()}>
-          \u{2190} Back
-        </button>
-        <div class="second-brain-section">
-          <div class="second-brain-section-header">
-            <span class="second-brain-section-title">${folderName ?? "Folder"}</span>
-            <span class="second-brain-section-count">${folderEntries.length} items</span>
-          </div>
-          <div class="second-brain-entry-list">
-            ${folderEntries.length > 0
-              ? folderEntries.map((e) => renderEntryRow(e, props))
-              : html`<div class="second-brain-empty-inline">Empty folder</div>`}
-          </div>
-        </div>
-      </div>
-    `;
-  }
-
-  if (!memoryBank) {
-    return renderEmpty(
-      "No memory bank files found",
-      "Start building your memory bank by telling your ally about the people, companies, and projects in your life.",
-    );
-  }
-
-  const query = (searchQuery ?? "").toLowerCase().trim();
-  const filterEntries = (entries: SecondBrainMemoryEntry[]) =>
-    query
-      ? entries.filter(
-          (e) => e.name.toLowerCase().includes(query) || e.excerpt.toLowerCase().includes(query),
-        )
-      : entries;
-
-  return html`
-    <div class="second-brain-panel">
-      <div class="second-brain-search">
-        <input
-          class="second-brain-search-input"
-          type="text"
-          placeholder="Search people, companies, projects..."
-          .value=${searchQuery ?? ""}
-          @input=${(e: Event) => props.onSearch((e.target as HTMLInputElement).value)}
-        />
-        <span class="second-brain-search-count">${memoryBank.totalEntries} entries</span>
-      </div>
-
-      ${memoryBank.sections.map((section) => {
-        const filtered = filterEntries(section.entries);
-        if (section.entries.length === 0) return nothing;
-        return html`
-          <div class="second-brain-section">
-            <div class="second-brain-section-header">
-              <span class="second-brain-section-title">${section.icon} ${section.label}</span>
-              <span class="second-brain-section-count">${section.entries.length}</span>
-            </div>
-            <div class="second-brain-entry-list">
-              ${filtered.length > 0
-                ? filtered.map((e) => renderEntryRow(e, props))
-                : query
-                  ? html`<div class="second-brain-empty-inline">No matches</div>`
-                  : nothing}
-            </div>
-          </div>
-        `;
-      })}
-
-      ${memoryBank.extraFiles.length > 0 ? html`
-        <div class="second-brain-section">
-          <div class="second-brain-section-header">
-            <span class="second-brain-section-title">\u{1F4CB} Reference Files</span>
-            <span class="second-brain-section-count">${memoryBank.extraFiles.length}</span>
-          </div>
-          <div class="second-brain-entry-list">
-            ${memoryBank.extraFiles.map((e) => renderEntryRow(e, props))}
-          </div>
-        </div>
-      ` : nothing}
-
-      ${memoryBank.curated ? html`
-        <div class="second-brain-section">
-          <div class="second-brain-section-header">
-            <span class="second-brain-section-title">\u{2B50} Curated Facts</span>
-            <span class="second-brain-section-count">${fmtUpdated(memoryBank.curated.updatedAt)}</span>
-          </div>
-          <div class="second-brain-card">
-            <div class="second-brain-card-content">${renderMd(memoryBank.curated.content)}</div>
-          </div>
-        </div>
-      ` : nothing}
-    </div>
-  `;
-}
-
-// ── Knowledge Panel (unified: Memory Bank + Research + Files) ────────
-
-function renderKnowledgePanel(props: SecondBrainProps) {
-  const { memoryBank, researchData, searchQuery, browsingFolder, folderEntries, folderName } = props;
-
-  // Browsing a subfolder
-  if (browsingFolder && folderEntries) {
-    return html`
-      <div class="second-brain-panel">
-        <button class="second-brain-back-btn" @click=${() => props.onBack()}>
-          \u{2190} Back
-        </button>
-        <div class="second-brain-section">
-          <div class="second-brain-section-header">
-            <span class="second-brain-section-title">${folderName ?? "Folder"}</span>
-            <span class="second-brain-section-count">${folderEntries.length} items</span>
-          </div>
-          <div class="second-brain-entry-list">
-            ${folderEntries.length > 0
-              ? folderEntries.map((e) => renderEntryRow(e, props))
-              : html`<div class="second-brain-empty-inline">Empty folder</div>`}
-          </div>
-        </div>
-      </div>
-    `;
-  }
-
-  const hasContent = (memoryBank && memoryBank.totalEntries > 0) ||
-    (researchData && researchData.totalEntries > 0) ||
-    (props.fileTree && props.fileTree.length > 0);
-
-  if (!hasContent) {
-    return renderEmpty(
-      "No knowledge found",
-      "Start building your second brain by telling your ally about the people, companies, and projects in your life.",
-    );
-  }
-
-  // Search bar + file search results
-  const query = (searchQuery ?? "").toLowerCase().trim();
-  const filterMemoryEntries = (entries: SecondBrainMemoryEntry[]) =>
-    query
-      ? entries.filter(
-          (e) => e.name.toLowerCase().includes(query) || e.excerpt.toLowerCase().includes(query),
-        )
-      : entries;
-
-  // File search results (from secondBrain.search)
-  const fileSearchResults = props.fileSearchResults;
-
-  return html`
-    <div class="second-brain-panel">
-      <div class="second-brain-search knowledge-search">
-        <input
-          class="second-brain-search-input"
-          type="text"
-          placeholder="Search your second brain..."
-          .value=${searchQuery ?? ""}
-          @input=${(e: Event) => {
-            const val = (e.target as HTMLInputElement).value;
-            props.onSearch(val);
-            props.onFileSearch?.(val);
-          }}
-        />
-      </div>
-
-      ${fileSearchResults && query ? html`
-        <div class="second-brain-section">
-          <div class="second-brain-section-header">
-            <span class="second-brain-section-title">\u{1F50D} Search Results</span>
-            <span class="second-brain-section-count">${fileSearchResults.length}</span>
-          </div>
-          <div class="second-brain-entry-list">
-            ${fileSearchResults.length > 0
-              ? fileSearchResults.map((r) => html`
-                  <div class="second-brain-entry" @click=${() => props.onFileSelect?.(r.path)}>
-                    <div class="second-brain-entry-icon">${r.type === "folder" ? "\u{1F4C1}" : "\u{1F4C4}"}</div>
-                    <div class="second-brain-entry-body">
-                      <div class="second-brain-entry-name">${r.name}</div>
-                      ${r.matchContext || r.excerpt
-                        ? html`<div class="second-brain-entry-excerpt">${r.matchContext ?? r.excerpt}</div>`
-                        : nothing}
-                    </div>
-                  </div>
-                `)
-              : html`<div class="second-brain-empty-inline">No results</div>`}
-          </div>
-        </div>
-      ` : nothing}
-
-      ${!query && memoryBank ? html`
-        ${memoryBank.sections.map((section) => {
-          const filtered = filterMemoryEntries(section.entries);
-          if (section.entries.length === 0) return nothing;
-          return html`
-            <details class="second-brain-section-details">
-              <summary class="second-brain-section-header second-brain-section-header--toggle">
-                <span class="second-brain-section-title">${section.icon} ${section.label}</span>
-                <span class="second-brain-section-count">${section.entries.length}</span>
-              </summary>
-              <div class="second-brain-entry-list">
-                ${filtered.length > 0
-                  ? filtered.map((e) => renderEntryRow(e, props))
-                  : query
-                    ? html`<div class="second-brain-empty-inline">No matches</div>`
-                    : nothing}
-              </div>
-            </details>
-          `;
-        })}
-
-        ${memoryBank.extraFiles.length > 0 ? html`
-          <details class="second-brain-section-details">
-            <summary class="second-brain-section-header second-brain-section-header--toggle">
-              <span class="second-brain-section-title">\u{1F4CB} Reference Files</span>
-              <span class="second-brain-section-count">${memoryBank.extraFiles.length}</span>
-            </summary>
-            <div class="second-brain-entry-list">
-              ${memoryBank.extraFiles.map((e) => renderEntryRow(e, props))}
-            </div>
-          </details>
-        ` : nothing}
-
-        ${memoryBank.curated ? html`
-          <details class="second-brain-section-details">
-            <summary class="second-brain-section-header second-brain-section-header--toggle">
-              <span class="second-brain-section-title">\u{2B50} Curated Facts</span>
-              <span class="second-brain-section-count">${fmtUpdated(memoryBank.curated.updatedAt)}</span>
-            </summary>
-            <div class="second-brain-card">
-              <div class="second-brain-card-content">${renderMd(memoryBank.curated.content)}</div>
-            </div>
-          </details>
-        ` : nothing}
-      ` : nothing}
-
-      ${!query && researchData && researchData.totalEntries > 0 ? html`
-        ${researchData.categories.map((cat) => {
-          if (cat.entries.length === 0) return nothing;
-          return html`
-            <details class="second-brain-section-details">
-              <summary class="second-brain-section-header second-brain-section-header--toggle">
-                <span class="second-brain-section-title">\u{1F50D} ${cat.label}</span>
-                <span class="second-brain-section-count">${cat.entries.length}</span>
-              </summary>
-              <div class="second-brain-entry-list">
-                ${cat.entries.map((e) => renderResearchEntryRow(e, props))}
-              </div>
-            </details>
-          `;
-        })}
-      ` : nothing}
-
-      ${!query && props.fileTree && props.fileTree.length > 0 ? html`
-        <details class="second-brain-section-details">
-          <summary class="second-brain-section-header second-brain-section-header--toggle">
-            <span class="second-brain-section-title">\u{1F5C2}\uFE0F Browse All</span>
-          </summary>
-          ${renderFileTree(props.fileTree, props)}
-        </details>
-      ` : nothing}
-    </div>
-  `;
-}
-
-// ── Context Panel (unified: Awareness + Sources + Vault Health) ─────
-
-const STATUS_STYLE: Record<string, { dot: string; label: string; cls: string }> = {
-  connected: { dot: "\u{25CF}", label: "Connected", cls: "second-brain-source--connected" },
-  available: { dot: "\u{25CB}", label: "Available", cls: "second-brain-source--available" },
+const STATUS_DOT: Record<string, string> = {
+  ready: "sb-dot--ready",
+  degraded: "sb-dot--degraded",
+  offline: "sb-dot--offline",
 };
 
-function renderSourceCard(source: SecondBrainSourceEntry) {
-  const status = STATUS_STYLE[source.status] ?? STATUS_STYLE["available"];
+const ACTIVITY_ICONS: Record<string, string> = {
+  "vault-capture": "\u{1F4DD}",
+  "identity-update": "\u{1F464}",
+  "calendar-enrichment": "\u{1F4C5}",
+  "thought-captured": "\u{1F4AD}",
+  "search": "\u{1F50D}",
+  "file-modified": "\u{1F4C4}",
+};
 
-  return html`
-    <div class="second-brain-source-card ${status.cls}">
-      <div class="second-brain-source-icon">${source.icon}</div>
-      <div class="second-brain-source-body">
-        <div class="second-brain-source-name">${source.name}</div>
-        <div class="second-brain-source-desc">${source.description}</div>
-        ${source.stats ? html`<div class="second-brain-source-stats">${source.stats}</div>` : nothing}
-      </div>
-      <div class="second-brain-source-status">
-        <span class="second-brain-source-dot" style="color: ${source.status === "connected" ? "var(--success, #10b981)" : source.status === "available" ? "var(--warning, #f59e0b)" : "var(--muted)"}">${status.dot}</span>
-        <span class="second-brain-source-status-label">${status.label}</span>
-        ${source.status === "connected" && source.lastSync
-          ? html`<span class="second-brain-source-sync">${fmtUpdated(source.lastSync)}</span>`
-          : nothing}
-      </div>
-    </div>
-  `;
-}
+const SOURCE_LABELS: Record<string, string> = {
+  honcho: "\u{1F7E3}",
+  vault: "\u{1F4D3}",
+  session: "\u{1F4AC}",
+  screenpipe: "\u{1F4FA}",
+};
 
-function renderContextPanel(props: SecondBrainProps) {
-  const { aiPacket, sourcesData, vaultHealth, syncing } = props;
-  const snapshotData = aiPacket?.snapshot ?? null;
-
-  return html`
-    <div class="second-brain-panel">
-      <!-- Awareness Snapshot (hero) -->
-      <div class="second-brain-section">
-        <div class="second-brain-sync-bar">
-          <div class="second-brain-sync-info">
-            <span class="second-brain-sync-label">Awareness Snapshot</span>
-            <span class="second-brain-sync-time">
-              ${snapshotData?.updatedAt
-                ? `Last synced ${fmtUpdated(snapshotData.updatedAt)}`
-                : "Not yet synced"}
-              ${snapshotData ? ` \u{2022} ${snapshotData.lineCount} lines` : ""}
-            </span>
-          </div>
-          <button
-            class="second-brain-sync-btn ${syncing ? "syncing" : ""}"
-            ?disabled=${syncing}
-            @click=${() => props.onSync()}
-          >
-            ${syncing ? "Syncing..." : "\u{26A1} Sync Now"}
-          </button>
-        </div>
-
-        ${snapshotData ? html`
-          <details class="second-brain-section-details">
-            <summary class="second-brain-section-header second-brain-section-header--toggle">
-              <span class="second-brain-section-title">\u{1F9E0} Snapshot Content</span>
-              <span class="second-brain-section-count">${snapshotData.lineCount} lines</span>
-            </summary>
-            <div class="second-brain-card">
-              <div class="second-brain-card-content">${renderMd(snapshotData.content)}</div>
-            </div>
-          </details>
-        ` : html`
-          <div class="second-brain-empty-block">
-            <div class="second-brain-empty-icon">\u{1F9E0}</div>
-            <div class="second-brain-empty-title">No awareness snapshot yet</div>
-            <div class="second-brain-empty-hint">Hit "Sync Now" to generate your first awareness snapshot. It includes your schedule, tasks, goals, and agent activity.</div>
-          </div>
-        `}
-      </div>
-
-      <!-- Connected Sources -->
-      ${sourcesData && sourcesData.sources.length > 0 ? html`
-        <div class="second-brain-section">
-          <div class="second-brain-section-header">
-            <span class="second-brain-section-title">\u{1F310} Connected Sources</span>
-            <span class="second-brain-section-count">${sourcesData.connectedCount} of ${sourcesData.totalCount}</span>
-            <button class="second-brain-add-source-btn" @click=${() => props.onAddSource()}>+ Add</button>
-          </div>
-          <div class="second-brain-sources-grid">
-            ${sourcesData.sources
-              .filter(s => s.status === "connected")
-              .map(s => renderSourceCard(s))}
-          </div>
-          ${sourcesData.sources.some(s => s.status === "available") ? html`
-            <details style="margin-top: 8px;">
-              <summary style="cursor: pointer; font-size: 12px; color: var(--muted);">
-                ${sourcesData.sources.filter(s => s.status === "available").length} available sources
-              </summary>
-              <div class="second-brain-sources-grid" style="margin-top: 8px;">
-                ${sourcesData.sources
-                  .filter(s => s.status === "available")
-                  .map(s => renderSourceCard(s))}
-              </div>
-            </details>
-          ` : nothing}
-        </div>
-      ` : nothing}
-
-      <!-- Vault Health -->
-      ${vaultHealth ? html`
-        <div class="second-brain-section">
-          <div class="second-brain-section-header">
-            <span class="second-brain-section-title">\u{1F4D3} Vault Health</span>
-          </div>
-          ${vaultHealth.available && vaultHealth.stats ? html`
-            <div class="context-health-row">
-              <span>${vaultHealth.stats.totalNotes} notes</span>
-              <span>\u00B7</span>
-              <span>${vaultHealth.stats.brainCount} brain</span>
-              <span>\u00B7</span>
-              <span>${vaultHealth.stats.inboxCount} inbox</span>
-              <span>\u00B7</span>
-              <span>${vaultHealth.stats.dailyCount} daily</span>
-              <span>\u00B7</span>
-              <span>Last: ${vaultHealth.stats.lastActivity ? fmtUpdated(vaultHealth.stats.lastActivity) : "never"}</span>
-            </div>
-          ` : html`
-            <div class="context-health-row" style="color: var(--muted);">
-              Vault not connected. Set OBSIDIAN_VAULT_PATH to enable.
-            </div>
-          `}
-        </div>
-      ` : nothing}
-    </div>
-  `;
-}
-
-// ── Empty state ──────────────────────────────────────────────────────
-
-function renderEmpty(title: string, hint: string) {
-  return html`
-    <div class="second-brain-empty-block">
-      <div class="second-brain-empty-icon">\u{1F9E0}</div>
-      <div class="second-brain-empty-title">${title}</div>
-      <div class="second-brain-empty-hint">${hint}</div>
-    </div>
-  `;
-}
-
-// ── People Panel ─────────────────────────────────────────────────────
-
-function renderPeoplePanel(props: SecondBrainProps) {
-  // Detail view
-  if (props.selectedPerson) {
-    const p = props.selectedPerson;
-    return html`
-      <div class="second-brain-panel">
-        <button class="sb-back-btn" @click=${() => props.onBackFromPerson?.()}>
-          \u2190 Back to People
-        </button>
-        <h2 style="margin: 8px 0 4px;">${p.name}</h2>
-        ${p.honchoSays
-          ? html`
-              <div class="sb-honcho-card" style="background: var(--surface-2, #1a1a2e); border-radius: 8px; padding: 12px; margin: 8px 0; border-left: 3px solid var(--accent, #6366f1);">
-                <div style="font-size: 11px; color: var(--text-muted); margin-bottom: 4px;">What your ally remembers</div>
-                <div style="font-size: 13px; line-height: 1.5;">${p.honchoSays}</div>
-              </div>
-            `
-          : nothing}
-        ${renderMd(p.content)}
-      </div>
-    `;
+function renderScopeBadge(scope?: string) {
+  if (!scope || scope === "personal") {
+    return html`<span class="sb-scope-badge sb-scope-badge--personal" title="Personal memory">\u{1F512} personal</span>`;
   }
-
-  // List view
-  const people = props.peopleList ?? [];
-  if (people.length === 0) {
-    return html`
-      <div class="second-brain-panel">
-        <div class="second-brain-empty-block">
-          <div class="second-brain-empty-icon">\u{1F465}</div>
-          <div class="second-brain-empty-title">No people files yet</div>
-          <div class="second-brain-empty-hint">
-            People files are auto-created from calendar meetings, email contacts, and calls.
-            You can also capture a person via the capture_thought MCP tool.
-          </div>
-        </div>
-      </div>
-    `;
-  }
-
-  return html`
-    <div class="second-brain-panel">
-      <div class="second-brain-entry-list">
-        ${people.map(
-          (p) => html`
-            <div class="second-brain-entry" @click=${() => props.onSelectPerson?.(p.file)}>
-              <div class="second-brain-entry-icon">\u{1F464}</div>
-              <div class="second-brain-entry-body">
-                <div class="second-brain-entry-name">${p.name}</div>
-                <div class="second-brain-entry-excerpt">
-                  ${p.email ? `${p.email} \u00B7 ` : ""}${p.firstSeen ? `Since ${p.firstSeen}` : ""}
-                </div>
-              </div>
-              <div class="second-brain-entry-meta">${fmtUpdated(p.lastModified)}</div>
-            </div>
-          `,
-        )}
-      </div>
-    </div>
-  `;
-}
-
-// ── Timeline Panel ───────────────────────────────────────────────────
-
-function renderTimelinePanel(props: SecondBrainProps) {
-  const entries = props.timelineEntries ?? [];
-  const overview = props.brainOverview;
-
-  return html`
-    <div class="second-brain-panel">
-      ${overview
-        ? html`
-            <div class="sb-overview-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 8px; margin-bottom: 16px;">
-              <div class="sb-stat-card" style="background: var(--surface-2, #1a1a2e); border-radius: 8px; padding: 12px; text-align: center;">
-                <div style="font-size: 24px; font-weight: 600;">${overview.health.peopleCount}</div>
-                <div style="font-size: 11px; color: var(--text-muted);">People</div>
-              </div>
-              <div class="sb-stat-card" style="background: var(--surface-2, #1a1a2e); border-radius: 8px; padding: 12px; text-align: center;">
-                <div style="font-size: 24px; font-weight: 600;">${overview.health.dailyNoteCount}</div>
-                <div style="font-size: 11px; color: var(--text-muted);">Days Logged</div>
-              </div>
-              <div class="sb-stat-card" style="background: var(--surface-2, #1a1a2e); border-radius: 8px; padding: 12px; text-align: center;">
-                <div style="font-size: 24px; font-weight: 600;">${overview.health.companyCount}</div>
-                <div style="font-size: 11px; color: var(--text-muted);">Companies</div>
-              </div>
-              <div class="sb-stat-card" style="background: var(--surface-2, #1a1a2e); border-radius: 8px; padding: 12px; text-align: center;">
-                <div style="font-size: 12px; font-weight: 600;">${overview.health.honchoStatus === "ready" ? "\u2705" : "\u26A0\uFE0F"} ${overview.health.honchoStatus}</div>
-                <div style="font-size: 11px; color: var(--text-muted);">Honcho</div>
-              </div>
-            </div>
-
-            ${overview.ingestion.length > 0
-              ? html`
-                  <div style="margin-bottom: 16px;">
-                    <div style="font-size: 12px; font-weight: 600; margin-bottom: 6px; color: var(--text-muted);">INGESTION PIPELINES</div>
-                    ${overview.ingestion.map(
-                      (p) => html`
-                        <div style="display: flex; align-items: center; gap: 8px; padding: 4px 0; font-size: 13px;">
-                          <span>${p.type === "engine" ? (p.configured ? "\u2705" : "\u274C") : p.type === "webhook" ? (p.configured ? "\u2705" : "\u{1F517}") : "\u{1F916}"}</span>
-                          <span>${p.name}</span>
-                          <span style="font-size: 11px; color: var(--text-muted);">${p.hint}</span>
-                        </div>
-                      `,
-                    )}
-                  </div>
-                `
-              : nothing}
-          `
-        : nothing}
-
-      ${entries.length === 0
-        ? html`
-            <div class="second-brain-empty-block">
-              <div class="second-brain-empty-icon">\u{1F4C5}</div>
-              <div class="second-brain-empty-title">No daily notes yet</div>
-              <div class="second-brain-empty-hint">
-                Daily notes are created automatically by ingestion pipelines and the capture_thought tool.
-              </div>
-            </div>
-          `
-        : html`
-            <div style="font-size: 12px; font-weight: 600; margin-bottom: 6px; color: var(--text-muted);">RECENT DAILY NOTES</div>
-            <div class="second-brain-entry-list">
-              ${entries.map(
-                (e) => html`
-                  <div class="second-brain-entry" @click=${() => props.onSelectEntry(e.file)}>
-                    <div class="second-brain-entry-icon">\u{1F4C5}</div>
-                    <div class="second-brain-entry-body">
-                      <div class="second-brain-entry-name">${e.date}</div>
-                      <div class="second-brain-entry-excerpt">${e.entryCount} entries</div>
-                    </div>
-                  </div>
-                `,
-              )}
-            </div>
-          `}
-    </div>
-  `;
-}
-
-// ── Main render ──────────────────────────────────────────────────────
-
-export function renderSecondBrain(props: SecondBrainProps) {
-  const { subtab, loading } = props;
-
-  return html`
-    <section class="second-brain-container">
-      <div class="second-brain-tabs">
-        <button
-          class="second-brain-tab ${subtab === "identity" ? "active" : ""}"
-          @click=${() => props.onSubtabChange("identity")}
-        >
-          \u{1F464} Identity
-        </button>
-        <button
-          class="second-brain-tab ${subtab === "people" ? "active" : ""}"
-          @click=${() => props.onSubtabChange("people")}
-        >
-          \u{1F465} People
-        </button>
-        <button
-          class="second-brain-tab ${subtab === "knowledge" ? "active" : ""}"
-          @click=${() => props.onSubtabChange("knowledge")}
-        >
-          \u{1F4DA} Knowledge
-        </button>
-        <button
-          class="second-brain-tab ${subtab === "timeline" ? "active" : ""}"
-          @click=${() => props.onSubtabChange("timeline")}
-        >
-          \u{1F4C5} Timeline
-        </button>
-        <button
-          class="second-brain-tab ${subtab === "context" ? "active" : ""}"
-          @click=${() => props.onSubtabChange("context")}
-        >
-          \u{26A1} Context
-        </button>
-      </div>
-
-      ${loading
-        ? html`<div class="second-brain-loading"><div class="second-brain-loading-spinner"></div>Loading...</div>`
-        : subtab === "identity"
-          ? renderIdentityPanel(props)
-          : subtab === "people"
-            ? renderPeoplePanel(props)
-            : subtab === "knowledge"
-              ? renderKnowledgePanel(props)
-              : subtab === "timeline"
-                ? renderTimelinePanel(props)
-                : renderContextPanel(props)}
-    </section>
-  `;
+  return html`<span class="sb-scope-badge sb-scope-badge--shared" title="Shared to ${scope}">\u{2197}\u{FE0F} ${scope}</span>`;
 }
 
 // ── Component ────────────────────────────────────────────────────────
 
 @customElement("gm-second-brain")
 export class GmSecondBrain extends LitElement {
-  // -- Shared context (provided by root app) --------------------------------
-
   @consume({ context: appContext, subscribe: true })
   ctx!: AppContext;
 
-  // -- Owned state (all 20 Second Brain properties) -------------------------
+  // Dashboard state
+  @state() loading = false;
+  @state() error: string | null = null;
+  @state() pulse: MemoryPulseData | null = null;
+  @state() activity: ActivityFeedData | null = null;
+  @state() identity: SecondBrainIdentityData | null = null;
+  @state() memoryBank: SecondBrainMemoryBankData | null = null;
+  @state() fileTree: BrainTreeNode[] | null = null;
 
-  @state() secondBrainSubtab: SecondBrainSubtab = "identity";
-  @state() secondBrainLoading = false;
-  @state() secondBrainError: string | null = null;
-  @state() secondBrainIdentity: SecondBrainIdentityData | null = null;
-  @state() secondBrainMemoryBank: SecondBrainMemoryBankData | null = null;
-  @state() secondBrainAiPacket: SecondBrainAiPacketData | null = null;
-  @state() secondBrainSourcesData: SecondBrainSourcesData | null = null;
-  @state() secondBrainResearchData: SecondBrainResearchData | null = null;
-  @state() secondBrainSelectedEntry: SecondBrainEntryDetail | null = null;
-  @state() secondBrainSearchQuery = "";
-  @state() secondBrainSyncing = false;
-  @state() secondBrainBrowsingFolder: string | null = null;
-  @state() secondBrainFolderEntries: SecondBrainMemoryEntry[] | null = null;
-  @state() secondBrainFolderName: string | null = null;
-  @state() secondBrainVaultHealth: VaultHealthData | null = null;
-  @state() secondBrainFileTree: BrainTreeNode[] | null = null;
-  @state() secondBrainFileTreeLoading = false;
-  @state() secondBrainFileSearchQuery = "";
-  @state() secondBrainFileSearchResults: BrainSearchResult[] | null = null;
+  // Screenpipe & Ingestion
+  @state() screenpipeStatus: ScreenpipeStatusData | null = null;
+  @state() ingestionStatus: IngestionStatusData | null = null;
 
-  // People + Timeline + Overview state
-  @state() secondBrainPeopleList: PersonEntry[] | null = null;
-  @state() secondBrainSelectedPerson: PersonDetail | null = null;
-  @state() secondBrainTimelineEntries: TimelineEntry[] | null = null;
-  @state() secondBrainOverview: BrainOverview | null = null;
+  // Search
+  @state() searchQuery = "";
+  @state() searchResults: BrainSearchResult[] | null = null;
+  @state() searching = false;
 
-  // -- Event-bus subscription cleanup ---------------------------------------
+  // Folder browsing
+  @state() browsingFolder: string | null = null;
+  @state() folderEntries: SecondBrainMemoryEntry[] | null = null;
+  @state() folderName: string | null = null;
+
+  // Expanded pulse detail
+  @state() expandedPulseSystem: string | null = null;
 
   private _unsubs: Array<() => void> = [];
+  private _searchTimer: ReturnType<typeof setTimeout> | null = null;
 
-  // -- Light DOM (no shadow root) so existing CSS classes work ---------------
-
-  override createRenderRoot() {
-    return this;
-  }
-
-  // -- SecondBrainState interface for controller functions -------------------
-
-  get client() {
-    return this.ctx.gateway;
-  }
-
-  get connected() {
-    return this.ctx.connected;
-  }
-
-  // -- Lifecycle ------------------------------------------------------------
+  override createRenderRoot() { return this; }
 
   override connectedCallback() {
     super.connectedCallback();
-
-    // Listen for external refresh requests (e.g. after a chat saves research)
     this._unsubs.push(
       appEventBus.on("refresh-requested", (payload) => {
-        if (payload.target === "second-brain") {
-          void this._refresh();
-        }
+        if (payload.target === "second-brain") void this._loadAll();
       }),
     );
-
-    // Auto-load initial data
-    void this._refresh();
+    void this._loadAll();
   }
 
   override disconnectedCallback() {
     for (const unsub of this._unsubs) unsub();
     this._unsubs = [];
+    if (this._searchTimer) clearTimeout(this._searchTimer);
     super.disconnectedCallback();
   }
 
-  // -- Render ---------------------------------------------------------------
+  // ── Data Loading ──────────────────────────────────────────────────
 
-  override render() {
-    return renderSecondBrain({
-      connected: this.ctx.connected,
-      loading: this.secondBrainLoading,
-      error: this.secondBrainError,
-      subtab: this.secondBrainSubtab,
-      // Identity
-      identity: this.secondBrainIdentity,
-      // Knowledge
-      memoryBank: this.secondBrainMemoryBank,
-      researchData: this.secondBrainResearchData,
-      fileTree: this.secondBrainFileTree,
-      fileTreeLoading: this.secondBrainFileTreeLoading,
-      fileSearchQuery: this.secondBrainFileSearchQuery,
-      fileSearchResults: this.secondBrainFileSearchResults,
-      selectedEntry: this.secondBrainSelectedEntry,
-      searchQuery: this.secondBrainSearchQuery,
-      browsingFolder: this.secondBrainBrowsingFolder,
-      folderEntries: this.secondBrainFolderEntries,
-      folderName: this.secondBrainFolderName,
-      // Context
-      aiPacket: this.secondBrainAiPacket,
-      sourcesData: this.secondBrainSourcesData,
-      vaultHealth: this.secondBrainVaultHealth,
-      syncing: this.secondBrainSyncing,
-      // Callbacks
-      onSubtabChange: (subtab) => this._onSubtabChange(subtab),
-      onSelectEntry: (path) => this._onSelectEntry(path),
-      onBrowseFolder: (path) => this._onBrowseFolder(path),
-      onBack: () => this._onBack(),
-      onSearch: (query) => this._onSearch(query),
-      onFileSearch: (query) => this._onFileSearch(query),
-      onFileSelect: (path) => this._onFileSelect(path),
-      onSync: () => this._onSync(),
-      onRefresh: () => this._refresh(),
-      onSaveViaChat: () => this._onSaveViaChat(),
-      onAddSource: () => this._onAddSource(),
-      // People
-      peopleList: this.secondBrainPeopleList,
-      selectedPerson: this.secondBrainSelectedPerson,
-      onSelectPerson: (file) => this._onSelectPerson(file),
-      onBackFromPerson: () => { this.secondBrainSelectedPerson = null; },
-      // Timeline + Overview
-      timelineEntries: this.secondBrainTimelineEntries,
-      brainOverview: this.secondBrainOverview,
-    });
-  }
-
-  // -- Handlers (logic moved from app.ts) -----------------------------------
-
-  private async _refresh(): Promise<void> {
-    await loadSecondBrain(this as unknown as SecondBrainState);
-    this.requestUpdate();
-  }
-
-  private _onSubtabChange(subtab: SecondBrainSubtab): void {
-    this.secondBrainSubtab = subtab;
-    this.secondBrainLoading = false;
-    this.secondBrainSelectedEntry = null;
-    this.secondBrainSearchQuery = "";
-    this.secondBrainFileSearchQuery = "";
-    this.secondBrainFileSearchResults = null;
-    this.secondBrainError = null;
-    this.secondBrainBrowsingFolder = null;
-    this.secondBrainFolderEntries = null;
-    this.secondBrainFolderName = null;
-    this.secondBrainSelectedPerson = null;
-
-    // Load data for the new subtab
-    if (subtab === "people") {
-      this._loadPeople().catch((err) => {
-        console.error("[SecondBrain] People load failed:", err);
-      });
-    } else if (subtab === "timeline") {
-      this._loadTimeline().catch((err) => {
-        console.error("[SecondBrain] Timeline load failed:", err);
-      });
-    } else {
-      this._refresh().catch((err) => {
-        console.error("[SecondBrain] Refresh after subtab change failed:", err);
-        this.secondBrainError =
-          err instanceof Error ? err.message : "Failed to load data";
-        this.secondBrainLoading = false;
-      });
-    }
-  }
-
-  private async _onSelectEntry(path: string): Promise<void> {
+  private async _loadAll(): Promise<void> {
     if (!this.ctx.gateway || !this.ctx.connected) return;
-    const isHtml = path.endsWith(".html") || path.endsWith(".htm");
+    this.loading = true;
+    this.error = null;
+
     try {
-      const result = await this.ctx.gateway.request<{
-        name: string;
-        content: string;
-        updatedAt?: string;
-      }>("secondBrain.memoryBankEntry", { path });
-      if (result?.content) {
-        this.ctx.openSidebar({
-          content: result.content,
-          mimeType: isHtml ? "text/html" : "text/markdown",
-          filePath: path,
-          title: result.name || path.split("/").pop() || "File",
-        });
-      }
+      const gw = this.ctx.gateway;
+      const [pulse, activity, identityData, bank, tree] = await Promise.all([
+        gw.request<MemoryPulseData>("secondBrain.memoryPulse", {}),
+        gw.request<ActivityFeedData>("secondBrain.activity", { limit: 20 }),
+        gw.request<SecondBrainIdentityData>("secondBrain.identity", {}),
+        gw.request<SecondBrainMemoryBankData>("secondBrain.memoryBank", {}),
+        gw.request<{ tree: BrainTreeNode[] }>("secondBrain.fileTree", { depth: 3 }),
+      ]);
+
+      this.pulse = pulse;
+      this.activity = activity;
+      this.identity = identityData;
+      this.memoryBank = bank;
+      this.fileTree = tree.tree ?? [];
+
+      // Load screenpipe + ingestion status (non-blocking — these methods may not exist yet)
+      Promise.all([
+        gw.request<ScreenpipeStatusData>("ingestion.screenpipeStatus", {}).catch(() => null),
+        gw.request<IngestionStatusData>("ingestion.status", {}).catch(() => null),
+      ]).then(([sp, ing]) => {
+        this.screenpipeStatus = sp;
+        this.ingestionStatus = ing;
+      });
     } catch (err) {
-      console.error("[SecondBrain] Failed to open file:", err);
-      this.ctx.addToast("Failed to open file", "error");
+      console.error("[SecondBrain] Load failed:", err);
+      this.error = err instanceof Error ? err.message : "Failed to load";
+    } finally {
+      this.loading = false;
     }
   }
 
-  private async _onBrowseFolder(path: string): Promise<void> {
-    await browseFolder(this as unknown as SecondBrainState, path);
-    this.requestUpdate();
-  }
-
-  private _onBack(): void {
-    if (this.secondBrainSelectedEntry) {
-      this.secondBrainSelectedEntry = null;
-    } else if (this.secondBrainBrowsingFolder) {
-      this.secondBrainBrowsingFolder = null;
-      this.secondBrainFolderEntries = null;
-      this.secondBrainFolderName = null;
-    }
-  }
-
-  private _onSearch(query: string): void {
-    this.secondBrainSearchQuery = query;
-  }
-
-  private _onFileSearch(query: string): void {
-    this.secondBrainFileSearchQuery = query;
-    if (!query.trim()) {
-      this.secondBrainFileSearchResults = null;
+  private async _doSearch(query: string): Promise<void> {
+    if (!this.ctx.gateway || !this.ctx.connected || !query.trim()) {
+      this.searchResults = null;
+      this.searching = false;
       return;
     }
-    void this._doFileSearch(query);
-  }
-
-  private async _doFileSearch(query: string): Promise<void> {
-    if (!this.ctx.gateway || !this.ctx.connected) return;
+    this.searching = true;
     try {
-      const result = await this.ctx.gateway.request<{
-        results: BrainSearchResult[];
-      }>("secondBrain.search", { query, limit: 50 });
-      // Only apply results if the query hasn't changed while we were waiting
-      if (this.secondBrainFileSearchQuery === query) {
-        this.secondBrainFileSearchResults = result.results ?? [];
+      const result = await this.ctx.gateway.request<{ results: BrainSearchResult[] }>(
+        "secondBrain.search", { query, limit: 30 },
+      );
+      if (this.searchQuery === query) {
+        this.searchResults = result.results ?? [];
       }
     } catch (err) {
-      console.error("[SecondBrain] search failed:", err);
+      console.error("[SecondBrain] Search failed:", err);
+    } finally {
+      this.searching = false;
     }
   }
 
-  private async _onFileSelect(path: string): Promise<void> {
+  private _onSearchInput(e: Event): void {
+    const val = (e.target as HTMLInputElement).value;
+    this.searchQuery = val;
+    if (this._searchTimer) clearTimeout(this._searchTimer);
+    if (!val.trim()) {
+      this.searchResults = null;
+      return;
+    }
+    this._searchTimer = setTimeout(() => void this._doSearch(val), 300);
+  }
+
+  private async _openFile(path: string): Promise<void> {
     if (!this.ctx.gateway || !this.ctx.connected) return;
     try {
       const result = await this.ctx.gateway.request<{
-        name: string;
-        content: string;
-        updatedAt?: string;
+        name: string; content: string; updatedAt?: string;
       }>("secondBrain.memoryBankEntry", { path });
       if (result?.content) {
         const isHtml = path.endsWith(".html") || path.endsWith(".htm");
@@ -1282,77 +336,561 @@ export class GmSecondBrain extends LitElement {
         });
       }
     } catch (err) {
-      console.error("[SecondBrain] Failed to open file:", err);
+      console.error("[SecondBrain] Open file failed:", err);
       this.ctx.addToast("Failed to open file", "error");
     }
   }
 
-  private async _onSync(): Promise<void> {
-    await syncSecondBrain(this as unknown as SecondBrainState);
-    this.requestUpdate();
-  }
-
-  private async _onSelectPerson(file: string): Promise<void> {
+  private async _browseFolder(path: string): Promise<void> {
     if (!this.ctx.gateway || !this.ctx.connected) return;
     try {
-      const result = await this.ctx.gateway.request<PersonDetail>("brain.person", { file });
-      if (result) {
-        this.secondBrainSelectedPerson = result;
+      const result = await this.ctx.gateway.request<{
+        folder: string; folderName: string; entries: SecondBrainMemoryEntry[];
+      }>("secondBrain.memoryBank", { folder: path });
+      this.browsingFolder = result.folder;
+      this.folderName = result.folderName;
+      this.folderEntries = result.entries;
+    } catch (err) {
+      console.error("[SecondBrain] Browse folder failed:", err);
+    }
+  }
+
+  private _exitFolder(): void {
+    this.browsingFolder = null;
+    this.folderEntries = null;
+    this.folderName = null;
+  }
+
+  private _chatNavigate(message: string): void {
+    appEventBus.emit("chat-navigate", {
+      sessionKey: "new",
+      tab: "chat" as Parameters<AppContext["setTab"]>[0],
+      message,
+    });
+  }
+
+  // ── Render ────────────────────────────────────────────────────────
+
+  override render() {
+    if (this.loading && !this.pulse) {
+      return html`<div class="sb-loading"><div class="sb-spinner"></div>Loading Second Brain...</div>`;
+    }
+
+    if (this.error && !this.pulse) {
+      return html`<div class="sb-error">${this.error}</div>`;
+    }
+
+    // Folder browsing mode
+    if (this.browsingFolder && this.folderEntries) {
+      return html`
+        <section class="sb-dashboard">
+          <button class="sb-back-btn" @click=${() => this._exitFolder()}>
+            \u{2190} Back
+          </button>
+          <div class="sb-section">
+            <div class="sb-section-header">
+              <span class="sb-section-title">${this.folderName ?? "Folder"}</span>
+              <span class="sb-section-count">${this.folderEntries.length}</span>
+            </div>
+            <div class="sb-entry-list">
+              ${this.folderEntries.length > 0
+                ? this.folderEntries.map((e) => this._renderEntry(e))
+                : html`<div class="sb-empty-inline">Empty folder</div>`}
+            </div>
+          </div>
+        </section>
+      `;
+    }
+
+    return html`
+      <section class="sb-dashboard">
+        ${this._renderMemoryPulse()}
+        ${this._renderSearch()}
+        ${this.searchQuery.trim() ? nothing : html`
+          ${this._renderActivityFeed()}
+          ${this._renderIdentityCard()}
+          ${this._renderPeopleEntities()}
+          ${this._renderKnowledgeBrowser()}
+          ${this._renderScreenpipePanel()}
+          ${this._renderIngestionStatus()}
+        `}
+      </section>
+    `;
+  }
+
+  // ── Section 1: Memory Pulse ──────────────────────────────────────
+
+  private _renderMemoryPulse() {
+    if (!this.pulse) return nothing;
+
+    return html`
+      <div class="sb-pulse">
+        <div class="sb-pulse-systems">
+          ${this.pulse.systems.map((sys) => html`
+            <button
+              class="sb-pulse-pill"
+              @click=${() => {
+                this.expandedPulseSystem = this.expandedPulseSystem === sys.id ? null : sys.id;
+              }}
+            >
+              <span class="sb-dot ${STATUS_DOT[sys.status] ?? "sb-dot--offline"}"></span>
+              <span class="sb-pulse-name">${sys.name}</span>
+            </button>
+          `)}
+          <span class="sb-pulse-summary">${this.pulse.readyCount}/${this.pulse.totalCount} systems</span>
+        </div>
+        ${this.expandedPulseSystem ? html`
+          <div class="sb-pulse-detail">
+            ${this.pulse.systems
+              .filter(s => s.id === this.expandedPulseSystem)
+              .map(s => html`
+                <div class="sb-pulse-detail-row">
+                  <span class="sb-dot ${STATUS_DOT[s.status]}"></span>
+                  <strong>${s.name}</strong>
+                  <span class="sb-muted">${s.detail}</span>
+                  ${s.count != null ? html`<span class="sb-badge">${s.count}</span>` : nothing}
+                </div>
+              `)}
+          </div>
+        ` : nothing}
+      </div>
+    `;
+  }
+
+  // ── Section 2: Unified Search ────────────────────────────────────
+
+  private _renderSearch() {
+    return html`
+      <div class="sb-search-container">
+        <div class="sb-search-bar">
+          <span class="sb-search-icon">\u{1F50D}</span>
+          <input
+            class="sb-search-input"
+            type="text"
+            placeholder="Search your memory \u2014 Honcho, Vault, Sessions, Screenpipe..."
+            .value=${this.searchQuery}
+            @input=${(e: Event) => this._onSearchInput(e)}
+          />
+          ${this.searching ? html`<div class="sb-spinner sb-spinner--sm"></div>` : nothing}
+        </div>
+        ${this.searchResults ? html`
+          <div class="sb-search-results">
+            <div class="sb-section-header">
+              <span class="sb-section-title">Results</span>
+              <span class="sb-section-count">${this.searchResults.length}</span>
+            </div>
+            ${this.searchResults.length > 0
+              ? html`<div class="sb-entry-list">
+                  ${this.searchResults.map((r) => html`
+                    <div class="sb-entry" @click=${() => this._openFile(r.path)}>
+                      <div class="sb-entry-icon">\u{1F4C4}</div>
+                      <div class="sb-entry-body">
+                        <div class="sb-entry-name">
+                          ${r.name}
+                          ${r.source ? html`<span class="sb-source-tag">${SOURCE_LABELS[r.source] ?? ""} ${r.source}</span>` : nothing}
+                          ${r.scope ? renderScopeBadge(r.scope) : nothing}
+                        </div>
+                        ${r.matchContext ?? r.excerpt
+                          ? html`<div class="sb-entry-excerpt">${r.matchContext ?? r.excerpt}</div>`
+                          : nothing}
+                      </div>
+                    </div>
+                  `)}
+                </div>`
+              : html`<div class="sb-empty-inline">No results for "${this.searchQuery}"</div>`}
+          </div>
+        ` : nothing}
+      </div>
+    `;
+  }
+
+  // ── Section 3: Activity Feed ─────────────────────────────────────
+
+  private _renderActivityFeed() {
+    if (!this.activity || this.activity.events.length === 0) {
+      return html`
+        <div class="sb-section">
+          <div class="sb-section-header">
+            <span class="sb-section-title">Recent Activity</span>
+          </div>
+          <div class="sb-empty-block">
+            <div class="sb-empty-hint">No memory activity yet. As your ally learns, activity will appear here.</div>
+          </div>
+        </div>
+      `;
+    }
+
+    return html`
+      <div class="sb-section">
+        <div class="sb-section-header">
+          <span class="sb-section-title">Recent Activity</span>
+          <span class="sb-section-count">${this.activity.total} events</span>
+        </div>
+        <div class="sb-activity-feed">
+          ${this.activity.events.slice(0, 15).map((ev) => html`
+            <div class="sb-activity-item">
+              <span class="sb-activity-icon">${ACTIVITY_ICONS[ev.type] ?? "\u{2022}"}</span>
+              <div class="sb-activity-body">
+                <span class="sb-activity-title">${ev.title}</span>
+                ${ev.detail ? html`<span class="sb-activity-detail">${ev.detail}</span>` : nothing}
+              </div>
+              ${ev.scope ? renderScopeBadge(ev.scope) : nothing}
+              <span class="sb-activity-time">${fmtAgo(ev.timestamp)}</span>
+            </div>
+          `)}
+        </div>
+      </div>
+    `;
+  }
+
+  // ── Section 4: Identity Card ─────────────────────────────────────
+
+  private _renderIdentityCard() {
+    if (!this.identity || this.identity.files.length === 0) {
+      return html`
+        <div class="sb-section">
+          <div class="sb-section-header">
+            <span class="sb-section-title">Identity</span>
+          </div>
+          <div class="sb-empty-block">
+            <div class="sb-empty-hint">Tell your ally about yourself to build your identity profile.</div>
+            <button class="sb-action-btn" @click=${() => this._chatNavigate(
+              "I want to build my identity profile. Ask me about my values, principles, vision, and communication style.",
+            )}>Tell your ally about you</button>
+          </div>
+        </div>
+      `;
+    }
+
+    return html`
+      <div class="sb-section">
+        <div class="sb-section-header">
+          <span class="sb-section-title">Identity</span>
+          <button class="sb-action-btn sb-action-btn--sm" @click=${() => this._chatNavigate(
+            "I want to update my identity profile. Ask me what I'd like to change.",
+          )}>Edit via Chat</button>
+        </div>
+        <div class="sb-identity-grid">
+          ${this.identity.files.map((file) => html`
+            <div class="sb-identity-card" @click=${() => this._openFile(file.key)}>
+              <div class="sb-identity-label">${file.label}</div>
+              <div class="sb-identity-excerpt">${file.content.slice(0, 100).replace(/[#\n]+/g, " ").trim()}\u{2026}</div>
+              ${file.updatedAt ? html`<div class="sb-identity-time">${fmtAgo(file.updatedAt)}</div>` : nothing}
+            </div>
+          `)}
+        </div>
+      </div>
+    `;
+  }
+
+  // ── Section 5: People & Entities ─────────────────────────────────
+
+  private _renderPeopleEntities() {
+    if (!this.memoryBank) return nothing;
+
+    const peopleSection = this.memoryBank.sections.find(s => s.key === "people");
+    const companiesSection = this.memoryBank.sections.find(s => s.key === "companies");
+    const hasPeople = (peopleSection?.entries.length ?? 0) > 0;
+    const hasCompanies = (companiesSection?.entries.length ?? 0) > 0;
+
+    if (!hasPeople && !hasCompanies) {
+      return html`
+        <div class="sb-section">
+          <div class="sb-section-header">
+            <span class="sb-section-title">People & Companies</span>
+          </div>
+          <div class="sb-empty-block">
+            <div class="sb-empty-hint">Your ally will build profiles for people and companies as you mention them.</div>
+          </div>
+        </div>
+      `;
+    }
+
+    return html`
+      <div class="sb-section">
+        <div class="sb-section-header">
+          <span class="sb-section-title">People & Companies</span>
+          <span class="sb-section-count">${(peopleSection?.entries.length ?? 0) + (companiesSection?.entries.length ?? 0)}</span>
+        </div>
+        <div class="sb-people-grid">
+          ${(peopleSection?.entries ?? []).map((e) => html`
+            <div class="sb-person-card" @click=${() => this._openFile(e.path)}>
+              <div class="sb-person-icon">\u{1F464}</div>
+              <div class="sb-person-body">
+                <div class="sb-person-name">${e.name}</div>
+                ${e.excerpt ? html`<div class="sb-person-excerpt">${e.excerpt}</div>` : nothing}
+              </div>
+              ${e.updatedAt ? html`<div class="sb-person-time">${fmtAgo(e.updatedAt)}</div>` : nothing}
+            </div>
+          `)}
+          ${(companiesSection?.entries ?? []).map((e) => html`
+            <div class="sb-person-card" @click=${() => this._openFile(e.path)}>
+              <div class="sb-person-icon">\u{1F3E2}</div>
+              <div class="sb-person-body">
+                <div class="sb-person-name">${e.name}</div>
+                ${e.excerpt ? html`<div class="sb-person-excerpt">${e.excerpt}</div>` : nothing}
+              </div>
+              ${e.updatedAt ? html`<div class="sb-person-time">${fmtAgo(e.updatedAt)}</div>` : nothing}
+            </div>
+          `)}
+        </div>
+      </div>
+    `;
+  }
+
+  // ── Section 6: Knowledge Browser ─────────────────────────────────
+
+  private _renderKnowledgeBrowser() {
+    // Projects section
+    const projectsSection = this.memoryBank?.sections.find(s => s.key === "projects");
+    const hasProjects = (projectsSection?.entries.length ?? 0) > 0;
+    const hasCurated = !!this.memoryBank?.curated;
+    const hasExtras = (this.memoryBank?.extraFiles.length ?? 0) > 0;
+    const hasTree = (this.fileTree?.length ?? 0) > 0;
+
+    if (!hasProjects && !hasCurated && !hasExtras && !hasTree) return nothing;
+
+    return html`
+      <div class="sb-section">
+        <div class="sb-section-header">
+          <span class="sb-section-title">Knowledge</span>
+        </div>
+
+        ${hasProjects ? html`
+          <details class="sb-collapsible">
+            <summary class="sb-collapsible-header">
+              <span>\u{1F4C2} Projects</span>
+              <span class="sb-section-count">${projectsSection!.entries.length}</span>
+            </summary>
+            <div class="sb-entry-list">
+              ${projectsSection!.entries.map((e) => this._renderEntry(e))}
+            </div>
+          </details>
+        ` : nothing}
+
+        ${hasCurated ? html`
+          <details class="sb-collapsible">
+            <summary class="sb-collapsible-header">
+              <span>\u{2B50} Curated Facts</span>
+            </summary>
+            <div class="sb-card">${renderMd(this.memoryBank!.curated!.content)}</div>
+          </details>
+        ` : nothing}
+
+        ${hasExtras ? html`
+          <details class="sb-collapsible">
+            <summary class="sb-collapsible-header">
+              <span>\u{1F4CB} Reference Files</span>
+              <span class="sb-section-count">${this.memoryBank!.extraFiles.length}</span>
+            </summary>
+            <div class="sb-entry-list">
+              ${this.memoryBank!.extraFiles.map((e) => this._renderEntry(e))}
+            </div>
+          </details>
+        ` : nothing}
+
+        ${hasTree ? html`
+          <details class="sb-collapsible">
+            <summary class="sb-collapsible-header">
+              <span>\u{1F5C2}\uFE0F Browse All Files</span>
+            </summary>
+            ${this._renderFileTree(this.fileTree!, 0)}
+          </details>
+        ` : nothing}
+      </div>
+    `;
+  }
+
+  // ── Section 7: Screenpipe Panel ──────────────────────────────────
+
+  private _renderScreenpipePanel() {
+    const sp = this.screenpipeStatus;
+
+    return html`
+      <div class="sb-section">
+        <div class="sb-section-header">
+          <span class="sb-section-title">\u{1F4FA} Ambient Memory (Screenpipe)</span>
+          ${sp ? html`
+            <span class="sb-dot ${sp.available ? "sb-dot--ready" : "sb-dot--offline"}"></span>
+          ` : nothing}
+        </div>
+        ${!sp ? html`
+          <div class="sb-empty-block">
+            <div class="sb-empty-hint">Loading Screenpipe status...</div>
+          </div>
+        ` : !sp.available ? html`
+          <div class="sb-screenpipe-setup">
+            <div class="sb-setup-message">
+              Screenpipe captures what's on your screen and in your audio, locally. Your ally uses it to recall context you've seen.
+            </div>
+            <div class="sb-setup-steps">
+              <div class="sb-setup-step">
+                <span class="sb-setup-num">1</span>
+                <span>Install: <code>brew install screenpipe</code></span>
+              </div>
+              <div class="sb-setup-step">
+                <span class="sb-setup-num">2</span>
+                <span>Grant accessibility permissions when prompted</span>
+              </div>
+              <div class="sb-setup-step">
+                <span class="sb-setup-num">3</span>
+                <span>Run: <code>screenpipe</code> (keeps running in background)</span>
+              </div>
+            </div>
+            <button class="sb-action-btn" @click=${() => this._testScreenpipe()}>Check Connection</button>
+          </div>
+        ` : html`
+          <div class="sb-screenpipe-active">
+            <div class="sb-screenpipe-row">
+              <span class="sb-screenpipe-label">Status</span>
+              <span class="sb-screenpipe-value">${sp.enabled ? "Active — capturing" : "Connected but not enabled"}</span>
+            </div>
+            <div class="sb-screenpipe-row">
+              <span class="sb-screenpipe-label">Blocked Apps</span>
+              <span class="sb-screenpipe-value">${sp.blockedApps?.length ?? 0} apps filtered</span>
+            </div>
+            <div class="sb-screenpipe-actions">
+              ${!sp.enabled ? html`
+                <button class="sb-action-btn" @click=${() => this._toggleScreenpipe(true)}>Enable Ambient Memory</button>
+              ` : html`
+                <button class="sb-action-btn sb-action-btn--muted" @click=${() => this._toggleScreenpipe(false)}>Pause</button>
+              `}
+            </div>
+          </div>
+        `}
+      </div>
+    `;
+  }
+
+  private async _testScreenpipe(): Promise<void> {
+    if (!this.ctx.gateway || !this.ctx.connected) return;
+    try {
+      const result = await this.ctx.gateway.request<ScreenpipeStatusData>("ingestion.screenpipeStatus", {});
+      this.screenpipeStatus = result;
+      if (result.available) {
+        this.ctx.addToast("Screenpipe connected!", "success");
+      } else {
+        this.ctx.addToast("Screenpipe not running. Start it with `screenpipe`.", "error");
       }
-    } catch (err) {
-      console.error("[SecondBrain] Failed to load person:", err);
-      this.ctx.addToast("Failed to load person details", "error");
+    } catch {
+      this.ctx.addToast("Could not check Screenpipe status", "error");
     }
   }
 
-  private async _loadPeople(): Promise<void> {
+  private async _toggleScreenpipe(enabled: boolean): Promise<void> {
     if (!this.ctx.gateway || !this.ctx.connected) return;
     try {
-      const result = await this.ctx.gateway.request<{ people: PersonEntry[] }>("brain.people", {});
-      this.secondBrainPeopleList = result?.people ?? [];
-    } catch (err) {
-      console.error("[SecondBrain] Failed to load people:", err);
+      await this.ctx.gateway.request("ingestion.screenpipeConfigure", { enabled });
+      if (this.screenpipeStatus) {
+        this.screenpipeStatus = { ...this.screenpipeStatus, enabled };
+      }
+      this.ctx.addToast(enabled ? "Ambient memory enabled" : "Ambient memory paused", "success");
+    } catch {
+      this.ctx.addToast("Failed to update Screenpipe config", "error");
     }
   }
 
-  private async _loadTimeline(): Promise<void> {
-    if (!this.ctx.gateway || !this.ctx.connected) return;
-    try {
-      const [timelineResult, overviewResult] = await Promise.all([
-        this.ctx.gateway.request<{ entries: TimelineEntry[] }>("brain.timeline", { days: 14 }),
-        this.ctx.gateway.request<BrainOverview>("brain.overview", {}),
-      ]);
-      this.secondBrainTimelineEntries = timelineResult?.entries ?? [];
-      this.secondBrainOverview = overviewResult ?? null;
-    } catch (err) {
-      console.error("[SecondBrain] Failed to load timeline:", err);
-    }
+  // ── Section 8: Ingestion Pipelines ─────────────────────────────
+
+  private _renderIngestionStatus() {
+    const ing = this.ingestionStatus;
+    if (!ing) return nothing;
+
+    const configured = ing.pipelines.filter(p => p.configured);
+    const unconfigured = ing.pipelines.filter(p => !p.configured);
+
+    return html`
+      <div class="sb-section">
+        <div class="sb-section-header">
+          <span class="sb-section-title">\u{1F504} Data Sources</span>
+          <span class="sb-section-count">${configured.length}/${ing.pipelines.length} connected</span>
+        </div>
+        ${configured.length > 0 ? html`
+          <div class="sb-ingestion-list">
+            ${configured.map(p => html`
+              <div class="sb-ingestion-item sb-ingestion-item--active">
+                <span class="sb-dot sb-dot--ready"></span>
+                <span class="sb-ingestion-name">${p.name}</span>
+                <span class="sb-ingestion-badge">Connected</span>
+              </div>
+            `)}
+          </div>
+        ` : nothing}
+        ${unconfigured.length > 0 ? html`
+          <details class="sb-collapsible">
+            <summary class="sb-collapsible-header">
+              <span>Available Sources</span>
+              <span class="sb-section-count">${unconfigured.length}</span>
+            </summary>
+            <div class="sb-ingestion-list">
+              ${unconfigured.map(p => html`
+                <div class="sb-ingestion-item">
+                  <span class="sb-dot sb-dot--offline"></span>
+                  <span class="sb-ingestion-name">${p.name}</span>
+                  <span class="sb-muted">${p.envVar}</span>
+                </div>
+              `)}
+            </div>
+          </details>
+        ` : nothing}
+      </div>
+    `;
   }
 
-  private _onSaveViaChat(): void {
-    appEventBus.emit("chat-navigate", {
-      sessionKey: "new",
-      tab: "chat" as Parameters<AppContext["setTab"]>[0],
-      message:
-        "I want to save some research. I'll paste links, bookmarks, or notes \u2014 " +
-        "please organize them into ~/godmode/memory/research/ with proper frontmatter " +
-        "(title, url, category, tags, date). Ask me what I'd like to save.",
-    });
+  // ── Shared Renderers ─────────────────────────────────────────────
+
+  private _renderEntry(entry: SecondBrainMemoryEntry) {
+    const isDir = entry.isDirectory;
+    const icon = isDir ? "\u{1F4C1}" : "\u{1F4C4}";
+    const handleClick = () => {
+      if (isDir) this._browseFolder(entry.path);
+      else this._openFile(entry.path);
+    };
+
+    return html`
+      <div class="sb-entry" @click=${handleClick}>
+        <div class="sb-entry-icon ${isDir ? "sb-entry-icon--folder" : ""}">${icon}</div>
+        <div class="sb-entry-body">
+          <div class="sb-entry-name">${entry.name}${isDir ? "/" : ""}</div>
+          ${entry.excerpt ? html`<div class="sb-entry-excerpt">${entry.excerpt}</div>` : nothing}
+        </div>
+        ${entry.updatedAt ? html`<div class="sb-entry-meta">${fmtAgo(entry.updatedAt)}</div>` : nothing}
+      </div>
+    `;
   }
 
-  private _onAddSource(): void {
-    appEventBus.emit("chat-navigate", {
-      sessionKey: "new",
-      tab: "chat" as Parameters<AppContext["setTab"]>[0],
-      message:
-        "I want to add a new data source to my Second Brain. Help me figure out " +
-        "what I need \u2014 whether it's an API integration, a local file sync, or a " +
-        "new skill. Ask me what source I'd like to connect.",
-    });
+  private _renderFileTree(nodes: BrainTreeNode[], depth: number) {
+    return html`
+      <div class="sb-file-tree" style="padding-left: ${depth * 16}px">
+        ${nodes.map((node) => {
+          if (node.type === "folder") {
+            return html`
+              <details class="sb-tree-folder">
+                <summary class="sb-tree-item sb-tree-folder-name">
+                  <span class="sb-file-icon">\u{1F4C1}</span>
+                  <span>${node.name}</span>
+                  ${node.childCount != null ? html`<span class="sb-tree-count">${node.childCount}</span>` : nothing}
+                </summary>
+                ${node.children ? this._renderFileTree(node.children, depth + 1) : nothing}
+              </details>
+            `;
+          }
+          return html`
+            <button class="sb-tree-item sb-tree-file" @click=${() => this._openFile(node.path)}>
+              <span class="sb-file-icon">\u{1F4C4}</span>
+              <span class="sb-file-name">${node.name}</span>
+              ${node.size != null ? html`<span class="sb-tree-size">${node.size < 1024 ? `${node.size}B` : `${(node.size / 1024).toFixed(1)}K`}</span>` : nothing}
+            </button>
+          `;
+        })}
+      </div>
+    `;
   }
 }
 
-// Ensure the module is importable as a side-effect registration
+// Backward compat: export renderSecondBrain for anything that imports it
+export function renderSecondBrain() { return nothing; }
+
 declare global {
   interface HTMLElementTagNameMap {
     "gm-second-brain": GmSecondBrain;

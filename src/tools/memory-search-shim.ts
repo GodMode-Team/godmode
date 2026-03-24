@@ -45,11 +45,12 @@ export function createMemorySearchShimTool(ctx: ToolContext): AnyAgentTool {
       const results: Array<{ source: string; content: string }> = [];
       const warnings: string[] = [];
 
-      // Run all three backends concurrently
-      const [honchoResult, qmdResult, ftsResult] = await Promise.allSettled([
+      // Run all four backends concurrently
+      const [honchoResult, qmdResult, ftsResult, screenpipeResult] = await Promise.allSettled([
         searchHoncho(query, ctx.sessionKey),
         searchQmd(query),
         searchFts5(query),
+        searchScreenpipe(query),
       ]);
 
       // Collect Honcho results
@@ -77,12 +78,26 @@ export function createMemorySearchShimTool(ctx: ToolContext): AnyAgentTool {
         warnings.push(`sessions: ${String(ftsResult.reason)}`);
       }
 
+      // Collect Screenpipe results
+      if (screenpipeResult.status === "fulfilled") {
+        for (const hit of screenpipeResult.value) {
+          results.push(hit);
+        }
+      } else if (screenpipeResult.status === "rejected") {
+        warnings.push(`screenpipe: ${String(screenpipeResult.reason)}`);
+      }
+
       // Signal health
       try {
         const { health } = await import("../lib/health-ledger.js");
         health.signal("memory.search", results.length > 0, {
           total: results.length,
-          backends: { honcho: honchoResult.status === "fulfilled", qmd: qmdResult.status === "fulfilled", fts5: ftsResult.status === "fulfilled" },
+          backends: {
+            honcho: honchoResult.status === "fulfilled",
+            qmd: qmdResult.status === "fulfilled",
+            fts5: ftsResult.status === "fulfilled",
+            screenpipe: screenpipeResult.status === "fulfilled",
+          },
         });
       } catch { /* non-fatal */ }
 
@@ -127,4 +142,40 @@ async function searchFts5(query: string): Promise<Array<{ source: string; conten
     source: "session",
     content: `[${h.sessionKey} / ${h.role}] ${h.content.length > 300 ? h.content.slice(0, 300) + "..." : h.content}`,
   }));
+}
+
+/** Query Screenpipe REST API for screen/audio context. Returns formatted hits. */
+async function searchScreenpipe(query: string): Promise<Array<{ source: string; content: string }>> {
+  try {
+    const resp = await fetch(`http://localhost:3030/search`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ q: query, limit: 5, content_type: "all" }),
+      signal: AbortSignal.timeout(3_000),
+    });
+    if (!resp.ok) return [];
+    const data = (await resp.json()) as {
+      data?: Array<{
+        type: string;
+        content: { text?: string; transcription?: string; timestamp?: string; app_name?: string };
+      }>;
+    };
+    if (!data.data?.length) return [];
+
+    return data.data
+      .filter((d) => d.content?.text || d.content?.transcription)
+      .slice(0, 5)
+      .map((d) => {
+        const text = d.content.text || d.content.transcription || "";
+        const app = d.content.app_name ? `[${d.content.app_name}] ` : "";
+        const ts = d.content.timestamp ? `(${d.content.timestamp}) ` : "";
+        return {
+          source: "screenpipe",
+          content: `${ts}${app}${text.length > 300 ? text.slice(0, 300) + "..." : text}`,
+        };
+      });
+  } catch {
+    // Screenpipe not running — silently skip
+    return [];
+  }
 }

@@ -1286,6 +1286,12 @@ export const onboardingHandlers: GatewayRequestHandlers = {
           break;
         }
 
+        case "screenpipe": {
+          // Screenpipe is auto-detected — configure just marks it acknowledged
+          // No env var needed; detection happens via localhost:3030 health check
+          break;
+        }
+
         case "second-brain": {
           const vaultPath = values.OBSIDIAN_VAULT_PATH?.trim();
           if (!vaultPath) {
@@ -1399,6 +1405,20 @@ export const onboardingHandlers: GatewayRequestHandlers = {
             respond(true, { success: true, message: "Composio API key is valid and client initialized." });
           } catch (err) {
             respond(true, { success: false, message: `Composio key found but init failed: ${err instanceof Error ? err.message : String(err)}` });
+          }
+          return;
+        }
+
+        case "screenpipe": {
+          try {
+            const resp = await fetch("http://localhost:3030/health", { signal: AbortSignal.timeout(3_000) });
+            if (resp.ok) {
+              respond(true, { success: true, message: "Screenpipe is running and healthy. Screen & audio memory active." });
+            } else {
+              respond(true, { success: false, message: `Screenpipe returned status ${resp.status}. Try restarting it with \`screenpipe\`.` });
+            }
+          } catch {
+            respond(true, { success: false, message: "Screenpipe not running. Install with `brew install screenpipe` (macOS) then run `screenpipe` to start." });
           }
           return;
         }
