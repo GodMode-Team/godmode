@@ -422,7 +422,12 @@ function checkApiKeys(logger: Logger): void {
   }
 
   if (missing.length > 0) {
-    markDegraded(id, `Missing API keys: ${missing.join(", ")}`);
+    markDegraded(
+      id,
+      `Missing required API key: ${missing.join(", ")}. ` +
+      `Set ANTHROPIC_API_KEY in your environment or add it to ~/godmode/.env — ` +
+      `get a key at https://console.anthropic.com/settings/keys`,
+    );
   } else {
     markHealthy(id, "All required API keys present");
   }

@@ -109,7 +109,11 @@ export function getQueueProcessor(): QueueProcessor | null {
 export function initQueueProcessor(logger: Logger): QueueProcessor {
   instance = new QueueProcessor(logger);
   if (!resolveAnthropicKeyForAgents()) {
-    logger.warn("[QueueProcessor] No Anthropic API key found — agent tasks will fail until a key is configured");
+    logger.warn(
+      "[QueueProcessor] No Anthropic API key found — agent tasks will fail until a key is configured. " +
+      "Set ANTHROPIC_API_KEY in your environment or add it to ~/godmode/.env " +
+      "(get a key at https://console.anthropic.com/settings/keys)",
+    );
   }
   return instance;
 }

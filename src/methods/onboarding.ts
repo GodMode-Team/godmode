@@ -1259,7 +1259,10 @@ export const onboardingHandlers: GatewayRequestHandlers = {
         case "api-key": {
           const apiKey = values.ANTHROPIC_API_KEY?.trim();
           if (!apiKey) {
-            respond(false, undefined, { code: "MISSING_KEY", message: "ANTHROPIC_API_KEY is required" });
+            respond(false, undefined, {
+              code: "MISSING_KEY",
+              message: "GodMode requires an Anthropic API key. Get one at https://console.anthropic.com/settings/keys and paste it here.",
+            });
             return;
           }
           writeEnvVar("ANTHROPIC_API_KEY", apiKey);
@@ -1370,14 +1373,20 @@ export const onboardingHandlers: GatewayRequestHandlers = {
         case "api-key": {
           const key = getEnvVar("ANTHROPIC_API_KEY");
           if (!key) {
-            respond(true, { success: false, message: "No ANTHROPIC_API_KEY found in environment or .env file." });
+            respond(true, {
+              success: false,
+              message: "GodMode requires an Anthropic API key. Set ANTHROPIC_API_KEY in your environment or add it to ~/godmode/.env — get a key at https://console.anthropic.com/settings/keys",
+            });
             return;
           }
           // Validate key format (sk-ant-...)
           if (key.startsWith("sk-ant-") || key.startsWith("sk-")) {
             respond(true, { success: true, message: "Anthropic API key is configured and has valid format." });
           } else {
-            respond(true, { success: false, message: "ANTHROPIC_API_KEY exists but doesn't match expected format (sk-ant-... or sk-...)." });
+            respond(true, {
+              success: false,
+              message: "ANTHROPIC_API_KEY is set but doesn't look like a valid Anthropic key (expected sk-ant-... or sk-...). Double-check the key at https://console.anthropic.com/settings/keys",
+            });
           }
           return;
         }

@@ -94,7 +94,7 @@ async function summarizeChunk(
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
     // Fallback: truncate to ~2000 chars
-    return text.length > 2000 ? text.slice(0, 2000) + "\n\n[truncated — no API key]" : text;
+    return text.length > 2000 ? text.slice(0, 2000) + "\n\n[truncated — set ANTHROPIC_API_KEY in ~/godmode/.env for full summaries]" : text;
   }
 
   try {

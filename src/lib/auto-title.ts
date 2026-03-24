@@ -52,7 +52,7 @@ export async function generateSessionTitle(
     const { resolveAnthropicAuth } = await import("../methods/brief-generator.js");
     const apiKey = resolveAnthropicAuth();
     if (!apiKey) {
-      console.warn("[GodMode][AutoTitle] No Anthropic API key found — LLM title generation skipped. Check ANTHROPIC_API_KEY or auth-profiles.json.");
+      console.warn("[GodMode][AutoTitle] No Anthropic API key found — session titles will use fallback text. Set ANTHROPIC_API_KEY in your environment or ~/godmode/.env");
       return null;
     }
 

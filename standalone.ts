@@ -111,6 +111,34 @@ function registerOcStubs(adapter: { registerMethod: (name: string, handler: Stan
 async function main() {
   const { port, hermesUrl, hermesApiKey } = parseArgs();
 
+  // ── API Key Pre-flight ────────────────────────────────────────
+  // Check for an Anthropic API key early so users get a clear, actionable
+  // message instead of mysterious failures later.
+  try {
+    const { resolveAnthropicKey } = await import("./src/lib/anthropic-auth.js");
+    if (!resolveAnthropicKey()) {
+      console.warn(
+        "\n" +
+        "  ┌─────────────────────────────────────────────────────────────┐\n" +
+        "  │  GodMode requires an Anthropic API key.                    │\n" +
+        "  │                                                            │\n" +
+        "  │  Set it in your environment:                               │\n" +
+        "  │    export ANTHROPIC_API_KEY=sk-ant-...                     │\n" +
+        "  │                                                            │\n" +
+        "  │  Or create ~/godmode/.env with:                            │\n" +
+        "  │    ANTHROPIC_API_KEY=sk-ant-...                            │\n" +
+        "  │                                                            │\n" +
+        "  │  Get a key: https://console.anthropic.com/settings/keys   │\n" +
+        "  └─────────────────────────────────────────────────────────────┘\n" +
+        "\n" +
+        "  Continuing startup — chat may work via host auth, but agent\n" +
+        "  delegation and background features will be unavailable.\n",
+      );
+    }
+  } catch {
+    // anthropic-auth module not yet available — non-fatal at this stage
+  }
+
   const adapter = new HermesAdapter({ port, hermesUrl, hermesApiKey });
 
   // Register everything — methods, tools, services, hooks
