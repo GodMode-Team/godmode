@@ -113,8 +113,23 @@ export function handleConnected(host: LifecycleHost) {
   attachThemeListener(host as unknown as Parameters<typeof attachThemeListener>[0]);
   window.addEventListener("popstate", host.popStateHandler);
 
-  // Keyboard shortcuts for chat tab
+  // Keyboard shortcuts
   host.keydownHandler = (e: KeyboardEvent) => {
+    // Alt+1-6: Switch main navigation tabs (works from any tab)
+    if (e.altKey && !e.metaKey && !e.ctrlKey && !e.shiftKey) {
+      const num = parseInt(e.key, 10);
+      if (num >= 1 && num <= 6) {
+        const mainTabs = ["chat", "today", "team", "workspaces", "brain", "dashboards"] as const;
+        const targetTab = mainTabs[num - 1];
+        if (targetTab && host.tab !== targetTab) {
+          e.preventDefault();
+          host.tab = targetTab as Parameters<typeof syncTabWithLocation>[0]["tab"];
+          syncTabWithLocation(host as unknown as Parameters<typeof syncTabWithLocation>[0], true);
+        }
+        return;
+      }
+    }
+
     if (host.tab !== "chat") {
       return;
     }

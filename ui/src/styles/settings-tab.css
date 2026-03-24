@@ -9,6 +9,15 @@
   min-height: 0;
 }
 
+.settings-tab__memory-notice {
+  padding: 6px 12px;
+  font-size: 12px;
+  color: var(--warning-text, #c9a227);
+  background: var(--warning-bg, rgba(201, 162, 39, 0.08));
+  border-bottom: 1px solid var(--warning-border, rgba(201, 162, 39, 0.2));
+  flex-shrink: 0;
+}
+
 .settings-tab__nav {
   display: flex;
   align-items: center;

@@ -24,8 +24,15 @@ const setPrivate: GatewayRequestHandler = async ({ params, respond }) => {
     return;
   }
 
-  const result = await setSessionPrivate(sessionKey, enabled);
-  respond(true, result);
+  try {
+    const result = await setSessionPrivate(sessionKey, enabled);
+    respond(true, result);
+  } catch (err) {
+    respond(false, null, {
+      code: "PRIVACY_SET_FAILED",
+      message: `Failed to update session privacy — session state may be corrupted or unwritable. (${String(err).slice(0, 100)})`,
+    });
+  }
 };
 
 /**
@@ -40,8 +47,15 @@ const getStatus: GatewayRequestHandler = async ({ params, respond }) => {
     return;
   }
 
-  const result = await getPrivateStatus(sessionKey);
-  respond(true, result);
+  try {
+    const result = await getPrivateStatus(sessionKey);
+    respond(true, result);
+  } catch (err) {
+    respond(false, null, {
+      code: "PRIVACY_STATUS_FAILED",
+      message: `Failed to read session privacy status — session state may be unreadable. (${String(err).slice(0, 100)})`,
+    });
+  }
 };
 
 export const sessionPrivacyHandlers: Record<string, GatewayRequestHandler> = {

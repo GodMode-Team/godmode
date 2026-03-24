@@ -254,7 +254,7 @@ function renderCompactionIndicator(status: CompactionIndicatorStatus | null | un
 
   if (status.active) {
     return html`
-      <div class="compaction-bar compaction-bar--active">
+      <div class="compaction-bar compaction-bar--active" role="status" aria-label="Optimizing context">
         <span class="compaction-bar__icon">${icons.loader}</span>
         <span class="compaction-bar__text">Optimizing context...</span>
       </div>
@@ -265,7 +265,7 @@ function renderCompactionIndicator(status: CompactionIndicatorStatus | null | un
     const elapsed = Date.now() - status.completedAt;
     if (elapsed < COMPACTION_TOAST_DURATION_MS) {
       return html`
-        <div class="compaction-bar compaction-bar--complete">
+        <div class="compaction-bar compaction-bar--complete" role="status" aria-label="Context optimized">
           <span class="compaction-bar__icon">${icons.check}</span>
           <span class="compaction-bar__text">Context optimized</span>
         </div>
@@ -991,6 +991,7 @@ export function renderChat(props: ChatProps) {
           <div class="chat-compose__input-area">
             <textarea
               class="chat-compose__textarea"
+              aria-label="Chat message"
               ${ref((el) => el && adjustTextareaHeight(el as HTMLTextAreaElement))}
               .value=${props.draft}
               ?disabled=${!props.connected}
@@ -1033,6 +1034,8 @@ export function renderChat(props: ChatProps) {
                       props.onToggleModelPicker?.();
                     }}
                     title="Switch model"
+                    aria-label="Switch model"
+                    aria-expanded=${props.modelPickerOpen ?? false}
                   >${formatModelLabel(props.currentModel)} &#9662;</button>
                   ${props.modelPickerOpen && (props.availableModels?.length ?? 0) > 0 ? html`
                     <div class="model-picker-dropdown">
@@ -1059,6 +1062,7 @@ export function renderChat(props: ChatProps) {
                 class="chat-compose__toolbar-btn"
                 type="button"
                 title="Attach files"
+                aria-label="Attach files"
                 ?disabled=${!props.connected}
                 @click=${() => {
                   const input = document.getElementById("chat-file-input") as HTMLInputElement;
@@ -1074,6 +1078,7 @@ export function renderChat(props: ChatProps) {
                     class="chat-compose__send-btn chat-compose__send-btn--stop"
                     @click=${() => props.onAbort!()}
                     title="Stop generating"
+                    aria-label="Stop generating"
                   >
                     <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
                       <rect x="3" y="3" width="10" height="10" rx="1.5" />
@@ -1086,6 +1091,7 @@ export function renderChat(props: ChatProps) {
                     ?disabled=${!props.canSend || !props.connected}
                     @click=${() => props.onSend(false)}
                     title=${isBusy ? "Send now - interrupts current run (↵)" : "Send message (↵)"}
+                    aria-label=${isBusy ? "Send now, interrupts current run" : "Send message"}
                   >
                     ${icons.arrowUp}
                   </button>

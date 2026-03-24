@@ -19,7 +19,7 @@
  */
 
 import { existsSync, readdirSync, readFileSync } from "node:fs";
-import { readFile, writeFile, mkdir } from "node:fs/promises";
+import { readFile, writeFile, rename, mkdir } from "node:fs/promises";
 import { join, basename, dirname } from "node:path";
 import { MEMORY_DIR, DATA_DIR } from "../data-paths.js";
 import { getVaultPath, VAULT_FOLDERS } from "./vault-paths.js";
@@ -285,5 +285,8 @@ export async function readSkillRuns(): Promise<SkillRunState> {
 
 export async function saveSkillRuns(state: SkillRunState): Promise<void> {
   await mkdir(dirname(SKILL_RUNS_FILE), { recursive: true });
-  await writeFile(SKILL_RUNS_FILE, JSON.stringify(state, null, 2), "utf-8");
+  // Atomic write: temp file + rename to prevent corruption on crash
+  const tmpPath = SKILL_RUNS_FILE + ".tmp";
+  await writeFile(tmpPath, JSON.stringify(state, null, 2), "utf-8");
+  await rename(tmpPath, SKILL_RUNS_FILE);
 }

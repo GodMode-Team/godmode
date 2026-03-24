@@ -6,7 +6,7 @@
  * Activity log tracks when gates fire (capped at 200 entries).
  */
 
-import { readFile, writeFile, mkdir } from "node:fs/promises";
+import { readFile, writeFile, rename, mkdir } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
 import { join, dirname } from "node:path";
 import { DATA_DIR } from "../data-paths.js";
@@ -424,7 +424,10 @@ export async function writeGuardrailsState(state: GuardrailsState): Promise<void
   state.updatedAt = new Date().toISOString();
   _cache = null;
   await mkdir(dirname(STATE_FILE), { recursive: true });
-  await writeFile(STATE_FILE, JSON.stringify(state, null, 2), "utf-8");
+  // Atomic write: temp file + rename to prevent corruption on crash
+  const tmpPath = STATE_FILE + ".tmp";
+  await writeFile(tmpPath, JSON.stringify(state, null, 2), "utf-8");
+  await rename(tmpPath, STATE_FILE);
 }
 
 // ── Helpers ────────────────────────────────────────────────────────

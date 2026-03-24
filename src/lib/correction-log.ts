@@ -7,7 +7,7 @@
  */
 
 import { randomUUID } from "node:crypto";
-import fs from "node:fs/promises";
+import fs, { rename } from "node:fs/promises";
 import path from "node:path";
 import { withFileLock } from "./sdk-helpers.js";
 import { DATA_DIR } from "../data-paths.js";
@@ -194,7 +194,10 @@ async function readLogUnsafe(): Promise<CorrectionLog> {
 async function writeLogUnsafe(log: CorrectionLog): Promise<void> {
   log.updatedAt = new Date().toISOString();
   await fs.mkdir(path.dirname(LOG_FILE), { recursive: true });
-  await fs.writeFile(LOG_FILE, JSON.stringify(log, null, 2) + "\n", "utf-8");
+  // Atomic write: temp file + rename to prevent corruption on crash
+  const tmpPath = LOG_FILE + ".tmp";
+  await fs.writeFile(tmpPath, JSON.stringify(log, null, 2) + "\n", "utf-8");
+  await rename(tmpPath, LOG_FILE);
 }
 
 // ── Public API: Read/Write ──────────────────────────────────────────

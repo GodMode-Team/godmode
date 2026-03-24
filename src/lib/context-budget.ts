@@ -45,6 +45,9 @@ export interface ContextInputs {
   /** P0: Memory system health — "ready" | "degraded" | "offline" */
   memoryStatus: "ready" | "degraded" | "offline";
 
+  /** P0: 1-line retrieval quality note (e.g. "Memory confidence: high") — appended after memoryBlock */
+  memoryConfidence?: string | null;
+
   /** P0: Identity graph — entity/relationship context */
   graphBlock: string | null;
 
@@ -148,7 +151,11 @@ export function assembleContext(inputs: ContextInputs): string {
   // Honcho memories (skip for agent-to-agent — not relevant to operational handoffs)
   if (!isAgentMessage) {
     if (inputs.memoryBlock) {
-      chunks.push(truncateChars(truncateLines(inputs.memoryBlock, MAX_MEMORY_LINES), MAX_MEMORY_CHARS));
+      let memBlock = truncateChars(truncateLines(inputs.memoryBlock, MAX_MEMORY_LINES), MAX_MEMORY_CHARS);
+      if (inputs.memoryConfidence) {
+        memBlock += "\n" + inputs.memoryConfidence;
+      }
+      chunks.push(memBlock);
     } else if (inputs.memoryStatus === "offline") {
       chunks.push(
         "## Memory Status: Offline\n" +

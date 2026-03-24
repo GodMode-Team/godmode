@@ -94,9 +94,22 @@ function copyBundle({
   mkdirSync(destination, { recursive: true });
   rmSync(destination, { recursive: true, force: true });
   mkdirSync(destination, { recursive: true });
+  // Skip source maps and unused large images to reduce bundle size.
+  // Only consciousness-icon.webp is referenced by the UI; the full-size
+  // PNG, the 64px PNG, and godmode-logo.png are unreferenced.
+  const excludedFiles = new Set([
+    "consciousness-icon.png",
+    "consciousness-icon-64.png",
+    "godmode-logo.png",
+  ]);
   cpSync(source, destination, {
     recursive: true,
-    filter: (src) => !src.endsWith(".map"),
+    filter: (src) => {
+      if (src.endsWith(".map")) return false;
+      const basename = src.split("/").pop();
+      if (excludedFiles.has(basename)) return false;
+      return true;
+    },
   });
   if (afterCopy) {
     afterCopy(destination, source);

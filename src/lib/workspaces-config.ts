@@ -1,4 +1,4 @@
-import fs from "node:fs/promises";
+import fs, { rename } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import JSON5 from "json5";
@@ -459,11 +459,10 @@ async function readConfigFile(configPath: string): Promise<WorkspaceConfigFile> 
 export async function writeWorkspaceConfig(config: WorkspaceConfigFile): Promise<void> {
   const normalized = normalizeWorkspaceConfig(config);
   await fs.mkdir(path.dirname(CANONICAL_WORKSPACES_CONFIG_PATH), { recursive: true });
-  await fs.writeFile(
-    CANONICAL_WORKSPACES_CONFIG_PATH,
-    `${JSON.stringify(normalized, null, 2)}\n`,
-    "utf-8",
-  );
+  // Atomic write: temp file + rename to prevent corruption on crash
+  const tmpPath = CANONICAL_WORKSPACES_CONFIG_PATH + ".tmp";
+  await fs.writeFile(tmpPath, `${JSON.stringify(normalized, null, 2)}\n`, "utf-8");
+  await rename(tmpPath, CANONICAL_WORKSPACES_CONFIG_PATH);
 }
 
 export async function readWorkspaceConfig(opts?: {

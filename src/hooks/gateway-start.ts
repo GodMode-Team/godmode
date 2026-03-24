@@ -16,6 +16,7 @@ import { killZombieGateways } from "../lib/zombie-guard.js";
 import { refreshLicenseOnStart } from "../lib/license.js";
 import { health, turnErrors, sessions } from "../lib/health-ledger.js";
 import { writeSentinel, consumeSentinel } from "../lib/restart-sentinel.js";
+import { resolveAnthropicKey } from "../lib/anthropic-auth.js";
 
 import type { Logger } from "../types/plugin-api.js";
 type CleanupEntry = { name: string; fn: () => void | Promise<void> };
@@ -213,6 +214,26 @@ export async function runGatewayStart(
     }
   } catch (err) {
     logger.warn(`[GodMode] Failed to auto-generate secrets: ${String(err)}`);
+  }
+
+  // ── API Key Check — actionable first-run warning ─────────────────
+  // After .env loading, check whether we can resolve an Anthropic API key.
+  // Without one, chat still works (via host auth) but agent delegation,
+  // auto-titling, identity graph, and other background features are degraded.
+  if (!resolveAnthropicKey()) {
+    const gmEnvPath = join(GODMODE_ROOT, ".env");
+    logger.warn(
+      `[GodMode] No Anthropic API key found. ` +
+      `GodMode requires an Anthropic API key for full functionality (agent delegation, auto-titling, memory extraction). ` +
+      `Set ANTHROPIC_API_KEY in your environment or add it to ${gmEnvPath} — ` +
+      `get a key at https://console.anthropic.com/settings/keys`,
+    );
+    health.signal("gateway.api-key", false, {
+      warning: "No Anthropic API key found",
+      hint: `Set ANTHROPIC_API_KEY in env or ${gmEnvPath}`,
+    });
+  } else {
+    health.signal("gateway.api-key", true);
   }
 
   // Drain stale cleanup from a previous gateway cycle

@@ -280,8 +280,8 @@ function renderAddTaskForm(onCreateTask: (title: string) => void) {
       onCreateTask(title);
       input.value = "";
     }}>
-      <input type="text" class="ws-task-create-input" placeholder="Add a task for today..." />
-      <button type="submit" class="ws-task-create-btn">Add</button>
+      <input type="text" class="ws-task-create-input" placeholder="Add a task for today..." aria-label="New task title" />
+      <button type="submit" class="ws-task-create-btn" aria-label="Add task">Add</button>
     </form>
   `;
 }
@@ -311,7 +311,7 @@ function renderTaskPanel(props: MyDayProps) {
               ${props.onCreateTask ? renderAddTaskForm(props.onCreateTask) : nothing}
               <div class="today-tasks-list">
                 ${pendingTasks.length === 0 && completedTasks.length === 0
-                  ? html`<div class="today-tasks-empty">No tasks for today. Add one above or drop tasks in your daily brief.</div>`
+                  ? html`<div class="today-tasks-empty">No tasks for today. Type above to add one, or ask your ally to create tasks from your daily brief.</div>`
                   : pendingTasks.map((task) =>
                       renderAllTaskRow(
                         task,
@@ -514,26 +514,29 @@ function renderMyDayToolbar(props: MyDayProps) {
 
   return html`
     <div class="my-day-toolbar">
-      <div class="today-date-nav">
+      <div class="today-date-nav" role="navigation" aria-label="Date navigation">
         ${props.onDatePrev
-          ? html`<button class="today-date-btn" @click=${props.onDatePrev} title="Previous day">&#x2039;</button>`
+          ? html`<button class="today-date-btn" @click=${props.onDatePrev} title="Previous day" aria-label="Go to previous day">&#x2039;</button>`
           : nothing}
-        <span class="today-date-label ${viewingToday ? "" : "past-date"}">${displayDate}</span>
+        <span class="today-date-label ${viewingToday ? "" : "past-date"}" aria-live="polite">${displayDate}</span>
         ${props.onDateNext
-          ? html`<button class="today-date-btn" @click=${props.onDateNext} title="Next day">&#x203A;</button>`
+          ? html`<button class="today-date-btn" @click=${props.onDateNext} title="Next day" aria-label="Go to next day">&#x203A;</button>`
           : nothing}
         ${!viewingToday && props.onDateToday
-          ? html`<button class="today-date-today-btn" @click=${props.onDateToday}>Today</button>`
+          ? html`<button class="today-date-today-btn" @click=${props.onDateToday} aria-label="Return to today">Today</button>`
           : nothing}
       </div>
-      <div class="today-view-tabs">
+      <div class="today-view-tabs" role="tablist" aria-label="Today view">
         <button class="today-view-tab ${viewMode === "brief" ? "active" : ""}"
+          role="tab" aria-selected=${viewMode === "brief" ? "true" : "false"}
           @click=${() => props.onViewModeChange?.("brief")}>Brief</button>
         <button class="today-view-tab ${viewMode === "tasks" ? "active" : ""}"
+          role="tab" aria-selected=${viewMode === "tasks" ? "true" : "false"}
           @click=${() => props.onViewModeChange?.("tasks")}>Tasks</button>
         <button class="today-view-tab ${viewMode === "inbox" ? "active" : ""}"
+          role="tab" aria-selected=${viewMode === "inbox" ? "true" : "false"}
           @click=${() => props.onViewModeChange?.("inbox")}>Inbox${(props.inboxCount ?? props.inboxItems?.filter((item) => item.status === "pending").length ?? props.decisionCards?.items.length ?? 0) > 0
-            ? html`<span class="tab-badge">${props.inboxCount ?? props.inboxItems?.filter((item) => item.status === "pending").length ?? props.decisionCards?.items.length}</span>`
+            ? html`<span class="tab-badge" aria-label="pending items">${props.inboxCount ?? props.inboxItems?.filter((item) => item.status === "pending").length ?? props.decisionCards?.items.length}</span>`
             : nothing}</button>
       </div>
       <div class="today-quick-actions">
@@ -547,7 +550,7 @@ function renderMyDayToolbar(props: MyDayProps) {
                   title="Reflect on your day and set up tomorrow">\uD83C\uDF19 Evening Capture</button>`
               : nothing)}
         ${props.onRefresh
-          ? html`<button class="my-day-refresh-btn" @click=${props.onRefresh} title="Refresh / Generate Brief">&#x21BB;</button>`
+          ? html`<button class="my-day-refresh-btn" @click=${props.onRefresh} title="Refresh / Generate Brief" aria-label="Refresh or generate today's brief">&#x21BB;</button>`
           : null}
       </div>
     </div>

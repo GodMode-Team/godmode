@@ -79,6 +79,9 @@ export function renderTab(state: AppViewState, tab: Tab) {
     <a
       href=${href}
       class="nav-item ${state.tab === tab ? "active" : ""}"
+      role="tab"
+      aria-selected=${state.tab === tab ? "true" : "false"}
+      aria-label=${titleForTab(tab)}
       @click=${(event: MouseEvent) => {
         if (
           event.defaultPrevented ||
@@ -270,6 +273,7 @@ export function renderChatControls(state: AppViewState) {
           void refreshChat(state as unknown as Parameters<typeof refreshChat>[0]);
         }}
         title="Refresh chat data"
+        aria-label="Refresh chat data"
       >
         ${refreshIcon}
       </button>
@@ -288,6 +292,7 @@ export function renderChatControls(state: AppViewState) {
           });
         }}
         aria-pressed=${showThinking}
+        aria-label=${showThinking ? "Hide assistant thinking" : "Show assistant thinking"}
         title=${
           disableThinkingToggle
             ? "Disabled during onboarding"
@@ -310,6 +315,7 @@ export function renderChatControls(state: AppViewState) {
           });
         }}
         aria-pressed=${focusActive}
+        aria-label=${focusActive ? "Exit focus mode" : "Enter focus mode"}
         title=${
           disableFocusToggle
             ? "Disabled during onboarding"
@@ -323,6 +329,7 @@ export function renderChatControls(state: AppViewState) {
         class="chat-toolbar__btn ${state.chatPrivateMode ? "active private-mode" : ""}"
         @click=${() => state.handlePrivateModeToggle()}
         aria-pressed=${state.chatPrivateMode ?? false}
+        aria-label=${state.chatPrivateMode ? "Disable private mode" : "Enable private mode"}
         title=${state.chatPrivateMode
           ? "Private mode ON — click to destroy session"
           : "Start a private session (ephemeral, 24h auto-delete)"}
@@ -346,6 +353,8 @@ export function renderChatControls(state: AppViewState) {
             });
           }
         }}
+        aria-label=${state.sidebarOpen ? "Close sidebar panel" : "Open sidebar panel"}
+        aria-expanded=${state.sidebarOpen}
         title=${state.sidebarOpen ? "Close sidebar panel" : "Open sidebar panel"}
       >
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">

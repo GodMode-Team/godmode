@@ -336,7 +336,7 @@ export class GmBrain extends LitElement {
   override render() {
     if (this.loading && !this.pulse && !this.identityCard) {
       return html`
-        <div class="brain-loading">
+        <div class="brain-loading" role="status" aria-label="Loading your Second Brain">
           <div class="brain-skeleton brain-skeleton--card"></div>
           <div class="brain-skeleton-row">
             <div class="brain-skeleton brain-skeleton--panel"></div>
@@ -348,22 +348,22 @@ export class GmBrain extends LitElement {
     }
 
     if (this.error && !this.pulse) {
-      return html`<div class="brain-error">${this.error}</div>`;
+      return html`<div class="brain-error" role="alert">${this.error}</div>`;
     }
 
     // Folder browsing mode
     if (this.browsingFolder && this.folderEntries) {
       return html`
         <section class="brain-dashboard">
-          <button class="brain-back-btn" @click=${() => this._exitFolder()}>
+          <button class="brain-back-btn" aria-label="Go back to dashboard" @click=${() => this._exitFolder()}>
             \u{2190} Back
           </button>
           <div class="brain-section">
             <div class="brain-section-header">
               <span class="brain-section-title">${this.folderName ?? "Folder"}</span>
-              <span class="brain-section-count">${this.folderEntries.length}</span>
+              <span class="brain-section-count" aria-label="${this.folderEntries.length} items">${this.folderEntries.length}</span>
             </div>
-            <div class="brain-entry-list">
+            <div class="brain-entry-list" role="list" aria-label="Folder contents">
               ${this.folderEntries.length > 0
                 ? this.folderEntries.map((e) => this._renderEntry(e))
                 : html`<div class="brain-empty-inline">Empty folder</div>`}
@@ -374,7 +374,7 @@ export class GmBrain extends LitElement {
     }
 
     return html`
-      <section class="brain-dashboard">
+      <section class="brain-dashboard" aria-label="Your Second Brain dashboard">
         <div class="brain-header">
           <h1 class="brain-page-title">Your Brain</h1>
           <button
@@ -389,13 +389,13 @@ export class GmBrain extends LitElement {
         ${this._renderSearch()}
         ${this.searchQuery.trim() ? nothing : html`
           <div class="brain-panels">
-            <div class="brain-panel brain-panel--pulse">
+            <div class="brain-panel brain-panel--pulse" role="region" aria-label="Memory pulse and activity">
               ${this._renderPulsePanel()}
             </div>
-            <div class="brain-panel brain-panel--people">
+            <div class="brain-panel brain-panel--people" role="region" aria-label="People tracked">
               ${this._renderPeoplePanel()}
             </div>
-            <div class="brain-panel brain-panel--knowledge">
+            <div class="brain-panel brain-panel--knowledge" role="region" aria-label="Knowledge base">
               ${this._renderKnowledgePanel()}
             </div>
           </div>
@@ -412,10 +412,10 @@ export class GmBrain extends LitElement {
 
     if (!card) {
       return html`
-        <div class="brain-identity-card brain-identity-card--empty">
+        <div class="brain-identity-card brain-identity-card--empty" role="region" aria-label="Identity card">
           <div class="brain-id-representation brain-id-rep--empty">
             <p>Your AI is still learning about you. Keep chatting \u2014 this card fills in automatically.</p>
-            <button class="brain-action-btn" @click=${() => this._chatNavigate(
+            <button class="brain-action-btn" aria-label="Start building your identity profile" @click=${() => this._chatNavigate(
               "I want to build my identity profile. Ask me about my values, principles, vision, and communication style.",
             )}>Start chatting \u{2192}</button>
           </div>
@@ -424,7 +424,7 @@ export class GmBrain extends LitElement {
     }
 
     return html`
-      <div class="brain-identity-card">
+      <div class="brain-identity-card" role="region" aria-label="Identity card for ${card.name}">
         <div class="brain-id-header">
           <h2 class="brain-id-name">${card.name}</h2>
           ${card.tagline ? html`<p class="brain-id-tagline">${card.tagline}</p>` : nothing}
@@ -447,16 +447,16 @@ export class GmBrain extends LitElement {
           </div>
         ` : nothing}
 
-        <div class="brain-id-stats">
-          <div class="brain-id-stat">
+        <div class="brain-id-stats" role="group" aria-label="Brain statistics">
+          <div class="brain-id-stat" aria-label="${card.stats.peopleTracked} people tracked">
             <span class="brain-id-stat-value">${card.stats.peopleTracked}</span>
             <span class="brain-id-stat-label">People</span>
           </div>
-          <div class="brain-id-stat">
+          <div class="brain-id-stat" aria-label="${card.stats.dailyNotes} daily notes">
             <span class="brain-id-stat-value">${card.stats.dailyNotes}</span>
             <span class="brain-id-stat-label">Daily Notes</span>
           </div>
-          <div class="brain-id-stat">
+          <div class="brain-id-stat" aria-label="${card.stats.totalNotes} total files">
             <span class="brain-id-stat-value">${card.stats.totalNotes}</span>
             <span class="brain-id-stat-label">Total Files</span>
           </div>
@@ -469,7 +469,7 @@ export class GmBrain extends LitElement {
         </div>
 
         <div class="brain-id-footer">
-          <button class="brain-id-correct-btn" @click=${() => this._chatNavigate(
+          <button class="brain-id-correct-btn" aria-label="Edit your identity card via chat" @click=${() => this._chatNavigate(
             "I want to correct something in my identity card. Here's what needs updating:",
           )}>Edit via Chat</button>
           ${card.lastUpdated ? html`
@@ -484,30 +484,33 @@ export class GmBrain extends LitElement {
 
   private _renderSearch() {
     return html`
-      <div class="brain-search-container">
+      <div class="brain-search-container" role="search" aria-label="Search your Second Brain">
         <div class="brain-search-bar">
-          <span class="brain-search-icon">\u{1F50D}</span>
+          <span class="brain-search-icon" aria-hidden="true">\u{1F50D}</span>
           <input
             class="brain-search-input"
             type="text"
             placeholder="Search your memory \u2014 Honcho, Vault, Sessions, Screenpipe..."
             .value=${this.searchQuery}
             @input=${(e: Event) => this._onSearchInput(e)}
-            aria-label="Search your brain"
+            aria-label="Search your Second Brain"
+            aria-controls="brain-search-results"
+            aria-expanded=${this.searchResults ? "true" : "false"}
           />
-          ${this.searching ? html`<div class="brain-spinner brain-spinner--sm"></div>` : nothing}
+          ${this.searching ? html`<div class="brain-spinner brain-spinner--sm" role="status" aria-label="Searching"></div>` : nothing}
         </div>
+        <div id="brain-search-results" aria-live="polite" aria-atomic="false">
         ${this.searchResults ? html`
-          <div class="brain-search-results">
+          <div class="brain-search-results" role="region" aria-label="Search results">
             <div class="brain-section-header">
               <span class="brain-section-title">Results</span>
-              <span class="brain-section-count">${this.searchResults.length}</span>
+              <span class="brain-section-count" aria-label="${this.searchResults.length} results found">${this.searchResults.length}</span>
             </div>
             ${this.searchResults.length > 0
-              ? html`<div class="brain-entry-list">
+              ? html`<div class="brain-entry-list" role="list">
                   ${this.searchResults.map((r) => html`
-                    <div class="brain-entry" @click=${() => this._openFile(r.path)}>
-                      <div class="brain-entry-icon">\u{1F4C4}</div>
+                    <div class="brain-entry" role="listitem" tabindex="0" aria-label="Open ${r.name}" @click=${() => this._openFile(r.path)} @keydown=${(e: KeyboardEvent) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); this._openFile(r.path); } }}>
+                      <div class="brain-entry-icon" aria-hidden="true">\u{1F4C4}</div>
                       <div class="brain-entry-body">
                         <div class="brain-entry-name">
                           ${r.name}
@@ -521,9 +524,10 @@ export class GmBrain extends LitElement {
                     </div>
                   `)}
                 </div>`
-              : html`<div class="brain-empty-inline">No results for "${this.searchQuery}"</div>`}
+              : html`<div class="brain-empty-inline" role="status">No results for "${this.searchQuery}"</div>`}
           </div>
         ` : nothing}
+        </div>
       </div>
     `;
   }
@@ -545,16 +549,16 @@ export class GmBrain extends LitElement {
         <span class="brain-section-count">${this.activity.total} events</span>
       </h2>
       ${this.pulse ? html`
-        <div class="brain-pulse-dots">
+        <div class="brain-pulse-dots" role="status" aria-label="Memory system status: ${this.pulse.readyCount} of ${this.pulse.totalCount} systems ready">
           ${this.pulse.systems.map((sys) => html`
-            <span class="brain-pulse-dot" title="${sys.name}: ${sys.status}${sys.detail ? ` \u2014 ${sys.detail}` : ""}" aria-label="${sys.name}: ${sys.status}">
-              <span class="brain-dot ${STATUS_DOT[sys.status] ?? "brain-dot--offline"}"></span>
+            <span class="brain-pulse-dot" title="${sys.name}: ${sys.status}${sys.detail ? ` \u2014 ${sys.detail}` : ""}" role="img" aria-label="${sys.name}: ${sys.status}${sys.detail ? ` \u2014 ${sys.detail}` : ""}">
+              <span class="brain-dot ${STATUS_DOT[sys.status] ?? "brain-dot--offline"}" aria-hidden="true"></span>
               <span class="brain-pulse-label">${sys.name}</span>
             </span>
           `)}
         </div>
       ` : nothing}
-      <div class="brain-activity-feed">
+      <div class="brain-activity-feed" role="log" aria-label="Memory activity feed">
         ${this.activity.events.slice(0, 12).map((ev) => html`
           <div class="brain-activity-item">
             <span class="brain-activity-icon">${ACTIVITY_ICONS[ev.type] ?? "\u{2022}"}</span>
@@ -583,7 +587,7 @@ export class GmBrain extends LitElement {
         <h2 class="brain-panel-title">People</h2>
         <div class="brain-empty-block">
           <div class="brain-empty-hint">People you interact with will appear here. Connect your calendar to start.</div>
-          <button class="brain-action-btn brain-action-btn--sm" @click=${() => this._chatNavigate(
+          <button class="brain-action-btn brain-action-btn--sm" aria-label="Connect your calendar to track people" @click=${() => this._chatNavigate(
             "Help me connect my calendar so my Brain can track the people I interact with.",
           )}>Connect Calendar \u{2192}</button>
         </div>
@@ -606,10 +610,10 @@ export class GmBrain extends LitElement {
         @input=${(e: Event) => { this.peopleSearch = (e.target as HTMLInputElement).value; }}
         aria-label="Filter people"
       />
-      <div class="brain-people-list">
+      <div class="brain-people-list" role="list" aria-label="People in your brain">
         ${filtered.slice(0, 8).map((p) => html`
-          <div class="brain-person-card" @click=${() => this._openFile(p.path)}>
-            <div class="brain-person-icon">\u{1F464}</div>
+          <div class="brain-person-card" role="listitem" tabindex="0" aria-label="Open profile for ${p.name}" @click=${() => this._openFile(p.path)} @keydown=${(e: KeyboardEvent) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); this._openFile(p.path); } }}>
+            <div class="brain-person-icon" aria-hidden="true">\u{1F464}</div>
             <div class="brain-person-body">
               <div class="brain-person-name">${p.name}</div>
               ${(p as RecentPerson).role ? html`<div class="brain-person-role">${(p as RecentPerson).role}</div>` : nothing}
@@ -620,7 +624,7 @@ export class GmBrain extends LitElement {
         `)}
       </div>
       ${total > 8 ? html`
-        <button class="brain-see-all-btn" @click=${() => {
+        <button class="brain-see-all-btn" aria-label="See all people" @click=${() => {
           const section = this.memoryBank?.sections.find(s => s.key === "people");
           if (section) this._browseFolder(section.path);
         }}>See all \u{2192}</button>
@@ -652,11 +656,11 @@ export class GmBrain extends LitElement {
       `}
 
       ${recentFiles.length > 0 ? html`
-        <div class="brain-knowledge-recent">
+        <div class="brain-knowledge-recent" role="list" aria-label="Recently modified files">
           <h3 class="brain-subsection-title">Recent</h3>
           ${recentFiles.slice(0, 5).map((f) => html`
-            <div class="brain-entry brain-entry--compact" @click=${() => this._openFile(f.path)}>
-              <span class="brain-entry-icon">\u{1F4C4}</span>
+            <div class="brain-entry brain-entry--compact" role="listitem" tabindex="0" aria-label="Open ${f.name}" @click=${() => this._openFile(f.path)} @keydown=${(e: KeyboardEvent) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); this._openFile(f.path); } }}>
+              <span class="brain-entry-icon" aria-hidden="true">\u{1F4C4}</span>
               <span class="brain-entry-name">${f.name}</span>
               <span class="brain-entry-meta">${fmtAgo(f.updatedAt)}</span>
             </div>
@@ -735,7 +739,7 @@ export class GmBrain extends LitElement {
               <span class="brain-table-cell brain-table-cell--status">${p.configured ? "Connected" : "Not configured"}</span>
               <span class="brain-table-cell">
                 ${p.configured
-                  ? html`<button class="brain-action-btn brain-action-btn--xs" @click=${() => this._runPipeline(p.name)}>Run now</button>`
+                  ? html`<button class="brain-action-btn brain-action-btn--xs" aria-label="Run ${p.name} pipeline now" @click=${() => this._runPipeline(p.name)}>Run now</button>`
                   : html`<span class="brain-muted">${p.envVar}</span>`}
               </span>
             </div>
@@ -767,7 +771,7 @@ export class GmBrain extends LitElement {
           <span class="brain-dot ${sp?.available ? (sp.enabled ? "brain-dot--ready" : "brain-dot--degraded") : "brain-dot--offline"}"></span>
           <span>${!sp ? "Loading..." : !sp.available ? "Not installed" : sp.enabled ? "Active" : "Paused"}</span>
           ${sp?.available ? html`
-            <button class="brain-action-btn brain-action-btn--xs" @click=${() => this._toggleScreenpipe(!sp.enabled)}>
+            <button class="brain-action-btn brain-action-btn--xs" aria-label="${sp.enabled ? "Pause ambient memory" : "Enable ambient memory"}" @click=${() => this._toggleScreenpipe(!sp.enabled)}>
               ${sp.enabled ? "Pause" : "Enable"}
             </button>
           ` : nothing}
@@ -787,8 +791,8 @@ export class GmBrain extends LitElement {
     };
 
     return html`
-      <div class="brain-entry" @click=${handleClick}>
-        <div class="brain-entry-icon ${isDir ? "brain-entry-icon--folder" : ""}">${icon}</div>
+      <div class="brain-entry" role="listitem" tabindex="0" aria-label="${isDir ? "Open folder" : "Open file"}: ${entry.name}" @click=${handleClick} @keydown=${(e: KeyboardEvent) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); handleClick(); } }}>
+        <div class="brain-entry-icon ${isDir ? "brain-entry-icon--folder" : ""}" aria-hidden="true">${icon}</div>
         <div class="brain-entry-body">
           <div class="brain-entry-name">${entry.name}${isDir ? "/" : ""}</div>
           ${entry.excerpt ? html`<div class="brain-entry-excerpt">${entry.excerpt}</div>` : nothing}
@@ -800,13 +804,13 @@ export class GmBrain extends LitElement {
 
   private _renderFileTree(nodes: BrainTreeNode[], depth: number) {
     return html`
-      <div class="brain-file-tree" style="padding-left: ${depth * 16}px">
+      <div class="brain-file-tree" role="tree" aria-label="${depth === 0 ? "Vault file browser" : ""}" style="padding-left: ${depth * 16}px">
         ${nodes.map((node) => {
           if (node.type === "folder") {
             return html`
-              <details class="brain-tree-folder">
+              <details class="brain-tree-folder" role="treeitem" aria-label="Folder: ${node.name}${node.childCount != null ? `, ${node.childCount} items` : ""}">
                 <summary class="brain-tree-item brain-tree-folder-name">
-                  <span class="brain-file-icon">\u{1F4C1}</span>
+                  <span class="brain-file-icon" aria-hidden="true">\u{1F4C1}</span>
                   <span>${node.name}</span>
                   ${node.childCount != null ? html`<span class="brain-tree-count">${node.childCount}</span>` : nothing}
                 </summary>
@@ -815,8 +819,8 @@ export class GmBrain extends LitElement {
             `;
           }
           return html`
-            <button class="brain-tree-item brain-tree-file" @click=${() => this._openFile(node.path)}>
-              <span class="brain-file-icon">\u{1F4C4}</span>
+            <button class="brain-tree-item brain-tree-file" role="treeitem" aria-label="Open file: ${node.name}" @click=${() => this._openFile(node.path)}>
+              <span class="brain-file-icon" aria-hidden="true">\u{1F4C4}</span>
               <span class="brain-file-name">${node.name}</span>
               ${node.size != null ? html`<span class="brain-tree-size">${node.size < 1024 ? `${node.size}B` : `${(node.size / 1024).toFixed(1)}K`}</span>` : nothing}
             </button>

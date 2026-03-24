@@ -20,8 +20,15 @@ import type { GatewayRequestHandler, GatewayRequestHandlers } from "../types/plu
 // ── List ──────────────────────────────────────────────────────────────
 
 const listDeployProjects: GatewayRequestHandler = async ({ respond }) => {
-  const entries = await loadRegistry();
-  respond(true, { entries, count: entries.length });
+  try {
+    const entries = await loadRegistry();
+    respond(true, { entries, count: entries.length });
+  } catch (err) {
+    respond(false, null, {
+      code: "REGISTRY_LOAD_FAILED",
+      message: `Failed to load deploy registry — check that ~/godmode/data/ is readable. (${String(err).slice(0, 100)})`,
+    });
+  }
 };
 
 // ── Register ──────────────────────────────────────────────────────────
@@ -54,8 +61,15 @@ const registerDeployProject: GatewayRequestHandler = async ({ params, respond })
     updatedAt: new Date().toISOString(),
   };
 
-  await registerProject(entry);
-  respond(true, { entry, message: `Registered ${domain} → ${repo} (${platform}/${projectName})` });
+  try {
+    await registerProject(entry);
+    respond(true, { entry, message: `Registered ${domain} → ${repo} (${platform}/${projectName})` });
+  } catch (err) {
+    respond(false, null, {
+      code: "REGISTRY_WRITE_FAILED",
+      message: `Failed to register project ${domain} — check disk space and file permissions. (${String(err).slice(0, 100)})`,
+    });
+  }
 };
 
 // ── Remove ────────────────────────────────────────────────────────────
@@ -67,11 +81,18 @@ const removeDeployProject: GatewayRequestHandler = async ({ params, respond }) =
     return;
   }
 
-  const removed = await removeProject(domain);
-  if (removed) {
-    respond(true, { message: `Removed ${domain} from deploy registry` });
-  } else {
-    respond(false, null, { code: "NOT_FOUND", message: `No registry entry for ${domain}` });
+  try {
+    const removed = await removeProject(domain);
+    if (removed) {
+      respond(true, { message: `Removed ${domain} from deploy registry` });
+    } else {
+      respond(false, null, { code: "NOT_FOUND", message: `No registry entry for ${domain}` });
+    }
+  } catch (err) {
+    respond(false, null, {
+      code: "REGISTRY_REMOVE_FAILED",
+      message: `Failed to remove ${domain} from registry — check file permissions. (${String(err).slice(0, 100)})`,
+    });
   }
 };
 
@@ -91,12 +112,19 @@ const checkDeployProject: GatewayRequestHandler = async ({ params, respond }) =>
     return;
   }
 
-  if (action === "create" && platform) {
-    const result = await checkProjectCreation(domain, platform);
-    respond(true, result);
-  } else {
-    const result = await checkDeploy(domain, repo, projectName);
-    respond(true, result);
+  try {
+    if (action === "create" && platform) {
+      const result = await checkProjectCreation(domain, platform);
+      respond(true, result);
+    } else {
+      const result = await checkDeploy(domain, repo, projectName);
+      respond(true, result);
+    }
+  } catch (err) {
+    respond(false, null, {
+      code: "DEPLOY_CHECK_FAILED",
+      message: `Deploy guard check failed for ${domain} — verify the project registry is intact. (${String(err).slice(0, 100)})`,
+    });
   }
 };
 

@@ -415,7 +415,7 @@ export function renderReadingIndicatorGroup(
         ${
           currentToolInfo
             ? html`
-              <div class="chat-working-indicator">
+              <div class="chat-working-indicator" role="status" aria-label="${getWorkingVerb(currentToolInfo.name)} ${currentToolInfo.name}">
                 <div class="chat-working-indicator__row">
                   <span class="chat-working-indicator__icon">⚙</span>
                   <span class="chat-working-indicator__text">
@@ -432,8 +432,8 @@ export function renderReadingIndicatorGroup(
             `
             : nothing
         }
-        <div class="chat-bubble chat-reading-indicator" aria-hidden="true">
-          <span class="chat-reading-indicator__dots">
+        <div class="chat-bubble chat-reading-indicator" role="status" aria-label="Assistant is thinking">
+          <span class="chat-reading-indicator__dots" aria-hidden="true">
             <span></span><span></span><span></span>
           </span>
         </div>
@@ -468,7 +468,7 @@ export function renderStreamingGroup(
         ${
           currentToolInfo
             ? html`
-              <div class="chat-working-indicator">
+              <div class="chat-working-indicator" role="status" aria-label="${getWorkingVerb(currentToolInfo.name)} ${currentToolInfo.name}">
                 <div class="chat-working-indicator__row">
                   <span class="chat-working-indicator__icon">⚙</span>
                   <span class="chat-working-indicator__text">

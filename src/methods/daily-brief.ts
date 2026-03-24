@@ -453,7 +453,7 @@ const updateDailyBrief: GatewayRequestHandler = async ({ params, respond }) => {
     console.error("[DailyBrief] Error writing brief:", err);
     respond(false, null, {
       code: "UNAVAILABLE",
-      message: err instanceof Error ? err.message : "Failed to write daily brief",
+      message: `Failed to write daily brief (${err instanceof Error ? err.message : "unknown error"})`,
     });
   }
 };
@@ -469,7 +469,7 @@ const captureEveningReview: GatewayRequestHandler = async ({ params, respond }) 
     }
     respond(false, null, {
       code: "UNAVAILABLE",
-      message: err instanceof Error ? err.message : "Failed to capture evening review",
+      message: `Failed to capture evening review (${err instanceof Error ? err.message : "unknown error"})`,
     });
   }
 };
@@ -617,10 +617,18 @@ export async function syncTasksFromBrief(date: string, opts?: { force?: boolean 
   }
 
   // Use shared locked task updater from tasks.ts
-  const { updateTasks } = await import("./tasks.js");
-  const { readWorkspaceConfig, detectWorkspaceFromText } = await import("../lib/workspaces-config.js");
-
-  const { randomUUID } = await import("node:crypto");
+  let updateTasks: Awaited<typeof import("./tasks.js")>["updateTasks"];
+  let readWorkspaceConfig: Awaited<typeof import("../lib/workspaces-config.js")>["readWorkspaceConfig"];
+  let detectWorkspaceFromText: Awaited<typeof import("../lib/workspaces-config.js")>["detectWorkspaceFromText"];
+  let randomUUID: Awaited<typeof import("node:crypto")>["randomUUID"];
+  try {
+    ({ updateTasks } = await import("./tasks.js"));
+    ({ readWorkspaceConfig, detectWorkspaceFromText } = await import("../lib/workspaces-config.js"));
+    ({ randomUUID } = await import("node:crypto"));
+  } catch (err) {
+    console.error("[DailyBrief] Failed to load task sync dependencies:", err);
+    return { added: 0, updated: 0, total: 0 };
+  }
 
   // Pre-load workspace config for task→workspace detection
   let wsConfig: Awaited<ReturnType<typeof readWorkspaceConfig>> | null = null;
@@ -741,7 +749,13 @@ export async function syncBriefFromTasks(
   }
 
   // Get the specific task that was just changed
-  const { readTasks } = await import("./tasks.js");
+  let readTasks: Awaited<typeof import("./tasks.js")>["readTasks"];
+  try {
+    ({ readTasks } = await import("./tasks.js"));
+  } catch (err) {
+    console.error("[DailyBrief] Failed to load tasks module for brief sync:", err);
+    return { updated: 0 };
+  }
   const tasksData = await readTasks();
   const targetTask = tasksData.tasks.find(
     (t) =>
@@ -973,7 +987,7 @@ const toggleCheckbox: GatewayRequestHandler = async ({ params, respond }) => {
     console.error("[DailyBrief] Error toggling checkbox:", err);
     respond(false, null, {
       code: "UNAVAILABLE",
-      message: err instanceof Error ? err.message : "Failed to toggle checkbox",
+      message: `Failed to toggle brief checkbox (${err instanceof Error ? err.message : "unknown error"})`,
     });
   }
 };
@@ -1100,7 +1114,13 @@ export async function scopeTasksToWinTheDay(
   date: string,
   winTheDayItems: FocusItem[],
 ): Promise<{ deferred: number }> {
-  const { updateTasks } = await import("./tasks.js");
+  let updateTasks: Awaited<typeof import("./tasks.js")>["updateTasks"];
+  try {
+    ({ updateTasks } = await import("./tasks.js"));
+  } catch (err) {
+    console.error("[DailyBrief] Failed to load tasks module for WTD scoping:", err);
+    return { deferred: 0 };
+  }
 
   const wtdTitles = new Set(winTheDayItems.map((i) => i.title.toLowerCase()));
 

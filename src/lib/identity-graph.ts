@@ -223,9 +223,10 @@ export interface GraphNode {
 
 /**
  * Query the identity graph for entities matching words in the user's message.
- * Returns 1-2 hop connected entities with their relationships.
+ * Returns connected entities with their relationships.
+ * @param depth 1 = direct connections only, 2 = include 2nd-degree connections (default: 1)
  */
-export function queryGraph(userMessage: string): GraphNode[] {
+export function queryGraph(userMessage: string, depth: 1 | 2 = 1): GraphNode[] {
   if (!db || !userMessage || userMessage.length < 3) return [];
 
   try {
@@ -281,6 +282,8 @@ export function queryGraph(userMessage: string): GraphNode[] {
     `);
 
     const results: GraphNode[] = [];
+    const includedIds = new Set<string>();
+
     for (const entity of matchedEntities.slice(0, 5)) {
       const edges = edgeStmt.all({ id: entity.id }) as Array<{
         src: string; rel: string; dst: string; target_name: string; target_kind: string;
@@ -296,6 +299,46 @@ export function queryGraph(userMessage: string): GraphNode[] {
           targetKind: e.target_kind,
         })),
       });
+      includedIds.add(entity.id);
+    }
+
+    // 2-hop: follow edges from 1-hop targets to find 2nd-degree connections
+    if (depth >= 2) {
+      // Collect all 1-hop target IDs that aren't already in results
+      const hop1TargetIds = new Set<string>();
+      for (const node of results) {
+        for (const rel of node.relationships) {
+          const targetId = slugify(rel.target);
+          if (targetId && !includedIds.has(targetId)) {
+            hop1TargetIds.add(targetId);
+          }
+        }
+      }
+
+      const entityStmt = db.prepare("SELECT id, name, kind FROM entities WHERE id = @id");
+
+      for (const targetId of hop1TargetIds) {
+        if (results.length >= 10) break; // cap total results
+
+        const entity = entityStmt.get({ id: targetId }) as { id: string; name: string; kind: string } | undefined;
+        if (!entity) continue;
+
+        const edges = edgeStmt.all({ id: targetId }) as Array<{
+          src: string; rel: string; dst: string; target_name: string; target_kind: string;
+        }>;
+
+        results.push({
+          id: entity.id,
+          name: entity.name,
+          kind: entity.kind,
+          relationships: edges.map(e => ({
+            rel: e.rel,
+            target: e.target_name,
+            targetKind: e.target_kind,
+          })),
+        });
+        includedIds.add(targetId);
+      }
     }
 
     return results;

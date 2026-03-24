@@ -534,6 +534,8 @@ function renderModelPicker(props: ConfigProps) {
                   <button
                     class="model-card ${isActive ? "model-card--active" : ""}"
                     style="--model-accent: ${color}"
+                    aria-label="${isActive ? `${model.name || model.id} (active)` : `Switch to ${model.name || model.id}`}"
+                    aria-pressed=${isActive ? "true" : "false"}
                     ?disabled=${isSwitching}
                     @click=${() => {
                       if (isActive || !props.onModelSwitch) return;
@@ -566,7 +568,7 @@ function renderSecrets(props: ConfigProps) {
     <div class="config-secrets">
       <div class="config-secrets__header">
         <h3 class="config-secrets__title">Stored Secrets</h3>
-        <button class="btn btn--sm" ?disabled=${props.secretsLoading} @click=${props.onSecretsRefresh}>
+        <button class="btn btn--sm" aria-label="Refresh secrets" ?disabled=${props.secretsLoading} @click=${props.onSecretsRefresh}>
           ${props.secretsLoading ? "Loading..." : "Refresh"}
         </button>
       </div>
@@ -610,6 +612,7 @@ function renderWebFetch(props: ConfigProps) {
       <div class="config-webfetch__select">
         <select
           class="config-select"
+          aria-label="Web fetch provider"
           .value=${props.webFetchProvider}
           ?disabled=${props.webFetchLoading}
           @change=${(e: Event) => props.onWebFetchChange((e.target as HTMLSelectElement).value)}
@@ -635,6 +638,7 @@ function renderSearchProviders(props: ConfigProps) {
         <label class="config-search-providers__label">Default Provider</label>
         <select
           class="config-select"
+          aria-label="Default search provider"
           .value=${props.searchProvider}
           ?disabled=${props.searchLoading}
           @change=${(e: Event) => props.onSearchProviderChange((e.target as HTMLSelectElement).value)}
@@ -748,6 +752,7 @@ export function renderConfig(props: ConfigProps) {
             type="text"
             class="config-search__input"
             placeholder="Search settings..."
+            aria-label="Search settings"
             .value=${props.searchQuery}
             @input=${(e: Event) => props.onSearchChange((e.target as HTMLInputElement).value)}
           />
@@ -756,6 +761,7 @@ export function renderConfig(props: ConfigProps) {
               ? html`
             <button
               class="config-search__clear"
+              aria-label="Clear search"
               @click=${() => props.onSearchChange("")}
             >×</button>
           `
@@ -764,9 +770,11 @@ export function renderConfig(props: ConfigProps) {
         </div>
 
         <!-- Section nav -->
-        <nav class="config-nav">
+        <nav class="config-nav" aria-label="Config sections">
           <button
             class="config-nav__item ${props.activeSection === null ? "active" : ""}"
+            aria-label="All Settings"
+            aria-current=${props.activeSection === null ? "page" : "false"}
             @click=${() => props.onSectionChange(null)}
           >
             <span class="config-nav__icon">${sidebarIcons.all}</span>
@@ -776,6 +784,8 @@ export function renderConfig(props: ConfigProps) {
             (section) => html`
             <button
               class="config-nav__item ${props.activeSection === section.key ? "active" : ""}"
+              aria-label="${section.label} section"
+              aria-current=${props.activeSection === section.key ? "page" : "false"}
               @click=${() => props.onSectionChange(section.key)}
             >
               <span class="config-nav__icon">${getSectionIcon(section.key)}</span>
@@ -787,9 +797,11 @@ export function renderConfig(props: ConfigProps) {
 
         <!-- Mode toggle at bottom -->
         <div class="config-sidebar__footer">
-          <div class="config-mode-toggle">
+          <div class="config-mode-toggle" role="group" aria-label="Editor mode">
             <button
               class="config-mode-toggle__btn ${props.formMode === "form" ? "active" : ""}"
+              aria-label="Form editor mode"
+              aria-pressed=${props.formMode === "form" ? "true" : "false"}
               ?disabled=${props.schemaLoading || !props.schema}
               @click=${() => props.onFormModeChange("form")}
             >
@@ -797,6 +809,8 @@ export function renderConfig(props: ConfigProps) {
             </button>
             <button
               class="config-mode-toggle__btn ${props.formMode === "raw" ? "active" : ""}"
+              aria-label="Raw JSON editor mode"
+              aria-pressed=${props.formMode === "raw" ? "true" : "false"}
               @click=${() => props.onFormModeChange("raw")}
             >
               Raw
@@ -821,11 +835,12 @@ export function renderConfig(props: ConfigProps) {
             }
           </div>
           <div class="config-actions__right">
-            <button class="btn btn--sm" ?disabled=${props.loading} @click=${props.onReload}>
+            <button class="btn btn--sm" aria-label="Reload configuration" ?disabled=${props.loading} @click=${props.onReload}>
               ${props.loading ? "Loading…" : "Reload"}
             </button>
             <button
               class="btn btn--sm primary"
+              aria-label="Save configuration"
               ?disabled=${!canSave}
               @click=${props.onSave}
             >
@@ -833,6 +848,7 @@ export function renderConfig(props: ConfigProps) {
             </button>
             <button
               class="btn btn--sm"
+              aria-label="Apply configuration changes"
               ?disabled=${!canApply}
               @click=${props.onApply}
             >
@@ -840,6 +856,7 @@ export function renderConfig(props: ConfigProps) {
             </button>
             <button
               class="btn btn--sm"
+              aria-label="Update gateway"
               ?disabled=${!canUpdate}
               @click=${props.onUpdate}
             >
@@ -899,9 +916,11 @@ export function renderConfig(props: ConfigProps) {
         ${
           allowSubnav
             ? html`
-              <div class="config-subnav">
+              <nav class="config-subnav" aria-label="Config subsections">
                 <button
                   class="config-subnav__item ${effectiveSubsection === null ? "active" : ""}"
+                  aria-label="Show all subsections"
+                  aria-current=${effectiveSubsection === null ? "page" : "false"}
                   @click=${() => props.onSubsectionChange(ALL_SUBSECTION)}
                 >
                   All
@@ -913,13 +932,15 @@ export function renderConfig(props: ConfigProps) {
                         effectiveSubsection === entry.key ? "active" : ""
                       }"
                       title=${entry.description || entry.label}
+                      aria-label="${entry.label} subsection"
+                      aria-current=${effectiveSubsection === entry.key ? "page" : "false"}
                       @click=${() => props.onSubsectionChange(entry.key)}
                     >
                       ${entry.label}
                     </button>
                   `,
                 )}
-              </div>
+              </nav>
             `
             : nothing
         }
@@ -977,6 +998,7 @@ export function renderConfig(props: ConfigProps) {
                   <label class="field config-raw-field">
                     <span>Raw JSON5</span>
                     <textarea
+                      aria-label="Raw JSON5 configuration editor"
                       .value=${props.raw}
                       @input=${(e: Event) =>
                         props.onRawChange((e.target as HTMLTextAreaElement).value)}

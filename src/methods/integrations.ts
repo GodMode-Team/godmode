@@ -63,7 +63,7 @@ const status: GatewayRequestHandler = async ({ respond }) => {
   } catch (err) {
     respond(false, undefined, {
       code: "INTEGRATIONS_ERROR",
-      message: err instanceof Error ? err.message : String(err),
+      message: `Failed to list integrations (${err instanceof Error ? err.message : String(err)})`,
     });
   }
 };
@@ -92,7 +92,7 @@ const test: GatewayRequestHandler = async ({ params, respond }) => {
   } catch (err) {
     respond(true, {
       success: false,
-      message: err instanceof Error ? err.message : String(err),
+      message: `Integration test failed (${err instanceof Error ? err.message : String(err)})`,
     });
   }
 };
@@ -104,6 +104,25 @@ const test: GatewayRequestHandler = async ({ params, respond }) => {
  * Routes to the correct target file (.env, godmode-options.json, or openclaw.json).
  */
 const configure: GatewayRequestHandler = async ({ params, respond }) => {
+  // Runtime type validation before cast
+  if (params.integrationId !== undefined && typeof params.integrationId !== "string") {
+    respond(false, undefined, { code: "INVALID_REQUEST", message: "integrationId must be a string" });
+    return;
+  }
+  if (params.values !== undefined && (typeof params.values !== "object" || params.values === null || Array.isArray(params.values))) {
+    respond(false, undefined, { code: "INVALID_REQUEST", message: "values must be a plain object" });
+    return;
+  }
+  if (params.values !== undefined && typeof params.values === "object" && params.values !== null) {
+    const vals = params.values as Record<string, unknown>;
+    for (const [k, v] of Object.entries(vals)) {
+      if (typeof k !== "string" || typeof v !== "string") {
+        respond(false, undefined, { code: "INVALID_REQUEST", message: "values must be an object with string keys and string values" });
+        return;
+      }
+    }
+  }
+
   const { integrationId, values } = params as {
     integrationId: string;
     values: Record<string, string>;
@@ -169,7 +188,7 @@ const configure: GatewayRequestHandler = async ({ params, respond }) => {
   } catch (err) {
     respond(false, undefined, {
       code: "CONFIGURE_ERROR",
-      message: err instanceof Error ? err.message : String(err),
+      message: `Failed to configure integration (${err instanceof Error ? err.message : String(err)})`,
     });
   }
 };
@@ -374,7 +393,7 @@ const autoInstall: GatewayRequestHandler = async ({ params, respond }) => {
   } catch (err) {
     respond(false, undefined, {
       code: "INSTALL_ERROR",
-      message: err instanceof Error ? err.message : String(err),
+      message: `Failed to install integration (${err instanceof Error ? err.message : String(err)})`,
     });
   }
 };
@@ -662,7 +681,7 @@ const paperclipSetup: GatewayRequestHandler = async ({ params, respond }) => {
   } catch (err) {
     respond(false, undefined, {
       code: "SETUP_ERROR",
-      message: err instanceof Error ? err.message : String(err),
+      message: `Failed to run integration setup action (${err instanceof Error ? err.message : String(err)})`,
     });
   }
 };

@@ -42,6 +42,56 @@ function countsByStatus(items: QueueItem[]): Record<QueueItemStatus, number> {
 // ── RPC Handlers ─────────────────────────────────────────────────
 
 const addItem: GatewayRequestHandler = async ({ params, respond }) => {
+  // Runtime type validation before cast
+  if (params.title !== undefined && typeof params.title !== "string") {
+    respond(false, null, { code: "INVALID_REQUEST", message: "title must be a string" });
+    return;
+  }
+  if (params.type !== undefined && typeof params.type !== "string") {
+    respond(false, null, { code: "INVALID_REQUEST", message: "type must be a string" });
+    return;
+  }
+  if (params.description !== undefined && typeof params.description !== "string") {
+    respond(false, null, { code: "INVALID_REQUEST", message: "description must be a string" });
+    return;
+  }
+  if (params.url !== undefined && typeof params.url !== "string") {
+    respond(false, null, { code: "INVALID_REQUEST", message: "url must be a string" });
+    return;
+  }
+  if (params.repoRoot !== undefined && typeof params.repoRoot !== "string") {
+    respond(false, null, { code: "INVALID_REQUEST", message: "repoRoot must be a string" });
+    return;
+  }
+  if (params.priority !== undefined && typeof params.priority !== "string") {
+    respond(false, null, { code: "INVALID_REQUEST", message: "priority must be a string" });
+    return;
+  }
+  if (params.priority !== undefined && !["high", "normal", "low"].includes(params.priority as string)) {
+    respond(false, null, { code: "INVALID_REQUEST", message: `Invalid priority "${params.priority}". Must be "high", "normal", or "low".` });
+    return;
+  }
+  if (params.engine !== undefined && typeof params.engine !== "string") {
+    respond(false, null, { code: "INVALID_REQUEST", message: "engine must be a string" });
+    return;
+  }
+  if (params.engine !== undefined && !["claude", "codex", "gemini"].includes(params.engine as string)) {
+    respond(false, null, { code: "INVALID_REQUEST", message: `Invalid engine "${params.engine}". Must be "claude", "codex", or "gemini".` });
+    return;
+  }
+  if (params.sourceTaskId !== undefined && typeof params.sourceTaskId !== "string") {
+    respond(false, null, { code: "INVALID_REQUEST", message: "sourceTaskId must be a string" });
+    return;
+  }
+  if (params.personaHint !== undefined && typeof params.personaHint !== "string") {
+    respond(false, null, { code: "INVALID_REQUEST", message: "personaHint must be a string" });
+    return;
+  }
+  if (params.sessionId !== undefined && typeof params.sessionId !== "string") {
+    respond(false, null, { code: "INVALID_REQUEST", message: "sessionId must be a string" });
+    return;
+  }
+
   const { type, title, description, url, repoRoot, priority, sourceTaskId, personaHint, engine, sessionId } = params as {
     type?: QueueItemType;
     title?: string;
@@ -557,10 +607,10 @@ const hitlRespond: GatewayRequestHandler = async ({ params, respond }) => {
     if (result.ok) {
       respond(true, { status: "resolved" });
     } else {
-      respond(false, null, { code: "HITL_ERROR", message: result.error ?? "Unknown error" });
+      respond(false, null, { code: "HITL_ERROR", message: result.error ?? "Could not process your checkpoint response — please try again." });
     }
   } catch (err) {
-    respond(false, null, { code: "HITL_ERROR", message: String(err) });
+    respond(false, null, { code: "HITL_ERROR", message: `Failed to process checkpoint feedback — please try again. (${String(err).slice(0, 100)})` });
   }
 };
 

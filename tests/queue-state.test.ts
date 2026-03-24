@@ -37,15 +37,17 @@ describe("Queue State", () => {
   it("adds and removes items via updateQueueState", async () => {
     const testId = `test-${Date.now()}`;
 
-    // Add
+    // Add — use "done" status so the live queue processor never dispatches test items.
+    // This prevents the TOCTOU race (CWE-367) where test items with "pending" status
+    // leak into production and spawn phantom agents.
     await updateQueueState((state) => {
       state.items.push({
         id: testId,
         type: "research",
         title: "Integration test item",
         priority: "low",
-        status: "pending",
-        source: "manual",
+        status: "done",
+        source: "test",
         createdAt: Date.now(),
       });
     });
@@ -55,7 +57,7 @@ describe("Queue State", () => {
     const found = afterAdd.items.find((i) => i.id === testId);
     expect(found).toBeDefined();
     expect(found!.title).toBe("Integration test item");
-    expect(found!.status).toBe("pending");
+    expect(found!.status).toBe("done");
 
     // Update status
     await updateQueueState((state) => {
@@ -93,8 +95,8 @@ describe("Queue State", () => {
         type: "analysis",
         title: "Preserve test",
         priority: "normal",
-        status: "pending",
-        source: "manual",
+        status: "done",
+        source: "test",
         createdAt: Date.now(),
       });
     });
@@ -111,7 +113,8 @@ describe("Queue State", () => {
   it("handles concurrent updates safely (file locking)", async () => {
     const ids = Array.from({ length: 5 }, (_, i) => `concurrent-${Date.now()}-${i}`);
 
-    // Add 5 items concurrently
+    // Add 5 items concurrently — use "done" status to prevent queue processor
+    // from dispatching these as real agent tasks (TOCTOU race fix)
     await Promise.all(
       ids.map((id) =>
         updateQueueState((state) => {
@@ -120,8 +123,8 @@ describe("Queue State", () => {
             type: "research",
             title: `Concurrent item ${id}`,
             priority: "low",
-            status: "pending",
-            source: "manual",
+            status: "done",
+            source: "test",
             createdAt: Date.now(),
           });
         }),

@@ -228,6 +228,36 @@ const getTask: GatewayRequestHandler = async ({ params, respond }) => {
 };
 
 const createTask: GatewayRequestHandler = async ({ params, respond }) => {
+  // Runtime type validation before cast
+  if (params.title !== undefined && typeof params.title !== "string") {
+    respond(false, null, { code: "INVALID_REQUEST", message: "title must be a string" });
+    return;
+  }
+  if (params.project !== undefined && params.project !== null && typeof params.project !== "string") {
+    respond(false, null, { code: "INVALID_REQUEST", message: "project must be a string" });
+    return;
+  }
+  if (params.dueDate !== undefined && params.dueDate !== null && typeof params.dueDate !== "string") {
+    respond(false, null, { code: "INVALID_REQUEST", message: "dueDate must be a string" });
+    return;
+  }
+  if (params.priority !== undefined && typeof params.priority !== "string") {
+    respond(false, null, { code: "INVALID_REQUEST", message: "priority must be a string" });
+    return;
+  }
+  if (params.priority !== undefined && !["high", "medium", "low"].includes(params.priority as string)) {
+    respond(false, null, { code: "INVALID_REQUEST", message: `Invalid priority "${params.priority}". Must be "high", "medium", or "low".` });
+    return;
+  }
+  if (params.source !== undefined && typeof params.source !== "string") {
+    respond(false, null, { code: "INVALID_REQUEST", message: "source must be a string" });
+    return;
+  }
+  if (params.source !== undefined && !["chat", "cron", "import"].includes(params.source as string)) {
+    respond(false, null, { code: "INVALID_REQUEST", message: `Invalid source "${params.source}". Must be "chat", "cron", or "import".` });
+    return;
+  }
+
   const { title, project, dueDate, priority, source } = params as {
     title?: string;
     project?: string | null;
@@ -313,6 +343,36 @@ const createTask: GatewayRequestHandler = async ({ params, respond }) => {
 };
 
 const updateTask: GatewayRequestHandler = async ({ params, respond }) => {
+  // Runtime type validation before cast
+  if (params.id !== undefined && typeof params.id !== "string") {
+    respond(false, null, { code: "INVALID_REQUEST", message: "id must be a string" });
+    return;
+  }
+  if (params.title !== undefined && typeof params.title !== "string") {
+    respond(false, null, { code: "INVALID_REQUEST", message: "title must be a string" });
+    return;
+  }
+  if (params.status !== undefined && typeof params.status !== "string") {
+    respond(false, null, { code: "INVALID_REQUEST", message: "status must be a string" });
+    return;
+  }
+  if (params.priority !== undefined && typeof params.priority !== "string") {
+    respond(false, null, { code: "INVALID_REQUEST", message: "priority must be a string" });
+    return;
+  }
+  if (params.project !== undefined && params.project !== null && typeof params.project !== "string") {
+    respond(false, null, { code: "INVALID_REQUEST", message: "project must be a string" });
+    return;
+  }
+  if (params.dueDate !== undefined && params.dueDate !== null && typeof params.dueDate !== "string") {
+    respond(false, null, { code: "INVALID_REQUEST", message: "dueDate must be a string" });
+    return;
+  }
+  if (params.source !== undefined && typeof params.source !== "string") {
+    respond(false, null, { code: "INVALID_REQUEST", message: "source must be a string" });
+    return;
+  }
+
   const { id, ...updates } = params as { id?: string } & Partial<NativeTask>;
   if (!id) {
     respond(false, null, { code: "INVALID_REQUEST", message: "Missing task id" });

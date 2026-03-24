@@ -215,8 +215,15 @@ export async function handleBeforePromptBuild(
   } catch (e) { logger?.warn?.(`[GodMode] Context pressure level error: ${(e as Error).message}`); }
 
   // ── Shared context gathering (PARITY: same code path as Hermes) ──
-  const { gatherContextInputs } = await import("../lib/gather-context-inputs.js");
-  const { assembleContext } = await import("../lib/context-budget.js");
+  let gatherContextInputs: Awaited<typeof import("../lib/gather-context-inputs.js")>["gatherContextInputs"];
+  let assembleContext: Awaited<typeof import("../lib/context-budget.js")>["assembleContext"];
+  try {
+    ({ gatherContextInputs } = await import("../lib/gather-context-inputs.js"));
+    ({ assembleContext } = await import("../lib/context-budget.js"));
+  } catch (err) {
+    logger.warn(`[GodMode] Critical context modules failed to load — skipping context injection: ${String(err)}`);
+    return;
+  }
 
   const sessionKeyOrNull = sessionKey ?? null;
   const inputs = await gatherContextInputs({

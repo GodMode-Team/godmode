@@ -82,6 +82,32 @@ export interface GatherContextOptions {
   suppressMemoryOfflineWarning?: boolean;
 }
 
+// ── Memory Confidence ────────────────────────────────────────────────
+// Derives a 1-line quality indicator from the Honcho memory block.
+// Helps the ally gauge how much to trust the injected context.
+
+function computeMemoryConfidence(memoryBlock: string | null, elapsedMs: number): string | null {
+  if (!memoryBlock) return null;
+
+  const contentLength = memoryBlock.length;
+  const lineCount = memoryBlock.split("\n").length;
+  // Rough heuristic: more content with detail = higher confidence
+  const isRich = contentLength > 300 && lineCount >= 4;
+  const isSparse = contentLength < 100 || lineCount <= 2;
+
+  let level: string;
+  if (isRich) {
+    level = "high";
+  } else if (isSparse) {
+    level = "low";
+  } else {
+    level = "moderate";
+  }
+
+  const detail = `${lineCount} lines, ${elapsedMs}ms`;
+  return `_Memory confidence: ${level} (${detail})_`;
+}
+
 // ── Main Gatherer ───────────────────────────────────────────────────
 
 /**
@@ -109,23 +135,50 @@ export async function gatherContextInputs(opts: GatherContextOptions): Promise<C
   const defaultMemoryStatus = opts.suppressMemoryOfflineWarning ? "ready" : "offline";
   let memoryBlock: string | null = null;
   let memoryStatus: "ready" | "degraded" | "offline" = defaultMemoryStatus;
+  let memoryConfidence: string | null = null;
   if (provenance?.kind !== "inter_session" && !lightMode && sessionKey) {
     const memoryCacheKey = `memory:${sessionKey}`;
-    const cached = getCached<{ block: string | null; status: "ready" | "degraded" | "offline" }>(memoryCacheKey);
+    const cached = getCached<{ block: string | null; status: "ready" | "degraded" | "offline"; confidence: string | null }>(memoryCacheKey);
     if (cached) {
       memoryBlock = cached.block;
       memoryStatus = cached.status;
+      memoryConfidence = cached.confidence;
     } else {
       try {
         const { isMemoryReady, getContext, getMemoryStatus } = await import("./memory.js");
         const { sanitizeForPrompt } = await import("./prompt-sanitizer.js");
         memoryStatus = getMemoryStatus();
         if (isMemoryReady()) {
+          const retrievalStart = Date.now();
           const ctx = await getContext(sessionKey);
+          const elapsedMs = Date.now() - retrievalStart;
           if (ctx) memoryBlock = sanitizeForPrompt(ctx, "honcho-context");
           memoryStatus = getMemoryStatus();
+
+          // Compute retrieval quality feedback for context injection
+          memoryConfidence = computeMemoryConfidence(memoryBlock, elapsedMs);
+
+          // Log retrieval trajectory for observability
+          try {
+            const { logRetrieval } = await import("./retrieval-log.js");
+            logRetrieval({
+              ts: new Date().toISOString(),
+              source: "honcho",
+              query: userMessage.slice(0, 200),
+              resultCount: memoryBlock ? 1 : 0,
+              topScore: null,
+              topResults: memoryBlock
+                ? [{ snippet: memoryBlock.slice(0, 120) }]
+                : [],
+              elapsedMs,
+              injected: !!memoryBlock,
+              emptyReason: memoryBlock ? undefined : "no context returned",
+            });
+          } catch {
+            // Retrieval logging is non-fatal
+          }
         }
-        setCache(memoryCacheKey, { block: memoryBlock, status: memoryStatus }, 30_000);
+        setCache(memoryCacheKey, { block: memoryBlock, status: memoryStatus, confidence: memoryConfidence }, 30_000);
       } catch (err) {
         logger.warn(`[GodMode][gather] Honcho context error (non-fatal): ${String(err)}`);
         memoryStatus = "degraded";
@@ -149,7 +202,10 @@ export async function gatherContextInputs(opts: GatherContextOptions): Promise<C
         if (isGraphReady()) {
           const graphInput = memoryBlock ? `${userMessage}\n${memoryBlock}` : userMessage;
           if (graphInput.length >= 5) {
-            const graphResults = queryGraph(graphInput);
+            // Use depth=2 when the message likely involves people or relationships
+            const PEOPLE_PATTERN = /\b(?:who|team|manager|report|colleague|met|knows?|introduced|work(?:s|ed|ing)?\s+with|relationship|connected|friend|partner|married|family|spouse|sibling|parent|boss|lead|hire[ds]?|referred|mention(?:s|ed)?)\b/i;
+            const graphDepth: 1 | 2 = PEOPLE_PATTERN.test(userMessage) ? 2 : 1;
+            const graphResults = queryGraph(graphInput, graphDepth);
             const rawGraph = formatGraphContext(graphResults);
             graphBlock = rawGraph ? sanitizeForPrompt(rawGraph, "identity-graph") : null;
           }
@@ -509,6 +565,7 @@ export async function gatherContextInputs(opts: GatherContextOptions): Promise<C
     identityAnchor,
     memoryBlock,
     memoryStatus,
+    memoryConfidence,
     graphBlock,
     schedule,
     operationalCounts,

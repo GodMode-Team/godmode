@@ -45,7 +45,7 @@ export type QueueItem = {
   repoRoot?: string;
   priority: "high" | "normal" | "low";
   status: QueueItemStatus;
-  source: "chat" | "brief" | "cron" | "proactive" | "manual";
+  source: "chat" | "brief" | "cron" | "proactive" | "manual" | "test";
   sourceTaskId?: string;
   pid?: number;
   retryCount?: number;

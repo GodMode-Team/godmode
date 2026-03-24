@@ -18,7 +18,7 @@ const ingestionStatus: GatewayRequestHandler = async ({ respond }) => {
   } catch (err) {
     respond(false, undefined, {
       code: "INGESTION_ERROR",
-      message: String(err),
+      message: `Could not check ingestion status — ensure pipelines are configured. (${String(err).slice(0, 100)})`,
     });
   }
 };
@@ -49,7 +49,7 @@ const ingestionRun: GatewayRequestHandler = async ({ params, respond }) => {
   } catch (err) {
     respond(false, undefined, {
       code: "INGESTION_ERROR",
-      message: String(err),
+      message: `Ingestion pipeline failed to run — check pipeline configuration. (${String(err).slice(0, 100)})`,
     });
   }
 };
@@ -74,7 +74,7 @@ const screenpipeStatus: GatewayRequestHandler = async ({ respond }) => {
   } catch (err) {
     respond(false, undefined, {
       code: "SCREENPIPE_ERROR",
-      message: String(err),
+      message: `Could not check Screenpipe status — ensure Screenpipe is running. (${String(err).slice(0, 100)})`,
     });
   }
 };
@@ -104,7 +104,7 @@ const screenpipeConfigure: GatewayRequestHandler = async ({
   } catch (err) {
     respond(false, undefined, {
       code: "SCREENPIPE_ERROR",
-      message: String(err),
+      message: `Screenpipe configuration failed — check file permissions in ~/godmode. (${String(err).slice(0, 100)})`,
     });
   }
 };
@@ -123,7 +123,7 @@ const screenpipeToggle: GatewayRequestHandler = async ({ params, respond }) => {
     const merged = await saveConfig({ enabled });
     respond(true, { enabled: (merged as unknown as Record<string, unknown>).enabled ?? enabled });
   } catch (err) {
-    respond(false, undefined, { code: "SCREENPIPE_ERROR", message: String(err) });
+    respond(false, undefined, { code: "SCREENPIPE_ERROR", message: `Screenpipe toggle failed — the service may not be responding. (${String(err).slice(0, 100)})` });
   }
 };
 
@@ -143,7 +143,7 @@ const runPipeline: GatewayRequestHandler = async ({ params, respond }) => {
     );
     respond(true, match ?? { pipeline, status: "not_found" });
   } catch (err) {
-    respond(false, undefined, { code: "INGESTION_ERROR", message: String(err) });
+    respond(false, undefined, { code: "INGESTION_ERROR", message: `Pipeline "${pipeline}" failed to run — check pipeline configuration. (${String(err).slice(0, 100)})` });
   }
 };
 
