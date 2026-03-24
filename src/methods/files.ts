@@ -6,7 +6,7 @@ import { promisify } from "node:util";
 import type { GatewayRequestHandler } from "../types/plugin-api.js";
 import { readQueueState } from "../lib/queue-state.js";
 import { isAllowedPath } from "../lib/vault-paths.js";
-import { readWorkspaceConfig } from "../lib/workspaces-config.js";
+import { readWorkspaceConfig, expandPath } from "../lib/workspaces-config.js";
 import { DATA_DIR, GODMODE_ROOT } from "../data-paths.js";
 
 const execFile = promisify(execFileCb);

@@ -217,9 +217,7 @@ export function createGodmodeHttpHandler(deps: HttpHandlerDeps) {
         }
         try {
           const { runAllIngestion } = await import("../services/ingestion/runner.js");
-          const pipeline = pathname.split("/").pop();
-          const only = pipeline && pipeline !== "run" ? pipeline : undefined;
-          const results = await runAllIngestion(only);
+          const results = await runAllIngestion();
           res.writeHead(200, { "Content-Type": "application/json" });
           res.end(JSON.stringify({ results }));
         } catch (err) {
