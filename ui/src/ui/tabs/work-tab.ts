@@ -41,6 +41,10 @@ import {
   browseWorkspaceFolder,
   searchWorkspaceFiles,
   createWorkspaceFolder,
+  postToFeed,
+  testConnection,
+  removeConnection,
+  loadConnections,
   type WorkspacesState,
   type BrowseEntry,
 } from "../controllers/workspaces.js";
@@ -221,6 +225,11 @@ export class GmWork extends LitElement {
       onBrowseBack: () => this._onBrowseBack(),
       onCreateFolder: (path) => this._onCreateFolder(path),
       onBatchPushToDrive: (paths) => this._onBatchPushToDrive(paths),
+      // Feed
+      onPostToFeed: (text, type) => this._onPostToFeed(text, type),
+      // Connections
+      onTestConnection: (connectionId) => this._onTestConnection(connectionId),
+      onRemoveConnection: (connectionId) => this._onRemoveConnection(connectionId),
     });
   }
 
@@ -593,6 +602,70 @@ export class GmWork extends LitElement {
     if (ok) {
       this.ctx.addToast("Folder created", "success");
     }
+  }
+
+  private async _onPostToFeed(text: string, type: string): Promise<void> {
+    if (!this.selectedWorkspace) return;
+    const entry = await postToFeed(
+      this as unknown as WorkspacesState,
+      this.selectedWorkspace.id,
+      text,
+      type,
+    );
+    if (!entry) {
+      this.ctx.addToast("Failed to post to feed", "error");
+      return;
+    }
+    // Prepend to local feed entries
+    if (this.selectedWorkspace.feedEntries) {
+      this.selectedWorkspace = {
+        ...this.selectedWorkspace,
+        feedEntries: [entry, ...this.selectedWorkspace.feedEntries],
+      };
+    }
+    this.requestUpdate();
+  }
+
+  private async _onTestConnection(connectionId: string): Promise<void> {
+    if (!this.selectedWorkspace) return;
+    this.ctx.addToast("Testing connection...", "info");
+    const result = await testConnection(
+      this as unknown as WorkspacesState,
+      this.selectedWorkspace.id,
+      connectionId,
+    );
+    if (result.ok) {
+      this.ctx.addToast("Connection OK", "success");
+      // Refresh connections
+      const connections = await loadConnections(
+        this as unknown as WorkspacesState,
+        this.selectedWorkspace.id,
+      );
+      this.selectedWorkspace = { ...this.selectedWorkspace, connections };
+    } else {
+      this.ctx.addToast("Connection failed: " + (result.error ?? "unknown"), "error");
+    }
+    this.requestUpdate();
+  }
+
+  private async _onRemoveConnection(connectionId: string): Promise<void> {
+    if (!this.selectedWorkspace) return;
+    const ok = await removeConnection(
+      this as unknown as WorkspacesState,
+      this.selectedWorkspace.id,
+      connectionId,
+    );
+    if (!ok) {
+      this.ctx.addToast("Failed to remove connection", "error");
+      return;
+    }
+    this.ctx.addToast("Connection removed", "success");
+    // Update local state
+    this.selectedWorkspace = {
+      ...this.selectedWorkspace,
+      connections: (this.selectedWorkspace.connections ?? []).filter(c => c.id !== connectionId),
+    };
+    this.requestUpdate();
   }
 
   private async _onBatchPushToDrive(filePaths: string[]): Promise<void> {
