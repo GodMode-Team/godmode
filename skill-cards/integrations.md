@@ -2,6 +2,12 @@
 domain: integrations
 triggers: integration, connect, setup, configure, hubspot, google, apple, api key, not working, broken, connected, working, isn't working
 tools: integrations.status, integrations.test, integrations.configure, integrations.setupGuide
+name: godmode-integrations
+version: 1.0.0
+description: "Configures and troubleshoots third-party service connections"
+keywords: ["integration", "connect", "setup", "configure", "hubspot"]
+author: godmode-team
+clawhub: true
 ---
 ## When to Use
 - User asks about connected services

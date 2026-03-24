@@ -123,9 +123,13 @@ export function handleChatScroll(host: ScrollHost, event: Event) {
   }
   const distanceFromBottom = container.scrollHeight - container.scrollTop - container.clientHeight;
   // Use a tight threshold so user must genuinely reach the bottom to re-engage auto-scroll.
-  if (distanceFromBottom < RE_ENGAGE_THRESHOLD) {
+  if (distanceFromBottom < 2) {
+    // Hard bottom — definitely clear everything
     host.chatUserNearBottom = true;
     host.chatNewMessagesBelow = false;
+  } else if (distanceFromBottom < RE_ENGAGE_THRESHOLD) {
+    host.chatUserNearBottom = true;
+    // Don't clear badge until hard bottom
   } else {
     host.chatUserNearBottom = false;
   }

@@ -323,6 +323,7 @@ export class GodModeApp extends LitElement {
   @state() currentModel: string | null = null;
   @state() availableModels: { id: string; name: string; provider: string }[] = [];
   @state() modelPickerOpen = false;
+  @state() modelCacheTs = 0;
 
   @state() sessionKey = this.settings.sessionKey;
   @state() sessionPickerOpen = false;
@@ -342,6 +343,8 @@ export class GodModeApp extends LitElement {
   @state() profileEditName = "";
   @state() profileEditAvatar = "";
   @state() editingTabKey: string | null = null;
+  @state() navDrawerOpen = false;
+  closeNavDrawer = () => { this.navDrawerOpen = false; };
   @state() chatLoading = false;
   @state() chatSending = false;
   @state() chatSendingSessionKey: string | null = null;
@@ -594,6 +597,16 @@ export class GodModeApp extends LitElement {
   @state() guardrailsData: GuardrailsViewData | null = null;
   @state() guardrailsLoading = false;
   @state() guardrailsShowAddForm = false;
+
+  // ── Secrets / WebFetch / Search provider config ─────────────────
+  @state() secrets: string[] = [];
+  @state() secretsLoading = false;
+  @state() webFetchProvider: string = "default";
+  @state() webFetchLoading = false;
+  @state() searchProvider: string = "tavily";
+  @state() searchExaConfigured = false;
+  @state() searchTavilyConfigured = false;
+  @state() searchLoading = false;
 
   /** Stashed session key to restore when leaving an active dashboard */
   dashboardPreviousSessionKey: string | null = null;
@@ -966,6 +979,30 @@ export class GodModeApp extends LitElement {
         console.error("[Ally] Action RPC failed:", e);
         this.showToast("Action failed", "error");
       }
+    }
+  }
+
+  async handleHitlAction(checkpointId: string, action: string, modifiedInstructions?: string) {
+    if (!this.client) return;
+    try {
+      await this.client.request("queue.hitl.respond", {
+        checkpointId,
+        action,
+        modifiedInstructions,
+      });
+      // Remove the checkpoint from local state
+      const hitlSelf = this as unknown as { hitlCheckpoints?: Array<Record<string, unknown>> };
+      if (hitlSelf.hitlCheckpoints) {
+        hitlSelf.hitlCheckpoints = hitlSelf.hitlCheckpoints.filter(
+          (cp) => cp.id !== checkpointId,
+        );
+      }
+      const actionLabel = action === "continue" ? "Approved" : action === "abort" ? "Aborted" : "Modified";
+      this.showToast(`Checkpoint ${actionLabel.toLowerCase()}`, "success", 2000);
+      this.requestUpdate();
+    } catch (e) {
+      console.error("[HITL] Respond failed:", e);
+      this.showToast("Failed to respond to checkpoint", "error");
     }
   }
 

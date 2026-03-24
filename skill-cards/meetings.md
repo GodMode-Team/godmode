@@ -2,6 +2,12 @@
 domain: meetings
 triggers: last call, analyze call, meeting recording, transcript, fathom, recording, what did we discuss, call summary, call notes, meeting notes, debrief call, review call, action items from call, follow up from call, what happened on the call
 tools: fathom.listMeetings, fathom.getMeeting, fathom.ingest
+name: godmode-meetings
+version: 1.0.0
+description: "Analyzes meeting recordings, transcripts, and extracts action items"
+keywords: ["last call", "analyze call", "meeting recording", "transcript", "fathom"]
+author: godmode-team
+clawhub: true
 ---
 ## When to Use
 - User mentions "last call", "my call", "the call", "that meeting" — always check Fathom first

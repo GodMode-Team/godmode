@@ -470,6 +470,106 @@ const godmodePlugin = {
       }
     }) as Parameters<typeof api.registerGatewayMethod>[1]);
 
+    // ── Secrets list ──────────────────────────────────────────────
+    api.registerGatewayMethod("godmode.secrets.list", (async ({ respond }: { respond: Function }) => {
+      try {
+        const { resolveStateDir } = await import("./src/lib/openclaw-state.js");
+        const { readdirSync } = await import("node:fs");
+        const { join: joinPath } = await import("node:path");
+        const secretsDir = joinPath(resolveStateDir(), "secrets");
+        const keys: string[] = [];
+        if (existsSync(secretsDir)) {
+          for (const f of readdirSync(secretsDir)) {
+            if (f.endsWith(".enc")) {
+              keys.push(f.replace(/\.enc$/, ""));
+            }
+          }
+        }
+        respond(true, { keys });
+      } catch (err) {
+        respond(true, { keys: [], error: String(err) });
+      }
+    }) as Parameters<typeof api.registerGatewayMethod>[1]);
+
+    // ── Web fetch provider config ─────────────────────────────────
+    api.registerGatewayMethod("godmode.config.webfetch", (async ({ respond }: { respond: Function }) => {
+      try {
+        const { resolveConfigPath } = await import("./src/lib/openclaw-state.js");
+        const cfgPath = resolveConfigPath();
+        if (existsSync(cfgPath)) {
+          const raw = JSON.parse(readFileSync(cfgPath, "utf-8"));
+          const provider = raw?.webFetch?.provider ?? "default";
+          respond(true, { provider });
+        } else {
+          respond(true, { provider: "default" });
+        }
+      } catch {
+        respond(true, { provider: "default" });
+      }
+    }) as Parameters<typeof api.registerGatewayMethod>[1]);
+
+    api.registerGatewayMethod("godmode.config.webfetch.set", (async ({ params, respond }: { params: Record<string, unknown>; respond: Function }) => {
+      try {
+        const { resolveConfigPath } = await import("./src/lib/openclaw-state.js");
+        const cfgPath = resolveConfigPath();
+        const provider = params?.provider as string;
+        if (!provider) { respond(false, { error: "provider is required" }); return; }
+        let raw: Record<string, unknown> = {};
+        if (existsSync(cfgPath)) {
+          raw = JSON.parse(readFileSync(cfgPath, "utf-8"));
+        }
+        if (!raw.webFetch) raw.webFetch = {};
+        (raw.webFetch as Record<string, unknown>).provider = provider;
+        writeFileSync(cfgPath, JSON.stringify(raw, null, 2), "utf-8");
+        respond(true, { provider });
+      } catch (err) {
+        respond(false, { error: String(err) });
+      }
+    }) as Parameters<typeof api.registerGatewayMethod>[1]);
+
+    // ── Search provider config ────────────────────────────────────
+    api.registerGatewayMethod("godmode.config.search", (async ({ respond }: { respond: Function }) => {
+      try {
+        const { resolveConfigPath } = await import("./src/lib/openclaw-state.js");
+        const cfgPath = resolveConfigPath();
+        let defaultProvider = "tavily";
+        let exaConfigured = false;
+        let tavilyConfigured = false;
+        if (existsSync(cfgPath)) {
+          const raw = JSON.parse(readFileSync(cfgPath, "utf-8"));
+          defaultProvider = raw?.search?.defaultProvider ?? "tavily";
+          const keys = raw?.apiKeys ?? raw?.keys ?? {};
+          exaConfigured = Boolean(keys.EXA_API_KEY || process.env.EXA_API_KEY);
+          tavilyConfigured = Boolean(keys.TAVILY_API_KEY || process.env.TAVILY_API_KEY);
+        } else {
+          exaConfigured = Boolean(process.env.EXA_API_KEY);
+          tavilyConfigured = Boolean(process.env.TAVILY_API_KEY);
+        }
+        respond(true, { defaultProvider, exaConfigured, tavilyConfigured });
+      } catch {
+        respond(true, { defaultProvider: "tavily", exaConfigured: false, tavilyConfigured: false });
+      }
+    }) as Parameters<typeof api.registerGatewayMethod>[1]);
+
+    api.registerGatewayMethod("godmode.config.search.set", (async ({ params, respond }: { params: Record<string, unknown>; respond: Function }) => {
+      try {
+        const { resolveConfigPath } = await import("./src/lib/openclaw-state.js");
+        const cfgPath = resolveConfigPath();
+        const defaultProvider = params?.defaultProvider as string;
+        if (!defaultProvider) { respond(false, { error: "defaultProvider is required" }); return; }
+        let raw: Record<string, unknown> = {};
+        if (existsSync(cfgPath)) {
+          raw = JSON.parse(readFileSync(cfgPath, "utf-8"));
+        }
+        if (!raw.search) raw.search = {};
+        (raw.search as Record<string, unknown>).defaultProvider = defaultProvider;
+        writeFileSync(cfgPath, JSON.stringify(raw, null, 2), "utf-8");
+        respond(true, { defaultProvider });
+      } catch (err) {
+        respond(false, { error: String(err) });
+      }
+    }) as Parameters<typeof api.registerGatewayMethod>[1]);
+
     api.registerGatewayMethod("godmode.health", (async ({ respond }: { respond: Function }) => {
       try {
         const { getHealthReport } = await import("./src/services/self-heal.js");

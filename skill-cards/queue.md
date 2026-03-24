@@ -2,6 +2,12 @@
 domain: queue
 triggers: queue, delegate, background, agent, run this, can you do, draft, research for me, write this up, code review, research, deep dive
 tools: queue_add, queue_check, queue_action
+name: godmode-queue
+version: 1.0.0
+description: "Manages the background agent queue for delegated tasks"
+keywords: ["queue", "delegate", "background", "agent", "run this"]
+author: godmode-team
+clawhub: true
 ---
 ## When to Use
 - User wants work done in the background (research, drafting, code review, analysis)

@@ -25,6 +25,7 @@ function countsByStatus(items: QueueItem[]): Record<QueueItemStatus, number> {
   const counts: Record<QueueItemStatus, number> = {
     pending: 0,
     processing: 0,
+    "hitl-pending": 0,
     review: 0,
     "needs-review": 0,
     done: 0,
@@ -525,6 +526,58 @@ const bulkDismiss: GatewayRequestHandler = async ({ params, respond }) => {
   respond(true, { dismissed });
 };
 
+// ── HITL Checkpoint Handlers ─────────────────────────────────────
+
+const hitlRespond: GatewayRequestHandler = async ({ params, respond }) => {
+  const { checkpointId, action, modifiedInstructions } = params as {
+    checkpointId?: string;
+    action?: string;
+    modifiedInstructions?: string;
+  };
+  if (!checkpointId || !action) {
+    respond(false, null, { code: "INVALID_REQUEST", message: "Missing checkpointId or action" });
+    return;
+  }
+  if (!["continue", "modify", "abort"].includes(action)) {
+    respond(false, null, { code: "INVALID_REQUEST", message: `Invalid action: ${action}` });
+    return;
+  }
+  try {
+    const { getQueueProcessor } = await import("../services/queue-processor.js");
+    const qp = getQueueProcessor();
+    if (!qp) {
+      respond(false, null, { code: "NOT_READY", message: "Queue processor not initialized" });
+      return;
+    }
+    const result = await qp.respondToHitlCheckpoint(
+      checkpointId,
+      action as "continue" | "modify" | "abort",
+      modifiedInstructions,
+    );
+    if (result.ok) {
+      respond(true, { status: "resolved" });
+    } else {
+      respond(false, null, { code: "HITL_ERROR", message: result.error ?? "Unknown error" });
+    }
+  } catch (err) {
+    respond(false, null, { code: "HITL_ERROR", message: String(err) });
+  }
+};
+
+const hitlList: GatewayRequestHandler = async ({ respond }) => {
+  try {
+    const { getQueueProcessor } = await import("../services/queue-processor.js");
+    const qp = getQueueProcessor();
+    if (!qp) {
+      respond(true, { checkpoints: [] });
+      return;
+    }
+    respond(true, { checkpoints: qp.getActiveHitlCheckpoints() });
+  } catch {
+    respond(true, { checkpoints: [] });
+  }
+};
+
 // ── Export ────────────────────────────────────────────────────────
 
 export const queueHandlers: Record<string, GatewayRequestHandler> = {
@@ -544,4 +597,6 @@ export const queueHandlers: Record<string, GatewayRequestHandler> = {
   "queue.addLesson": addLessonManual,
   "queue.removeLesson": removeLessonRpc,
   "queue.bulkDismiss": bulkDismiss,
+  "queue.hitl.respond": hitlRespond,
+  "queue.hitl.list": hitlList,
 };

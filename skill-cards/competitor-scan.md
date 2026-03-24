@@ -2,6 +2,12 @@
 domain: competitor-scan
 triggers: competitors, competitor scan, market research, what are competitors doing, ai market, competitive landscape, market moves, product launches, competitive analysis
 tools: queue_add
+name: godmode-competitor-scan
+version: 1.0.0
+description: "Scans the competitive landscape and tracks market moves"
+keywords: ["competitors", "competitor scan", "market research", "what are competitors doing", "ai market"]
+author: godmode-team
+clawhub: true
 ---
 
 # Competitor Scan — Weekly Market Intelligence

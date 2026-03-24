@@ -35,6 +35,21 @@ describe("config view", () => {
     onApply: vi.fn(),
     onUpdate: vi.fn(),
     onSubsectionChange: vi.fn(),
+    userName: "Test",
+    userAvatar: null,
+    onUserProfileUpdate: vi.fn(),
+    onModelSwitch: vi.fn(),
+    secrets: [],
+    secretsLoading: false,
+    onSecretsRefresh: vi.fn(),
+    webFetchProvider: "default",
+    webFetchLoading: false,
+    onWebFetchChange: vi.fn(),
+    searchProvider: "tavily",
+    searchExaConfigured: false,
+    searchTavilyConfigured: false,
+    searchLoading: false,
+    onSearchProviderChange: vi.fn(),
   });
 
   it("allows save when form is unsafe", () => {

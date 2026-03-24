@@ -39,6 +39,20 @@ export type ConfigProps = {
   onUserProfileUpdate: (name: string, avatar: string) => void;
   // Model switcher
   onModelSwitch?: (primary: string, fallbacks: string[]) => void;
+  // Secrets
+  secrets: string[];
+  secretsLoading: boolean;
+  onSecretsRefresh: () => void;
+  // Web Fetch provider
+  webFetchProvider: string;
+  webFetchLoading: boolean;
+  onWebFetchChange: (provider: string) => void;
+  // Search providers
+  searchProvider: string;
+  searchExaConfigured: boolean;
+  searchTavilyConfigured: boolean;
+  searchLoading: boolean;
+  onSearchProviderChange: (provider: string) => void;
 };
 
 // SVG Icons for sidebar (Lucide-style)
@@ -290,11 +304,14 @@ const SECTIONS: Array<{ key: string; label: string }> = [
   { key: "tools", label: "Tools" },
   { key: "gateway", label: "Gateway" },
   { key: "wizard", label: "Setup Wizard" },
+  { key: "secrets", label: "Secrets" },
+  { key: "webfetch", label: "Web Fetch" },
+  { key: "search", label: "Search" },
   { key: "user", label: "User" },
 ];
 
 // Sections that always appear (not schema-dependent)
-const FIXED_SECTIONS = new Set(["user", "model"]);
+const FIXED_SECTIONS = new Set(["user", "model", "secrets", "webfetch", "search"]);
 
 type SubsectionEntry = {
   key: string;
@@ -538,6 +555,109 @@ function renderModelPicker(props: ConfigProps) {
           </div>
         `,
       )}
+    </div>
+  `;
+}
+
+// ── Secrets Section ──────────────────────────────────────────────────
+
+function renderSecrets(props: ConfigProps) {
+  return html`
+    <div class="config-secrets">
+      <div class="config-secrets__header">
+        <h3 class="config-secrets__title">Stored Secrets</h3>
+        <button class="btn btn--sm" ?disabled=${props.secretsLoading} @click=${props.onSecretsRefresh}>
+          ${props.secretsLoading ? "Loading..." : "Refresh"}
+        </button>
+      </div>
+      <p class="config-secrets__hint muted">
+        Encrypted secrets stored in the OpenClaw state directory. Manage via <code>/secrets set KEY</code> in chat.
+      </p>
+      ${props.secrets.length === 0 && !props.secretsLoading
+        ? html`<div class="config-secrets__empty muted">No secrets stored yet.</div>`
+        : html`
+          <div class="config-secrets__list">
+            ${props.secrets.map(
+              (key) => html`
+                <div class="config-secrets__item">
+                  <span class="config-secrets__icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                      <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                      <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                    </svg>
+                  </span>
+                  <span class="config-secrets__key">${key}</span>
+                  <span class="config-secrets__badge">encrypted</span>
+                </div>
+              `,
+            )}
+          </div>
+        `
+      }
+    </div>
+  `;
+}
+
+// ── Web Fetch Provider Section ──────────────────────────────────────
+
+function renderWebFetch(props: ConfigProps) {
+  return html`
+    <div class="config-webfetch">
+      <h3 class="config-webfetch__title">Web Fetch Provider</h3>
+      <p class="config-webfetch__hint muted">
+        Controls how web pages are fetched. Firecrawl renders JavaScript for dynamic sites.
+      </p>
+      <div class="config-webfetch__select">
+        <select
+          class="config-select"
+          .value=${props.webFetchProvider}
+          ?disabled=${props.webFetchLoading}
+          @change=${(e: Event) => props.onWebFetchChange((e.target as HTMLSelectElement).value)}
+        >
+          <option value="default" ?selected=${props.webFetchProvider === "default"}>Default (curl)</option>
+          <option value="firecrawl" ?selected=${props.webFetchProvider === "firecrawl"}>Firecrawl (JS rendering)</option>
+        </select>
+      </div>
+    </div>
+  `;
+}
+
+// ── Search Provider Section ─────────────────────────────────────────
+
+function renderSearchProviders(props: ConfigProps) {
+  return html`
+    <div class="config-search-providers">
+      <h3 class="config-search-providers__title">Search Providers</h3>
+      <p class="config-search-providers__hint muted">
+        Default provider for web search tools. Both Tavily and Exa require API keys.
+      </p>
+      <div class="config-search-providers__select">
+        <label class="config-search-providers__label">Default Provider</label>
+        <select
+          class="config-select"
+          .value=${props.searchProvider}
+          ?disabled=${props.searchLoading}
+          @change=${(e: Event) => props.onSearchProviderChange((e.target as HTMLSelectElement).value)}
+        >
+          <option value="tavily" ?selected=${props.searchProvider === "tavily"}>Tavily</option>
+          <option value="exa" ?selected=${props.searchProvider === "exa"}>Exa</option>
+        </select>
+      </div>
+      <div class="config-search-providers__status">
+        <div class="config-search-providers__row">
+          <span class="config-search-providers__dot ${props.searchTavilyConfigured ? "config-search-providers__dot--ok" : "config-search-providers__dot--missing"}"></span>
+          <span>Tavily API Key</span>
+          <span class="config-search-providers__state">${props.searchTavilyConfigured ? "Configured" : "Not set"}</span>
+        </div>
+        <div class="config-search-providers__row">
+          <span class="config-search-providers__dot ${props.searchExaConfigured ? "config-search-providers__dot--ok" : "config-search-providers__dot--missing"}"></span>
+          <span>Exa API Key</span>
+          <span class="config-search-providers__state">${props.searchExaConfigured ? "Configured" : "Not set"}</span>
+        </div>
+      </div>
+      <p class="config-search-providers__keyhint muted">
+        Set API keys via <code>/secrets set EXA_API_KEY</code> or <code>/secrets set TAVILY_API_KEY</code>
+      </p>
     </div>
   `;
 }
@@ -815,6 +935,12 @@ export function renderConfig(props: ConfigProps) {
                   userAvatar: props.userAvatar,
                   onUpdate: props.onUserProfileUpdate,
                 })
+              : props.activeSection === "secrets"
+              ? renderSecrets(props)
+              : props.activeSection === "webfetch"
+              ? renderWebFetch(props)
+              : props.activeSection === "search"
+              ? renderSearchProviders(props)
               : props.formMode === "form"
                 ? html`
                   ${

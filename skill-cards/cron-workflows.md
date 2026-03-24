@@ -2,6 +2,12 @@
 domain: integrations
 triggers: recurring, every day, every week, weekly, daily, automate, workflow, schedule task, set up routine, ongoing
 tools: cron_create, cron_list, queue_add
+name: godmode-cron-workflows
+version: 1.0.0
+description: "Sets up recurring automated workflows and scheduled tasks"
+keywords: ["recurring", "every day", "every week", "weekly", "daily"]
+author: godmode-team
+clawhub: true
 ---
 ## When to Use
 - The user wants a recurring business function automated

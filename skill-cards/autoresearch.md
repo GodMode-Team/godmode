@@ -2,6 +2,12 @@
 domain: autoresearch
 triggers: autoresearch, optimize, overnight, campaign, eval, benchmark, tune, evolve prompts, improve godmode
 tools: queue_add
+name: godmode-autoresearch
+version: 1.0.0
+description: "Overnight optimization system using the Karpathy eval-loop pattern"
+keywords: ["autoresearch", "optimize", "overnight", "campaign", "eval"]
+author: godmode-team
+clawhub: true
 ---
 
 # Autoresearch — Overnight Optimization System

@@ -2,6 +2,12 @@
 domain: second-brain
 triggers: vault, note, notes, obsidian, search, find, look up, brain, knowledge, what do we know, remember
 tools: secondBrain.search, secondBrain.identity, secondBrain.memoryBank, secondBrain.memoryBankEntry
+name: godmode-second-brain
+version: 1.0.0
+description: "Searches and manages the Obsidian vault knowledge base"
+keywords: ["vault", "note", "notes", "obsidian", "search"]
+author: godmode-team
+clawhub: true
 ---
 ## When to Use
 - User asks about a person, company, project, or any stored knowledge

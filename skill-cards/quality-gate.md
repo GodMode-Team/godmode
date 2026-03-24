@@ -2,6 +2,12 @@
 domain: quality-gate
 triggers: review, check, validate, qa, quality, verify, fact check, before sending, before publishing, is this good, proofread, double check
 tools: queue_add
+name: godmode-quality-gate
+version: 1.0.0
+description: "Reviews and validates work before publishing or sending"
+keywords: ["review", "check", "validate", "qa", "quality"]
+author: godmode-team
+clawhub: true
 ---
 ## When to Use
 - After any agent completes work that will be published, sent, or acted on

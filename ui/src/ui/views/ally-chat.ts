@@ -8,11 +8,22 @@ import type { ChatAttachment } from "../ui-types.js";
 
 // ── Types ──────────────────────────────────────────────────────────
 
+export type HitlCheckpointData = {
+  id: string;
+  queueItemId: string;
+  agentName: string;
+  stage: string;
+  summary: string;
+  options: Array<{ label: string; action: string }>;
+  timestamp: number;
+};
+
 export type AllyChatMessage = {
   role: "user" | "assistant";
   content: string;
   timestamp?: number;
   isNotification?: boolean;
+  hitlCheckpoint?: HitlCheckpointData;
   actions?: Array<{
     label: string;
     action: string;
@@ -61,6 +72,8 @@ export type AllyChatProps = {
   onAttachmentsChange: (attachments: ChatAttachment[]) => void;
   /** Handle notification action button clicks */
   onAction?: (action: string, target?: string, method?: string, params?: Record<string, unknown>) => void;
+  /** Handle HITL checkpoint action button clicks */
+  onHitlAction?: (checkpointId: string, action: string, modifiedInstructions?: string) => void;
 };
 
 // ── Helpers ────────────────────────────────────────────────────────
@@ -172,12 +185,69 @@ function renderActions(msg: AllyChatMessage, onAction?: AllyChatProps["onAction"
   `;
 }
 
-function renderMessage(msg: AllyChatMessage, index: number, onAction?: AllyChatProps["onAction"]) {
+function renderHitlCard(
+  checkpoint: HitlCheckpointData,
+  onHitlAction?: AllyChatProps["onHitlAction"],
+) {
+  return html`
+    <div class="hitl-card">
+      <div class="hitl-card__header">Checkpoint: ${checkpoint.agentName}</div>
+      <div class="hitl-card__summary">${checkpoint.summary}</div>
+      <div class="hitl-card__actions">
+        ${checkpoint.options.map(
+          (opt) => html`
+            <button
+              type="button"
+              class="hitl-card__btn hitl-card__btn--${opt.action}"
+              @click=${(e: Event) => {
+                if (opt.action === "modify") {
+                  // Toggle modify input visibility
+                  const card = (e.target as HTMLElement).closest(".hitl-card");
+                  const existing = card?.querySelector(".hitl-card__modify-input") as HTMLTextAreaElement | null;
+                  if (existing) {
+                    // Submit the modification
+                    const instructions = existing.value.trim();
+                    if (instructions) {
+                      onHitlAction?.(checkpoint.id, "modify", instructions);
+                    }
+                  } else {
+                    // Show textarea
+                    const actionsDiv = (e.target as HTMLElement).closest(".hitl-card__actions");
+                    if (actionsDiv) {
+                      const textarea = document.createElement("textarea");
+                      textarea.className = "hitl-card__modify-input";
+                      textarea.placeholder = "Enter modified instructions...";
+                      actionsDiv.after(textarea);
+                      textarea.focus();
+                    }
+                  }
+                } else {
+                  onHitlAction?.(checkpoint.id, opt.action);
+                }
+              }}
+            >
+              ${opt.label}
+            </button>
+          `,
+        )}
+      </div>
+    </div>
+  `;
+}
+
+function renderMessage(
+  msg: AllyChatMessage,
+  index: number,
+  onAction?: AllyChatProps["onAction"],
+  onHitlAction?: AllyChatProps["onHitlAction"],
+) {
   if (msg.isNotification) {
     return html`
       <div class="ally-msg ally-msg--notification" data-idx=${index}>
-        ${renderMessageContent(msg)}
-        ${renderActions(msg, onAction)}
+        ${msg.hitlCheckpoint
+          ? renderHitlCard(msg.hitlCheckpoint, onHitlAction)
+          : renderMessageContent(msg)}
+        ${!msg.hitlCheckpoint ? renderActions(msg, onAction) : nothing}
         ${msg.timestamp ? html`<div class="ally-msg__time">${formatTimestamp(msg.timestamp)}</div>` : nothing}
       </div>
     `;
@@ -372,7 +442,7 @@ function renderPanelContent(props: AllyChatProps): TemplateResult {
             Start a conversation with ${props.allyName}
           </div>`
         : nothing}
-      ${props.messages.map((msg, i) => renderMessage(msg, i, props.onAction))}
+      ${props.messages.map((msg, i) => renderMessage(msg, i, props.onAction, props.onHitlAction))}
       ${props.stream ? renderStream(props.stream) : nothing}
       ${(props.isWorking || props.sending) && !props.stream ? renderReadingIndicator() : nothing}
       <button

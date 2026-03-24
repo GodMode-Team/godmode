@@ -2,6 +2,12 @@
 domain: content-generation
 triggers: content, write posts, social media, tweets, blog post, newsletter, content ideas, what should I post, weekly content, twitter posts, x posts
 tools: queue_add
+name: godmode-content-generation
+version: 1.0.0
+description: "Generates social media posts, blog content, and newsletters"
+keywords: ["content", "write posts", "social media", "tweets", "blog post"]
+author: godmode-team
+clawhub: true
 ---
 
 # Content Generation — Weekly Content from Your Activity

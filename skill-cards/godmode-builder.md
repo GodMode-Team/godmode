@@ -2,6 +2,12 @@
 domain: godmode-builder
 triggers: fix godmode, godmode bug, fix this bug, something broke, fix the plugin, builder agent, codefix, repair the code, fix the codebase, godmode is broken, this is broken, can you fix, ship a fix, patch this, deploy a fix
 tools: queue_add
+name: godmode-godmode-builder
+version: 1.0.0
+description: "Autonomous agent that fixes GodMode plugin bugs in the codebase"
+keywords: ["fix godmode", "godmode bug", "fix this bug", "something broke", "fix the plugin"]
+author: godmode-team
+clawhub: true
 ---
 
 # GodMode Builder — In-Session Codefix & Deploy

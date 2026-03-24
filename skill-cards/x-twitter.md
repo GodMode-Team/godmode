@@ -2,6 +2,12 @@
 domain: x-twitter
 triggers: twitter, tweet, tweets, tweeted, x.com, timeline, trending, what's happening, social, post, thread, bookmark, bookmarks, saying, discussions, draft a post, draft a tweet
 tools: x_read, x.search, x.readTweet, x.readThread, x.userTimeline, x.bookmarks
+name: godmode-x-twitter
+version: 1.0.0
+description: "Reads timelines, searches tweets, and drafts posts for X/Twitter"
+keywords: ["twitter", "tweet", "tweets", "tweeted", "x.com"]
+author: godmode-team
+clawhub: true
 ---
 ## When to Use
 - User asks about tweets, threads, Twitter/X content

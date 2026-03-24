@@ -215,6 +215,9 @@ export type AppViewState = {
   logsLevelFilters: Record<LogLevel, boolean>;
   logsAutoFollow: boolean;
   logsTruncated: boolean;
+  // Mobile nav drawer
+  navDrawerOpen: boolean;
+  closeNavDrawer: () => void;
   // Ally side-chat state
   allyPanelOpen?: boolean;
   allyMessages?: AllyChatMessage[];

@@ -2,6 +2,12 @@
 domain: people
 triggers: who is, person, contact, team, coworker, client, relationship, met with, meeting with, attendee, attendees, who was, who's the, talked to, email, invite, admin, member, onboard, add user
 tools: secondBrain.search, secondBrain.memoryBankEntry, secondBrain.memoryBank
+name: godmode-people
+version: 1.0.0
+description: "Manages contacts, relationships, and people context from memory"
+keywords: ["who is", "person", "contact", "team", "coworker"]
+author: godmode-team
+clawhub: true
 ---
 ## When to Use
 - User mentions a person by name

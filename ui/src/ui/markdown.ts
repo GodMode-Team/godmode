@@ -146,7 +146,32 @@ const MARKDOWN_CHAR_LIMIT = 140_000;
 const MARKDOWN_PARSE_LIMIT = 140_000;
 const MARKDOWN_CACHE_LIMIT = 200;
 const MARKDOWN_CACHE_MAX_CHARS = 50_000;
+/** Render first N chars as rich markdown when input exceeds this; rest behind expand. */
+const MARKDOWN_PARTIAL_RENDER = 50_000;
 const markdownCache = new Map<string, string>();
+
+// Store full markdown text for expand-button rendering, keyed by expand ID.
+let expandIdCounter = 0;
+const pendingExpands = new Map<string, string>();
+
+/**
+ * Expand a partially-rendered message to its full markdown.
+ * Called when the user clicks "Show more". Returns the full sanitized HTML
+ * or null if the expand ID is unknown.
+ */
+export function expandFullMarkdown(expandId: string): string | null {
+  const fullText = pendingExpands.get(expandId);
+  if (!fullText) return null;
+  pendingExpands.delete(expandId);
+  // Render the full text through the normal pipeline (will hit the <PARSE_LIMIT path)
+  const linked = linkifyFilePaths(fullText);
+  const rendered = marked.parse(linked) as string;
+  return DOMPurify.sanitize(rendered, {
+    ALLOWED_TAGS: allowedTags,
+    ALLOWED_ATTR: allowedAttrs,
+    ALLOWED_URI_REGEXP: ALLOWED_URI_RE,
+  });
+}
 
 function getCachedMarkdown(key: string): string | null {
   const cached = markdownCache.get(key);
@@ -210,6 +235,24 @@ export function toSanitizedMarkdownHtml(markdown: string): string {
       return cached;
     }
   }
+  // Progressive rendering for large inputs: rich markdown for first chunk + expand button
+  if (input.length > MARKDOWN_PARTIAL_RENDER && input.length <= MARKDOWN_CHAR_LIMIT) {
+    const partial = input.slice(0, MARKDOWN_PARTIAL_RENDER);
+    const linked = linkifyFilePaths(partial);
+    const rendered = marked.parse(linked) as string;
+    const sanitized = DOMPurify.sanitize(rendered, {
+      ALLOWED_TAGS: allowedTags,
+      ALLOWED_ATTR: allowedAttrs,
+      ALLOWED_URI_REGEXP: ALLOWED_URI_RE,
+    });
+    const expandId = `expand-${++expandIdCounter}`;
+    pendingExpands.set(expandId, input);
+    const remainingK = Math.round((input.length - MARKDOWN_PARTIAL_RENDER) / 1000);
+    return sanitized +
+      `<div class="chat-expand-marker" data-expand-id="${expandId}">` +
+      `<button class="chat-expand-btn">Show ${remainingK}k more characters</button></div>`;
+  }
+
   const truncated = truncateText(input, MARKDOWN_CHAR_LIMIT);
   const suffix = truncated.truncated
     ? `\n\n… truncated (${truncated.total} chars, showing first ${truncated.text.length}).`
