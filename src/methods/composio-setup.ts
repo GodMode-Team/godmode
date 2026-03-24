@@ -23,8 +23,15 @@ const connect: GatewayRequestHandler = async ({ params, respond }) => {
     return;
   }
   const callbackUrl = typeof params.callbackUrl === "string" ? params.callbackUrl : undefined;
-  const result = await composio.initiateConnection(DEFAULT_USER, appName, callbackUrl);
-  respond(true, result);
+  try {
+    const result = await composio.initiateConnection(DEFAULT_USER, appName, callbackUrl);
+    respond(true, result);
+  } catch (err) {
+    respond(false, null, {
+      code: "COMPOSIO_CONNECT_FAILED",
+      message: `Failed to initiate Composio connection for ${appName} — check your Composio API key and network. (${String(err).slice(0, 100)})`,
+    });
+  }
 };
 
 // ── composio.status ─────────────────────────────────────────────────────
@@ -33,9 +40,16 @@ const status: GatewayRequestHandler = async ({ respond }) => {
     respond(true, { configured: false, error: "Composio not configured" });
     return;
   }
-  const connections = await composio.getConnections(DEFAULT_USER);
-  const statusInfo = await composio.getStatus(DEFAULT_USER);
-  respond(true, { configured: true, connections, ...statusInfo });
+  try {
+    const connections = await composio.getConnections(DEFAULT_USER);
+    const statusInfo = await composio.getStatus(DEFAULT_USER);
+    respond(true, { configured: true, connections, ...statusInfo });
+  } catch (err) {
+    respond(false, null, {
+      code: "COMPOSIO_STATUS_FAILED",
+      message: `Failed to fetch Composio status — the Composio API may be unreachable. (${String(err).slice(0, 100)})`,
+    });
+  }
 };
 
 // ── composio.disconnect ─────────────────────────────────────────────────

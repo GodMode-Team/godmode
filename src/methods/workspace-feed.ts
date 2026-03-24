@@ -14,14 +14,21 @@ const feedRead: GatewayRequestHandler = async ({ params, respond }) => {
     respond(false, undefined, { code: "INVALID_REQUEST", message: "workspaceId required" });
     return;
   }
-  const config = await readWorkspaceConfig();
-  const ws = findWorkspaceById(config, workspaceId);
-  if (!ws) {
-    respond(false, undefined, { code: "NOT_FOUND", message: "Workspace not found" });
-    return;
+  try {
+    const config = await readWorkspaceConfig();
+    const ws = findWorkspaceById(config, workspaceId);
+    if (!ws) {
+      respond(false, undefined, { code: "NOT_FOUND", message: "Workspace not found" });
+      return;
+    }
+    const entries = readFeed(ws.path, limit ?? 50, before);
+    respond(true, { entries, workspaceId });
+  } catch (err) {
+    respond(false, null, {
+      code: "FEED_READ_FAILED",
+      message: `Failed to read workspace feed — workspace config or feed file may be corrupted. (${String(err).slice(0, 100)})`,
+    });
   }
-  const entries = readFeed(ws.path, limit ?? 50, before);
-  respond(true, { entries, workspaceId });
 };
 
 const feedPost: GatewayRequestHandler = async ({ params, respond }) => {
@@ -32,20 +39,27 @@ const feedPost: GatewayRequestHandler = async ({ params, respond }) => {
     respond(false, undefined, { code: "INVALID_REQUEST", message: "workspaceId and text required" });
     return;
   }
-  const config = await readWorkspaceConfig();
-  const ws = findWorkspaceById(config, workspaceId);
-  if (!ws) {
-    respond(false, undefined, { code: "NOT_FOUND", message: "Workspace not found" });
-    return;
+  try {
+    const config = await readWorkspaceConfig();
+    const ws = findWorkspaceById(config, workspaceId);
+    if (!ws) {
+      respond(false, undefined, { code: "NOT_FOUND", message: "Workspace not found" });
+      return;
+    }
+    const entry = appendFeedEntry(ws.path, {
+      author: author ?? "user",
+      type: type ?? "update",
+      text,
+      ref: ref ?? null,
+      workspace: workspaceId,
+    });
+    respond(true, { entry });
+  } catch (err) {
+    respond(false, null, {
+      code: "FEED_POST_FAILED",
+      message: `Failed to post to workspace feed — check disk space and workspace directory permissions. (${String(err).slice(0, 100)})`,
+    });
   }
-  const entry = appendFeedEntry(ws.path, {
-    author: author ?? "user",
-    type: type ?? "update",
-    text,
-    ref: ref ?? null,
-    workspace: workspaceId,
-  });
-  respond(true, { entry });
 };
 
 const feedSearch: GatewayRequestHandler = async ({ params, respond }) => {
@@ -56,14 +70,21 @@ const feedSearch: GatewayRequestHandler = async ({ params, respond }) => {
     respond(false, undefined, { code: "INVALID_REQUEST", message: "workspaceId and query required" });
     return;
   }
-  const config = await readWorkspaceConfig();
-  const ws = findWorkspaceById(config, workspaceId);
-  if (!ws) {
-    respond(false, undefined, { code: "NOT_FOUND", message: "Workspace not found" });
-    return;
+  try {
+    const config = await readWorkspaceConfig();
+    const ws = findWorkspaceById(config, workspaceId);
+    if (!ws) {
+      respond(false, undefined, { code: "NOT_FOUND", message: "Workspace not found" });
+      return;
+    }
+    const entries = searchFeed(ws.path, query, limit ?? 20);
+    respond(true, { entries, workspaceId });
+  } catch (err) {
+    respond(false, null, {
+      code: "FEED_SEARCH_FAILED",
+      message: `Failed to search workspace feed — workspace config or feed file may be unreadable. (${String(err).slice(0, 100)})`,
+    });
   }
-  const entries = searchFeed(ws.path, query, limit ?? 20);
-  respond(true, { entries, workspaceId });
 };
 
 export const workspaceFeedHandlers: GatewayRequestHandlers = {
