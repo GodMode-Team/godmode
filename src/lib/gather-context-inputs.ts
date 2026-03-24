@@ -149,7 +149,10 @@ export async function gatherContextInputs(opts: GatherContextOptions): Promise<C
         if (isGraphReady()) {
           const graphInput = memoryBlock ? `${userMessage}\n${memoryBlock}` : userMessage;
           if (graphInput.length >= 5) {
-            const graphResults = queryGraph(graphInput);
+            // Use depth=2 when the message likely involves people or relationships
+            const PEOPLE_PATTERN = /\b(?:who|team|manager|report|colleague|met|knows?|introduced|work(?:s|ed|ing)?\s+with|relationship|connected|friend|partner|married|family|spouse|sibling|parent|boss|lead|hire[ds]?|referred|mention(?:s|ed)?)\b/i;
+            const graphDepth: 1 | 2 = PEOPLE_PATTERN.test(userMessage) ? 2 : 1;
+            const graphResults = queryGraph(graphInput, graphDepth);
             const rawGraph = formatGraphContext(graphResults);
             graphBlock = rawGraph ? sanitizeForPrompt(rawGraph, "identity-graph") : null;
           }
