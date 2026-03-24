@@ -16,3 +16,4 @@ experiments/
 .env.local
 .env.*.local
 !.env.example
+.qa-reports/
