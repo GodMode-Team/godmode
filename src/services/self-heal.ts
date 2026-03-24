@@ -15,7 +15,7 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { homedir } from "node:os";
 import { DATA_DIR } from "../data-paths.js";
-import { health } from "../lib/health-ledger.js";
+import { health, repairLog } from "../lib/health-ledger.js";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -258,11 +258,18 @@ export function getHealthReport(): HealthReport {
   // Include the signal ledger for operation-level visibility
   const ledger = health.snapshot();
 
+  // Compute total repair success rate from repair log
+  const recentRepairs = repairLog.recent(50);
+  const totalRepairs = recentRepairs.length;
+  const verifiedRepairs = recentRepairs.filter((r) => r.verified).length;
+  const repairSuccessRate = totalRepairs > 0 ? verifiedRepairs / totalRepairs : null;
+
   return {
     ts: Date.now(),
     overall,
     subsystems,
     lastRepairSummary: lastRepair ? `${lastRepair.id}: ${lastRepair.message}` : null,
+    repairSuccessRate,
     ledger,
   };
 }
@@ -273,6 +280,8 @@ export interface HealthReport {
   overall: HealthState;
   subsystems: SubsystemStatus[];
   lastRepairSummary: string | null;
+  /** Ratio of verified-successful repairs to total repairs (0-1), null if no repairs recorded */
+  repairSuccessRate: number | null;
   ledger?: import("../lib/health-ledger.js").LedgerSnapshot;
 }
 
@@ -312,7 +321,19 @@ async function checkAndRepairOAuth(logger: Logger): Promise<void> {
           if (refreshed) {
             // Update process.env so Honcho and other services pick it up
             process.env.ANTHROPIC_API_KEY = refreshed;
+            const repairStart = Date.now();
             markRepaired(id, "Refreshed expired OAuth token");
+            // Verify: re-read credentials to confirm the token was written
+            const verified = await verifyOAuthToken(credsPath);
+            repairLog.record({
+              ts: Date.now(),
+              subsystem: id,
+              failure: "OAuth token expired",
+              repairAction: "Refreshed OAuth token",
+              verified,
+              elapsed: Date.now() - repairStart,
+            });
+            health.signal("oauth.repair", verified, { verified });
             return;
           }
         }
@@ -327,7 +348,18 @@ async function checkAndRepairOAuth(logger: Logger): Promise<void> {
           const refreshed = await refreshOAuthToken(oauth.refreshToken, credsPath, logger);
           if (refreshed) {
             process.env.ANTHROPIC_API_KEY = refreshed;
+            const repairStart = Date.now();
             markRepaired(id, "Proactively refreshed OAuth token");
+            const verified = await verifyOAuthToken(credsPath);
+            repairLog.record({
+              ts: Date.now(),
+              subsystem: id,
+              failure: "OAuth token expiring soon",
+              repairAction: "Proactively refreshed OAuth token",
+              verified,
+              elapsed: Date.now() - repairStart,
+            });
+            health.signal("oauth.repair", verified, { verified });
             return;
           }
         }
@@ -403,6 +435,26 @@ async function refreshOAuthToken(
 }
 
 /**
+ * Verify that the OAuth token on disk is valid and not expired.
+ * Used to confirm a repair actually worked.
+ */
+async function verifyOAuthToken(credsPath: string): Promise<boolean> {
+  try {
+    const creds = JSON.parse(await readFile(credsPath, "utf-8"));
+    const oauth = creds?.claudeAiOauth;
+    if (!oauth?.accessToken) return false;
+    if (oauth.expiresAt) {
+      const expiresAt = typeof oauth.expiresAt === "number" ? oauth.expiresAt : Date.parse(oauth.expiresAt);
+      return expiresAt > Date.now();
+    }
+    // Has a token but no expiry — assume valid
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Check that required API keys are present in process.env.
  */
 function checkApiKeys(logger: Logger): void {
@@ -451,10 +503,21 @@ async function checkAndRepairMemory(logger: Logger): Promise<void> {
 
       if (provider !== "none") {
         logger.info(`[SelfHeal] Memory offline but provider "${provider}" configured — attempting re-init...`);
+        const repairStart = Date.now();
         const ok = await initMemory();
         if (ok) {
           markRepaired(id, `Re-initialized memory (provider: ${provider})`);
-          health.signal("memory.repair", true);
+          // Verify: re-check if memory is actually ready after repair
+          const verified = isMemoryReady();
+          health.signal("memory.repair", verified, { verified });
+          repairLog.record({
+            ts: Date.now(),
+            subsystem: id,
+            failure: `Memory offline (provider: ${provider})`,
+            repairAction: `Re-initialized memory (provider: ${provider})`,
+            verified,
+            elapsed: Date.now() - repairStart,
+          });
         } else {
           markDegraded(id, `Memory re-init failed (provider: ${provider})`);
         }
@@ -485,10 +548,22 @@ async function checkAndRepairIdentityGraph(logger: Logger): Promise<void> {
 
     // Try re-init
     logger.info("[SelfHeal] Identity graph not ready — attempting re-init...");
+    const repairStart = Date.now();
     initIdentityGraph();
 
     if (isGraphReady()) {
       markRepaired(id, "Re-initialized identity graph");
+      // Verify: re-check graph readiness as verification
+      const verified = isGraphReady();
+      repairLog.record({
+        ts: Date.now(),
+        subsystem: id,
+        failure: "Identity graph not ready",
+        repairAction: "Re-initialized identity graph",
+        verified,
+        elapsed: Date.now() - repairStart,
+      });
+      health.signal("identity-graph.repair", verified, { verified });
     } else {
       markOffline(id, "Identity graph init failed");
     }
@@ -521,9 +596,20 @@ async function checkIdentityCache(logger: Logger): Promise<void> {
       // File changed — invalidate the cache
       logger.info("[SelfHeal] USER.md changed — invalidating identity cache");
       try {
+        const repairStart = Date.now();
         const { invalidateIdentityCache } = await import("../lib/context-budget.js");
         invalidateIdentityCache();
         markRepaired(id, "Invalidated stale identity cache after USER.md change");
+        // Cache invalidation is fire-and-forget; verified = true if no error thrown
+        repairLog.record({
+          ts: Date.now(),
+          subsystem: id,
+          failure: "Stale identity cache (USER.md changed)",
+          repairAction: "Invalidated identity cache",
+          verified: true,
+          elapsed: Date.now() - repairStart,
+        });
+        health.signal("identity-cache.repair", true, { verified: true });
       } catch {
         markDegraded(id, "USER.md changed but cache invalidation failed");
       }
@@ -559,10 +645,22 @@ async function checkAndRepairQueueProcessor(logger: Logger): Promise<void> {
 
     // Not polling — try to restart
     logger.info("[SelfHeal] Queue processor not polling — restarting...");
+    const repairStart = Date.now();
     processor.startPolling();
 
     if (processor.isPolling?.()) {
       markRepaired(id, "Restarted queue processor polling");
+      // Verify: re-check polling is actually running
+      const verified = !!processor.isPolling?.();
+      repairLog.record({
+        ts: Date.now(),
+        subsystem: id,
+        failure: "Queue processor not polling",
+        repairAction: "Restarted queue processor polling",
+        verified,
+        elapsed: Date.now() - repairStart,
+      });
+      health.signal("queue-processor.repair", verified, { verified });
     } else {
       markDegraded(id, "Queue processor restart failed");
     }
@@ -625,11 +723,28 @@ async function checkDataDirectoryIntegrity(logger: Logger): Promise<void> {
         const bakPath = filePath + ".bak";
         if (existsSync(bakPath)) {
           try {
+            const repairStart = Date.now();
             const bakContent = await readFile(bakPath, "utf-8");
             JSON.parse(bakContent); // Validate backup is also good
             const { writeFile } = await import("node:fs/promises");
             await writeFile(filePath, bakContent, "utf-8");
             logger.info(`[SelfHeal] Recovered corrupted ${file} from backup`);
+            // Verify: re-read and parse the restored file
+            let verified = false;
+            try {
+              const restored = await readFile(filePath, "utf-8");
+              JSON.parse(restored);
+              verified = true;
+            } catch { /* verification failed */ }
+            repairLog.record({
+              ts: Date.now(),
+              subsystem: "data-dir",
+              failure: `Corrupted data file: ${file}`,
+              repairAction: `Restored ${file} from backup`,
+              verified,
+              elapsed: Date.now() - repairStart,
+            });
+            health.signal("data-dir.repair", verified, { file, verified });
           } catch {
             corruptFiles.push(file);
           }
