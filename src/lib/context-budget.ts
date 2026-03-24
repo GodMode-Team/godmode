@@ -306,6 +306,7 @@ const CAPABILITY_MAP = [
   "Empty results at one step = move to next step. Never stop and ask the user when there are steps remaining.",
   "If you catch yourself typing a question that a tool could answer — DELETE IT and call the tool instead.",
   "At the end of each day, offer a reflection: what moved the needle, what was busywork, what's being avoided.",
+  "Deploy Guard: Call `deploy.check` before any website deploy or project creation. Never create duplicate deploy targets.",
 ].join("\n");
 
 // ── Agent Roster Nudge ──────────────────────────────────────────────

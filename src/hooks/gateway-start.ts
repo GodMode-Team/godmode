@@ -248,6 +248,26 @@ export async function runGatewayStart(
     }
   } catch { /* no pending deploy — normal */ }
 
+  // Seed deploy project registry (only if empty — don't overwrite user data)
+  try {
+    const { loadRegistry, registerProject } = await import("../lib/project-registry.js");
+    const existing = await loadRegistry();
+    if (existing.length === 0) {
+      await registerProject({
+        domain: "lifeongodmode.com",
+        repo: "GodMode-Team/lifeongodmode",
+        localDir: "~/godmode/private/sites/lifeongodmode",
+        platform: "vercel",
+        projectName: "lifeongodmode",
+        branch: "main",
+        updatedAt: new Date().toISOString(),
+      });
+      logger.info("[GodMode] Seeded deploy project registry with lifeongodmode.com");
+    }
+  } catch (err) {
+    logger.warn(`[GodMode] Deploy registry seed failed (non-fatal): ${String(err)}`);
+  }
+
   // Host compatibility scan
   try {
     const { changes } = await detectHostContext(api, pluginVersion);

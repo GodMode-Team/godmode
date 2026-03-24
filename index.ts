@@ -100,6 +100,7 @@ import { createDelegateTool } from "./src/tools/delegate-tool.js";
 import { createQueueSteerTool } from "./src/tools/queue-steer.js";
 import { createComposioExecuteTool } from "./src/tools/composio-tool.js";
 import { composioSetupHandlers } from "./src/methods/composio-setup.js";
+import { deployRegistryHandlers } from "./src/methods/project-registry.js";
 import { queueHandlers } from "./src/methods/queue.js";
 // REMOVED (v2 slim): x-intel — OC has x_read tool
 import { filesHandlers } from "./src/methods/files.js";
@@ -196,6 +197,7 @@ const godmodePlugin = {
       ...resourcesHandlers,
       ...inboxHandlers,
       ...composioSetupHandlers,
+      ...deployRegistryHandlers,
     };
 
     for (const [method, handler] of Object.entries(allHandlers)) {
