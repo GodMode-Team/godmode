@@ -406,6 +406,267 @@ const paperclipDashboardUrl: GatewayRequestHandler = async ({ respond }) => {
   }
 };
 
+// ── paperclip.setup — One-click Paperclip install + agent seeding ─────
+
+type SetupStepResult = { step: string; status: "ok" | "error" | "skipped"; detail?: string };
+
+const paperclipSetup: GatewayRequestHandler = async ({ params, respond }) => {
+  const { action } = params as { action?: "check" | "install" | "connect" | "seed" };
+  const steps: SetupStepResult[] = [];
+
+  try {
+    // ── CHECK: Is Paperclip server already running somewhere? ──────
+    if (action === "check" || !action) {
+      const url = process.env.PAPERCLIP_URL || "";
+      const companyId = process.env.PAPERCLIP_COMPANY_ID || "";
+
+      // Check if npx @paperclipai/server is available
+      const { code: npxCheck } = await runShell("npx --yes @paperclipai/server --version 2>/dev/null", 15_000);
+      steps.push(npxCheck === 0
+        ? { step: "Paperclip package available", status: "ok" }
+        : { step: "Paperclip package not installed", status: "skipped" });
+
+      // Check if server is running
+      let serverUp = false;
+      const checkUrl = url || "http://localhost:3100";
+      try {
+        const resp = await fetch(`${checkUrl}/api/companies`, {
+          signal: AbortSignal.timeout(3_000),
+        });
+        serverUp = resp.ok || resp.status === 401; // 401 = running but needs auth
+      } catch { /* not running */ }
+
+      steps.push(serverUp
+        ? { step: "Paperclip server running", status: "ok", detail: checkUrl }
+        : { step: "Paperclip server not running", status: "skipped" });
+
+      // Check env vars
+      steps.push(url
+        ? { step: "PAPERCLIP_URL configured", status: "ok", detail: url }
+        : { step: "PAPERCLIP_URL not set", status: "skipped" });
+      steps.push(companyId
+        ? { step: "PAPERCLIP_COMPANY_ID configured", status: "ok", detail: companyId }
+        : { step: "PAPERCLIP_COMPANY_ID not set", status: "skipped" });
+
+      respond(true, { action: "check", serverUp, configured: !!url && !!companyId, steps });
+      return;
+    }
+
+    // ── INSTALL: Install @paperclipai/server and start it ─────────
+    if (action === "install") {
+      // Step 1: Start the server via npx (it manages its own embedded Postgres)
+      const { code, stdout, stderr } = await runShell(
+        "npx --yes @paperclipai/server start --daemon --port 3100 2>&1",
+        120_000,
+      );
+      if (code !== 0) {
+        // Fallback: try starting in background
+        const bgResult = await runShell(
+          "nohup npx --yes @paperclipai/server start --port 3100 > /tmp/paperclip.log 2>&1 &",
+          30_000,
+        );
+        // Wait briefly for server to start
+        await new Promise((r) => setTimeout(r, 3_000));
+        // Verify it's running
+        let running = false;
+        try {
+          const resp = await fetch("http://localhost:3100/api/companies", {
+            signal: AbortSignal.timeout(5_000),
+          });
+          running = resp.ok || resp.status === 401;
+        } catch { /* not running */ }
+        if (!running) {
+          steps.push({
+            step: "Start Paperclip server",
+            status: "error",
+            detail: (stderr || stdout || bgResult.stderr).slice(-300),
+          });
+          respond(true, { action: "install", success: false, steps });
+          return;
+        }
+      }
+      steps.push({ step: "Paperclip server started on port 3100", status: "ok" });
+
+      // Step 2: Write PAPERCLIP_URL to .env
+      const { writeEnvVar: writeEnv } = await import("../lib/env-writer.js");
+      writeEnv("PAPERCLIP_URL", "http://localhost:3100");
+      process.env.PAPERCLIP_URL = "http://localhost:3100";
+      steps.push({ step: "PAPERCLIP_URL saved to .env", status: "ok" });
+
+      respond(true, { action: "install", success: true, url: "http://localhost:3100", steps });
+      return;
+    }
+
+    // ── CONNECT: Connect to an existing server URL ────────────────
+    if (action === "connect") {
+      const { url } = params as { url?: string };
+      if (!url) {
+        respond(false, undefined, { code: "MISSING_PARAM", message: "url is required for connect action" });
+        return;
+      }
+
+      const cleanUrl = url.replace(/\/+$/, "");
+      // Verify connectivity
+      try {
+        const resp = await fetch(`${cleanUrl}/api/companies`, {
+          signal: AbortSignal.timeout(5_000),
+        });
+        if (!resp.ok && resp.status !== 401) {
+          steps.push({ step: "Connect to server", status: "error", detail: `Server returned ${resp.status}` });
+          respond(true, { action: "connect", success: false, steps });
+          return;
+        }
+      } catch (err) {
+        steps.push({
+          step: "Connect to server",
+          status: "error",
+          detail: `Could not reach ${cleanUrl}: ${err instanceof Error ? err.message : String(err)}`,
+        });
+        respond(true, { action: "connect", success: false, steps });
+        return;
+      }
+
+      const { writeEnvVar: writeEnv } = await import("../lib/env-writer.js");
+      writeEnv("PAPERCLIP_URL", cleanUrl);
+      process.env.PAPERCLIP_URL = cleanUrl;
+      steps.push({ step: `Connected to ${cleanUrl}`, status: "ok" });
+
+      respond(true, { action: "connect", success: true, url: cleanUrl, steps });
+      return;
+    }
+
+    // ── SEED: Create company + agents from GodMode roster ─────────
+    if (action === "seed") {
+      const paperclipUrl = (process.env.PAPERCLIP_URL || "http://localhost:3100").replace(/\/+$/, "");
+      const apiKeyVal = process.env.PAPERCLIP_API_KEY || "";
+      const hdrs: Record<string, string> = { "Content-Type": "application/json" };
+      if (apiKeyVal) hdrs.Authorization = `Bearer ${apiKeyVal}`;
+
+      const pcFetch = async <T = unknown>(path: string, opts?: { method?: string; body?: unknown }): Promise<T> => {
+        const init: RequestInit = { method: opts?.method ?? "GET", headers: hdrs };
+        if (opts?.body !== undefined) init.body = JSON.stringify(opts.body);
+        const res = await fetch(`${paperclipUrl}${path}`, init);
+        if (!res.ok) throw new Error(`${res.status}: ${await res.text().catch(() => "")}`);
+        return res.json() as Promise<T>;
+      };
+
+      // Step 1: Check if company already exists
+      let companyId = process.env.PAPERCLIP_COMPANY_ID || "";
+      if (companyId) {
+        try {
+          await pcFetch(`/api/companies/${companyId}`);
+          steps.push({ step: "Company already exists", status: "skipped", detail: companyId });
+        } catch {
+          companyId = ""; // Company doesn't exist, create new
+        }
+      }
+
+      if (!companyId) {
+        const company = await pcFetch<{ id: string; name: string }>("/api/companies", {
+          method: "POST",
+          body: { name: "GodMode Team", description: "AI agent team managed by GodMode" },
+        });
+        companyId = company.id;
+        steps.push({ step: `Company created: ${company.name}`, status: "ok", detail: companyId });
+
+        // Save company ID
+        const { writeEnvVar: writeEnv } = await import("../lib/env-writer.js");
+        writeEnv("PAPERCLIP_COMPANY_ID", companyId);
+        process.env.PAPERCLIP_COMPANY_ID = companyId;
+        steps.push({ step: "PAPERCLIP_COMPANY_ID saved", status: "ok" });
+      }
+
+      // Step 2: Load GodMode agent roster and seed into Paperclip
+      const { listRoster } = await import("../lib/agent-roster.js");
+      const personas = listRoster();
+
+      // Get existing agents to avoid duplicates
+      const existingRes = await pcFetch<Record<string, unknown>>(`/api/companies/${companyId}/agents`);
+      const existingAgents = Array.isArray(existingRes)
+        ? existingRes as Array<{ name: string }>
+        : ((existingRes as { agents?: Array<{ name: string }> }).agents ?? []);
+      const existingNames = new Set(existingAgents.map((a: { name: string }) => a.name.toLowerCase()));
+
+      let seeded = 0;
+      let skipped = 0;
+      for (const persona of personas) {
+        if (existingNames.has(persona.name.toLowerCase())) {
+          skipped++;
+          continue;
+        }
+        try {
+          await pcFetch(`/api/companies/${companyId}/agents`, {
+            method: "POST",
+            body: {
+              name: persona.name,
+              role: persona.taskTypes.join(", "),
+              adapterType: "claude_local",
+              adapterConfig: {
+                command: "claude",
+                model: "claude-sonnet-4-20250514",
+                cwd: homedir(),
+                maxTurnsPerRun: 50,
+                timeoutSec: 1800,
+                dangerouslySkipPermissions: true,
+                promptTemplate:
+                  `You are ${persona.name}. ${persona.mission || ""}\n\n` +
+                  `Your task:\n\n{{context.issueDescription}}\n\n{{context.issueTitle}}`,
+              },
+              capabilities: persona.mission || persona.taskTypes.join(", "),
+            },
+          });
+          seeded++;
+        } catch (err) {
+          steps.push({
+            step: `Seed agent: ${persona.name}`,
+            status: "error",
+            detail: err instanceof Error ? err.message : String(err),
+          });
+        }
+      }
+
+      steps.push({
+        step: `Agents seeded: ${seeded} new, ${skipped} already existed`,
+        status: "ok",
+        detail: `${seeded + skipped + existingAgents.length} total agents`,
+      });
+
+      // Step 3: Re-initialize the Paperclip client
+      try {
+        const { initPaperclip } = await import("../services/paperclip-client.js");
+        const ok = await initPaperclip(paperclipUrl, apiKeyVal, companyId);
+        steps.push(ok
+          ? { step: "Paperclip client connected", status: "ok" }
+          : { step: "Paperclip client failed to connect", status: "error" });
+      } catch (err) {
+        steps.push({
+          step: "Re-init client",
+          status: "error",
+          detail: err instanceof Error ? err.message : String(err),
+        });
+      }
+
+      respond(true, {
+        action: "seed",
+        success: true,
+        companyId,
+        agentsSeeded: seeded,
+        agentsSkipped: skipped,
+        totalAgents: seeded + skipped + existingAgents.length,
+        steps,
+      });
+      return;
+    }
+
+    respond(false, undefined, { code: "UNKNOWN_ACTION", message: `Unknown action: ${action}` });
+  } catch (err) {
+    respond(false, undefined, {
+      code: "SETUP_ERROR",
+      message: err instanceof Error ? err.message : String(err),
+    });
+  }
+};
+
 // ── Export ──────────────────────────────────────────────────────────────
 
 export const integrationsHandlers: GatewayRequestHandlers = {
@@ -416,4 +677,5 @@ export const integrationsHandlers: GatewayRequestHandlers = {
   "integrations.platformInfo": platformInfo,
   "integrations.autoInstall": autoInstall,
   "paperclip.dashboardUrl": paperclipDashboardUrl,
+  "paperclip.setup": paperclipSetup,
 };

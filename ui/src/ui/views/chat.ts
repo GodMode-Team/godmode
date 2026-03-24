@@ -135,6 +135,7 @@ export type ChatProps = {
   // Session resources strip
   sessionResources?: Array<{ id: string; title: string; type: string; path?: string; url?: string }>;
   sessionResourcesCollapsed?: boolean;
+  sessionResourcesShowAll?: boolean;
   onToggleSessionResources?: () => void;
   onSessionResourceClick?: (resource: { path?: string; url?: string }) => void;
   onViewAllResources?: () => void;
@@ -698,19 +699,20 @@ function renderSessionResourcesStrip(props: ChatProps) {
       </div>
     `;
   }
-  const shown = resources.slice(0, 5);
+  const showAll = props.sessionResourcesShowAll;
+  const shown = showAll ? resources : resources.slice(0, 5);
   return html`
     <div class="session-resources-strip">
       <div class="session-resources-header">
         <span class="session-resources-label">Resources (${resources.length})</span>
         <div style="display: flex; gap: 8px; align-items: center;">
           ${resources.length > 5
-            ? html`<button class="session-resources-view-all" @click=${props.onViewAllResources}>View all</button>`
+            ? html`<button class="session-resources-view-all" @click=${props.onViewAllResources}>${showAll ? "Show less" : "View all"}</button>`
             : nothing}
           <button class="session-resources-toggle" @click=${props.onToggleSessionResources}>▼</button>
         </div>
       </div>
-      <div class="session-resources-cards">
+      <div class="session-resources-cards"${showAll ? html` style="flex-wrap: wrap;"` : nothing}>
         ${shown.map(
           (r) => html`
             <button

@@ -6,7 +6,7 @@ import { promisify } from "node:util";
 import type { GatewayRequestHandler } from "../types/plugin-api.js";
 import { readQueueState } from "../lib/queue-state.js";
 import { isAllowedPath } from "../lib/vault-paths.js";
-import { readWorkspaceConfig } from "../lib/workspaces-config.js";
+import { expandPath, readWorkspaceConfig } from "../lib/workspaces-config.js";
 import { GODMODE_ROOT } from "../data-paths.js";
 
 const execFile = promisify(execFileCb);
@@ -355,7 +355,7 @@ const readFile: GatewayRequestHandler = async ({ params, respond }) => {
 
   // SECURITY: Validate path is within GodMode-owned dirs, vault, or workspaces.
   // Resolves symlinks before checking to prevent traversal via symlink.
-  const resolvedPath = path.resolve(filePath);
+  const resolvedPath = path.resolve(expandPath(filePath));
   const realPath = await fs.realpath(resolvedPath).catch(() => resolvedPath);
   if (!isAllowedPath(realPath)) {
     respond(false, null, { code: "ACCESS_DENIED", message: "Path not allowed" });

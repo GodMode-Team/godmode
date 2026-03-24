@@ -156,6 +156,20 @@ export async function queryPeer(question: string, sessionKey: string): Promise<s
   }
 }
 
+// ── Ingestion Forward ─────────────────────────────────────────────────
+
+/**
+ * Forward an arbitrary message to Honcho for processing by the Deriver.
+ * Used by ingestion pipelines and MCP capture to feed data into the reasoning engine.
+ * Thin wrapper over forwardMessage with role fixed to "user".
+ */
+export async function forwardToHoncho(
+  content: string,
+  sessionKey: string,
+): Promise<void> {
+  return forwardMessage("user", content, sessionKey);
+}
+
 // ── Status ───────────────────────────────────────────────────────────
 
 export function isHonchoReady(): boolean {
