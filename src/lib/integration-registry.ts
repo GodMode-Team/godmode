@@ -444,6 +444,86 @@ const honchoMemory: IntegrationProvider = {
 
 // ── Deep Integrations (optional) ───────────────────────────────────────
 
+const paperclipTeam: IntegrationProvider = {
+  id: "paperclip",
+  name: "Paperclip (Agent Team)",
+  description: "Multi-agent orchestration — delegate complex tasks to a team of AI specialists",
+  tier: "deep",
+  platforms: ["darwin", "linux", "win32"],
+  envVars: [
+    {
+      key: "PAPERCLIP_URL",
+      label: "Paperclip Server URL",
+      description: "URL of your Paperclip server (e.g. http://localhost:3100)",
+      secret: false,
+      target: "env",
+    },
+    {
+      key: "PAPERCLIP_COMPANY_ID",
+      label: "Company ID",
+      description: "Your Paperclip company/org ID (auto-generated during setup)",
+      secret: false,
+      target: "env",
+    },
+    {
+      key: "PAPERCLIP_API_KEY",
+      label: "API Key (optional)",
+      description: "API key for Paperclip auth — not needed for local setups",
+      secret: true,
+      target: "env",
+    },
+  ],
+  cliDeps: [],
+  detect: async () => {
+    const url = getEnvVar("PAPERCLIP_URL");
+    const companyId = getEnvVar("PAPERCLIP_COMPANY_ID");
+    let working = false;
+
+    if (url && companyId) {
+      try {
+        const resp = await fetch(`${url.replace(/\/+$/, "")}/api/companies/${companyId}/agents`, {
+          signal: AbortSignal.timeout(3_000),
+        });
+        working = resp.ok;
+      } catch { /* not reachable */ }
+    }
+
+    return {
+      configured: !!url && !!companyId,
+      cliInstalled: true,
+      authenticated: true,
+      working,
+      details: !url
+        ? "Not configured — go to Team tab for one-click setup"
+        : working
+          ? "Connected to Paperclip server"
+          : "Server not reachable",
+    };
+  },
+  test: async () => {
+    const url = getEnvVar("PAPERCLIP_URL");
+    const companyId = getEnvVar("PAPERCLIP_COMPANY_ID");
+    if (!url) return { success: false, message: "PAPERCLIP_URL not set — use the Team tab to set up" };
+    if (!companyId) return { success: false, message: "PAPERCLIP_COMPANY_ID not set" };
+    try {
+      const resp = await fetch(`${url.replace(/\/+$/, "")}/api/companies/${companyId}/agents`, {
+        signal: AbortSignal.timeout(5_000),
+      });
+      if (!resp.ok) return { success: false, message: `Server returned ${resp.status}` };
+      const data = await resp.json() as Record<string, unknown>;
+      const agents = Array.isArray(data) ? data : (data as { agents?: unknown[] }).agents ?? [];
+      return { success: true, message: `Connected — ${agents.length} agents registered` };
+    } catch (err) {
+      return { success: false, message: `Connection failed: ${err instanceof Error ? err.message : String(err)}` };
+    }
+  },
+  setupSteps: {
+    darwin: "1. Go to the **Team** tab\n2. Click **Set Up Agent Team**\n3. GodMode will install and configure Paperclip automatically\n4. Your agent roster is seeded from your persona files",
+    linux: "1. Go to the **Team** tab\n2. Click **Set Up Agent Team**\n3. GodMode will install and configure Paperclip automatically\n4. Your agent roster is seeded from your persona files",
+    win32: "1. Go to the **Team** tab\n2. Click **Set Up Agent Team**\n3. GodMode will install and configure Paperclip automatically\n4. Your agent roster is seeded from your persona files",
+  },
+};
+
 const ouraRing: IntegrationProvider = {
   id: "oura-ring",
   name: "Oura Ring",
@@ -671,7 +751,8 @@ export const INTEGRATIONS: IntegrationProvider[] = [
   githubCli,
   messagingChannel,
   honchoMemory,
-  // Deep (5)
+  // Deep (6)
+  paperclipTeam,
   ouraRing,
   weather,
   obsidianSync,

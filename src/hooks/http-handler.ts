@@ -190,6 +190,46 @@ export function createGodmodeHttpHandler(deps: HttpHandlerDeps) {
       return true;
     }
 
+    // ── Ingestion endpoints ──────────────────────────────────────────
+    if (pathname === "/godmode/ingestion/status" && req.method === "GET") {
+      try {
+        const { getIngestionStatus } = await import("../services/ingestion/runner.js");
+        const pipelines = getIngestionStatus();
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ pipelines }));
+      } catch (err) {
+        res.writeHead(500, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: String(err) }));
+      }
+      return true;
+    }
+
+    if (pathname.startsWith("/godmode/ingestion/run") && req.method === "POST") {
+      const chunks: Buffer[] = [];
+      req.on("data", (c: Buffer) => chunks.push(c));
+      req.on("end", async () => {
+        const body = Buffer.concat(chunks).toString("utf8");
+        if (!verifyWebhookSignature(body, req)) {
+          audit("webhook.rejected", { endpoint: "ingestion", ip: req.socket.remoteAddress });
+          res.writeHead(401, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ error: "Invalid or missing webhook signature" }));
+          return;
+        }
+        try {
+          const { runAllIngestion } = await import("../services/ingestion/runner.js");
+          const pipeline = pathname.split("/").pop();
+          const only = pipeline && pipeline !== "run" ? pipeline : undefined;
+          const results = await runAllIngestion(only);
+          res.writeHead(200, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ results }));
+        } catch (err) {
+          res.writeHead(500, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ error: String(err) }));
+        }
+      });
+      return true;
+    }
+
     // Artifact file server — serves from ~/godmode/artifacts/ (primary)
     // and ~/godmode/memory/inbox/ (fallback for queue agent output).
     if (pathname.startsWith("/godmode/artifacts/")) {

@@ -103,7 +103,51 @@ export type SecondBrainSourcesData = {
   totalCount: number;
 };
 
-export type SecondBrainSubtab = "identity" | "knowledge" | "context";
+export type SecondBrainSubtab = "identity" | "knowledge" | "context" | "people" | "timeline";
+
+// ── People Types ──────────────────────────────────────────────────────
+
+export type PersonEntry = {
+  name: string;
+  file: string;
+  path: string;
+  email: string | null;
+  firstSeen: string | null;
+  lastModified: string;
+  snippet: string;
+};
+
+export type PersonDetail = {
+  name: string;
+  content: string;
+  honchoSays: string | null;
+  file: string;
+};
+
+export type TimelineEntry = {
+  date: string;
+  file: string;
+  preview: string;
+  entryCount: number;
+};
+
+export type IngestionPipeline = {
+  name: string;
+  type: "engine" | "webhook" | "ally";
+  configured: boolean;
+  hint: string;
+};
+
+export type BrainOverview = {
+  health: {
+    peopleCount: number;
+    dailyNoteCount: number;
+    companyCount: number;
+    honchoStatus: string;
+    today: string;
+  };
+  ingestion: IngestionPipeline[];
+};
 
 export type BrainTreeNode = {
   name: string;
@@ -201,6 +245,15 @@ export type SecondBrainProps = {
   onRefresh: () => void;
   onSaveViaChat: () => void;
   onAddSource: () => void;
+  // People
+  peopleList?: PersonEntry[] | null;
+  selectedPerson?: PersonDetail | null;
+  onSelectPerson?: (file: string) => void;
+  onBackFromPerson?: () => void;
+  // Timeline
+  timelineEntries?: TimelineEntry[] | null;
+  // Overview / Ingestion
+  brainOverview?: BrainOverview | null;
 };
 
 // ── Render Helpers ───────────────────────────────────────────────────
@@ -778,6 +831,148 @@ function renderEmpty(title: string, hint: string) {
   `;
 }
 
+// ── People Panel ─────────────────────────────────────────────────────
+
+function renderPeoplePanel(props: SecondBrainProps) {
+  // Detail view
+  if (props.selectedPerson) {
+    const p = props.selectedPerson;
+    return html`
+      <div class="second-brain-panel">
+        <button class="sb-back-btn" @click=${() => props.onBackFromPerson?.()}>
+          \u2190 Back to People
+        </button>
+        <h2 style="margin: 8px 0 4px;">${p.name}</h2>
+        ${p.honchoSays
+          ? html`
+              <div class="sb-honcho-card" style="background: var(--surface-2, #1a1a2e); border-radius: 8px; padding: 12px; margin: 8px 0; border-left: 3px solid var(--accent, #6366f1);">
+                <div style="font-size: 11px; color: var(--text-muted); margin-bottom: 4px;">What your ally remembers</div>
+                <div style="font-size: 13px; line-height: 1.5;">${p.honchoSays}</div>
+              </div>
+            `
+          : nothing}
+        ${renderMd(p.content)}
+      </div>
+    `;
+  }
+
+  // List view
+  const people = props.peopleList ?? [];
+  if (people.length === 0) {
+    return html`
+      <div class="second-brain-panel">
+        <div class="second-brain-empty-block">
+          <div class="second-brain-empty-icon">\u{1F465}</div>
+          <div class="second-brain-empty-title">No people files yet</div>
+          <div class="second-brain-empty-hint">
+            People files are auto-created from calendar meetings, email contacts, and calls.
+            You can also capture a person via the capture_thought MCP tool.
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  return html`
+    <div class="second-brain-panel">
+      <div class="second-brain-entry-list">
+        ${people.map(
+          (p) => html`
+            <div class="second-brain-entry" @click=${() => props.onSelectPerson?.(p.file)}>
+              <div class="second-brain-entry-icon">\u{1F464}</div>
+              <div class="second-brain-entry-body">
+                <div class="second-brain-entry-name">${p.name}</div>
+                <div class="second-brain-entry-excerpt">
+                  ${p.email ? `${p.email} \u00B7 ` : ""}${p.firstSeen ? `Since ${p.firstSeen}` : ""}
+                </div>
+              </div>
+              <div class="second-brain-entry-meta">${fmtUpdated(p.lastModified)}</div>
+            </div>
+          `,
+        )}
+      </div>
+    </div>
+  `;
+}
+
+// ── Timeline Panel ───────────────────────────────────────────────────
+
+function renderTimelinePanel(props: SecondBrainProps) {
+  const entries = props.timelineEntries ?? [];
+  const overview = props.brainOverview;
+
+  return html`
+    <div class="second-brain-panel">
+      ${overview
+        ? html`
+            <div class="sb-overview-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 8px; margin-bottom: 16px;">
+              <div class="sb-stat-card" style="background: var(--surface-2, #1a1a2e); border-radius: 8px; padding: 12px; text-align: center;">
+                <div style="font-size: 24px; font-weight: 600;">${overview.health.peopleCount}</div>
+                <div style="font-size: 11px; color: var(--text-muted);">People</div>
+              </div>
+              <div class="sb-stat-card" style="background: var(--surface-2, #1a1a2e); border-radius: 8px; padding: 12px; text-align: center;">
+                <div style="font-size: 24px; font-weight: 600;">${overview.health.dailyNoteCount}</div>
+                <div style="font-size: 11px; color: var(--text-muted);">Days Logged</div>
+              </div>
+              <div class="sb-stat-card" style="background: var(--surface-2, #1a1a2e); border-radius: 8px; padding: 12px; text-align: center;">
+                <div style="font-size: 24px; font-weight: 600;">${overview.health.companyCount}</div>
+                <div style="font-size: 11px; color: var(--text-muted);">Companies</div>
+              </div>
+              <div class="sb-stat-card" style="background: var(--surface-2, #1a1a2e); border-radius: 8px; padding: 12px; text-align: center;">
+                <div style="font-size: 12px; font-weight: 600;">${overview.health.honchoStatus === "ready" ? "\u2705" : "\u26A0\uFE0F"} ${overview.health.honchoStatus}</div>
+                <div style="font-size: 11px; color: var(--text-muted);">Honcho</div>
+              </div>
+            </div>
+
+            ${overview.ingestion.length > 0
+              ? html`
+                  <div style="margin-bottom: 16px;">
+                    <div style="font-size: 12px; font-weight: 600; margin-bottom: 6px; color: var(--text-muted);">INGESTION PIPELINES</div>
+                    ${overview.ingestion.map(
+                      (p) => html`
+                        <div style="display: flex; align-items: center; gap: 8px; padding: 4px 0; font-size: 13px;">
+                          <span>${p.type === "engine" ? (p.configured ? "\u2705" : "\u274C") : p.type === "webhook" ? (p.configured ? "\u2705" : "\u{1F517}") : "\u{1F916}"}</span>
+                          <span>${p.name}</span>
+                          <span style="font-size: 11px; color: var(--text-muted);">${p.hint}</span>
+                        </div>
+                      `,
+                    )}
+                  </div>
+                `
+              : nothing}
+          `
+        : nothing}
+
+      ${entries.length === 0
+        ? html`
+            <div class="second-brain-empty-block">
+              <div class="second-brain-empty-icon">\u{1F4C5}</div>
+              <div class="second-brain-empty-title">No daily notes yet</div>
+              <div class="second-brain-empty-hint">
+                Daily notes are created automatically by ingestion pipelines and the capture_thought tool.
+              </div>
+            </div>
+          `
+        : html`
+            <div style="font-size: 12px; font-weight: 600; margin-bottom: 6px; color: var(--text-muted);">RECENT DAILY NOTES</div>
+            <div class="second-brain-entry-list">
+              ${entries.map(
+                (e) => html`
+                  <div class="second-brain-entry" @click=${() => props.onSelectEntry(e.file)}>
+                    <div class="second-brain-entry-icon">\u{1F4C5}</div>
+                    <div class="second-brain-entry-body">
+                      <div class="second-brain-entry-name">${e.date}</div>
+                      <div class="second-brain-entry-excerpt">${e.entryCount} entries</div>
+                    </div>
+                  </div>
+                `,
+              )}
+            </div>
+          `}
+    </div>
+  `;
+}
+
 // ── Main render ──────────────────────────────────────────────────────
 
 export function renderSecondBrain(props: SecondBrainProps) {
@@ -793,10 +988,22 @@ export function renderSecondBrain(props: SecondBrainProps) {
           \u{1F464} Identity
         </button>
         <button
+          class="second-brain-tab ${subtab === "people" ? "active" : ""}"
+          @click=${() => props.onSubtabChange("people")}
+        >
+          \u{1F465} People
+        </button>
+        <button
           class="second-brain-tab ${subtab === "knowledge" ? "active" : ""}"
           @click=${() => props.onSubtabChange("knowledge")}
         >
           \u{1F4DA} Knowledge
+        </button>
+        <button
+          class="second-brain-tab ${subtab === "timeline" ? "active" : ""}"
+          @click=${() => props.onSubtabChange("timeline")}
+        >
+          \u{1F4C5} Timeline
         </button>
         <button
           class="second-brain-tab ${subtab === "context" ? "active" : ""}"
@@ -810,9 +1017,13 @@ export function renderSecondBrain(props: SecondBrainProps) {
         ? html`<div class="second-brain-loading"><div class="second-brain-loading-spinner"></div>Loading...</div>`
         : subtab === "identity"
           ? renderIdentityPanel(props)
-          : subtab === "knowledge"
-            ? renderKnowledgePanel(props)
-            : renderContextPanel(props)}
+          : subtab === "people"
+            ? renderPeoplePanel(props)
+            : subtab === "knowledge"
+              ? renderKnowledgePanel(props)
+              : subtab === "timeline"
+                ? renderTimelinePanel(props)
+                : renderContextPanel(props)}
     </section>
   `;
 }
@@ -847,6 +1058,12 @@ export class GmSecondBrain extends LitElement {
   @state() secondBrainFileTreeLoading = false;
   @state() secondBrainFileSearchQuery = "";
   @state() secondBrainFileSearchResults: BrainSearchResult[] | null = null;
+
+  // People + Timeline + Overview state
+  @state() secondBrainPeopleList: PersonEntry[] | null = null;
+  @state() secondBrainSelectedPerson: PersonDetail | null = null;
+  @state() secondBrainTimelineEntries: TimelineEntry[] | null = null;
+  @state() secondBrainOverview: BrainOverview | null = null;
 
   // -- Event-bus subscription cleanup ---------------------------------------
 
@@ -931,6 +1148,14 @@ export class GmSecondBrain extends LitElement {
       onRefresh: () => this._refresh(),
       onSaveViaChat: () => this._onSaveViaChat(),
       onAddSource: () => this._onAddSource(),
+      // People
+      peopleList: this.secondBrainPeopleList,
+      selectedPerson: this.secondBrainSelectedPerson,
+      onSelectPerson: (file) => this._onSelectPerson(file),
+      onBackFromPerson: () => { this.secondBrainSelectedPerson = null; },
+      // Timeline + Overview
+      timelineEntries: this.secondBrainTimelineEntries,
+      brainOverview: this.secondBrainOverview,
     });
   }
 
@@ -952,12 +1177,25 @@ export class GmSecondBrain extends LitElement {
     this.secondBrainBrowsingFolder = null;
     this.secondBrainFolderEntries = null;
     this.secondBrainFolderName = null;
-    this._refresh().catch((err) => {
-      console.error("[SecondBrain] Refresh after subtab change failed:", err);
-      this.secondBrainError =
-        err instanceof Error ? err.message : "Failed to load data";
-      this.secondBrainLoading = false;
-    });
+    this.secondBrainSelectedPerson = null;
+
+    // Load data for the new subtab
+    if (subtab === "people") {
+      this._loadPeople().catch((err) => {
+        console.error("[SecondBrain] People load failed:", err);
+      });
+    } else if (subtab === "timeline") {
+      this._loadTimeline().catch((err) => {
+        console.error("[SecondBrain] Timeline load failed:", err);
+      });
+    } else {
+      this._refresh().catch((err) => {
+        console.error("[SecondBrain] Refresh after subtab change failed:", err);
+        this.secondBrainError =
+          err instanceof Error ? err.message : "Failed to load data";
+        this.secondBrainLoading = false;
+      });
+    }
   }
 
   private async _onSelectEntry(path: string): Promise<void> {
@@ -1052,6 +1290,43 @@ export class GmSecondBrain extends LitElement {
   private async _onSync(): Promise<void> {
     await syncSecondBrain(this as unknown as SecondBrainState);
     this.requestUpdate();
+  }
+
+  private async _onSelectPerson(file: string): Promise<void> {
+    if (!this.ctx.gateway || !this.ctx.connected) return;
+    try {
+      const result = await this.ctx.gateway.request<PersonDetail>("brain.person", { file });
+      if (result) {
+        this.secondBrainSelectedPerson = result;
+      }
+    } catch (err) {
+      console.error("[SecondBrain] Failed to load person:", err);
+      this.ctx.addToast("Failed to load person details", "error");
+    }
+  }
+
+  private async _loadPeople(): Promise<void> {
+    if (!this.ctx.gateway || !this.ctx.connected) return;
+    try {
+      const result = await this.ctx.gateway.request<{ people: PersonEntry[] }>("brain.people", {});
+      this.secondBrainPeopleList = result?.people ?? [];
+    } catch (err) {
+      console.error("[SecondBrain] Failed to load people:", err);
+    }
+  }
+
+  private async _loadTimeline(): Promise<void> {
+    if (!this.ctx.gateway || !this.ctx.connected) return;
+    try {
+      const [timelineResult, overviewResult] = await Promise.all([
+        this.ctx.gateway.request<{ entries: TimelineEntry[] }>("brain.timeline", { days: 14 }),
+        this.ctx.gateway.request<BrainOverview>("brain.overview", {}),
+      ]);
+      this.secondBrainTimelineEntries = timelineResult?.entries ?? [];
+      this.secondBrainOverview = overviewResult ?? null;
+    } catch (err) {
+      console.error("[SecondBrain] Failed to load timeline:", err);
+    }
   }
 
   private _onSaveViaChat(): void {

@@ -65,6 +65,8 @@ export async function registerGodMode(
     () => import("../methods/auth.js"),
     () => import("../methods/session-privacy.js"),
     () => import("../services/inbox.js"),
+    () => import("../methods/ingestion.js"),
+    () => import("../methods/brain-dashboard.js"),
   ];
 
   for (const load of methodModules) {
@@ -416,6 +418,8 @@ export async function registerGodMode(
     () => import("../tools/delegate-tool.js").then((m) => m.createDelegateTool),
     () => import("../tools/composio-tool.js").then((m) => m.createComposioExecuteTool),
     () => import("../tools/memory-search-shim.js").then((m) => m.createMemorySearchShimTool),
+    () => import("../tools/memory-get-mcp.js").then((m) => m.createMemoryGetMcpTool),
+    () => import("../tools/capture-thought.js").then((m) => m.createCaptureThoughtTool),
   ];
 
   let toolCount = 0;
