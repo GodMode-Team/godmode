@@ -104,6 +104,25 @@ const test: GatewayRequestHandler = async ({ params, respond }) => {
  * Routes to the correct target file (.env, godmode-options.json, or openclaw.json).
  */
 const configure: GatewayRequestHandler = async ({ params, respond }) => {
+  // Runtime type validation before cast
+  if (params.integrationId !== undefined && typeof params.integrationId !== "string") {
+    respond(false, undefined, { code: "INVALID_REQUEST", message: "integrationId must be a string" });
+    return;
+  }
+  if (params.values !== undefined && (typeof params.values !== "object" || params.values === null || Array.isArray(params.values))) {
+    respond(false, undefined, { code: "INVALID_REQUEST", message: "values must be a plain object" });
+    return;
+  }
+  if (params.values !== undefined && typeof params.values === "object" && params.values !== null) {
+    const vals = params.values as Record<string, unknown>;
+    for (const [k, v] of Object.entries(vals)) {
+      if (typeof k !== "string" || typeof v !== "string") {
+        respond(false, undefined, { code: "INVALID_REQUEST", message: "values must be an object with string keys and string values" });
+        return;
+      }
+    }
+  }
+
   const { integrationId, values } = params as {
     integrationId: string;
     values: Record<string, string>;

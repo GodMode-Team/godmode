@@ -31,6 +31,39 @@ const list: GatewayRequestHandler = async ({ params, respond }) => {
 
 /** Add or update a connection for a workspace. */
 const upsert: GatewayRequestHandler = async ({ params, respond }) => {
+  // Runtime type validation before cast
+  if (params.workspaceId !== undefined && typeof params.workspaceId !== "string") {
+    respond(false, undefined, { code: "INVALID_REQUEST", message: "workspaceId must be a string" });
+    return;
+  }
+  if (params.secret !== undefined && typeof params.secret !== "string") {
+    respond(false, undefined, { code: "INVALID_REQUEST", message: "secret must be a string" });
+    return;
+  }
+  if (params.connection !== undefined && (typeof params.connection !== "object" || params.connection === null || Array.isArray(params.connection))) {
+    respond(false, undefined, { code: "INVALID_REQUEST", message: "connection must be an object" });
+    return;
+  }
+  if (params.connection !== undefined && typeof params.connection === "object" && params.connection !== null) {
+    const conn = params.connection as Record<string, unknown>;
+    if (conn.id !== undefined && typeof conn.id !== "string") {
+      respond(false, undefined, { code: "INVALID_REQUEST", message: "connection.id must be a string" });
+      return;
+    }
+    if (conn.type !== undefined && typeof conn.type !== "string") {
+      respond(false, undefined, { code: "INVALID_REQUEST", message: "connection.type must be a string" });
+      return;
+    }
+    if (conn.name !== undefined && typeof conn.name !== "string") {
+      respond(false, undefined, { code: "INVALID_REQUEST", message: "connection.name must be a string" });
+      return;
+    }
+    if (conn.config !== undefined && (typeof conn.config !== "object" || conn.config === null || Array.isArray(conn.config))) {
+      respond(false, undefined, { code: "INVALID_REQUEST", message: "connection.config must be an object" });
+      return;
+    }
+  }
+
   const { workspaceId, connection, secret } = params as {
     workspaceId?: string;
     connection?: { id: string; type: string; name: string; config: Record<string, string> };
