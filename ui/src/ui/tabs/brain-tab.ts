@@ -379,10 +379,10 @@ export class GmBrain extends LitElement {
           <h1 class="brain-page-title">Your Brain</h1>
           <button
             class="brain-engine-toggle ${this.engineExpanded ? "brain-engine-toggle--active" : ""}"
-            @click=${() => { this.engineExpanded = !this.engineExpanded; }}
+            @click=${() => { this.engineExpanded = !this.engineExpanded; if (this.engineExpanded) requestAnimationFrame(() => this.renderRoot.querySelector(".brain-engine")?.scrollIntoView({ behavior: "smooth", block: "start" })); }}
             title="Toggle Engine panel"
             aria-label="Toggle Engine panel"
-          >\u{2699}\u{FE0F} Engine</button>
+          >\u{2699}\u{FE0F} Engine ${this.pulse?.systems ? html`<span class="brain-engine-badge">${this.pulse.systems.filter(s => s.status === "ready").length}/${this.pulse.systems.length}</span>` : nothing}</button>
         </div>
 
         ${this._renderIdentityCard()}
@@ -740,7 +740,7 @@ export class GmBrain extends LitElement {
               <span class="brain-table-cell">
                 ${p.configured
                   ? html`<button class="brain-action-btn brain-action-btn--xs" aria-label="Run ${p.name} pipeline now" @click=${() => this._runPipeline(p.name)}>Run now</button>`
-                  : html`<span class="brain-muted">${p.envVar}</span>`}
+                  : html`<button class="brain-action-btn brain-action-btn--xs" @click=${() => this._chatNavigate(`Help me configure the ${p.name} ingestion pipeline. I need to set up ${p.envVar}.`)}>Set up</button>`}
               </span>
             </div>
           `)}
@@ -750,13 +750,17 @@ export class GmBrain extends LitElement {
   }
 
   private _renderMcpRow() {
+    const enabled = this.mcpStatusData?.enabled;
     return html`
       <div class="brain-engine-section">
         <h3 class="brain-subsection-title">MCP Server</h3>
         <div class="brain-mcp-row">
-          <span class="brain-dot ${this.mcpStatusData?.enabled ? "brain-dot--ready" : "brain-dot--offline"}"></span>
-          <span>${this.mcpStatusData?.enabled ? "Active" : "Inactive"}</span>
+          <span class="brain-dot ${enabled ? "brain-dot--ready" : "brain-dot--offline"}"></span>
+          <span>${enabled ? "Active" : "Inactive"}</span>
           <span class="brain-muted">${this.mcpStatusData?.transport ?? "stdio"} transport</span>
+          ${!enabled ? html`
+            <button class="brain-action-btn brain-action-btn--xs" @click=${() => this._chatNavigate("Help me set up the GodMode MCP server so I can use it with Claude Code or other MCP clients.")}>Set up</button>
+          ` : nothing}
         </div>
       </div>
     `;
@@ -774,6 +778,8 @@ export class GmBrain extends LitElement {
             <button class="brain-action-btn brain-action-btn--xs" aria-label="${sp.enabled ? "Pause ambient memory" : "Enable ambient memory"}" @click=${() => this._toggleScreenpipe(!sp.enabled)}>
               ${sp.enabled ? "Pause" : "Enable"}
             </button>
+          ` : !sp?.available && sp !== null ? html`
+            <button class="brain-action-btn brain-action-btn--xs" @click=${() => this._chatNavigate("Help me set up Screenpipe for ambient memory capture. Walk me through installation and configuration step by step.")}>Set up</button>
           ` : nothing}
         </div>
       </div>

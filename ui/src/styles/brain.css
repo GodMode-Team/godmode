@@ -50,6 +50,20 @@
   background: color-mix(in srgb, var(--accent) 8%, transparent);
 }
 
+.brain-engine-badge {
+  font-size: 0.65rem;
+  font-weight: 600;
+  background: var(--muted);
+  color: var(--bg);
+  padding: 0.1rem 0.35rem;
+  border-radius: 999px;
+  margin-left: 0.15rem;
+}
+
+.brain-engine-toggle--active .brain-engine-badge {
+  background: var(--accent);
+}
+
 /* ── Loading / Skeleton ───────────────────────────────────────── */
 
 .brain-loading {
