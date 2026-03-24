@@ -101,6 +101,9 @@ import { createQueueSteerTool } from "./src/tools/queue-steer.js";
 import { createComposioExecuteTool } from "./src/tools/composio-tool.js";
 import { composioSetupHandlers } from "./src/methods/composio-setup.js";
 import { deployRegistryHandlers } from "./src/methods/project-registry.js";
+import { workspaceConnectionHandlers } from "./src/methods/workspace-connections.js";
+import { workspaceFeedHandlers } from "./src/methods/workspace-feed.js";
+import { createWorkspaceQueryTool } from "./src/tools/workspace-query.js";
 import { queueHandlers } from "./src/methods/queue.js";
 // REMOVED (v2 slim): x-intel — OC has x_read tool
 import { filesHandlers } from "./src/methods/files.js";
@@ -198,6 +201,8 @@ const godmodePlugin = {
       ...inboxHandlers,
       ...composioSetupHandlers,
       ...deployRegistryHandlers,
+      ...workspaceConnectionHandlers,
+      ...workspaceFeedHandlers,
     };
 
     for (const [method, handler] of Object.entries(allHandlers)) {
@@ -610,6 +615,7 @@ const godmodePlugin = {
     api.registerTool(() => createQueueSteerTool());
     api.registerTool((ctx: { sessionKey?: string }) => createDelegateTool(ctx));
     api.registerTool(() => createComposioExecuteTool());
+    api.registerTool(() => createWorkspaceQueryTool());
 
     // ── 7. CLI commands ───────────────────────────────────────────
     api.registerCli(

@@ -98,6 +98,20 @@ export function createTeamMessageTool(ctx: {
 
       await appendFeedMessage(feedPath, message);
 
+      // Also cross-post to workspace activity feed (feed.jsonl)
+      try {
+        const { appendFeedEntry } = await import("../services/workspace-feed.js");
+        appendFeedEntry(workspace.path, {
+          author: from,
+          type: msgTypeRaw,
+          text: msgBody,
+          ref: null,
+          workspace: workspaceId,
+        });
+      } catch {
+        // Non-fatal — workspace feed is supplementary
+      }
+
       try {
         const syncService = getWorkspaceSyncService();
         await syncService.pushNow(workspace.id);

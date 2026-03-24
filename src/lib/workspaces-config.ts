@@ -32,6 +32,16 @@ export type WorkspaceCurationConfig = {
   threshold?: number;
 };
 
+export type WorkspaceConnection = {
+  id: string;
+  type: string;
+  name: string;
+  status: "connected" | "error" | "unconfigured";
+  config: Record<string, string>;
+  lastSync?: string;
+  error?: string;
+};
+
 export type WorkspaceConfigEntry = {
   id: string;
   name: string;
@@ -43,6 +53,8 @@ export type WorkspaceConfigEntry = {
   pinnedSessions: string[];
   /** Directories (relative to path) scanned for artifacts. Defaults to ["outputs"]. */
   artifactDirs: string[];
+  /** Shared tool connections (Google Drive, ClickUp, HubSpot, etc.). */
+  connections?: WorkspaceConnection[];
   sync?: WorkspaceGitSyncConfig;
   team?: TeamWorkspaceConfig;
   curation?: WorkspaceCurationConfig;

@@ -11,6 +11,8 @@ import type {
   WorkspaceSessionEntry,
   WorkspaceSummary,
   WorkspaceTask,
+  WorkspaceConnectionSummary,
+  FeedEntry,
 } from "../views/workspaces";
 
 export type WorkspacesState = {
@@ -37,6 +39,8 @@ type GatewayWorkspaceSummary = {
   path: string;
   artifactCount?: number;
   sessionCount?: number;
+  connectionCount?: number;
+  feedCount?: number;
   lastUpdated?: string;
   lastScanned?: number;
 };
@@ -114,6 +118,8 @@ function transformSummary(entry: GatewayWorkspaceSummary): WorkspaceSummary {
     path: entry.path,
     artifactCount: entry.artifactCount ?? 0,
     sessionCount: entry.sessionCount ?? 0,
+    connectionCount: entry.connectionCount ?? 0,
+    feedCount: entry.feedCount ?? 0,
     lastUpdated: toDate(entry.lastUpdated, entry.lastScanned),
   };
 }
@@ -238,7 +244,7 @@ export async function getWorkspace(
       return null;
     }
 
-    return {
+    const detail: WorkspaceDetail = {
       ...transformSummary(result.workspace),
       pinned: (result.pinned ?? []).map(transformFile),
       pinnedSessions: (result.pinnedSessions ?? []).map(transformSession),
@@ -248,6 +254,22 @@ export async function getWorkspace(
       tasks: (result.tasks ?? []).map(transformTask),
       memory: (result.memory ?? []).map(transformFile),
     };
+
+    // Load feed and connections in parallel (non-blocking)
+    try {
+      const [feedEntries, connections] = await Promise.all([
+        loadFeed(state, id),
+        loadConnections(state, id),
+      ]);
+      detail.feedEntries = feedEntries;
+      detail.connections = connections;
+      detail.feedCount = feedEntries.length;
+      detail.connectionCount = connections.length;
+    } catch {
+      // Non-fatal — workspace detail works without feed/connections
+    }
+
+    return detail;
   } catch (err) {
     console.error("[Workspaces] get failed:", err);
     return null;
@@ -779,6 +801,95 @@ export async function renameWorkspaceFile(
     return true;
   } catch (err) {
     console.error("[Workspaces] renameFile failed:", err);
+    return false;
+  }
+}
+
+// ── Feed Controller ─────────────────────────────────────────────────
+
+export async function loadFeed(
+  state: WorkspacesState,
+  workspaceId: string,
+  limit = 50,
+  before?: string,
+): Promise<FeedEntry[]> {
+  if (!state.client || !state.connected) return [];
+  try {
+    const result = await state.client.request<{
+      entries: FeedEntry[];
+    }>("workspace.feed.read", { workspaceId, limit, before });
+    return result.entries ?? [];
+  } catch (err) {
+    console.error("[Workspaces] loadFeed failed:", err);
+    return [];
+  }
+}
+
+export async function postToFeed(
+  state: WorkspacesState,
+  workspaceId: string,
+  text: string,
+  type = "update",
+): Promise<FeedEntry | null> {
+  if (!state.client || !state.connected) return null;
+  try {
+    const result = await state.client.request<{
+      entry: FeedEntry;
+    }>("workspace.feed.post", { workspaceId, text, type, author: "user" });
+    return result.entry ?? null;
+  } catch (err) {
+    console.error("[Workspaces] postToFeed failed:", err);
+    return null;
+  }
+}
+
+// ── Connections Controller ──────────────────────────────────────────
+
+export async function loadConnections(
+  state: WorkspacesState,
+  workspaceId: string,
+): Promise<WorkspaceConnectionSummary[]> {
+  if (!state.client || !state.connected) return [];
+  try {
+    const result = await state.client.request<{
+      connections: WorkspaceConnectionSummary[];
+    }>("workspace.connections.list", { workspaceId });
+    return result.connections ?? [];
+  } catch (err) {
+    console.error("[Workspaces] loadConnections failed:", err);
+    return [];
+  }
+}
+
+export async function testConnection(
+  state: WorkspacesState,
+  workspaceId: string,
+  connectionId: string,
+): Promise<{ ok: boolean; error?: string }> {
+  if (!state.client || !state.connected) return { ok: false, error: "Not connected" };
+  try {
+    const result = await state.client.request<{ ok: boolean; error?: string }>(
+      "workspace.connections.test",
+      { workspaceId, connectionId },
+    );
+    return result;
+  } catch (err) {
+    console.error("[Workspaces] testConnection failed:", err);
+    return { ok: false, error: err instanceof Error ? err.message : "Failed" };
+  }
+}
+
+export async function removeConnection(
+  state: WorkspacesState,
+  workspaceId: string,
+  connectionId: string,
+): Promise<boolean> {
+  if (!state.client || !state.connected) return false;
+  try {
+    await state.client.request("workspace.connections.remove", { workspaceId, connectionId });
+    return true;
+  } catch (err) {
+    console.error("[Workspaces] removeConnection failed:", err);
     return false;
   }
 }
