@@ -175,6 +175,53 @@ Contributions welcome! GodMode gets better when the community builds for their o
 - [Community Circle](https://lifeongodmode.com/community) — Weekly office hours, power user tips, creative workflows ($99/mo)
 - [Website](https://lifeongodmode.com) — Learn more about the GodMode vision
 
+## Troubleshooting
+
+### Build fails: "Node.js version unsupported" or missing pnpm
+
+```bash
+node -v          # Need v22+. Install/upgrade: nvm install 22 && nvm use 22
+pnpm -v          # Not found? npm install -g pnpm
+```
+
+### "ANTHROPIC_API_KEY is not set"
+
+Get a key at [console.anthropic.com](https://console.anthropic.com), then add it to your `.env`:
+
+```bash
+cp .env.example .env
+echo 'ANTHROPIC_API_KEY=sk-ant-...' >> .env
+```
+
+### Port already in use
+
+Change the port with the `--port` flag or `GODMODE_PORT` env variable:
+
+```bash
+GODMODE_PORT=4000 pnpm start
+# or
+pnpm start -- --port 4000
+```
+
+### UI doesn't load (blank page or 404)
+
+The UI must be built before the server can serve it:
+
+```bash
+pnpm build:ui    # Build the frontend assets
+pnpm start       # Then restart the server
+```
+
+### Memory features not working
+
+Persistent memory requires a Honcho API key. Get one at [honcho.dev](https://honcho.dev) and add to `.env`:
+
+```
+HONCHO_API_KEY=your-key-here
+```
+
+Without it, GodMode still works but conversations won't persist across sessions.
+
 ## License
 
 [AGPL-3.0](./LICENSE) — Free to use, modify, and distribute. If you run a modified version as a service, you must open source your changes.
