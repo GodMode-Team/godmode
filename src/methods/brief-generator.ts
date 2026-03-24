@@ -867,7 +867,12 @@ function formatXIntelligence(items: XIntelItem[], error?: string): string {
 // ── Data source: Overnight Agent Work (queue processor) ──────────────────────
 
 async function formatOvernightWorkSection(): Promise<string | null> {
-  const { readQueueState } = await import("../lib/queue-state.js");
+  let readQueueState: Awaited<typeof import("../lib/queue-state.js")>["readQueueState"];
+  try {
+    ({ readQueueState } = await import("../lib/queue-state.js"));
+  } catch {
+    return null; // Queue state module unavailable — skip overnight work section
+  }
   const state = await readQueueState();
 
   const cutoff = Date.now() - 24 * 60 * 60 * 1000;
@@ -1369,7 +1374,13 @@ async function generateDailyBrief(date?: string): Promise<GenerateResult> {
   const briefDate = date || todayDate();
   const vaultPath = resolveVaultPath();
   if (!vaultPath) {
-    throw new Error("Obsidian vault path not configured. Set OBSIDIAN_VAULT_PATH.");
+    return {
+      date: briefDate,
+      path: "",
+      sections: [],
+      warnings: ["Obsidian vault path not configured. Set OBSIDIAN_VAULT_PATH."],
+      carryForward: { unfinishedTasks: 0, actionItems: 0, tomorrowHandoff: 0 },
+    };
   }
 
   const filePath = join(vaultPath, DAILY_FOLDER, `${briefDate}.md`);
@@ -2031,7 +2042,7 @@ const generateBrief: GatewayRequestHandler = async ({ params, respond }) => {
     console.error("[BriefGenerator] Error:", err);
     respond(false, null, {
       code: "GENERATION_FAILED",
-      message: err instanceof Error ? err.message : "Failed to generate daily brief",
+      message: `Failed to generate daily brief (${err instanceof Error ? err.message : "unknown error"})`,
     });
   }
 };
