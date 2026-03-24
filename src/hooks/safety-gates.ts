@@ -1082,8 +1082,13 @@ export function markPendingApproval(sk: string | undefined, action?: string): "r
   const s = readApprovalState();
   const prev = s.blocked[ch];
   const rapid = !!prev && Date.now() - prev.ts < 60_000;
-  s.blocked[ch] = { action: action || "a blocked action", ts: Date.now() };
-  writeApprovalState(s);
+  if (!rapid) {
+    // First block — record timestamp. DON'T overwrite on rapid retries
+    // or the timestamp keeps refreshing and consumeApprovalNudge never
+    // sees it as >2s old.
+    s.blocked[ch] = { action: action || "a blocked action", ts: Date.now() };
+    writeApprovalState(s);
+  }
   return rapid ? "rapid-retry" : "first";
 }
 
