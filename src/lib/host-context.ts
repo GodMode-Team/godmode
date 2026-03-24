@@ -9,7 +9,7 @@
  * and logs detailed diffs so breakages are immediately visible.
  */
 
-import { readFile, writeFile, mkdir } from "node:fs/promises";
+import { readFile, writeFile, rename, mkdir } from "node:fs/promises";
 import { join, dirname } from "node:path";
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk";
 import { DATA_DIR } from "../data-paths.js";
@@ -142,7 +142,10 @@ export async function detectHostContext(
   _context = context;
   try {
     await mkdir(dirname(COMPAT_FILE), { recursive: true });
-    await writeFile(COMPAT_FILE, JSON.stringify(context, null, 2), "utf-8");
+    // Atomic write: temp file + rename to prevent corruption on crash
+    const tmpPath = COMPAT_FILE + ".tmp";
+    await writeFile(tmpPath, JSON.stringify(context, null, 2), "utf-8");
+    await rename(tmpPath, COMPAT_FILE);
   } catch (err) {
     logger.warn(`[GodMode][HostContext] Failed to persist compat state: ${String(err)}`);
   }
@@ -206,7 +209,10 @@ export async function runCompatScan(
     _context.methods = methods;
     try {
       await mkdir(dirname(COMPAT_FILE), { recursive: true });
-      await writeFile(COMPAT_FILE, JSON.stringify(_context, null, 2), "utf-8");
+      // Atomic write: temp file + rename to prevent corruption on crash
+      const tmpPath = COMPAT_FILE + ".tmp";
+      await writeFile(tmpPath, JSON.stringify(_context, null, 2), "utf-8");
+      await rename(tmpPath, COMPAT_FILE);
     } catch {
       // Non-fatal
     }
