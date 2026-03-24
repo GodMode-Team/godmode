@@ -12,6 +12,7 @@ export default defineConfig([
 		clean: true,
 		splitting: false,
 		sourcemap: false,
+		minify: true,
 		external: [
 			"openclaw/plugin-sdk",
 		],
@@ -27,6 +28,7 @@ export default defineConfig([
 		clean: false, // Don't clean — OC build already ran
 		splitting: false,
 		sourcemap: false,
+		minify: true,
 		noExternal: ["openclaw/plugin-sdk", "openclaw/plugin-sdk/agent-runtime", "openclaw/plugin-sdk/infra-runtime"],
 		esbuildOptions(options) {
 			options.alias = {
