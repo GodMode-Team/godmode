@@ -307,9 +307,19 @@ export async function gatherContextInputs(opts: GatherContextOptions): Promise<C
     try {
       const { readQueueState } = await import("./queue-state.js");
       const qs = await readQueueState();
-      const review = qs.items.filter((i: { status: string }) => i.status === "review").length;
-      if (review > 0) {
-        queueReview = `${review} queue item(s) ready for review. Prompt the user.`;
+      type QueueItem = { status: string; title?: string; id?: string; result?: { summary?: string; outputPath?: string } };
+      const reviewItems = qs.items.filter((i: QueueItem) => i.status === "review" || i.status === "needs-review");
+      if (reviewItems.length > 0) {
+        const lines = (reviewItems as QueueItem[]).slice(0, 5).map((i) => {
+          const path = i.result?.outputPath ? ` → ${i.result.outputPath}` : "";
+          return `- "${i.title || i.id}"${path}`;
+        });
+        queueReview =
+          `## Queue Deliverables Ready (${reviewItems.length})\n` +
+          `Agents completed work that needs your review:\n` +
+          lines.join("\n") +
+          `\n\nPresent each deliverable to the user. Use queue_check to read the output, ` +
+          `summarize key findings, and ask for approval or edits.`;
       }
     } catch (e) { logger.warn(`[GodMode][gather] Queue review count error: ${(e as Error).message}`); }
   }

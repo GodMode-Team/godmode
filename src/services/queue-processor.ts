@@ -808,6 +808,8 @@ class QueueProcessor {
             type: "queue-needs-review",
             title: completedItem.title,
             summary: `Agent finished "${completedItem.title}" but provided no artifact — manual verification needed.`,
+            outputPath: outPath,
+            sessionKey: completedItem.sessionId ?? undefined,
             actions: [
               { label: "Review", action: "navigate", target: "today" },
             ],
@@ -906,6 +908,7 @@ class QueueProcessor {
         summary: `Agent finished "${completedItem?.title ?? itemId}" — ready for review.`,
         outputPreview,
         outputPath: outPath,
+        sessionKey: completedItem?.sessionId ?? undefined,
         actions: [
           { label: "Review", action: "navigate", target: "today" },
           { label: "Approve", action: "rpc", method: "queue.approve", params: { id: itemId } },

@@ -1320,10 +1320,11 @@ function handleGatewayEventUnsafe(host: GatewayHost, evt: GatewayEventFrame) {
         appEventBus.emit("refresh-requested", { target: "today" });
       }
 
-      // Paperclip completions: inject into the originating chat session
+      // Queue / Paperclip completions: inject into the originating chat session
       // so the ally can present the deliverable for review
-      if (payload.type === "paperclip-completion") {
-        const pcPayload = payload as {
+      const completionTypes = ["queue-complete", "queue-needs-review", "paperclip-completion"];
+      if (payload.type && completionTypes.includes(payload.type)) {
+        const compPayload = payload as {
           message?: string;
           sessionKey?: string;
           outputPath?: string;
@@ -1338,11 +1339,11 @@ function handleGatewayEventUnsafe(host: GatewayHost, evt: GatewayEventFrame) {
         };
         // If this is the session that initiated the delegation, reload history
         // so the ally's response about the completed work appears naturally
-        if (pcPayload.sessionKey && chatHost.sessionKey === pcPayload.sessionKey) {
+        if (compPayload.sessionKey && chatHost.sessionKey === compPayload.sessionKey) {
           chatHost.loadChatHistory?.().catch(() => {});
         }
         // Use the message field for the notification content
-        msg.content = pcPayload.message || msg.content;
+        msg.content = compPayload.message || msg.content;
       }
       allyHost.requestUpdate?.();
     }
