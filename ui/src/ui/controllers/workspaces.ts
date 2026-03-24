@@ -185,9 +185,12 @@ function mergeSummaryIntoDetail(
 
 export async function loadWorkspaces(state: WorkspacesState) {
   if (!state.client || !state.connected) {
-    state.workspaces = [];
+    // Don't overwrite existing workspaces if we had them before
+    if (!state.workspaces?.length) {
+      state.workspaces = [];
+      state.workspacesError = "Connect to gateway to see workspaces";
+    }
     state.workspacesLoading = false;
-    state.workspacesError = "Connect to gateway to see workspaces";
     return;
   }
 
