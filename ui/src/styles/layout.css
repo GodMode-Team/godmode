@@ -750,6 +750,12 @@
   opacity: 1;
 }
 
+.nav-item:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: var(--radius-md);
+}
+
 .nav-item.active {
   color: var(--text-strong);
   background: color-mix(in srgb, var(--accent-subtle) 70%, var(--secondary));

@@ -79,6 +79,9 @@ export function renderTab(state: AppViewState, tab: Tab) {
     <a
       href=${href}
       class="nav-item ${state.tab === tab ? "active" : ""}"
+      role="tab"
+      aria-selected=${state.tab === tab ? "true" : "false"}
+      aria-label=${titleForTab(tab)}
       @click=${(event: MouseEvent) => {
         if (
           event.defaultPrevented ||
