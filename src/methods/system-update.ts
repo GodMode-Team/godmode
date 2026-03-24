@@ -174,7 +174,7 @@ const check: GatewayRequestHandler = async ({ respond }) => {
   } catch (err) {
     respond(false, undefined, {
       code: "UPDATE_CHECK_FAILED",
-      message: String(err),
+      message: `Failed to check for updates — verify your internet connection and try again. (${String(err).slice(0, 100)})`,
     });
   }
 };
@@ -230,7 +230,7 @@ const run: GatewayRequestHandler = async ({ respond }) => {
   } catch (err) {
     respond(false, undefined, {
       code: "UPDATE_ERROR",
-      message: String(err),
+      message: `Update failed — check disk space and permissions, then try again. (${String(err).slice(0, 100)})`,
     });
   }
 };
@@ -250,7 +250,7 @@ const pluginCheck: GatewayRequestHandler = async ({ respond }) => {
   } catch (err) {
     respond(false, undefined, {
       code: "PLUGIN_CHECK_FAILED",
-      message: String(err),
+      message: `Could not check for plugin updates — npm registry may be unreachable. (${String(err).slice(0, 100)})`,
     });
   }
 };
@@ -569,7 +569,7 @@ const pluginRun: GatewayRequestHandler = async ({ respond }) => {
   } catch (err) {
     respond(false, undefined, {
       code: "PLUGIN_UPDATE_ERROR",
-      message: String(err),
+      message: `Plugin update failed — try manually: npm install -g @godmode-team/godmode. (${String(err).slice(0, 100)})`,
     });
   }
 };
@@ -625,7 +625,7 @@ const deployDismiss: GatewayRequestHandler = ({ respond }) => {
   } catch (err) {
     respond(false, undefined, {
       code: "DEPLOY_DISMISS_FAILED",
-      message: String(err),
+      message: `Could not dismiss deploy notification — refresh the page to retry. (${String(err).slice(0, 100)})`,
     });
   }
 };
