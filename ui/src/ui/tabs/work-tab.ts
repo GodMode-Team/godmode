@@ -222,8 +222,16 @@ export class GmWork extends LitElement {
 
   private async _onSelectWorkspace(workspace: WorkspaceSummary): Promise<void> {
     this.workspaceItemSearchQuery = "";
-    await selectWorkspace(this as unknown as WorkspacesState, workspace);
-    this.requestUpdate();
+    this.workspacesLoading = true;
+    try {
+      await selectWorkspace(this as unknown as WorkspacesState, workspace);
+    } catch (err) {
+      console.error("[GmWork] workspace select failed:", err);
+      this.ctx.addToast("Failed to open workspace: " + workspace.name, "error");
+    } finally {
+      this.workspacesLoading = false;
+      this.requestUpdate();
+    }
   }
 
   private _onBack(): void {

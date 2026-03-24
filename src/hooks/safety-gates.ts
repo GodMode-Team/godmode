@@ -1063,6 +1063,8 @@ interface ApprovalState {
   nudges: Record<string, string>;
   /** channel → timestamp of last gate block (rapid-retry detection) */
   lastBlock: Record<string, number>;
+  /** diagnostic trace — temporary */
+  _debug?: unknown[];
 }
 
 function readState(): ApprovalState {
@@ -1125,6 +1127,18 @@ export function processUserMessage(
   const key = approvalKey(sessionKey);
   if (!key) return false;
   const state = readState();
+
+  // Diagnostic: log every call to trace why approvals don't match
+  if (!state._debug) state._debug = [];
+  (state._debug as Array<{ ts: number; rawKey: string | undefined; normalizedKey: string; hasPending: boolean; msg: string }>).push({
+    ts: Date.now(),
+    rawKey: sessionKey,
+    normalizedKey: key,
+    hasPending: !!state.pending[key],
+    msg: (_userMessage || "").slice(0, 50),
+  });
+  // Keep only last 20 debug entries
+  if ((state._debug as unknown[]).length > 20) (state._debug as unknown[]).splice(0, (state._debug as unknown[]).length - 20);
 
   // New user message = new turn, reset rapid-retry tracker
   delete state.lastBlock[key];

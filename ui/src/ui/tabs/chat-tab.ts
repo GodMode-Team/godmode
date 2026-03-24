@@ -310,6 +310,7 @@ export class GmChat extends LitElement {
       // Session resources strip (Manus-style)
       sessionResources: s.sessionResources,
       sessionResourcesCollapsed: s.sessionResourcesCollapsed,
+      sessionResourcesShowAll: s.sessionResourcesShowAll,
       onToggleSessionResources: () => s.handleToggleSessionResources(),
       onSessionResourceClick: (r: { path?: string; url?: string }) =>
         s.handleSessionResourceClick(r),
