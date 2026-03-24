@@ -640,6 +640,7 @@ async function handleChatThreadLinkClick(event: MouseEvent, props: ChatProps) {
     }
 
     event.preventDefault();
+    event.stopPropagation(); // Prevent .chat-main from closing the sidebar
     const handled = await props.onMessageLinkClick(href);
     if (!handled) {
       openAnchorFallback(anchor);
@@ -674,6 +675,7 @@ async function handleChatThreadLinkClick(event: MouseEvent, props: ChatProps) {
   }
 
   event.preventDefault();
+  event.stopPropagation(); // Prevent .chat-main from closing the sidebar
   await props.onMessageLinkClick(pathCandidate);
 }
 
