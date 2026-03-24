@@ -311,7 +311,7 @@ function renderTaskPanel(props: MyDayProps) {
               ${props.onCreateTask ? renderAddTaskForm(props.onCreateTask) : nothing}
               <div class="today-tasks-list">
                 ${pendingTasks.length === 0 && completedTasks.length === 0
-                  ? html`<div class="today-tasks-empty">No tasks for today. Add one above or drop tasks in your daily brief.</div>`
+                  ? html`<div class="today-tasks-empty">No tasks for today. Type above to add one, or ask your ally to create tasks from your daily brief.</div>`
                   : pendingTasks.map((task) =>
                       renderAllTaskRow(
                         task,

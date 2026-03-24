@@ -196,8 +196,8 @@ export function renderDailyBrief(props: DailyBriefProps) {
         <div class="my-day-card-content">
           <div class="brief-empty">
             <span class="empty-icon">\uD83D\uDCDD</span>
-            <span>No brief available for today</span>
-            <span class="empty-hint">Your morning brief pulls together your calendar, tasks, goals, and energy data into a single scannable page.</span>
+            <span>No brief generated yet</span>
+            <span class="empty-hint">Your daily brief pulls together your calendar, tasks, goals, and energy data into a single scannable page. Click the button below to create your first one.</span>
             ${onGenerate
               ? html`<button class="brief-generate-btn" @click=${onGenerate}>Generate Brief Now</button>`
               : onRefresh

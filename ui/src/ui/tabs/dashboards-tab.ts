@@ -322,16 +322,20 @@ function renderGallery(props: DashboardsProps) {
               </div>
             `
           : html`
-              <div class="dashboards-grid">
-                ${sortedDashboards.map((d) =>
-                  renderDashboardCard(
-                    d,
-                    props.onSelectDashboard,
-                    props.onDeleteDashboard,
-                    props.onTogglePin,
-                  ),
-                )}
-              </div>
+              ${sortedDashboards.length === 0
+                ? html`<div class="dashboards-empty">
+                    <div class="dashboards-empty-hint">No dashboards in this category. Try a different filter or create one with the button above.</div>
+                  </div>`
+                : html`<div class="dashboards-grid">
+                    ${sortedDashboards.map((d) =>
+                      renderDashboardCard(
+                        d,
+                        props.onSelectDashboard,
+                        props.onDeleteDashboard,
+                        props.onTogglePin,
+                      ),
+                    )}
+                  </div>`}
               ${filteredTemplates.length > 0 ? html`
                 <div class="dashboards-templates-section">
                   <h3 class="dashboards-section-title">Create from template</h3>
