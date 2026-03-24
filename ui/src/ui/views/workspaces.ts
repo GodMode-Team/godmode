@@ -269,6 +269,7 @@ export function renderTaskRow(
     return html`
       <form
         class="ws-list-row ws-task-row ws-task-edit-row"
+        aria-label="Edit task: ${task.title}"
         @submit=${(e: Event) => {
           e.preventDefault();
           const form = e.currentTarget as HTMLFormElement;
@@ -286,18 +287,21 @@ export function renderTaskRow(
         <input
           type="text"
           class="ws-task-edit-input"
+          aria-label="Task title"
           .value=${task.title}
           @click=${(e: Event) => e.stopPropagation()}
         />
         <input
           type="date"
           class="ws-task-date-input"
+          aria-label="Task due date"
           .value=${task.dueDate ?? ""}
         />
-        <button type="submit" class="ws-task-save-btn">Save</button>
+        <button type="submit" class="ws-task-save-btn" aria-label="Save task changes">Save</button>
         <button
           type="button"
           class="ws-task-cancel-btn"
+          aria-label="Cancel editing"
           @click=${() => onEditTask?.(null)}
         >Cancel</button>
       </form>
@@ -305,11 +309,12 @@ export function renderTaskRow(
   }
 
   return html`
-    <div class="ws-list-row ws-task-row ${isComplete ? "ws-task-row--complete" : ""}">
+    <div class="ws-list-row ws-task-row ${isComplete ? "ws-task-row--complete" : ""}" role="listitem">
       <button
         class="ws-task-check ${isComplete ? "ws-task-check--done" : ""}"
         @click=${() => onToggle?.(task.id, task.status)}
         title=${isComplete ? "Mark incomplete" : "Mark complete"}
+        aria-label="${isComplete ? "Mark incomplete" : "Mark complete"}: ${task.title}"
       >
         ${isComplete ? "\u2713" : ""}
       </button>
@@ -322,7 +327,7 @@ export function renderTaskRow(
       <span class=${priorityBadgeClass(task.priority)}>${priorityLabel(task.priority)}</span>
       ${task.dueDate ? html`<span class=${dueDateClass(task.dueDate)}>${formatDueDate(task.dueDate)}</span>` : nothing}
       ${!isComplete && task.queueStatus?.status === "processing"
-        ? html`<span class="ws-task-agent-status ws-task-agent-status--processing">
+        ? html`<span class="ws-task-agent-status ws-task-agent-status--processing" aria-live="polite">
             <span class="ws-task-agent-dot"></span>
             ${task.queueStatus.roleName} working...
           </span>`
@@ -331,6 +336,7 @@ export function renderTaskRow(
               class="ws-task-start-btn ws-task-start-btn--review"
               @click=${() => onStartTask(task.id)}
               title="Review agent output"
+              aria-label="Review agent output for: ${task.title}"
             >Review</button>`
           : task.queueStatus?.status === "done"
             ? html`
@@ -339,6 +345,7 @@ export function renderTaskRow(
                       class="ws-task-start-btn ws-task-start-btn--done"
                       @click=${() => onViewTaskOutput(task.id)}
                       title="Preview agent output"
+                      aria-label="View output for: ${task.title}"
                     >View Output</button>`
                   : nothing}
                 ${onStartTask
@@ -346,6 +353,7 @@ export function renderTaskRow(
                       class="ws-task-start-btn ws-task-start-btn--chat"
                       @click=${() => onStartTask(task.id)}
                       title="Open chat session for this task"
+                      aria-label="Open chat for: ${task.title}"
                     >Open Chat</button>`
                   : nothing}
               `
@@ -354,6 +362,7 @@ export function renderTaskRow(
                   class="ws-task-start-btn"
                   @click=${() => onStartTask(task.id)}
                   title="Start working on this task"
+                  aria-label="Start task: ${task.title}"
                 >Start</button>`
               : nothing}
     </div>
@@ -376,6 +385,7 @@ export function renderAllTaskRow(
     return html`
       <form
         class="ws-list-row ws-task-row ws-task-edit-row"
+        aria-label="Edit task: ${task.title}"
         @submit=${(e: Event) => {
           e.preventDefault();
           const form = e.currentTarget as HTMLFormElement;
@@ -393,18 +403,21 @@ export function renderAllTaskRow(
         <input
           type="text"
           class="ws-task-edit-input"
+          aria-label="Task title"
           .value=${task.title}
           @click=${(e: Event) => e.stopPropagation()}
         />
         <input
           type="date"
           class="ws-task-date-input"
+          aria-label="Task due date"
           .value=${task.dueDate ?? ""}
         />
-        <button type="submit" class="ws-task-save-btn">Save</button>
+        <button type="submit" class="ws-task-save-btn" aria-label="Save task changes">Save</button>
         <button
           type="button"
           class="ws-task-cancel-btn"
+          aria-label="Cancel editing"
           @click=${() => onEditTask?.(null)}
         >Cancel</button>
       </form>
@@ -412,11 +425,12 @@ export function renderAllTaskRow(
   }
 
   return html`
-    <div class="ws-list-row ws-task-row ${isComplete ? "ws-task-row--complete" : ""}">
+    <div class="ws-list-row ws-task-row ${isComplete ? "ws-task-row--complete" : ""}" role="listitem">
       <button
         class="ws-task-check ${isComplete ? "ws-task-check--done" : ""}"
         @click=${() => onToggle?.(task.id, task.status)}
         title=${isComplete ? "Mark incomplete" : "Mark complete"}
+        aria-label="${isComplete ? "Mark incomplete" : "Mark complete"}: ${task.title}"
       >
         ${isComplete ? "\u2713" : ""}
       </button>
@@ -430,7 +444,7 @@ export function renderAllTaskRow(
       <span class=${priorityBadgeClass(task.priority)}>${priorityLabel(task.priority)}</span>
       ${task.dueDate ? html`<span class=${dueDateClass(task.dueDate)}>${formatDueDate(task.dueDate)}</span>` : nothing}
       ${!isComplete && task.queueStatus?.status === "processing"
-        ? html`<span class="ws-task-agent-status ws-task-agent-status--processing">
+        ? html`<span class="ws-task-agent-status ws-task-agent-status--processing" aria-live="polite">
             <span class="ws-task-agent-dot"></span>
             ${task.queueStatus.roleName} working...
           </span>`
@@ -439,6 +453,7 @@ export function renderAllTaskRow(
               class="ws-task-start-btn ws-task-start-btn--review"
               @click=${() => onStartTask(task.id)}
               title="Review agent output"
+              aria-label="Review agent output for: ${task.title}"
             >Review</button>`
           : task.queueStatus?.status === "done"
             ? html`
@@ -447,6 +462,7 @@ export function renderAllTaskRow(
                       class="ws-task-start-btn ws-task-start-btn--done"
                       @click=${() => onViewTaskOutput(task.id)}
                       title="Preview agent output"
+                      aria-label="View output for: ${task.title}"
                     >View Output</button>`
                   : nothing}
                 ${onStartTask
@@ -454,6 +470,7 @@ export function renderAllTaskRow(
                       class="ws-task-start-btn ws-task-start-btn--chat"
                       @click=${() => onStartTask(task.id)}
                       title="Open chat session for this task"
+                      aria-label="Open chat for: ${task.title}"
                     >Open Chat</button>`
                   : nothing}
               `
@@ -462,6 +479,7 @@ export function renderAllTaskRow(
                   class="ws-task-start-btn"
                   @click=${() => onStartTask(task.id)}
                   title="Start working on this task"
+                  aria-label="Start task: ${task.title}"
                 >Start</button>`
               : nothing}
     </div>
@@ -602,9 +620,10 @@ function renderFolderNode(
   if (node.type === "file") {
     const isPinned = ctx.pinnedPaths.has(node.path);
     return html`
-      <div class="ws-folder-file-row" style="padding-left: ${12 + depth * 16}px">
+      <div class="ws-folder-file-row" role="listitem" style="padding-left: ${12 + depth * 16}px">
         <button
           class="ws-folder-file"
+          aria-label="Open file: ${node.name}"
           @click=${() =>
             ctx.onItemClick?.({
               path: node.path,
@@ -614,7 +633,7 @@ function renderFolderNode(
               modified: node.modified ?? new Date(),
             })}
         >
-          <span class="ws-list-icon">${fileIcon(node.fileType ?? "text")}</span>
+          <span class="ws-list-icon" aria-hidden="true">${fileIcon(node.fileType ?? "text")}</span>
           <span class="ws-list-title">${node.name}</span>
           ${node.size != null ? html`<span class="ws-list-meta">${formatFileSize(node.size)}</span>` : nothing}
           ${node.modified ? html`<span class="ws-list-meta">${formatAgo(node.modified.getTime())}</span>` : nothing}
@@ -623,6 +642,7 @@ function renderFolderNode(
           class="ws-pin-btn ${isPinned ? "active" : ""}"
           @click=${() => ctx.onPinToggle?.(ctx.workspaceId, node.path, isPinned)}
           title=${isPinned ? "Unpin" : "Pin"}
+          aria-label="${isPinned ? "Unpin" : "Pin"} file: ${node.name}"
         >
           ${isPinned ? "Unpin" : "Pin"}
         </button>
@@ -635,14 +655,16 @@ function renderFolderNode(
   const fileCount = countFilesInTree(children);
 
   return html`
-    <div class="ws-folder-node">
+    <div class="ws-folder-node" role="listitem">
       <button
         class="ws-folder-header"
         style="padding-left: ${12 + depth * 16}px"
         @click=${() => ctx.onToggleFolder?.(node.path)}
+        aria-expanded=${isExpanded}
+        aria-label="${isExpanded ? "Collapse" : "Expand"} folder: ${node.name}, ${fileCount} files"
       >
-        <span class="ws-folder-chevron ${isExpanded ? "expanded" : ""}">&#9654;</span>
-        <span class="ws-list-icon">&#128193;</span>
+        <span class="ws-folder-chevron ${isExpanded ? "expanded" : ""}" aria-hidden="true">&#9654;</span>
+        <span class="ws-list-icon" aria-hidden="true">&#128193;</span>
         <span class="ws-folder-name">${node.name}</span>
         <span class="ws-folder-count">${fileCount} ${fileCount === 1 ? "file" : "files"}</span>
       </button>
@@ -665,7 +687,7 @@ function renderWorkspaceCard(
   onDelete?: (workspace: WorkspaceSummary) => void,
 ) {
   return html`
-    <div class="workspace-card-wrapper">
+    <div class="workspace-card-wrapper" role="listitem">
       <button
         class="workspace-card"
         @click=${() => {
@@ -673,8 +695,9 @@ function renderWorkspaceCard(
           onSelect?.(workspace);
         }}
         title="Open workspace"
+        aria-label="Open workspace: ${workspace.name}"
       >
-        <div class="workspace-card-emoji">${workspace.emoji}</div>
+        <div class="workspace-card-emoji" aria-hidden="true">${workspace.emoji}</div>
         <div class="workspace-card-content">
           <div class="workspace-card-name">${workspace.name}</div>
           <div class="workspace-card-meta">
@@ -696,6 +719,7 @@ function renderWorkspaceCard(
         ? html`<button
             class="workspace-card-delete"
             title="Delete workspace"
+            aria-label="Delete workspace: ${workspace.name}"
             @click=${(e: Event) => {
               e.stopPropagation();
               if (confirm(`Delete workspace "${workspace.name}"? This removes it from your list but does not delete any files.`)) {
@@ -717,9 +741,9 @@ function renderSectionFileRow(props: {
 }) {
   const { workspaceId, entry, pinned, onOpen, onPinToggle } = props;
   return html`
-    <div class="ws-list-row">
-      <button class="ws-list-main" @click=${() => onOpen?.(entry)}>
-        <span class="ws-list-icon">${fileIcon(entry.type)}</span>
+    <div class="ws-list-row" role="listitem">
+      <button class="ws-list-main" @click=${() => onOpen?.(entry)} aria-label="Open file: ${entry.name}">
+        <span class="ws-list-icon" aria-hidden="true">${fileIcon(entry.type)}</span>
         <span class="ws-list-title">${entry.name}</span>
         <span class="ws-list-meta">${formatFileSize(entry.size)}</span>
         <span class="ws-list-meta">${formatAgo(entry.modified.getTime())}</span>
@@ -728,6 +752,7 @@ function renderSectionFileRow(props: {
         class="ws-pin-btn ${pinned ? "active" : ""}"
         @click=${() => onPinToggle?.(workspaceId, entry.path, pinned)}
         title=${pinned ? "Unpin" : "Pin"}
+        aria-label="${pinned ? "Unpin" : "Pin"} file: ${entry.name}"
       >
         ${pinned ? "Unpin" : "Pin"}
       </button>
@@ -746,9 +771,9 @@ function renderRecentFileRow(props: {
   const { workspaceId, entry, pinned, onOpen, onPinToggle } = props;
   const desc = extractFileDescription(entry);
   return html`
-    <div class="ws-list-row">
-      <button class="ws-list-main" @click=${() => onOpen?.(entry)}>
-        <span class="ws-list-icon">${fileIcon(entry.type)}</span>
+    <div class="ws-list-row" role="listitem">
+      <button class="ws-list-main" @click=${() => onOpen?.(entry)} aria-label="Open file: ${entry.name}">
+        <span class="ws-list-icon" aria-hidden="true">${fileIcon(entry.type)}</span>
         <span class="ws-list-title">${entry.name}</span>
         <span class="ws-list-meta">${formatAgo(entry.modified.getTime())}</span>
         ${desc ? html`<span class="ws-list-desc">${desc}</span>` : nothing}
@@ -757,6 +782,7 @@ function renderRecentFileRow(props: {
         class="ws-pin-btn ${pinned ? "active" : ""}"
         @click=${() => onPinToggle?.(workspaceId, entry.path, pinned)}
         title=${pinned ? "Unpin" : "Pin"}
+        aria-label="${pinned ? "Unpin" : "Pin"} file: ${entry.name}"
       >
         ${pinned ? "Unpin" : "Pin"}
       </button>
@@ -769,17 +795,18 @@ function renderBreadcrumbs(
   onBrowse: (path: string) => void,
 ) {
   return html`
-    <div class="workspace-breadcrumbs">
+    <nav class="workspace-breadcrumbs" aria-label="File browser breadcrumb">
       ${crumbs.map(
         (c, i) => html`
-          ${i > 0 ? html`<span class="breadcrumb-sep">/</span>` : nothing}
+          ${i > 0 ? html`<span class="breadcrumb-sep" aria-hidden="true">/</span>` : nothing}
           <button
             class="breadcrumb-item ${i === crumbs.length - 1 ? "breadcrumb-current" : ""}"
             @click=${() => onBrowse(c.path)}
+            aria-current=${i === crumbs.length - 1 ? "location" : nothing}
           >${c.name}</button>
         `,
       )}
-    </div>
+    </nav>
   `;
 }
 
@@ -809,9 +836,9 @@ function renderWorkspaceBrowser(props: {
   const entries = browseSearchResults ?? browseEntries ?? [];
 
   return html`
-    <div class="workspace-browser">
+    <div class="workspace-browser" role="region" aria-label="File browser">
       <div class="workspace-browser-toolbar">
-        <button class="workspace-browse-back" @click=${() => onBrowseBack?.()}>
+        <button class="workspace-browse-back" @click=${() => onBrowseBack?.()} aria-label="Go back to workspace">
           &larr; Back
         </button>
         ${breadcrumbs
@@ -821,6 +848,7 @@ function renderWorkspaceBrowser(props: {
           type="text"
           class="workspace-browse-search"
           placeholder="Search files..."
+          aria-label="Search files in workspace"
           .value=${browseSearchQuery ?? ""}
           @input=${(e: InputEvent) => {
             const target = e.target as HTMLInputElement;
@@ -829,6 +857,7 @@ function renderWorkspaceBrowser(props: {
         />
         <button
           class="workspace-browse-new-folder"
+          aria-label="Create new folder"
           @click=${() => {
             const name = prompt("New folder name:");
             if (name?.trim()) {
@@ -839,7 +868,7 @@ function renderWorkspaceBrowser(props: {
         >+ Folder</button>
       </div>
 
-      <div class="workspace-browse-list">
+      <div class="workspace-browse-list" role="list" aria-label="File listing">
         ${entries.length === 0
           ? html`<div class="workspace-browse-empty">No files found</div>`
           : entries.map((entry) => html`
@@ -961,11 +990,11 @@ function renderWorkspaceDetail(props: {
   };
 
   return html`
-    <div class="workspaces-container">
+    <div class="workspaces-container" role="region" aria-label="Workspace: ${workspace.name}">
       <div class="workspaces-header">
         <div class="workspaces-title">
-          <button class="workspace-back-btn" @click=${onBack}>←</button>
-          <span class="workspaces-icon">${workspace.emoji}</span>
+          <button class="workspace-back-btn" @click=${onBack} aria-label="Back to workspace list">&#8592;</button>
+          <span class="workspaces-icon" aria-hidden="true">${workspace.emoji}</span>
           <div class="workspace-header-text">
             <span class="workspace-header-name">${workspace.name}</span>
             <span class="workspace-header-desc">${workspace.path}</span>
@@ -976,11 +1005,13 @@ function renderWorkspaceDetail(props: {
             type="text"
             class="workspaces-search-input"
             placeholder="Search workspace..."
+            aria-label="Search within ${workspace.name}"
             .value=${itemSearchQuery}
             @input=${(e: Event) => onItemSearch?.((e.target as HTMLInputElement).value)}
           />
           <button
             class="workspace-browse-btn"
+            aria-label="Browse files in ${workspace.name}"
             @click=${() => props.onBrowseFolder?.(".")}
           >Browse Files</button>
         </div>
@@ -992,17 +1023,17 @@ function renderWorkspaceDetail(props: {
         ${
           showPinnedSection
             ? html`
-                <section class="ws-section">
+                <section class="ws-section" aria-label="Pinned items">
                   <div class="ws-section__header">
                     <h3>Pinned</h3>
                     <span>${filteredPinned.length + filteredPinnedSessions.length}</span>
                   </div>
-                  <div class="ws-list">
+                  <div class="ws-list" role="list" aria-label="Pinned items list">
                     ${filteredPinnedSessions.map(
                       (session) => html`
-                        <div class="ws-list-row">
-                          <button class="ws-list-main" @click=${() => onSessionClick?.(session)}>
-                            <span class=${statusDotClass(session.status)}></span>
+                        <div class="ws-list-row" role="listitem">
+                          <button class="ws-list-main" @click=${() => onSessionClick?.(session)} aria-label="Open session: ${session.title}">
+                            <span class=${statusDotClass(session.status)} aria-label="Status: ${session.status}"></span>
                             <span class="ws-list-title">${session.title}</span>
                             <span class="ws-list-meta">${formatAgo(session.created.getTime())}</span>
                           </button>
@@ -1010,6 +1041,7 @@ function renderWorkspaceDetail(props: {
                             class="ws-pin-btn active"
                             @click=${() => onPinSessionToggle?.(workspace.id, session.key, true)}
                             title="Unpin"
+                            aria-label="Unpin session: ${session.title}"
                           >
                             Unpin
                           </button>
@@ -1047,12 +1079,12 @@ function renderWorkspaceDetail(props: {
 
         ${showRecentSection
           ? html`
-              <section class="ws-section">
+              <section class="ws-section" aria-label="Recent files">
                 <div class="ws-section__header">
                   <h3>Recent</h3>
                   <span>${recentFiles.length}</span>
                 </div>
-                <div class="ws-list">
+                <div class="ws-list" role="list" aria-label="Recent files list">
                   ${recentFiles.map((entry) =>
                     renderRecentFileRow({
                       workspaceId: workspace.id,
@@ -1068,18 +1100,18 @@ function renderWorkspaceDetail(props: {
           : nothing
         }
 
-        <section class="ws-section">
+        <section class="ws-section" aria-label="Artifacts">
           <div class="ws-section__header">
             <h3>Artifacts</h3>
             <span>${hasFolderTree ? filteredFolderTree.length : filteredArtifacts.length}</span>
             ${onBatchPushToDrive && filteredArtifacts.length > 0
-              ? html`<button class="ws-export-drive-btn" @click=${() => {
+              ? html`<button class="ws-export-drive-btn" aria-label="Export all artifacts to Google Drive" @click=${() => {
                   const paths = filteredArtifacts.map((e) => e.path);
                   onBatchPushToDrive(paths);
                 }}>Export to Drive</button>`
               : nothing}
           </div>
-          <div class="ws-list ws-list--scroll">
+          <div class="ws-list ws-list--scroll" role="list" aria-label="Artifacts list">
             ${
               hasFolderTree
                 ? filteredFolderTree.length === 0
@@ -1109,12 +1141,12 @@ function renderWorkspaceDetail(props: {
         ${
           showSessionsSection
             ? html`
-                <section class="ws-section">
+                <section class="ws-section" aria-label="Sessions">
                   <div class="ws-section__header">
                     <h3>Sessions</h3>
                     <span>${filteredSessions.length}</span>
                   </div>
-                  <div class="ws-list ws-list--scroll">
+                  <div class="ws-list ws-list--scroll" role="list" aria-label="Sessions list">
                     ${
                       filteredSessions.length === 0
                         ? html`
@@ -1124,9 +1156,9 @@ function renderWorkspaceDetail(props: {
                           `
                         : filteredSessions.map(
                             (session) => html`
-                              <div class="ws-list-row">
-                                <button class="ws-list-main ws-list-row--button" @click=${() => onSessionClick?.(session)}>
-                                  <span class=${statusDotClass(session.status)}></span>
+                              <div class="ws-list-row" role="listitem">
+                                <button class="ws-list-main ws-list-row--button" @click=${() => onSessionClick?.(session)} aria-label="Open session: ${session.title}">
+                                  <span class=${statusDotClass(session.status)} aria-label="Status: ${session.status}"></span>
                                   <span class="ws-list-title">${session.title}</span>
                                   <span class="ws-list-meta">${formatAgo(session.created.getTime())}</span>
                                 </button>
@@ -1134,6 +1166,7 @@ function renderWorkspaceDetail(props: {
                                   class="ws-pin-btn ${pinnedSessionKeys.has(session.key) ? "active" : ""}"
                                   @click=${() => onPinSessionToggle?.(workspace.id, session.key, pinnedSessionKeys.has(session.key))}
                                   title=${pinnedSessionKeys.has(session.key) ? "Unpin" : "Pin"}
+                                  aria-label="${pinnedSessionKeys.has(session.key) ? "Unpin" : "Pin"} session: ${session.title}"
                                 >
                                   ${pinnedSessionKeys.has(session.key) ? "Unpin" : "Pin"}
                                 </button>
@@ -1149,12 +1182,12 @@ function renderWorkspaceDetail(props: {
 
         ${(workspace.memory?.length ?? 0) > 0
           ? html`
-              <section class="ws-section">
+              <section class="ws-section" aria-label="Workspace memory">
                 <div class="ws-section__header">
                   <h3>Memory</h3>
                   <span>${workspace.memory!.length}</span>
                 </div>
-                <div class="ws-list ws-list--scroll">
+                <div class="ws-list ws-list--scroll" role="list" aria-label="Memory files list">
                   ${workspace.memory!.map((entry) =>
                     renderSectionFileRow({
                       workspaceId: workspace.id,
@@ -1215,12 +1248,12 @@ function renderFeedSection(props: {
   }
 
   return html`
-    <section class="ws-section">
+    <section class="ws-section" aria-label="Activity feed">
       <div class="ws-section__header">
         <h3>Activity Feed</h3>
         <span>${entries.length}</span>
       </div>
-      <div class="ws-list ws-list--scroll" style="max-height: 400px;">
+      <div class="ws-list ws-list--scroll" role="list" aria-live="polite" aria-label="Feed entries" style="max-height: 400px;">
         ${entries.length === 0
           ? html`<div class="ws-empty">
               <span class="ws-empty-hint">No activity yet. Post updates, decisions, or requests to the feed.</span>
@@ -1241,12 +1274,13 @@ function renderFeedSection(props: {
         }
       </div>
       ${entries.length >= 50 && onLoadMore
-        ? html`<button class="ws-task-completed-toggle" @click=${() => onLoadMore()}>Load more...</button>`
+        ? html`<button class="ws-task-completed-toggle" aria-label="Load more feed entries" @click=${() => onLoadMore()}>Load more...</button>`
         : nothing}
       ${onPost
         ? html`
             <form
               class="ws-task-create-form"
+              aria-label="Post to activity feed"
               @submit=${(e: Event) => {
                 e.preventDefault();
                 const form = e.currentTarget as HTMLFormElement;
@@ -1262,15 +1296,16 @@ function renderFeedSection(props: {
                 type="text"
                 class="ws-task-create-input ws-feed-input"
                 placeholder="Post to feed..."
+                aria-label="Feed post content"
               />
-              <select class="ws-task-create-project ws-feed-type">
+              <select class="ws-task-create-project ws-feed-type" aria-label="Post type">
                 <option value="update">Update</option>
                 <option value="decision">Decision</option>
                 <option value="request">Request</option>
                 <option value="sop">SOP</option>
                 <option value="artifact">Artifact</option>
               </select>
-              <button type="submit" class="ws-task-create-btn">Post</button>
+              <button type="submit" class="ws-task-create-btn" aria-label="Submit post">Post</button>
             </form>
           `
         : nothing}
@@ -1295,7 +1330,7 @@ function renderConnectionsSection(props: {
 
   if (connections.length === 0) {
     return html`
-      <section class="ws-section">
+      <section class="ws-section" aria-label="Connections">
         <div class="ws-section__header">
           <h3>Connections</h3>
           <span>0</span>
@@ -1308,14 +1343,14 @@ function renderConnectionsSection(props: {
   }
 
   return html`
-    <section class="ws-section">
+    <section class="ws-section" aria-label="Connections">
       <div class="ws-section__header">
         <h3>Connections</h3>
         <span>${connections.length}</span>
       </div>
-      <div class="ws-list">
+      <div class="ws-list" role="list" aria-label="Connection list">
         ${connections.map((conn) => html`
-          <div class="ws-list-row">
+          <div class="ws-list-row" role="listitem">
             <div class="ws-list-main" style="gap: 8px;">
               <span class="ws-list-title">${conn.name}</span>
               ${statusBadge(conn.status)}
@@ -1323,10 +1358,10 @@ function renderConnectionsSection(props: {
               ${conn.error ? html`<span class="ws-list-meta" style="color: var(--danger-color, #e74c3c);">${conn.error}</span>` : nothing}
             </div>
             <div style="display: flex; gap: 4px;">
-              ${onTest ? html`<button class="ws-pin-btn" @click=${() => onTest(conn.id)} title="Test connection">Test</button>` : nothing}
+              ${onTest ? html`<button class="ws-pin-btn" @click=${() => onTest(conn.id)} title="Test connection" aria-label="Test connection: ${conn.name}">Test</button>` : nothing}
               ${onRemove ? html`<button class="ws-pin-btn" @click=${() => {
                 if (confirm(`Remove connection "${conn.name}"?`)) onRemove(conn.id);
-              }} title="Remove connection">Remove</button>` : nothing}
+              }} title="Remove connection" aria-label="Remove connection: ${conn.name}">Remove</button>` : nothing}
             </div>
           </div>
         `)}
@@ -1340,16 +1375,16 @@ function renderConnectionsSection(props: {
 function renderMembersSection(members: Array<{ name: string; role: string }>): ReturnType<typeof html> {
   if (members.length === 0) return html``;
   return html`
-    <section class="ws-section">
+    <section class="ws-section" aria-label="Workspace members">
       <div class="ws-section__header">
         <h3>Members</h3>
         <span>${members.length}</span>
       </div>
-      <div class="ws-list">
+      <div class="ws-list" role="list" aria-label="Members list">
         ${members.map((m) => html`
-          <div class="ws-list-row">
+          <div class="ws-list-row" role="listitem">
             <div class="ws-list-main">
-              <span>👤</span>
+              <span aria-hidden="true">\u{1F464}</span>
               <span class="ws-list-title">${m.name}</span>
               <span class="ws-list-meta">${m.role}</span>
             </div>
@@ -1381,19 +1416,19 @@ function renderWorkspaceTasksSection(props: {
   const completed = sortTasks(tasks.filter((t) => t.status === "complete"));
 
   return html`
-    <section class="ws-section">
+    <section class="ws-section" aria-label="Workspace tasks">
       <div class="ws-section__header">
         <h3>Tasks</h3>
         <span>${pending.length} open${completed.length > 0 ? `, ${completed.length} done` : ""}</span>
       </div>
-      <div class="ws-list ws-list--scroll">
+      <div class="ws-list ws-list--scroll" role="list" aria-live="polite" aria-label="Task list">
         ${pending.length === 0 && completed.length === 0
           ? html`<div class="ws-empty">No tasks</div>`
           : nothing}
         ${pending.map((task) => renderTaskRow(task, onToggleTaskComplete, onStartTask, editingTaskId, onEditTask, onUpdateTask, onViewTaskOutput))}
         ${completed.length > 0
           ? html`
-              <button class="ws-task-completed-toggle" @click=${() => onToggleCompletedTasks?.()}>
+              <button class="ws-task-completed-toggle" aria-expanded=${showCompleted} @click=${() => onToggleCompletedTasks?.()}>
                 ${showCompleted ? "Hide" : "Show"} ${completed.length} completed
               </button>
               ${showCompleted ? completed.map((task) => renderTaskRow(task, onToggleTaskComplete, onStartTask, editingTaskId, onEditTask, onUpdateTask, onViewTaskOutput)) : nothing}
@@ -1404,6 +1439,7 @@ function renderWorkspaceTasksSection(props: {
         ? html`
             <form
               class="ws-task-create-form"
+              aria-label="Create new task"
               @submit=${(e: Event) => {
                 e.preventDefault();
                 const form = e.currentTarget as HTMLFormElement;
@@ -1418,8 +1454,9 @@ function renderWorkspaceTasksSection(props: {
                 type="text"
                 class="ws-task-create-input"
                 placeholder="Add a task..."
+                aria-label="New task title"
               />
-              <button type="submit" class="ws-task-create-btn">Add</button>
+              <button type="submit" class="ws-task-create-btn" aria-label="Add task">Add</button>
             </form>
           `
         : nothing}
@@ -1511,10 +1548,11 @@ export function renderWorkspaces(props: WorkspacesProps) {
   }
 
   return html`
-    <div class="workspaces-container">
-      <div class="workspaces-toolbar">
+    <div class="workspaces-container" role="region" aria-label="Workspaces">
+      <div class="workspaces-toolbar" role="toolbar" aria-label="Workspace controls">
         <form
             class="workspaces-create-form"
+            aria-label="Create new workspace"
             @submit=${async (event: Event) => {
               event.preventDefault();
               if (createLoading) {
@@ -1553,9 +1591,10 @@ export function renderWorkspaces(props: WorkspacesProps) {
               name="name"
               class="workspaces-create-input"
               placeholder="New workspace name (e.g. Acme Corp)"
+              aria-label="Workspace name"
               required
             />
-            <select name="type" class="workspaces-create-select">
+            <select name="type" class="workspaces-create-select" aria-label="Workspace type">
               <option value="project">Project</option>
               <option value="team">Team</option>
               <option value="personal">Personal</option>
@@ -1565,10 +1604,12 @@ export function renderWorkspaces(props: WorkspacesProps) {
               name="path"
               class="workspaces-create-input workspaces-create-input--path"
               placeholder="Optional path (auto-created if blank)"
+              aria-label="Workspace path (optional)"
             />
             <button
               type="submit"
               class="workspaces-add-btn"
+              aria-label="Create workspace"
               ?disabled=${Boolean(createLoading)}
             >
               ${createLoading ? "Adding..." : "Add Workspace"}
@@ -1578,38 +1619,39 @@ export function renderWorkspaces(props: WorkspacesProps) {
             type="text"
             class="workspaces-search-input"
             placeholder="Search workspaces..."
+            aria-label="Search workspaces"
             .value=${searchQuery}
             @input=${(e: Event) => onSearch?.((e.target as HTMLInputElement).value)}
           />
-          <span class="workspaces-count">${filteredWorkspaces.length} workspaces</span>
-          <span class="workspaces-status ${connected ? "online" : "offline"}">
+          <span class="workspaces-count" aria-live="polite">${filteredWorkspaces.length} workspaces</span>
+          <span class="workspaces-status ${connected ? "online" : "offline"}" role="status">
             ${connected ? "Online" : "Offline"}
           </span>
           ${
             onTeamSetup
-              ? html`<button class="ws-team-setup-btn" @click=${() => onTeamSetup()}>Team Setup</button>`
+              ? html`<button class="ws-team-setup-btn" aria-label="Start team workspace setup" @click=${() => onTeamSetup()}>Team Setup</button>`
               : nothing
           }
       </div>
 
-      ${error ? html`<div class="callout danger" style="margin: 16px;">${error}</div>` : nothing}
+      ${error ? html`<div class="callout danger" role="alert" style="margin: 16px;">${error}</div>` : nothing}
 
       ${
         loading
           ? html`
-              <div class="workspaces-loading">
-                <div class="spinner"></div>
+              <div class="workspaces-loading" role="status" aria-label="Loading workspaces">
+                <div class="spinner" aria-hidden="true"></div>
                 <span>Loading workspaces...</span>
               </div>
             `
           : html`
               <div class="workspaces-body">
-                <div class="workspace-grid">
+                <div class="workspace-grid" role="list" aria-label="Workspace list">
                   ${
                     filteredWorkspaces.length === 0
                       ? html`
                           <div class="workspaces-empty">
-                            <span class="workspaces-empty-icon">${connected ? "📭" : "🔌"}</span>
+                            <span class="workspaces-empty-icon" aria-hidden="true">${connected ? "\u{1F4ED}" : "\u{1F50C}"}</span>
                             <span>${connected ? "No workspaces yet" : "Connect to gateway to see workspaces"}</span>
                             ${connected ? html`<span class="workspaces-empty-hint">Workspaces organize your projects. Ask your ally to create one, or start a focused session in chat.</span>` : nothing}
                           </div>
@@ -1689,7 +1731,7 @@ function renderAllTasksSection(props: {
 
   return html`
     <div class="ws-all-tasks-section">
-      <section class="ws-section">
+      <section class="ws-section" aria-label="All tasks">
         <div class="ws-section__header">
           <div class="ws-section__header-left">
             <h3>All Tasks</h3>
@@ -1698,32 +1740,38 @@ function renderAllTasksSection(props: {
                   type="text"
                   class="ws-task-search"
                   placeholder="Search tasks..."
+                  aria-label="Search tasks"
                   .value=${taskSearch}
                   @input=${(e: Event) => onSetTaskSearch((e.target as HTMLInputElement).value)}
                 />`
               : nothing}
           </div>
           <div class="ws-task-controls">
-            <div class="ws-task-filters">
+            <div class="ws-task-filters" role="group" aria-label="Task filters">
               <button
                 class="ws-task-filter-btn ${taskFilter === "all" ? "active" : ""}"
                 @click=${() => onSetTaskFilter?.("all")}
+                aria-pressed=${taskFilter === "all"}
               >All</button>
               <button
                 class="ws-task-filter-btn ${taskFilter === "outstanding" ? "active" : ""}"
                 @click=${() => onSetTaskFilter?.("outstanding")}
+                aria-pressed=${taskFilter === "outstanding"}
               >To Do</button>
               <button
                 class="ws-task-filter-btn ${taskFilter === "today" ? "active" : ""}"
                 @click=${() => onSetTaskFilter?.("today")}
+                aria-pressed=${taskFilter === "today"}
               >Today</button>
               <button
                 class="ws-task-filter-btn ${taskFilter === "complete" ? "active" : ""}"
                 @click=${() => onSetTaskFilter?.("complete")}
+                aria-pressed=${taskFilter === "complete"}
               >Done</button>
             </div>
             <select
               class="ws-task-sort"
+              aria-label="Sort tasks by"
               .value=${taskSort}
               @change=${(e: Event) => onSetTaskSort?.((e.target as HTMLSelectElement).value as TaskSort)}
             >
@@ -1737,6 +1785,7 @@ function renderAllTasksSection(props: {
           ? html`
               <form
                 class="ws-task-create-form"
+                aria-label="Create new task"
                 @submit=${(e: Event) => {
                   e.preventDefault();
                   const form = e.currentTarget as HTMLFormElement;
@@ -1753,19 +1802,20 @@ function renderAllTasksSection(props: {
                   type="text"
                   class="ws-task-create-input"
                   placeholder="Add a task..."
+                  aria-label="New task title"
                 />
                 ${workspaceNames.length > 0
                   ? html`
-                      <select class="ws-task-create-project">
+                      <select class="ws-task-create-project" aria-label="Task workspace">
                         ${workspaceNames.map((name) => html`<option value=${name}>${name}</option>`)}
                       </select>
                     `
                   : nothing}
-                <button type="submit" class="ws-task-create-btn">Add</button>
+                <button type="submit" class="ws-task-create-btn" aria-label="Add task">Add</button>
               </form>
             `
           : nothing}
-        <div class="ws-list ws-list--scroll">
+        <div class="ws-list ws-list--scroll" role="list" aria-live="polite" aria-label="Task list">
           ${sorted.length === 0
             ? html`<div class="ws-empty">No tasks</div>`
             : sorted.map((task) => renderAllTaskRow(task, onToggleTaskComplete, onStartTask, editingTaskId, onEditTask, onUpdateTask, onViewTaskOutput))}
