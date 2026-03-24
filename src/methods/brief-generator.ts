@@ -472,175 +472,8 @@ async function formatMeetingPrepSection(events: CalendarEvent[]): Promise<string
   return lines.join("\n");
 }
 
-// ── Data source: Oura ────────────────────────────────────────────────────────
+// ── Data source: Oura (REMOVED — user has no Oura Ring) ─────────────────────
 
-type OuraData = {
-  readiness: number | null;
-  sleepScore: number | null;
-  sleepDuration: string | null;
-  hrv: number | null;
-  rhr: number | null;
-  mode: string;
-  insight: string;
-};
-
-async function fetchOuraData(): Promise<OuraData> {
-  const token = getEnv("OURA_API_TOKEN");
-  if (!token) {
-    return {
-      readiness: null,
-      sleepScore: null,
-      sleepDuration: null,
-      hrv: null,
-      rhr: null,
-      mode: "Unknown",
-      insight: "Oura data unavailable — OURA_API_TOKEN not set.",
-    };
-  }
-
-  const yesterday = yesterdayDate();
-
-  try {
-    // Fetch readiness
-    const readinessResp = await fetch(
-      `https://api.ouraring.com/v2/usercollection/daily_readiness?start_date=${yesterday}`,
-      { headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(10_000) },
-    );
-    if (!readinessResp.ok) {
-      throw new Error(`Oura readiness API ${readinessResp.status}: ${readinessResp.statusText}`);
-    }
-    const readinessData = (await readinessResp.json()) as {
-      data?: Array<{ score?: number; contributors?: Record<string, number> }>;
-    };
-    const latest = readinessData.data?.[readinessData.data.length - 1];
-    const readiness = latest?.score ?? null;
-
-    // Fetch sleep
-    const sleepResp = await fetch(
-      `https://api.ouraring.com/v2/usercollection/daily_sleep?start_date=${yesterday}`,
-      { headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(10_000) },
-    );
-    if (!sleepResp.ok) {
-      throw new Error(`Oura sleep API ${sleepResp.status}: ${sleepResp.statusText}`);
-    }
-    const sleepData = (await sleepResp.json()) as {
-      data?: Array<{
-        score?: number;
-        contributors?: Record<string, number>;
-      }>;
-    };
-    const sleepLatest = sleepData.data?.[sleepData.data.length - 1];
-    const sleepScore = sleepLatest?.score ?? null;
-
-    // Fetch heart rate / HRV from sleep periods
-    const sleepPeriodsResp = await fetch(
-      `https://api.ouraring.com/v2/usercollection/sleep?start_date=${yesterday}`,
-      { headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(10_000) },
-    );
-    if (!sleepPeriodsResp.ok) {
-      throw new Error(`Oura sleep periods API ${sleepPeriodsResp.status}: ${sleepPeriodsResp.statusText}`);
-    }
-    const sleepPeriods = (await sleepPeriodsResp.json()) as {
-      data?: Array<{
-        average_hrv?: number;
-        lowest_heart_rate?: number;
-        total_sleep_duration?: number;
-      }>;
-    };
-    const longestSleep = sleepPeriods.data?.reduce(
-      (longest, current) =>
-        (current.total_sleep_duration ?? 0) > (longest?.total_sleep_duration ?? 0)
-          ? current
-          : longest,
-      sleepPeriods.data[0],
-    );
-    const hrv = longestSleep?.average_hrv ?? null;
-    const rhr = longestSleep?.lowest_heart_rate ?? null;
-    const totalSleepSec = longestSleep?.total_sleep_duration ?? null;
-    const sleepDuration = totalSleepSec
-      ? `${Math.floor(totalSleepSec / 3600)}h ${Math.floor((totalSleepSec % 3600) / 60)}m`
-      : null;
-
-    // Determine mode
-    let mode = "Unknown";
-    let modeEmoji = "⚪";
-    if (readiness !== null) {
-      if (readiness >= 85) {
-        mode = "Peak";
-        modeEmoji = "🟢";
-      } else if (readiness >= 70) {
-        mode = "Steady State";
-        modeEmoji = "🟡";
-      } else if (readiness >= 55) {
-        mode = "Conserve";
-        modeEmoji = "🟠";
-      } else {
-        mode = "Recovery";
-        modeEmoji = "🔴";
-      }
-    }
-
-    const insight = generateOuraInsight(readiness, sleepScore, hrv);
-
-    return {
-      readiness,
-      sleepScore,
-      sleepDuration,
-      hrv,
-      rhr,
-      mode: `${readiness ?? "--"} ${modeEmoji} ${mode}`,
-      insight,
-    };
-  } catch (err) {
-    return {
-      readiness: null,
-      sleepScore: null,
-      sleepDuration: null,
-      hrv: null,
-      rhr: null,
-      mode: "Unknown",
-      insight: `Oura fetch failed: ${err instanceof Error ? err.message : "unknown error"}`,
-    };
-  }
-}
-
-function generateOuraInsight(
-  readiness: number | null,
-  sleep: number | null,
-  hrv: number | null,
-): string {
-  if (readiness === null) return "No Oura data available. Trust your body.";
-
-  const parts: string[] = [];
-  if (readiness >= 85) {
-    parts.push("Peak day — push hard on your top priority.");
-  } else if (readiness >= 70) {
-    parts.push("Solid foundation. Execute the plan, take breaks every 90 min.");
-  } else if (readiness >= 55) {
-    parts.push("Conserve mode. Prioritize deep work in the morning, protect your evening.");
-  } else {
-    parts.push("Recovery day. Minimum viable work, extra rest.");
-  }
-
-  if (hrv !== null && hrv < 30) {
-    parts.push("HRV is low — add breathwork between focus sessions.");
-  }
-  if (sleep !== null && sleep < 60) {
-    parts.push("Sleep was rough — consider a power nap if energy dips.");
-  }
-
-  return parts.join(" ");
-}
-
-function formatBodyCheck(oura: OuraData): string {
-  const readinessStr = oura.readiness !== null ? String(oura.readiness) : "--";
-  const sleepStr = oura.sleepScore !== null ? String(oura.sleepScore) : "--";
-  const sleepDur = oura.sleepDuration ? ` (${oura.sleepDuration})` : "";
-  const hrvStr = oura.hrv !== null ? `${oura.hrv}ms` : "--ms";
-  const rhrStr = oura.rhr !== null ? `${oura.rhr}bpm` : "--bpm";
-
-  return `**Readiness: ${oura.mode}** · Sleep ${sleepStr}${sleepDur} · HRV ${hrvStr} · RHR ${rhrStr}\n\n${oura.insight}`;
-}
 
 // ── Data source: Weather ─────────────────────────────────────────────────────
 
@@ -1445,15 +1278,11 @@ async function generateDailyBrief(date?: string): Promise<GenerateResult> {
 
   // ── Gather all data sources in parallel ──────────────────────────
   const [
-    calendar, oura, weather, context, xIntel, carryForward,
+    calendar, weather, context, xIntel, carryForward,
     frontInbox, eveningReview, overnightWork,
     cronFailures, latestReflection,
   ] = await Promise.all([
     fetchCalendarEvents().catch((e) => ({ events: [] as CalendarEvent[], error: String(e) })),
-    fetchOuraData().catch(() => ({
-      readiness: null, sleepScore: null, sleepDuration: null,
-      hrv: null, rhr: null, mode: "Unknown", insight: "Oura fetch failed.",
-    })),
     fetchWeather().catch(() => ({ temp: null as number | null, condition: "Unknown", icon: "🌤️" })),
     readContextData(),
     fetchXIntelligence().catch(() => ({ items: [] as XIntelItem[], error: "X fetch failed" })),
@@ -1552,26 +1381,23 @@ async function generateDailyBrief(date?: string): Promise<GenerateResult> {
     ? formatXIntelligence(xIntel.items, xIntel.error)
     : xIntel.error || "No X intel scan today.";
 
-  const ouraRaw = `Readiness: ${oura.readiness ?? "--"} | Sleep: ${oura.sleepScore ?? "--"} (${oura.sleepDuration ?? "--"}) | HRV: ${oura.hrv ?? "--"}ms | RHR: ${oura.rhr ?? "--"}bpm | Mode: ${oura.mode}`;
-
   // ── Build LLM prompt ────────────────────────────────────────────
   const BRIEF_SYSTEM_PROMPT = `You are a daily brief renderer for GodMode, a personal AI operating system. Given a template and raw data, produce a clean, scannable markdown daily brief that a founder looks forward to reading.
 
 RULES:
 1. Output ONLY the rendered markdown. No explanations, no code fences, no preamble.
-2. Follow the template structure EXACTLY — sections in this order: Chief Aim, LifeTrack, Win The Day, Calendar, Communications, Yesterday's Impact, X Intelligence, Body Check. Never add or reorder.
+2. Follow the template structure EXACTLY — sections in this order: Chief Aim, LifeTrack, Win The Day, Calendar, Communications, Yesterday's Impact, X Intelligence. Never add or reorder.
 3. NO emoji in section headers. Clean: "## Chief Aim" not "## 🎯 Chief Aim"
 4. Do NOT include the Notes section — it is appended separately after you.
-5. The brief should end after the Body Check section (with its trailing ---).
+5. The brief should end after the X Intelligence section (with its trailing ---).
 6. Be CONCISE. This must be scannable in 60 seconds. Respect the reader's time.
 7. For Calendar, calculate deep work windows (gaps of 90+ minutes with no meetings).
 8. For Meeting Prep, only prep EXTERNAL meetings (skip internal huddles/standups). Include context about attendees if available.
 9. For Communications, categorize by urgency: Action Needed (🟡), FYI.
 10. Win The Day priorities: FIRST use evening review carryover (Tomorrow Handoff from yesterday). Then fill Bonus section with remaining tasks. Deduplicate.
 11. If a data source is empty, show a one-line placeholder. Never skip a section.
-12. Body Check: render Oura metrics in compact format. Write a 2-3 sentence energy prescription based on the biometrics — specific, actionable, flowing prose. If no Oura data, show a placeholder.
-13. All Win The Day items must use checkbox format: "1. [ ] **Task** — context"
-14. Bonus items use: "- Task description"
+12. All Win The Day items must use checkbox format: "1. [ ] **Task** — context"
+13. Bonus items use: "- Task description"
 
 CRITICAL: The "Tomorrow Handoff" section from yesterday's evening review is your PRIMARY source for today's Win The Day priorities. These are items the user explicitly identified as important for today. Put them FIRST in the numbered priority list, then supplement with pending tasks and carryover items. The "Pending Tasks" from tasks.json are a FIRST-CLASS data source — use them for the Bonus section and to fill any remaining priority slots after the Tomorrow Handoff items.`;
 
@@ -1659,14 +1485,6 @@ ${context.streakDay !== null ? `- ${context.streakLabel}: Day ${context.streakDa
 
 ---
 
-## Body Check
-
-**Readiness: {score} {emoji} {mode}** · Sleep {score} ({duration}) · HRV {n}ms · RHR {n}bpm
-
-{2-3 sentence energy prescription based on biometrics. Specific and actionable. Flowing prose.}
-
----
-
 ## RAW DATA
 
 ### PRIORITY SOURCE: Evening Review — Tomorrow Handoff (${yesterdayDate()})
@@ -1703,9 +1521,6 @@ ${carryoverRaw}
 ${context.activeGoals.length > 0
   ? context.activeGoals.map(g => `- ${g.title}${g.area ? ` [${g.area}]` : ""}${g.progress != null ? ` (${g.progress}%)` : ""}`).join("\n")
   : "(no goals set)"}
-
-### Oura Biometrics
-${ouraRaw}
 
 ### Agent Work Overnight
 ${overnightWork || "(none)"}
@@ -1760,9 +1575,8 @@ ${cronFailures && cronFailures.cronErrors.length > 0 ? "\nIMPORTANT: Surface the
       "", "---", "",
       carryForward.yesterdayImpact ? `## Yesterday's Impact\n\n${carryForward.yesterdayImpact}\n\n---\n` : "",
       latestReflection ? `## Yesterday's Reflection (${latestReflection.date})\n\n- **Moved the needle:** ${latestReflection.movedNeedle}\n- **Busywork:** ${latestReflection.busywork}\n- **Avoiding:** ${latestReflection.avoiding}\n\n---\n` : "",
-      "## Body Check", "", formatBodyCheck(oura), "", "---",
     ].filter(Boolean).join("\n");
-    sections.push("Win The Day", "Calendar", "Communications", "Body Check");
+    sections.push("Win The Day", "Calendar", "Communications");
   }
 
   // Append Notes section (sacred — never touched by AI)
@@ -1990,9 +1804,8 @@ const generateBrief: GatewayRequestHandler = async ({ params, respond }) => {
         return;
       }
 
-      const [calendar, oura, weather, xIntel, carryForward] = await Promise.all([
+      const [calendar, weather, xIntel, carryForward] = await Promise.all([
         fetchCalendarEvents(),
-        fetchOuraData(),
         fetchWeather(),
         fetchXIntelligence(),
         extractCarryForward(vaultPath),
@@ -2004,11 +1817,6 @@ const generateBrief: GatewayRequestHandler = async ({ params, respond }) => {
           calendar: {
             eventCount: calendar.events.length,
             error: calendar.error || null,
-          },
-          oura: {
-            readiness: oura.readiness,
-            sleepScore: oura.sleepScore,
-            mode: oura.mode,
           },
           weather: {
             temp: weather.temp,
@@ -2089,4 +1897,4 @@ export const briefGeneratorHandlers: GatewayRequestHandlers = {
 };
 
 // Export for use by other modules
-export { fetchCalendarEvents, fetchOuraData, fetchWeather, fetchXIntelligence, extractCarryForward, generateDailyBrief, resolveAnthropicAuth };
+export { fetchCalendarEvents, fetchWeather, fetchXIntelligence, extractCarryForward, generateDailyBrief, resolveAnthropicAuth };
