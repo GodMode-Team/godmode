@@ -2,7 +2,7 @@
   "id": "godmode",
   "name": "GodMode",
   "description": "Personal AI Operating System — your deeply contextual AI ally that manages tasks, memory, integrations, and a swarm of agents",
-  "version": "1.8.0",
+  "version": "1.8.1",
   "license": "AGPL-3.0-only",
   "author": {
     "name": "GodMode Team",
