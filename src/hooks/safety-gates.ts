@@ -1407,6 +1407,21 @@ const INTERNAL_DOMAINS = [
   ".ts.net",
 ];
 
+/**
+ * Domains where POST is semantically read-only (reporting/query APIs).
+ * These APIs require POST for complex query payloads but don't mutate state.
+ * Never block these — they're data reads, not client-facing actions.
+ */
+const READ_ONLY_POST_DOMAINS = [
+  "analyticsdata.googleapis.com",     // GA4 Data API (runReport, batchRunReports)
+  "analyticsreporting.googleapis.com", // Universal Analytics Reporting API
+  "bigquery.googleapis.com",          // BigQuery query jobs
+  "dataform.googleapis.com",          // Dataform query
+  "monitoring.googleapis.com",        // Cloud Monitoring queries
+  "logging.googleapis.com",           // Cloud Logging queries
+  "searchconsole.googleapis.com",     // Search Console query
+];
+
 /** HTTP methods that are read-only — never block */
 const SAFE_HTTP_METHODS = ["get", "head", "options"];
 
@@ -1548,6 +1563,10 @@ export async function checkClientFacingGate(
       const isInternal = INTERNAL_DOMAINS.some((d) => command.includes(d));
       if (isInternal) return undefined;
 
+      // Check if it's a read-only API that uses POST for queries (e.g. GA4 reports)
+      const isReadOnlyApi = READ_ONLY_POST_DOMAINS.some((d) => command.includes(d));
+      if (isReadOnlyApi) return undefined;
+
       // HARD GATE: Front API must use draft_mode (no approval override)
       const frontBlock = enforceFrontDraftMode(command, sessionKey);
       if (frontBlock) return frontBlock;
@@ -1583,6 +1602,10 @@ export async function checkClientFacingGate(
     if (!SAFE_HTTP_METHODS.includes(method)) {
       const isInternal = INTERNAL_DOMAINS.some((d) => url.includes(d));
       if (!isInternal) {
+        // Read-only APIs that use POST for queries — always allow
+        const isReadOnlyApi = READ_ONLY_POST_DOMAINS.some((d) => url.includes(d));
+        if (isReadOnlyApi) return undefined;
+
         // HARD GATE: Front API via fetch must include draft_mode in body
         if (FRONT_API_PATTERN.test(url)) {
           const body = typeof params.body === "string" ? params.body : JSON.stringify(params.body ?? "");

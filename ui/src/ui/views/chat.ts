@@ -640,6 +640,7 @@ async function handleChatThreadLinkClick(event: MouseEvent, props: ChatProps) {
     }
 
     event.preventDefault();
+    event.stopPropagation(); // Prevent .chat-main from closing the sidebar
     const handled = await props.onMessageLinkClick(href);
     if (!handled) {
       openAnchorFallback(anchor);
@@ -661,8 +662,8 @@ async function handleChatThreadLinkClick(event: MouseEvent, props: ChatProps) {
     return;
   }
 
-  // Bare domains in <code> blocks (e.g. go.example.com/page) — prefix https://
-  if (/^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+\.[a-z]{2,}(\/\S*)?$/i.test(codeText)) {
+  // Bare domains in <code> blocks (e.g. lifeongodmode.com/page, go.example.com/page) — prefix https://
+  if (/^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*\.[a-z]{2,}(\/\S*)?$/i.test(codeText)) {
     event.preventDefault();
     window.open(`https://${codeText}`, "_blank", "noopener,noreferrer");
     return;
@@ -674,6 +675,7 @@ async function handleChatThreadLinkClick(event: MouseEvent, props: ChatProps) {
   }
 
   event.preventDefault();
+  event.stopPropagation(); // Prevent .chat-main from closing the sidebar
   await props.onMessageLinkClick(pathCandidate);
 }
 

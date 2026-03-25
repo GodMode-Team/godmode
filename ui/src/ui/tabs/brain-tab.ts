@@ -139,7 +139,6 @@ export class GmBrain extends LitElement {
   @state() searching = false;
 
   // Engine
-  @state() engineExpanded = false;
   @state() expandedPulseSystem: string | null = null;
 
   // Folder browsing
@@ -182,26 +181,34 @@ export class GmBrain extends LitElement {
 
     try {
       const gw = this.ctx.gateway;
-      const [pulse, activity, bank, tree, card, people, health] = await Promise.all([
+
+      // Phase 1: Fast — render identity + pulse immediately
+      const [pulse, card, people] = await Promise.all([
         gw.request<MemoryPulseData>("secondBrain.memoryPulse", {}),
-        gw.request<ActivityFeedData>("secondBrain.activity", { limit: 20 }),
-        gw.request<SecondBrainMemoryBankData>("secondBrain.memoryBank", {}),
-        gw.request<{ tree: BrainTreeNode[] }>("secondBrain.fileTree", { depth: 3 }),
         gw.request<IdentityCardData>("secondBrain.identityCard", {}).catch(() => null),
         gw.request<{ people: RecentPerson[]; total: number }>("secondBrain.recentPeople", { limit: 8 }).catch(() => null),
-        gw.request<VaultHealthData>("secondBrain.vaultHealth", {}).catch(() => null),
       ]);
 
       this.pulse = pulse;
-      this.activity = activity;
-      this.memoryBank = bank;
-      this.fileTree = tree.tree ?? [];
       this.identityCard = card;
       this.recentPeople = people?.people ?? null;
       this.peopleTotalCount = people?.total ?? 0;
-      this.vaultHealth = health;
+      this.loading = false; // Render what we have NOW
 
-      // Non-blocking: screenpipe, ingestion, MCP
+      // Phase 2: Lazy — heavier data loads in background
+      Promise.all([
+        gw.request<ActivityFeedData>("secondBrain.activity", { limit: 20 }).catch(() => null),
+        gw.request<SecondBrainMemoryBankData>("secondBrain.memoryBank", {}).catch(() => null),
+        gw.request<{ tree: BrainTreeNode[] }>("secondBrain.fileTree", { depth: 3 }).catch(() => ({ tree: [] })),
+        gw.request<VaultHealthData>("secondBrain.vaultHealth", {}).catch(() => null),
+      ]).then(([activity, bank, tree, health]) => {
+        this.activity = activity;
+        this.memoryBank = bank;
+        this.fileTree = tree?.tree ?? [];
+        this.vaultHealth = health;
+      });
+
+      // Phase 3: Non-blocking services
       Promise.all([
         gw.request<ScreenpipeStatusData>("ingestion.screenpipeStatus", {}).catch(() => null),
         gw.request<IngestionStatusData>("ingestion.status", {}).catch(() => null),
@@ -214,7 +221,6 @@ export class GmBrain extends LitElement {
     } catch (err) {
       console.error("[Brain] Load failed:", err);
       this.error = err instanceof Error ? err.message : "Failed to load";
-    } finally {
       this.loading = false;
     }
   }
@@ -376,13 +382,12 @@ export class GmBrain extends LitElement {
     return html`
       <section class="brain-dashboard" aria-label="Your Second Brain dashboard">
         <div class="brain-header">
-          <h1 class="brain-page-title">Your Brain</h1>
           <button
-            class="brain-engine-toggle ${this.engineExpanded ? "brain-engine-toggle--active" : ""}"
-            @click=${() => { this.engineExpanded = !this.engineExpanded; }}
-            title="Toggle Engine panel"
-            aria-label="Toggle Engine panel"
-          >\u{2699}\u{FE0F} Engine</button>
+            class="brain-engine-toggle"
+            @click=${() => { this.renderRoot.querySelector(".brain-engine")?.scrollIntoView({ behavior: "smooth", block: "start" }); }}
+            title="Scroll to Engine panel"
+            aria-label="Scroll to Engine panel"
+          >\u{2699}\u{FE0F} Engine ${this.pulse?.systems ? html`<span class="brain-engine-badge">${this.pulse.systems.filter(s => s.status === "ready").length}/${this.pulse.systems.length}</span>` : nothing}</button>
         </div>
 
         ${this._renderIdentityCard()}
@@ -399,7 +404,7 @@ export class GmBrain extends LitElement {
               ${this._renderKnowledgePanel()}
             </div>
           </div>
-          ${this.engineExpanded ? this._renderEngine() : nothing}
+          ${this._renderEngine()}
         `}
       </section>
     `;
@@ -700,18 +705,29 @@ export class GmBrain extends LitElement {
     return html`
       <div class="brain-engine-section">
         <h3 class="brain-subsection-title">Memory Layers</h3>
-        <div class="brain-table">
-          <div class="brain-table-header">
-            <span>Layer</span><span>Status</span><span>Detail</span>
+        <div class="brain-table brain-table--4col">
+          <div class="brain-table-header brain-table-header--4col">
+            <span>Layer</span><span>Status</span><span>Detail</span><span>Action</span>
           </div>
           ${this.pulse.systems.map((sys) => html`
-            <div class="brain-table-row">
+            <div class="brain-table-row brain-table-row--4col brain-table-row--clickable"
+                 @click=${() => this._chatNavigate(`Tell me about the ${sys.name} memory system. What's in it? How's it performing?`)}>
               <span class="brain-table-cell">
                 <span class="brain-dot ${STATUS_DOT[sys.status] ?? "brain-dot--offline"}"></span>
                 ${sys.name}
               </span>
               <span class="brain-table-cell brain-table-cell--status">${sys.status}</span>
               <span class="brain-table-cell brain-table-cell--detail">${sys.detail}${sys.count != null ? ` (${sys.count})` : ""}</span>
+              <span class="brain-table-cell brain-table-cell--action">
+                ${sys.status === "offline" || sys.status === "degraded"
+                  ? html`<button class="brain-action-btn brain-action-btn--small"
+                      @click=${(e: Event) => { e.stopPropagation(); this._chatNavigate(`The ${sys.name} system is ${sys.status}. Can you diagnose and repair it?`); }}>
+                      Repair</button>`
+                  : html`<button class="brain-action-btn brain-action-btn--small"
+                      @click=${(e: Event) => { e.stopPropagation(); this._chatNavigate(`Search my ${sys.name} for recent entries. Show me what you know.`); }}>
+                      Explore</button>`
+                }
+              </span>
             </div>
           `)}
         </div>
@@ -740,7 +756,7 @@ export class GmBrain extends LitElement {
               <span class="brain-table-cell">
                 ${p.configured
                   ? html`<button class="brain-action-btn brain-action-btn--xs" aria-label="Run ${p.name} pipeline now" @click=${() => this._runPipeline(p.name)}>Run now</button>`
-                  : html`<span class="brain-muted">${p.envVar}</span>`}
+                  : html`<button class="brain-action-btn brain-action-btn--xs" @click=${() => this._chatNavigate(`Help me configure the ${p.name} ingestion pipeline. I need to set up ${p.envVar}.`)}>Set up</button>`}
               </span>
             </div>
           `)}
@@ -750,13 +766,17 @@ export class GmBrain extends LitElement {
   }
 
   private _renderMcpRow() {
+    const enabled = this.mcpStatusData?.enabled;
     return html`
       <div class="brain-engine-section">
         <h3 class="brain-subsection-title">MCP Server</h3>
         <div class="brain-mcp-row">
-          <span class="brain-dot ${this.mcpStatusData?.enabled ? "brain-dot--ready" : "brain-dot--offline"}"></span>
-          <span>${this.mcpStatusData?.enabled ? "Active" : "Inactive"}</span>
+          <span class="brain-dot ${enabled ? "brain-dot--ready" : "brain-dot--offline"}"></span>
+          <span>${enabled ? "Active" : "Inactive"}</span>
           <span class="brain-muted">${this.mcpStatusData?.transport ?? "stdio"} transport</span>
+          ${!enabled ? html`
+            <button class="brain-action-btn brain-action-btn--xs" @click=${() => this._chatNavigate("Help me set up the GodMode MCP server so I can use it with Claude Code or other MCP clients.")}>Set up</button>
+          ` : nothing}
         </div>
       </div>
     `;
@@ -774,6 +794,8 @@ export class GmBrain extends LitElement {
             <button class="brain-action-btn brain-action-btn--xs" aria-label="${sp.enabled ? "Pause ambient memory" : "Enable ambient memory"}" @click=${() => this._toggleScreenpipe(!sp.enabled)}>
               ${sp.enabled ? "Pause" : "Enable"}
             </button>
+          ` : !sp?.available && sp !== null ? html`
+            <button class="brain-action-btn brain-action-btn--xs" @click=${() => this._chatNavigate("Help me set up Screenpipe for ambient memory capture. Walk me through installation and configuration step by step.")}>Set up</button>
           ` : nothing}
         </div>
       </div>

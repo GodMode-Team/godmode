@@ -11,7 +11,6 @@ import { homedir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { DATA_DIR, GODMODE_ROOT, MEMORY_DIR } from "../data-paths.js";
 import { detectHostContext, safeBroadcast } from "../lib/host-context.js";
-import { notifySession } from "../lib/session-notifier.js";
 import { killZombieGateways } from "../lib/zombie-guard.js";
 import { refreshLicenseOnStart } from "../lib/license.js";
 import { health, turnErrors, sessions } from "../lib/health-ledger.js";
@@ -419,6 +418,17 @@ export async function runGatewayStart(
     ensureSkillCards(pluginRoot);
   } catch { /* non-fatal */ }
 
+  // Custom tabs — load manifests from ~/godmode/custom-tabs/
+  try {
+    const { loadCustomTabs } = await import("../lib/custom-tabs.js");
+    const loaded = loadCustomTabs();
+    if (loaded.length > 0) {
+      logger.info(`[GodMode] Loaded ${loaded.length} custom tab(s)`);
+    }
+  } catch (err) {
+    logger.warn(`[GodMode] Custom tabs load failed (non-fatal): ${String(err)}`);
+  }
+
   // Memory provider (Honcho or none)
   try {
     const { initMemory, getMemoryProvider } = await import("../lib/memory.js");
@@ -563,10 +573,11 @@ export async function runGatewayStart(
     if (ok) {
       logger.info("[GodMode] Paperclip agent orchestration connected");
 
-      // Wire Paperclip webhook broadcast (for inbound webhooks)
+      // Wire Paperclip webhook broadcast + pluginApi (for inbound webhooks)
       try {
-        const { setPaperclipWebhookBroadcast } = await import("../methods/paperclip-webhook.js");
+        const { setPaperclipWebhookBroadcast, setPaperclipWebhookPluginApi } = await import("../methods/paperclip-webhook.js");
         setPaperclipWebhookBroadcast((event: string, data: unknown) => safeBroadcast(api, event, data));
+        setPaperclipWebhookPluginApi(api);
       } catch { /* non-fatal */ }
 
       // Start polling for completed Paperclip tasks and route results to inbox
@@ -631,12 +642,7 @@ export async function runGatewayStart(
               message: `Agent completed: "${issue.title}". The deliverable is ready for your review.`,
             });
 
-            // 6. Push system event into originating session for proactive agent response
-            notifySession(
-              api,
-              sessionKey,
-              `[Agent completed] "${issue.title}" is ready for review. Output: ${outputPath}`,
-            );
+            // 6. notifySession is already called inside handlePaperclipWebhookHttp — skip here to avoid duplicates
 
             logger.info(
               `[GodMode] Paperclip task completed: "${issue.title}" (${issue.id})` +

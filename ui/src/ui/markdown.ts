@@ -16,13 +16,14 @@ const FILE_EXT_RE = /\.(html?|css|js|ts|tsx|jsx|json|md|txt|csv|py|sh|yaml|yml|x
 
 // Match absolute paths like /Users/... or ~/... with a file extension OR trailing slash (directory).
 // Negative lookbehind avoids matching paths already inside markdown links or URLs (://path).
-const FILE_PATH_RE = /(?<![(\[`]|:\/\/)(?:~\/|\/(?:Users|home|tmp|var|opt|etc|godmode)\/)[\w/.+@-]+(?:\.\w+|\/)(?=\s|[),;:!?]|$)/g;
+const FILE_PATH_RE = /(?<![(\[`~]|:\/\/)(?:~\/|\/(?:Users|home|tmp|var|opt|etc|godmode)\/)[\w/.+@-]+(?:\.\w+|\/)(?=\s|[),;:!?]|$)/g;
 
 // Match bare filenames with known extensions (e.g. "report.md", "my-report.md").
 // Matches ANY filename (word chars, hyphens, dots) with a recognized extension.
 // Does NOT require hyphens or underscores — plain names like "report.md" match.
-// Negative lookbehind: not preceded by ( [ ` / ~ or word char to avoid double-matching paths.
-const BARE_FILENAME_RE = /(?<![(\[`/~\w])(?:[\w][\w.-]*\.(?:html?|css|js|ts|tsx|jsx|json|md|txt|csv|py|sh|yaml|yml|xml|svg|png|jpe?g|gif|webp|pdf|log|mp4|mov|mkv|avi|webm|mp3|wav|aac|ogg|flac|zip|tar|gz|bz2|dmg|iso|doc|docx|xls|xlsx|ppt|pptx))(?=\s|[),;:!?|]|$)/gi;
+// Negative lookbehind: not preceded by ( [ ` / ~ - or word char to avoid double-matching paths
+// and matching partial fragments of hyphenated filenames inside markdown links.
+const BARE_FILENAME_RE = /(?<![(\[`/~\w-])(?:[\w][\w.-]*\.(?:html?|css|js|ts|tsx|jsx|json|md|txt|csv|py|sh|yaml|yml|xml|svg|png|jpe?g|gif|webp|pdf|log|mp4|mov|mkv|avi|webm|mp3|wav|aac|ogg|flac|zip|tar|gz|bz2|dmg|iso|doc|docx|xls|xlsx|ppt|pptx))(?=\s|[),;:!?|]|$)/gi;
 
 /**
  * Pre-process markdown to wrap bare file paths in clickable links.
@@ -41,9 +42,9 @@ export function linkifyFilePaths(markdown: string): string {
       // Don't linkify if the match appears inside a URL (preceded by ://)
       const before = str.slice(Math.max(0, offset - 3), offset);
       if (before.includes("://")) return match;
-      // Don't linkify inside markdown link targets: ](path)
-      const before2 = str.slice(Math.max(0, offset - 2), offset);
-      if (before2.includes("](")) return match;
+      // Don't linkify inside markdown link targets: ](path) or ](~/path)
+      const before3 = str.slice(Math.max(0, offset - 3), offset);
+      if (before3.includes("](")) return match;
       const isDir = match.endsWith("/");
       if (!isDir && !FILE_EXT_RE.test(match)) return match;
       // Expand ~ to a placeholder that the click handler resolves
@@ -60,7 +61,15 @@ export function linkifyFilePaths(markdown: string): string {
 
     // Second pass: bare filenames → godmode-file:// links
     // Skip if already inside a markdown link [...](...)
-    parts[i] = parts[i].replace(BARE_FILENAME_RE, (match) => {
+    parts[i] = parts[i].replace(BARE_FILENAME_RE, (match, offset, str) => {
+      // Don't linkify inside markdown link text [text](url) or URL parts
+      const before = str.slice(0, offset);
+      const lastOpen = before.lastIndexOf("[");
+      const lastClose = before.lastIndexOf("]");
+      if (lastOpen > lastClose) return match; // Inside [...] part
+      const lastParen = before.lastIndexOf("(");
+      const lastParenClose = before.lastIndexOf(")");
+      if (lastParen > lastParenClose) return match; // Inside (...) part
       return `[${match}](godmode-file://${encodeURIComponent(match)})`;
     });
   }

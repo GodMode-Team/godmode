@@ -23,7 +23,10 @@ import { handleChatFileClick } from "./file-click";
  * Replaces the partial render with the full markdown output.
  */
 function handleExpandClick(e: Event) {
-  const target = e.target as HTMLElement;
+  // e.target may be a Text node — walk up to the nearest Element.
+  const raw = e.target;
+  const target = raw instanceof Element ? raw : raw instanceof Node ? raw.parentElement : null;
+  if (!target) return;
   const btn = target.closest(".chat-expand-btn") as HTMLElement | null;
   if (!btn) return;
   const marker = btn.closest(".chat-expand-marker") as HTMLElement | null;

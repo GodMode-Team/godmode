@@ -2,7 +2,7 @@ import type { IconName } from "./icons.js";
 
 export const TAB_GROUPS = [
   { label: "", tabs: ["chat", "today", "team", "workspaces", "brain", "dashboards"] },
-  { label: "Settings", tabs: ["config", "connections", "skills", "agents", "trust", "guardrails"] },
+  { label: "Settings", tabs: ["overview", "config", "connections", "skills", "agents", "trust", "guardrails"] },
 ] as const;
 
 export const POWER_USER_GROUPS = [
@@ -68,6 +68,7 @@ const TAB_PATHS: Partial<Record<Tab, string>> = {
   brain: "/brain",
   "second-brain": "/second-brain",
   dashboards: "/dashboards",
+  overview: "/overview",
 };
 
 const PATH_TO_TAB = new Map(Object.entries(TAB_PATHS).map(([tab, path]) => [path, tab as Tab]));
@@ -77,8 +78,7 @@ PATH_TO_TAB.set("/my-day", "today");
 PATH_TO_TAB.set("/work", "workspaces");
 // Legacy URL support: /setup redirects to onboarding
 PATH_TO_TAB.set("/setup", "onboarding");
-// Legacy URL support: /overview redirects to dashboards
-PATH_TO_TAB.set("/overview", "dashboards");
+// /overview is now a real tab again (no redirect needed)
 // Legacy URL support: /mission-control redirects to dashboards
 PATH_TO_TAB.set("/mission-control", "dashboards");
 // Legacy URL support: /second-brain redirects to brain
@@ -113,6 +113,32 @@ export function normalizePath(path: string): string {
     normalized = normalized.slice(0, -1);
   }
   return normalized;
+}
+
+// ── Custom tab dynamic registry ──────────────────────────────────────
+// Custom tabs register their slugs here so pathForTab/tabFromPath work.
+const _customTabSlugs = new Set<string>();
+
+/** Register a custom tab slug for URL routing. */
+export function registerCustomTabSlug(slug: string): void {
+  _customTabSlugs.add(slug);
+  PATH_TO_TAB.set(`/${slug}`, slug as Tab);
+}
+
+/** Unregister a custom tab slug. */
+export function unregisterCustomTabSlug(slug: string): void {
+  _customTabSlugs.delete(slug);
+  PATH_TO_TAB.delete(`/${slug}`);
+}
+
+/** Check if a tab identifier is a registered custom tab. */
+export function isCustomTab(tab: string): boolean {
+  return _customTabSlugs.has(tab);
+}
+
+/** Get all registered custom tab slugs. */
+export function getCustomTabSlugs(): string[] {
+  return [..._customTabSlugs];
 }
 
 export function pathForTab(tab: Tab, basePath = ""): string {
@@ -209,6 +235,8 @@ export function iconForTab(tab: Tab): IconName {
       return "brain";
     case "dashboards":
       return "barChart";
+    case "overview":
+      return "monitor";
     case "config":
       return "settings";
     case "debug":
@@ -258,6 +286,8 @@ export function titleForTab(tab: Tab) {
       return "Second Brain";
     case "dashboards":
       return "Dashboards";
+    case "overview":
+      return "Overview";
     case "config":
       return "Settings";
     case "debug":
@@ -306,6 +336,8 @@ export function emojiForTab(tab: Tab): string {
       return "\u{1F9E0}";
     case "dashboards":
       return "\u{1F4CA}";
+    case "overview":
+      return "\u{2139}\uFE0F";
     case "config":
       return "\u{2699}\uFE0F";
     case "debug":
@@ -355,6 +387,8 @@ export function subtitleForTab(tab: Tab) {
       return "Custom data views built by your AI ally — remix anything.";
     case "team":
       return "Your AI agent team — orchestrated by Paperclip.";
+    case "overview":
+      return "Version info, gateway status, and updates.";
     case "config":
       return "Core settings — model, plugins, and API configuration.";
     case "debug":

@@ -267,6 +267,11 @@ export type AppViewState = {
   seedSessionWithAgentOutput: (taskTitle: string, output: string, agentPrompt?: string) => Promise<void>;
   // Dynamic HTML slot state (AI-generated tab content)
   dynamicSlots: Record<string, string>;
+  // Custom tabs state
+  customTabs?: Array<import("./views/custom-tab-renderer").CustomTabManifest>;
+  customTabData?: Record<string, unknown>;
+  customTabLoading?: boolean;
+  customTabErrors?: Record<string, string>;
   // Update check state
   updateStatus: {
     openclawVersion: string;

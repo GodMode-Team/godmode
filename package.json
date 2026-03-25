@@ -68,17 +68,17 @@
     "postinstall": "bash patches/fix-imessage-native-vision.sh 2>/dev/null || true"
   },
   "dependencies": {
-    "@composio/core": "^0.6.5",
-    "@honcho-ai/sdk": "^2.0.1",
-    "@lit/context": "^1.1.6",
+    "@composio/core": "0.6.5",
+    "@honcho-ai/sdk": "2.0.1",
+    "@lit/context": "1.1.6",
     "@noble/ed25519": "3.0.0",
-    "better-sqlite3": "^11.8.1",
-    "chokidar": "^4.0.3",
-    "dompurify": "^3.3.3",
-    "json5": "^2.2.3",
-    "lit": "^3.3.2",
-    "marked": "^17.0.1",
-    "ws": "^8.18.0"
+    "better-sqlite3": "11.10.0",
+    "chokidar": "4.0.3",
+    "dompurify": "3.3.3",
+    "json5": "2.2.3",
+    "lit": "3.3.2",
+    "marked": "17.0.3",
+    "ws": "8.19.0"
   },
   "devDependencies": {
     "@types/node": "^24.3.3",

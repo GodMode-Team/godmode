@@ -140,8 +140,9 @@ describe("chat markdown rendering", () => {
       expect(request).toHaveBeenCalledWith("workspaces.readFile", { path: "outputs/report.html" });
       expect(app.sidebarOpen).toBe(true);
     });
-    const heading = app.querySelector<HTMLElement>(".sidebar-html h1");
-    expect(heading?.textContent).toBe("Report");
+    await app.updateComplete;
+    const iframe = app.querySelector<HTMLIFrameElement>(".sidebar-html-frame");
+    expect(iframe).not.toBeNull();
   });
 
   it("renders image files in the sidebar viewer", async () => {
@@ -231,6 +232,58 @@ describe("chat markdown rendering", () => {
     });
     const heading = app.querySelector<HTMLElement>(".sidebar-markdown h1");
     expect(heading?.textContent).toContain("Brief");
+  });
+
+  it("opens tilde-prefixed file links from chat messages in the document viewer", async () => {
+    const app = mountApp("/chat");
+    await app.updateComplete;
+
+    const tildePath = "~/godmode/artifacts/trp-vsl-titan-audit.html";
+    const request = vi.fn(async (method: string, params: Record<string, unknown>) => {
+      if (method === "workspaces.readFile" && params.path === tildePath) {
+        return { content: null, error: "path is outside allowed workspace directories" };
+      }
+      if (method === "files.read" && params.path === tildePath) {
+        return {
+          content: "<h1>TRP VSL Titan Audit</h1><p>Report content.</p>",
+          contentType: "text/html",
+        };
+      }
+      return { content: null };
+    });
+
+    app.client = { request } as unknown as GodModeApp["client"];
+    app.connected = true;
+    app.chatMessages = [
+      {
+        role: "assistant",
+        content: `Here you go: [📄 TRP VSL Titan Audit](${tildePath})`,
+        timestamp: Date.now(),
+      },
+    ];
+    await app.updateComplete;
+
+    const link = app.querySelector<HTMLAnchorElement>(".chat-text a");
+    expect(link).not.toBeNull();
+    expect(link?.getAttribute("href")).toBe(tildePath);
+    link?.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, button: 0 }));
+    await vi.waitFor(() => {
+      // Check that the workspace readFile was attempted first
+      expect(request).toHaveBeenCalledWith("workspaces.readFile", { path: tildePath });
+    });
+    await vi.waitFor(() => {
+      // Then the files.read fallback should be called for absolute paths
+      expect(request).toHaveBeenCalledWith("files.read", {
+        path: tildePath,
+        maxSize: 1_000_000,
+      });
+    });
+    await vi.waitFor(() => {
+      expect(app.sidebarOpen).toBe(true);
+    });
+    await app.updateComplete;
+    const iframe = app.querySelector<HTMLIFrameElement>(".sidebar-html-frame");
+    expect(iframe).not.toBeNull();
   });
 
   it("opens workspace-relative inline code file paths from chat list content", async () => {

@@ -635,14 +635,35 @@ export async function submitTrustRating(
 /**
  * Get trust score for a specific workflow/persona.
  * Returns null if not enough ratings yet.
+ *
+ * Uses recency-weighted scoring: ratings older than 14 days count at 50%.
+ * Requires ratings from at least MIN_UNIQUE_DAYS different days before
+ * a score is considered reliable enough to disable a persona — one bad
+ * infrastructure day shouldn't permanently kill an agent.
  */
 export async function getTrustScore(workflow: string): Promise<number | null> {
   const state = await readState();
   const ratings = state.ratings.filter((r) => r.workflow === workflow.trim());
   if (ratings.length < SCORE_THRESHOLD) return null;
-  const avg = ratings.reduce((s, r) => s + r.rating, 0) / ratings.length;
+
+  const now = Date.now();
+  const RECENCY_CUTOFF_MS = 14 * 24 * 60 * 60 * 1000; // 14 days
+
+  let weightedSum = 0;
+  let totalWeight = 0;
+  for (const r of ratings) {
+    const age = now - Date.parse(r.timestamp);
+    const weight = age > RECENCY_CUTOFF_MS ? 0.5 : 1;
+    weightedSum += r.rating * weight;
+    totalWeight += weight;
+  }
+
+  const avg = totalWeight > 0 ? weightedSum / totalWeight : 0;
   return Math.round(avg * 10) / 10;
 }
+
+/** Minimum number of distinct calendar days of ratings before "disabled" is allowed. */
+const MIN_UNIQUE_DAYS = 3;
 
 // ── Autonomy helpers (used by queue-processor) ───────────────────
 
@@ -651,13 +672,17 @@ export type AutonomyLevel = "full" | "approval" | "disabled";
 /**
  * Determine the autonomy level for a persona based on trust score.
  * - full (score >= 8): auto-approve results, skip manual review
- * - approval (score 5-7.9): queue for human review after completion
- * - disabled (score < 5): block from running entirely
+ * - approval (score 5-7.9 OR low score from too few unique days): queue for review
+ * - disabled (score < 5 AND ratings from 3+ unique days): block from running
  *
  * Returns "full" if the persona/workflow isn't tracked in the trust system
  * (untracked workflows default to allowed so new users aren't blocked).
  * Returns "approval" if tracked but not enough ratings yet (safe default
  * once user has opted into tracking).
+ *
+ * SAFETY: A single bad day of auto-failures can't permanently disable a persona.
+ * The "disabled" level requires ratings from at least MIN_UNIQUE_DAYS (3) different
+ * calendar days, preventing infrastructure outages from poisoning trust scores.
  */
 export async function getAutonomyLevel(persona: string): Promise<AutonomyLevel> {
   const state = await readState();
@@ -674,6 +699,19 @@ export async function getAutonomyLevel(persona: string): Promise<AutonomyLevel> 
   if (score === null) return "approval"; // tracked but not enough data yet
   if (score >= 8) return "full";
   if (score >= 5) return "approval";
+
+  // Score is below 5 — but only disable if we have ratings from enough unique days.
+  // This prevents a single infrastructure outage from permanently killing a persona.
+  const ratings = state.ratings.filter(
+    (r) => r.workflow.toLowerCase() === normalized.toLowerCase(),
+  );
+  const uniqueDays = new Set(
+    ratings.map((r) => r.timestamp.slice(0, 10)), // YYYY-MM-DD
+  );
+  if (uniqueDays.size < MIN_UNIQUE_DAYS) {
+    return "approval"; // not enough diverse data to justify disabling
+  }
+
   return "disabled";
 }
 

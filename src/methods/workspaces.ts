@@ -935,6 +935,10 @@ const list: GatewayRequestHandler = async ({ respond }) => {
     const summaries = await Promise.all(
       config.workspaces.map(async (workspace) => {
         try {
+          if (!(await pathExists(workspace.path))) {
+            console.warn(`[workspaces.list] workspace directory missing, recreating: ${workspace.path}`);
+            await ensureWorkspaceFolders(workspace.path, workspace.type);
+          }
           const outputs = await listWorkspaceOutputs(workspace);
           const sessions = await listWorkspaceSessions(workspace.id, config);
           const summary = resolveWorkspaceSummary(workspace, outputs, sessions);
@@ -1024,6 +1028,13 @@ const get: GatewayRequestHandler = async ({ params, respond }) => {
     if (!workspace) {
       respond(true, { workspace: null, error: `workspace not found: ${id}` });
       return;
+    }
+
+    // Self-heal: if workspace directory is missing, recreate it so downstream
+    // file I/O (scanDirectory, listWorkspaceMemoryFiles, etc.) doesn't hang or crash.
+    if (!(await pathExists(workspace.path))) {
+      console.warn(`[workspaces.get] workspace directory missing, recreating: ${workspace.path}`);
+      await ensureWorkspaceFolders(workspace.path, workspace.type);
     }
 
     const rawOutputs = await listWorkspaceOutputs(workspace);

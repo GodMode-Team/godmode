@@ -17,8 +17,8 @@
 // ── Priority Tiers ───────────────────────────────────────────────────
 //
 // P0 (always): Soul essence, identity anchor, Honcho context, routing guide
-// P1 (normal): Schedule, task/queue counts, priorities, skill card
-// P2 (trim under pressure): Meeting prep, cron failures, queue review, routing lessons
+// P1 (normal): Schedule, task/queue counts, priorities, skill card, queue deliverables ready
+// P2 (trim under pressure): Meeting prep, cron failures, routing lessons
 // P3 (first to drop): Safety nudges, conditional context
 
 import { getAllyNameLower } from "./ally-identity.js";
@@ -66,7 +66,7 @@ export interface ContextInputs {
   /** P2: Cron failure alerts — ~3 lines */
   cronFailures: string | null;
 
-  /** P2: Queue items ready for review — ~1 line */
+  /** P1: Queue items ready for review — users are waiting for these results */
   queueReview: string | null;
 
   /** P2: Agent team status — blocked issues, completed work needing review */
@@ -232,6 +232,11 @@ export function assembleContext(inputs: ContextInputs): string {
     chunks.push(inputs.skillCard);
   }
 
+  // Queue deliverables ready is P1 — users are actively waiting for these results
+  if (inputs.queueReview) {
+    chunks.push(inputs.queueReview);
+  }
+
   // Under moderate pressure, stop here
   if (pressure >= 0.7) {
     return wrapContext(chunks);
@@ -245,10 +250,6 @@ export function assembleContext(inputs: ContextInputs): string {
 
   if (inputs.cronFailures) {
     chunks.push(inputs.cronFailures);
-  }
-
-  if (inputs.queueReview) {
-    chunks.push(inputs.queueReview);
   }
 
   if (inputs.teamStatus) {

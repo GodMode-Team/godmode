@@ -1,13 +1,25 @@
 /**
  * Delegated click handler for file links in chat text.
  * Intercepts clicks on file:// and godmode-file:// anchors and routes to onOpenFile.
+ *
+ * NOTE: <code> element clicks (backtick-wrapped paths) are handled by the outer
+ * handleChatThreadLinkClick in views/chat.ts, which also handles workspace resolution.
+ * This handler only deals with explicitly linkified anchors from linkifyFilePaths.
  */
 export function handleChatFileClick(
   e: Event,
   onOpenFile?: (filePath: string) => void,
 ) {
   if (!onOpenFile) return;
-  const target = e.target as HTMLElement;
+  // e.target may be a Text node when clicking on link text — walk up to the nearest Element.
+  const raw = e.target;
+  const target =
+    raw instanceof Element
+      ? raw
+      : raw instanceof Node
+        ? raw.parentElement
+        : null;
+  if (!target) return;
   const anchor = target.closest("a");
   if (!anchor) return;
   const href = anchor.getAttribute("href");
@@ -42,6 +54,27 @@ export function handleChatFileClick(
       // keep as-is
     }
     onOpenFile(filename);
+    return;
+  }
+
+  // Handle local file paths in ally-generated markdown links
+  // e.g. [Open it](~/godmode/artifacts/report.html) or [View](/Users/.../file.md)
+  if (
+    href.startsWith("~/") ||
+    href.startsWith("/Users/") ||
+    href.startsWith("/home/") ||
+    href.startsWith("/tmp/") ||
+    href.startsWith("/godmode/")
+  ) {
+    e.preventDefault();
+    e.stopPropagation();
+    let filePath = href;
+    try {
+      filePath = decodeURIComponent(filePath);
+    } catch {
+      // keep as-is
+    }
+    onOpenFile(filePath);
     return;
   }
 }

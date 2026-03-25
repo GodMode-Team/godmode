@@ -42,6 +42,12 @@ export function createDelegateTool(ctx?: { sessionKey?: string }): AnyAgentTool 
       "Delegate complex work to the agent team. " +
       "Use this when a task needs multiple specialists (research, content, design, engineering, etc.) " +
       "or would take too long to handle inline. " +
+      "SCOPING RULE: Always decompose complex requests into MULTIPLE issues, one per specialist. " +
+      "Example: 'Build Sunny's audit page + Austin's pre-install page' = at LEAST 2 issues " +
+      "(one per page, each assigned to a content-writer or researcher). " +
+      "If a single page needs research + writing, create 2 issues: one 'research' issue and one 'content' issue. " +
+      "Each issue gets ONE persona — never assign multiple specialists to one issue. " +
+      "More issues = more parallel agents = faster results. " +
       "DELEGATION FLOW: Step 1 — call with action='delegate', confirmed=false to get a preview. " +
       "Step 2 — present the brief to the user. " +
       "Step 3 — when user approves (says 'go', 'yes', 'do it', etc.), call AGAIN with action='delegate', confirmed=true and THE SAME title/description/issues. " +
@@ -261,7 +267,7 @@ export function createDelegateTool(ctx?: { sessionKey?: string }): AnyAgentTool 
 
           // Queue all issues for execution, tracking which were actually queued
           const queuedIssueMap = new Map<string, string>(); // issueId → queueItemId
-          let skippedCount = 0;
+          const skippedItems: { title: string; persona: string; reason: string }[] = [];
 
           for (let i = 0; i < issueRecords.length; i++) {
             const record = issueRecords[i];
@@ -283,20 +289,29 @@ export function createDelegateTool(ctx?: { sessionKey?: string }): AnyAgentTool 
 
             const taskType = isQAStage ? "review" as const : inferTaskType(record.personaSlug || task.title);
 
-            // Trust gating: skip disabled or dormant personas
+            // Trust gating: warn but DON'T silently skip — demote to "approval" instead.
+            // The ally MUST tell the user when agents are gated. Silent skipping caused
+            // Prosper to claim "5 agents working" when only 2 were actually queued.
             if (record.personaSlug && record.personaSlug !== "unassigned") {
+              let gateWarning: string | null = null;
+
               try {
-                const { getAutonomyLevel } = await import("../methods/trust-tracker.js");
+                const { getAutonomyLevel, getTrustScore } = await import("../methods/trust-tracker.js");
                 const autonomy = await getAutonomyLevel(record.personaSlug);
                 if (autonomy === "disabled") {
-                  skippedCount++;
-                  continue;
+                  const score = await getTrustScore(record.personaSlug);
+                  gateWarning = `${record.personaSlug} has low trust score (${score ?? "unknown"}). Running with approval-required.`;
                 }
               } catch { /* trust tracker unavailable */ }
 
-              if (isPersonaDormant(record.personaSlug)) {
-                skippedCount++;
-                continue;
+              if (!gateWarning && isPersonaDormant(record.personaSlug)) {
+                gateWarning = `${record.personaSlug} is dormant per roster config. Running anyway with approval-required.`;
+              }
+
+              if (gateWarning) {
+                skippedItems.push({ title: task.title, persona: record.personaSlug, reason: gateWarning });
+                // Don't skip — queue it anyway so work actually happens.
+                // The queue processor will hold it for human review via "approval" autonomy.
               }
             }
 
@@ -318,6 +333,7 @@ export function createDelegateTool(ctx?: { sessionKey?: string }): AnyAgentTool 
                 createdAt: Date.now(),
                 personaHint: record.personaSlug,
                 workspaceId: workspace,
+                sessionId: ctx?.sessionKey,
                 meta: {
                   issueId: record.issueId,
                   projectId,
@@ -354,15 +370,21 @@ export function createDelegateTool(ctx?: { sessionKey?: string }): AnyAgentTool 
             if (qp) void qp.processAllPending();
           } catch { /* queue processor not ready */ }
 
+          const warnings = skippedItems.length > 0
+            ? `\n\n⚠️ TRUST WARNINGS — Tell the user:\n${skippedItems.map(s => `- "${s.title}" (${s.persona}): ${s.reason}`).join("\n")}\nThese items are queued but flagged for human approval. The user should know some agents have low trust scores.`
+            : "";
+
           return jsonResult({
             success: true,
-            message: `Project "${title}" delegated to the team (${issues.length} issue(s)${skippedCount > 0 ? `, ${skippedCount} skipped` : ""}).`,
+            message: `Project "${title}" delegated to the team (${issueRecords.length} issue(s) queued).${warnings}`,
             projectId,
             issues: issueRecords.map(r => ({
               issueId: r.issueId,
               title: r.title,
               assignee: r.personaSlug,
+              queued: queuedIssueMap.has(r.issueId),
             })),
+            ...(skippedItems.length > 0 ? { trustWarnings: skippedItems } : {}),
           });
         }
 

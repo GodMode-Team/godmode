@@ -108,6 +108,7 @@ import { queueHandlers } from "./src/methods/queue.js";
 // REMOVED (v2 slim): x-intel — OC has x_read tool
 import { filesHandlers } from "./src/methods/files.js";
 import { dashboardsHandlers } from "./src/methods/dashboards.js";
+import { customTabsHandlers } from "./src/methods/custom-tabs.js";
 // REMOVED (v2 slim): impact-ledger — not core
 import { guardrailsHandlers } from "./src/methods/guardrails.js";
 import { imageCacheHandlers } from "./src/methods/image-cache.js";
@@ -203,6 +204,7 @@ const godmodePlugin = {
       ...deployRegistryHandlers,
       ...workspaceConnectionHandlers,
       ...workspaceFeedHandlers,
+      ...customTabsHandlers,
     };
 
     for (const [method, handler] of Object.entries(allHandlers)) {

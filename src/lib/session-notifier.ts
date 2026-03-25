@@ -27,10 +27,14 @@ export function notifySession(
       const enqueue = api.runtime?.system?.enqueueSystemEvent;
       if (typeof enqueue === "function") {
         enqueue(message, { sessionKey });
+      } else {
+        console.warn(`[session-notifier] enqueueSystemEvent not available — sessionKey=${sessionKey} notification dropped`);
       }
-    } catch {
-      // Non-fatal — session may not exist or API may not support it
+    } catch (err) {
+      console.warn(`[session-notifier] Failed to enqueue event for session=${sessionKey}:`, err);
     }
+  } else {
+    console.warn(`[session-notifier] No sessionKey — broadcast-only notification`);
   }
 
   // 2. Broadcast SSE event to Control UI

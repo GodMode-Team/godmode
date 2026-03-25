@@ -494,6 +494,19 @@ export function handleChatEvent(state: ChatState, payload?: ChatEventPayload) {
     state.chatRunId = null;
     state.chatStreamStartedAt = null;
   } else if (payload.state === "aborted") {
+    // Preserve partial streamed text so the user can see what was said before
+    // they interrupted. Without this, the entire response vanishes on abort.
+    if (state.chatStream && state.chatStream.trim().length > 0) {
+      state.chatMessages = [
+        ...state.chatMessages,
+        {
+          role: "assistant",
+          content: [{ type: "text", text: state.chatStream }],
+          timestamp: state.chatStreamStartedAt ?? Date.now(),
+          isAborted: true,
+        },
+      ];
+    }
     state.chatStream = null;
     state.chatRunId = null;
     state.chatStreamStartedAt = null;
