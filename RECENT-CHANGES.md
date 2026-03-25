@@ -4,17 +4,18 @@ This file tracks recent development changes so Atlas and other agents can quickl
 
 ---
 
-## Onboarding Memory Seed Sentinel Fix (2026-03-21)
+## QMD Missing Binary Guardrail (2026-03-16)
 
 ### What Landed
-- Restored the memory seed sentinel as the onboarding source of truth by writing `~/godmode/data/.mem0-seeded` after a real successful memory init.
-- Updated the onboarding wizard to verify actual memory init before setting `secondBrain.memorySeeded`.
-- Updated the onboarding assessment and onboarding prompt copy to use the sentinel-backed seeded state instead of `MEMORY.md` existence.
+- Added a shared qmd status detector so startup, health checks, onboarding audit, and Second Brain search all agree on whether the qmd CLI is actually available.
+- Startup now logs the actionable install command `npm install -g @tobilu/qmd`, raises a health warning, and broadcasts a visible degraded-search notification instead of failing silently.
+- QMD-backed search now degrades cleanly to file-walk fallback without repeatedly hitting `spawn qmd ENOENT`.
+- `/godmode/health`, onboarding assessment/config audit, and Setup capability state now surface qmd availability and the missing-binary warning.
 
 ### Verification
-- `pnpm typecheck` — blocked locally (`tsc` missing because `node_modules` is not installed)
-- `pnpm build` — blocked locally (`vite` missing because `node_modules` is not installed)
-- `rg "\\.\\./\\.\\./\\.\\./\\.\\./src/" -n`
+- `pnpm typecheck`
+- `pnpm build`
+- `rg "\.\./\.\./\.\./\.\./src/" -n`
 
 ## Linux systemd gateway service template (2026-03-21)
 
