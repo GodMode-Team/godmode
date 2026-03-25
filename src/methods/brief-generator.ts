@@ -31,6 +31,7 @@ import {
 import { getUserTimezone, getUserLocation, getTempUnit } from "../lib/user-config.js";
 import { loadLatestReflection } from "../lib/evening-reflection.js";
 import { resolveAnthropicKey } from "../lib/anthropic-auth.js";
+import { ANTHROPIC_API_URL, MODEL_SONNET, MODEL_HAIKU } from "../lib/constants.js";
 
 type GatewayRequestHandlers = Record<string, GatewayRequestHandler>;
 
@@ -90,11 +91,11 @@ async function callClaudeDirectAPI(
   userPrompt: string,
   opts?: { model?: string; maxTokens?: number },
 ): Promise<string | null> {
-  const model = opts?.model ?? "claude-sonnet-4-6-20250514";
+  const model = opts?.model ?? MODEL_SONNET;
   const maxTokens = opts?.maxTokens ?? 8192;
 
   try {
-    const resp = await fetch("https://api.anthropic.com/v1/messages", {
+    const resp = await fetch(ANTHROPIC_API_URL, {
       method: "POST",
       headers: {
         "x-api-key": apiKey,
@@ -143,11 +144,11 @@ async function callClaudeCLI(
 
   // Map full model IDs to CLI-friendly aliases
   const modelMap: Record<string, string> = {
-    "claude-sonnet-4-6-20250514": "sonnet",
+    [MODEL_SONNET]: "sonnet",
     "claude-opus-4-6": "opus",
-    "claude-haiku-4-5-20251001": "haiku",
+    [MODEL_HAIKU]: "haiku",
   };
-  const rawModel = opts?.model ?? "claude-sonnet-4-6-20250514";
+  const rawModel = opts?.model ?? MODEL_SONNET;
   const model = modelMap[rawModel] ?? rawModel;
 
   try {
@@ -1537,7 +1538,7 @@ ${cronFailures && cronFailures.cronErrors.length > 0 ? "\nIMPORTANT: Surface the
   // ── Call Claude to render the brief ─────────────────────────────
   console.log("[BriefGenerator] Calling Claude Sonnet 4.6 to render brief...");
   let briefContent = await callClaude(BRIEF_SYSTEM_PROMPT, briefUserPrompt, {
-    model: "claude-sonnet-4-6-20250514",
+    model: MODEL_SONNET,
     maxTokens: 8192,
   });
 

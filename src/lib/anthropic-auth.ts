@@ -13,6 +13,7 @@
 
 import { readFileSync } from "node:fs";
 import { homedir } from "node:os";
+import { ANTHROPIC_API_URL, MODEL_HAIKU } from "./constants.js";
 import { join } from "node:path";
 
 /**
@@ -86,14 +87,14 @@ export async function callHaiku(opts: {
   if (!apiKey) return null;
 
   const body: Record<string, unknown> = {
-    model: opts.model ?? "claude-haiku-4-5-20251001",
+    model: opts.model ?? MODEL_HAIKU,
     max_tokens: opts.maxTokens ?? 1024,
     messages: opts.messages,
   };
   if (opts.system) body.system = opts.system;
 
   const response = await fetchWithTimeout(
-    "https://api.anthropic.com/v1/messages",
+    ANTHROPIC_API_URL,
     {
       method: "POST",
       headers: {

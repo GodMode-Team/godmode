@@ -22,6 +22,7 @@ import {
 import { join } from "node:path";
 import { MEMORY_DIR, localDateString } from "../../data-paths.js";
 import { health } from "../../lib/health-ledger.js";
+import { ANTHROPIC_API_URL, MODEL_HAIKU, MODEL_SONNET_SHORT, SCREENPIPE_API_URL } from "../../lib/constants.js";
 import { forwardMessage, isHonchoReady } from "../honcho-client.js";
 import { loadConfig, type ScreenpipeConfig } from "./screenpipe-config.js";
 
@@ -70,7 +71,7 @@ export async function isScreenpipeAvailable(): Promise<boolean> {
   try {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 2000);
-    const res = await fetch("http://localhost:3030/health", {
+    const res = await fetch(`${SCREENPIPE_API_URL}/health`, {
       signal: controller.signal,
     });
     clearTimeout(timeout);
@@ -89,7 +90,7 @@ export async function isScreenpipeAvailable(): Promise<boolean> {
 async function summarizeChunk(
   text: string,
   systemPrompt: string,
-  model = "claude-haiku-4-5-20251001",
+  model = MODEL_HAIKU,
 ): Promise<string> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
@@ -98,7 +99,7 @@ async function summarizeChunk(
   }
 
   try {
-    const res = await fetch("https://api.anthropic.com/v1/messages", {
+    const res = await fetch(ANTHROPIC_API_URL, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -585,7 +586,7 @@ export async function runWeeklyCompression(): Promise<void> {
         "Highlight patterns: what apps/projects dominated, key people interacted with, " +
         "major decisions made, time allocation trends. " +
         "Use concise bullet points. This is for personal reflection.",
-      "claude-sonnet-4-6",
+      MODEL_SONNET_SHORT,
     );
 
     // Write weekly file
@@ -674,7 +675,7 @@ export async function runMonthlyCompression(): Promise<void> {
       "Compress these weekly screen activity summaries into a single concise monthly overview. " +
         "One paragraph capturing: dominant projects, key relationships, behavioral patterns, " +
         "and any shifts in focus. This is a high-level reflection for long-term memory.",
-      "claude-sonnet-4-6",
+      MODEL_SONNET_SHORT,
     );
 
     // Write monthly file

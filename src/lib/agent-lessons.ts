@@ -13,9 +13,10 @@ import { readFile, writeFile, rename, mkdir } from "node:fs/promises";
 import { join, dirname } from "node:path";
 import { randomUUID } from "node:crypto";
 import { DATA_DIR } from "../data-paths.js";
+import { MAX_LESSONS_PER_KEY as MAX_LESSONS_CONST } from "./constants.js";
 
 const LESSONS_FILE = join(DATA_DIR, "agent-lessons.json");
-const MAX_LESSONS_PER_KEY = 20;
+const MAX_LESSONS_PER_KEY = MAX_LESSONS_CONST;
 
 // ── Types ─────────────────────────────────────────────────────────
 

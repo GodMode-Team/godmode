@@ -14,8 +14,10 @@ import { safeName, ensureDir } from "./helpers.js";
 
 const execFile = promisify(execFileCb);
 
-const GOG_ACCOUNT =
-  process.env.GOG_CALENDAR_ACCOUNT || "caleb@patientautopilot.com";
+const GOG_ACCOUNT = process.env.GOG_CALENDAR_ACCOUNT ?? "";
+if (!GOG_ACCOUNT) {
+  console.warn("[GodMode][DriveSync] GOG_CALENDAR_ACCOUNT not set — drive sync disabled");
+}
 
 interface DriveFile {
   id?: string;
@@ -26,6 +28,7 @@ interface DriveFile {
 
 export async function runDriveSync(): Promise<{ filesProcessed: number }> {
   const result = { filesProcessed: 0 };
+  if (!GOG_ACCOUNT) return result;
 
   try {
     const driveDir = join(MEMORY_DIR, "ingested", "drive");

@@ -10,6 +10,7 @@
 import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { join, dirname } from "node:path";
 import { DATA_DIR } from "../../data-paths.js";
+import { SCREENPIPE_API_URL } from "../../lib/constants.js";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -50,7 +51,7 @@ export interface ScreenpipeConfig {
 
 export const DEFAULT_CONFIG: ScreenpipeConfig = {
   enabled: false,
-  apiUrl: "http://localhost:3030",
+  apiUrl: SCREENPIPE_API_URL,
   blockedApps: [
     "1Password",
     "Keychain Access",

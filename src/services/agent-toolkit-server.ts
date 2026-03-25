@@ -34,6 +34,7 @@ import { existsSync, readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { join, dirname, resolve, basename, extname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { DATA_DIR } from "../data-paths.js";
+import { TOOLKIT_PORT_START, TOOLKIT_PORT_END } from "../lib/constants.js";
 
 import type { Logger } from "../types/plugin-api.js";
 
@@ -134,8 +135,8 @@ export async function startToolkitServer(log: Logger): Promise<boolean> {
     });
   });
 
-  // Port scan 5000-5009
-  for (let port = 5000; port <= 5009; port++) {
+  // Port scan configurable range
+  for (let port = TOOLKIT_PORT_START; port <= TOOLKIT_PORT_END; port++) {
     try {
       await new Promise<void>((resolve, reject) => {
         server.once("error", reject);

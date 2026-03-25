@@ -55,7 +55,13 @@ export interface LedgerSnapshot {
 
 // ── Ring Buffer Per Operation ────────────────────────────────────────
 
-const BUFFER_SIZE = 50; // Keep last 50 signals per operation
+import {
+  HEALTH_SIGNAL_BUFFER_SIZE, MAX_TURN_ERRORS as MAX_TURN_ERRORS_CONST,
+  TURN_ERROR_TTL_MS as TURN_ERROR_TTL_CONST, HEALTH_SESSION_IDLE_MS,
+  GITHUB_REPO as GITHUB_REPO_CONST,
+} from "./constants.js";
+
+const BUFFER_SIZE = HEALTH_SIGNAL_BUFFER_SIZE;
 
 interface OperationBuffer {
   signals: HealthSignal[];
@@ -212,8 +218,8 @@ export const health = {
  *   5. turnErrors.drain() clears the buffer
  */
 
-const MAX_TURN_ERRORS = 10;
-const TURN_ERROR_TTL_MS = 5 * 60 * 1000; // Surface errors within 5 minutes
+const MAX_TURN_ERRORS = MAX_TURN_ERRORS_CONST;
+const TURN_ERROR_TTL_MS = TURN_ERROR_TTL_CONST;
 
 interface TurnError {
   operation: string;
@@ -340,7 +346,7 @@ export const repairLog = {
  * for diagnostics and operational awareness.
  */
 const sessionActivity = new Map<string, number>();
-const SESSION_IDLE_MS = 5 * 60 * 1000; // 5 minutes = idle
+const SESSION_IDLE_MS = HEALTH_SESSION_IDLE_MS;
 
 export const sessions = {
   /** Record activity for a session (call from message_received). */
@@ -398,7 +404,7 @@ export const sessions = {
 
 // ── Auto-File GitHub Issues ──────────────────────────────────────
 
-const GITHUB_REPO = process.env.GODMODE_GITHUB_REPO || "godmode-team/godmode";
+const GITHUB_REPO = GITHUB_REPO_CONST;
 
 async function autoFileGitHubIssue(entry: RepairEntry, occurrences: number): Promise<void> {
   try {

@@ -40,6 +40,7 @@ import {
   BRAIN_SUBFOLDERS,
 } from "../lib/vault-paths.js";
 import { autoMigrateIfNeeded, migrateToVault } from "../lib/vault-migrate.js";
+import { SCREENPIPE_API_URL } from "../lib/constants.js";
 
 type GatewayRequestHandlers = Record<string, GatewayRequestHandler>;
 
@@ -1413,7 +1414,7 @@ const memoryPulse: GatewayRequestHandler = async ({ respond }) => {
 
   // 4. Screenpipe
   try {
-    const resp = await fetch("http://localhost:3030/health", {
+    const resp = await fetch(`${SCREENPIPE_API_URL}/health`, {
       signal: AbortSignal.timeout(2_000),
     });
     systems.push({

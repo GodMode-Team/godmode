@@ -11,6 +11,7 @@ import { existsSync, mkdirSync, readdirSync, statSync } from "node:fs";
 import { join, resolve, sep } from "node:path";
 import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { GODMODE_ROOT, MEMORY_DIR, resolveVaultPath } from "../data-paths.js";
+import { WORKSPACE_CACHE_TTL_MS } from "./constants.js";
 
 // ── Vault Folder Constants ──────────────────────────────────────────
 
@@ -350,7 +351,7 @@ export async function writeVaultManifest(manifest: VaultManifest): Promise<void>
 // Cache workspace paths — refreshed lazily when isAllowedPath is called
 let _workspacePaths: string[] = [];
 let _workspacePathsTs = 0;
-const WORKSPACE_CACHE_TTL = 30_000; // 30s
+const WORKSPACE_CACHE_TTL = WORKSPACE_CACHE_TTL_MS;
 
 function isWithinRoot(resolved: string, root: string): boolean {
   const prefix = root.endsWith(sep) ? root : root + sep;

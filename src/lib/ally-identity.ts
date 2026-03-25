@@ -12,9 +12,13 @@ import { readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { GODMODE_ROOT } from "../data-paths.js";
+import {
+  DEFAULT_ALLY_NAME as DEFAULT_NAME_CONST,
+  ALLY_IDENTITY_CACHE_TTL_MS,
+} from "./constants.js";
 
-const DEFAULT_ALLY_NAME = "Ally";
-const CACHE_TTL_MS = 30 * 60 * 1000;
+const DEFAULT_ALLY_NAME = DEFAULT_NAME_CONST;
+const CACHE_TTL_MS = ALLY_IDENTITY_CACHE_TTL_MS;
 
 let cachedName: string | null = null;
 let cachedAt = 0;

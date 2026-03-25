@@ -12,13 +12,14 @@ import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { join, dirname } from "node:path";
 import { DATA_DIR, localDateString } from "../data-paths.js";
 import { reportConnected, reportDegraded, reportUnavailable } from "./service-health.js";
+import { AWARENESS_CACHE_TTL_MS } from "./constants.js";
 
 const SNAPSHOT_PATH = join(DATA_DIR, "awareness-snapshot.md");
 let logger: { warn?: (msg: string) => void } | null = null;
 export function setSnapshotLogger(l: { warn?: (msg: string) => void }): void { logger = l; }
 let cachedSnapshot: string | null = null;
 let cachedAt = 0;
-const CACHE_TTL_MS = 60_000; // 1 min — heartbeat regenerates every 15 min
+const CACHE_TTL_MS = AWARENESS_CACHE_TTL_MS;
 
 /**
  * Build a lean awareness snapshot (~50 lines) from current state.

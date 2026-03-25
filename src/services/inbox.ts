@@ -21,6 +21,11 @@ import { readFile, writeFile, rename, mkdir } from "node:fs/promises";
 import { join, dirname } from "node:path";
 import { randomUUID } from "node:crypto";
 import { DATA_DIR } from "../data-paths.js";
+import {
+  MAX_INBOX_ITEMS as MAX_INBOX_ITEMS_CONST,
+  INBOX_STALE_DAYS,
+  INBOX_SWEEP_COOLDOWN_MS,
+} from "../lib/constants.js";
 
 // ── Types ────────────────────────────────────────────────────────
 
@@ -115,7 +120,7 @@ export function shouldInbox(input: ShouldInboxInput): boolean {
 // ── File paths ───────────────────────────────────────────────────
 
 const INBOX_FILE = join(DATA_DIR, "inbox.json");
-const MAX_INBOX_ITEMS = 200;
+const MAX_INBOX_ITEMS = MAX_INBOX_ITEMS_CONST;
 
 // ── State I/O ────────────────────────────────────────────────────
 
@@ -308,9 +313,9 @@ function pendingCount(state: InboxState): number {
 
 // ── Stale sweep ─────────────────────────────────────────────────
 
-const STALE_DAYS = 7;
+const STALE_DAYS = INBOX_STALE_DAYS;
 let _lastSweep = 0;
-const SWEEP_COOLDOWN_MS = 60 * 60 * 1000; // 1 hour — don't sweep on every list call
+const SWEEP_COOLDOWN_MS = INBOX_SWEEP_COOLDOWN_MS;
 
 /**
  * Auto-dismiss pending items older than STALE_DAYS.

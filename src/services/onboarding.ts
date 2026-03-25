@@ -14,6 +14,10 @@ import { homedir } from "node:os";
 import { localDateString } from "../data-paths.js";
 import { getAllyName } from "../lib/ally-identity.js";
 import {
+  ONBOARDING_MAX_FIELD_LENGTH, ONBOARDING_MAX_KEY_PEOPLE,
+  ONBOARDING_MAX_HARD_RULES, MODEL_ADAPTER_DEFAULT,
+} from "../lib/constants.js";
+import {
   generateAgentsMd,
   generateUserMd,
   generateSoulMd,
@@ -114,13 +118,13 @@ export interface OnboardingPreviewResult {
 const MAX_PROJECTS = 10;
 
 /** Maximum number of key people the wizard will generate stubs for. */
-const MAX_KEY_PEOPLE = 20;
+const MAX_KEY_PEOPLE = ONBOARDING_MAX_KEY_PEOPLE;
 
 /** Maximum number of hard rules to include in AGENTS.md. */
-const MAX_HARD_RULES = 15;
+const MAX_HARD_RULES = ONBOARDING_MAX_HARD_RULES;
 
 /** Maximum character length for free-text answer fields. */
-const MAX_FIELD_LEN = 500;
+const MAX_FIELD_LEN = ONBOARDING_MAX_FIELD_LENGTH;
 
 // ── Helpers ──────────────────────────────────────────────────────
 
@@ -379,7 +383,7 @@ export function buildConfigPatch(answers: OnboardingAnswers): Record<string, unk
         },
         thinkingDefault: "low",
         models: {
-          "anthropic/claude-sonnet-4-6": {
+          [MODEL_ADAPTER_DEFAULT]: {
             alias: "sonnet",
             params: { cacheRetention: "long" },
           },

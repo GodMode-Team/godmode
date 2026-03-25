@@ -9,16 +9,17 @@
 
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
+import { HERMES_API_URL as HERMES_URL_CONST, HERMES_DEBOUNCE_MS } from "../lib/constants.js";
 
 const execFileAsync = promisify(execFile);
 
-const HERMES_API_URL = process.env.HERMES_API_URL || "http://127.0.0.1:8642";
+const HERMES_API_URL = HERMES_URL_CONST;
 const HERMES_API_KEY = process.env.HERMES_API_KEY || "";
 const IMSG_CLI = process.env.IMSG_CLI_PATH || "/opt/homebrew/bin/imsg";
 
 // Debounce: don't forward if Hermes just replied (prevent echo loops)
 const _recentForwards = new Map<string, number>();
-const DEBOUNCE_MS = 10_000;
+const DEBOUNCE_MS = HERMES_DEBOUNCE_MS;
 
 /**
  * Extract the phone/handle from an iMessage session key.

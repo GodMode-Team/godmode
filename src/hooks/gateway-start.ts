@@ -16,6 +16,12 @@ import { refreshLicenseOnStart } from "../lib/license.js";
 import { health, turnErrors, sessions } from "../lib/health-ledger.js";
 import { writeSentinel, consumeSentinel } from "../lib/restart-sentinel.js";
 import { resolveAnthropicKey } from "../lib/anthropic-auth.js";
+import {
+  DEPLOY_DOMAIN, DEPLOY_REPO,
+  HONCHO_SYNC_INTERVAL_MS as HONCHO_SYNC_CONST,
+  SCREENPIPE_HOURLY_MS, SCREENPIPE_CLEANUP_MS, CALENDAR_ENRICHMENT_MS,
+  VAULT_INBOX_MIN_AGE_MS,
+} from "../lib/constants.js";
 
 import type { Logger } from "../types/plugin-api.js";
 type CleanupEntry = { name: string; fn: () => void | Promise<void> };
@@ -254,8 +260,8 @@ export async function runGatewayStart(
     const existing = await loadRegistry();
     if (existing.length === 0) {
       await registerProject({
-        domain: "lifeongodmode.com",
-        repo: "GodMode-Team/lifeongodmode",
+        domain: DEPLOY_DOMAIN,
+        repo: DEPLOY_REPO,
         localDir: "~/godmode/private/sites/lifeongodmode",
         platform: "vercel",
         projectName: "lifeongodmode",
@@ -417,7 +423,7 @@ export async function runGatewayStart(
       logger.info(`[GodMode] Memory initialized (provider: ${getMemoryProvider()})`);
 
       // Periodic vault sync every 6 hours (gateway runs indefinitely)
-      const HONCHO_SYNC_INTERVAL_MS = 6 * 60 * 60 * 1000;
+      const HONCHO_SYNC_INTERVAL_MS = HONCHO_SYNC_CONST;
       const honchoSyncTimer = setInterval(async () => {
         try {
           const { syncHonchoToVault } = await import("../services/honcho-sync.js");
@@ -710,7 +716,7 @@ export async function runGatewayStart(
       } catch (err) {
         logger.warn(`[GodMode] Screenpipe hourly failed: ${String(err)}`);
       }
-    }, 60 * 60_000); // 60 min
+    }, SCREENPIPE_HOURLY_MS);
     serviceCleanup.push({ name: "screenpipe-hourly", fn: () => clearInterval(screenpipeHourlyTimer) });
 
     // Screenpipe daily digest — every 24 hours (runs at next interval from startup)
@@ -727,7 +733,7 @@ export async function runGatewayStart(
       } catch (err) {
         logger.warn(`[GodMode] Screenpipe daily digest failed: ${String(err)}`);
       }
-    }, 24 * 60 * 60_000); // 24 hours
+    }, VAULT_INBOX_MIN_AGE_MS);
     serviceCleanup.push({ name: "screenpipe-daily", fn: () => clearInterval(screenpipeDailyTimer) });
 
     // Screenpipe retention cleanup — every 12 hours
@@ -741,7 +747,7 @@ export async function runGatewayStart(
       } catch (err) {
         logger.warn(`[GodMode] Screenpipe cleanup failed: ${String(err)}`);
       }
-    }, 12 * 60 * 60_000); // 12 hours
+    }, SCREENPIPE_CLEANUP_MS);
     serviceCleanup.push({ name: "screenpipe-cleanup", fn: () => clearInterval(screenpipeCleanupTimer) });
 
     // Calendar enrichment — every 60 minutes
@@ -756,7 +762,7 @@ export async function runGatewayStart(
       } catch (err) {
         logger.warn(`[GodMode] Calendar enrichment failed: ${String(err)}`);
       }
-    }, 60 * 60_000); // 60 min
+    }, CALENDAR_ENRICHMENT_MS);
     serviceCleanup.push({ name: "calendar-enrichment", fn: () => clearInterval(calendarTimer) });
 
     logger.info("[GodMode] Ingestion pipelines registered (screenpipe hourly/daily/cleanup, calendar)");

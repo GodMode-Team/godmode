@@ -13,6 +13,7 @@
 
 import Database from "better-sqlite3";
 import { join } from "node:path";
+import { ANTHROPIC_API_URL, MODEL_SONNET_SHORT } from "./constants.js";
 import { reportConnected, reportDegraded } from "./service-health.js";
 import { DATA_DIR } from "../data-paths.js";
 import { resolveAnthropicKey, fetchWithTimeout } from "./anthropic-auth.js";
@@ -142,7 +143,7 @@ export async function extractAndStore(text: string): Promise<void> {
 
   try {
     const body = JSON.stringify({
-      model: "claude-sonnet-4-6",
+      model: MODEL_SONNET_SHORT,
       max_tokens: 1024,
       messages: [
         {
@@ -169,7 +170,7 @@ ${truncated}`,
     });
 
     const response = await fetchWithTimeout(
-      "https://api.anthropic.com/v1/messages",
+      ANTHROPIC_API_URL,
       {
         method: "POST",
         headers: {

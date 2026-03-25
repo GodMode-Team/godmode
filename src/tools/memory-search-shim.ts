@@ -14,6 +14,7 @@
 
 import { type AnyAgentTool } from "openclaw/plugin-sdk";
 import { jsonResult } from "../lib/sdk-helpers.js";
+import { SCREENPIPE_API_URL } from "../lib/constants.js";
 
 type ToolContext = {
   sessionKey?: string;
@@ -151,7 +152,7 @@ async function searchFts5(query: string): Promise<Array<{ source: string; conten
 /** Query Screenpipe REST API for screen/audio context. Returns formatted hits. */
 async function searchScreenpipe(query: string): Promise<Array<{ source: string; content: string }>> {
   try {
-    const resp = await fetch(`http://localhost:3030/search`, {
+    const resp = await fetch(`${SCREENPIPE_API_URL}/search`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ q: query, limit: 5, content_type: "all" }),

@@ -10,7 +10,9 @@ import { join } from "node:path";
 import { homedir } from "node:os";
 import { createVerify } from "node:crypto";
 
-const AUTH_API = "https://lifeongodmode.com/api/auth";
+import { AUTH_API_URL } from "./constants.js";
+
+const AUTH_API = AUTH_API_URL;
 const AUTH_FILE = join(homedir(), ".openclaw", "godmode-auth.json");
 
 // Load the public key from the embedded PEM file

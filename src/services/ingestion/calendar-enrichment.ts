@@ -13,8 +13,10 @@ import { updatePersonFile, appendToDaily, todayString } from "./helpers.js";
 
 const execFile = promisify(execFileCb);
 
-const GOG_ACCOUNT =
-  process.env.GOG_CALENDAR_ACCOUNT || "caleb@patientautopilot.com";
+const GOG_ACCOUNT = process.env.GOG_CALENDAR_ACCOUNT ?? "";
+if (!GOG_ACCOUNT) {
+  console.warn("[GodMode][CalendarEnrichment] GOG_CALENDAR_ACCOUNT not set — calendar enrichment disabled");
+}
 
 interface CalendarEvent {
   summary?: string;
@@ -29,6 +31,7 @@ export async function runCalendarEnrichment(): Promise<{
   peopleUpdated: number;
 }> {
   const result = { eventsProcessed: 0, peopleUpdated: 0 };
+  if (!GOG_ACCOUNT) return result;
 
   try {
     const { stdout } = await execFile("gog", [

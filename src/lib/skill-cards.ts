@@ -24,6 +24,7 @@ import { existsSync, readdirSync, readFileSync, mkdirSync, copyFileSync, writeFi
 import { join, basename } from "node:path";
 import { MEMORY_DIR } from "../data-paths.js";
 import { getVaultPath, VAULT_FOLDERS } from "./vault-paths.js";
+import { SKILL_CARD_CACHE_TTL_MS, MAX_SKILL_CARD_LINES } from "./constants.js";
 
 // ── Types ────────────────────────────────────────────────────────
 
@@ -40,7 +41,7 @@ export type SkillCard = {
 
 const _cache: Map<string, SkillCard> = new Map();
 let _cacheTs = 0;
-const CACHE_TTL_MS = 60_000; // 1 min — skill cards rarely change
+const CACHE_TTL_MS = SKILL_CARD_CACHE_TTL_MS;
 
 // ── Path Resolution ──────────────────────────────────────────────
 
@@ -183,7 +184,7 @@ export function matchSkillCard(userMessage: string): SkillCard | null {
 
 // ── Format for Context ──────────────────────────────────────────
 
-const MAX_CARD_LINES = 40;
+const MAX_CARD_LINES = MAX_SKILL_CARD_LINES;
 
 /**
  * Format a skill card for context injection.

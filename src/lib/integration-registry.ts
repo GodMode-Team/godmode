@@ -20,6 +20,7 @@ import {
   deletePersistedCredential,
   persistCredential,
 } from "./credentials-store.js";
+import { SCREENPIPE_API_URL } from "./constants.js";
 
 // ── Types ──────────────────────────────────────────────────────────────
 
@@ -452,7 +453,7 @@ const screenpipe: IntegrationProvider = {
     // Check REST API
     let apiReachable = false;
     try {
-      const resp = await fetch("http://localhost:3030/health", {
+      const resp = await fetch(`${SCREENPIPE_API_URL}/health`, {
         signal: AbortSignal.timeout(2_000),
       });
       apiReachable = resp.ok;
@@ -464,7 +465,7 @@ const screenpipe: IntegrationProvider = {
       authenticated: true, // local — no auth needed
       working: apiReachable,
       details: apiReachable
-        ? "Screenpipe running (localhost:3030)"
+        ? `Screenpipe running (${SCREENPIPE_API_URL})`
         : cliResult.ok
           ? "CLI installed but service not running"
           : "Screenpipe not installed",
@@ -472,7 +473,7 @@ const screenpipe: IntegrationProvider = {
   },
   test: async () => {
     try {
-      const resp = await fetch("http://localhost:3030/health", {
+      const resp = await fetch(`${SCREENPIPE_API_URL}/health`, {
         signal: AbortSignal.timeout(3_000),
       });
       if (resp.ok) return { success: true, message: "Screenpipe running and healthy" };

@@ -11,6 +11,7 @@
 
 import { join } from "node:path";
 import { DATA_DIR } from "../data-paths.js";
+import { RETRIEVAL_LOG_BUFFER_SIZE } from "./constants.js";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -39,7 +40,7 @@ export interface RetrievalEntry {
 
 // ── Ring Buffer ──────────────────────────────────────────────────────
 
-const BUFFER_SIZE = 200;
+const BUFFER_SIZE = RETRIEVAL_LOG_BUFFER_SIZE;
 const buffer: RetrievalEntry[] = [];
 
 // ── Public API ───────────────────────────────────────────────────────

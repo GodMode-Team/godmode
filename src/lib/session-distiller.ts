@@ -18,6 +18,12 @@
 
 import { existsSync, readdirSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
+import {
+  ANTHROPIC_API_URL, MODEL_HAIKU,
+  SESSION_IDLE_THRESHOLD_MS, SESSION_DISTILL_MAX_PER_TICK,
+  SESSION_DISTILL_MIN_MESSAGES, SESSION_DISTILL_MAX_CHARS,
+  SESSION_DISTILL_MAX_STATE,
+} from "./constants.js";
 import { join } from "node:path";
 import { DATA_DIR, MEMORY_DIR } from "../data-paths.js";
 import { resolveAnthropicKey, fetchWithTimeout } from "./anthropic-auth.js";
@@ -58,11 +64,11 @@ type ApiRequestFn = (method: string, params: Record<string, unknown>) => Promise
 
 const STATE_FILE = join(DATA_DIR, "distiller-state.json");
 const SKILL_DRAFTS_DIR = join(MEMORY_DIR, "skill-drafts");
-const IDLE_THRESHOLD_MS = 15 * 60 * 1000; // 15 minutes
-const MAX_SESSIONS_PER_TICK = 3; // Limit API calls per heartbeat
-const MIN_MESSAGES = 4; // Skip tiny sessions
-const MAX_TRANSCRIPT_CHARS = 4000; // Keep Haiku costs low
-const MAX_STATE_ENTRIES = 500;
+const IDLE_THRESHOLD_MS = SESSION_IDLE_THRESHOLD_MS;
+const MAX_SESSIONS_PER_TICK = SESSION_DISTILL_MAX_PER_TICK;
+const MIN_MESSAGES = SESSION_DISTILL_MIN_MESSAGES;
+const MAX_TRANSCRIPT_CHARS = SESSION_DISTILL_MAX_CHARS;
+const MAX_STATE_ENTRIES = SESSION_DISTILL_MAX_STATE;
 
 // ── State I/O ──────────────────────────────────────────────────────────
 
@@ -117,7 +123,7 @@ async function extractFromTranscript(transcript: string): Promise<DistillerExtra
 
   try {
     const body = JSON.stringify({
-      model: "claude-haiku-4-5-20251001",
+      model: MODEL_HAIKU,
       max_tokens: 1024,
       messages: [
         { role: "user", content: EXTRACTION_PROMPT + truncated },
@@ -125,7 +131,7 @@ async function extractFromTranscript(transcript: string): Promise<DistillerExtra
     });
 
     const response = await fetchWithTimeout(
-      "https://api.anthropic.com/v1/messages",
+      ANTHROPIC_API_URL,
       {
         method: "POST",
         headers: {

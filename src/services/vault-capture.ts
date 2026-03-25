@@ -26,6 +26,12 @@ import {
   ensureVaultStructure,
 } from "../lib/vault-paths.js";
 import { localDateString, DATA_DIR as GM_DATA_DIR } from "../data-paths.js";
+import {
+  VAULT_SCOUT_IDS_PRUNE, VAULT_SESSION_PATHS_PRUNE,
+  VAULT_INBOX_FILES_PRUNE, VAULT_PROGRESSIVE_MAX_NOTES,
+  VAULT_MIN_CONTENT_LENGTH, VAULT_INBOX_MIN_AGE_MS,
+  VAULT_LAYER_1_AGE_MS, VAULT_LAYER_2_AGE_MS, VAULT_LAYER_3_AGE_MS,
+} from "../lib/constants.js";
 
 // ── Scout types (inlined from deleted scout.ts) ─────────────────────
 
@@ -284,9 +290,9 @@ export async function captureScoutToVault(logger: Logger): Promise<CaptureResult
     }
   }
 
-  // Prune old captured IDs (keep last 500)
-  if (state.capturedScoutIds.length > 500) {
-    state.capturedScoutIds = state.capturedScoutIds.slice(-500);
+  // Prune old captured IDs
+  if (state.capturedScoutIds.length > VAULT_SCOUT_IDS_PRUNE) {
+    state.capturedScoutIds = state.capturedScoutIds.slice(-VAULT_SCOUT_IDS_PRUNE);
   }
 
   state.lastRun = new Date().toISOString();
@@ -436,9 +442,9 @@ export async function captureSessionsToDailyNotes(logger: Logger): Promise<Captu
     errors.push(`daily-note: ${String(err)}`);
   }
 
-  // Prune old session IDs (keep last 200)
-  if (state.capturedSessionPaths.length > 200) {
-    state.capturedSessionPaths = state.capturedSessionPaths.slice(-200);
+  // Prune old session IDs
+  if (state.capturedSessionPaths.length > VAULT_SESSION_PATHS_PRUNE) {
+    state.capturedSessionPaths = state.capturedSessionPaths.slice(-VAULT_SESSION_PATHS_PRUNE);
   }
 
   await saveCaptureState(state);
@@ -512,7 +518,7 @@ const CLASSIFICATION_RULES: Array<{
 ];
 
 /** Minimum age (ms) before inbox items are auto-processed. Gives user time to review. */
-const INBOX_MIN_AGE_MS = 24 * 60 * 60 * 1000; // 24 hours
+const INBOX_MIN_AGE_MS = VAULT_INBOX_MIN_AGE_MS;
 
 /**
  * Process mature inbox items and route them to proper PARA folders.
@@ -609,9 +615,9 @@ export async function processVaultInbox(logger: Logger): Promise<InboxProcessRes
     }
   }
 
-  // Prune old processed files list (keep last 500)
-  if (state.processedInboxFiles.length > 500) {
-    state.processedInboxFiles = state.processedInboxFiles.slice(-500);
+  // Prune old processed files list
+  if (state.processedInboxFiles.length > VAULT_INBOX_FILES_PRUNE) {
+    state.processedInboxFiles = state.processedInboxFiles.slice(-VAULT_INBOX_FILES_PRUNE);
   }
 
   await saveCaptureState(state);
@@ -644,11 +650,11 @@ export async function processVaultInbox(logger: Logger): Promise<InboxProcessRes
  * Heuristic-based (fast, offline, deterministic). AI summarization can be
  * layered on via queue agents later.
  */
-const LAYER_1_AGE_MS = 7 * 24 * 60 * 60 * 1000;   // 7 days
-const LAYER_2_AGE_MS = 30 * 24 * 60 * 60 * 1000;  // 30 days
-const LAYER_3_AGE_MS = 60 * 24 * 60 * 60 * 1000;  // 60 days
-const MAX_NOTES_PER_RUN = 5; // Conservative — don't over-process
-const MIN_CONTENT_LENGTH = 500; // Skip short notes
+const LAYER_1_AGE_MS = VAULT_LAYER_1_AGE_MS;
+const LAYER_2_AGE_MS = VAULT_LAYER_2_AGE_MS;
+const LAYER_3_AGE_MS = VAULT_LAYER_3_AGE_MS;
+const MAX_NOTES_PER_RUN = VAULT_PROGRESSIVE_MAX_NOTES;
+const MIN_CONTENT_LENGTH = VAULT_MIN_CONTENT_LENGTH;
 
 export async function runProgressiveSummarization(logger: Logger): Promise<SummarizationResult> {
   const vault = getVaultPath();

@@ -13,6 +13,7 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, basename } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { HostAdapter, StandaloneRequestHandler } from "./types.js";
+import { MODEL_ADAPTER_DEFAULT } from "../lib/constants.js";
 
 
 import type { Logger } from "../types/plugin-api.js";
@@ -162,7 +163,7 @@ export async function registerGodMode(
       if (primary.startsWith("anthropic/")) {
         model.fallbacks = ["openai-codex/gpt-5.3-codex"];
       } else {
-        model.fallbacks = ["anthropic/claude-sonnet-4-6"];
+        model.fallbacks = [MODEL_ADAPTER_DEFAULT];
       }
       writeFileSync(cfgPath, JSON.stringify(raw, null, 2), "utf-8");
       respond(true, { primary, fallbacks: model.fallbacks });

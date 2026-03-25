@@ -13,6 +13,8 @@ import { appContext, type AppContext } from "../context/app-context.js";
 type SetupStep = { step: string; status: "ok" | "error" | "skipped"; detail?: string };
 type SetupPhase = "loading" | "not-configured" | "installing" | "seeding" | "ready" | "error";
 
+const PAPERCLIP_DEFAULT_URL = "http://localhost:3100";
+
 @customElement("gm-team")
 export class GmTeam extends LitElement {
   @consume({ context: appContext, subscribe: true })
@@ -124,7 +126,7 @@ export class GmTeam extends LitElement {
         this._error = "Could not start Paperclip server. See details below.";
         return;
       }
-      this._url = installRes.url ?? "http://localhost:3100";
+      this._url = installRes.url ?? PAPERCLIP_DEFAULT_URL;
 
       // Step 2: Seed agents
       this._phase = "seeding";
@@ -466,7 +468,7 @@ export class GmTeam extends LitElement {
                   @click=${() => void this._seedOnly()}
                 >Connect & Seed Agents</button>
                 <p style="color: var(--muted); font-size: 12px; margin: 0 0 16px; text-align: center;">
-                  Paperclip server detected on localhost:3100. Click to configure and seed agents.
+                  Paperclip server detected. Click to configure and seed agents.
                 </p>
               `
               : html`

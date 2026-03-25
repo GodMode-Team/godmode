@@ -12,6 +12,8 @@
  *   USER SPEAKS → EXTRACT → CLARIFY → CREATE → ORGANIZE
  */
 
+import { MAX_ACTION_ITEMS_PER_SESSION, ACTION_ITEM_TTL_MS } from "./constants.js";
+
 // ── Types ────────────────────────────────────────────────────────────
 
 export interface ActionItem {
@@ -163,8 +165,8 @@ function extractDeadline(text: string): string | null {
  * Accumulated across messages in a session, drained when ally sees them.
  */
 const sessionActionItems = new Map<string, ActionItem[]>();
-const MAX_SESSION_ITEMS = 15;
-const ITEM_TTL_MS = 30 * 60 * 1000; // 30 minutes
+const MAX_SESSION_ITEMS = MAX_ACTION_ITEMS_PER_SESSION;
+const ITEM_TTL_MS = ACTION_ITEM_TTL_MS;
 const sessionTimestamps = new Map<string, number>();
 
 export const actionItemBuffer = {

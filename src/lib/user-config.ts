@@ -11,6 +11,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { DATA_DIR } from "../data-paths.js";
 import { resolveConfigPath } from "./openclaw-state.js";
+import { USER_CONFIG_CACHE_TTL_MS } from "./constants.js";
 
 const OPTIONS_FILE = join(DATA_DIR, "godmode-options.json");
 
@@ -18,7 +19,7 @@ const OPTIONS_FILE = join(DATA_DIR, "godmode-options.json");
 let cachedOptions: Record<string, unknown> | null = null;
 let cachedOcConfig: Record<string, unknown> | null = null;
 let cacheTs = 0;
-const CACHE_TTL_MS = 5_000;
+const CACHE_TTL_MS = USER_CONFIG_CACHE_TTL_MS;
 
 function refreshCache(): void {
   const now = Date.now();

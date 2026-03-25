@@ -14,7 +14,9 @@ const TITLED_SESSIONS_MAX = 5_000;
 /** Max llm_output fires to wait for assistant text before giving up and using string derivation */
 export const MAX_TITLE_ATTEMPTS = 8;
 /** Expire pending entries after 5 minutes (handles sessions that never get a response) */
-export const PENDING_TTL_MS = 5 * 60_000;
+import { PENDING_TITLE_TTL_MS, ANTHROPIC_API_URL, MODEL_HAIKU } from "./constants.js";
+
+export const PENDING_TTL_MS = PENDING_TITLE_TTL_MS;
 
 /**
  * Internal system terms that should never be used as session titles.
@@ -76,7 +78,7 @@ export async function generateSessionTitle(
     const userSnippet = cleanMessage.slice(0, 300);
     const assistantSnippet = cleanResponse.slice(0, 300);
 
-    const resp = await fetch("https://api.anthropic.com/v1/messages", {
+    const resp = await fetch(ANTHROPIC_API_URL, {
       method: "POST",
       headers: {
         "x-api-key": apiKey,
@@ -84,7 +86,7 @@ export async function generateSessionTitle(
         "content-type": "application/json",
       },
       body: JSON.stringify({
-        model: "claude-haiku-4-5-20251001",
+        model: MODEL_HAIKU,
         max_tokens: 20,
         system: [
           "You are a conversation title generator. Given a user's first message, output a short label for what this chat is about.",

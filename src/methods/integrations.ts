@@ -20,6 +20,7 @@ import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { exec } from "node:child_process";
 import { join } from "node:path";
 import { homedir } from "node:os";
+import { MODEL_SONNET, PAPERCLIP_URL } from "../lib/constants.js";
 
 type GatewayRequestHandlers = Record<string, GatewayRequestHandler>;
 
@@ -447,7 +448,7 @@ const paperclipSetup: GatewayRequestHandler = async ({ params, respond }) => {
 
       // Check if server is running
       let serverUp = false;
-      const checkUrl = url || "http://localhost:3100";
+      const checkUrl = url || PAPERCLIP_URL;
       try {
         const resp = await fetch(`${checkUrl}/api/companies`, {
           signal: AbortSignal.timeout(3_000),
@@ -475,13 +476,13 @@ const paperclipSetup: GatewayRequestHandler = async ({ params, respond }) => {
     if (action === "install") {
       // Step 1: Start the server via npx (it manages its own embedded Postgres)
       const { code, stdout, stderr } = await runShell(
-        "npx --yes @paperclipai/server start --daemon --port 3100 2>&1",
+        `npx --yes @paperclipai/server start --daemon --port ${new URL(PAPERCLIP_URL).port || "3100"} 2>&1`,
         120_000,
       );
       if (code !== 0) {
         // Fallback: try starting in background
         const bgResult = await runShell(
-          "nohup npx --yes @paperclipai/server start --port 3100 > /tmp/paperclip.log 2>&1 &",
+          `nohup npx --yes @paperclipai/server start --port ${new URL(PAPERCLIP_URL).port || "3100"} > /tmp/paperclip.log 2>&1 &`,
           30_000,
         );
         // Wait briefly for server to start
@@ -489,7 +490,7 @@ const paperclipSetup: GatewayRequestHandler = async ({ params, respond }) => {
         // Verify it's running
         let running = false;
         try {
-          const resp = await fetch("http://localhost:3100/api/companies", {
+          const resp = await fetch(`${PAPERCLIP_URL}/api/companies`, {
             signal: AbortSignal.timeout(5_000),
           });
           running = resp.ok || resp.status === 401;
@@ -504,15 +505,15 @@ const paperclipSetup: GatewayRequestHandler = async ({ params, respond }) => {
           return;
         }
       }
-      steps.push({ step: "Paperclip server started on port 3100", status: "ok" });
+      steps.push({ step: `Paperclip server started at ${PAPERCLIP_URL}`, status: "ok" });
 
       // Step 2: Write PAPERCLIP_URL to .env
       const { writeEnvVar: writeEnv } = await import("../lib/env-writer.js");
-      writeEnv("PAPERCLIP_URL", "http://localhost:3100");
-      process.env.PAPERCLIP_URL = "http://localhost:3100";
+      writeEnv("PAPERCLIP_URL", PAPERCLIP_URL);
+      process.env.PAPERCLIP_URL = PAPERCLIP_URL;
       steps.push({ step: "PAPERCLIP_URL saved to .env", status: "ok" });
 
-      respond(true, { action: "install", success: true, url: "http://localhost:3100", steps });
+      respond(true, { action: "install", success: true, url: PAPERCLIP_URL, steps });
       return;
     }
 
@@ -556,7 +557,7 @@ const paperclipSetup: GatewayRequestHandler = async ({ params, respond }) => {
 
     // ── SEED: Create company + agents from GodMode roster ─────────
     if (action === "seed") {
-      const paperclipUrl = (process.env.PAPERCLIP_URL || "http://localhost:3100").replace(/\/+$/, "");
+      const paperclipUrl = PAPERCLIP_URL.replace(/\/+$/, "");
       const apiKeyVal = process.env.PAPERCLIP_API_KEY || "";
       const hdrs: Record<string, string> = { "Content-Type": "application/json" };
       if (apiKeyVal) hdrs.Authorization = `Bearer ${apiKeyVal}`;
@@ -622,7 +623,7 @@ const paperclipSetup: GatewayRequestHandler = async ({ params, respond }) => {
               adapterType: "claude_local",
               adapterConfig: {
                 command: "claude",
-                model: "claude-sonnet-4-20250514",
+                model: MODEL_SONNET,
                 cwd: homedir(),
                 maxTurnsPerRun: 50,
                 timeoutSec: 1800,

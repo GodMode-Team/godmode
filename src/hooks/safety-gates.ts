@@ -13,6 +13,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { GODMODE_ROOT, MEMORY_DIR } from "../data-paths.js";
+import { ANTHROPIC_API_URL, MODEL_HAIKU } from "../lib/constants.js";
 import {
   readGuardrailsStateCached,
   logGateActivity,
@@ -2048,7 +2049,7 @@ async function llmJudgeUnverifiedClaim(content: string): Promise<boolean> {
     // Truncate to keep the call tiny
     const snippet = content.slice(0, 800);
 
-    const resp = await fetch("https://api.anthropic.com/v1/messages", {
+    const resp = await fetch(ANTHROPIC_API_URL, {
       method: "POST",
       headers: {
         "x-api-key": apiKey,
@@ -2056,7 +2057,7 @@ async function llmJudgeUnverifiedClaim(content: string): Promise<boolean> {
         "content-type": "application/json",
       },
       body: JSON.stringify({
-        model: "claude-haiku-4-5-20251001",
+        model: MODEL_HAIKU,
         max_tokens: 10,
         system: [
           "You are a safety gate judge. Given an AI assistant's outbound message, determine if it contains UNVERIFIED factual claims about external systems.",
@@ -2110,7 +2111,7 @@ async function llmJudgeProactiveLookup(content: string): Promise<boolean> {
 
     const snippet = content.slice(0, 800);
 
-    const resp = await fetch("https://api.anthropic.com/v1/messages", {
+    const resp = await fetch(ANTHROPIC_API_URL, {
       method: "POST",
       headers: {
         "x-api-key": apiKey,
@@ -2118,7 +2119,7 @@ async function llmJudgeProactiveLookup(content: string): Promise<boolean> {
         "content-type": "application/json",
       },
       body: JSON.stringify({
-        model: "claude-haiku-4-5-20251001",
+        model: MODEL_HAIKU,
         max_tokens: 10,
         system: [
           "You are a safety gate judge for an AI assistant. The assistant has access to: memory search, vault/note search, exec (Front email API, curl, CLI tools), contacts, calendar, task lists, file search, and web search.",
@@ -2242,7 +2243,7 @@ async function llmJudgeVeiledAsk(content: string): Promise<boolean> {
 
     const snippet = content.slice(0, 800);
 
-    const resp = await fetch("https://api.anthropic.com/v1/messages", {
+    const resp = await fetch(ANTHROPIC_API_URL, {
       method: "POST",
       headers: {
         "x-api-key": apiKey,
@@ -2250,7 +2251,7 @@ async function llmJudgeVeiledAsk(content: string): Promise<boolean> {
         "content-type": "application/json",
       },
       body: JSON.stringify({
-        model: "claude-haiku-4-5-20251001",
+        model: MODEL_HAIKU,
         max_tokens: 10,
         system: [
           "You are a safety gate judge. Given an AI assistant's outbound message that contains phrases like 'if you want', 'feel free to', 'let me know if', etc., determine if the assistant is GENUINELY DELEGATING WORK BACK to the user.",
@@ -2304,7 +2305,7 @@ async function llmJudgeFactualQuestion(content: string): Promise<boolean> {
 
     const snippet = content.slice(0, 800);
 
-    const resp = await fetch("https://api.anthropic.com/v1/messages", {
+    const resp = await fetch(ANTHROPIC_API_URL, {
       method: "POST",
       headers: {
         "x-api-key": apiKey,
@@ -2312,7 +2313,7 @@ async function llmJudgeFactualQuestion(content: string): Promise<boolean> {
         "content-type": "application/json",
       },
       body: JSON.stringify({
-        model: "claude-haiku-4-5-20251001",
+        model: MODEL_HAIKU,
         max_tokens: 10,
         system: [
           "You are a safety gate judge. Given an AI assistant's outbound message, determine if it contains a FACTUAL QUESTION — a question the assistant could answer itself using search tools, memory, files, or API calls.",

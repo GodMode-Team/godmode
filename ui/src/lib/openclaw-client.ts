@@ -38,7 +38,7 @@ export class OpenClawClient {
   private reconnectDelay = 1000;
   private url: string;
 
-  constructor(url: string = "ws://localhost:18789/ws") {
+  constructor(url: string = `${window.location.protocol === "https:" ? "wss:" : "ws:"}//${window.location.host}/ws`) {
     this.url = url;
   }
 

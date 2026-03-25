@@ -27,6 +27,7 @@ import type {
   AdapterLogger,
 } from "../types.js";
 import { GodModeWsServer } from "./ws-server.js";
+import { MODEL_ADAPTER_DEFAULT } from "../../lib/constants.js";
 import { HermesChatProxy } from "./chat-proxy.js";
 import { GodModeMcpServer } from "./mcp-server.js";
 
@@ -450,7 +451,7 @@ export class HermesAdapter implements HostAdapter {
         if (primary.startsWith("anthropic/")) {
           model.fallbacks = ["openai-codex/gpt-5.3-codex"];
         } else {
-          model.fallbacks = ["anthropic/claude-sonnet-4-6"];
+          model.fallbacks = [MODEL_ADAPTER_DEFAULT];
         }
         writeFileSync(cfgPath, JSON.stringify(raw, null, 2), "utf-8");
         respond(true, { primary, fallbacks: model.fallbacks });

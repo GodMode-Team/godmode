@@ -2,6 +2,10 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { getWorkspaceSyncService } from "../lib/workspace-sync-service.js";
 import { readWorkspaceConfig, type WorkspaceConfigEntry } from "../lib/workspaces-config.js";
+import {
+  ANTHROPIC_API_URL, MODEL_HAIKU,
+  CURATION_SCHEDULE_MS, CURATION_CHECK_INTERVAL_MS, CURATION_MAX_TOKENS as CURATION_MAX_TOKENS_CONST,
+} from "../lib/constants.js";
 
 import type { Logger } from "../types/plugin-api.js";
 
@@ -13,7 +17,7 @@ type CurationState = {
 };
 
 const DEFAULT_THRESHOLD = 10;
-const DEFAULT_SCHEDULE_MS = 24 * 60 * 60 * 1000; // 24 hours
+const DEFAULT_SCHEDULE_MS = CURATION_SCHEDULE_MS;
 
 /**
  * Service that manages workspace memory curation.
@@ -56,7 +60,7 @@ export class CurationAgentService {
     // Schedule periodic check
     this.scheduleTimer = setInterval(() => {
       void this.checkScheduledCurations();
-    }, 60 * 60 * 1000); // Check hourly
+    }, CURATION_CHECK_INTERVAL_MS);
 
     this.log.info(`[Curation] Service started, tracking ${this.stateByWorkspace.size} workspace(s)`);
   }
@@ -238,8 +242,8 @@ type CurationLLMResult = {
   sopCandidates?: string;
 };
 
-const CURATION_MODEL = "claude-haiku-4-5-20251001";
-const CURATION_MAX_TOKENS = 4096;
+const CURATION_MODEL = MODEL_HAIKU;
+const CURATION_MAX_TOKENS = CURATION_MAX_TOKENS_CONST;
 
 function buildCurationPrompt(params: {
   memoryFiles: MemoryFile[];
@@ -308,7 +312,7 @@ async function runCurationLLM(params: {
   if (apiKey) {
     try {
       const prompt = buildCurationPrompt({ memoryFiles, currentMemory, currentSops });
-      const response = await fetch("https://api.anthropic.com/v1/messages", {
+      const response = await fetch(ANTHROPIC_API_URL, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

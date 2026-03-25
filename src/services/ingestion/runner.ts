@@ -139,7 +139,7 @@ export function getIngestionStatus(): Array<{
     },
     {
       name: "Screenpipe",
-      configured: true, // auto-detected at runtime via localhost:3030
+      configured: true, // auto-detected at runtime via Screenpipe health check
       envVar: "(auto-detected)",
     },
   ];

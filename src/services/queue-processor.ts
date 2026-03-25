@@ -12,6 +12,14 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { GODMODE_ROOT, MEMORY_DIR, DATA_DIR, localDateString } from "../data-paths.js";
 import { resolveAnthropicKey } from "../lib/anthropic-auth.js";
+import {
+  QUEUE_POLL_MS as QUEUE_POLL_MS_CONST,
+  AGENT_TIMEOUT_MS as AGENT_TIMEOUT_MS_CONST,
+  CIRCUIT_BREAKER_THRESHOLD as CB_THRESHOLD,
+  CIRCUIT_BREAKER_COOLDOWN_MS as CB_COOLDOWN,
+  RETRY_BASE_DELAY_MS, RETRY_MAX_DELAY_MS,
+  QUEUE_MAX_RETRIES,
+} from "../lib/constants.js";
 import { formatGuardrailsForPrompt } from "./guardrails.js";
 import { resolveClaudeBin, buildSpawnArgs, isEngineAvailable } from "../lib/resolve-claude-bin.js";
 import crypto from "node:crypto";
@@ -199,8 +207,8 @@ function extractArtifacts(content: string): string[] {
 
 // ── Queue Processor Class ──────────────────────────────────────────
 
-const QUEUE_POLL_MS = 10 * 60 * 1000; // 10 minutes — faster than hourly heartbeat
-const AGENT_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes max runtime per agent
+const QUEUE_POLL_MS = QUEUE_POLL_MS_CONST;
+const AGENT_TIMEOUT_MS = AGENT_TIMEOUT_MS_CONST;
 
 // ── Circuit Breaker ─────────────────────────────────────────────
 //
@@ -208,8 +216,8 @@ const AGENT_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes max runtime per agent
 // pause it for CIRCUIT_BREAKER_COOLDOWN_MS. Prevents burning credits
 // when an engine is down or misconfigured.
 
-const CIRCUIT_BREAKER_THRESHOLD = 3;
-const CIRCUIT_BREAKER_COOLDOWN_MS = 600_000; // 10 minutes
+const CIRCUIT_BREAKER_THRESHOLD = CB_THRESHOLD;
+const CIRCUIT_BREAKER_COOLDOWN_MS = CB_COOLDOWN;
 
 interface CircuitState {
   consecutiveFailures: number;
@@ -948,8 +956,8 @@ class QueueProcessor {
    * Retry 1: 30s, Retry 2: 120s (2min), capped at 5min.
    */
   private retryDelayMs(retryCount: number): number {
-    const BASE_DELAY = 30_000; // 30 seconds
-    const MAX_DELAY = 300_000; // 5 minutes
+    const BASE_DELAY = RETRY_BASE_DELAY_MS;
+    const MAX_DELAY = RETRY_MAX_DELAY_MS;
     return Math.min(BASE_DELAY * Math.pow(2, retryCount), MAX_DELAY);
   }
 
@@ -1355,7 +1363,7 @@ class QueueProcessor {
     const now = Date.now();
 
     // Cap retries: mark items with too many retries as failed (prevents infinite loops)
-    const MAX_RETRIES = 3;
+    const MAX_RETRIES = QUEUE_MAX_RETRIES;
     for (const item of state.items) {
       if (item.status === "pending" && (item.retryCount ?? 0) >= MAX_RETRIES) {
         this.logger.warn(

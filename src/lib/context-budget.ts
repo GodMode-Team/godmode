@@ -22,6 +22,13 @@
 // P3 (first to drop): Safety nudges, conditional context
 
 import { getAllyNameLower } from "./ally-identity.js";
+import {
+  MAX_MEMORY_LINES as MAX_MEM_LINES_CONST,
+  MAX_SCHEDULE_LINES as MAX_SCHED_LINES_CONST,
+  MAX_MEMORY_CHARS as MAX_MEM_CHARS_CONST,
+  MAX_IDENTITY_CHARS as MAX_ID_CHARS_CONST,
+  MAX_GRAPH_CHARS as MAX_GR_CHARS_CONST,
+} from "./constants.js";
 import { listRoster } from "./agent-roster.js";
 
 // ── ACP Provenance ────────────────────────────────────────────────
@@ -104,13 +111,13 @@ export interface ContextInputs {
 }
 
 /** Max lines for each section to prevent any single section from bloating */
-const MAX_MEMORY_LINES = 15;
-const MAX_SCHEDULE_LINES = 6;
+const MAX_MEMORY_LINES = MAX_MEM_LINES_CONST;
+const MAX_SCHEDULE_LINES = MAX_SCHED_LINES_CONST;
 
 /** Hard character caps for P0 blocks to prevent oversized context injection */
-const MAX_MEMORY_CHARS = 2000;
-const MAX_IDENTITY_CHARS = 500;
-const MAX_GRAPH_CHARS = 800;
+const MAX_MEMORY_CHARS = MAX_MEM_CHARS_CONST;
+const MAX_IDENTITY_CHARS = MAX_ID_CHARS_CONST;
+const MAX_GRAPH_CHARS = MAX_GR_CHARS_CONST;
 
 /** Truncate text to a character limit, appending ellipsis if truncated */
 function truncateChars(text: string, maxChars: number): string {

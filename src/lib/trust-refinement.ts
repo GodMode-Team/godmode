@@ -16,8 +16,9 @@ import { join, basename } from "node:path";
 import { existsSync, readdirSync } from "node:fs";
 import { MEMORY_DIR } from "../data-paths.js";
 import { getVaultPath, VAULT_FOLDERS } from "./vault-paths.js";
+import { MODEL_HAIKU, MAX_RAW_FEEDBACK_ITEMS } from "./constants.js";
 
-const MAX_RAW_ITEMS = 5;
+const MAX_RAW_ITEMS = MAX_RAW_FEEDBACK_ITEMS;
 const FEEDBACK_HEADING = "## User Feedback";
 
 // ── File Resolution ──────────────────────────────────────────────
@@ -211,7 +212,7 @@ async function consolidateFeedback(items: string[]): Promise<string[] | null> {
     ].join("\n");
 
     const result = await new Promise<string>((resolve, reject) => {
-      const proc = spawn("claude", ["-p", "--model", "claude-haiku-4-5-20251001"], {
+      const proc = spawn("claude", ["-p", "--model", MODEL_HAIKU], {
         stdio: ["pipe", "pipe", "pipe"],
         timeout: 30_000,
       });

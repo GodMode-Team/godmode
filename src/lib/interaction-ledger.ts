@@ -13,6 +13,7 @@
 
 import Database from "better-sqlite3";
 import { randomUUID } from "node:crypto";
+import { ANTHROPIC_API_URL, MODEL_HAIKU } from "./constants.js";
 import { readFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
@@ -355,7 +356,7 @@ export async function extractSignals(transcript: string): Promise<RawSignal[]> {
 
   try {
     const body = JSON.stringify({
-      model: "claude-haiku-4-5-20251001",
+      model: MODEL_HAIKU,
       max_tokens: 2048,
       messages: [
         {
@@ -370,7 +371,7 @@ export async function extractSignals(transcript: string): Promise<RawSignal[]> {
     });
 
     const response = await fetchWithTimeout(
-      "https://api.anthropic.com/v1/messages",
+      ANTHROPIC_API_URL,
       {
         method: "POST",
         headers: {

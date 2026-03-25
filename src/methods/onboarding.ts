@@ -46,6 +46,7 @@ import {
   type OnboardingAnswers,
 } from "../services/onboarding.js";
 import { readEnvFile, writeEnvVar, getEnvVar } from "../lib/env-writer.js";
+import { SCREENPIPE_API_URL } from "../lib/constants.js";
 
 // ── Checklist Types ─────────────────────────────────────────────
 
@@ -1298,7 +1299,7 @@ export const onboardingHandlers: GatewayRequestHandlers = {
 
         case "screenpipe": {
           // Screenpipe is auto-detected — configure just marks it acknowledged
-          // No env var needed; detection happens via localhost:3030 health check
+          // No env var needed; detection happens via Screenpipe health check
           break;
         }
 
@@ -1433,7 +1434,7 @@ export const onboardingHandlers: GatewayRequestHandlers = {
 
         case "screenpipe": {
           try {
-            const resp = await fetch("http://localhost:3030/health", { signal: AbortSignal.timeout(3_000) });
+            const resp = await fetch(`${SCREENPIPE_API_URL}/health`, { signal: AbortSignal.timeout(3_000) });
             if (resp.ok) {
               respond(true, { success: true, message: "Screenpipe is running and healthy. Screen & audio memory active." });
             } else {

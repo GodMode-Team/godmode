@@ -6,6 +6,7 @@
  */
 
 import { execFileSync } from "node:child_process";
+import { PLATFORM_CACHE_TTL_MS } from "./constants.js";
 
 export type PlatformInfo = {
   os: "darwin" | "linux" | "win32" | string;
@@ -49,7 +50,7 @@ function detectPackageManagers(): string[] {
 
 let cached: PlatformInfo | null = null;
 let cacheTs = 0;
-const CACHE_TTL = 60_000; // 1 minute
+const CACHE_TTL = PLATFORM_CACHE_TTL_MS;
 
 /** Detect full platform info (cached for 1 minute). */
 export function detectPlatform(): PlatformInfo {

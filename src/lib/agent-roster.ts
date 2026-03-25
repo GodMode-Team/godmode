@@ -19,6 +19,7 @@ import type { QueueItemType } from "./queue-state.js";
 import type { OnboardingState } from "../methods/onboarding-types.js";
 import { loadSkillCards, type SkillCard } from "./skill-cards.js";
 import { sanitizeForPrompt } from "./prompt-sanitizer.js";
+import { AGENT_ROSTER_CACHE_TTL_MS } from "./constants.js";
 
 // ── Types ────────────────────────────────────────────────────────
 
@@ -46,7 +47,7 @@ export type HandoffContext = {
 
 const _cache: Map<string, PersonaProfile> = new Map();
 let _cacheTs = 0;
-const CACHE_TTL_MS = 30_000;
+const CACHE_TTL_MS = AGENT_ROSTER_CACHE_TTL_MS;
 
 /** Trust score cache — populated by consciousness heartbeat, read by resolvePersona. */
 const _trustScores: Map<string, number> = new Map();
