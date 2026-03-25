@@ -73,7 +73,7 @@ git init
 cp -r /path/to/godmode-plugin/* .
 cp /path/to/godmode-plugin/.gitignore .
 git add -A
-git commit -m "Initial commit: GodMode v1.8.1 (AGPL-3.0)"
+git commit -m "Initial commit: GodMode v1.8.1 (FSL-1.1-MIT)"
 git remote add origin git@github.com:GodMode-Team/godmode.git
 git push -u origin main
 ```

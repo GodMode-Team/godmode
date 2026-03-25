@@ -2,7 +2,7 @@
 
 ## Context
 
-A comprehensive secrets/PII audit ("blacklight sweep") was performed on 2026-03-24 and fixes were applied. This is a **verification pass** to catch anything that was missed. The repo is preparing for AGPL-3.0 open-source release.
+A comprehensive secrets/PII audit ("blacklight sweep") was performed on 2026-03-24 and fixes were applied. This is a **verification pass** to catch anything that was missed. The repo is preparing for FSL-1.1-MIT open-source release.
 
 ## What Was Already Done
 

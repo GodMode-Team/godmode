@@ -1,7 +1,7 @@
 # GodMode Open Source Readiness Plan
 
 **Date:** 2026-03-23
-**Goal:** Make the GodMode plugin clean, secure, and ready for public open source release (AGPL-3.0).
+**Goal:** Make the GodMode plugin clean, secure, and ready for public open source release (FSL-1.1-MIT).
 **Baseline:** 6.9/10 architecture score, 147/147 tests passing, build clean.
 **Branch:** Create `feat/oss-readiness` from `main`.
 

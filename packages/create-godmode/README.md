@@ -53,4 +53,4 @@ npx create-godmode --standalone
 
 ## License
 
-AGPL-3.0-only
+FSL-1.1-MIT

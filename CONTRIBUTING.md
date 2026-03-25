@@ -124,4 +124,4 @@ RPC methods are called by the UI or external clients via the gateway.
 
 ## License
 
-By contributing, you agree that your contributions will be licensed under the [AGPL-3.0](LICENSE) license.
+By contributing, you agree that your contributions will be licensed under the [FSL-1.1-MIT](LICENSE) license. No CLA required.

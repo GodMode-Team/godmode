@@ -3,7 +3,7 @@
   "version": "1.8.1",
   "private": false,
   "description": "GodMode - Personal AI Operating System plugin for OpenClaw",
-  "license": "AGPL-3.0-only",
+  "license": "FSL-1.1-MIT",
   "author": "GodMode Team <support@lifeongodmode.com>",
   "homepage": "https://lifeongodmode.com",
   "repository": {

@@ -227,6 +227,6 @@ Without it, GodMode still works but conversations won't persist across sessions.
 
 ## License
 
-[AGPL-3.0](./LICENSE) — Free to use, modify, and distribute. If you run a modified version as a service, you must open source your changes.
+[FSL-1.1-MIT](./LICENSE) — Free to use, modify, and self-host. Cannot be used to build a competing commercial product. Each version converts to MIT after 2 years.
 
 Made with conviction by the [GodMode Team](https://lifeongodmode.com).
