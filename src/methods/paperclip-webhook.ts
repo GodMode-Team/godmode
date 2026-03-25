@@ -11,6 +11,7 @@ import { writeFile, mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { MEMORY_DIR } from "../data-paths.js";
 import { addInboxItem } from "../services/inbox.js";
+import { notifySession } from "../lib/session-notifier.js";
 
 // ── Helpers ──────────────────────────────────────────────────────
 
@@ -25,11 +26,18 @@ function slugify(text: string): string {
 // ── Broadcast hook (set by gateway-start) ────────────────────────
 
 let broadcastFn: ((event: string, data: unknown) => void) | null = null;
+let pluginApiRef: import("openclaw/plugin-sdk").OpenClawPluginApi | null = null;
 
 export function setPaperclipWebhookBroadcast(
   fn: (event: string, data: unknown) => void,
 ): void {
   broadcastFn = fn;
+}
+
+export function setPaperclipWebhookPluginApi(
+  api: import("openclaw/plugin-sdk").OpenClawPluginApi,
+): void {
+  pluginApiRef = api;
 }
 
 // ── HTTP webhook handler ─────────────────────────────────────────
@@ -122,5 +130,37 @@ export async function handlePaperclipWebhookHttp(
     try {
       broadcastFn("inbox:new", { title, issueId, slug, filePath });
     } catch { /* non-fatal */ }
+  }
+
+  // Notify the originating chat session so the ally presents the result in-stream
+  if (pluginApiRef) {
+    try {
+      const { listProjects } = await import("../lib/projects-state.js");
+      const projects = await listProjects();
+      const project = projects.find((p: any) =>
+        p.issues?.some((iss: any) => iss.queueItemId === issueId),
+      );
+      const sessionKey = project?.sessionKey;
+      if (!sessionKey) {
+        console.warn(`[paperclip-webhook] No sessionKey found for issueId=${issueId}. Projects searched: ${projects.length}. Result will appear in inbox only.`);
+      } else {
+        console.info(`[paperclip-webhook] Routing completion to session=${sessionKey} for issueId=${issueId}`);
+      }
+      notifySession(
+        pluginApiRef,
+        sessionKey,
+        `[Agent completed] "${title}" is ready for review. Output: ${filePath}`,
+        "ally:notification",
+        {
+          type: "queue-complete",
+          title,
+          summary: `Agent finished "${title}" — ready for review.`,
+          outputPath: filePath,
+          sessionKey,
+        },
+      );
+    } catch (err) {
+      console.error(`[paperclip-webhook] Session notification failed for issueId=${issueId}:`, err);
+    }
   }
 }

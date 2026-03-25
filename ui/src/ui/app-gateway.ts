@@ -750,6 +750,27 @@ export function connectGateway(host: GatewayHost) {
   host.client.start();
 }
 
+/** Inject a queue/Paperclip completion notification into the chat message stream. */
+function injectCompletionNotification(
+  chatHost: { chatMessages?: Array<Record<string, unknown>>; requestUpdate?: () => void },
+  payload: { title?: string; outputPreview?: string; outputPath?: string },
+): void {
+  if (!chatHost.chatMessages) return;
+  const preview = payload.outputPreview
+    ? `\n\n${payload.outputPreview.slice(0, 800)}${payload.outputPreview.length > 800 ? "\u2026" : ""}`
+    : "";
+  const outputNote = payload.outputPath
+    ? `\n\nFull output: \`${payload.outputPath}\``
+    : "";
+  chatHost.chatMessages = [...chatHost.chatMessages, {
+    role: "assistant",
+    content: `**Agent completed: "${payload.title || "Queue item"}"**${preview}${outputNote}\n\n_Reply to review, approve, or ask follow-up questions._`,
+    timestamp: Date.now(),
+    isNotification: true,
+  }];
+  chatHost.requestUpdate?.();
+}
+
 export function handleGatewayEvent(host: GatewayHost, evt: GatewayEventFrame) {
   try {
     handleGatewayEventUnsafe(host, evt);
@@ -1345,19 +1366,11 @@ function handleGatewayEventUnsafe(host: GatewayHost, evt: GatewayEventFrame) {
 
         // Inject deliverable notification directly into the chat stream
         // for the originating session so the user sees it immediately
-        if (compPayload.sessionKey && chatHost.sessionKey === compPayload.sessionKey && chatHost.chatMessages) {
-          const preview = compPayload.outputPreview
-            ? `\n\n${compPayload.outputPreview.slice(0, 800)}${compPayload.outputPreview.length > 800 ? "…" : ""}`
-            : "";
-          const outputNote = compPayload.outputPath
-            ? `\n\nFull output: \`${compPayload.outputPath}\``
-            : "";
-          chatHost.chatMessages = [...chatHost.chatMessages, {
-            role: "assistant",
-            content: `**Agent completed: "${compPayload.title || "Queue item"}"**${preview}${outputNote}\n\n_Reply to review, approve, or ask follow-up questions._`,
-            timestamp: Date.now(),
-            isNotification: true,
-          }];
+        if (compPayload.sessionKey && chatHost.sessionKey === compPayload.sessionKey) {
+          injectCompletionNotification(chatHost, compPayload);
+        } else if (!compPayload.sessionKey) {
+          // Fallback: inject into active session when session tracking fails
+          injectCompletionNotification(chatHost, compPayload);
         }
       }
       allyHost.requestUpdate?.();

@@ -174,11 +174,9 @@ function renderWorkflowCard(
       ${renderProgressBar(summary.trustScore, summary.avgRating)}
 
       <div class="trust-card-meta">
-        <span class="trust-card-count">${summary.count} rating${summary.count !== 1 ? "s" : ""}</span>
-        ${ratingsNeeded > 0
-          ? html`<span class="trust-card-pending">${ratingsNeeded} more until trust score</span>`
-          : nothing
-        }
+        <span class="trust-card-provenance" style="font-size: 0.75rem; color: var(--text-muted, #888); display: block; margin-top: 4px;">
+          ${summary.count} rating${summary.count !== 1 ? "s" : ""}${summary.trustScore != null ? "" : ` \u2014 ${10 - summary.count} more for trust score`}
+        </span>
         ${summary.needsFeedback
           ? html`<span class="trust-card-needs-feedback">Needs improvement</span>`
           : nothing

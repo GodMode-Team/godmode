@@ -1069,3 +1069,31 @@
   color: var(--muted);
   font-size: 0.75rem;
 }
+
+/* ── 4-Column Table (Memory Layers) ──────────────────────────── */
+
+.brain-table-header--4col {
+  grid-template-columns: 2fr 1fr 2fr auto;
+}
+
+.brain-table-row--4col {
+  grid-template-columns: 2fr 1fr 2fr auto;
+}
+
+.brain-table-row--clickable {
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.brain-table-row--clickable:hover {
+  background: var(--bg-hover, rgba(0,0,0,0.04));
+}
+
+.brain-table-cell--action {
+  justify-content: flex-end;
+}
+
+.brain-action-btn--small {
+  padding: 2px 8px;
+  font-size: 0.75rem;
+}

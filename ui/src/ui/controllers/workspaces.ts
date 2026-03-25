@@ -255,11 +255,11 @@ export async function getWorkspace(
       memory: (result.memory ?? []).map(transformFile),
     };
 
-    // Load feed and connections in parallel (non-blocking)
+    // Load feed and connections in parallel — fail independently
     try {
       const [feedEntries, connections] = await Promise.all([
-        loadFeed(state, id),
-        loadConnections(state, id),
+        loadFeed(state, id).catch(() => []),
+        loadConnections(state, id).catch(() => []),
       ]);
       detail.feedEntries = feedEntries;
       detail.connections = connections;

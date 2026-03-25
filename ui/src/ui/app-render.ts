@@ -98,6 +98,7 @@ import {
 import { renderToasts } from "./views/toast";
 import { renderOnboardingWizard, type WizardStep } from "./views/onboarding-wizard";
 import { renderTrustTracker } from "./views/trust-tracker";
+import { renderOverview } from "./views/overview";
 import { renderGuardrails } from "./views/guardrails";
 // Tab components are lazy-loaded on first visit (code splitting)
 const _tabLoaders: Record<string, () => Promise<unknown>> = {
@@ -1696,6 +1697,19 @@ export function renderApp(state: AppViewState) {
                   state.handleAllyToggle();
                   if (prefill) state.handleAllyDraftChange(prefill);
                 },
+              })
+            : nothing
+        }
+
+        ${
+          state.tab === "overview"
+            ? renderOverview({
+                connected: state.connected,
+                updateStatus: state.updateStatus,
+                updateLoading: state.updateLoading,
+                onCheckUpdates: () => void import("./controllers/updates.js").then((m) => m.checkForUpdates(state as any)),
+                onUpdateOpenclaw: () => runUpdate(state as any),
+                onUpdatePlugin: () => runPluginUpdate(state as any),
               })
             : nothing
         }

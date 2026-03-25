@@ -292,17 +292,37 @@ export class GatewayBrowserClient {
     }
   }
 
-  request<T = unknown>(method: string, params?: unknown): Promise<T> {
+  request<T = unknown>(method: string, params?: unknown, timeoutMs = 10_000): Promise<T> {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
       return Promise.reject(new Error("gateway not connected"));
     }
     const id = generateUUID();
     const frame = { type: "req", id, method, params };
+
+    let timer: ReturnType<typeof setTimeout> | null = null;
+
     const p = new Promise<T>((resolve, reject) => {
-      this.pending.set(id, { resolve: (v) => resolve(v as T), reject });
+      this.pending.set(id, {
+        resolve: (v) => {
+          if (timer) clearTimeout(timer);
+          resolve(v as T);
+        },
+        reject: (e) => {
+          if (timer) clearTimeout(timer);
+          reject(e);
+        },
+      });
     });
     this.ws.send(JSON.stringify(frame));
-    return p;
+
+    // Race against timeout so hanging RPCs don't block the UI forever
+    const timeout = new Promise<never>((_, reject) => {
+      timer = setTimeout(() => {
+        this.pending.delete(id);
+        reject(new Error(`RPC timeout: ${method} (${timeoutMs}ms)`));
+      }, timeoutMs);
+    });
+    return Promise.race([p, timeout]);
   }
 
   private queueConnect() {
