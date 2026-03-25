@@ -1348,11 +1348,17 @@ export const onboardingHandlers: GatewayRequestHandlers = {
   "onboarding.setupDismiss": async ({ respond }) => {
     try {
       const state = await readOnboarding();
-      // Store dismissed flag — we'll use a custom field on the state
-      // Store in a way that deriveSetupProgress can read it
+      // Store dismissed flag in a dedicated file for deriveSetupProgress
       const dismissedPath = join(DATA_DIR, "setup-dismissed.json");
       await secureMkdir(DATA_DIR);
       await secureWriteFile(dismissedPath, JSON.stringify({ dismissed: true, at: new Date().toISOString() }) + "\n");
+      // Also mark legacy onboarding as complete so phase prompts don't leak
+      // into new chats when the setup flow is dismissed
+      if (!state.completedAt) {
+        state.completedAt = new Date().toISOString();
+        state.phase = 6;
+        await writeOnboarding(state);
+      }
       respond(true, { dismissed: true });
     } catch (err) {
       respond(false, undefined, {

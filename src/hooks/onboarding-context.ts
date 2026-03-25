@@ -606,20 +606,30 @@ This is the last setup step. After this, setup is complete — transition to nor
  */
 export async function loadOnboardingContext(): Promise<{ prependContext?: string } | void> {
   // Check new setup flow first
+  let setupFlowResolved = false;
   try {
     const { deriveSetupProgressForContext } = await import("../methods/onboarding.js");
     const progress = await deriveSetupProgressForContext();
+    setupFlowResolved = true;
     if (progress && !progress.completedAt && !progress.dismissed) {
       const setupPrompt = buildSetupPrompt(progress);
       if (setupPrompt) {
         return { prependContext: setupPrompt };
       }
     }
+    // Setup flow resolved and is either complete or dismissed — skip legacy
+    if (progress?.completedAt || progress?.dismissed) {
+      return;
+    }
   } catch {
     // Setup flow not available — fall through to legacy
   }
 
-  // Legacy phase-based onboarding
+  // Legacy phase-based onboarding — only if the new setup flow didn't resolve.
+  // When the new flow is active (dismissed or complete), skip legacy to prevent
+  // stale phase-0 prompts from onboarding.json leaking into every new chat.
+  if (setupFlowResolved) return;
+
   const state = await readOnboardingState();
   if (!state) return;
 
