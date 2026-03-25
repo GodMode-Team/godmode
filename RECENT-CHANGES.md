@@ -4,6 +4,18 @@ This file tracks recent development changes so Atlas and other agents can quickl
 
 ---
 
+## Onboarding Memory Seed Sentinel Fix (2026-03-21)
+
+### What Landed
+- Restored the memory seed sentinel as the onboarding source of truth by writing `~/godmode/data/.mem0-seeded` after a real successful memory init.
+- Updated the onboarding wizard to verify actual memory init before setting `secondBrain.memorySeeded`.
+- Updated the onboarding assessment and onboarding prompt copy to use the sentinel-backed seeded state instead of `MEMORY.md` existence.
+
+### Verification
+- `pnpm typecheck` — blocked locally (`tsc` missing because `node_modules` is not installed)
+- `pnpm build` — blocked locally (`vite` missing because `node_modules` is not installed)
+- `rg "\\.\\./\\.\\./\\.\\./\\.\\./src/" -n`
+
 ## Linux systemd gateway service template (2026-03-21)
 
 ### What Landed

@@ -22,6 +22,7 @@ import { secureWriteFile, secureMkdir } from "../lib/secure-fs.js";
 import { existsSync } from "node:fs";
 import { invalidateIdentityCache } from "../lib/awareness-snapshot.js";
 import { generateRosterConfig } from "../lib/agent-roster.js";
+import { initMemory, isMemorySeeded } from "../lib/memory.js";
 import type { GatewayRequestHandler } from "../types/plugin-api.js";
 import {
   type OnboardingState,
@@ -311,7 +312,7 @@ function buildPhase2Steps(state: OnboardingState): ChecklistStep[] {
   return [
     {
       id: "p2-memory",
-      label: "Seed MEMORY.md",
+      label: "Seed memory",
       completed: Boolean(sb?.memorySeeded),
     },
     {
@@ -1529,6 +1530,16 @@ export const onboardingHandlers: GatewayRequestHandlers = {
       configResult = await patchOCConfig(answers, undefined, { skipKeys });
     }
 
+    let memorySeeded = isMemorySeeded();
+    if (!memorySeeded) {
+      try {
+        await initMemory();
+      } catch {
+        // Non-fatal: onboarding can still complete its file/config setup.
+      }
+      memorySeeded = isMemorySeeded();
+    }
+
     // Update onboarding state to reflect wizard completion
     const state = await readOnboarding();
     state.interview = {
@@ -1539,7 +1550,7 @@ export const onboardingHandlers: GatewayRequestHandlers = {
       completed: true,
     };
     state.secondBrain = {
-      memorySeeded: true,
+      memorySeeded,
       dailyBriefConfigured: false,
       completed: true,
     };

@@ -8,6 +8,11 @@
  * No other files need to change.
  */
 
+import { existsSync } from "node:fs";
+import { mkdir, writeFile } from "node:fs/promises";
+import { join } from "node:path";
+import { DATA_DIR } from "../data-paths.js";
+
 // ── Provider Detection ──────────────────────────────────────────────
 
 export type MemoryProvider = "honcho" | "none";
@@ -29,6 +34,28 @@ export function getMemoryProvider(): MemoryProvider {
 // ── Status ──────────────────────────────────────────────────────────
 
 export type MemoryStatus = "ready" | "degraded" | "offline";
+
+const MEMORY_SEED_SENTINEL = join(DATA_DIR, ".mem0-seeded");
+
+export function getMemorySeedSentinelPath(): string {
+  return MEMORY_SEED_SENTINEL;
+}
+
+export function isMemorySeeded(): boolean {
+  return existsSync(MEMORY_SEED_SENTINEL);
+}
+
+async function writeMemorySeedSentinel(provider: MemoryProvider): Promise<void> {
+  await mkdir(DATA_DIR, { recursive: true });
+  await writeFile(
+    MEMORY_SEED_SENTINEL,
+    JSON.stringify({
+      seededAt: new Date().toISOString(),
+      provider,
+    }, null, 2) + "\n",
+    "utf-8",
+  );
+}
 
 export function isMemoryReady(): boolean {
   if (getMemoryProvider() === "none") return false;
@@ -76,7 +103,11 @@ export async function initMemory(): Promise<boolean> {
     try {
       const mod = await import("../services/honcho-client.js");
       _honchoModule = mod;
-      return await mod.initHoncho();
+      const ready = await mod.initHoncho();
+      if (ready) {
+        await writeMemorySeedSentinel(provider);
+      }
+      return ready;
     } catch (err) {
       console.warn(`[GodMode] Memory init failed (non-fatal): ${String(err)}`);
       return false;
