@@ -9,8 +9,6 @@
  * If XAI key is missing, twitter-cli operations still work.
  */
 
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
 import {
   checkHealth as checkCliHealth,
   getBookmarks as cliGetBookmarks,
@@ -23,41 +21,12 @@ import {
   type XBrowserHealth,
   type ExtractedTweet,
 } from "./x-browser.js";
+import { getEnvVar } from "../lib/env-writer.js";
 
 // ── XAI key loading (shared with brief-generator) ──────────────────────
 
 export function getXaiApiKey(): string {
-  // Primary: ~/.openclaw/.env
-  try {
-    const envPath = join(
-      process.env.HOME || process.env.USERPROFILE || "",
-      ".openclaw",
-      ".env",
-    );
-    const raw = readFileSync(envPath, "utf-8");
-    for (const line of raw.split("\n")) {
-      if (line.startsWith("XAI_API_KEY=")) {
-        const v = line.slice("XAI_API_KEY=".length).trim();
-        return (v.startsWith('"') && v.endsWith('"')) || (v.startsWith("'") && v.endsWith("'")) ? v.slice(1, -1) : v;
-      }
-    }
-  } catch {
-    // not found
-  }
-  // Fallback: ~/godmode/.env
-  try {
-    const root = process.env.GODMODE_ROOT || join(process.env.HOME || "", "godmode");
-    const raw = readFileSync(join(root, ".env"), "utf-8");
-    for (const line of raw.split("\n")) {
-      if (line.startsWith("XAI_API_KEY=")) {
-        const v = line.slice("XAI_API_KEY=".length).trim();
-        return (v.startsWith('"') && v.endsWith('"')) || (v.startsWith("'") && v.endsWith("'")) ? v.slice(1, -1) : v;
-      }
-    }
-  } catch {
-    // not found
-  }
-  return "";
+  return getEnvVar("XAI_API_KEY");
 }
 
 // ── Types ──────────────────────────────────────────────────────────────
@@ -89,7 +58,7 @@ export async function searchX(
   if (!apiKey) {
     // Fall back to twitter-cli search
     // twitter-cli doesn't have a search command that maps cleanly, but we can try
-    return { items: [], source: "xai", error: "XAI_API_KEY not configured. Search requires the XAI API key in ~/.openclaw/.env" };
+    return { items: [], source: "xai", error: "XAI_API_KEY not configured" };
   }
 
   try {
@@ -205,7 +174,7 @@ export async function health(): Promise<XHealthStatus> {
   return {
     xai: {
       available: !!apiKey,
-      error: apiKey ? undefined : "XAI_API_KEY not set in ~/.openclaw/.env",
+      error: apiKey ? undefined : "XAI_API_KEY not configured",
     },
     browser: cliHealth,
   };
