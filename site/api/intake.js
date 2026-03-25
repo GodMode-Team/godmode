@@ -3,7 +3,7 @@
  *
  * Receives AI Audit intake form submissions from /audit-intake.
  * Creates/updates a contact in GHL with the ai-audit tag and all form data.
- * Sends Caleb a notification email via GHL.
+ * Sends the admin a notification email via GHL.
  *
  * Env vars required:
  *   GHL_PIT_TOKEN     — GHL Private Integration Token (already in Vercel)

@@ -96,9 +96,9 @@ Default pull interval is 5 minutes (`normalizeIntervalMs` returns `5 * 60 * 1000
 
 ### Gap 5: Multi-Workspace Team Context (NICE TO HAVE)
 
-`team-bootstrap.ts` currently only injects context for ONE workspace (the session's workspace). But a user might be in multiple team workspaces (TRP, Patient Autopilot, GodMode).
+`team-bootstrap.ts` currently only injects context for ONE workspace (the session's workspace). But a user might be in multiple team workspaces (Project Alpha, Project Beta, GodMode).
 
-**Consider:** Should unread messages from ALL team workspaces be surfaced, even if the current session is in a different workspace? At minimum, inject a line like "You have unread messages in 2 other team workspaces: TRP (3), Patient Autopilot (1)" at P2 priority. Don't inject the full messages from other workspaces — just the count.
+**Consider:** Should unread messages from ALL team workspaces be surfaced, even if the current session is in a different workspace? At minimum, inject a line like "You have unread messages in 2 other team workspaces: Project Alpha (3), Project Beta (1)" at P2 priority. Don't inject the full messages from other workspaces — just the count.
 
 ---
 
@@ -134,11 +134,11 @@ Default pull interval is 5 minutes (`normalizeIntervalMs` returns `5 * 60 * 1000
 
 ## The Real Test Tomorrow
 
-1. Create team workspaces for TRP, Patient Autopilot, GodMode — each backed by a private GitHub repo
+1. Create team workspaces for Project Alpha, Project Beta, GodMode — each backed by a private GitHub repo
 2. Team members `team.joinTeam` with the repo URL
 3. Someone says "Tell the team I'm starting on VSL scripts" → ally uses `team_message` → git syncs → other members' allies see the message on their next turn
-4. Someone drops a skill into `TRP/skills/vsl-framework.md` → git syncs → all team allies have access
-5. Research notes in `TRP/memory/` → visible in all team allies' context via team-bootstrap
+4. Someone drops a skill into `Project Alpha/skills/vsl-framework.md` → git syncs → all team allies have access
+5. Research notes in `Project Alpha/memory/` → visible in all team allies' context via team-bootstrap
 
 **If those 5 things work, we ship it.**
 

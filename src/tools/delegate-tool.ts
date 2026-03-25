@@ -291,7 +291,7 @@ export function createDelegateTool(ctx?: { sessionKey?: string }): AnyAgentTool 
 
             // Trust gating: warn but DON'T silently skip — demote to "approval" instead.
             // The ally MUST tell the user when agents are gated. Silent skipping caused
-            // Prosper to claim "5 agents working" when only 2 were actually queued.
+            // the ally to claim "5 agents working" when only 2 were actually queued.
             if (record.personaSlug && record.personaSlug !== "unassigned") {
               let gateWarning: string | null = null;
 

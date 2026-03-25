@@ -33,7 +33,7 @@ Questions about topics, companies, people, markets, trends, technologies, or any
 - Suggested follow-ups (1-2 questions to dig deeper)
 
 ## Examples
-1. "What's happening with AI agents in healthcare?" — Memory check (prior interest in Patient Autopilot), web search for market size + key players + regulation, X check for practitioner sentiment. Output: market briefing with 8 findings, 2 gaps (pricing data unclear, regulation still evolving).
+1. "What's happening with AI agents in healthcare?" — Memory check (prior interest in Project Beta), web search for market size + key players + regulation, X check for practitioner sentiment. Output: market briefing with 8 findings, 2 gaps (pricing data unclear, regulation still evolving).
 2. "Tell me about this person before my meeting" — Memory check for past interactions, web search for LinkedIn/bio/company, X for recent posts. Output: 1-page briefing with role, company, recent activity, talking points.
 
 ## Failure Modes

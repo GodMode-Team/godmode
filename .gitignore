@@ -19,3 +19,10 @@ experiments/
 !.env.example
 .qa-reports/
 .gstack/
+
+# Vercel
+.vercel/
+
+# SQLite databases (runtime)
+*.sqlite
+*.sqlite3

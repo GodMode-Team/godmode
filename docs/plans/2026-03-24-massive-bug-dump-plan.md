@@ -58,7 +58,7 @@ describe("gateway RPC timeout", () => {
 
 **Step 2: Run test to verify it passes (these test the pattern, not the integration)**
 
-Run: `cd /Users/calebhodges/Projects/godmode-plugin && npx vitest run ui/src/ui/__tests__/gateway-timeout.test.ts`
+Run: `cd . && npx vitest run ui/src/ui/__tests__/gateway-timeout.test.ts`
 
 **Step 3: Add timeout with timer cleanup to `request()` method**
 

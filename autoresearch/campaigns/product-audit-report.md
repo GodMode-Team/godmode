@@ -1,7 +1,7 @@
 # GodMode Product Audit Report
 Generated: 2026-03-10T04:10:32.138Z
 Judge: claude-sonnet-4-6
-Plugin root: /Users/calebhodges/Projects/godmode-plugin
+Plugin root: <plugin-root>
 
 # Phase 1: Structural Tests
 Testing assembleContext(), skill cards, and context budget logic.
@@ -49,7 +49,7 @@ Testing assembleContext(), skill cards, and context budget logic.
   [PASS] "Queue up a research report" → queue
   [PASS] "Search my vault for the project plan" → second-brain
   [PASS] "Check my Twitter bookmarks" → x-twitter
-  [PASS] "Who is Jake and what does he do?" → people
+  [PASS] "Who is Alex and what does he do?" → people
   [PASS] "Read the README file" → files
   [FAIL] "What integrations do I have set up?" → null (expected: integrations)
   [PASS] "Tell me a joke" → null
@@ -115,7 +115,7 @@ Testing injection detection, output shielding, and config access control.
 Simulating 5 personas through full-day interactions.
 
 
-## Persona: Caleb (Founder/CEO)
+## Persona: TestUser (Founder/CEO)
 Bio: Tech founder running multiple companies. Uses GodMode as strategic brain — delegates research, tracks OKRs, manages a team of agents. Power user. Wants leverage and flow.
 
   [ERROR] LLM judge failed for this persona
@@ -125,12 +125,12 @@ Bio: Leads brand and content. Uses GodMode to manage creative projects, draft co
 
   [ERROR] LLM judge failed for this persona
 
-## Persona: Marcus (Senior Engineer)
+## Persona: Jordan (Senior Engineer)
 Bio: Backend engineer. Uses GodMode for code reviews, architectural decisions, and keeping track of technical debt. Values precision and efficiency.
 
   [ERROR] LLM judge failed for this persona
 
-## Persona: Sarah (Executive Coach)
+## Persona: Morgan (Executive Coach)
 Bio: Runs a coaching practice. Uses GodMode to manage clients, prep for sessions, and track personal development goals. Values relationships and purpose.
 
   [ERROR] LLM judge failed for this persona

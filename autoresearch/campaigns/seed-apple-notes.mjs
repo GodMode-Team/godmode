@@ -78,7 +78,7 @@ const PERSON_PATTERNS = [
   /\bDr\.?\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)/g,       // Dr. FirstName LastName
   /\bCall\s+(?:w|with)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)/gi, // Call w FirstName
   /\bMeeting\s+(?:w|with)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)/gi,
-  /\b([A-Z][a-z]+)'s\s+(?:call|meeting|proposal|project)/gi, // Sarah's call
+  /\b([A-Z][a-z]+)'s\s+(?:call|meeting|proposal|project)/gi, // Morgan's call
 ];
 
 const COMPANY_PATTERNS = [
@@ -268,8 +268,8 @@ function main() {
         allEntities.push({ name: person, kind: "person", meta: { firstSeen: filename } });
         knownPeople.add(person.toLowerCase());
       }
-      // Edge: Caleb → knows → Person
-      allEdges.push({ src: "caleb", rel: "knows", dst: person, meta: { context: filename } });
+      // Edge: TestUser → knows → Person
+      allEdges.push({ src: "testuser", rel: "knows", dst: person, meta: { context: filename } });
       stats.peopleFound++;
     }
 

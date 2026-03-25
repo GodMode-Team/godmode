@@ -196,9 +196,9 @@ async function main() {
 
   const KNOWN_FACTS = [
     { input: "My dog's name is Edison and he's a golden retriever.", key: "edison", searchQuery: "what's my dog's name" },
-    { input: "I have a meeting with Rich every Tuesday at 10am about product strategy.", key: "rich-meeting", searchQuery: "when do I meet with Rich" },
-    { input: "My company GodMode is building a personal AI operating system. We charge $297/month.", key: "godmode-price", searchQuery: "how much does GodMode cost" },
-    { input: "Jake is my co-founder. He handles engineering and I handle product and sales.", key: "jake-cofounder", searchQuery: "who is Jake" },
+    { input: "I have a meeting with Jordan every Tuesday at 10am about product strategy.", key: "jordan-meeting", searchQuery: "when do I meet with Jordan" },
+    { input: "My company TestCorp is building a personal AI operating system. We charge $49/month.", key: "testcorp-price", searchQuery: "how much does TestCorp cost" },
+    { input: "Alex is my co-founder. He handles engineering and I handle product and sales.", key: "alex-cofounder", searchQuery: "who is Alex" },
     { input: "I use Obsidian for note-taking and my vault is at ~/Documents/VAULT.", key: "obsidian-vault", searchQuery: "where are my notes stored" },
   ];
 
@@ -249,8 +249,8 @@ async function main() {
 
   const CROSS_QUERIES = [
     { query: "tell me about my pets", expectKey: "edison" },
-    { query: "what's our pricing model", expectKey: "godmode-price" },
-    { query: "who works with me on the business", expectKey: "jake-cofounder" },
+    { query: "what's our pricing model", expectKey: "testcorp-price" },
+    { query: "who works with me on the business", expectKey: "alex-cofounder" },
   ];
 
   for (const cq of CROSS_QUERIES) {
@@ -265,8 +265,8 @@ async function main() {
         const m = (r.memory ?? "").toLowerCase();
         switch (cq.expectKey) {
           case "edison": return m.includes("edison") || m.includes("dog") || m.includes("golden");
-          case "godmode-price": return m.includes("297") || m.includes("pricing") || m.includes("charge");
-          case "jake-cofounder": return m.includes("jake") || m.includes("co-founder") || m.includes("cofounder");
+          case "testcorp-price": return m.includes("49") || m.includes("pricing") || m.includes("charge");
+          case "alex-cofounder": return m.includes("alex") || m.includes("co-founder") || m.includes("cofounder");
           default: return false;
         }
       });

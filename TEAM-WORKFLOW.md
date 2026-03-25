@@ -21,7 +21,7 @@ That's the whole workflow. Claude does the git stuff. You just describe problems
 - **Claude Code** installed and working (`claude` command in terminal)
 - **GitHub CLI** installed (`gh` — run `gh auth status` to check)
 - **Node.js 22+** and **pnpm** installed
-- Access to the `GodMode-Team/godmode-plugin` repo (ask Caleb if you get a 404)
+- Access to the `GodMode-Team/godmode-plugin` repo (ask the repo admin if you get a 404)
 
 ### Clone and build
 ```bash

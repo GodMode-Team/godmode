@@ -30,12 +30,12 @@
       "note": "schedule = calendar, person is context"
     },
     {
-      "message": "Add a note about the meeting with Sarah",
+      "message": "Add a note about the meeting with Morgan",
       "expected": "second-brain",
       "note": "note = second-brain, meeting/person is context"
     },
     {
-      "message": "Find what Jake tweeted about our integration",
+      "message": "Find what Alex tweeted about our integration",
       "expected": "x-twitter",
       "note": "tweeted = x-twitter, person/integration is context"
     },
@@ -145,7 +145,7 @@
       "note": "jot down = note-taking"
     },
     {
-      "message": "ping Jake about the deliverable",
+      "message": "ping Alex about the deliverable",
       "expected": "people",
       "note": "person-directed action"
     },

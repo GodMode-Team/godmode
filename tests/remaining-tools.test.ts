@@ -321,7 +321,7 @@ describe("godmode_onboard tool", () => {
 
   it("status check mode works", async () => {
     const tool = createOnboardTool({});
-    const result = await tool.execute("call-1", { name: "Caleb", statusOnly: true });
+    const result = await tool.execute("call-1", { name: "TestUser", statusOnly: true });
     const data = parseResult(result);
     expect(data.mode).toBe("status");
     expect(data.initialized).toBe(true);
@@ -329,7 +329,7 @@ describe("godmode_onboard tool", () => {
 
   it("generate mode creates workspace files", async () => {
     const tool = createOnboardTool({});
-    const result = await tool.execute("call-1", { name: "Caleb", timezone: "America/Chicago" });
+    const result = await tool.execute("call-1", { name: "TestUser", timezone: "America/Chicago" });
     const data = parseResult(result);
     expect(data.mode).toBe("generate");
     expect(data.success).toBe(true);

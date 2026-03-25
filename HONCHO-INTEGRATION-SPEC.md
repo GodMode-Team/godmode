@@ -3,7 +3,7 @@
 **Status:** Phase 2 (after v2 slim ships and is stable)
 **Date:** March 18, 2026
 **Honcho Version:** v3.0.3
-**Account:** caleb@patientautopilot.com (GODMODE workspace exists)
+**Account:** user@example.com (GODMODE workspace exists)
 
 ---
 
@@ -23,17 +23,17 @@
 Honcho peers are **many-to-many with sessions** and **cross-session context carries automatically**.
 
 This means:
-1. Caleb is ONE peer that exists in all workspaces
+1. the user is ONE peer that exists in all workspaces
 2. Prosper is ONE peer that exists in all workspaces
-3. When Honcho reasons about Caleb from a TRP session, those conclusions are available in GodMode sessions
-4. Caleb's communication preferences, decision patterns, and personality model compound across ALL workspaces
+3. When Honcho reasons about the user from a TRP session, those conclusions are available in GodMode sessions
+4. the user's communication preferences, decision patterns, and personality model compound across ALL workspaces
 5. BUT workspace-specific data stays isolated (TRP client data doesn't leak to GodMode workspace)
 
 ### Three Types of Memory
 
 | Type | Scope | How Honcho Handles It |
 |---|---|---|
-| **Identity memory** | Cross-workspace (Caleb is Caleb everywhere) | Peer representation — conclusions about the person |
+| **Identity memory** | Cross-workspace (the user is the user everywhere) | Peer representation — conclusions about the person |
 | **Workspace memory** | Isolated to workspace | Workspace-scoped sessions and messages |
 | **Session memory** | Single conversation | Session messages + session-scoped reasoning |
 
@@ -116,7 +116,7 @@ Each GodMode workspace maps to a Honcho workspace:
 - /workspace create godmode → honcho.workspaces.create("godmode")
 - /workspace create trp → honcho.workspaces.create("trp")
 
-User (Caleb) is a peer in ALL workspaces:
+User (the user) is a peer in ALL workspaces:
 - honcho.peers.create(godmodeWs, "caleb") 
 - honcho.peers.create(trpWs, "caleb")
 
@@ -128,7 +128,7 @@ Cross-workspace intelligence:
 Team sync:
 - When Austen joins the godmode workspace, create peer "austen" in honcho
 - Austen gets workspace-scoped context (shared skills, shared memory)
-- But Caleb's private peer model stays private unless explicitly shared
+- But the user's private peer model stays private unless explicitly shared
 ```
 
 ### Session D: Honcho → Vault Sync (Cron)
@@ -138,7 +138,7 @@ Nightly cron (or hourly heartbeat):
 1. Query Honcho for each peer's latest conclusions
 2. Write to vault:
    - memory/bank/people/{name}.md ← peer representation
-   - memory/identity/honcho-model.md ← Caleb's self-model
+   - memory/identity/honcho-model.md ← the user's self-model
    - memory/daily/{date}.md ← append notable conclusions
 3. This makes Honcho's reasoning visible in the Obsidian vault
 4. User can browse, edit, correct in Obsidian
@@ -187,7 +187,7 @@ At current pricing ($0.001-$0.50 per .chat() query):
 ## What This Unlocks
 
 1. **Memory that improves by reasoning, not retrieval** — Honcho doesn't just find what was said, it figures out what it means
-2. **Cross-workspace identity** — Caleb's preferences/patterns carry everywhere
-3. **Team memory isolation** — TRP team sees TRP context, not Caleb's personal GodMode data  
-4. **Automatic pattern detection** — "Caleb tends to defer TRP tasks when under GodMode pressure" emerges naturally
+2. **Cross-workspace identity** — the user's preferences/patterns carry everywhere
+3. **Team memory isolation** — TRP team sees TRP context, not the user's personal GodMode data  
+4. **Automatic pattern detection** — "the user tends to defer TRP tasks when under GodMode pressure" emerges naturally
 5. **The moat** — After 6 months of Honcho reasoning, switching to a competitor means losing the entire relationship model

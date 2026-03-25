@@ -49,7 +49,7 @@ try {
 
   console.log("3. Creating agents...");
   const ceo = await api("POST", `/api/companies/${company.id}/agents`, {
-    name: "Prosper",
+    name: "Assistant",
     role: "ceo",
     adapterType: "openclaw_gateway",
     adapterConfig: {},

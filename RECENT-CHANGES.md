@@ -761,7 +761,7 @@ Replace license key system with real account-based auth. Users sign up, pay via 
 
 ### Infrastructure
 - **Upstash Redis** connected to Vercel project (REDIS_URL set)
-- **Stripe** product/price created (test mode): `prod_U5GQlJ6WBHCAcO` / `price_1T75u8EtK2soZQjqiZ11zEU7`
+- **Stripe** product/price created (test mode) — IDs stored in Stripe dashboard, not in code
 - **RSA keypair** generated, env vars set on Vercel (all environments)
 - **Deployed** to `patient-autopilot/lifeongodmode` (Pro plan) at `lifeongodmode-iota.vercel.app`
 - API helpers moved to `site/api/_lib/` (underscore prefix = not counted as serverless functions)
@@ -830,7 +830,7 @@ OpenClaw 2026.3.1 broke GodMode in 4 ways with zero deprecation warnings. Parall
 openclaw plugin install @godmode-team/godmode
 openclaw gateway restart
 ```
-License key: `GM-DEV-TEAM-2026`
+License key: `YOUR_LICENSE_KEY`
 
 ---
 

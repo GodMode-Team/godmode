@@ -10,7 +10,7 @@ import { join } from "node:path";
 
 export type FeedEntry = {
   ts: string;           // ISO timestamp
-  author: string;       // "caleb:agent", "titus", "caleb", "system"
+  author: string;       // "user:agent", "teammate", "user", "system"
   type: string;         // "decision", "request", "response", "artifact", "update", "sop"
   text: string;         // The message/update
   ref?: string | null;  // Optional reference: "gdrive:file-xyz", "clickup:task-abc"

@@ -251,7 +251,7 @@ export const googleDriveConnector: WorkspaceConnector = {
       const { stdout } = await exec("gog", [
         "drive", "ls",
         "--folder-id", config.folderId,
-        "--account", config.account || "caleb@patientautopilot.com",
+        "--account", config.account || "user@example.com",
         "--client", "godmode",
         "--limit", "1",
       ], { maxBuffer: 1024 * 1024 });
@@ -267,7 +267,7 @@ export const googleDriveConnector: WorkspaceConnector = {
         "drive", "search",
         "--query", query,
         "--folder-id", config.folderId,
-        "--account", config.account || "caleb@patientautopilot.com",
+        "--account", config.account || "user@example.com",
         "--client", "godmode",
         "--limit", "10",
       ], { maxBuffer: 5 * 1024 * 1024 });
@@ -292,7 +292,7 @@ export const googleDriveConnector: WorkspaceConnector = {
       const { stdout } = await exec("gog", [
         "drive", "ls",
         "--folder-id", config.folderId,
-        "--account", config.account || "caleb@patientautopilot.com",
+        "--account", config.account || "user@example.com",
         "--client", "godmode",
         "--limit", String(limit),
         "--order-by", "modifiedTime desc",
@@ -963,7 +963,7 @@ When a user clicks into a workspace, they see:
 │  🤖 Agent — 2 min ago   │  💬 Slack — ⚪ Not configured     │
 │  ChiroHD: 4/7 done      │                                   │
 │                          │  + Add Connection                 │
-│  👤 Caleb — 1 hr ago    │                                   │
+│  👤 User — 1 hr ago    │                                   │
 │  Decision: Switch to     ├──────────────────────────────────┤
 │  HubSpot forms           │  DOCS                            │
 │                          │  📋 SOPs (3)                      │
@@ -972,7 +972,7 @@ When a user clicks into a workspace, they see:
 │                          │  📦 Resources (12)               │
 │  [Post to feed...]       │                                   │
 │                          │  MEMBERS                          │
-│                          │  👤 Caleb (admin)                │
+│                          │  👤 User (admin)                │
 │                          │  👤 Titus (admin)                │
 │                          │  👤 Ashley (member)              │
 │                          │  + Invite Member                 │
@@ -989,7 +989,7 @@ Shows all workspaces as cards:
 ├─────────────────────────────────────────────────────────────┤
 │                                                              │
 │  ┌─────────────────────┐  ┌─────────────────────┐          │
-│  │ 🏢 TRP              │  │ 💊 Patient Autopilot │          │
+│  │ 🏢 Project Alpha     │  │ 💊 Project Beta      │          │
 │  │ 3 connections       │  │ 1 connection         │          │
 │  │ 3 members           │  │ 2 members            │          │
 │  │ Last: 5 min ago     │  │ Last: 2 days ago     │          │

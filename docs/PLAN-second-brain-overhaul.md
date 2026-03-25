@@ -168,7 +168,7 @@ Merge the old Memory Bank + Research + Files views into one:
 │ ── People ──────────────────────    │
 │   Alice Chen  ·  Bob Smith  · ...   │
 │ ── Companies ───────────────────    │
-│   TRP  ·  Patient Autopilot  · ... │
+│   Project Alpha  ·  Project Beta  · ... │
 │ ── Projects ────────────────────    │
 │   GodMode  ·  100xHuman  · ...     │
 │ ── Research ────────────────────    │  ← NEW: research entries appear here

@@ -49,7 +49,7 @@ Each customer DMs {{ALLY_NAME}} directly via a dedicated support Telegram bot.
 2. Customer given bot username during onboarding
 3. {{ALLY_NAME}} routes messages to this skill via Telegram user ID lookup
 
-**Bot Token:** `8389581060:AAGvq-Rzd7CJmQafd55dlrHIek0igeIyRMo`
+**Bot Token:** Set via `TELEGRAM_SUPPORT_BOT_TOKEN` environment variable.
 (See `references/telegram-bot-setup.md` for full bot configuration)
 
 **Customer Identification:**
@@ -676,7 +676,7 @@ When users ask about GodMode capabilities, reference this list:
 | Symptom | Fix |
 |---------|-----|
 | "Gateway Offline" in UI | `openclaw gateway restart` |
-| LICENSE_REQUIRED errors | `openclaw godmode activate GM-DEV-TEAM-2026` |
+| LICENSE_REQUIRED errors | `openclaw godmode activate YOUR_LICENSE_KEY` |
 | Chat not responding | Check gateway logs: `openclaw gateway logs` |
 | Daily brief empty | Run: ask {{ALLY_NAME}} "generate my daily brief" |
 | Focus Pulse not ticking | Check if enabled in Lab tab settings |
@@ -693,7 +693,7 @@ When users ask about GodMode capabilities, reference this list:
 
 - **npm package:** `@godmode-team/godmode@1.3.0`
 - **Install:** `openclaw plugins install @godmode-team/godmode`
-- **Team license key:** `GM-DEV-TEAM-2026`
+- **Team license key:** `YOUR_LICENSE_KEY`
 
 ### Quick Diagnostic Checklist
 
@@ -734,7 +734,7 @@ Services start in order. All failures are non-fatal (logged, continues):
 **Dev keys bypass validation entirely:**
 - Any key matching `GM-DEV-*` → immediate pass, tier = "developer"
 - `GM-INTERNAL` → immediate pass
-- Team key: `GM-DEV-TEAM-2026`
+- Team key: `GM-XXXX-XXXX`
 
 **Production keys:**
 - Validated against `https://lifeongodmode.com/api/v1/license/validate`
@@ -868,7 +868,7 @@ lsof -i :3000
 2. Queue items: Check outputs, move to review or reset to pending
 3. Services resume: Focus Pulse, Consciousness, Queue Processor, Obsidian Sync
 
-### Build & Update Commands (for developers/Prosper)
+### Build & Update Commands (for developers)
 
 ```bash
 pnpm build          # Full build: code + UI + bundle

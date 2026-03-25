@@ -43,8 +43,8 @@ if (itIdx !== -1 && args[itIdx + 1]) {
 
 const PERSONAS = [
   {
-    name: "Caleb (founder)",
-    goals: ["Ship GodMode v2.0", "Grow Patient Autopilot to $50k MRR", "Maintain health routine"],
+    name: "TestUser (founder)",
+    goals: ["Ship GodMode v2.0", "Grow side project to $50k MRR", "Maintain health routine"],
     style: "Direct, fast, hates menus and options. Wants recommendations and execution.",
     morning: "Good morning, what should I focus on today?",
     midday: "I'm behind on the Q2 launch. What can I delegate?",
@@ -63,7 +63,7 @@ const PERSONAS = [
     deep_work: "Help me outline the brand guidelines document",
   },
   {
-    name: "Marcus (engineer)",
+    name: "Jordan (engineer)",
     goals: ["Ship queue processor refactor", "Learn Rust", "Run a half marathon"],
     style: "Precise, wants technical depth, hates vague instructions.",
     morning: "What PRs need review? Any blockers?",
@@ -73,7 +73,7 @@ const PERSONAS = [
     deep_work: "I need to architect the new event system. Walk me through the trade-offs.",
   },
   {
-    name: "Sarah (therapist/coach)",
+    name: "Morgan (therapist/coach)",
     goals: ["Grow practice to 30 clients", "Write self-help book", "Better work-life balance"],
     style: "Empathetic, values emotional intelligence, wants the ally to understand context.",
     morning: "Who am I seeing today? Anything I should prep for?",

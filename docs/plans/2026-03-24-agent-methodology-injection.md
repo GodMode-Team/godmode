@@ -378,7 +378,7 @@ Add immediately after it:
 **Step 4: Build and typecheck**
 
 ```bash
-cd /Users/calebhodges/Projects/godmode-plugin && pnpm build && pnpm typecheck
+pnpm build && pnpm typecheck
 ```
 
 Expected: Both pass with zero errors.
@@ -431,7 +431,7 @@ const PROMPT_TEMPLATES: Record<QueueItemType, string> = {
 **Step 2: Build and typecheck**
 
 ```bash
-cd /Users/calebhodges/Projects/godmode-plugin && pnpm build && pnpm typecheck
+pnpm build && pnpm typecheck
 ```
 
 **Step 3: Commit**

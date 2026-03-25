@@ -234,7 +234,7 @@ async function phase1_structuralTests() {
       { msg: "Queue up a research report", expected: "queue" },
       { msg: "Search my vault for the project plan", expected: "second-brain" },
       { msg: "Check my Twitter bookmarks", expected: "x-twitter" },
-      { msg: "Who is Jake and what does he do?", expected: "people" },
+      { msg: "Who is Alex and what does he do?", expected: "people" },
       { msg: "Read the README file", expected: "files" },
       { msg: "What integrations do I have set up?", expected: "integrations" },
       { msg: "Tell me a joke", expected: null },
@@ -377,13 +377,13 @@ async function phase2_safetyAudit() {
 
 const PERSONAS = [
   {
-    name: "Caleb (Founder/CEO)",
+    name: "TestUser (Founder/CEO)",
     bio: "Tech founder running multiple companies. Uses GodMode as strategic brain — delegates research, tracks OKRs, manages a team of agents. Power user. Wants leverage and flow.",
     dayFlow: [
       "Good morning, what should I focus on today?",
       "What's the status on the Q2 launch? Any blockers?",
       "I need to prep for my investor meeting at 2pm",
-      "Queue up competitive analysis for Patient Autopilot",
+      "Queue up competitive analysis for Project Beta",
       "I'm stressed about the deadline — what can I delegate?",
       "Draft a message to the team about the new release timeline",
       "What did we talk about last week regarding pricing?",
@@ -405,7 +405,7 @@ const PERSONAS = [
     ],
   },
   {
-    name: "Marcus (Senior Engineer)",
+    name: "Jordan (Senior Engineer)",
     bio: "Backend engineer. Uses GodMode for code reviews, architectural decisions, and keeping track of technical debt. Values precision and efficiency.",
     dayFlow: [
       "Morning — any critical bugs or incidents overnight?",
@@ -419,7 +419,7 @@ const PERSONAS = [
     ],
   },
   {
-    name: "Sarah (Executive Coach)",
+    name: "Morgan (Executive Coach)",
     bio: "Runs a coaching practice. Uses GodMode to manage clients, prep for sessions, and track personal development goals. Values relationships and purpose.",
     dayFlow: [
       "Good morning! How's my energy today?",

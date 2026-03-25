@@ -155,8 +155,8 @@ Location: `~/godmode/custom-tabs/{slug}.json`
       "data": {
         "items": [
           { "name": "GodMode v1", "status": "Shipping", "priority": "P0" },
-          { "name": "Patient Autopilot", "status": "In Progress", "priority": "P1" },
-          { "name": "TRP VSL", "status": "Blocked", "priority": "P1" }
+          { "name": "Project Beta", "status": "In Progress", "priority": "P1" },
+          { "name": "Project Alpha VSL", "status": "Blocked", "priority": "P1" }
         ]
       }
     }

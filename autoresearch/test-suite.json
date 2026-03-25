@@ -16,7 +16,7 @@
       { "message": "Do I have anything after lunch?", "expected": null, "note": "no calendar trigger words" },
       { "message": "Reschedule my standup to 10am", "expected": "calendar" },
 
-      { "message": "Add a task to follow up with Jake", "expected": "tasks" },
+      { "message": "Add a task to follow up with Alex", "expected": "tasks" },
       { "message": "What are my priorities today?", "expected": "tasks" },
       { "message": "Do I have any overdue tasks?", "expected": "tasks" },
       { "message": "Remind me to send the invoice Friday", "expected": "tasks" },
@@ -38,14 +38,14 @@
       { "message": "Can you do a deep dive on this topic?", "expected": "queue" },
       { "message": "Run this in the background", "expected": "queue" },
 
-      { "message": "Who is Sarah Chen?", "expected": "people" },
-      { "message": "What do we know about Jake? Who is he?", "expected": "people" },
+      { "message": "Who is Morgan Chen?", "expected": "people" },
+      { "message": "What do we know about Alex? Who is he?", "expected": "people" },
       { "message": "Look up that client I met last week", "expected": "people" },
       { "message": "Who was in the standup this morning? Any attendees I should know about?", "expected": "people" },
       { "message": "Tell me about my relationship with the Acme team", "expected": "people" },
       { "message": "Who's the contact at HubSpot?", "expected": "people" },
       { "message": "I just met with Dr. Williams", "expected": "people" },
-      { "message": "What team is Marcus on?", "expected": "people" },
+      { "message": "What team is Jordan on?", "expected": "people" },
 
       { "message": "Search my vault for the product roadmap", "expected": "second-brain" },
       { "message": "What notes do I have on the Q2 launch?", "expected": "second-brain" },
@@ -93,7 +93,7 @@
       { "message": "Good morning!", "expected": null },
 
       { "message": "What meetings do I have and what tasks are overdue?", "expected": "tasks", "note": "multi-domain — overdue tasks signal is stronger than meeting mention" },
-      { "message": "Search my vault for notes about the meeting with Jake", "expected": "second-brain", "note": "vault/search triggers should beat meeting trigger" },
+      { "message": "Search my vault for notes about the meeting with Alex", "expected": "second-brain", "note": "vault/search triggers should beat meeting trigger" },
       { "message": "Who is attending the 3pm call?", "expected": "people", "note": "people intent even though meeting is mentioned" },
       { "message": "Draft a tweet about my calendar app", "expected": "x-twitter", "note": "creative intent, twitter domain" },
       { "message": "Queue a task to research my schedule optimization", "expected": "queue", "note": "queue intent even though schedule is mentioned" },
@@ -169,35 +169,35 @@
   "memory_recall": {
     "description": "Tests memory search quality. Seeded facts with queries and expected recall. These test the score threshold, result limit, and query matching.",
     "seed_facts": [
-      "Caleb's timezone is US Central (CST/CDT). He lives in Austin, Texas.",
-      "Jake Morrison works at Acme Corp as VP of Engineering. Met at SaaStr 2025.",
-      "Sarah Chen is the design lead at TRP (The Recovery Practice). She handles all patient-facing materials.",
-      "Patient Autopilot is Caleb's chiropractic marketing company. It does automated ad campaigns for chiropractors.",
-      "GodMode is Caleb's personal AI project. It's a deeply contextual personal AI ally built on OpenClaw.",
-      "Caleb's morning routine: wake at 6am, cold plunge, journal, then work by 7:30am.",
+      "TestUser's timezone is US Central (CST/CDT). He lives in Austin, Texas.",
+      "Alex Rivera works at Acme Corp as VP of Engineering. Met at SaaStr 2025.",
+      "Morgan Chen is the design lead at TRP (The Recovery Practice). She handles all patient-facing materials.",
+      "Acme Health Marketing is TestUser's chiropractic marketing company. It does automated ad campaigns for chiropractors.",
+      "GodMode is TestUser's personal AI project. It's a deeply contextual personal AI ally built on OpenClaw.",
+      "TestUser's morning routine: wake at 6am, cold plunge, journal, then work by 7:30am.",
       "The Q2 launch is targeting April 15, 2026. Key deliverables: auth system, billing integration, onboarding flow.",
-      "Caleb uses Obsidian for note-taking with PARA structure. Vault path is ~/Documents/VAULT/.",
+      "TestUser uses Obsidian for note-taking with PARA structure. Vault path is ~/Documents/VAULT/.",
       "TRP uses HubSpot for CRM and patient tracking. Integration via API key in ~/.openclaw/.env.",
-      "Caleb's communication style: direct, concise, no corporate speak. Prefers recommendations over options.",
-      "The weekly standup is every Monday at 9am CST with Jake, Sarah, and Marcus.",
-      "Marcus Thompson handles backend engineering. He built the queue processor and trust tracker.",
-      "Cara AI is the AI assistant product for Patient Autopilot. It automates chiro marketing campaigns.",
-      "Caleb's top goal for Q1 2026: ship GodMode v2.0 with full agent orchestration.",
+      "TestUser's communication style: direct, concise, no corporate speak. Prefers recommendations over options.",
+      "The weekly standup is every Monday at 9am CST with Alex, Morgan, and Jordan.",
+      "Jordan Thompson handles backend engineering. He built the queue processor and trust tracker.",
+      "Acme AI Assistant is the AI assistant product for Acme Health Marketing. It automates chiro marketing campaigns.",
+      "TestUser's top goal for Q1 2026: ship GodMode v2.0 with full agent orchestration.",
       "The GodMode license is $297/month. Auth uses OAuth Device Flow with JWT RS256."
     ],
     "tests": [
-      { "query": "What timezone is Caleb in?", "expected_facts": ["timezone", "CST", "Austin"], "note": "basic identity recall" },
-      { "query": "Tell me about Jake", "expected_facts": ["Jake Morrison", "Acme", "VP"], "note": "people recall" },
-      { "query": "What does Sarah do?", "expected_facts": ["Sarah Chen", "design lead", "TRP"], "note": "people + role recall" },
-      { "query": "What is Patient Autopilot?", "expected_facts": ["chiropractic", "marketing", "chiropractors"], "note": "business recall" },
+      { "query": "What timezone is TestUser in?", "expected_facts": ["timezone", "CST", "Austin"], "note": "basic identity recall" },
+      { "query": "Tell me about Alex", "expected_facts": ["Alex Rivera", "Acme", "VP"], "note": "people recall" },
+      { "query": "What does Morgan do?", "expected_facts": ["Morgan Chen", "design lead", "TRP"], "note": "people + role recall" },
+      { "query": "What is Acme Health Marketing?", "expected_facts": ["chiropractic", "marketing", "chiropractors"], "note": "business recall" },
       { "query": "When is the Q2 launch?", "expected_facts": ["April 15", "auth", "billing"], "note": "project recall" },
       { "query": "What CRM does TRP use?", "expected_facts": ["HubSpot", "patient"], "note": "tool recall" },
-      { "query": "Who is in the standup?", "expected_facts": ["Jake", "Sarah", "Marcus", "Monday"], "note": "meeting recall" },
-      { "query": "What is Cara AI?", "expected_facts": ["Patient Autopilot", "chiro", "marketing"], "note": "product recall" },
+      { "query": "Who is in the standup?", "expected_facts": ["Alex", "Morgan", "Jordan", "Monday"], "note": "meeting recall" },
+      { "query": "What is Acme AI Assistant?", "expected_facts": ["Acme Health", "chiro", "marketing"], "note": "product recall" },
       { "query": "How much does GodMode cost?", "expected_facts": ["297", "month"], "note": "pricing recall" },
-      { "query": "How does Caleb like to communicate?", "expected_facts": ["direct", "concise", "recommendations"], "note": "style recall" },
-      { "query": "What does Marcus work on?", "expected_facts": ["Marcus", "backend", "queue"], "note": "people + work recall" },
-      { "query": "What is Caleb's morning routine?", "expected_facts": ["6am", "cold plunge", "journal"], "note": "routine recall" }
+      { "query": "How does TestUser like to communicate?", "expected_facts": ["direct", "concise", "recommendations"], "note": "style recall" },
+      { "query": "What does Jordan work on?", "expected_facts": ["Jordan", "backend", "queue"], "note": "people + work recall" },
+      { "query": "What is TestUser's morning routine?", "expected_facts": ["6am", "cold plunge", "journal"], "note": "routine recall" }
     ]
   },
 
@@ -205,8 +205,8 @@
     "description": "Tests whether the context assembly would help advance user goals. Uses synthetic session scenarios scored against goals.",
     "goals": [
       "Ship GodMode v2.0 with full agent orchestration by end of Q1 2026",
-      "Grow Patient Autopilot revenue to $50k MRR",
-      "Build Cara AI as the flagship PA product",
+      "Grow Acme Health revenue to $50k MRR",
+      "Build Acme AI Assistant as the flagship product",
       "Maintain health routine (6am wake, cold plunge, exercise)"
     ],
     "scenarios": [
@@ -219,14 +219,14 @@
       {
         "user_message": "I need to work on the auth system for GodMode",
         "context_should_include": ["Q2 launch", "GodMode"],
-        "context_should_not_include": ["Patient Autopilot pricing", "morning routine"],
+        "context_should_not_include": ["Acme Health pricing", "morning routine"],
         "alignment_note": "Should surface project context relevant to the specific work"
       },
       {
-        "user_message": "How are the PA ad campaigns performing?",
-        "context_should_include": ["Patient Autopilot", "Cara AI"],
+        "user_message": "How are the Acme Health ad campaigns performing?",
+        "context_should_include": ["Acme Health Marketing", "Acme AI Assistant"],
         "context_should_not_include": ["GodMode architecture", "cold plunge"],
-        "alignment_note": "Should surface PA business context, not GodMode tech context"
+        "alignment_note": "Should surface Acme Health business context, not GodMode tech context"
       },
       {
         "user_message": "I'm behind on the Q2 launch, what can I delegate?",
@@ -235,10 +235,10 @@
         "alignment_note": "Should surface delegation tools and project timeline pressure"
       },
       {
-        "user_message": "Set up a meeting with Jake about the API integration",
-        "context_should_include": ["Jake", "Acme", "calendar"],
-        "context_should_not_include": ["Patient Autopilot", "Cara AI"],
-        "alignment_note": "Should surface Jake's people file and calendar for scheduling"
+        "user_message": "Set up a meeting with Alex about the API integration",
+        "context_should_include": ["Alex", "Acme", "calendar"],
+        "context_should_not_include": ["Acme Health Marketing", "Acme AI Assistant"],
+        "alignment_note": "Should surface Alex's people file and calendar for scheduling"
       }
     ]
   }

@@ -34,7 +34,7 @@ Before meetings (calendar event approaching), when a task or project comes up in
 
 ## Examples
 1. Meeting with "Jake from Linear" in 30 min — Calendar pull shows the event, memory surfaces past conversations about API integration, task history shows an open ticket about webhook setup. Briefing: "Jake is your Linear contact. Last spoke 2 weeks ago about webhook reliability. You promised to test the retry logic. Open task: 'Test Linear webhook retries' (due tomorrow)."
-2. User says "I need to think about the Patient Autopilot funnel" — Memory pulls PA context, recent decisions, current metrics, team status. Surfaces: last funnel conversion rate, recent A/B test results, open tasks related to PA.
+2. User says "I need to think about the Project Beta funnel" — Memory pulls PB context, recent decisions, current metrics, team status. Surfaces: last funnel conversion rate, recent A/B test results, open tasks related to PB.
 
 ## Failure Modes
 - **No memory hits** — If memory is empty for an attendee, say so: "No prior context on [person]. Want me to research them?" Then trigger auto-research.

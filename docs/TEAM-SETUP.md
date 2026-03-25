@@ -1,12 +1,12 @@
 # GodMode Team Setup Guide
 
-## For Team Admins (Caleb)
+## For Team Admins
 
 ### 1. Create workspace repos
 For each project, create a GitHub repo in the godmode-team org:
 - `godmode-team/workspace-godmode-dev`
-- `godmode-team/workspace-trp`
-- `godmode-team/workspace-patient-autopilot`
+- `godmode-team/workspace-project-alpha`
+- `godmode-team/workspace-project-beta`
 
 ### 2. Initialize workspaces
 
@@ -18,16 +18,16 @@ In your GodMode chat:
 Or call the RPC directly:
 ```
 workspace.setupFromTemplate { template: "godmode-dev", github: "godmode-team/workspace-godmode-dev" }
-workspace.setupFromTemplate { template: "trp", github: "godmode-team/workspace-trp" }
-workspace.setupFromTemplate { template: "patient-autopilot", github: "godmode-team/workspace-patient-autopilot" }
+workspace.setupFromTemplate { template: "project-alpha", github: "godmode-team/workspace-project-alpha" }
+workspace.setupFromTemplate { template: "project-beta", github: "godmode-team/workspace-project-beta" }
 ```
 
 **Option B: From scratch**
 
 ```
 workspace.createTeam { name: "GodMode", github: "godmode-team/workspace-godmode-dev" }
-workspace.createTeam { name: "TRP", github: "godmode-team/workspace-trp" }
-workspace.createTeam { name: "Patient Autopilot", github: "godmode-team/workspace-patient-autopilot" }
+workspace.createTeam { name: "Project Alpha", github: "godmode-team/workspace-project-alpha" }
+workspace.createTeam { name: "Project Beta", github: "godmode-team/workspace-project-beta" }
 ```
 
 **Option C: Full provision (creates GitHub repo + workspace)**
@@ -62,14 +62,14 @@ Open GodMode UI → Enter your name and API key → Get your first brief.
 ### 3. Join Team Workspaces
 ```
 workspace.joinTeam { github: "godmode-team/workspace-godmode-dev" }
-workspace.joinTeam { github: "godmode-team/workspace-trp" }
-workspace.joinTeam { github: "godmode-team/workspace-patient-autopilot" }
+workspace.joinTeam { github: "godmode-team/workspace-project-alpha" }
+workspace.joinTeam { github: "godmode-team/workspace-project-beta" }
 ```
 
 Or tell your ally: "Join the GodMode team workspace" and provide the GitHub repo URL.
 
 ### 4. Start Working
-- Switch to a workspace: "Let's work on TRP"
+- Switch to a workspace: "Let's work on Project Alpha"
 - Your ally now has the team's shared context
 - Any memory you create in the workspace is shared with the team
 - Queue tasks scoped to a workspace for team visibility
@@ -94,7 +94,7 @@ Read the feed: `comms.feed { workspaceId: "godmode" }`
 Check unread: `comms.unread { workspaceId: "godmode", memberId: "your-id" }`
 
 ### Workspace Isolation
-Each workspace is isolated. TRP data stays in TRP. GodMode dev data stays in GodMode. Your ally loads the right context based on which workspace you're in.
+Each workspace is isolated. Project Alpha data stays in Project Alpha. GodMode dev data stays in GodMode. Your ally loads the right context based on which workspace you're in.
 
 ### GitSync
 Workspaces sync automatically:
@@ -139,8 +139,8 @@ The curation agent runs periodically (or manually via `curation.run`) to:
 | Template | Slug | Type | Use Case |
 |----------|------|------|----------|
 | GodMode | `godmode-dev` | development | Plugin development with code review & build verify skills |
-| TRP | `trp` | project | General team collaboration |
-| Patient Autopilot | `patient-autopilot` | project | General team collaboration |
+| Project Alpha | `project-alpha` | project | General team collaboration |
+| Project Beta | `project-beta` | project | General team collaboration |
 
 List templates programmatically: `workspace.listTemplates`
 

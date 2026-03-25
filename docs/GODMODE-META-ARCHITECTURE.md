@@ -345,7 +345,7 @@ Better models, basic personal context, agent orchestration, standard integration
 
 ## 8. The Gap List (v1.5.0 → v1.6.0)
 
-What must ship to close the gap between "works for Caleb's team" and "works for founders who find it online."
+What must ship to close the gap between "works for the team" and "works for founders who find it online."
 
 ### Fixes
 1. Ally sync bug — bubble ↔ Chat tab ↔ iMessage not seamlessly synced

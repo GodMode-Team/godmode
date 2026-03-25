@@ -264,7 +264,7 @@ Register this as a npm bin entry in package.json or document manual startup.
  * 1. Log "met with X, Y on DATE" to daily note
  * 2. Update people files with last-interaction date
  *
- * Uses: gog CLI (already configured at caleb@patientautopilot.com)
+ * Uses: gog CLI (already configured at user@example.com)
  * Schedule: hourly via OC cron
  */
 
@@ -285,7 +285,7 @@ interface CalendarEvent {
 
 export async function runCalendarEnrichment(): Promise<{ eventsProcessed: number; peopleUpdated: number }> {
   // 1. Fetch events via gog CLI (JSON output)
-  const account = process.env.GOG_CALENDAR_ACCOUNT || "caleb@patientautopilot.com";
+  const account = process.env.GOG_CALENDAR_ACCOUNT || "user@example.com";
   const client = process.env.GOG_CLIENT || "godmode";
   
   const { stdout } = await exec("gog", [
@@ -450,7 +450,7 @@ export async function runEmailDigest(): Promise<{ threadsProcessed: number; cont
  * Downloads and indexes them into the vault.
  *
  * Uses: gog CLI (gog drive ls, gog drive download, gog drive search)
- * Account: caleb@patientautopilot.com, client: godmode
+ * Account: user@example.com, client: godmode
  * Schedule: every 6 hours via OC cron
  *
  * gog drive commands available:
@@ -479,7 +479,7 @@ interface DriveFile {
 }
 
 export async function runDriveSync(folderIds?: string[]): Promise<{ filesProcessed: number }> {
-  const account = process.env.GOG_CALENDAR_ACCOUNT || "caleb@patientautopilot.com";
+  const account = process.env.GOG_CALENDAR_ACCOUNT || "user@example.com";
   const client = process.env.GOG_CLIENT || "godmode";
   const ingestDir = join(MEMORY_DIR, "ingested", "drive");
   if (!existsSync(ingestDir)) mkdirSync(ingestDir, { recursive: true });
@@ -903,7 +903,7 @@ Add to `src/lib/integration-registry.ts` (check existing pattern):
 
 Already configured via `gog` CLI. Just needs the ingestion pipeline (Task 2.4).
 
-Document in Settings UI: "Google Drive connected via gog CLI (caleb@patientautopilot.com)"
+Document in Settings UI: "Google Drive connected via gog CLI (user@example.com)"
 
 ---
 

@@ -106,8 +106,8 @@ const EXTENDED_TESTS = [
   { message: "Write up the research and save it to drive", expected: "files", note: "save to drive = files, even though research could be queue" },
   { message: "Remind me to check twitter tomorrow", expected: "tasks", note: "remind = tasks intent, twitter is content" },
   { message: "Schedule a call with the person I met at the conference", expected: "calendar", note: "schedule = calendar, person is context" },
-  { message: "Add a note about the meeting with Sarah", expected: "second-brain", note: "note = second-brain, meeting/person is context" },
-  { message: "Find what Jake tweeted about our integration", expected: "x-twitter", note: "tweeted = x-twitter, person/integration is context" },
+  { message: "Add a note about the meeting with Morgan", expected: "second-brain", note: "note = second-brain, meeting/person is context" },
+  { message: "Find what Alex tweeted about our integration", expected: "x-twitter", note: "tweeted = x-twitter, person/integration is context" },
   { message: "Queue up a draft tweet about the product launch", expected: "queue", note: "queue = queue intent, draft tweet is the task content" },
   { message: "Look up the file I saved about the team contact list", expected: "files", note: "file = files, team/contact is content" },
 
@@ -137,7 +137,7 @@ const EXTENDED_TESTS = [
   { message: "bookmark this", expected: "x-twitter", note: "bookmark = x-twitter bookmarks feature" },
   { message: "what's the word on the street", expected: "x-twitter", note: "social sentiment = x-twitter discussions" },
   { message: "jot this down for me", expected: "second-brain", note: "jot down = note-taking" },
-  { message: "ping Jake about the deliverable", expected: "people", note: "person-directed action" },
+  { message: "ping Alex about the deliverable", expected: "people", note: "person-directed action" },
   { message: "offload this to someone", expected: "queue", note: "offload = delegate to queue" },
   { message: "is everything hooked up properly", expected: "integrations", note: "hooked up = integration status check" },
 ];

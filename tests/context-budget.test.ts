@@ -50,10 +50,10 @@ describe("assembleContext", () => {
 
   it("includes identity anchor at P0", () => {
     const result = assembleContext(baseInputs({
-      identityAnchor: "Caleb — Austin TX, entrepreneur",
+      identityAnchor: "TestUser — Anytown US, entrepreneur",
     }));
-    expect(result).toContain("Caleb");
-    expect(result).toContain("Austin TX");
+    expect(result).toContain("TestUser");
+    expect(result).toContain("Anytown US");
   });
 
   it("includes memory block at P0", () => {
@@ -220,9 +220,9 @@ describe("assembleContext", () => {
 
   it("returns minimal context for inter-session messages", () => {
     const result = assembleContext(baseInputs({
-      identityAnchor: "Caleb — Austin TX",
+      identityAnchor: "TestUser — Anytown US",
       memoryBlock: "## Memories\n- User likes GodMode",
-      graphBlock: "## People\n- Sarah",
+      graphBlock: "## People\n- Dana",
       schedule: "## Schedule\n- 10:00 AM: Standup",
       operationalCounts: "Tasks: 5 pending",
       provenance: { kind: "inter_session", sourceSessionKey: "agent:cron:daily" },
@@ -233,9 +233,9 @@ describe("assembleContext", () => {
     // Provenance notice present
     expect(result).toContain("Message Origin: Agent");
     // Personal context stripped — identity, memories, graph, schedule, ops
-    expect(result).not.toContain("Austin TX");
+    expect(result).not.toContain("Anytown US");
     expect(result).not.toContain("User likes GodMode");
-    expect(result).not.toContain("Sarah");
+    expect(result).not.toContain("Dana");
     expect(result).not.toContain("Standup");
     expect(result).not.toContain("5 pending");
   });

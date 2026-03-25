@@ -56,7 +56,7 @@ const TEST_TASKS = {
     { title: "Clean up stale branches", description: "Delete merged branches older than 30 days from the repo" },
   ],
   task: [
-    { title: "Send Jake the API docs", description: "Jake needs the latest API documentation for the integration" },
+    { title: "Send Alex the API docs", description: "Alex needs the latest API documentation for the integration" },
     { title: "Update the README with new setup steps", description: "The onboarding flow changed, README is outdated" },
     { title: "Organize vault inbox", description: "Move processed notes from inbox to appropriate PARA folders" },
   ],
