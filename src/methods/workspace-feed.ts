@@ -2,6 +2,7 @@
  * workspace-feed.ts — RPC handlers for the workspace activity feed.
  */
 
+import { existsSync } from "node:fs";
 import type { GatewayRequestHandler, GatewayRequestHandlers } from "../types/plugin-api.js";
 import { findWorkspaceById, readWorkspaceConfig } from "../lib/workspaces-config.js";
 import { appendFeedEntry, readFeed, searchFeed } from "../services/workspace-feed.js";
@@ -19,6 +20,11 @@ const feedRead: GatewayRequestHandler = async ({ params, respond }) => {
     const ws = findWorkspaceById(config, workspaceId);
     if (!ws) {
       respond(false, undefined, { code: "NOT_FOUND", message: "Workspace not found" });
+      return;
+    }
+    if (!existsSync(ws.path)) {
+      console.warn(`[workspace.feed.read] workspace directory missing, returning empty feed: ${ws.path}`);
+      respond(true, { entries: [], workspaceId });
       return;
     }
     const entries = readFeed(ws.path, limit ?? 50, before);
@@ -45,6 +51,9 @@ const feedPost: GatewayRequestHandler = async ({ params, respond }) => {
     if (!ws) {
       respond(false, undefined, { code: "NOT_FOUND", message: "Workspace not found" });
       return;
+    }
+    if (!existsSync(ws.path)) {
+      console.warn(`[workspace.feed.post] workspace directory missing, will be created: ${ws.path}`);
     }
     const entry = appendFeedEntry(ws.path, {
       author: author ?? "user",
@@ -75,6 +84,11 @@ const feedSearch: GatewayRequestHandler = async ({ params, respond }) => {
     const ws = findWorkspaceById(config, workspaceId);
     if (!ws) {
       respond(false, undefined, { code: "NOT_FOUND", message: "Workspace not found" });
+      return;
+    }
+    if (!existsSync(ws.path)) {
+      console.warn(`[workspace.feed.search] workspace directory missing, returning empty results: ${ws.path}`);
+      respond(true, { entries: [], workspaceId });
       return;
     }
     const entries = searchFeed(ws.path, query, limit ?? 20);

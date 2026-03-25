@@ -20,13 +20,18 @@ const list: GatewayRequestHandler = async ({ params, respond }) => {
     respond(false, undefined, { code: "INVALID_REQUEST", message: "workspaceId required" });
     return;
   }
-  const config = await readWorkspaceConfig();
-  const ws = findWorkspaceById(config, workspaceId);
-  if (!ws) {
-    respond(false, undefined, { code: "NOT_FOUND", message: "Workspace not found" });
-    return;
+  try {
+    const config = await readWorkspaceConfig();
+    const ws = findWorkspaceById(config, workspaceId);
+    if (!ws) {
+      respond(false, undefined, { code: "NOT_FOUND", message: "Workspace not found" });
+      return;
+    }
+    respond(true, { connections: ws.connections ?? [] });
+  } catch (err) {
+    console.warn(`[workspace.connections.list] failed to read workspace config, returning empty connections: ${String(err).slice(0, 120)}`);
+    respond(true, { connections: [] });
   }
-  respond(true, { connections: ws.connections ?? [] });
 };
 
 /** Add or update a connection for a workspace. */
