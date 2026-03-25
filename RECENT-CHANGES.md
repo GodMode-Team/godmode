@@ -1,6 +1,6 @@
 # Recent Changes
 
-This file tracks recent development changes so Atlas and other agents can quickly understand what's been modified and why.
+This file tracks recent development changes so the ally and other agents can quickly understand what's been modified and why.
 
 ---
 
@@ -69,7 +69,7 @@ See `CHANGELOG.md` for the full itemized list.
 ## Proof Steering Safety Follow-up (2026-03-13)
 
 ### What Landed
-- Changed `queue_steer` to append Prosper steering blocks instead of rewriting the full Proof doc, which avoids clobbering concurrent agent or human edits.
+- Changed `queue_steer` to append the ally steering blocks instead of rewriting the full Proof doc, which avoids clobbering concurrent agent or human edits.
 - Declared the `proof_editor.mode` parameter so the ally can intentionally choose append vs replace writes when editing a Proof draft.
 
 ### Verification
@@ -668,18 +668,18 @@ The Fathom webhook receiver was already queuing meetings, but nothing processed 
 ## 2026-03-04 — Mega Stability Push (23 fixes across 5 parallel streams)
 
 ### Why
-GodMode had accumulated ~23 bugs across daily brief, side chat, auto-titling, memory system, security, and UI. Core product experience was degraded — daily rhythm loop broken, Prosper side chat unresponsive, memory stale, document tiles non-functional. This push stabilizes everything for team rollout.
+GodMode had accumulated ~23 bugs across daily brief, side chat, auto-titling, memory system, security, and UI. Core product experience was degraded — daily rhythm loop broken, the ally side chat unresponsive, memory stale, document tiles non-functional. This push stabilizes everything for team rollout.
 
 ### What Changed
 
-**Stream A — Daily Brief + Memory + Prosper Soul (7 fixes):**
+**Stream A — Daily Brief + Memory + the ally Soul (7 fixes):**
 - `brief-generator.ts`: Notes section extraction hardened — never silently loses user content
 - `brief-generator.ts`: Pending tasks now wired into LLM prompt as first-class data source
 - `brief-generator.ts`: Evening check-in / Tomorrow Handoff elevated to PRIMARY source for Win The Day
 - `consciousness-heartbeat.ts`: Once-per-day brief regeneration guard (flag file prevents overwrites)
 - `consciousness-heartbeat.ts`: Built `regenerateConsciousness()` and `regenerateWorking()` natively — no external script dependency
 - `agent-persona.ts`: Persistence protocol rewritten (philosophy-based, not "try 5 things")
-- `agent-persona.ts`: Prosper EA elite behavior embedded (architecture awareness, daily rhythm, context retrieval, task intelligence)
+- `agent-persona.ts`: the ally EA elite behavior embedded (architecture awareness, daily rhythm, context retrieval, task intelligence)
 
 **Stream B — UI Chat Fixes (7 fixes):**
 - `app.ts`: Side chat auto-scroll now waits for Lit `updateComplete` before scrolling
@@ -1038,10 +1038,10 @@ Agent-generated dashboards looked terrible — agents create HTML with `<style>`
 
 ---
 
-## 2026-03-01 — Agent Roster System + Prosper as General
+## 2026-03-01 — Agent Roster System + the ally as General
 
 ### Why
-Inspired by the "agents as team roles" pattern (markdown persona files organized by department). GodMode already had the hard part (queue processor, swarm pipeline, mission control). This adds the persona layer so Prosper can manage a team of specialized agents.
+Inspired by the "agents as team roles" pattern (markdown persona files organized by department). GodMode already had the hard part (queue processor, swarm pipeline, mission control). This adds the persona layer so the ally can manage a team of specialized agents.
 
 ### What Changed
 
@@ -1085,7 +1085,7 @@ Inspired by the "agents as team roles" pattern (markdown persona files organized
 - `appendRosterContext()` appends a "## Your Team (Agent Roster)" section to CONSCIOUSNESS.md on every hourly sync
 - Groups personas by category with slugs and task type mappings
 - Replaces any existing roster section to avoid duplication
-- Runs before vault mirror so Prosper and all agents see the current team
+- Runs before vault mirror so the ally and all agents see the current team
 
 **Starter Persona Templates:**
 - `~/godmode/memory/agent-roster/_defaults/researcher.md` — research + url tasks
@@ -1103,8 +1103,8 @@ Inspired by the "agents as team roles" pattern (markdown persona files organized
 
 ### How It Works (End-to-End)
 1. User defines team roles as `.md` files in vault or `~/godmode/memory/agent-roster/`
-2. Consciousness heartbeat syncs roster to CONSCIOUSNESS.md → Prosper sees the team (with trust scores)
-3. When Prosper sets the day and creates tasks, it knows which personas to assign
+2. Consciousness heartbeat syncs roster to CONSCIOUSNESS.md → the ally sees the team (with trust scores)
+3. When the ally sets the day and creates tasks, it knows which personas to assign
 4. Tasks auto-queue with persona routing (type-based + roster match, trust-weighted)
 5. Queue processor spawns agents with persona identity + task instructions + handoff context
 6. Agents can hand off to other personas via `queue_add` with structured context
@@ -1319,10 +1319,10 @@ The 5 surfaces (Chat, Today, Work, Mission Control, Second Brain) were disconnec
 ### What Changed
 
 **1. Session-Scoped Queue Context Injection (the linchpin)**
-- When a user opens a task session, Atlas now immediately knows about any autonomous queue work done on that task
+- When a user opens a task session, the ally now immediately knows about any autonomous queue work done on that task
 - Reverse lookup chain: `sessionKey` → `tasks.json` → `queue.json` → read output file
 - For "processing" items: injects "an agent is currently working on this"
-- For "review" items: injects full output content so Atlas can present findings naturally
+- For "review" items: injects full output content so the ally can present findings naturally
 - Global queue injection still works but skips items already covered by session-scoped injection
 
 **2. Work Tab Queue-Aware Status Indicators**
@@ -1495,7 +1495,7 @@ When a new user activates their license (via `onboarding.activateLicense` RPC or
 - `src/methods/onboarding-types.ts` — Added `gatewayTokenSet: boolean` to `AssessmentResult`.
 
 **Audit finding fixed:**
-Atlas originally reported the gateway token as missing because the audit checked `gateway.token` (flat key) while the actual config uses `gateway.auth.token` (nested). All code now checks both paths.
+the ally originally reported the gateway token as missing because the audit checked `gateway.token` (flat key) while the actual config uses `gateway.auth.token` (nested). All code now checks both paths.
 
 ### X Scanner Sandbox (Separate Local Project)
 Built a fully sandboxed X/Twitter agent architecture for community engagement scanning. This is local infrastructure, NOT part of the GodMode plugin. Follows Meta's Rule of Two — the scanner processes untrusted inputs (A) and accesses sensitive data (B), so external actions (C) require human approval.
