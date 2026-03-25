@@ -11,38 +11,52 @@
 ## ARCHITECTURE OVERVIEW
 
 ```
-┌─────────────────────────────────────────────────────┐
-│                  OVERNIGHT RUNNER                     │
-│              (overnight-browser.sh)                    │
-├─────────────────────────────────────────────────────┤
-│                                                       │
-│  PHASE 1: DISCOVERY (20 loops)                        │
-│  ┌──────────┐  ┌──────────┐  ┌──────────┐           │
-│  │  Marcus   │  │  Diana   │  │   Raj    │  ...x7    │
-│  │ Stagehand │  │ Stagehand│  │ Stagehand│           │
-│  │ + LLM     │  │ + LLM    │  │ + LLM    │           │
-│  └─────┬─────┘  └─────┬────┘  └─────┬────┘           │
-│        │              │              │                 │
-│        ▼              ▼              ▼                 │
-│  ┌─────────────────────────────────────────┐          │
-│  │         LLM JUDGE (Sonnet 4.6)          │          │
-│  │  7 North Star Dimensions (0-10 each)    │          │
-│  └─────────────────┬───────────────────────┘          │
-│                    │                                   │
-│                    ▼                                   │
-│  ┌─────────────────────────────────────────┐          │
-│  │        RESULTS COLLECTOR                 │          │
-│  │  bugs.jsonl + feedback.jsonl + scores    │          │
-│  └─────────────────────────────────────────┘          │
-│                                                       │
-│  PHASE 2: OPTIMIZATION (20 loops)                     │
-│  ┌─────────────────────────────────────────┐          │
-│  │   Bug fixes + UX improvements            │          │
-│  │   modify → re-test → score → keep/revert │          │
-│  └─────────────────────────────────────────┘          │
-│                                                       │
-│  OUTPUT: Consolidated report + scored fixes            │
-└─────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────┐
+│                     OVERNIGHT RUNNER                          │
+│                 (overnight-browser.sh)                         │
+├──────────────────────────────────────────────────────────────┤
+│                                                                │
+│  PHASE 1: DISCOVERY (20 loops × ~62 min = ~21 hrs)            │
+│                                                                │
+│  Per loop — 3 parallel groups:                                 │
+│                                                                │
+│  GROUP A (parallel, ~15 min)     GROUP B (parallel, ~15 min)  │
+│  ┌────────┐┌────────┐┌────────┐  ┌────────┐┌────────┐        │
+│  │ Marcus ││Dr.Mike ││Frankie │  │ Diana  ││ Sarah  │        │
+│  │🖥️ Chat ││🖥️ Onbd ││🖥️ Zero │  │🖥️ Team ││🖥️ Multi│        │
+│  └───┬────┘└───┬────┘└───┬────┘  └───┬────┘└───┬────┘        │
+│      │         │         │           │         │               │
+│      └─────────┴─────────┘           └─────────┘               │
+│                │                          │                     │
+│                ▼                          ▼                     │
+│         GROUP C (sequential, ~25 min)                          │
+│         ┌────────┐ → ┌────────┐                                │
+│         │  Raj   │   │  Alex  │                                │
+│         │🖥️ Build│   │🖥️ Power│                                │
+│         └───┬────┘   └───┬────┘                                │
+│             └────────────┘                                     │
+│                    │                                           │
+│                    ▼                                           │
+│  ┌─────────────────────────────────────────┐                   │
+│  │     LLM JUDGE (Sonnet 4.6)              │                   │
+│  │  7 North Star Dimensions (0-10 each)    │                   │
+│  │  Rate-limited: max 3 concurrent calls   │                   │
+│  └─────────────────┬───────────────────────┘                   │
+│                    ▼                                           │
+│  ┌─────────────────────────────────────────┐                   │
+│  │        RESULTS COLLECTOR                 │                   │
+│  │  bugs.jsonl + feedback.jsonl + scores    │                   │
+│  └─────────────────────────────────────────┘                   │
+│                                                                │
+│  PHASE 2: OPTIMIZATION (20 loops × ~35 min = ~12 hrs)          │
+│  ┌─────────────────────────────────────────┐                   │
+│  │   Prioritize → Fix → Re-test affected   │                   │
+│  │   archetypes only → Score → Keep/Revert │                   │
+│  └─────────────────────────────────────────┘                   │
+│                                                                │
+│  TOTAL: ~33 hrs (fits in one long weekend run)                 │
+│  OUTPUT: Consolidated report + scored fixes + screenshot gallery│
+└──────────────────────────────────────────────────────────────┘
 ```
 
 ---
@@ -390,44 +404,106 @@ Each cell = a deep flow that gets tested. "P" = primary (run every loop), "S" = 
 
 ### Loop Structure
 
-Each loop runs all 7 archetypes sequentially through their assigned surfaces. Archetypes run one at a time (not parallel) because they share the same browser/gateway instance and some flows modify shared state (workspaces, memory).
+Each loop runs 7 archetypes in **3 parallel groups**, each group getting its own Stagehand/Chromium instance. Groups are isolated by state — archetypes that modify shared resources (workspaces, team settings) never run in parallel with each other.
+
+#### Parallelization Groups
+
+```
+GROUP A (parallel — 3 browsers):  Marcus + Dr. Mike + Frankie
+  Why together: Personal flows, minimal shared-state writes.
+  Marcus does chat/memory/content. Dr. Mike does onboarding/simple chat.
+  Frankie does zero-state/onboarding. No conflicts.
+
+GROUP B (parallel — 2 browsers):  Diana + Sarah
+  Why together: Both test workspaces/teams, but on DIFFERENT workspaces.
+  Diana creates "Q2 Planning" workspace. Sarah creates client workspaces.
+  Each operates in isolated workspace scope. Git sync tested sequentially
+  within each archetype (not cross-archetype).
+
+GROUP C (sequential — 1 browser):  Raj + Alex
+  Why sequential: Both modify global config, agent roster, trust settings,
+  custom tabs, and Paperclip. These are singleton resources.
+  Raj runs first (moderate changes), then Alex (power user, changes everything).
+  Alex's config stress test resets settings when done.
+
+Groups run sequentially: A → B → C
+Within groups A and B: parallel Stagehand instances.
+```
+
+**Timing:** ~15 min (Group A parallel) + ~15 min (Group B parallel) + ~25 min (Group C sequential) + ~7 min (aggregate/report) = **~62 min per loop** (down from ~97 min sequential)
+
+**40 loops at ~62 min = ~41 hours.** Fits in two overnight runs, or one long weekend run.
 
 ```
 LOOP N:
   1. SETUP (2 min)
-     - Reset test state (optional — configurable per archetype)
-     - Verify gateway is running
-     - Launch Stagehand with local Chromium
+     - Verify gateway is running on localhost
+     - Verify UI dev server is running
+     - Check stop file (~/godmode/data/stop-synthetic)
+     - Read synthetic-state.json for resume (if exists)
 
-  2. RUN ARCHETYPES (7 × ~10-15 min = ~90 min)
-     For each archetype:
-       a. Load personality prompt
-       b. Set viewport size
-       c. Navigate to http://localhost:{gateway-port}
-       d. Execute deep flow scripts (Stagehand act/extract/observe)
-       e. After each interaction:
+  2. GROUP A — PARALLEL (3 Stagehand instances, ~15 min)
+     Launch simultaneously:
+       Browser 1: Marcus (viewport 1280x720)
+       Browser 2: Dr. Mike (viewport 375x812 mobile + 1280x720 desktop)
+       Browser 3: Frankie (viewport 1280x720, cycles tech skill per loop)
+     Each browser:
+       a. Load archetype personality prompt + depth_level for this loop
+       b. Navigate to http://localhost:{ui-port}
+       c. Execute deep flow scripts via Stagehand act/extract/observe
+       d. After each interaction:
           - Screenshot → screenshots/{loop}-{archetype}-{flow}-{step}.png
           - Extract page state via Stagehand extract()
           - LLM judge scores on 7 dimensions
           - Classify any bugs found (P0-P3)
           - Generate UX feedback from archetype's perspective
-       f. Log all results to results/{loop}-{archetype}.jsonl
+       e. Log results to results/{loop}-{archetype}.jsonl
+       f. Close browser when done
+     Await all 3 → proceed to Group B
 
-  3. AGGREGATE (5 min)
+  3. GROUP B — PARALLEL (2 Stagehand instances, ~15 min)
+     Launch simultaneously:
+       Browser 1: Diana (viewport 1280x720)
+       Browser 2: Sarah (viewport 1280x720)
+     Same flow as Group A.
+     Workspace isolation: Diana uses workspace "diana-test-*", Sarah uses "sarah-client-*"
+     Await both → proceed to Group C
+
+  4. GROUP C — SEQUENTIAL (1 Stagehand instance, ~25 min)
+     Browser 1: Raj (~12 min)
+       - Paperclip, Second Brain deep search, cross-session memory, custom tabs
+       - Does NOT reset config when done
+     Browser 1: Alex (~13 min)
+       - Config stress test, Composio, cron, agent roster, guardrails, debug
+       - RESETS config/agent roster to defaults when done (cleanup for next loop)
+
+  5. AGGREGATE (5 min)
      - Compute per-archetype scores
      - Compute per-dimension scores (averaged across archetypes)
      - Compute per-surface scores (averaged across archetypes who tested it)
      - Append to cumulative-scores.tsv
      - Generate loop summary
+     - Write synthetic-state.json (for crash recovery)
 
-  4. REPORT (2 min)
+  6. REPORT (2 min)
      - Print scoreboard
-     - List new bugs found this loop
+     - List new bugs found this loop (delta from previous)
      - List top UX friction points
      - Write to loop-{N}-summary.md
+     - If loop % 5 == 0: generate mid-run consolidated report
 
   → Start LOOP N+1
 ```
+
+### Parallel Safety Rules
+
+1. **Each Stagehand instance gets its own Chromium process.** No shared browser state.
+2. **Namespace isolation:** Diana's workspaces are prefixed `diana-test-*`, Sarah's are `sarah-client-*`. No collision.
+3. **Memory writes are safe in parallel** — Honcho/Mem0 handles concurrent writes. But if a race condition is detected (duplicate facts, corrupted state), log it as a P1 bug.
+4. **Config/agent roster are singletons** — only Group C touches these, and it runs sequentially.
+5. **Gateway is shared** — all browsers hit the same localhost gateway. RPC handlers must be safe for concurrent requests (they should be already; if not, that's a P0 bug).
+6. **LLM judge calls are rate-limited** — max 3 concurrent judge calls across all groups. Use a semaphore in the runner to prevent Anthropic 429s.
+7. **Screenshot directories are per-archetype** — no filename collisions.
 
 ### Progressive Depth
 
