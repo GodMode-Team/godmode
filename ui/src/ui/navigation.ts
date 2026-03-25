@@ -115,6 +115,32 @@ export function normalizePath(path: string): string {
   return normalized;
 }
 
+// ── Custom tab dynamic registry ──────────────────────────────────────
+// Custom tabs register their slugs here so pathForTab/tabFromPath work.
+const _customTabSlugs = new Set<string>();
+
+/** Register a custom tab slug for URL routing. */
+export function registerCustomTabSlug(slug: string): void {
+  _customTabSlugs.add(slug);
+  PATH_TO_TAB.set(`/${slug}`, slug as Tab);
+}
+
+/** Unregister a custom tab slug. */
+export function unregisterCustomTabSlug(slug: string): void {
+  _customTabSlugs.delete(slug);
+  PATH_TO_TAB.delete(`/${slug}`);
+}
+
+/** Check if a tab identifier is a registered custom tab. */
+export function isCustomTab(tab: string): boolean {
+  return _customTabSlugs.has(tab);
+}
+
+/** Get all registered custom tab slugs. */
+export function getCustomTabSlugs(): string[] {
+  return [..._customTabSlugs];
+}
+
 export function pathForTab(tab: Tab, basePath = ""): string {
   const base = normalizeBasePath(basePath);
   const path = TAB_PATHS[tab] ?? `/${tab}`;

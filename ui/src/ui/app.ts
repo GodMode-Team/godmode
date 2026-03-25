@@ -608,6 +608,12 @@ export class GodModeApp extends LitElement {
   @state() searchTavilyConfigured = false;
   @state() searchLoading = false;
 
+  // Custom tabs state
+  @state() customTabs: Array<import("./views/custom-tab-renderer").CustomTabManifest> = [];
+  @state() customTabData: Record<string, unknown> = {};
+  @state() customTabLoading = false;
+  @state() customTabErrors: Record<string, string> = {};
+
   /** Stashed session key to restore when leaving an active dashboard */
   dashboardPreviousSessionKey: string | null = null;
 

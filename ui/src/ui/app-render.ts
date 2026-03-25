@@ -67,7 +67,9 @@ import {
 } from "./controllers/skills";
 import { loadRoster } from "./controllers/agents";
 import { icons } from "./icons";
-import { TAB_GROUPS, POWER_USER_GROUPS, subtitleForTab, titleForTab, type Tab } from "./navigation";
+import { TAB_GROUPS, POWER_USER_GROUPS, subtitleForTab, titleForTab, isCustomTab, pathForTab, type Tab } from "./navigation";
+import { renderCustomTab } from "./views/custom-tab-renderer.js";
+import { fetchCustomTabData } from "./app-gateway.js";
 import { renderAllyChat } from "./views/ally-chat.js";
 import { ALLY_SESSION_KEY } from "./controllers/ally.js";
 import { renderChannels } from "./views/channels";
@@ -469,6 +471,48 @@ export function renderApp(state: AppViewState) {
             </div>
           `;
         })}
+        ${(state.customTabs?.length ?? 0) > 0 ? (() => {
+          const customTabs = state.customTabs ?? [];
+          const isGroupCollapsed = state.settings.navGroupsCollapsed["Custom"] ?? false;
+          const hasActiveTab = customTabs.some((ct) => ct.slug === state.tab);
+          return html`
+            <div class="nav-group ${isGroupCollapsed && !hasActiveTab ? "nav-group--collapsed" : ""}">
+              <button
+                class="nav-label"
+                @click=${() => {
+                  const next = { ...state.settings.navGroupsCollapsed };
+                  next["Custom"] = !isGroupCollapsed;
+                  state.applySettings({ ...state.settings, navGroupsCollapsed: next });
+                }}
+                aria-expanded=${!isGroupCollapsed}
+              >
+                <span class="nav-label__text">Custom</span>
+                <span class="nav-label__chevron">${isGroupCollapsed ? "+" : "\u2212"}</span>
+              </button>
+              <div class="nav-group__items">
+                ${customTabs.map((ct) => {
+                  const isActive = state.tab === ct.slug;
+                  const href = pathForTab(ct.slug as Tab, state.basePath);
+                  return html`
+                    <a
+                      href=${href}
+                      class="nav-item ${isActive ? "nav-item--active" : ""}"
+                      @click=${(e: Event) => {
+                        e.preventDefault();
+                        state.setTab(ct.slug as Tab);
+                        // Fetch data for this custom tab
+                        void fetchCustomTabData(state as any, ct);
+                      }}
+                    >
+                      <span class="nav-item__icon">${icons[ct.icon as keyof typeof icons] ?? icons.folder}</span>
+                      <span class="nav-item__label">${ct.title}</span>
+                    </a>
+                  `;
+                })}
+              </div>
+            </div>
+          `;
+        })() : nothing}
         ${POWER_USER_GROUPS.map((group) => {
           const isGroupCollapsed = state.settings.navGroupsCollapsed[group.label] ?? true;
           const hasActiveTab = group.tabs.some((tab) => tab === state.tab);
@@ -1749,6 +1793,21 @@ export function renderApp(state: AppViewState) {
         ${
           state.tab === "dashboards"
             ? (ensureTab("gm-dashboards"), html`<gm-dashboards></gm-dashboards>`)
+            : nothing
+        }
+
+        ${
+          isCustomTab(state.tab)
+            ? (() => {
+                const ct = (state.customTabs ?? []).find((t) => t.slug === state.tab);
+                if (!ct) return html`<div class="tab-view"><p>Custom tab not found.</p></div>`;
+                return renderCustomTab({
+                  manifest: ct,
+                  data: state.customTabData ?? {},
+                  loading: state.customTabLoading ?? false,
+                  errors: state.customTabErrors ?? {},
+                });
+              })()
             : nothing
         }
 

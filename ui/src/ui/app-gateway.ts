@@ -674,6 +674,8 @@ export function connectGateway(host: GatewayHost) {
       void checkPostUpdateStatus(host as unknown as GodModeApp);
       // Handle ?openTask= URL parameter for task → session deep linking
       handleOpenTaskParam(host as unknown as GodModeApp);
+      // Load custom tabs
+      void loadCustomTabs(host as unknown as GodModeApp);
     },
     onClose: ({ code, reason }) => {
       host.connected = false;
@@ -1609,4 +1611,73 @@ export function applySnapshot(host: GatewayHost, hello: GatewayHelloOk) {
   if (snapshot?.sessionDefaults) {
     applySessionDefaults(host, snapshot.sessionDefaults);
   }
+}
+
+// ── Custom Tabs ──────────────────────────────────────────────────────
+
+import type { CustomTabManifest, CustomTabDataSource } from "./views/custom-tab-renderer.js";
+import { registerCustomTabSlug, unregisterCustomTabSlug, getCustomTabSlugs } from "./navigation.js";
+
+type CustomTabHost = GatewayHost & {
+  customTabs: CustomTabManifest[];
+  customTabData: Record<string, unknown>;
+  customTabLoading: boolean;
+  customTabErrors: Record<string, string>;
+};
+
+export async function loadCustomTabs(host: CustomTabHost): Promise<void> {
+  if (!host.client) return;
+  try {
+    const result = await host.client.request<{
+      tabs?: CustomTabManifest[];
+      count?: number;
+    }>("customTabs.list", {});
+    const tabs = result?.tabs ?? [];
+
+    // Unregister old custom tab slugs
+    for (const slug of getCustomTabSlugs()) {
+      unregisterCustomTabSlug(slug);
+    }
+    // Register new ones for URL routing
+    for (const tab of tabs) {
+      registerCustomTabSlug(tab.slug);
+    }
+
+    host.customTabs = tabs;
+  } catch {
+    // Custom tabs are optional — silently degrade
+    host.customTabs = [];
+  }
+}
+
+export async function fetchCustomTabData(
+  host: CustomTabHost,
+  manifest: CustomTabManifest,
+): Promise<void> {
+  if (!host.client) return;
+
+  host.customTabLoading = true;
+  host.customTabErrors = {};
+  const data: Record<string, unknown> = {};
+  const errors: Record<string, string> = {};
+
+  for (const ds of manifest.dataSources) {
+    try {
+      if (ds.type === "static") {
+        data[ds.id] = ds.data;
+      } else if (ds.type === "rpc" && ds.method) {
+        const result = await host.client.request<unknown>(
+          ds.method,
+          ds.params ?? {},
+        );
+        data[ds.id] = result;
+      }
+    } catch (err) {
+      errors[ds.id] = err instanceof Error ? err.message : String(err);
+    }
+  }
+
+  host.customTabData = data;
+  host.customTabErrors = errors;
+  host.customTabLoading = false;
 }

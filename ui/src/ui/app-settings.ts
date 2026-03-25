@@ -27,6 +27,7 @@ import { loadGodModeSkills, loadSkills } from "./controllers/skills";
 import { loadWorkspaces } from "./controllers/workspaces";
 import {
   inferBasePathFromPathname,
+  isCustomTab,
   normalizeBasePath,
   normalizePath,
   pathForTab,
@@ -348,6 +349,15 @@ export async function refreshActiveTab(host: SettingsHost) {
     host.logsAtBottom = true;
     await loadLogs(host as unknown as GodModeApp, { reset: true });
     scheduleLogsScroll(host as unknown as Parameters<typeof scheduleLogsScroll>[0], true);
+  }
+  // Custom tab data refresh
+  if (isCustomTab(host.tab)) {
+    const app = host as unknown as GodModeApp;
+    const ct = (app.customTabs ?? []).find((t) => t.slug === host.tab);
+    if (ct) {
+      const { fetchCustomTabData } = await import("./app-gateway.js");
+      await fetchCustomTabData(app as any, ct);
+    }
   }
 }
 
