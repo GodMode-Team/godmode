@@ -4,7 +4,7 @@
 
 - [ ] **Inbox file locking** — `src/services/inbox.ts` does read-modify-write without `withFileLock`. Copy pattern from `src/lib/queue-state.ts`. Silent data loss when agents complete simultaneously.
 - [ ] **activeCount drift** — `src/services/queue-processor.ts` lines 400/438/660. Decrement in a `finally` block so errors in completion handler can't permanently inflate the count. At 5 stuck, queue stops forever.
-- [ ] **Hardcoded userId "caleb"** — `src/hooks/before-prompt-build.ts:147` and `src/hooks/lifecycle-hooks.ts:398`. Replace with dynamic lookup from identity anchor or config.
+- [ ] **Hardcoded userId** — `src/hooks/before-prompt-build.ts:147` and `src/hooks/lifecycle-hooks.ts:398`. Replace with dynamic lookup from identity anchor or config.
 
 ## High — Fix This Month
 
