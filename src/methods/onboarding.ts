@@ -34,7 +34,6 @@ import {
 } from "./onboarding-types.js";
 import { runAssessment, generateConfigRecommendations } from "./onboarding-scanner.js";
 import {
-  getIntegrationsForPlatform,
   detectAllIntegrations,
 } from "../lib/integration-registry.js";
 import {
@@ -244,6 +243,7 @@ function buildPhase0Steps(state: OnboardingState): ChecklistStep[] {
             const gaps: string[] = [];
             if (a.authMethod === "none") gaps.push("auth");
             if (!a.memoryStatus.hasMemoryMd) gaps.push("memory");
+            if (a.qmdStatus?.backendConfigured && !a.qmdStatus.available) gaps.push("qmd");
             if (a.channelsConnected.length === 0) gaps.push("channels");
             return gaps.length > 0 ? `Gaps: ${gaps.join(", ")}` : "No major gaps";
           })()
@@ -553,8 +553,9 @@ export const onboardingHandlers: GatewayRequestHandlers = {
   "onboarding.capabilities": async ({ respond }) => {
     try {
       const state = await readOnboarding();
-      const integrations = getIntegrationsForPlatform();
       const integrationStatuses = await detectAllIntegrations();
+      const { getQmdStatus } = await import("../lib/qmd-status.js");
+      const qmdStatus = await getQmdStatus();
 
       type CapCard = {
         id: string;
@@ -668,7 +669,12 @@ export const onboardingHandlers: GatewayRequestHandlers = {
         title: "Smart Memory",
         description: "Your ally remembers context across sessions and conversations.",
         icon: "\u{1F4AD}",
-        status: state.secondBrain?.memorySeeded ? "active" : "available",
+        status: state.secondBrain?.memorySeeded && (qmdStatus.available || !qmdStatus.backendConfigured)
+          ? "active"
+          : "available",
+        detail: qmdStatus.backendConfigured && !qmdStatus.available
+          ? qmdStatus.warning ?? undefined
+          : undefined,
         action: state.secondBrain?.memorySeeded ? undefined : "Set Up Identity",
       });
 
