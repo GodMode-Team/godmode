@@ -9,37 +9,37 @@ importers:
   .:
     dependencies:
       '@composio/core':
-        specifier: ^0.6.5
+        specifier: 0.6.5
         version: 0.6.5(ws@8.19.0)(zod@4.3.6)
       '@honcho-ai/sdk':
-        specifier: ^2.0.1
+        specifier: 2.0.1
         version: 2.0.1
       '@lit/context':
-        specifier: ^1.1.6
+        specifier: 1.1.6
         version: 1.1.6
       '@noble/ed25519':
         specifier: 3.0.0
         version: 3.0.0
       better-sqlite3:
-        specifier: ^11.8.1
+        specifier: 11.10.0
         version: 11.10.0
       chokidar:
-        specifier: ^4.0.3
+        specifier: 4.0.3
         version: 4.0.3
       dompurify:
-        specifier: ^3.3.3
+        specifier: 3.3.3
         version: 3.3.3
       json5:
-        specifier: ^2.2.3
+        specifier: 2.2.3
         version: 2.2.3
       lit:
-        specifier: ^3.3.2
+        specifier: 3.3.2
         version: 3.3.2
       marked:
-        specifier: ^17.0.1
+        specifier: 17.0.3
         version: 17.0.3
       ws:
-        specifier: ^8.18.0
+        specifier: 8.19.0
         version: 8.19.0
     devDependencies:
       '@types/node':
@@ -3482,7 +3482,7 @@ snapshots:
       google-auth-library: 10.6.2
       p-retry: 4.6.2
       protobufjs: 7.5.4
-      ws: 8.20.0
+      ws: 8.19.0
     optionalDependencies:
       '@modelcontextprotocol/sdk': 1.27.1(zod@4.3.6)
     transitivePeerDependencies:
@@ -3501,7 +3501,7 @@ snapshots:
 
   '@honcho-ai/sdk@2.0.1':
     dependencies:
-      '@types/node': 24.10.13
+      '@types/node': 24.12.0
       zod: 4.0.0
 
   '@hono/node-server@1.19.11(hono@4.12.8)':
@@ -3796,7 +3796,7 @@ snapshots:
 
   '@mistralai/mistralai@1.14.1':
     dependencies:
-      ws: 8.20.0
+      ws: 8.19.0
       zod: 4.3.6
       zod-to-json-schema: 3.25.1(zod@4.3.6)
     transitivePeerDependencies:
@@ -5295,7 +5295,7 @@ snapshots:
   node-edge-tts@1.2.10:
     dependencies:
       https-proxy-agent: 7.0.6
-      ws: 8.20.0
+      ws: 8.19.0
       yargs: 17.7.2
     transitivePeerDependencies:
       - bufferutil

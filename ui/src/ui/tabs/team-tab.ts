@@ -31,6 +31,8 @@ export class GmTeam extends LitElement {
   @state() private _showAdvanced = false;
   @state() private _agentCount = 0;
 
+  private _wasConnected = false;
+
   override createRenderRoot() {
     return this;
   }
@@ -38,6 +40,16 @@ export class GmTeam extends LitElement {
   override connectedCallback() {
     super.connectedCallback();
     void this._checkStatus();
+  }
+
+  override willUpdate(changed: Map<string, unknown>) {
+    super.willUpdate(changed);
+    // Re-check Paperclip status when gateway reconnects
+    const connected = this.ctx?.connected ?? false;
+    if (connected && !this._wasConnected) {
+      void this._checkStatus();
+    }
+    this._wasConnected = connected;
   }
 
   private get _client() {

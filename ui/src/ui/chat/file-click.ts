@@ -56,4 +56,25 @@ export function handleChatFileClick(
     onOpenFile(filename);
     return;
   }
+
+  // Handle local file paths in ally-generated markdown links
+  // e.g. [Open it](~/godmode/artifacts/report.html) or [View](/Users/.../file.md)
+  if (
+    href.startsWith("~/") ||
+    href.startsWith("/Users/") ||
+    href.startsWith("/home/") ||
+    href.startsWith("/tmp/") ||
+    href.startsWith("/godmode/")
+  ) {
+    e.preventDefault();
+    e.stopPropagation();
+    let filePath = href;
+    try {
+      filePath = decodeURIComponent(filePath);
+    } catch {
+      // keep as-is
+    }
+    onOpenFile(filePath);
+    return;
+  }
 }

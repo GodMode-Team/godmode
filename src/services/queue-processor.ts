@@ -778,11 +778,67 @@ class QueueProcessor {
     const completedItem = queueState.items.find((i) => i.id === itemId);
     const personaSlug = completedItem?.personaHint;
 
-    // Verification gate for coding tasks: require artifact evidence
-    if (completedItem && completedItem.type === "coding") {
-      const hasPrLink = artifacts.some((a) => a.includes("/pull/"));
-      const hasFilePath = artifacts.some((a) => a.startsWith("/"));
-      if (!hasPrLink && !hasFilePath) {
+    // Push to universal inbox BEFORE any early returns (coding gate, auto-approve)
+    const projectId = completedItem?.meta?.projectId ?? completedItem?.meta?.paperclipProjectId;
+    try {
+      const { addInboxItem, shouldInbox } = await import("./inbox.js");
+      let trustScore: number | null = null;
+      if (personaSlug) {
+        try {
+          const { getTrustScore } = await import("../methods/trust-tracker.js");
+          trustScore = await getTrustScore(personaSlug);
+        } catch { /* trust tracker unavailable — conservative: null → will inbox */ }
+      }
+
+      const shouldAdd = shouldInbox({
+        type: "agent-execution",
+        queueItemType: completedItem?.type,
+        personaSlug,
+        trustScore,
+      });
+
+      if (shouldAdd) {
+        await addInboxItem({
+          type: "agent-execution",
+          title: completedItem?.title ?? itemId,
+          summary: summary.slice(0, 300),
+          source: {
+            persona: personaSlug,
+            queueItemId: itemId,
+            taskId: completedItem?.sourceTaskId,
+            projectId,
+          },
+          outputPath: outPath,
+          sessionId: completedItem?.sessionId,
+        });
+      } else {
+        this.logger.info(
+          `[GodMode][Queue] Skipped inbox for ${itemId} (${personaSlug} trust=${trustScore}, type=${completedItem?.type})`,
+        );
+      }
+    } catch (err) {
+      this.logger.warn(`[GodMode][Queue] Inbox push failed for ${itemId}: ${String(err)}`);
+    }
+
+    // Artifact-required gate: ALL task types must produce evidence of work.
+    // Coding tasks need a PR link or file path. Content/research/review tasks
+    // need either artifacts OR substantial output (> 200 chars). An agent that
+    // claims "done" with no artifact and no meaningful output gets flagged.
+    if (completedItem) {
+      let needsArtifactReview = false;
+
+      if (completedItem.type === "coding") {
+        const hasPrLink = artifacts.some((a) => a.includes("/pull/"));
+        const hasFilePath = artifacts.some((a) => a.startsWith("/"));
+        needsArtifactReview = !hasPrLink && !hasFilePath;
+      } else {
+        // Content, research, review, ops — need artifacts or meaningful output
+        const hasArtifacts = artifacts.length > 0;
+        const hasSubstantialOutput = outputContent.length > 200;
+        needsArtifactReview = !hasArtifacts && !hasSubstantialOutput;
+      }
+
+      if (needsArtifactReview) {
         await updateQueueState((state) => {
           const qi = state.items.find((i) => i.id === itemId);
           if (qi) {
@@ -794,7 +850,7 @@ class QueueProcessor {
           }
         });
         this.logger.info(
-          `[GodMode][Queue] Item ${itemId} (coding) has no artifacts — set to needs-review`,
+          `[GodMode][Queue] Item ${itemId} (${completedItem.type}) has no artifacts — set to needs-review`,
         );
         this.broadcast("queue:update", {
           itemId,
@@ -851,48 +907,6 @@ class QueueProcessor {
     });
 
     // REMOVED (v2 slim): impact-ledger logging
-
-    // Push to universal inbox — only if triage gate says it's worth reviewing
-    const projectId = completedItem?.meta?.projectId ?? completedItem?.meta?.paperclipProjectId;
-    try {
-      const { addInboxItem, shouldInbox } = await import("./inbox.js");
-      let trustScore: number | null = null;
-      if (personaSlug) {
-        try {
-          const { getTrustScore } = await import("../methods/trust-tracker.js");
-          trustScore = await getTrustScore(personaSlug);
-        } catch { /* trust tracker unavailable — conservative: null → will inbox */ }
-      }
-
-      const shouldAdd = shouldInbox({
-        type: "agent-execution",
-        queueItemType: completedItem?.type,
-        personaSlug,
-        trustScore,
-      });
-
-      if (shouldAdd) {
-        await addInboxItem({
-          type: "agent-execution",
-          title: completedItem?.title ?? itemId,
-          summary: summary.slice(0, 300),
-          source: {
-            persona: personaSlug,
-            queueItemId: itemId,
-            taskId: completedItem?.sourceTaskId,
-            projectId,
-          },
-          outputPath: outPath,
-          sessionId: completedItem?.sessionId,
-        });
-      } else {
-        this.logger.info(
-          `[GodMode][Queue] Skipped inbox for ${itemId} (${personaSlug} trust=${trustScore}, type=${completedItem?.type})`,
-        );
-      }
-    } catch (err) {
-      this.logger.warn(`[GodMode][Queue] Inbox push failed for ${itemId}: ${String(err)}`);
-    }
 
     // Check for project-level completion (all sibling items in same project are terminal)
     if (projectId && await this.isMultiIssueProject(projectId)) {
@@ -1498,6 +1512,17 @@ class QueueProcessor {
     // Inject roster persona instructions if available
     if (persona) {
       sections.push("", "## Your Role", "", persona.body);
+    }
+
+    // Inject hardcoded agent rules from AGENTS.md — non-negotiable behavioral anchors
+    try {
+      const { fileURLToPath } = await import("node:url");
+      const thisFile = fileURLToPath(import.meta.url);
+      const agentsRulesPath = path.resolve(path.dirname(thisFile), "..", "..", "assets", "AGENTS.md");
+      const agentsRules = await fs.readFile(agentsRulesPath, "utf-8");
+      sections.push("", agentsRules);
+    } catch {
+      // AGENTS.md not available — continue without hardcoded rules
     }
 
     // Inject methodology for this task type

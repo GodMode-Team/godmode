@@ -16,7 +16,7 @@ const FILE_EXT_RE = /\.(html?|css|js|ts|tsx|jsx|json|md|txt|csv|py|sh|yaml|yml|x
 
 // Match absolute paths like /Users/... or ~/... with a file extension OR trailing slash (directory).
 // Negative lookbehind avoids matching paths already inside markdown links or URLs (://path).
-const FILE_PATH_RE = /(?<![(\[`]|:\/\/)(?:~\/|\/(?:Users|home|tmp|var|opt|etc|godmode)\/)[\w/.+@-]+(?:\.\w+|\/)(?=\s|[),;:!?]|$)/g;
+const FILE_PATH_RE = /(?<![(\[`~]|:\/\/)(?:~\/|\/(?:Users|home|tmp|var|opt|etc|godmode)\/)[\w/.+@-]+(?:\.\w+|\/)(?=\s|[),;:!?]|$)/g;
 
 // Match bare filenames with known extensions (e.g. "report.md", "my-report.md").
 // Matches ANY filename (word chars, hyphens, dots) with a recognized extension.
@@ -42,9 +42,9 @@ export function linkifyFilePaths(markdown: string): string {
       // Don't linkify if the match appears inside a URL (preceded by ://)
       const before = str.slice(Math.max(0, offset - 3), offset);
       if (before.includes("://")) return match;
-      // Don't linkify inside markdown link targets: ](path)
-      const before2 = str.slice(Math.max(0, offset - 2), offset);
-      if (before2.includes("](")) return match;
+      // Don't linkify inside markdown link targets: ](path) or ](~/path)
+      const before3 = str.slice(Math.max(0, offset - 3), offset);
+      if (before3.includes("](")) return match;
       const isDir = match.endsWith("/");
       if (!isDir && !FILE_EXT_RE.test(match)) return match;
       // Expand ~ to a placeholder that the click handler resolves

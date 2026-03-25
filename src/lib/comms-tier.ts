@@ -29,6 +29,13 @@ const SERVICE_RULES: ServiceRule[] = [
   { pattern: /gmail\.googleapis\.com/i, defaultTier: "draft", supportsDraft: true },
   // Circle community
   { pattern: /circle\.so/i, defaultTier: "draft", supportsDraft: true },
+  // Google read-only APIs (POST is semantically a query, not a mutation)
+  { pattern: /analyticsdata\.googleapis\.com/i, defaultTier: "free", supportsDraft: false },
+  { pattern: /analyticsreporting\.googleapis\.com/i, defaultTier: "free", supportsDraft: false },
+  { pattern: /bigquery\.googleapis\.com/i, defaultTier: "free", supportsDraft: false },
+  { pattern: /monitoring\.googleapis\.com/i, defaultTier: "free", supportsDraft: false },
+  { pattern: /logging\.googleapis\.com/i, defaultTier: "free", supportsDraft: false },
+  { pattern: /searchconsole\.googleapis\.com/i, defaultTier: "free", supportsDraft: false },
   // Slack external channels — approval (can't draft a Slack message)
   { pattern: /slack\.com\/api/i, defaultTier: "approval", supportsDraft: false },
   // Twitter/X
