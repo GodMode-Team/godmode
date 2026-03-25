@@ -40,7 +40,7 @@ openclaw gateway restart
 open http://localhost:18789/godmode
 ```
 
-### Option B: Run Standalone (no OpenClaw required)
+### Option B: Clone and Run (with OpenClaw from source)
 
 ```bash
 # Clone and build
@@ -53,11 +53,15 @@ pnpm build
 cp .env.example .env
 # Edit .env and add your ANTHROPIC_API_KEY
 
-# Run
-pnpm start
+# Register as a local plugin in your OpenClaw config
+# Add to ~/.openclaw/openclaw.json under plugins.entries:
+#   "godmode": { "enabled": true, "path": "/path/to/godmode-plugin" }
+
+# Restart your OpenClaw gateway
+openclaw gateway restart
 
 # Open GodMode
-open http://localhost:3333/godmode
+open http://localhost:18789/godmode
 ```
 
 ### Option C: Clone and Develop
@@ -97,12 +101,11 @@ See [.env.example](.env.example) for the full list.
 ## Verify Installation
 
 ```bash
-# Plugin mode
+# Check plugin is registered
 openclaw plugins list
-curl -fsS http://127.0.0.1:18789/godmode/health
 
-# Standalone mode
-curl -fsS http://127.0.0.1:3333/godmode/health
+# Health check
+curl -fsS http://127.0.0.1:18789/godmode/health
 ```
 
 ## Customization
@@ -121,7 +124,7 @@ Drop a file in, restart, and your AI knows something new. No TypeScript required
 ```
 godmode-plugin/
 ├── index.ts              # OpenClaw plugin entry point
-├── standalone.ts         # Standalone server (no OpenClaw needed)
+├── standalone.ts         # Standalone Hermes server (alternative to OpenClaw gateway)
 ├── src/
 │   ├── methods/          # RPC handlers (tasks, calendar, brief, queue, etc.)
 │   ├── services/         # Background services (queue, self-heal, heartbeat)
