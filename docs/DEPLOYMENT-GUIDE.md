@@ -246,10 +246,16 @@ Nothing will crash. Every dependency degrades gracefully with a clear message.
 - The `~/godmode` shorthand maps to `%USERPROFILE%\godmode`
 - Gateway runs the same way: `openclaw gateway start`
 
-### Linux VPS / Mac Mini (headless)
-- Start gateway in background: `openclaw gateway start --daemon` or use `tmux`/`screen`
+### Linux VPS (headless)
+- From a repo checkout, install the user-level systemd service: `./scripts/install-systemd.sh`
+- Check service health with `systemctl --user status godmode-gateway.service`
+- Follow logs with `journalctl --user -u godmode-gateway.service -f`
 - Access GodMode remotely via SSH tunnel: `ssh -L 18789:localhost:18789 your-vps`
 - Or configure Tailscale for direct access to `http://your-vps:18789/godmode/`
+
+### Mac Mini (headless)
+- Use `openclaw gateway install` or `openclaw gateway start --daemon`
+- Access GodMode remotely via SSH tunnel or Tailscale
 
 ### macOS
 - If using Homebrew: `brew install node@22` is the fastest path

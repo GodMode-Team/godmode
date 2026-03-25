@@ -1,5 +1,7 @@
 src/
-scripts/
+scripts/*
+!scripts/install-systemd.sh
+!scripts/godmode-gateway.service
 ui/
 docs/
 skills/
