@@ -13,6 +13,7 @@ import { homedir } from "node:os";
 import type { AssessmentResult, FeatureCheck } from "./onboarding-types.js";
 import { DATA_DIR, GODMODE_ROOT, MEMORY_DIR } from "../data-paths.js";
 import { getQmdStatus } from "../lib/qmd-status.js";
+import { getConfiguredChannels } from "../lib/channel-config-detect.js";
 // resolveVaultPath not used directly — checkObsidianVault() checks for real Obsidian presence
 
 const OC_DIR = join(homedir(), ".openclaw");
@@ -118,28 +119,11 @@ async function detectAuthMethod(): Promise<AssessmentResult["authMethod"]> {
 // ── Detect channels ──────────────────────────────────────────────
 
 async function detectChannels(config: Record<string, unknown>): Promise<string[]> {
-  const channels: string[] = [];
   const channelKeys = [
     "telegram", "discord", "slack", "signal", "imessage", "whatsapp",
     "web", "matrix", "msteams", "nostr", "zalo",
   ];
-
-  for (const key of channelKeys) {
-    const section = config[key] as Record<string, unknown> | undefined;
-    if (section && typeof section === "object") {
-      // Check if there's a token/bot config with actual values (not empty strings)
-      const tokenVal = section.token || section.botToken || section.apiKey;
-      const hasRealToken = typeof tokenVal === "string" && tokenVal.length > 5;
-      const hasEnabled = section.enabled === true;
-      const hasPhone = typeof section.phoneNumber === "string" && section.phoneNumber.length > 3;
-
-      if (hasRealToken || hasEnabled || hasPhone) {
-        channels.push(key);
-      }
-    }
-  }
-
-  return channels;
+  return getConfiguredChannels(config, channelKeys);
 }
 
 // ── Detect skills ────────────────────────────────────────────────

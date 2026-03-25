@@ -4,18 +4,18 @@ This file tracks recent development changes so Atlas and other agents can quickl
 
 ---
 
-## QMD Missing Binary Guardrail (2026-03-16)
+## Slack Onboarding Status Detection Fix (2026-03-16)
 
 ### What Landed
-- Added a shared qmd status detector so startup, health checks, onboarding audit, and Second Brain search all agree on whether the qmd CLI is actually available.
-- Startup now logs the actionable install command `npm install -g @tobilu/qmd`, raises a health warning, and broadcasts a visible degraded-search notification instead of failing silently.
-- QMD-backed search now degrades cleanly to file-walk fallback without repeatedly hitting `spawn qmd ENOENT`.
-- `/godmode/health`, onboarding assessment/config audit, and Setup capability state now surface qmd availability and the missing-binary warning.
+- Added a shared channel-configuration detector so onboarding and integration status both recognize channel config saved under `channels.<id>` as well as legacy top-level channel keys.
+- Taught the detector to treat Slack OAuth/token-source markers plus saved DM/channel policy config as a real configured state, so onboarding can show Slack as connected after setup even without a live runtime probe.
+- Wired the shared detector into both `src/lib/integration-registry.ts` and `src/methods/onboarding-scanner.ts` to keep setup badges and onboarding assessment in sync.
 
 ### Verification
-- `pnpm typecheck`
-- `pnpm build`
-- `rg "\.\./\.\./\.\./\.\./src/" -n`
+- `rg "\.\./\.\./\.\./\.\./src/" -n` — clean
+- `pnpm typecheck` — blocked in this workspace because `node_modules` is missing and `tsc` is unavailable
+- `pnpm build` — blocked in this workspace because `node_modules` is missing and `vite` is unavailable
+- `pnpm install` — attempted, but failed with `ENOTFOUND registry.npmjs.org` under sandboxed network restrictions
 
 ## Linux systemd gateway service template (2026-03-21)
 
