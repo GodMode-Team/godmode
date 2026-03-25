@@ -102,12 +102,27 @@ export function createSelfRepairTool(): AnyAgentTool {
 
             const issues: string[] = [];
             const healthy: string[] = [];
+            const knownFixes: string[] = [];
 
             for (const sub of report.subsystems) {
               if (sub.state === "healthy" || sub.state === "repaired") {
                 healthy.push(sub.id);
               } else {
                 issues.push(`${sub.id}: ${sub.state} — ${sub.message}`);
+                
+                // Surface known fixes for v2026.3.22 issues
+                if (sub.id === "host-ui" && sub.message.includes("52808")) {
+                  knownFixes.push("Control UI missing: Run `openclaw doctor --fix` or `openclaw update --channel beta`");
+                }
+                if (sub.id === "host-plugins" && sub.message.includes("acpx")) {
+                  knownFixes.push("Stale acpx plugin: Remove 'acpx' from plugins config, set `acp.backend: 'core'`");
+                }
+                if (sub.id === "host-gateway" && sub.message.includes("not running")) {
+                  knownFixes.push("Gateway down: Run `openclaw doctor --fix` then restart");
+                }
+                if (sub.id === "oauth-token") {
+                  knownFixes.push("OAuth issue: Re-authenticate or run `openclaw doctor --fix`");
+                }
               }
             }
 
@@ -117,14 +132,27 @@ export function createSelfRepairTool(): AnyAgentTool {
               }
             }
 
-            const detail = issues.length === 0
+            let detail = issues.length === 0
               ? `All systems healthy: ${healthy.join(", ")}`
               : `${issues.length} issue(s) found:\n${issues.map((i) => `- ${i}`).join("\n")}\n\nHealthy: ${healthy.join(", ")}`;
+
+            if (knownFixes.length > 0) {
+              detail += `\n\n### Known Fixes\n${knownFixes.map((f) => `- ${f}`).join("\n")}`;
+              detail += `\n\n**General recovery:** Run \`openclaw doctor --fix\` — this resolves most v2026.3.22 update issues.`;
+            }
+
+            const recommendations: string[] = [];
+            if (issues.length > 0) {
+              recommendations.push("Run with action='repair' to attempt auto-fix.");
+              if (issues.some((i) => i.includes("host-"))) {
+                recommendations.push("For host-level issues, run: openclaw doctor --fix");
+              }
+            }
 
             return jsonResult({
               issues: issues.length,
               detail,
-              recommendation: issues.length > 0 ? "Run with action='repair' to attempt auto-fix." : "No action needed.",
+              recommendation: recommendations.length > 0 ? recommendations.join(" ") : "No action needed.",
             });
           }
 
