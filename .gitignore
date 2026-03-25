@@ -4,6 +4,10 @@ ui/dist/
 .DS_Store
 *.log
 *.db
+*.pem
+*.key
+*.p12
+*.pfx
 coverage/
 .tmp/
 .worktrees/

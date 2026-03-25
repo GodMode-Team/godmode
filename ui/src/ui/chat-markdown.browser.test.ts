@@ -238,14 +238,14 @@ describe("chat markdown rendering", () => {
     const app = mountApp("/chat");
     await app.updateComplete;
 
-    const tildePath = "~/godmode/artifacts/trp-vsl-titan-audit.html";
+    const tildePath = "~/godmode/artifacts/project-alpha-vsl-audit.html";
     const request = vi.fn(async (method: string, params: Record<string, unknown>) => {
       if (method === "workspaces.readFile" && params.path === tildePath) {
         return { content: null, error: "path is outside allowed workspace directories" };
       }
       if (method === "files.read" && params.path === tildePath) {
         return {
-          content: "<h1>TRP VSL Titan Audit</h1><p>Report content.</p>",
+          content: "<h1>Project Alpha VSL Audit</h1><p>Report content.</p>",
           contentType: "text/html",
         };
       }
@@ -257,7 +257,7 @@ describe("chat markdown rendering", () => {
     app.chatMessages = [
       {
         role: "assistant",
-        content: `Here you go: [📄 TRP VSL Titan Audit](${tildePath})`,
+        content: `Here you go: [📄 Project Alpha VSL Audit](${tildePath})`,
         timestamp: Date.now(),
       },
     ];
@@ -268,14 +268,9 @@ describe("chat markdown rendering", () => {
     expect(link?.getAttribute("href")).toBe(tildePath);
     link?.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, button: 0 }));
     await vi.waitFor(() => {
-      // Check that the workspace readFile was attempted first
-      expect(request).toHaveBeenCalledWith("workspaces.readFile", { path: tildePath });
-    });
-    await vi.waitFor(() => {
-      // Then the files.read fallback should be called for absolute paths
+      // Tilde-prefixed paths are treated as absolute filesystem paths.
       expect(request).toHaveBeenCalledWith("files.read", {
         path: tildePath,
-        maxSize: 1_000_000,
       });
     });
     await vi.waitFor(() => {

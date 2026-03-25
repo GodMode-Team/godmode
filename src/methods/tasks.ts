@@ -105,7 +105,7 @@ function todayDateStr(): string {
 
 // ── One-time workspace backfill ──────────────────────────────────────
 // Fills in missing project/projectId on tasks that have workspace keywords
-// in their title (e.g. "TRP: Build quiz funnel" → project: "TRP", projectId: "trp").
+// in their title (e.g. "Project Alpha: Build quiz funnel" → project: "Project Alpha", projectId: "project-alpha").
 let workspaceBackfillDone = false;
 
 async function backfillWorkspaceLinks(): Promise<void> {

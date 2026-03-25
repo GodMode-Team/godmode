@@ -113,9 +113,14 @@ check_pattern "Personal Email (non-placeholder)" \
   '[a-zA-Z0-9._%+-]+@(gmail|yahoo|hotmail|icloud|outlook|patientautopilot|godmode)\.(com|ai)' \
   "MEDIUM"
 
-check_pattern "Hardcoded User Path" \
-  '/Users/[a-zA-Z][a-zA-Z0-9_-]+/(?!example)' \
-  "MEDIUM"
+matches=$(echo "$STAGED" | xargs grep -nEH '/Users/[a-zA-Z][a-zA-Z0-9_-]+/' 2>/dev/null | grep -v '.env.example' | grep -v 'secrets-guard.sh' | grep -v 'node_modules/' | grep -v 'docs/audits/' | grep -vE '/Users/(example|yourname|test)(/|$)' || true)
+if [[ -n "$matches" ]]; then
+  echo "──────────────────────────────────────────" >&2
+  echo "[MEDIUM] Hardcoded User Path" >&2
+  echo "$matches" >&2
+  echo "" >&2
+  FOUND=1
+fi
 
 # ─── Result ────────────────────────────────────────────────────────────
 

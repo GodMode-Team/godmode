@@ -40,7 +40,7 @@ fi
 
 # 2. Evening Review — 9 PM daily (user-facing check-in via iMessage)
 #    MUST use sessionTarget=main + kind=systemEvent so the user's reply
-#    stays in the main Prosper session (isolated sessions swallow replies).
+#    stays in the main ally session (isolated sessions swallow replies).
 if job_exists "evening-review"; then
   echo "✓ evening-review already exists, skipping"
 else

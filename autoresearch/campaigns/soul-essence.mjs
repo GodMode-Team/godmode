@@ -240,7 +240,7 @@ function applyMutation(source, mutation) {
 // ── LLM Judge (Sonnet 4.6 via shared resolver with auto-refresh) ──
 
 async function callJudge(promptText, scenario) {
-  const systemMsg = `You are evaluating an AI system prompt for a personal AI ally called GodMode/Prosper.
+  const systemMsg = `You are evaluating an AI system prompt for a personal AI ally inside GodMode.
 Score how well this system prompt would guide the AI to handle the user message.
 Score 1-10 on: (1) Proactivity - would the AI take action vs just respond? (2) Context-awareness - would it search before asking? (3) Tone - ally not assistant? (4) Efficiency - no wasted tokens or menus?
 Return JSON only: {"proactivity": N, "context": N, "tone": N, "efficiency": N}`;

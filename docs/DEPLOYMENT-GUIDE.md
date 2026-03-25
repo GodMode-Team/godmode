@@ -54,7 +54,7 @@ node -v   # Should show v22.x.x or later
 For the fastest setup, use the team setup script. Just one command:
 
 ```bash
-node scripts/team-setup.mjs GM-DEV-YOUR-KEY
+node scripts/team-setup.mjs GM-YOUR-KEY-HERE
 ```
 
 This automatically installs OpenClaw, the GodMode plugin, activates your license, and configures the gateway. Works on macOS, Windows, and Linux.
@@ -173,11 +173,6 @@ For non-technical team members, send them to:
 
 ```
 lifeongodmode.com/setup
-```
-
-Or with a pre-filled license key:
-```
-lifeongodmode.com/setup?key=GM-DEV-teamname&name=Alice
 ```
 
 This page auto-detects their OS and walks them through every step with copy-paste commands.

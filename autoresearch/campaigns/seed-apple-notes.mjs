@@ -83,7 +83,7 @@ const PERSON_PATTERNS = [
 
 const COMPANY_PATTERNS = [
   /\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)\s+(?:Inc|LLC|Corp|AI|Health|Labs|App|Media|Digital|Group|Agency|Tech|Studio|Co)\b/g,
-  /\b(100%\s+Chiropractic|TRP|OpenClaw|GodMode|ClickFunnels|GoHighLevel|Keap|HubSpot)\b/gi,
+  /\b(100%\s+Chiropractic|Project\s+Alpha|OpenClaw|GodMode|ClickFunnels|GoHighLevel|Keap|HubSpot)\b/gi,
 ];
 
 const MONEY_PATTERN = /\$[\d,]+(?:\.\d{2})?(?:k|K|mo|\/mo)?/g;

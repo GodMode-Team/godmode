@@ -4,6 +4,21 @@ This file tracks recent development changes so Atlas and other agents can quickl
 
 ---
 
+## Fix: OSS Surface Cleanup + Guard Hardening (2026-03-24)
+
+### What Landed
+- Removed or trimmed internal-only docs, reports, and support collateral that still contained internal naming, customer examples, or support workflow details.
+- Sanitized public docs, tests, and examples to replace internal project names, old ally naming, prefilled dev-key examples, and developer-local absolute paths.
+- Replaced the `godmode-support` skill body with a public-safe support prompt while preserving the runtime hook path.
+- Hardened `scripts/hooks/secrets-guard.sh` so staged `/Users/<name>/...` paths are actually blocked, and expanded `.gitignore` to cover common private key and cert file extensions.
+
+### Verification
+- Residual grep sweep across tracked files for internal names, local paths, and publish blockers
+- `npm pack --dry-run`
+- Staged-hook verification with a fake secret and a staged hardcoded-path pattern
+
+---
+
 ## Fix: Persist Third-Party API Credentials Across Restarts (2026-03-16)
 
 ### What Landed
@@ -35,7 +50,7 @@ This file tracks recent development changes so Atlas and other agents can quickl
 ### What Landed
 - **Native agent execution** — replaced Paperclip sidecar with native delegate-tool, evidence gates, project state tracking.
 - **Tool grounding gate** — deterministic tool enforcement, prevents hallucinated answers.
-- **Customer-ready cleanup** — removed ALL hardcoded personal references (13 items: caleb userId, Caleb in prompts, Prosper ally name, personal contacts, personal workspace templates, personal project examples).
+- **Customer-ready cleanup** — removed ALL hardcoded personal references (13 items: owner userId, owner name in prompts, ally name, personal contacts, personal workspace templates, personal project examples).
 - **New utilities** — `getOwnerName()`, `getOwnerUserId()` in ally-identity.ts for dynamic owner resolution.
 - **13 bug fixes** — chat messages disappearing, auto-title pipeline, memory search targeting, memory query truncation, capability map injection, scheduled queue items, anti-empty-promise, compaction stall.
 - **Context injection overhaul** — P1 context now uses tool hints instead of pre-injected facts.
@@ -700,10 +715,10 @@ GodMode had accumulated ~23 bugs across daily brief, side chat, auto-titling, me
 Multiple Claude Code sessions created 5+ duplicate Vercel projects named `lifeongodmode` across different scopes, causing repeated domain/deployment confusion. Fixed permanently.
 
 ### What Changed
-- **Website repo created:** `MrCalebH/godmode-website` on GitHub — canonical source for lifeongodmode.com
+- **Website repo created:** `godmode-team/godmode-website` on GitHub — canonical source for lifeongodmode.com
 - **All site content pushed** to the website repo (landing page, auth pages, API endpoints, audit reports, proposals, etc.)
 - **GitHub connected** to Vercel project for auto-deploy on push to `main`
-- **Domain verified:** `lifeongodmode.com` and `www.lifeongodmode.com` both verified on `patient-autopilot/lifeongodmode`
+- **Domain verified:** `lifeongodmode.com` and `www.lifeongodmode.com` both verified on `team/lifeongodmode`
 - **Original site restored** — was accidentally replaced with a Claude-generated landing page
 - **5 stale Vercel projects deleted:** `godmode-website-v2`, `lifeonogodmode-vercel`, `site`, `godmode-ui`, `godmode`
 - **API helpers renamed** `api/lib/` → `api/_lib/` (underscore = not counted as serverless functions)
@@ -712,10 +727,10 @@ Multiple Claude Code sessions created 5+ duplicate Vercel projects named `lifeon
 ### The Rule Going Forward
 | Repo | Purpose | Deploys to |
 |---|---|---|
-| `MrCalebH/godmode-website` | lifeongodmode.com website + API | Vercel → `lifeongodmode.com` |
+| `godmode-team/godmode-website` | lifeongodmode.com website + API | Vercel → `lifeongodmode.com` |
 | `godmode-plugin` | GodMode OpenClaw plugin | npm `@godmode-team/godmode` |
 
-**One Vercel project:** `patient-autopilot/lifeongodmode` (Pro plan, ID `prj_DoSyx6km5nSCAo3wOIQyQkXFvbiu`). No others.
+**One Vercel project:** `team/lifeongodmode` (Pro plan, ID `prj_REDACTED`). No others.
 
 ---
 
@@ -763,14 +778,14 @@ Replace license key system with real account-based auth. Users sign up, pay via 
 - **Upstash Redis** connected to Vercel project (REDIS_URL set)
 - **Stripe** product/price created (test mode) — IDs stored in Stripe dashboard, not in code
 - **RSA keypair** generated, env vars set on Vercel (all environments)
-- **Deployed** to `patient-autopilot/lifeongodmode` (Pro plan) at `lifeongodmode-iota.vercel.app`
+- **Deployed** to `team/lifeongodmode` (Pro plan) at `lifeongodmode-iota.vercel.app`
 - API helpers moved to `site/api/_lib/` (underscore prefix = not counted as serverless functions)
 - Removed `api/v1/license/validate-worker.js` (Cloudflare Workers variant, not needed on Vercel)
 
 ### Vercel Project Consolidation (2026-03-03)
 - **RESOLVED**: There were multiple `lifeongodmode` projects across Vercel scopes causing repeated confusion.
-- Consolidated to **`patient-autopilot/lifeongodmode`** (Pro plan, project ID `prj_DoSyx6km5nSCAo3wOIQyQkXFvbiu`).
-- Deleted duplicate `lifeongodmode` project from `mrcalebhs-projects` (hobby plan, had 12 function limit).
+- Consolidated to **`team/lifeongodmode`** (Pro plan, project ID `prj_REDACTED`).
+- Deleted duplicate `lifeongodmode` project from stale scope (hobby plan, had 12 function limit).
 - Removed `lifeongodmode.com` domain from stale `godmode-website-v2` project. Added to correct project.
 - Removed `www.lifeongodmode.com` from stale `lifeonogodmode-vercel` project. Added to correct project with 308 redirect.
 - Domain pending TXT verification — update `_vercel.lifeongodmode.com` TXT at GoDaddy.

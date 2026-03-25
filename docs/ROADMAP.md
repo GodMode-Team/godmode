@@ -8,21 +8,19 @@
 
 GodMode Personal is the AI-native way individuals work. Deeply personal context, deeply personal skills, an army of agents, persistent workflows. Plug into any company, client, or team and merge context seamlessly. The personal AI system that gets better every day.
 
-**GodMode Personal + Gallic (Business OS):** GodMode Personal is what every team member has. Gallic is the business operating system that ingests all business data and manages the company layer. GodMode Personal plugs into Gallic — the individual's ally, agents, and accumulated context compose with the business's data, tools, and workflows. Match made in heaven.
+**GodMode Personal + business context:** GodMode Personal is what every team member has. A separate business context layer ingests company data and manages the organization layer. GodMode Personal plugs into that layer so the individual's ally, agents, and accumulated context compose with team data, tools, and workflows.
 
 ---
 
 ## Current Sprint: Proof + Inbox Self-Evolution (2026-03-12)
 
-See `docs/OVERNIGHT-PLAN-PAPERCLIP-PROOF.md` for full spec.
-
 - [ ] Universal inbox (agent executions + skill runs, high signal only)
 - [ ] Self-evolution feedback loop (low scores → corrections in persona/skill files)
 - [ ] Proof integration (collaborative doc editor with provenance)
 - [ ] Single-agent → Proof pipeline (agents write to Proof, user watches + co-edits)
-- [ ] Real-time steering (Prosper steers agents via chat, human edits Proof directly)
+- [ ] Real-time steering (the ally steers agents via chat, human edits Proof directly)
 - [ ] Cron workflow skill card (recurring business functions as cron jobs)
-- [ ] Prosper chief-of-staff awareness (context injection + skill cards)
+- [ ] Ally chief-of-staff awareness (context injection + skill cards)
 
 ---
 
@@ -67,7 +65,7 @@ See `docs/OVERNIGHT-PLAN-PAPERCLIP-PROOF.md` for full spec.
 
 ## Sprint 5: Ally-in-Slack
 
-- [ ] Prosper lives in Slack for human co-working at communication level
+- [ ] The ally lives in Slack for human co-working at communication level
 - [ ] Slack messages can trigger agent delegation
 - [ ] Agent results surface in Slack channels
 - [ ] Bots have their back channel for coordination
@@ -85,12 +83,12 @@ See `docs/OVERNIGHT-PLAN-PAPERCLIP-PROOF.md` for full spec.
 
 ---
 
-## Sprint 7: Gallic Integration
+## Sprint 7: Business Context Integration
 
-- [ ] GodMode Personal ↔ Gallic Business OS bridge
+- [ ] GodMode Personal ↔ business context bridge
 - [ ] Individual context merges with business context through a clean API layer
-- [ ] Business data (CRM, analytics, financials) available to personal ally via Gallic
-- [ ] Team allies coordinate through Gallic's business graph
+- [ ] Business data (CRM, analytics, financials) available to the personal ally through that layer
+- [ ] Team allies coordinate through a shared business graph
 - [ ] Privacy boundary: personal context stays personal unless explicitly shared
 
 ---
@@ -132,6 +130,6 @@ This works for ALL founders and entrepreneurs because it's modular:
 
 Top employees will bring their own GodMode — their own ally, agents, skills, accumulated context, and trust scores. That's the BYOA (Bring Your Own Agents) future. The outputs they're renowned for come from their personal AI system, and they plug it into wherever they work.
 
-**GodMode Personal + Gallic (Business OS):** GodMode Personal is what every team member has — their sovereign personal agent. Gallic is the business operating system that ingests all business data. GodMode Personal plugs into Gallic seamlessly. Individual context composes with business data. Privacy boundary: personal stays personal unless shared. The full stack: GodMode Personal (individual) → Gallic (business) → external tools (via adapters).
+**GodMode Personal + business context:** GodMode Personal is what every team member has — their sovereign personal agent. A separate business context layer ingests company data. GodMode Personal plugs into that layer seamlessly. Individual context composes with business data. Privacy boundary: personal stays personal unless shared. The full stack: GodMode Personal (individual) → business context (team) → external tools (via adapters).
 
 **Platform-agnostic by design:** GodMode works with any agent provider (Hermes, OpenClaw, Claude, Codex, custom). The persona files define what agents do. The adapters define how they run. Swap providers without losing context, trust scores, or accumulated corrections. True sovereignty.

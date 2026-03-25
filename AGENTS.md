@@ -82,7 +82,7 @@ When the user gives a task, plan, or big prompt, follow this pipeline automatica
 | "Build X" / "Add Y" / new feature | brainstorming → writing-plans → plan-eng-review → implement → qa → ship |
 | "Fix this bug" / test failure | systematic-debugging → fix → qa → ship |
 | "Review this PR" / pre-merge | gstack-review → verification-before-completion |
-| "Here's a plan from Prosper" | plan-eng-review → (plan-design-review if UI) → executing-plans → qa → ship |
+| "Here's a plan from the ally" | plan-eng-review → (plan-design-review if UI) → executing-plans → qa → ship |
 | "What should we build?" / strategy | gstack-office-hours → brainstorming → writing-plans |
 | "Ship it" | gstack-ship |
 | "How'd we do this week?" | gstack-retro |

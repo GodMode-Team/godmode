@@ -52,42 +52,42 @@
 
 ### 1.6 Remove personal content from site/ai-audit/
 - **Directory:** `site/ai-audit/` (9 files)
-- **Bug:** Contains Caleb's headshot, client prospect pages (john-gulick.html, rich-hodge.html, thomas-goubau.html), email campaign templates with personal details.
+- **Bug:** Contains owner headshot, client prospect pages, email campaign templates with personal details.
 - **Fix:** `git rm -r site/ai-audit/`
-- **Consider:** Whether the entire `site/` directory belongs in this repo or should be a separate `godmode-website` repo (it already has one at `MrCalebH/godmode-website`).
+- **Consider:** Whether the entire `site/` directory belongs in this repo or should be a separate website repo.
 
 ---
 
 ## Phase 2: Identity Scrub (same branch, same session)
 
-### 2.1 Replace hardcoded "Caleb"
-- `src/services/hermes-imessage-forwarder.ts:72` — `"replying to an iMessage from Caleb"`
+### 2.1 Replace hardcoded owner name
+- `src/services/hermes-imessage-forwarder.ts:72` — hardcoded owner name in iMessage reply
   - **Fix:** Import `getOwnerName()` from `src/lib/ally-identity.ts` and use it dynamically.
 
-### 2.2 Replace hardcoded "Prosper" with dynamic assistant name
-- `ui/src/ui/context/app-context.ts:78` — `assistantName: "Prosper"` default
+### 2.2 Replace hardcoded ally name with dynamic assistant name
+- `ui/src/ui/context/app-context.ts:78` — `assistantName: "Assistant"` default
   - **Fix:** Use `"Assistant"` as default, let config override.
-- `assets/godmode-ui/index.html:21` — `window.__OPENCLAW_ASSISTANT_NAME__ = "Prosper"`
+- `assets/godmode-ui/index.html:21` — `window.__OPENCLAW_ASSISTANT_NAME__ = "Assistant"`
   - **Fix:** Change to `"Assistant"` or remove (let runtime set it).
-- `src/hooks/lifecycle-hooks.ts:895` — `"Prosper paused — AI service is overloaded"`
+- `src/hooks/lifecycle-hooks.ts:895` — `"Assistant paused — AI service is overloaded"`
   - **Fix:** Use `"Assistant paused"` or inject name dynamically.
 - `src/hooks/safety-gates.ts:881` — comment only
-  - **Fix:** Reword comment to not reference "Prosper".
+  - **Fix:** Reword comment to not reference the old internal ally name.
 - `src/tools/delegate-tool.ts:2` — JSDoc comment
-  - **Fix:** Change "Prosper delegates" to "The ally delegates".
+  - **Fix:** Change the comment to "The ally delegates".
 - `src/services/hermes-imessage-forwarder.ts:7` — JSDoc comment
-  - **Fix:** Change "Prosper (OC)" to "the ally (OC)".
+  - **Fix:** Change the comment to "the ally (OC)".
 
 ### 2.3 Remove private project references
-- `src/tools/honcho-query.ts:30` — `"What has the user said about Patient Autopilot?"` in tool description
+- `src/tools/honcho-query.ts:30` — `"What has the user said about Project X?"` in tool description
   - **Fix:** Use a generic example like `"What has the user said about Project X?"`.
 - `src/methods/team-workspace.ts:499` — `"trp, patient-autopilot"` in JSDoc
   - **Fix:** Use generic examples like `"project-a, project-b"`.
 
-### 2.4 Scrub hardcoded user paths from docs
-- Search `docs/` for `/Users/calebhodges` and replace with `~/` or `$HOME/`.
-- Files: `docs/SESSION-MERGE-ALL-PRs.md`, `docs/PAPERCLIP-HERMES-INTEGRATION-PLAN.md`, others.
-- Also check `tests/safety-gates.test.ts:168,202` for `/Users/caleb/godmode/`.
+### 2.4 Scrub hardcoded local paths from docs
+- Search `docs/` for developer-specific absolute paths and replace with `~/` or `$HOME/`.
+- Files: scan current docs and tests for any machine-specific examples before publishing.
+- Also check test fixtures for developer-specific home-directory examples.
 
 ### 2.5 Scrub internal docs
 - Remove or redact these files:
@@ -227,11 +227,11 @@ rg "sk_test_|sk_live_|pk_test_|pk_live_" --type ts --type md --type html
 rg "ANTHROPIC_API_KEY.*=.*sk-" --type ts
 
 # 2. No hardcoded personal names in source
-rg "\\bCaleb\\b" src/ ui/src/ --type ts
+rg "\\bOWNER_NAME\\b" src/ ui/src/ --type ts
 rg "\\bProsper\\b" src/ ui/src/ assets/ --type ts --type html | grep -v node_modules
 
-# 3. No hardcoded user paths
-rg "/Users/calebhodges" src/ docs/ tests/
+# 3. No hardcoded local paths
+rg "/Users/" src/ docs/ tests/
 
 # 4. Build + typecheck + tests
 pnpm build && pnpm typecheck && npx vitest run

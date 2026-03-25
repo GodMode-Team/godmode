@@ -3,7 +3,7 @@
 /**
  * GodMode Team Setup Script
  *
- * Usage: node scripts/team-setup.mjs GM-DEV-teamname
+ * Usage: node scripts/team-setup.mjs GM-YOUR-KEY-HERE
  *
  * Cross-platform (Windows, Mac, Linux). Only prerequisite: Node.js 22+.
  * Idempotent — safe to run multiple times.
@@ -121,7 +121,7 @@ ${c.white}Usage:${c.reset}
   ${c.green}node scripts/team-setup.mjs ${c.yellow}<LICENSE-KEY>${c.reset}
 
 ${c.white}Example:${c.reset}
-  ${c.dim}node scripts/team-setup.mjs GM-DEV-teamname${c.reset}
+  ${c.dim}node scripts/team-setup.mjs GM-YOUR-KEY-HERE${c.reset}
 
 The license key is provided by your team admin or at ${c.cyan}https://lifeongodmode.com${c.reset}.
 `);

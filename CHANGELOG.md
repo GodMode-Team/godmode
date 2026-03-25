@@ -41,16 +41,16 @@ All notable changes to the GodMode plugin are documented here.
 - **Tool grounding gate** (`src/hooks/tool-grounding-gate.ts`) — deterministic per-turn enforcement requiring tool-backed verification before the ally responds. Prevents hallucinated answers to factual questions.
 
 ### Customer-Ready Cleanup (13 items fixed)
-- **Removed all hardcoded "caleb" userId** from 5 Mem0 call sites → dynamic `getOwnerUserId()`.
-- **Removed hardcoded "Caleb"** from identity-graph.ts and session-distiller.ts LLM prompts → dynamic `getOwnerName()`.
+- **Removed all hardcoded owner userId** from 5 Mem0 call sites → dynamic `getOwnerUserId()`.
+- **Removed hardcoded owner name** from identity-graph.ts and session-distiller.ts LLM prompts → dynamic `getOwnerName()`.
 - **Removed hardcoded KNOWN_NAMES** personal contacts array in tool-grounding-gate.ts → populated from identity graph at runtime.
-- **Removed hardcoded "Caleb Reflection"** regex in brief-generator.ts → generic `\w+ Reflection` pattern.
-- **Removed hardcoded "Prosper"** ally name from queue-steer.ts, proof-tool.ts, inbox.ts, queue-processor.ts → `getAllyName()`.
-- **Rewrote content-writer.md** persona — was entirely Caleb-specific, now user-generic with voice reference lookups.
-- **Removed personal workspace templates** (TRP, Patient Autopilot) from shipped assets.
+- **Removed hardcoded owner reflection regex** in brief-generator.ts → generic `\w+ Reflection` pattern.
+- **Removed hardcoded default ally name** from queue-steer.ts, proof-tool.ts, inbox.ts, queue-processor.ts → `getAllyName()`.
+- **Rewrote content-writer.md** persona — was entirely owner-specific, now user-generic with voice reference lookups.
+- **Removed personal workspace templates** (internal customer/project examples) from shipped assets.
 - **Cleaned up godmode-dev.json** — removed hardcoded `~/Projects/godmode-plugin` path.
 - **Made GitHub repo configurable** for auto-issue filing via `GODMODE_GITHUB_REPO` env var.
-- **Cleaned up user-facing examples** — replaced TRP/Patient Autopilot references in tasks-tool and auto-title prompts.
+- **Cleaned up user-facing examples** — replaced internal customer/project references in tasks-tool and auto-title prompts.
 
 ### New Utilities
 - `getOwnerName()` in `ally-identity.ts` — reads from onboarding.json, cached 30min, falls back to "friend".
@@ -74,7 +74,7 @@ All notable changes to the GodMode plugin are documented here.
 - New inbox card design with score widgets and dismiss actions.
 - Mission Control polish — cleaner status display.
 - Proof viewer improvements — better rendering and controls.
-- "Review with Prosper" → "Review in Chat" (generic).
+- "Review with the ally" → "Review in Chat" (generic).
 
 ---
 

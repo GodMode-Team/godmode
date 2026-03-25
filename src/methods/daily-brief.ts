@@ -670,7 +670,7 @@ export async function syncTasksFromBrief(date: string, opts?: { force?: boolean 
         // Add new task from daily brief
         const priority = HIGH_PRIORITY_SECTIONS.test(item.section) ? "high" : "medium";
 
-        // Detect workspace from task title (e.g. "TRP: Build quiz funnel" → TRP workspace)
+        // Detect workspace from task title (e.g. "Project Alpha: Build quiz funnel" → Project Alpha workspace)
         let project: string | null = null;
         let projectId: string | null = null;
         if (wsConfig) {

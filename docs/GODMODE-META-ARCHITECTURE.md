@@ -2,7 +2,7 @@
 
 *Locked in 2026-03-04. Every future feature, session, and contribution must pass through these principles. This is not a suggestion — it is the law of how GodMode gets built.*
 
-*Grounded in GodMode v1.5.0 codebase and [12 research sources](~/godmode/memory/projects/godmode/research-2026-03-04.md).*
+*Grounded in the GodMode v1.5.0 codebase and prior product research.*
 
 ---
 

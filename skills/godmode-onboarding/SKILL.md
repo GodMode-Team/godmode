@@ -353,7 +353,7 @@ Designed to be:
 
 **Relationship to other skills:**
 
-- `godmode-support` handles allowlist management and support requests
+- The support workflow handles allowlist management and support requests
 - This skill (`godmode-onboarding`) handles the actual onboarding flow
 - Both log to `~/godmode/support-logs/` for admin visibility
 
@@ -365,8 +365,8 @@ Designed to be:
 
 **Flow:** Group chat → DM
 
-1. Admin creates group with new person + @GodModeSupportBot
-2. Admin @mentions bot to introduce
+1. Admin creates a group with the new person and the support bot
+2. Admin @mentions the bot to introduce the user
 3. {{ALLY_NAME}} adds person to allowlist
 4. {{ALLY_NAME}} directs them to DM
 5. Onboarding happens in DM (no @mention needed)
@@ -835,7 +835,7 @@ have a specific question I can help with?
        `tailscale status`
 
        Both should show the same 'tailnet' name at the top (looks like
-       something@gmail.com or yourname.github).
+       your-account@example.com or yourname.github).
 
        Are they the same?"
 ```
@@ -1939,4 +1939,4 @@ Then notify the admin via Slack with full context.
 
 ---
 
-_This skill works with godmode-support for the full onboarding pipeline._
+_This skill works with the support workflow for the full onboarding pipeline._

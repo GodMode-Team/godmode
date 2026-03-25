@@ -84,6 +84,7 @@
     "ws": "8.19.0"
   },
   "devDependencies": {
+    "@browserbasehq/stagehand": "^3.2.0",
     "@types/node": "^24.3.3",
     "@types/ws": "^8.18.1",
     "openclaw": "^2026.3.22",
