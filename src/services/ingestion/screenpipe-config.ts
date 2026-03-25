@@ -37,6 +37,8 @@ export interface PrivacyConfig {
 export interface ScreenpipeConfig {
   /** Master toggle — must be explicitly enabled */
   enabled: boolean;
+  /** Auto-start Screenpipe daemon on GodMode gateway boot */
+  autoStart: boolean;
   /** Screenpipe API base URL */
   apiUrl: string;
   /** Apps whose frames are always discarded */
@@ -51,6 +53,7 @@ export interface ScreenpipeConfig {
 
 export const DEFAULT_CONFIG: ScreenpipeConfig = {
   enabled: false,
+  autoStart: false,
   apiUrl: SCREENPIPE_API_URL,
   blockedApps: [
     "1Password",

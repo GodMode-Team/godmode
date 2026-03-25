@@ -331,7 +331,7 @@ export async function refreshActiveTab(host: SettingsHost) {
       await app.handleDashboardsRefresh();
     }
   }
-  if (host.tab === "second-brain") {
+  if (host.tab === "memory" || host.tab === "second-brain") {
     const app = host as unknown as GodModeApp;
     if (typeof app.handleSecondBrainRefresh === "function") {
       await app.handleSecondBrainRefresh();

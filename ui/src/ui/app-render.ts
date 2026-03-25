@@ -1785,7 +1785,7 @@ export function renderApp(state: AppViewState) {
         }
 
         ${
-          state.tab === "brain" || state.tab === "second-brain"
+          state.tab === "memory" || state.tab === "second-brain"
             ? (ensureTab("gm-brain"), html`<gm-brain></gm-brain>`)
             : nothing
         }

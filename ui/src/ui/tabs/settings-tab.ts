@@ -208,7 +208,7 @@ export class GmSettings extends LitElement {
           ? html`
             <div class="settings-tab__memory-notice" role="status">
               Memory offline: ${this._memoryOfflineSystems.join(", ")} not connected.
-              Check the Brain tab for details.
+              Check the Memory tab for details.
             </div>`
           : nothing}
         ${this._renderSubtabNav()}

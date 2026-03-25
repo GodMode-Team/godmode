@@ -66,6 +66,23 @@ type McpStatusData = {
   url: string | null;
 };
 
+type IntegrationsStatusData = {
+  integrations: Array<{
+    id: string;
+    name: string;
+    description: string;
+    tier: "core" | "deep";
+    status: {
+      configured: boolean;
+      cliInstalled: boolean;
+      authenticated: boolean;
+      working: boolean;
+      details?: string;
+    };
+  }>;
+  coreProgress: { connected: number; total: number };
+};
+
 // ── Render Helpers ───────────────────────────────────────────────────
 
 function fmtAgo(isoString: string | null | undefined): string {
@@ -132,6 +149,7 @@ export class GmBrain extends LitElement {
   @state() screenpipeStatus: ScreenpipeStatusData | null = null;
   @state() ingestionStatus: IngestionStatusData | null = null;
   @state() mcpStatusData: McpStatusData | null = null;
+  @state() private integrationsData: IntegrationsStatusData | null = null;
 
   // Search
   @state() searchQuery = "";
@@ -156,7 +174,7 @@ export class GmBrain extends LitElement {
     super.connectedCallback();
     this._unsubs.push(
       appEventBus.on("refresh-requested", (payload) => {
-        if (payload.target === "brain" || payload.target === "second-brain") void this._loadAll();
+        if (payload.target === "memory" || payload.target === "brain" || payload.target === "second-brain") void this._loadAll();
       }),
     );
     void this._loadAll();
@@ -213,10 +231,12 @@ export class GmBrain extends LitElement {
         gw.request<ScreenpipeStatusData>("ingestion.screenpipeStatus", {}).catch(() => null),
         gw.request<IngestionStatusData>("ingestion.status", {}).catch(() => null),
         gw.request<McpStatusData>("secondBrain.mcpStatus", {}).catch(() => null),
-      ]).then(([sp, ing, mcp]) => {
+        gw.request<IntegrationsStatusData>("integrations.status", {}).catch(() => null),
+      ]).then(([sp, ing, mcp, integrations]) => {
         this.screenpipeStatus = sp;
         this.ingestionStatus = ing;
         this.mcpStatusData = mcp;
+        this.integrationsData = integrations;
       });
     } catch (err) {
       console.error("[Brain] Load failed:", err);
@@ -692,6 +712,7 @@ export class GmBrain extends LitElement {
         <h2 class="brain-engine-title">Engine</h2>
 
         ${this._renderMemoryLayersTable()}
+        ${this._renderConnectedSources()}
         ${this._renderIngestionTable()}
         ${this._renderMcpRow()}
         ${this._renderScreenpipeRow()}
@@ -765,6 +786,53 @@ export class GmBrain extends LitElement {
     `;
   }
 
+  private _renderConnectedSources() {
+    const data = this.integrationsData;
+    if (!data) return nothing;
+
+    // Filter out infrastructure integrations — show user-facing sources only
+    const sources = data.integrations.filter(
+      (i) => !["composio", "obsidian-vault", "obsidian-sync"].includes(i.id)
+    );
+
+    if (sources.length === 0) return nothing;
+
+    return html`
+      <div class="brain-engine-section">
+        <h3 class="brain-subsection-title">Connected Sources</h3>
+        <div class="brain-table">
+          <div class="brain-table-header">
+            <span>Source</span><span>Status</span><span>Action</span>
+          </div>
+          ${sources.map((s) => {
+            const working = s.status.working || s.status.configured;
+            return html`
+              <div class="brain-table-row">
+                <span class="brain-table-cell">
+                  <span class="brain-dot ${working ? "brain-dot--ready" : "brain-dot--offline"}"></span>
+                  ${s.name}
+                </span>
+                <span class="brain-table-cell brain-table-cell--status">
+                  ${s.status.working ? "Connected" : s.status.configured ? "Configured" : "Not connected"}
+                </span>
+                <span class="brain-table-cell">
+                  ${working
+                    ? html`<button class="brain-action-btn brain-action-btn--xs"
+                        @click=${() => this._chatNavigate(`Show me what's coming in from ${s.name}. Any recent activity?`)}>
+                        Explore</button>`
+                    : html`<button class="brain-action-btn brain-action-btn--xs"
+                        @click=${() => this._chatNavigate(`Help me connect ${s.name} to GodMode. Walk me through setup.`)}>
+                        Connect</button>`
+                  }
+                </span>
+              </div>
+            `;
+          })}
+        </div>
+      </div>
+    `;
+  }
+
   private _renderMcpRow() {
     const enabled = this.mcpStatusData?.enabled;
     return html`
@@ -774,9 +842,15 @@ export class GmBrain extends LitElement {
           <span class="brain-dot ${enabled ? "brain-dot--ready" : "brain-dot--offline"}"></span>
           <span>${enabled ? "Active" : "Inactive"}</span>
           <span class="brain-muted">${this.mcpStatusData?.transport ?? "stdio"} transport</span>
-          ${!enabled ? html`
-            <button class="brain-action-btn brain-action-btn--xs" @click=${() => this._chatNavigate("Help me set up the GodMode MCP server so I can use it with Claude Code or other MCP clients.")}>Set up</button>
-          ` : nothing}
+          ${enabled ? html`
+            <button class="brain-action-btn brain-action-btn--xs"
+              @click=${() => this._chatNavigate("Explain the GodMode MCP server — what tools does it expose, how do I connect it to Claude Code or other MCP clients, and what can I do with it?")}>
+              How to use</button>
+          ` : html`
+            <button class="brain-action-btn brain-action-btn--xs"
+              @click=${() => this._chatNavigate("Help me set up the GodMode MCP server so I can use it with Claude Code or other MCP clients.")}>
+              Set up</button>
+          `}
         </div>
       </div>
     `;

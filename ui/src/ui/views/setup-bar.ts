@@ -47,7 +47,8 @@ const STEPS = [
   { id: "api-key", title: "AI Connection", icon: "\u{1F511}" },
   { id: "memory", title: "Memory", icon: "\u{1F9E0}" },
   { id: "integrations", title: "Integrations", icon: "\u{1F50C}" },
-  { id: "second-brain", title: "Second Brain", icon: "\u{1F4DA}" },
+  { id: "screenpipe", title: "Screen Recall", icon: "\u{1F4FA}" },
+  { id: "second-brain", title: "Memory Vault", icon: "\u{1F9E0}" },
 ] as const;
 
 // ── Render ─────────────────────────────────────────────────────

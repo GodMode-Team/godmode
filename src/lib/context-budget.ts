@@ -317,7 +317,7 @@ const SOUL_ESSENCE = [
 
 const CAPABILITY_MAP = [
   "## Lookup Chain (MANDATORY — exhaust before asking the user ANYTHING factual)",
-  "1. Memory (already injected above) → 2. Vault (secondBrain.search) → 3. Tools (exec, contacts, calendar, tasks, files, x, web_search) → 4. Queue (async research) → 5. ONLY THEN ask the user.",
+  "1. Memory (already injected above) → 2. Vault (secondBrain.search) → 3. Screenpipe (ingestion.screenpipeStatus — ambient screen/audio recall) → 4. Tools (exec, contacts, calendar, tasks, files, x, web_search) → 5. Queue (async research) → 6. ONLY THEN ask the user.",
   "Empty results at one step = move to next step. Never stop and ask the user when there are steps remaining.",
   "If you catch yourself typing a question that a tool could answer — DELETE IT and call the tool instead.",
   "At the end of each day, offer a reflection: what moved the needle, what was busywork, what's being avoided.",

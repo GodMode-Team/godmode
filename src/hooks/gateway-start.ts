@@ -700,6 +700,37 @@ export async function runGatewayStart(
     logger.warn(`[GodMode] Meeting webhook broadcast wiring failed: ${String(err)}`);
   }
 
+  // ── Screenpipe auto-start ──────────────────────────────────────
+  try {
+    const { loadConfig } = await import("../services/ingestion/screenpipe-config.js");
+    const { isScreenpipeAvailable } = await import("../services/ingestion/screenpipe-funnel.js");
+    const cfg = await loadConfig();
+
+    if (cfg.autoStart && !(await isScreenpipeAvailable())) {
+      logger.info("[GodMode] Screenpipe autoStart enabled — spawning daemon...");
+      try {
+        const { spawn } = await import("node:child_process");
+        const child = spawn("screenpipe", [], {
+          detached: true,
+          stdio: "ignore",
+        });
+        child.unref(); // Don't block gateway shutdown
+        // Give it a moment to start, then verify
+        await new Promise((r) => setTimeout(r, 3_000));
+        const running = await isScreenpipeAvailable();
+        if (running) {
+          logger.info("[GodMode] Screenpipe daemon started successfully");
+        } else {
+          logger.warn("[GodMode] Screenpipe daemon spawned but health check failed — may still be starting");
+        }
+      } catch (spawnErr) {
+        logger.warn(`[GodMode] Failed to auto-start Screenpipe: ${String(spawnErr)}`);
+      }
+    }
+  } catch (err) {
+    logger.warn(`[GodMode] Screenpipe auto-start check failed: ${String(err)}`);
+  }
+
   // ── Ingestion pipelines (Screenpipe funnel + structured sources) ──
   try {
     // Screenpipe hourly summary — every 60 minutes

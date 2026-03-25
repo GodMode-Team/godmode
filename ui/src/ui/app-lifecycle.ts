@@ -119,7 +119,7 @@ export function handleConnected(host: LifecycleHost) {
     if (e.altKey && !e.metaKey && !e.ctrlKey && !e.shiftKey) {
       const num = parseInt(e.key, 10);
       if (num >= 1 && num <= 6) {
-        const mainTabs = ["chat", "today", "team", "workspaces", "brain", "dashboards"] as const;
+        const mainTabs = ["chat", "today", "team", "workspaces", "memory", "dashboards"] as const;
         const targetTab = mainTabs[num - 1];
         if (targetTab && host.tab !== targetTab) {
           e.preventDefault();

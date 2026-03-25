@@ -1,10 +1,10 @@
 ---
 domain: second-brain
-triggers: vault, note, notes, obsidian, search, find, look up, brain, knowledge, what do we know, remember
+triggers: vault, note, notes, obsidian, search, find, look up, brain, knowledge, what do we know, remember, screenpipe, screen recall
 tools: secondBrain.search, secondBrain.identity, secondBrain.memoryBank, secondBrain.memoryBankEntry
 name: godmode-second-brain
 version: 1.0.0
-description: "Searches and manages the Obsidian vault knowledge base"
+description: "Searches and manages the Memory vault knowledge base"
 keywords: ["vault", "note", "notes", "obsidian", "search"]
 author: godmode-team
 clawhub: true
@@ -37,6 +37,7 @@ clawhub: true
 - If search returns nothing, try broader terms or different phrasing
 - Vault is the source of truth for long-term knowledge — memory is for conversational context
 - All searches are logged to retrieval-log.jsonl for trajectory analysis
+- Screenpipe ambient memory (screen/audio captures) feeds into the vault via hourly ingestion — use `ingestion.screenpipeStatus` for status, `secondBrain.search` to query captured content
 
 ## Tips
 - When user mentions a person, immediately search for their people file

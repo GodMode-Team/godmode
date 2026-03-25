@@ -37,7 +37,7 @@ function sanitizeSlug(text: string): string {
 
 /** Built-in tab slugs that custom tabs must not collide with. */
 const BUILT_IN_SLUGS = new Set([
-  "chat", "today", "team", "workspaces", "brain", "dashboards",
+  "chat", "today", "team", "workspaces", "memory", "brain", "dashboards",
   "overview", "config", "connections", "skills", "agents", "trust",
   "guardrails", "channels", "sessions", "cron", "debug", "logs",
   "onboarding", "second-brain", "nodes", "instances",

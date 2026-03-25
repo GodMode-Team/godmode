@@ -1,6 +1,6 @@
 ---
 domain: integrations
-triggers: integration, connect, setup, configure, hubspot, google, apple, api key, not working, broken, connected, working, isn't working
+triggers: integration, connect, setup, configure, hubspot, google, apple, api key, not working, broken, connected, working, isn't working, screenpipe
 tools: integrations.status, integrations.test, integrations.configure, integrations.setupGuide
 name: godmode-integrations
 version: 1.0.0
@@ -32,6 +32,7 @@ clawhub: true
 - Calendar uses `gog` CLI — needs GOG_CALENDAR_ACCOUNT configured
 - X/Twitter uses XAI_API_KEY, not a Twitter API key
 - Some integrations require restart after configuration changes
+- Screenpipe is a local service (localhost:3030) — if offline, user needs to start it with `screenpipe` in terminal. Use `ingestion.screenpipeStatus` to check, not `integrations.test`
 
 ## Tips
 - When any tool fails with an auth error, immediately check integrations.status

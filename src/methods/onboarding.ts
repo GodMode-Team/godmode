@@ -140,7 +140,7 @@ async function deriveSetupProgress(): Promise<SetupProgress> {
   if (obsidianConfigured) completedSteps.push("second-brain");
 
   // Derive current step (first incomplete step)
-  const stepOrder: SetupStep[] = ["welcome", "api-key", "memory", "integrations", "second-brain"];
+  const stepOrder: SetupStep[] = ["welcome", "api-key", "memory", "integrations", "screenpipe", "second-brain"];
   const currentStep = stepOrder.find((s) => !completedSteps.includes(s)) ?? "second-brain";
 
   // Check dismissed flag
@@ -1298,8 +1298,19 @@ export const onboardingHandlers: GatewayRequestHandlers = {
         }
 
         case "screenpipe": {
-          // Screenpipe is auto-detected — configure just marks it acknowledged
-          // No env var needed; detection happens via Screenpipe health check
+          // Enable Screenpipe + auto-start when user completes this onboarding step
+          const { saveConfig } = await import("../services/ingestion/screenpipe-config.js");
+          await saveConfig({ enabled: true, autoStart: true });
+
+          // Try to start it now if not already running
+          const { isScreenpipeAvailable } = await import("../services/ingestion/screenpipe-funnel.js");
+          if (!(await isScreenpipeAvailable())) {
+            try {
+              const { spawn } = await import("node:child_process");
+              const child = spawn("screenpipe", [], { detached: true, stdio: "ignore" });
+              child.unref();
+            } catch { /* best effort — will start on next gateway boot */ }
+          }
           break;
         }
 

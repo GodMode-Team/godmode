@@ -2864,7 +2864,8 @@ export class GodModeApp extends LitElement {
       "api-key": "Help me connect my Anthropic API key so you can work at full power.",
       "memory": "Help me set up persistent memory with Honcho so you remember our conversations.",
       "integrations": "Help me connect my tools via Composio — starting with Google and GitHub.",
-      "second-brain": "Help me link my Obsidian vault as my Second Brain.",
+      "screenpipe": "Help me set up Screenpipe for ambient screen and audio recall.",
+      "second-brain": "Help me link my Obsidian vault to my Memory.",
     };
     const prompt = prompts[stepId] ?? "Help me continue setting up GodMode.";
     this.handleStartChatWithPrompt(prompt);

@@ -165,8 +165,8 @@ export async function capabilityAction(host: GodModeApp, id: string): Promise<vo
       }
       break;
     case "obsidian-vault":
-      // Navigate to Second Brain tab for vault setup
-      host.setTab("second-brain" as import("../navigation").Tab);
+      // Navigate to Memory tab for vault setup
+      host.setTab("memory" as import("../navigation").Tab);
       break;
     default:
       host.showToast("Coming soon!", "success", 2000);
