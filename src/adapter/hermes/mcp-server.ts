@@ -49,7 +49,7 @@ export class GodModeMcpServer {
 
   /** Register a tool from a factory function. */
   registerTool(factory: (ctx: ToolContext) => StandaloneAgentTool): void {
-    const tool = factory({ sessionKey: "mcp-hermes" });
+    const tool = factory({ sessionKey: undefined });
     this.tools.set(tool.name, tool);
   }
 
