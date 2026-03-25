@@ -12,6 +12,8 @@ import { join, extname } from "node:path";
 import { homedir } from "node:os";
 import type { AssessmentResult, FeatureCheck } from "./onboarding-types.js";
 import { DATA_DIR, GODMODE_ROOT, MEMORY_DIR } from "../data-paths.js";
+import { getQmdStatus } from "../lib/qmd-status.js";
+import { getConfiguredChannels } from "../lib/channel-config-detect.js";
 // resolveVaultPath not used directly — checkObsidianVault() checks for real Obsidian presence
 
 const OC_DIR = join(homedir(), ".openclaw");
@@ -117,28 +119,11 @@ async function detectAuthMethod(): Promise<AssessmentResult["authMethod"]> {
 // ── Detect channels ──────────────────────────────────────────────
 
 async function detectChannels(config: Record<string, unknown>): Promise<string[]> {
-  const channels: string[] = [];
   const channelKeys = [
     "telegram", "discord", "slack", "signal", "imessage", "whatsapp",
     "web", "matrix", "msteams", "nostr", "zalo",
   ];
-
-  for (const key of channelKeys) {
-    const section = config[key] as Record<string, unknown> | undefined;
-    if (section && typeof section === "object") {
-      // Check if there's a token/bot config with actual values (not empty strings)
-      const tokenVal = section.token || section.botToken || section.apiKey;
-      const hasRealToken = typeof tokenVal === "string" && tokenVal.length > 5;
-      const hasEnabled = section.enabled === true;
-      const hasPhone = typeof section.phoneNumber === "string" && section.phoneNumber.length > 3;
-
-      if (hasRealToken || hasEnabled || hasPhone) {
-        channels.push(key);
-      }
-    }
-  }
-
-  return channels;
+  return getConfiguredChannels(config, channelKeys);
 }
 
 // ── Detect skills ────────────────────────────────────────────────
@@ -280,6 +265,11 @@ function calculateHealthScore(result: Omit<AssessmentResult, "healthScore" | "ti
     if (f.enabled) score += 4;
   }
 
+  // QMD available when it's the configured backend: 4 pts
+  if (!result.qmdStatus?.backendConfigured || result.qmdStatus?.available) {
+    score += 4;
+  }
+
   // Workspace configured: 6 pts
   if (result.workspaceConfigured) score += 6;
 
@@ -321,6 +311,7 @@ export type ConfigRecommendation = {
 export async function generateConfigRecommendations(): Promise<ConfigRecommendation[]> {
   const config = await safeReadJson<Record<string, unknown>>(OC_CONFIG) ?? {};
   const recommendations: ConfigRecommendation[] = [];
+  const qmdStatus = await getQmdStatus({ refresh: true });
 
   const gateway = config.gateway as Record<string, unknown> | undefined;
   const agents = config.agents as Record<string, unknown> | undefined;
@@ -405,6 +396,17 @@ export async function generateConfigRecommendations(): Promise<ConfigRecommendat
       currentValue: false,
       recommendedValue: true,
       reason: "Core learning mechanism. Your agent gets smarter with every conversation.",
+      priority: "recommended",
+    });
+  }
+
+  if (qmdStatus.backendConfigured && !qmdStatus.available) {
+    recommendations.push({
+      key: "memory.backend",
+      label: "QMD search binary",
+      currentValue: "qmd configured, binary missing",
+      recommendedValue: qmdStatus.installCommand,
+      reason: "GodMode's default memory backend is qmd. Without the qmd CLI, memory search degrades to a slower fallback and periodic qmd operations fail.",
       priority: "recommended",
     });
   }
@@ -652,6 +654,7 @@ export async function runAssessment(): Promise<AssessmentResult> {
   // Check key dependencies
   const githubReady = await checkGitHubReady();
   const obsidianVaultConfigured = await checkObsidianVault();
+  const qmdStatus = await getQmdStatus({ refresh: true });
 
   // Check gateway token (supports both gateway.token and gateway.auth.token)
   const gateway = config.gateway as Record<string, unknown> | undefined;
@@ -685,6 +688,15 @@ export async function runAssessment(): Promise<AssessmentResult> {
       hasMemoryMd,
       fileCount,
       totalSizeKb: Math.round(totalBytes / 1024),
+    },
+    qmdStatus: {
+      available: qmdStatus.available,
+      backend: qmdStatus.backend,
+      backendConfigured: qmdStatus.backendConfigured,
+      path: qmdStatus.path,
+      version: qmdStatus.version,
+      warning: qmdStatus.warning,
+      installCommand: qmdStatus.installCommand,
     },
     channelsConnected,
     skillsInstalled,

@@ -16,18 +16,23 @@ import { join } from "node:path";
 import { homedir } from "node:os";
 import { DATA_DIR } from "../data-paths.js";
 import { health, repairLog } from "../lib/health-ledger.js";
+import { getCachedQmdStatus } from "../lib/qmd-status.js";
 
 // ── Types ────────────────────────────────────────────────────────────
 
 export type SubsystemId =
   | "memory"
+  | "qmd"
   | "identity-graph"
   | "identity-cache"
   | "queue-processor"
   | "heartbeat"
   | "api-keys"
   | "oauth-token"
-  | "data-dir";
+  | "data-dir"
+  | "host-gateway"
+  | "host-ui"
+  | "host-plugins";
 
 export type HealthState = "healthy" | "degraded" | "offline" | "repaired";
 
@@ -199,6 +204,31 @@ export async function runSelfHeal(
     logger.warn(`[SelfHeal] Data directory check error: ${String(err)}`);
   }
 
+  // 9. Host gateway health (is OpenClaw gateway responding?)
+  checked++;
+  try {
+    await checkHostGateway(logger);
+  } catch (err) {
+    logger.warn(`[SelfHeal] Host gateway check error: ${String(err)}`);
+  }
+
+  // 10. Host UI assets (detect missing Control UI — common v2026.3.22 bug)
+  checked++;
+  try {
+    checkHostUiAssets(logger);
+  } catch (err) {
+    logger.warn(`[SelfHeal] Host UI assets check error: ${String(err)}`);
+  }
+
+  // 11. Host plugin config (detect stale acpx references, disabled plugins)
+  checked++;
+  try {
+    await checkHostPluginConfig(logger);
+  } catch (err) {
+    logger.warn(`[SelfHeal] Host plugin config check error: ${String(err)}`);
+
+  }
+
   // Collect failures for surfacing
   for (const [, status] of registry) {
     if (status.consecutiveFailures >= 2 && status.state !== "healthy" && status.state !== "repaired") {
@@ -245,6 +275,22 @@ export async function runSelfHeal(
  */
 export function getHealthReport(): HealthReport {
   const subsystems = Array.from(registry.values());
+  const cachedQmd = getCachedQmdStatus();
+  if (cachedQmd && !subsystems.some((s) => s.id === "qmd")) {
+    subsystems.push({
+      id: "qmd",
+      state: cachedQmd.available || !cachedQmd.backendConfigured ? "healthy" : "degraded",
+      message: cachedQmd.available
+        ? `QMD available${cachedQmd.version ? ` (${cachedQmd.version})` : ""}`
+        : cachedQmd.backendConfigured
+          ? cachedQmd.warning ?? "QMD unavailable"
+          : `QMD not required (memory.backend=${cachedQmd.backend})`,
+      lastCheck: Date.parse(cachedQmd.checkedAt) || Date.now(),
+      lastRepair: null,
+      repairCount: 0,
+      consecutiveFailures: cachedQmd.available || !cachedQmd.backendConfigured ? 0 : 1,
+    });
+  }
   const overall: HealthState = subsystems.every((s) => s.state === "healthy" || s.state === "repaired")
     ? "healthy"
     : subsystems.some((s) => s.state === "offline")
@@ -801,6 +847,164 @@ export function getEscalationContext(): string | null {
     "Do NOT pretend capabilities work when they're degraded.",
     ...alerts.map((a) => `- ${a}`),
   ].join("\n");
+}
+
+// ── Host Environment Checks (OpenClaw v2026.3.22 release hardening) ───
+
+/**
+ * Check if the host OpenClaw gateway is responsive.
+ * A non-responsive gateway means GodMode is also down.
+ */
+async function checkHostGateway(logger: Logger): Promise<void> {
+  const id: SubsystemId = "host-gateway";
+  try {
+    // Check if the openclaw process is running by looking for the state dir
+    const stateDir = join(homedir(), ".openclaw");
+    if (!existsSync(stateDir)) {
+      markDegraded(id, "OpenClaw state directory (~/.openclaw) not found — gateway may not be installed");
+      return;
+    }
+
+    // Check if the gateway PID file exists and the process is alive
+    const pidPath = join(stateDir, "gateway.pid");
+    if (existsSync(pidPath)) {
+      try {
+        const pidStr = (await readFile(pidPath, "utf-8")).trim();
+        const pid = parseInt(pidStr, 10);
+        if (!isNaN(pid)) {
+          try {
+            process.kill(pid, 0); // signal 0 = check only
+            markHealthy(id, "Gateway process alive");
+          } catch {
+            markDegraded(id, `Gateway PID ${pid} not running. Run: openclaw doctor --fix`);
+          }
+        } else {
+          markHealthy(id, "Gateway state dir exists (PID check skipped)");
+        }
+      } catch {
+        markHealthy(id, "Gateway state dir exists (PID file unreadable)");
+      }
+    } else {
+      // No PID file is normal in some setups — just check state dir existence
+      markHealthy(id, "Gateway state dir exists");
+    }
+  } catch (err) {
+    markDegraded(id, `Gateway check error: ${String(err)}`);
+  }
+}
+
+/**
+ * Check if the host Control UI assets exist.
+ * Missing assets is the #1 complaint from v2026.3.22 (upstream #52808).
+ */
+function checkHostUiAssets(logger: Logger): void {
+  const id: SubsystemId = "host-ui";
+  try {
+    // Check common locations for Control UI assets
+    const candidates = [
+      join(homedir(), ".openclaw", "control-ui"),
+      join(homedir(), ".openclaw", "dist", "control-ui"),
+    ];
+
+    // Also check if our own GodMode UI fallback exists
+    const godmodeUiFallback = join(DATA_DIR, "..", "dist", "godmode-ui");
+    const godmodeUiAssets = join(DATA_DIR, "..", "assets", "godmode-ui");
+
+    const hostUiExists = candidates.some((p) => existsSync(p));
+    const godmodeUiExists = existsSync(godmodeUiFallback) || existsSync(godmodeUiAssets);
+
+    if (hostUiExists) {
+      markHealthy(id, "Host Control UI assets present");
+    } else if (godmodeUiExists) {
+      markDegraded(id, 
+        "Host Control UI assets missing (known v2026.3.22 bug — upstream #52808). " +
+        "GodMode UI fallback is intact. " +
+        "Fix: openclaw doctor --fix, or update to beta: openclaw update --channel beta"
+      );
+      logger.warn("[SelfHeal] Host Control UI missing — GodMode UI fallback is serving");
+    } else {
+      markDegraded(id, 
+        "Both host Control UI and GodMode UI assets missing. " +
+        "Run: openclaw doctor --fix, then: pnpm ui:sync in godmode-plugin"
+      );
+    }
+  } catch (err) {
+    markDegraded(id, `UI assets check error: ${String(err)}`);
+  }
+}
+
+/**
+ * Check the host OpenClaw config for known problematic patterns:
+ * - Stale acpx plugin reference (should be removed, now built into core)
+ * - GodMode plugin still enabled
+ * - WhatsApp plugin present in config but missing from dist
+ */
+async function checkHostPluginConfig(logger: Logger): Promise<void> {
+  const id: SubsystemId = "host-plugins";
+  try {
+    const configPath = join(homedir(), ".openclaw", "openclaw.json");
+    if (!existsSync(configPath)) {
+      // Try alternate location
+      const altConfig = join(homedir(), ".openclaw", "config.json");
+      if (!existsSync(altConfig)) {
+        markHealthy(id, "No host config file found (may use defaults)");
+        return;
+      }
+    }
+
+    const configStr = await readFile(
+      existsSync(join(homedir(), ".openclaw", "openclaw.json"))
+        ? join(homedir(), ".openclaw", "openclaw.json")
+        : join(homedir(), ".openclaw", "config.json"),
+      "utf-8"
+    );
+
+    let config: Record<string, unknown>;
+    try {
+      config = JSON.parse(configStr);
+    } catch {
+      markDegraded(id, "Host config file is malformed JSON. Run: openclaw doctor --fix");
+      return;
+    }
+
+    const issues: string[] = [];
+
+    // Check for stale acpx plugin reference
+    const plugins = config.plugins as Record<string, unknown> | undefined;
+    const extensions = config.extensions as Record<string, unknown> | undefined;
+    const pluginList = plugins || extensions;
+    
+    if (pluginList) {
+      if ("acpx" in pluginList || "@openclaw/acpx" in pluginList) {
+        issues.push(
+          "Stale 'acpx' plugin in config — acpx is now built into core. " +
+          "Remove it and set acp.backend: 'core' in config"
+        );
+      }
+
+      // Check if GodMode/godmode plugin is present
+      const hasGodmode = Object.keys(pluginList).some(
+        (k) => k.toLowerCase().includes("godmode")
+      );
+      if (!hasGodmode) {
+        issues.push(
+          "GodMode plugin not found in host config — may have been disabled by config drift during update"
+        );
+      }
+    }
+
+    if (issues.length === 0) {
+      markHealthy(id, "Host plugin config looks clean");
+    } else {
+      markDegraded(id, issues.join("; "));
+      for (const issue of issues) {
+        logger.warn(`[SelfHeal] Host config issue: ${issue}`);
+      }
+    }
+  } catch (err) {
+    // Config check is best-effort — don't fail hard
+    markHealthy(id, "Host config check skipped (not accessible)");
+  }
 }
 
 /**

@@ -63,6 +63,8 @@ import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk";
 
+import "./src/lib/bootstrap-env.js";
+
 // Method handler imports
 import { agentLogHandlers } from "./src/methods/agent-log.js";
 import { calendarHandlers } from "./src/methods/calendar.js";

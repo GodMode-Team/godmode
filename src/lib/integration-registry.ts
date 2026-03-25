@@ -10,11 +10,16 @@ import { execFile } from "node:child_process";
 import { existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { detectPlatform } from "./platform-detect.js";
-import { getEnvVar, writeEnvVar } from "./env-writer.js";
+import { getEnvVar, removeEnvVar, writeEnvVar } from "./env-writer.js";
 import { resolveVaultPath, GODMODE_ROOT } from "../data-paths.js";
 import { getUserLocation } from "./user-config.js";
 import { resolveConfigPath } from "./openclaw-state.js";
+import { getConfiguredChannels } from "./channel-config-detect.js";
 import { readFileSync, writeFileSync } from "node:fs";
+import {
+  deletePersistedCredential,
+  persistCredential,
+} from "./credentials-store.js";
 
 // ── Types ──────────────────────────────────────────────────────────────
 
@@ -355,16 +360,7 @@ const messagingChannel: IntegrationProvider = {
     // Read OC config to check for any configured channels
     const config = readOcConfig();
     const channelKeys = ["telegram", "discord", "slack", "signal", "imessage", "whatsapp", "nostr"];
-    const configured: string[] = [];
-
-    for (const key of channelKeys) {
-      const section = config[key] as Record<string, unknown> | undefined;
-      if (section && typeof section === "object") {
-        if (section.token || section.botToken || section.apiKey || section.enabled || section.phoneNumber) {
-          configured.push(key);
-        }
-      }
-    }
+    const configured = getConfiguredChannels(config, channelKeys);
 
     return {
       configured: configured.length > 0,
@@ -787,9 +783,16 @@ export function configureIntegration(
 
     switch (spec.target) {
       case "env":
-        writeEnvVar(spec.key, value);
-        // Also set in current process for immediate detection
-        process.env[spec.key] = value;
+        if (value.trim()) {
+          writeEnvVar(spec.key, value);
+          if (spec.secret) persistCredential(spec.key, value);
+          // Also set in current process for immediate detection
+          process.env[spec.key] = value;
+        } else {
+          removeEnvVar(spec.key);
+          if (spec.secret) deletePersistedCredential(spec.key);
+          delete process.env[spec.key];
+        }
         break;
       case "options":
         writeOptionsJson(spec.key, value);

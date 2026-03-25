@@ -5,7 +5,7 @@
  * zombie cleanup, host compat, content seeding, and service startup.
  */
 
-import { existsSync, readFileSync, readdirSync, mkdirSync, copyFileSync } from "node:fs";
+import { existsSync, readdirSync, mkdirSync, copyFileSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
 import { homedir } from "node:os";
 import { fileURLToPath } from "node:url";
@@ -158,39 +158,19 @@ export async function runGatewayStart(
     initAllowedPaths();
   } catch { /* non-fatal */ }
 
-  // Load workspace .env into process.env
+  // Load env files + persisted credentials into process.env
   try {
-    const homeDir = process.env.HOME || process.env.USERPROFILE || "";
-    const envPaths = [
-      join(GODMODE_ROOT, ".env"),
-      join(process.env.OPENCLAW_STATE_DIR || join(homeDir, ".openclaw"), ".env"),
-    ];
-    let loaded = 0;
-    for (const envPath of envPaths) {
-      if (!existsSync(envPath)) continue;
-      const raw = readFileSync(envPath, "utf-8");
-      for (const line of raw.split("\n")) {
-        const trimmed = line.trim();
-        if (!trimmed || trimmed.startsWith("#")) continue;
-        const cleaned = trimmed.replace(/^export\s+/, "");
-        const eqIdx = cleaned.indexOf("=");
-        if (eqIdx < 1) continue;
-        const key = cleaned.slice(0, eqIdx).trim();
-        let val = cleaned.slice(eqIdx + 1).trim();
-        if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
-          val = val.slice(1, -1);
-        }
-        if (!process.env[key]) {
-          process.env[key] = val;
-          loaded++;
-        }
-      }
-    }
-    if (loaded > 0) {
-      logger.info(`[GodMode] Loaded ${loaded} env var(s) from workspace .env`);
+    const { hydrateProcessEnvFromDisk } = await import("../lib/bootstrap-env.js");
+    const hydrated = hydrateProcessEnvFromDisk();
+    const totalLoaded = hydrated.envFileKeysLoaded + hydrated.persistedKeysLoaded;
+    if (totalLoaded > 0) {
+      logger.info(
+        `[GodMode] Hydrated ${totalLoaded} startup secret(s) ` +
+        `(${hydrated.envFileKeysLoaded} from .env, ${hydrated.persistedKeysLoaded} from credentials store)`,
+      );
     }
   } catch (err) {
-    logger.warn(`[GodMode] Failed to load workspace .env: ${String(err)}`);
+    logger.warn(`[GodMode] Failed to hydrate startup secrets: ${String(err)}`);
   }
 
   // ── Auto-generate security secrets if not set ─────────────────────
@@ -484,17 +464,47 @@ export async function runGatewayStart(
     logger.warn(`[GodMode] Identity graph init failed (non-fatal): ${String(err)}`);
   }
 
-  // QMD binary check (#25) — warn if missing so users know search is degraded
+  // QMD binary check (#25) — fail loudly once at startup, then degrade cleanly
   try {
-    const { execFileSync } = await import("node:child_process");
-    execFileSync("qmd", ["--version"], { timeout: 3000, stdio: "pipe" });
-    logger.info("[GodMode] qmd binary found — full-text vault search available");
-  } catch {
-    logger.warn(
-      "[GodMode] qmd binary not found — Second Brain search will use file-walk fallback. " +
-      "Install qmd for faster hybrid search: https://github.com/quadratic-ai/qmd",
-    );
-    health.signal("qmd.binary", false, { warning: "qmd not installed — using file-walk fallback" });
+    const { getQmdStatus } = await import("../lib/qmd-status.js");
+    const qmdStatus = await getQmdStatus({ refresh: true });
+
+    if (qmdStatus.available) {
+      logger.info(
+        `[GodMode] qmd binary found${qmdStatus.version ? ` (${qmdStatus.version})` : ""} — full-text vault search available`,
+      );
+      health.signal("qmd.binary", true, {
+        backend: qmdStatus.backend,
+        path: qmdStatus.path,
+        version: qmdStatus.version,
+      });
+    } else if (qmdStatus.backendConfigured) {
+      logger.error(`[GodMode] ${qmdStatus.warning}`);
+      logger.warn("[GodMode] QMD-backed memory search disabled — using file-walk fallback until qmd is installed");
+      health.signal("qmd.binary", false, {
+        error: qmdStatus.warning,
+        backend: qmdStatus.backend,
+        installCommand: qmdStatus.installCommand,
+        fallback: qmdStatus.fallbackMode,
+      });
+      turnErrors.capture("qmd.binary", qmdStatus.warning ?? "qmd binary missing", {
+        backend: qmdStatus.backend,
+        installCommand: qmdStatus.installCommand,
+      });
+      safeBroadcast(api, "ally:notification", {
+        type: "health-alert",
+        summary:
+          `QMD search is unavailable. ${qmdStatus.warning}. ` +
+          `GodMode will use slower file-walk search until qmd is installed.`,
+      });
+    } else {
+      health.signal("qmd.binary", true, {
+        backend: qmdStatus.backend,
+        note: "qmd not required for current memory backend",
+      });
+    }
+  } catch (err) {
+    logger.warn(`[GodMode] qmd startup check failed: ${String(err)}`);
   }
 
   // Image cache cleanup

@@ -121,9 +121,24 @@ export function createGodmodeHttpHandler(deps: HttpHandlerDeps) {
     if (pathname === "/godmode/health" || pathname === "/godmode/health/") {
       const licenseState = deps.getLicenseState();
       let memoryStatus: string = "unknown";
+      let qmdStatus: {
+        status: string;
+        available: boolean;
+        backend: string;
+        backendConfigured: boolean;
+        path: string | null;
+        version: string | null;
+        warning: string | null;
+        installCommand: string;
+        fallbackMode: string;
+      } | null = null;
       try {
         const { getMemoryStatus } = await import("../lib/memory.js");
         memoryStatus = getMemoryStatus();
+      } catch { /* non-fatal */ }
+      try {
+        const { getQmdStatus } = await import("../lib/qmd-status.js");
+        qmdStatus = await getQmdStatus({ refresh: true });
       } catch { /* non-fatal */ }
       const health = {
         plugin: "godmode",
@@ -134,6 +149,17 @@ export function createGodmodeHttpHandler(deps: HttpHandlerDeps) {
           ...(licenseState.error ? { error: licenseState.error } : {}),
         },
         memoryStatus,
+        qmd: qmdStatus ? {
+          status: qmdStatus.status,
+          available: qmdStatus.available,
+          backend: qmdStatus.backend,
+          backendConfigured: qmdStatus.backendConfigured,
+          path: qmdStatus.path,
+          version: qmdStatus.version,
+          warning: qmdStatus.warning,
+          installCommand: qmdStatus.available ? null : qmdStatus.installCommand,
+          fallback: qmdStatus.fallbackMode,
+        } : null,
         ui: deps.godmodeUiRoot ? "available" : "not-built",
         methods: deps.methodCount,
       };
