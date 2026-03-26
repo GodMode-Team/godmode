@@ -5,6 +5,7 @@ ui/dist/
 *.log
 *.db
 *.pem
+!src/lib/auth-public-key.pem
 *.key
 *.p12
 *.pfx

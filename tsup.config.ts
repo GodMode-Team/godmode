@@ -16,7 +16,7 @@ export default defineConfig([
 		external: [
 			"openclaw/plugin-sdk",
 		],
-		onSuccess: "cp src/lib/auth-public-key.pem dist/auth-public-key.pem && mkdir -p dist/assets/workspace-templates && cp -r assets/workspace-templates/* dist/assets/workspace-templates/ 2>/dev/null || true",
+		onSuccess: "cp src/lib/auth-public-key.pem dist/auth-public-key.pem 2>/dev/null || true && mkdir -p dist/assets/workspace-templates && cp -r assets/workspace-templates/* dist/assets/workspace-templates/ 2>/dev/null || true",
 	},
 	// 2. Hermes standalone + MCP entry
 	{
