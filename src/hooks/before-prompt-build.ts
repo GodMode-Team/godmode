@@ -179,8 +179,7 @@ export async function handleBeforePromptBuild(
         }
         const title = await generateSessionTitle(currentUserMessage);
         if (!title) {
-          titledSessions.add(sessionKey);
-          pendingAutoTitles.delete(sessionKey);
+          // Don't mark as titled — let llm_output retry with assistant context
           return;
         }
         const storePath = resolveAgentStorePath(sessionKey, cfg);

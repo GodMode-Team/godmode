@@ -47,6 +47,7 @@ import {
   evictTitledSessions,
   generateSessionTitle,
   PENDING_TTL_MS,
+  MAX_TITLE_ATTEMPTS,
 } from "../lib/auto-title.js";
 import {
   loadConfig as loadSessionConfig,
@@ -642,8 +643,14 @@ export async function handleLlmOutputAutoTitle(
 
   logger.info(`[GodMode][AutoTitle] llm_output: "${sessionKey}" has text (len=${assistantText.length}) — generating title`);
 
-  // Consume the pending entry — one shot, no retries with later messages
-  pendingAutoTitles.delete(sessionKey);
+  // Increment attempts — allow retries on next message if this fails
+  pending.attempts += 1;
+  if (pending.attempts > MAX_TITLE_ATTEMPTS) {
+    pendingAutoTitles.delete(sessionKey);
+    titledSessions.add(sessionKey);
+    logger.warn(`[GodMode][AutoTitle] Exhausted ${MAX_TITLE_ATTEMPTS} attempts for "${sessionKey}" — giving up`);
+    return;
+  }
 
   // Fire and forget — don't block LLM pipeline
   void (async () => {
@@ -662,11 +669,13 @@ export async function handleLlmOutputAutoTitle(
       }
 
       const title = await generateSessionTitle(pending.message, assistantText);
-      logger.info(`[GodMode][AutoTitle] LLM title: ${title ? `"${title}"` : "null — giving up (won't retry with later messages)"}`);
+      logger.info(`[GodMode][AutoTitle] LLM title: ${title ? `"${title}"` : `null — will retry (attempt ${pending.attempts}/${MAX_TITLE_ATTEMPTS})`}`);
       if (!title) {
-        titledSessions.add(sessionKey);
+        // Don't mark as titled — allow retry on next llm_output
         return;
       }
+      // Success — consume the pending entry
+      pendingAutoTitles.delete(sessionKey);
 
       // Write to the correct store — agent sessions go to agent-specific store
       const storePath = resolveAgentStorePath(sessionKey, cfg);
