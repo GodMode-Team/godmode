@@ -246,7 +246,7 @@ Nothing will crash. Every dependency degrades gracefully with a clear message.
 - Check service health with `systemctl --user status godmode-gateway.service`
 - Follow logs with `journalctl --user -u godmode-gateway.service -f`
 - Access GodMode remotely via SSH tunnel: `ssh -L 18789:localhost:18789 your-vps`
-- Or configure Tailscale for direct access to `http://your-vps:18789/godmode/`
+- Or install Tailscale — the install script auto-configures `trusted-proxy` auth so you can access `https://your-host.tailnet.ts.net/` with no token needed
 
 ### Mac Mini (headless)
 - Use `openclaw gateway install` or `openclaw gateway start --daemon`

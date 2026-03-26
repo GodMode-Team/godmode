@@ -20,6 +20,45 @@ Copy the sections you need into `~/.openclaw/openclaw.json`.
 
 **Why:** GodMode runs through the local gateway. Without `mode: "local"` the gateway refuses to start.
 
+### Tailscale Remote Access (VPS / headless)
+
+If you access GodMode through Tailscale Serve, use this config instead:
+
+```jsonc
+{
+  "gateway": {
+    "mode": "local",
+    "bind": "loopback",                         // Tailscale Serve proxies from localhost
+    "trustedProxies": ["127.0.0.1/32"],          // Trust headers from Tailscale Serve
+    "tailscale": { "mode": "serve" },
+    "auth": {
+      "mode": "trusted-proxy",                   // Tailscale identity = auth
+      "allowTailscale": true,
+      "trustedProxy": {
+        "userHeader": "tailscale-user-login",
+        "requiredHeaders": ["tailscale-user-login"]
+      }
+    },
+    "controlUi": {
+      "enabled": true,
+      "allowedOrigins": ["https://YOUR-HOST.tailnet.ts.net"],
+      "dangerouslyDisableDeviceAuth": true       // Tailscale IS the device auth
+    }
+  }
+}
+```
+
+Then activate Tailscale Serve and enable linger so the gateway survives SSH disconnect:
+
+```bash
+tailscale serve --bg 18789
+sudo loginctl enable-linger $(whoami)
+openclaw gateway install --force
+openclaw gateway start
+```
+
+The install script (`scripts/install.sh`) detects Tailscale automatically and configures all of this.
+
 ---
 
 ## 2. Model Selection

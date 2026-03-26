@@ -751,15 +751,29 @@ if [ "$IS_HEADLESS" = true ]; then
 
       # Use tailscale serve mode — exposes gateway to tailnet securely via HTTPS
       openclaw config set gateway.tailscale.mode serve 2>/dev/null && ok "gateway.tailscale.mode = serve" || warn "Could not set tailscale mode"
+
+      # Bind to loopback — Tailscale Serve proxies from 127.0.0.1, so the
+      # gateway only needs to listen on localhost. This is more secure than
+      # binding to LAN since nothing except Tailscale Serve can reach it.
+      openclaw config set gateway.bind loopback 2>/dev/null && ok "gateway.bind = loopback (Tailscale Serve proxies from localhost)" || true
+
+      # Trust the Tailscale Serve reverse proxy on loopback so forwarded
+      # headers (tailscale-user-login) are accepted by the gateway.
+      openclaw config set gateway.trustedProxies '["127.0.0.1/32"]' 2>/dev/null && ok "gateway.trustedProxies = [127.0.0.1/32]" || true
+
+      # Auth: trusted-proxy mode — Tailscale Serve injects identity headers,
+      # the gateway reads them instead of requiring a token in the URL.
+      openclaw config set gateway.auth.mode trusted-proxy 2>/dev/null && ok "gateway.auth.mode = trusted-proxy" || true
       openclaw config set gateway.auth.allowTailscale true 2>/dev/null || true
+      openclaw config set gateway.auth.trustedProxy.userHeader tailscale-user-login 2>/dev/null && ok "gateway.auth.trustedProxy.userHeader = tailscale-user-login" || true
+      openclaw config set gateway.auth.trustedProxy.requiredHeaders '["tailscale-user-login"]' 2>/dev/null || true
+
       # Tailscale IS the trust boundary — skip redundant device pairing for remote browsers
       openclaw config set gateway.controlUi.dangerouslyDisableDeviceAuth true 2>/dev/null && ok "Device pairing skipped (Tailscale provides device auth)" || true
-      # Bind to LAN so Tailscale serve can reach the gateway
-      openclaw config set gateway.bind lan 2>/dev/null && ok "gateway.bind = lan (Tailscale + SSH)" || true
 
-      # Allow origins for WebSocket connections (both HTTP Tailscale IP and HTTPS tailnet domain)
+      # Allow origins for WebSocket connections
       if [ -n "$TAILSCALE_FQDN" ]; then
-        openclaw config set gateway.controlUi.allowedOrigins "[\"http://${TAILSCALE_IP}:${GODMODE_PORT}\", \"https://${TAILSCALE_FQDN}\"]" 2>/dev/null && ok "gateway.controlUi.allowedOrigins includes Tailscale HTTPS + IP" || true
+        openclaw config set gateway.controlUi.allowedOrigins "[\"https://${TAILSCALE_FQDN}\"]" 2>/dev/null && ok "gateway.controlUi.allowedOrigins = https://${TAILSCALE_FQDN}" || true
       else
         openclaw config set gateway.controlUi.allowedOrigins "[\"http://${TAILSCALE_IP}:${GODMODE_PORT}\"]" 2>/dev/null && ok "gateway.controlUi.allowedOrigins includes Tailscale IP" || true
       fi
@@ -776,10 +790,12 @@ if [ "$IS_HEADLESS" = true ]; then
   fi
 fi
 
-# Generate security token if missing
+# Generate security token if missing — skip when Tailscale trusted-proxy auth is active
 STATE_DIR="${OPENCLAW_STATE_DIR:-$HOME/.openclaw}"
 CONFIG_FILE="$STATE_DIR/openclaw.json"
-if [ -f "$CONFIG_FILE" ]; then
+if [ "$TAILSCALE_CONFIGURED" = true ]; then
+  ok "Tailscale trusted-proxy auth active — token auth not needed"
+elif [ -f "$CONFIG_FILE" ]; then
   if grep -q '"token"' "$CONFIG_FILE" 2>/dev/null; then
     ok "Gateway security token already set"
   else
