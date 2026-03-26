@@ -1,5 +1,10 @@
 # GodMode — Personal AI Operating System
 
+[![npm version](https://img.shields.io/npm/v/@godmode-team/godmode)](https://www.npmjs.com/package/@godmode-team/godmode)
+[![License: FSL-1.1-MIT](https://img.shields.io/badge/License-FSL--1.1--MIT-blue.svg)](./LICENSE)
+[![GitHub release](https://img.shields.io/github/v/release/GodMode-Team/godmode)](https://github.com/GodMode-Team/godmode/releases)
+[![Node.js 22+](https://img.shields.io/badge/node-22%2B-brightgreen)](https://nodejs.org)
+
 GodMode turns your self-hosted AI into a personal operating system. It runs on top of [OpenClaw](https://github.com/nichochar/openclaw) and gives your AI deep context about you — your schedule, tasks, memory, skills, and preferences — so it actually works *for* you instead of starting from scratch every conversation.
 
 **Open source. Self-hosted. Yours.**
