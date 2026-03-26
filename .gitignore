@@ -30,3 +30,6 @@ experiments/
 # SQLite databases (runtime)
 *.sqlite
 *.sqlite3
+
+# Autoresearch runtime outputs (screenshots, state, scores)
+autoresearch/results/

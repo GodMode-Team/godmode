@@ -929,19 +929,46 @@ async function findSessionKeyFromSessionId(sessionId: string): Promise<string | 
 }
 
 const list: GatewayRequestHandler = async ({ respond }) => {
+  const start = Date.now();
   try {
     const config = await readWorkspaceConfig();
 
+    // Per-workspace timeout (8s) so one slow workspace can't block the rest
+    const PER_WS_TIMEOUT = 8_000;
     const summaries = await Promise.all(
       config.workspaces.map(async (workspace) => {
+        const fallback = {
+          id: workspace.id,
+          name: workspace.name,
+          emoji: workspace.emoji ?? "📁",
+          type: workspace.type ?? "project",
+          path: workspace.path,
+          artifactCount: 0,
+          sessionCount: 0,
+          lastUpdated: new Date().toISOString(),
+          lastScanned: Date.now(),
+          legacyType: null,
+        };
         try {
+          const wsStart = Date.now();
           if (!(await pathExists(workspace.path))) {
             console.warn(`[workspaces.list] workspace directory missing, recreating: ${workspace.path}`);
             await ensureWorkspaceFolders(workspace.path, workspace.type);
           }
-          const outputs = await listWorkspaceOutputs(workspace);
-          const sessions = await listWorkspaceSessions(workspace.id, config);
-          const summary = resolveWorkspaceSummary(workspace, outputs, sessions);
+          const timeout = new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error(`workspace ${workspace.name} timed out`)), PER_WS_TIMEOUT),
+          );
+          const work = (async () => {
+            const outputs = await listWorkspaceOutputs(workspace);
+            const sessions = await listWorkspaceSessions(workspace.id, config);
+            return resolveWorkspaceSummary(workspace, outputs, sessions);
+          })();
+
+          const summary = await Promise.race([work, timeout]);
+          const elapsed = Date.now() - wsStart;
+          if (elapsed > 3_000) {
+            console.warn(`[workspaces.list] slow workspace ${workspace.name}: ${elapsed}ms`);
+          }
           return {
             id: summary.id,
             name: summary.name,
@@ -956,21 +983,15 @@ const list: GatewayRequestHandler = async ({ respond }) => {
           };
         } catch (wsErr) {
           console.error(`[workspaces.list] failed to load workspace ${workspace.name}:`, wsErr);
-          return {
-            id: workspace.id,
-            name: workspace.name,
-            emoji: workspace.emoji ?? "📁",
-            type: workspace.type ?? "project",
-            path: workspace.path,
-            artifactCount: 0,
-            sessionCount: 0,
-            lastUpdated: new Date().toISOString(),
-            lastScanned: Date.now(),
-            legacyType: null,
-          };
+          return fallback;
         }
       }),
     );
+
+    const elapsed = Date.now() - start;
+    if (elapsed > 3_000) {
+      console.warn(`[workspaces.list] total: ${elapsed}ms for ${summaries.length} workspaces`);
+    }
 
     respond(true, {
       configPath: CANONICAL_WORKSPACES_CONFIG_PATH,

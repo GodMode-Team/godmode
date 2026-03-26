@@ -16,6 +16,39 @@ type ScrollHost = {
   topbarObserver: ResizeObserver | null;
 };
 
+/** Find the .chat-thread scroll container, returning null if not found or not scrollable. */
+function pickChatScrollTarget(host: ScrollHost): HTMLElement | null {
+  const container = host.querySelector(".chat-thread") as HTMLElement | null;
+  if (container) {
+    const overflowY = getComputedStyle(container).overflowY;
+    if (
+      overflowY === "auto" ||
+      overflowY === "scroll" ||
+      container.scrollHeight - container.clientHeight > 1
+    ) {
+      return container;
+    }
+  }
+  return null;
+}
+
+/** Programmatically scroll a container to its bottom, suppressing the scroll handler. */
+function autoScrollToBottom(host: ScrollHost, target: HTMLElement): void {
+  host.chatIsAutoScrolling = true;
+  target.scrollTop = target.scrollHeight;
+  host.chatNewMessagesBelow = false;
+  requestAnimationFrame(() => {
+    host.chatIsAutoScrolling = false;
+  });
+}
+
+/**
+ * Generation counter for force-scroll safety net.
+ * Each force=true call increments this; the safety-net timeout checks staleness
+ * so only the latest tab switch drives the final scroll.
+ */
+let _forceScrollGen = 0;
+
 export function scheduleChatScroll(host: ScrollHost, force = false) {
   if (host.chatScrollFrame) {
     cancelAnimationFrame(host.chatScrollFrame);
@@ -24,35 +57,39 @@ export function scheduleChatScroll(host: ScrollHost, force = false) {
     clearTimeout(host.chatScrollTimeout);
     host.chatScrollTimeout = null;
   }
-  const pickScrollTarget = () => {
-    const container = host.querySelector(".chat-thread") as HTMLElement | null;
-    if (container) {
-      const overflowY = getComputedStyle(container).overflowY;
-      const canScroll =
-        overflowY === "auto" ||
-        overflowY === "scroll" ||
-        container.scrollHeight - container.clientHeight > 1;
-      if (canScroll) {
-        return container;
-      }
-    }
-    return (document.scrollingElement ?? document.documentElement) as HTMLElement | null;
-  };
-  // Wait for Lit render to complete, then scroll.
-  // When switching tabs, the .chat-thread container may not be in the DOM yet
-  // on the first animation frame. Retry once after a short delay if not found.
+
+  // Safety-net generation: when multiple scheduleChatScroll(force=true) calls
+  // race (e.g. updated() lifecycle + .then() callback), the tracked rAF/timeout
+  // from an earlier call can be cancelled by a later one. The safety-net timeout
+  // below is intentionally NOT tracked, so it survives cancellation. The
+  // generation counter ensures only the latest call's safety net fires.
+  const safetyGen = force ? ++_forceScrollGen : 0;
+
   void host.updateComplete.then(() => {
     host.chatScrollFrame = requestAnimationFrame(() => {
       host.chatScrollFrame = null;
-      let target = pickScrollTarget();
-      if (!target || target === document.scrollingElement || target === document.documentElement) {
-        // Container not rendered yet — wait one more frame
-        requestAnimationFrame(() => {
-          target = pickScrollTarget();
-          if (target && target !== document.scrollingElement && target !== document.documentElement) {
-            target.scrollTop = target.scrollHeight;
-          }
-        });
+      const target = pickChatScrollTarget(host);
+      if (!target) {
+        // Container not rendered yet — retry with increasing delays when forced
+        if (force) {
+          let attempt = 0;
+          const tryLater = () => {
+            const t = pickChatScrollTarget(host);
+            if (t) {
+              autoScrollToBottom(host, t);
+            } else if (++attempt < 4) {
+              setTimeout(tryLater, 80 * attempt);
+            }
+          };
+          requestAnimationFrame(tryLater);
+        } else {
+          requestAnimationFrame(() => {
+            const t = pickChatScrollTarget(host);
+            if (t) {
+              t.scrollTop = t.scrollHeight;
+            }
+          });
+        }
         return;
       }
       // When force=true (tab switch, load complete, user message), always scroll.
@@ -67,17 +104,11 @@ export function scheduleChatScroll(host: ScrollHost, force = false) {
       if (force) {
         host.chatHasAutoScrolled = true;
       }
-      host.chatIsAutoScrolling = true;
-      target.scrollTop = target.scrollHeight;
-      host.chatNewMessagesBelow = false;
-      // Clear auto-scroll flag after the browser processes the scroll event.
-      requestAnimationFrame(() => {
-        host.chatIsAutoScrolling = false;
-      });
+      autoScrollToBottom(host, target);
       const retryDelay = force ? 150 : 120;
       host.chatScrollTimeout = window.setTimeout(() => {
         host.chatScrollTimeout = null;
-        const latest = pickScrollTarget();
+        const latest = pickChatScrollTarget(host);
         if (!latest) {
           return;
         }
@@ -85,14 +116,24 @@ export function scheduleChatScroll(host: ScrollHost, force = false) {
         if (!shouldStickRetry) {
           return;
         }
-        host.chatIsAutoScrolling = true;
-        latest.scrollTop = latest.scrollHeight;
-        requestAnimationFrame(() => {
-          host.chatIsAutoScrolling = false;
-        });
+        autoScrollToBottom(host, latest);
       }, retryDelay);
     });
   });
+
+  // Safety net for force scrolls (tab switches, history loads).
+  // This timeout is NOT tracked by host.chatScrollTimeout, so it survives
+  // cancellation when a concurrent scheduleChatScroll call races with us.
+  // The generation counter ensures only the latest force call's safety net fires.
+  if (force) {
+    setTimeout(() => {
+      if (safetyGen !== _forceScrollGen) return; // stale — a newer call owns the scroll
+      const t = pickChatScrollTarget(host);
+      if (t) {
+        autoScrollToBottom(host, t);
+      }
+    }, 400);
+  }
 }
 
 export function scheduleLogsScroll(host: ScrollHost, force = false) {

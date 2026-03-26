@@ -70,7 +70,7 @@ import { icons } from "./icons";
 import { TAB_GROUPS, POWER_USER_GROUPS, subtitleForTab, titleForTab, isCustomTab, pathForTab, type Tab } from "./navigation";
 import { renderCustomTab } from "./views/custom-tab-renderer.js";
 import { fetchCustomTabData } from "./app-gateway.js";
-import { renderAllyChat } from "./views/ally-chat.js";
+// renderAllyChat removed — bubble/panel archived
 import { ALLY_SESSION_KEY } from "./controllers/ally.js";
 import { renderChannels } from "./views/channels";
 import { renderChat } from "./views/chat";
@@ -578,43 +578,6 @@ export function renderApp(state: AppViewState) {
                 : state.tab === "chat"
                   ? html`
               <div class="session-tabs">
-                <div class="session-tab session-tab--pinned ${state.sessionKey === ALLY_SESSION_KEY ? 'session-tab--active' : ''}"
-                     @click=${() => {
-                       if (state.sessionKey === ALLY_SESSION_KEY) return;
-                       saveDraft(state);
-                       state.sessionKey = ALLY_SESSION_KEY;
-                       state.allyUnread = 0;
-                       restoreDraft(state, ALLY_SESSION_KEY);
-                       state.chatLoading = true;
-                       state.chatStream = null;
-                       state.chatStreamStartedAt = null;
-                       state.chatRunId = null;
-                       state.resetToolStream();
-                       state.resetChatScroll();
-                       state.applySettings({
-                         ...state.settings,
-                         sessionKey: ALLY_SESSION_KEY,
-                         lastActiveSessionKey: ALLY_SESSION_KEY,
-                         tabLastViewed: {
-                           ...state.settings.tabLastViewed,
-                           [ALLY_SESSION_KEY]: Date.now(),
-                         },
-                       });
-                       void state.loadAssistantIdentity();
-                       void loadChatHistory(state).then(() => {
-                         state.resetChatScroll();
-                         scheduleChatScroll(state as unknown as Parameters<typeof scheduleChatScroll>[0], true);
-                       });
-                       void state.loadSessionResources();
-                       void loadSessions(state);
-                     }}
-                     title="${state.assistantName || 'Ally'}">
-                  ${state.assistantAvatar
-                    ? html`<img src="${state.assistantAvatar}" class="session-tab-avatar" width="16" height="16" style="border-radius:50%;vertical-align:middle;margin-right:4px;" />`
-                    : html`<span class="session-tab-icon" style="margin-right:4px;">&#x2726;</span>`}
-                  ${state.assistantName || 'Ally'}
-                  ${(state.allyUnread ?? 0) > 0 ? html`<span class="ally-tab-badge" style="margin-left:4px;font-size:10px;background:var(--accent-color,#5b73e8);color:#fff;border-radius:50%;padding:1px 5px;">${state.allyUnread}</span>` : nothing}
-                </div>
                 ${repeat(
                   renderSessionTabKeys,
                   (key) => key,
@@ -1927,27 +1890,7 @@ export function renderApp(state: AppViewState) {
             : nothing
         }
       </main>
-      ${state.tab !== "chat" ? renderAllyChat({
-        allyName: state.assistantName,
-        allyAvatar: state.assistantAvatar ?? null,
-        open: state.allyPanelOpen ?? false,
-        messages: state.allyMessages ?? [],
-        stream: state.allyStream ?? null,
-        draft: state.allyDraft ?? "",
-        sending: state.allySending ?? false,
-        isWorking: state.allyWorking ?? false,
-        unreadCount: state.allyUnread ?? 0,
-        connected: state.connected,
-        compact: false,
-        attachments: state.allyAttachments ?? [],
-        onToggle: () => state.handleAllyToggle(),
-        onDraftChange: (text: string) => state.handleAllyDraftChange(text),
-        onSend: () => state.handleAllySend(),
-        onOpenFullChat: () => state.handleAllyOpenFull(),
-        onAttachmentsChange: (attachments) => state.handleAllyAttachmentsChange(attachments),
-        onAction: (action, target, method, params) => state.handleAllyAction(action, target, method, params),
-        onHitlAction: (checkpointId, action, modifiedInstructions) => state.handleHitlAction(checkpointId, action, modifiedInstructions),
-      }) : nothing}
+      ${nothing /* ally chat bubble removed — never used */}
       ${renderExecApprovalPrompt(state)}
       ${renderGatewayUrlConfirmation(state)}
       ${renderGatewayRestartConfirmation(state)}

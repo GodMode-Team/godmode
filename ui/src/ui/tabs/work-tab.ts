@@ -99,6 +99,7 @@ export class GmWork extends LitElement {
 
   private _unsubs: Array<() => void> = [];
   private _lastConnected = false;
+  private _refreshInFlight = false;
 
   // -- Light DOM (no shadow root) so existing CSS classes work ---------------
 
@@ -236,6 +237,19 @@ export class GmWork extends LitElement {
   // -- Handlers -------------------------------------------------------------
 
   private async _refresh(): Promise<void> {
+    if (this._refreshInFlight) return; // deduplicate concurrent calls
+    this._refreshInFlight = true;
+
+    // Safety net: force loading off after 12s no matter what
+    const safety = setTimeout(() => {
+      if (this.workspacesLoading) {
+        console.warn("[GmWork] safety timeout — forcing loading off");
+        this.workspacesLoading = false;
+        this.workspacesError ??= "Loading timed out — tap to retry";
+        this.requestUpdate();
+      }
+    }, 12_000);
+
     try {
       await loadWorkspaces(this as unknown as WorkspacesState);
       this.allTasks = await loadAllTasksWithQueueStatus(
@@ -243,6 +257,9 @@ export class GmWork extends LitElement {
       );
     } catch (err) {
       console.error("[GmWork] refresh failed:", err);
+    } finally {
+      clearTimeout(safety);
+      this._refreshInFlight = false;
     }
     this.requestUpdate();
   }

@@ -221,7 +221,10 @@ export async function loadWorkspaces(state: WorkspacesState) {
   } catch (err) {
     console.error("[Workspaces] load failed:", err);
     state.workspacesError = err instanceof Error ? err.message : "Failed to load workspaces";
-    state.workspaces = [];
+    // Preserve existing workspaces on error — don't clobber a successful load
+    if (!state.workspaces?.length) {
+      state.workspaces = [];
+    }
   } finally {
     state.workspacesLoading = false;
   }
