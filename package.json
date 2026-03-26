@@ -1,0 +1,123 @@
+{
+  "name": "@godmode-team/godmode",
+  "version": "1.8.1",
+  "private": false,
+  "description": "GodMode - Personal AI Operating System plugin for OpenClaw",
+  "license": "FSL-1.1-MIT",
+  "author": "GodMode Team <support@lifeongodmode.com>",
+  "homepage": "https://lifeongodmode.com",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/GodMode-Team/godmode-plugin.git"
+  },
+  "bugs": {
+    "url": "https://github.com/GodMode-Team/godmode-plugin/issues"
+  },
+  "keywords": [
+    "openclaw",
+    "openclaw-plugin",
+    "godmode",
+    "ai-assistant",
+    "personal-operating-system"
+  ],
+  "type": "module",
+  "main": "dist/index.js",
+  "bin": {
+    "godmode": "./dist/standalone.js",
+    "godmode-mcp": "./dist/mcp-entry.js"
+  },
+  "exports": {
+    ".": {
+      "import": "./dist/index.js"
+    },
+    "./plugin.json": "./openclaw.plugin.json"
+  },
+  "files": [
+    "dist/**/*.js",
+    "dist/**/*.css",
+    "dist/**/*.html",
+    "dist/**/*.png",
+    "dist/**/*.webp",
+    "dist/**/*.ico",
+    "dist/**/*.svg",
+    "dist/**/*.pem",
+    "assets/agent-roster/**/*.md",
+    "assets/skills/**/*.md",
+    "skill-cards/**/*.md",
+    "dist/assets/**/*.json",
+    "dist/assets/**/*.md",
+    "scripts/install-systemd.sh",
+    "scripts/godmode-gateway.service",
+    "openclaw.plugin.json",
+    "LICENSE",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "pnpm build:ui && pnpm build:code && pnpm bundle:ui",
+    "build:code": "tsup",
+    "build:ui": "vite build --config ui/vite.config.ts",
+    "bundle:ui": "node scripts/bundle-ui.mjs",
+    "start": "node dist/standalone.js",
+    "dev": "pnpm build && node dist/standalone.js",
+    "dev:ui": "vite --config ui/vite.config.ts",
+    "test:ui": "vitest run --config ui/vitest.config.ts",
+    "ui:sync": "node scripts/sync-ui-from-repo.mjs",
+    "clean": "rm -rf dist ui/dist",
+    "typecheck": "tsc --noEmit",
+    "pack:check": "npm pack --dry-run",
+    "prepublishOnly": "pnpm build && node scripts/verify-dist.mjs",
+    "preversion": "pnpm typecheck",
+    "postinstall": "bash patches/fix-imessage-native-vision.sh 2>/dev/null || true"
+  },
+  "dependencies": {
+    "@composio/core": "0.6.5",
+    "@honcho-ai/sdk": "2.0.1",
+    "@lit/context": "1.1.6",
+    "@noble/ed25519": "3.0.0",
+    "better-sqlite3": "11.10.0",
+    "chokidar": "4.0.3",
+    "dompurify": "3.3.3",
+    "json5": "2.2.3",
+    "lit": "3.3.2",
+    "marked": "17.0.3",
+    "mem0ai": "^2.3.0",
+    "ws": "8.19.0"
+  },
+  "devDependencies": {
+    "@browserbasehq/stagehand": "^3.2.0",
+    "@types/node": "^24.3.3",
+    "@types/ws": "^8.18.1",
+    "openclaw": "^2026.3.22",
+    "tsup": "^8.5.1",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3",
+    "vite": "7.3.1",
+    "vitest": "^4.0.18"
+  },
+  "peerDependencies": {
+    "openclaw": ">=2026.2.0 <2027.0.0"
+  },
+  "peerDependenciesMeta": {
+    "openclaw": {
+      "optional": false
+    }
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "sqlite3",
+      "better-sqlite3"
+    ],
+    "allowedDeprecatedVersions": {}
+  },
+  "openclaw": {
+    "extensions": [
+      "./dist/index.js"
+    ]
+  }
+}

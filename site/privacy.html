@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Privacy Policy | GodMode</title>
+    <meta name="description" content="GodMode Privacy Policy - How we handle your data">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚡</text></svg>">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --black: #000000;
+            --dark: #0a0a0a;
+            --gray-dark: #1a1a1a;
+            --gray: #666666;
+            --gray-light: #999999;
+            --white: #ffffff;
+            --accent: #00ff88;
+            --accent-dim: rgba(0, 255, 136, 0.1);
+        }
+
+        html {
+            scroll-behavior: smooth;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--black);
+            color: var(--white);
+            line-height: 1.8;
+            overflow-x: hidden;
+        }
+
+        .bg-gradient {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background:
+                radial-gradient(ellipse at 20% 20%, rgba(0, 255, 136, 0.06) 0%, transparent 50%),
+                radial-gradient(ellipse at 80% 80%, rgba(0, 255, 136, 0.04) 0%, transparent 50%);
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .container {
+            position: relative;
+            z-index: 2;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 0 40px;
+        }
+
+        header {
+            padding: 40px 0 20px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+            margin-bottom: 60px;
+        }
+
+        header a {
+            color: var(--accent);
+            text-decoration: none;
+            font-family: 'Space Grotesk', sans-serif;
+            font-weight: 600;
+            font-size: 1.1rem;
+            letter-spacing: -0.02em;
+        }
+
+        header a:hover {
+            opacity: 0.8;
+        }
+
+        h1 {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 2.5rem;
+            font-weight: 700;
+            letter-spacing: -0.03em;
+            margin-bottom: 12px;
+        }
+
+        .last-updated {
+            color: var(--gray-light);
+            font-size: 0.9rem;
+            margin-bottom: 50px;
+        }
+
+        h2 {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 1.4rem;
+            font-weight: 600;
+            letter-spacing: -0.02em;
+            color: var(--accent);
+            margin-top: 48px;
+            margin-bottom: 16px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid rgba(0, 255, 136, 0.15);
+        }
+
+        h2:first-of-type {
+            margin-top: 0;
+        }
+
+        h3 {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--white);
+            margin-top: 28px;
+            margin-bottom: 12px;
+        }
+
+        p {
+            color: rgba(255, 255, 255, 0.85);
+            margin-bottom: 16px;
+            font-size: 0.95rem;
+        }
+
+        ul, ol {
+            color: rgba(255, 255, 255, 0.85);
+            margin-bottom: 16px;
+            padding-left: 24px;
+            font-size: 0.95rem;
+        }
+
+        li {
+            margin-bottom: 8px;
+        }
+
+        strong {
+            color: var(--white);
+            font-weight: 600;
+        }
+
+        a {
+            color: var(--accent);
+            text-decoration: none;
+        }
+
+        a:hover {
+            text-decoration: underline;
+        }
+
+        .highlight-box {
+            background: rgba(0, 255, 136, 0.05);
+            border: 1px solid rgba(0, 255, 136, 0.15);
+            border-radius: 8px;
+            padding: 20px 24px;
+            margin: 20px 0;
+        }
+
+        .highlight-box p {
+            margin-bottom: 0;
+        }
+
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            font-size: 0.9rem;
+        }
+
+        .data-table th,
+        .data-table td {
+            padding: 12px 16px;
+            text-align: left;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+        }
+
+        .data-table th {
+            color: var(--accent);
+            font-weight: 600;
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .data-table td {
+            color: rgba(255, 255, 255, 0.85);
+        }
+
+        .data-table tr:last-child td {
+            border-bottom: none;
+        }
+
+        .badge-yes {
+            display: inline-block;
+            background: rgba(0, 255, 136, 0.1);
+            color: var(--accent);
+            padding: 2px 10px;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+
+        .badge-no {
+            display: inline-block;
+            background: rgba(255, 80, 80, 0.1);
+            color: #ff5050;
+            padding: 2px 10px;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+
+        footer {
+            margin-top: 80px;
+            padding: 40px 0;
+            border-top: 1px solid rgba(255, 255, 255, 0.06);
+            text-align: center;
+        }
+
+        footer p {
+            color: var(--gray);
+            font-size: 0.85rem;
+        }
+
+        footer a {
+            color: var(--gray-light);
+        }
+
+        @media (max-width: 640px) {
+            .container {
+                padding: 0 20px;
+            }
+
+            h1 {
+                font-size: 1.8rem;
+            }
+
+            h2 {
+                font-size: 1.2rem;
+            }
+
+            .data-table {
+                font-size: 0.8rem;
+            }
+
+            .data-table th,
+            .data-table td {
+                padding: 8px 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="bg-gradient"></div>
+    <div class="container">
+        <header>
+            <a href="/">GodMode</a>
+        </header>
+
+        <h1>Privacy Policy</h1>
+        <p class="last-updated">Last updated: February 2026</p>
+
+        <div class="highlight-box">
+            <p><strong>The short version:</strong> GodMode runs locally on your machine. Your conversations, workspace data, and personal files never leave your device. The only data we receive is your license key for validation, plus standard account and billing information.</p>
+        </div>
+
+        <h2>1. Who We Are</h2>
+        <p>This Privacy Policy describes how the GodMode Team ("we", "us", or "our") collects, uses, and protects information when you use the GodMode plugin ("Service"). GodMode is a commercial plugin for the OpenClaw AI gateway.</p>
+        <p>For questions about this policy, contact us at <a href="mailto:legal@lifeongodmode.com">legal@lifeongodmode.com</a>.</p>
+
+        <h2>2. Data We Collect</h2>
+
+        <h3>Account Information</h3>
+        <p>When you subscribe to GodMode, we collect:</p>
+        <ul>
+            <li><strong>Email address</strong> - used for account management, billing communications, and important service notices.</li>
+            <li><strong>Name</strong> (if provided) - used for account identification.</li>
+        </ul>
+
+        <h3>Payment Information</h3>
+        <p>Payment processing is handled entirely by <strong>Stripe</strong>, a PCI DSS Level 1 certified payment processor. We do not receive, store, or have access to your full credit card number. Stripe provides us with:</p>
+        <ul>
+            <li>Last four digits of your card (for your reference on receipts).</li>
+            <li>Card expiration date.</li>
+            <li>Billing address (if provided).</li>
+            <li>Transaction history and subscription status.</li>
+        </ul>
+
+        <h3>License Validation Data</h3>
+        <p>The GodMode plugin periodically contacts our license server to verify your subscription status. During this process, the following is transmitted:</p>
+        <ul>
+            <li>Your license key (format: <code>GM-PROD-{uuid}</code>).</li>
+            <li>A timestamp of the validation request.</li>
+        </ul>
+        <p>The validation endpoint is <code>api.lifeongodmode.com</code>. No other data is sent during this communication.</p>
+
+        <h2>3. Data We Do NOT Collect</h2>
+
+        <div class="highlight-box">
+            <p>GodMode is designed with local-first privacy. The following data <strong>never</strong> leaves your device:</p>
+        </div>
+
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Data Type</th>
+                    <th>Collected?</th>
+                    <th>Details</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Conversations / chat history</td>
+                    <td><span class="badge-no">No</span></td>
+                    <td>Stored locally in ~/godmode/data/</td>
+                </tr>
+                <tr>
+                    <td>Workspace data</td>
+                    <td><span class="badge-no">No</span></td>
+                    <td>All workspaces are local files</td>
+                </tr>
+                <tr>
+                    <td>Personal files and documents</td>
+                    <td><span class="badge-no">No</span></td>
+                    <td>Never accessed by our servers</td>
+                </tr>
+                <tr>
+                    <td>AI model responses</td>
+                    <td><span class="badge-no">No</span></td>
+                    <td>Handled by your AI provider directly</td>
+                </tr>
+                <tr>
+                    <td>Agent configurations</td>
+                    <td><span class="badge-no">No</span></td>
+                    <td>Stored locally on your machine</td>
+                </tr>
+                <tr>
+                    <td>Daily briefings and life-tracking</td>
+                    <td><span class="badge-no">No</span></td>
+                    <td>All data remains local</td>
+                </tr>
+                <tr>
+                    <td>Usage analytics or telemetry</td>
+                    <td><span class="badge-no">No</span></td>
+                    <td>No tracking, no analytics</td>
+                </tr>
+                <tr>
+                    <td>Device fingerprinting</td>
+                    <td><span class="badge-no">No</span></td>
+                    <td>Not performed</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>4. How We Use Your Information</h2>
+        <p>We use the limited information we collect for the following purposes:</p>
+        <ul>
+            <li><strong>Subscription management:</strong> To process payments, manage your account, and provide billing support.</li>
+            <li><strong>License validation:</strong> To verify that your subscription is active and authorize plugin use.</li>
+            <li><strong>Service communications:</strong> To send important notices about your account, billing, or material changes to the Service (such as updates to these Terms or pricing changes).</li>
+            <li><strong>Support:</strong> To respond to your questions and resolve issues when you contact us.</li>
+        </ul>
+        <p>We do <strong>not</strong> use your information for advertising, profiling, or selling to third parties.</p>
+
+        <h2>5. Third-Party Services</h2>
+
+        <h3>Stripe (Payment Processing)</h3>
+        <p>We use Stripe to process subscription payments. When you subscribe, you interact directly with Stripe's payment infrastructure. Stripe's handling of your payment information is governed by the <a href="https://stripe.com/privacy" target="_blank" rel="noopener">Stripe Privacy Policy</a>.</p>
+
+        <h3>AI Model Providers</h3>
+        <p>GodMode routes your requests to AI model providers (such as Anthropic, OpenAI, or Google) through OpenClaw. Your interactions with these providers are governed by their respective privacy policies and your own API key agreements. <strong>GodMode does not intermediate, log, or store these interactions.</strong></p>
+
+        <h3>No Other Third Parties</h3>
+        <p>We do not share, sell, rent, or trade your personal information with any other third parties. We do not use third-party analytics, advertising networks, or data brokers.</p>
+
+        <h2>6. Data Storage and Security</h2>
+        <p>Account and billing information is stored on secure, encrypted servers. We implement industry-standard security measures to protect this data, including:</p>
+        <ul>
+            <li>Encryption in transit (TLS) for all communications with our servers.</li>
+            <li>Encryption at rest for stored account data.</li>
+            <li>Restricted access controls for team members who require access to billing systems.</li>
+        </ul>
+        <p>Your workspace data is stored locally on your machine at <code>~/godmode/data/</code> and is protected by your own device security. We recommend keeping your operating system and device encryption up to date.</p>
+
+        <h2>7. Data Retention</h2>
+        <ul>
+            <li><strong>Active subscription:</strong> We retain your account and billing information for the duration of your subscription.</li>
+            <li><strong>After cancellation:</strong> Account information is deleted within 30 days of subscription cancellation. Transaction records may be retained longer as required by applicable tax and accounting regulations.</li>
+            <li><strong>License validation logs:</strong> Validation request logs (license key + timestamp) are retained for up to 90 days for abuse detection and then automatically purged.</li>
+            <li><strong>Local data:</strong> Your local data (~/godmode/data/) is unaffected by cancellation and remains on your device. We have no ability to access or delete it.</li>
+        </ul>
+
+        <h2>8. Your Rights</h2>
+        <p>Depending on your jurisdiction, you may have the right to:</p>
+        <ul>
+            <li><strong>Access</strong> the personal information we hold about you.</li>
+            <li><strong>Correct</strong> inaccurate information in your account.</li>
+            <li><strong>Delete</strong> your account and associated personal information.</li>
+            <li><strong>Export</strong> your account data in a portable format.</li>
+            <li><strong>Object</strong> to specific processing of your data.</li>
+        </ul>
+        <p>To exercise any of these rights, contact us at <a href="mailto:legal@lifeongodmode.com">legal@lifeongodmode.com</a>. We will respond to requests within 30 days.</p>
+
+        <h2>9. International Data Transfers</h2>
+        <p>Our license validation servers are located in the United States. If you are located outside the United States, your license validation requests (containing only your license key and a timestamp) will be processed in the United States. No personal data beyond the license key is transmitted.</p>
+
+        <h2>10. Children's Privacy</h2>
+        <p>GodMode is not intended for use by individuals under the age of 18. We do not knowingly collect personal information from children. If you believe a child has provided us with personal information, please contact us and we will delete it promptly.</p>
+
+        <h2>11. Changes to This Policy</h2>
+        <p>We may update this Privacy Policy from time to time. When we make material changes, we will notify you via email or through the Service at least 14 days before the changes take effect.</p>
+        <p>The "Last updated" date at the top of this policy indicates when it was last revised.</p>
+
+        <h2>12. Contact Us</h2>
+        <p>If you have questions or concerns about this Privacy Policy or our data practices, please contact us:</p>
+        <p><strong>Email:</strong> <a href="mailto:legal@lifeongodmode.com">legal@lifeongodmode.com</a></p>
+        <p><strong>Website:</strong> <a href="https://lifeongodmode.com">lifeongodmode.com</a></p>
+
+        <footer>
+            <p>&copy; 2026 GodMode Team. All rights reserved.</p>
+            <p style="margin-top: 8px;"><a href="/">Home</a> &middot; <a href="/privacy.html">Privacy Policy</a> &middot; <a href="/terms.html">Terms of Service</a></p>
+        </footer>
+    </div>
+</body>
+</html>

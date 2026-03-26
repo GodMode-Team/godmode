@@ -1,0 +1,25 @@
+{
+  "name": "create-godmode",
+  "version": "1.0.0",
+  "description": "Set up GodMode — your personal AI operating system — in one command",
+  "type": "module",
+  "bin": {
+    "create-godmode": "./index.mjs"
+  },
+  "files": [
+    "index.mjs",
+    "lib/"
+  ],
+  "keywords": [
+    "godmode",
+    "ai",
+    "agent",
+    "openclaw",
+    "personal-ai"
+  ],
+  "license": "FSL-1.1-MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/GodMode-Team/godmode-plugin"
+  }
+}

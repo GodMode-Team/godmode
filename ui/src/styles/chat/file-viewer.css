@@ -1,0 +1,402 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   File Viewer — Universal content renderer for sidebar
+   Inspired by: Claude Artifacts, ChatGPT Canvas, Manus AI
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Image viewer ─────────────────────────────────────────────────────────── */
+
+.fv-image-wrap {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 8px;
+  min-height: 200px;
+}
+
+.fv-image {
+  max-width: 100%;
+  max-height: 80vh;
+  border-radius: 8px;
+  border: 1px solid var(--border, #2a2d35);
+  background: var(--panel-elevated, rgba(255, 255, 255, 0.03));
+  cursor: zoom-in;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.fv-image:hover {
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+}
+
+.fv-image--broken {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.fv-image--broken::after {
+  content: "Image failed to load";
+  display: block;
+  text-align: center;
+  color: var(--muted, #6b7280);
+  font-size: 12px;
+  margin-top: 8px;
+}
+
+/* ── Video viewer ─────────────────────────────────────────────────────────── */
+
+.fv-video-wrap {
+  display: flex;
+  justify-content: center;
+  padding: 8px;
+  background: #000;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.fv-video {
+  max-width: 100%;
+  max-height: 70vh;
+  border-radius: 6px;
+}
+
+/* ── Audio player ─────────────────────────────────────────────────────────── */
+
+.fv-audio-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  padding: 32px 16px;
+  background: var(--bg-card, #16181d);
+  border-radius: 12px;
+  border: 1px solid var(--border, #2a2d35);
+}
+
+.fv-audio-icon {
+  color: var(--accent, #7c3aed);
+  opacity: 0.6;
+}
+
+.fv-audio-icon svg {
+  width: 48px;
+  height: 48px;
+}
+
+.fv-audio-name {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text, #e5e7eb);
+  text-align: center;
+  word-break: break-word;
+}
+
+.fv-audio {
+  width: 100%;
+  max-width: 400px;
+  height: 36px;
+  border-radius: 18px;
+}
+
+/* ── SVG viewer ───────────────────────────────────────────────────────────── */
+
+.fv-svg-wrap {
+  display: flex;
+  justify-content: center;
+  padding: 16px;
+  overflow: auto;
+}
+
+.fv-svg-wrap svg {
+  max-width: 100%;
+  max-height: 80vh;
+}
+
+/* ── HTML iframe ──────────────────────────────────────────────────────────── */
+
+.fv-html-frame {
+  width: 100%;
+  min-height: 500px;
+  height: 100%;
+  border: none;
+  border-radius: 6px;
+  background: #fff;
+}
+
+/* ── PDF iframe ───────────────────────────────────────────────────────────── */
+
+.fv-pdf-frame {
+  width: 100%;
+  min-height: 80vh;
+  height: 100%;
+  border: none;
+  border-radius: 6px;
+  background: #fff;
+}
+
+/* ── Markdown ─────────────────────────────────────────────────────────────── */
+
+.fv-markdown {
+  font-size: 14px;
+  line-height: 1.65;
+  color: var(--text, #e5e7eb);
+}
+
+.fv-markdown h1, .fv-markdown h2, .fv-markdown h3,
+.fv-markdown h4, .fv-markdown h5, .fv-markdown h6 {
+  color: var(--text-strong, #f3f4f6);
+  margin: 1.2em 0 0.6em;
+}
+
+.fv-markdown h1 { font-size: 1.5em; }
+.fv-markdown h2 { font-size: 1.3em; }
+.fv-markdown h3 { font-size: 1.15em; }
+
+.fv-markdown p { margin: 0.6em 0; }
+
+.fv-markdown a {
+  color: var(--accent, #7c3aed);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  transition: opacity 0.15s;
+}
+
+.fv-markdown a:hover { opacity: 0.8; }
+
+.fv-markdown a[href^="file://"] {
+  color: var(--teal, #14b8a6);
+  text-decoration: underline dotted;
+}
+
+.fv-markdown a[href^="file://"]:hover {
+  text-decoration: underline solid;
+}
+
+.fv-markdown pre {
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid var(--border, #2a2d35);
+  border-radius: 8px;
+  padding: 14px 16px;
+  overflow-x: auto;
+  margin: 0.8em 0;
+}
+
+.fv-markdown code {
+  font-family: var(--mono, "JetBrains Mono", monospace);
+  font-size: 13px;
+}
+
+.fv-markdown :not(pre) > code {
+  background: rgba(0, 0, 0, 0.15);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 0.9em;
+}
+
+.fv-markdown blockquote {
+  border-left: 3px solid var(--accent, #7c3aed);
+  padding-left: 16px;
+  margin: 0.8em 0;
+  color: var(--muted, #9ca3af);
+}
+
+.fv-markdown img {
+  max-width: 100%;
+  border-radius: 8px;
+  margin: 0.6em 0;
+}
+
+.fv-markdown table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0.8em 0;
+  font-size: 13px;
+}
+
+.fv-markdown th, .fv-markdown td {
+  padding: 8px 12px;
+  border: 1px solid var(--border, #2a2d35);
+  text-align: left;
+}
+
+.fv-markdown th {
+  background: rgba(0, 0, 0, 0.15);
+  font-weight: 600;
+}
+
+/* ── CSV/TSV table ────────────────────────────────────────────────────────── */
+
+.fv-table-wrap {
+  overflow: auto;
+  max-height: 80vh;
+}
+
+.fv-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  font-family: var(--mono, "JetBrains Mono", monospace);
+}
+
+.fv-table th {
+  position: sticky;
+  top: 0;
+  background: var(--bg-card, #16181d);
+  font-weight: 600;
+  text-align: left;
+  padding: 8px 12px;
+  border-bottom: 2px solid var(--border, #2a2d35);
+  white-space: nowrap;
+  color: var(--text-strong, #f3f4f6);
+  z-index: 1;
+}
+
+.fv-table td {
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--border, #2a2d35);
+  white-space: nowrap;
+  max-width: 300px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--text, #e5e7eb);
+}
+
+.fv-table tr:hover td {
+  background: var(--bg-hover, #1e2028);
+}
+
+.fv-table-overflow {
+  padding: 8px 12px;
+  font-size: 11px;
+  color: var(--muted, #6b7280);
+  text-align: center;
+  border-top: 1px solid var(--border, #2a2d35);
+}
+
+/* ── Code viewer ──────────────────────────────────────────────────────────── */
+
+.fv-code-wrap {
+  position: relative;
+}
+
+.fv-code-lang {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--bg-card, #16181d);
+  padding: 6px 16px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--muted, #6b7280);
+  border-bottom: 1px solid var(--border, #2a2d35);
+}
+
+.fv-code {
+  margin: 0;
+  padding: 12px 0;
+  overflow-x: auto;
+  font-family: var(--mono, "JetBrains Mono", monospace);
+  font-size: 13px;
+  line-height: 1.5;
+  tab-size: 2;
+}
+
+.fv-line {
+  display: block;
+}
+
+.fv-line:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.fv-line-num {
+  display: inline-block;
+  width: 4ch;
+  min-width: 3ch;
+  padding: 0 12px 0 16px;
+  text-align: right;
+  color: var(--muted, #4b5563);
+  user-select: none;
+  font-variant-numeric: tabular-nums;
+}
+
+.fv-line-text {
+  white-space: pre;
+  color: var(--text, #e5e7eb);
+}
+
+/* ── Empty / Error / Fallback ─────────────────────────────────────────────── */
+
+.fv-empty, .fv-fallback {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 48px 24px;
+  color: var(--muted, #6b7280);
+  text-align: center;
+}
+
+.fv-fallback-icon {
+  color: var(--muted, #6b7280);
+  opacity: 0.4;
+}
+
+.fv-fallback-icon svg {
+  width: 48px;
+  height: 48px;
+}
+
+.fv-error {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 16px;
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  border-radius: 8px;
+  color: #fca5a5;
+}
+
+.fv-error-icon {
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+.fv-error-text {
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+/* sidebar-type-badge is defined in artifact-sidebar.css */
+
+.sidebar-type-badge svg {
+  width: 12px;
+  height: 12px;
+}
+
+/* Copy button in sidebar header */
+.sidebar-copy-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--border, #2a2d35);
+  background: var(--bg-card, #16181d);
+  color: var(--muted, #6b7280);
+  font-size: 11px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.sidebar-copy-btn:hover {
+  color: var(--text, #e5e7eb);
+  border-color: var(--text-secondary, #9ca3af);
+}
+
+.sidebar-copy-btn--copied {
+  color: #10b981;
+  border-color: #10b981;
+}

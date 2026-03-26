@@ -1,0 +1,520 @@
+/* ===========================================
+   Guardrails — Safety gate dashboard
+   =========================================== */
+
+.guardrails-section {
+  padding: 0 1.5rem 1rem;
+}
+
+/* Two-column page layout — matches onboarding-setup pattern */
+.guardrails-two-col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2rem;
+  align-items: start;
+}
+@media (max-width: 900px) {
+  .guardrails-two-col {
+    grid-template-columns: 1fr;
+  }
+}
+
+.guardrails-left {
+  min-width: 0;
+}
+
+.guardrails-right {
+  min-width: 0;
+}
+
+/* Column headings — matches onboarding-setup pattern */
+.guardrails-col-heading {
+  font-size: 1.25rem;
+  font-weight: 700;
+  margin: 0 0 0.25rem;
+  color: var(--text-strong, var(--text));
+}
+
+.guardrails-col-subtitle {
+  font-size: 0.85rem;
+  color: var(--text-muted, var(--muted));
+  margin: 0 0 1.25rem;
+}
+
+/* Summary bar */
+.guardrails-summary {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  padding: 0.875rem 1.25rem;
+  background: var(--bg-card, var(--bg-secondary));
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  margin-bottom: 1.25rem;
+}
+
+.guardrails-summary-count {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--text-strong, var(--text));
+  line-height: 1;
+}
+
+.guardrails-summary-label {
+  font-size: 0.875rem;
+  color: var(--text-muted, var(--muted));
+  font-weight: 500;
+}
+
+/* Gate cards grid */
+.guardrails-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 1.25rem;
+}
+
+.guardrails-card {
+  padding: 16px 20px;
+  transition: opacity 0.2s ease;
+}
+
+.guardrails-card--disabled {
+  opacity: 0.55;
+}
+
+.guardrails-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.guardrails-card-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.guardrails-card-icon {
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+.guardrails-card-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-strong, var(--text));
+  letter-spacing: -0.02em;
+}
+
+.guardrails-card-hook {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-muted, var(--muted));
+  background: var(--bg-hover, rgba(255, 255, 255, 0.06));
+  padding: 2px 8px;
+  border-radius: 4px;
+  white-space: nowrap;
+  font-family: var(--font-mono, monospace);
+}
+
+.guardrails-card-description {
+  color: var(--muted, var(--text-muted));
+  font-size: 13px;
+  line-height: 1.5;
+  margin-top: 8px;
+}
+
+/* Threshold inputs */
+.guardrails-thresholds {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border-light, var(--border));
+}
+
+.guardrails-threshold {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.guardrails-threshold-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-muted, var(--muted));
+  white-space: nowrap;
+}
+
+.guardrails-threshold-input {
+  width: 72px;
+  padding: 4px 8px;
+  font-size: 13px;
+  font-family: var(--font-mono, monospace);
+  background: var(--bg-hover, rgba(255, 255, 255, 0.06));
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.guardrails-threshold-input:focus {
+  border-color: var(--accent);
+}
+
+.guardrails-threshold-input:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Activity history */
+.guardrails-history {
+  background: var(--bg-card, var(--bg-secondary));
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 1rem;
+}
+
+.guardrails-history-title {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  margin: 0 0 0.75rem;
+  color: var(--text-muted, var(--muted));
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.guardrails-history-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.guardrails-activity-row {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  grid-template-rows: auto auto;
+  gap: 0 0.5rem;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--border-light, var(--border));
+  font-size: 0.75rem;
+}
+
+.guardrails-activity-row:last-child {
+  border-bottom: none;
+}
+
+.guardrails-badge {
+  font-size: 0.625rem;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 3px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  grid-row: 1;
+  grid-column: 1;
+  align-self: center;
+}
+
+.guardrails-badge--fired {
+  color: #eab308;
+  background: rgba(234, 179, 8, 0.12);
+}
+
+.guardrails-badge--blocked {
+  color: var(--danger, #ef4444);
+  background: rgba(239, 68, 68, 0.12);
+}
+
+.guardrails-badge--cleaned {
+  color: #22c55e;
+  background: rgba(34, 197, 94, 0.12);
+}
+
+.guardrails-activity-gate {
+  font-weight: 600;
+  font-family: var(--font-mono, monospace);
+  font-size: 0.6875rem;
+  color: var(--text);
+  grid-row: 1;
+  grid-column: 2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  align-self: center;
+}
+
+.guardrails-activity-detail {
+  color: var(--text-muted, var(--muted));
+  font-size: 0.6875rem;
+  grid-row: 2;
+  grid-column: 1 / -1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.guardrails-activity-time {
+  color: var(--text-muted, var(--muted));
+  font-size: 0.6875rem;
+  white-space: nowrap;
+  opacity: 0.7;
+  grid-row: 1;
+  grid-column: 3;
+  align-self: center;
+}
+
+/* Empty / loading states */
+.guardrails-empty,
+.guardrails-loading {
+  text-align: center;
+  color: var(--muted, var(--text-muted));
+  font-size: 14px;
+  padding: 40px 16px;
+}
+
+.guardrails-no-activity {
+  text-align: center;
+  color: var(--text-muted, var(--muted));
+  font-size: 13px;
+  padding: 1.5rem 1rem;
+  font-style: italic;
+}
+
+/* ── Custom Rules Section ── */
+
+.guardrails-summary-sep {
+  color: var(--text-muted, var(--muted));
+  font-size: 1.25rem;
+  margin: 0 0.25rem;
+  opacity: 0.5;
+}
+
+.guardrails-summary-count--custom {
+  font-size: 1.25rem;
+}
+
+/* (guardrails-bottom-row removed — replaced by guardrails-two-col) */
+
+.guardrails-custom-section {
+  margin-top: 0;
+  margin-bottom: 1.25rem;
+}
+
+.guardrails-custom-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.75rem;
+}
+
+.guardrails-custom-title {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  margin: 0;
+  color: var(--text);
+}
+
+.guardrails-add-btn {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent);
+  background: transparent;
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  padding: 4px 12px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.guardrails-add-btn:hover {
+  background: var(--accent);
+  color: var(--bg, #000);
+}
+
+.guardrails-custom-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.guardrails-custom-card {
+  padding: 14px 18px;
+}
+
+.guardrails-custom-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.guardrails-delete-btn {
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-muted, var(--muted));
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  opacity: 0.5;
+  transition: opacity 0.15s, color 0.15s;
+}
+
+.guardrails-delete-btn:hover {
+  opacity: 1;
+  color: var(--danger, #ef4444);
+}
+
+.guardrails-action-tag {
+  font-size: 10px !important;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.guardrails-action-tag--block {
+  color: var(--danger, #ef4444);
+  background: rgba(239, 68, 68, 0.12);
+}
+
+.guardrails-action-tag--redirect {
+  color: #3b82f6;
+  background: rgba(59, 130, 246, 0.12);
+}
+
+.guardrails-custom-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.guardrails-custom-tool {
+  font-size: 11px;
+  font-weight: 600;
+  font-family: var(--font-mono, monospace);
+  color: var(--accent);
+  background: rgba(99, 102, 241, 0.1);
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+.guardrails-pattern-tag {
+  font-size: 11px;
+  font-family: var(--font-mono, monospace);
+  color: var(--text-muted, var(--muted));
+  background: var(--bg-hover, rgba(255, 255, 255, 0.06));
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+.guardrails-custom-empty {
+  text-align: center;
+  color: var(--text-muted, var(--muted));
+  font-size: 13px;
+  padding: 1.25rem 1rem;
+  font-style: italic;
+}
+
+/* ── Add Rule Form ── */
+
+.guardrails-add-form {
+  padding: 16px 20px;
+  margin-bottom: 12px;
+}
+
+.guardrails-add-form-title {
+  font-size: 14px;
+  font-weight: 600;
+  margin: 0 0 12px;
+  color: var(--text);
+}
+
+.guardrails-add-form-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.guardrails-add-form-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.guardrails-add-form-row label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-muted, var(--muted));
+}
+
+.guardrails-add-input {
+  padding: 6px 10px;
+  font-size: 13px;
+  background: var(--bg-hover, rgba(255, 255, 255, 0.06));
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  outline: none;
+  font-family: inherit;
+  transition: border-color 0.15s;
+}
+
+.guardrails-add-input:focus {
+  border-color: var(--accent);
+}
+
+.guardrails-add-textarea {
+  resize: vertical;
+  min-height: 40px;
+}
+
+.guardrails-add-form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.guardrails-add-cancel {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-muted, var(--muted));
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 14px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.guardrails-add-cancel:hover {
+  background: var(--bg-hover, rgba(255, 255, 255, 0.06));
+}
+
+.guardrails-add-submit {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--bg, #000);
+  background: var(--accent);
+  border: none;
+  border-radius: 6px;
+  padding: 6px 16px;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.guardrails-add-submit:hover {
+  opacity: 0.85;
+}

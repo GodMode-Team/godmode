@@ -1,0 +1,736 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Account - GodMode</title>
+<meta name="description" content="Manage your GodMode account and subscription.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><defs><linearGradient id='b' x1='0' y1='0' x2='0' y2='1'><stop offset='0%25' stop-color='%23FFD700'/><stop offset='100%25' stop-color='%23FF8C00'/></linearGradient></defs><path d='M58 2 L22 54 L42 54 L36 98 L78 42 L56 42 Z' fill='url(%23b)'/></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  font-family: 'Space Grotesk', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: #fafafa;
+  color: #3f3f46;
+  min-height: 100vh;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+a { color: #dc2626; text-decoration: none; transition: color 200ms ease; }
+a:hover { color: #ef4444; }
+
+::selection { background: rgba(220, 38, 38, 0.12); color: #18181b; }
+
+/* Nav */
+.nav {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid #e4e4e7;
+  padding: 0 24px;
+}
+
+.nav-inner {
+  max-width: 800px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 56px;
+}
+
+.nav-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 700;
+  font-size: 17px;
+  color: #18181b;
+  text-decoration: none;
+}
+
+.nav-brand:hover { color: #18181b; text-decoration: none; }
+.nav-brand svg { width: 26px; height: 26px; }
+
+.nav-links {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  list-style: none;
+}
+
+.nav-links a {
+  color: #71717a;
+  font-size: 14px;
+  font-weight: 500;
+  transition: color 200ms ease;
+}
+
+.nav-links a:hover { color: #18181b; text-decoration: none; }
+
+/* Page layout */
+.page {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 0 24px;
+}
+
+/* Header */
+.page-header {
+  padding: 48px 0 32px;
+}
+
+.page-header h1 {
+  font-size: 28px;
+  font-weight: 700;
+  color: #18181b;
+  letter-spacing: -0.02em;
+  margin-bottom: 4px;
+}
+
+.page-header .subtitle {
+  font-size: 15px;
+  color: #71717a;
+}
+
+/* Card */
+.card {
+  background: #ffffff;
+  border: 1px solid #e4e4e7;
+  border-radius: 12px;
+  padding: 24px;
+  margin-bottom: 20px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.card-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #18181b;
+}
+
+/* Status badges */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: 9999px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.badge-active {
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  color: #166534;
+}
+
+.badge-cancelled {
+  background: #fafafa;
+  border: 1px solid #e4e4e7;
+  color: #71717a;
+}
+
+.badge-past-due {
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  color: #92400e;
+}
+
+.badge-none {
+  background: #fafafa;
+  border: 1px solid #e4e4e7;
+  color: #a1a1aa;
+}
+
+/* Subscription details */
+.sub-details {
+  margin-bottom: 20px;
+}
+
+.sub-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 0;
+  border-bottom: 1px solid #f4f4f5;
+  font-size: 14px;
+}
+
+.sub-row:last-child { border-bottom: none; }
+
+.sub-label {
+  color: #71717a;
+}
+
+.sub-value {
+  color: #18181b;
+  font-weight: 500;
+}
+
+/* No subscription */
+.no-sub {
+  text-align: center;
+  padding: 20px 0;
+}
+
+.no-sub p {
+  font-size: 15px;
+  color: #71717a;
+  margin-bottom: 16px;
+}
+
+/* Warning */
+.warning-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 16px;
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  border-radius: 8px;
+  margin-bottom: 16px;
+  font-size: 14px;
+  color: #92400e;
+}
+
+.warning-banner svg {
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  margin-top: 1px;
+}
+
+/* Account info */
+.info-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 0;
+  border-bottom: 1px solid #f4f4f5;
+  font-size: 14px;
+}
+
+.info-row:last-child { border-bottom: none; }
+
+.info-label {
+  color: #71717a;
+  font-size: 13px;
+}
+
+.info-value {
+  color: #18181b;
+  font-weight: 500;
+}
+
+/* Buttons */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 20px;
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  transition: all 200ms ease;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.btn-primary {
+  background: #dc2626;
+  color: #ffffff;
+  box-shadow: 0 0 20px rgba(220, 38, 38, 0.2);
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: #ef4444;
+  color: #ffffff;
+  box-shadow: 0 0 24px rgba(220, 38, 38, 0.3);
+  transform: translateY(-1px);
+  text-decoration: none;
+}
+
+.btn-ghost {
+  background: #ffffff;
+  color: #3f3f46;
+  border: 1px solid #e4e4e7;
+}
+
+.btn-ghost:hover:not(:disabled) {
+  background: #fafafa;
+  border-color: #d4d4d8;
+  text-decoration: none;
+}
+
+.btn-danger-ghost {
+  background: #ffffff;
+  color: #dc2626;
+  border: 1px solid #fecaca;
+}
+
+.btn-danger-ghost:hover:not(:disabled) {
+  background: #fef2f2;
+  border-color: #dc2626;
+  text-decoration: none;
+}
+
+.btn-full {
+  width: 100%;
+}
+
+/* Loading state */
+.loading-screen {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 60vh;
+  gap: 16px;
+}
+
+.loading-screen p {
+  font-size: 15px;
+  color: #71717a;
+}
+
+.spinner {
+  display: inline-block;
+  width: 24px;
+  height: 24px;
+  border: 3px solid #e4e4e7;
+  border-top-color: #dc2626;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
+.spinner-sm {
+  width: 14px;
+  height: 14px;
+  border-width: 2px;
+  border-color: rgba(255, 255, 255, 0.3);
+  border-top-color: #ffffff;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Error message */
+.message {
+  padding: 12px 16px;
+  border-radius: 8px;
+  font-size: 14px;
+  margin-bottom: 16px;
+  display: none;
+}
+
+.message-error {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #991b1b;
+}
+
+.message.show { display: block; }
+
+/* Actions area */
+.actions-area {
+  padding: 16px 0 64px;
+}
+
+/* Footer */
+.page-footer {
+  border-top: 1px solid #e4e4e7;
+  padding: 24px 0;
+  text-align: center;
+  font-size: 13px;
+  color: #a1a1aa;
+}
+
+.page-footer a { color: #71717a; }
+.page-footer a:hover { color: #dc2626; }
+
+/* Hidden */
+.hidden { display: none !important; }
+
+/* Responsive */
+@media (max-width: 640px) {
+  .nav-links { display: none; }
+  .card { padding: 20px; }
+  .page-header h1 { font-size: 24px; }
+  .card-header { flex-direction: column; align-items: flex-start; gap: 8px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spinner { animation-duration: 1.4s; }
+  .btn { transition: none; }
+}
+</style>
+</head>
+<body>
+
+<!-- Nav -->
+<nav class="nav">
+  <div class="nav-inner">
+    <a href="/" class="nav-brand">
+      <svg viewBox="0 0 100 100"><defs><linearGradient id="bolt" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#FFD700"/><stop offset="100%" stop-color="#FF8C00"/></linearGradient></defs><path d="M58 2 L22 54 L42 54 L36 98 L78 42 L56 42 Z" fill="url(#bolt)"/></svg>
+      GodMode
+    </a>
+    <ul class="nav-links">
+      <li><a href="/">Home</a></li>
+      <li><a href="/pricing">Pricing</a></li>
+      <li><a href="/support">Support</a></li>
+    </ul>
+  </div>
+</nav>
+
+<!-- Loading -->
+<div class="page" id="loadingScreen">
+  <div class="loading-screen">
+    <div class="spinner"></div>
+    <p>Loading your account...</p>
+  </div>
+</div>
+
+<!-- Account Content (hidden until loaded) -->
+<div class="page hidden" id="accountContent">
+
+  <div class="page-header">
+    <h1>Your Account</h1>
+    <div class="subtitle" id="userEmailDisplay"></div>
+  </div>
+
+  <!-- Subscription Card -->
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">Subscription</span>
+      <span class="badge badge-none" id="subBadge">--</span>
+    </div>
+
+    <!-- Active/has subscription -->
+    <div id="subActive" class="hidden">
+      <div class="sub-details">
+        <div class="sub-row">
+          <span class="sub-label">Plan</span>
+          <span class="sub-value" id="subPlan">GodMode</span>
+        </div>
+        <div class="sub-row">
+          <span class="sub-label">Next billing date</span>
+          <span class="sub-value" id="subNextBilling">--</span>
+        </div>
+        <div class="sub-row">
+          <span class="sub-label">Amount</span>
+          <span class="sub-value" id="subAmount">--</span>
+        </div>
+      </div>
+      <button class="btn btn-ghost btn-full" id="manageBtn" onclick="handleManage()">
+        <span id="manageBtnText">Manage Subscription</span>
+      </button>
+    </div>
+
+    <!-- Past due warning -->
+    <div id="subPastDue" class="hidden">
+      <div class="warning-banner">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"></path>
+          <line x1="12" y1="9" x2="12" y2="13"></line>
+          <line x1="12" y1="17" x2="12.01" y2="17"></line>
+        </svg>
+        <div>
+          <strong>Payment past due.</strong> Please update your payment method to keep your subscription active.
+        </div>
+      </div>
+      <button class="btn btn-primary btn-full" id="updatePaymentBtn" onclick="handleManage()">
+        <span id="updatePaymentBtnText">Update Payment Method</span>
+      </button>
+    </div>
+
+    <!-- Cancelled -->
+    <div id="subCancelled" class="hidden">
+      <div class="sub-details">
+        <div class="sub-row">
+          <span class="sub-label">Status</span>
+          <span class="sub-value">Cancelled</span>
+        </div>
+        <div class="sub-row hidden" id="subCancelledAccessRow">
+          <span class="sub-label">Access until</span>
+          <span class="sub-value" id="subAccessUntil">--</span>
+        </div>
+      </div>
+      <a href="/pricing" class="btn btn-primary btn-full">Re-subscribe</a>
+    </div>
+
+    <!-- No subscription -->
+    <div id="subNone" class="hidden">
+      <div class="no-sub">
+        <p>You don't have an active subscription yet.</p>
+        <a href="/pricing" class="btn btn-primary">Subscribe Now</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Account Info Card -->
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">Account Info</span>
+    </div>
+    <div class="info-row">
+      <span class="info-label">Email</span>
+      <span class="info-value" id="infoEmail">--</span>
+    </div>
+    <div class="info-row">
+      <span class="info-label">Name</span>
+      <span class="info-value" id="infoName">--</span>
+    </div>
+    <div class="info-row">
+      <span class="info-label">Member since</span>
+      <span class="info-value" id="infoCreated">--</span>
+    </div>
+  </div>
+
+  <!-- Actions -->
+  <div class="actions-area">
+    <button class="btn btn-danger-ghost btn-full" onclick="handleLogout()">
+      Log Out
+    </button>
+  </div>
+</div>
+
+<!-- Footer -->
+<footer class="page-footer">
+  <div style="max-width: 640px; margin: 0 auto; padding: 0 24px;">
+    <a href="/">Home</a> &middot; <a href="/pricing">Pricing</a> &middot; <a href="/support">Support</a> &middot; <a href="/terms.html">Terms</a> &middot; <a href="/privacy.html">Privacy</a>
+  </div>
+</footer>
+
+<script>
+// ---- Auth helpers ----
+
+function getAuth() {
+  return {
+    accessToken: localStorage.getItem('godmode_access_token'),
+    refreshToken: localStorage.getItem('godmode_refresh_token')
+  };
+}
+
+async function authFetch(url, options) {
+  options = options || {};
+  var auth = getAuth();
+
+  if (!auth.accessToken) {
+    window.location.href = '/login';
+    return null;
+  }
+
+  options.headers = Object.assign({}, options.headers || {}, {
+    'Authorization': 'Bearer ' + auth.accessToken
+  });
+
+  var res = await fetch(url, options);
+
+  if (res.status === 401 && auth.refreshToken) {
+    // Try refresh
+    try {
+      var refreshRes = await fetch('/api/auth/refresh', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refresh_token: auth.refreshToken })
+      });
+
+      if (refreshRes.ok) {
+        var data = await refreshRes.json();
+        localStorage.setItem('godmode_access_token', data.access_token);
+        if (data.refresh_token) {
+          localStorage.setItem('godmode_refresh_token', data.refresh_token);
+        }
+        options.headers['Authorization'] = 'Bearer ' + data.access_token;
+        res = await fetch(url, options);
+      } else {
+        localStorage.removeItem('godmode_access_token');
+        localStorage.removeItem('godmode_refresh_token');
+        window.location.href = '/login';
+        return null;
+      }
+    } catch (e) {
+      localStorage.removeItem('godmode_access_token');
+      localStorage.removeItem('godmode_refresh_token');
+      window.location.href = '/login';
+      return null;
+    }
+  }
+
+  return res;
+}
+
+// ---- Page init ----
+
+(async function init() {
+  var auth = getAuth();
+
+  if (!auth.accessToken) {
+    window.location.href = '/login';
+    return;
+  }
+
+  try {
+    var res = await authFetch('/api/auth/me');
+    if (!res) return; // redirect already happened
+
+    if (!res.ok) {
+      window.location.href = '/login';
+      return;
+    }
+
+    var user = await res.json();
+    renderAccount(user);
+  } catch (err) {
+    window.location.href = '/login';
+  }
+})();
+
+function renderAccount(user) {
+  // Set user info
+  document.getElementById('userEmailDisplay').textContent = user.email || '';
+  document.getElementById('infoEmail').textContent = user.email || '--';
+  document.getElementById('infoName').textContent = user.name || '--';
+
+  if (user.created_at) {
+    var d = new Date(user.created_at);
+    document.getElementById('infoCreated').textContent = d.toLocaleDateString('en-US', {
+      year: 'numeric', month: 'long', day: 'numeric'
+    });
+  }
+
+  // Handle subscription state
+  var sub = user.subscription;
+  var badge = document.getElementById('subBadge');
+
+  if (!sub || sub.status === 'none' || !sub.status) {
+    // No subscription
+    badge.textContent = 'No Plan';
+    badge.className = 'badge badge-none';
+    document.getElementById('subNone').classList.remove('hidden');
+  } else if (sub.status === 'active' || sub.status === 'trialing') {
+    badge.textContent = sub.status === 'trialing' ? 'Trial' : 'Active';
+    badge.className = 'badge badge-active';
+    document.getElementById('subActive').classList.remove('hidden');
+
+    document.getElementById('subPlan').textContent = sub.plan_name || 'GodMode';
+
+    if (sub.current_period_end) {
+      var nextDate = new Date(sub.current_period_end);
+      document.getElementById('subNextBilling').textContent = nextDate.toLocaleDateString('en-US', {
+        year: 'numeric', month: 'long', day: 'numeric'
+      });
+    }
+
+    if (sub.amount) {
+      document.getElementById('subAmount').textContent = '$' + (sub.amount / 100).toFixed(0) + '/mo';
+    } else {
+      document.getElementById('subAmount').textContent = '$297/mo';
+    }
+  } else if (sub.status === 'past_due') {
+    badge.textContent = 'Past Due';
+    badge.className = 'badge badge-past-due';
+    document.getElementById('subActive').classList.remove('hidden');
+    document.getElementById('subPastDue').classList.remove('hidden');
+
+    document.getElementById('subPlan').textContent = sub.plan_name || 'GodMode';
+
+    if (sub.current_period_end) {
+      var nextDate = new Date(sub.current_period_end);
+      document.getElementById('subNextBilling').textContent = nextDate.toLocaleDateString('en-US', {
+        year: 'numeric', month: 'long', day: 'numeric'
+      });
+    }
+  } else if (sub.status === 'canceled' || sub.status === 'cancelled') {
+    badge.textContent = 'Cancelled';
+    badge.className = 'badge badge-cancelled';
+    document.getElementById('subCancelled').classList.remove('hidden');
+
+    if (sub.current_period_end) {
+      var endDate = new Date(sub.current_period_end);
+      document.getElementById('subAccessUntil').textContent = endDate.toLocaleDateString('en-US', {
+        year: 'numeric', month: 'long', day: 'numeric'
+      });
+      document.getElementById('subCancelledAccessRow').classList.remove('hidden');
+    }
+  }
+
+  // Show content, hide loading
+  document.getElementById('loadingScreen').classList.add('hidden');
+  document.getElementById('accountContent').classList.remove('hidden');
+}
+
+// ---- Actions ----
+
+async function handleManage() {
+  var btn = document.getElementById('manageBtn') || document.getElementById('updatePaymentBtn');
+  var textEl = document.getElementById('manageBtnText') || document.getElementById('updatePaymentBtnText');
+  var originalText = textEl.textContent;
+
+  btn.disabled = true;
+  textEl.innerHTML = '<span class="spinner spinner-sm"></span> Loading...';
+
+  try {
+    var res = await authFetch('/api/payments/portal', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' }
+    });
+
+    if (!res) return;
+
+    var data = await res.json();
+
+    if (!res.ok) {
+      throw new Error(data.message || data.error || 'Could not open billing portal.');
+    }
+
+    if (data.url) {
+      window.location.href = data.url;
+    } else {
+      throw new Error('No portal URL returned.');
+    }
+  } catch (err) {
+    alert(err.message || 'Something went wrong.');
+    btn.disabled = false;
+    textEl.textContent = originalText;
+  }
+}
+
+function handleLogout() {
+  localStorage.removeItem('godmode_access_token');
+  localStorage.removeItem('godmode_refresh_token');
+  window.location.href = '/';
+}
+</script>
+
+</body>
+</html>

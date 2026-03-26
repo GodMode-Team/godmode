@@ -1,0 +1,413 @@
+/* ===========================================
+   Setup Tab - 80/20 fast onboarding
+   =========================================== */
+
+.setup-section {
+  max-width: 640px;
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+  padding-bottom: 48px;
+}
+
+/* ── Quick Start Form ─────────────────────── */
+
+.setup-quick {
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  padding: 32px;
+  background: var(--bg-card, var(--bg));
+}
+
+.setup-quick__header {
+  text-align: center;
+  margin-bottom: 28px;
+}
+
+.setup-quick__icon {
+  font-size: 36px;
+  display: block;
+  margin-bottom: 12px;
+}
+
+.setup-quick__title {
+  font-size: 22px;
+  font-weight: 700;
+  margin: 0 0 6px;
+  color: var(--text);
+}
+
+.setup-quick__subtitle {
+  font-size: 14px;
+  color: var(--text-dim);
+  margin: 0;
+}
+
+.setup-quick__form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.setup-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.setup-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.setup-label-optional {
+  font-weight: 400;
+  color: var(--text-dim);
+  margin-left: 4px;
+}
+
+.setup-input,
+.setup-textarea {
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  font-size: 14px;
+  font-family: inherit;
+  transition: border-color 0.15s;
+}
+
+.setup-input:focus,
+.setup-textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-subtle);
+}
+
+.setup-input::placeholder,
+.setup-textarea::placeholder {
+  color: var(--text-dim);
+  opacity: 0.6;
+}
+
+.setup-textarea {
+  resize: vertical;
+  min-height: 48px;
+}
+
+.setup-hint {
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+/* ── Intel Chips ──────────────────────────── */
+
+.setup-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.setup-chip {
+  padding: 4px 10px;
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text-dim);
+  font-size: 12px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.setup-chip:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-subtle);
+}
+
+/* ── Submit Button ────────────────────────── */
+
+.setup-submit {
+  padding: 12px 24px;
+  border-radius: 8px;
+  border: none;
+  background: var(--accent);
+  color: var(--accent-foreground);
+  font-size: 15px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.15s;
+  margin-top: 4px;
+}
+
+.setup-submit:hover {
+  background: var(--accent-hover);
+}
+
+.setup-submit:active {
+  transform: scale(0.98);
+}
+
+/* ── Checklist ────────────────────────────── */
+
+.setup-checklist {
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  padding: 24px;
+  background: var(--bg-card, var(--bg));
+}
+
+.setup-checklist__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.setup-checklist__title {
+  font-size: 16px;
+  font-weight: 700;
+  margin: 0;
+  color: var(--text);
+}
+
+.setup-checklist__pct {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+/* ── Progress Bar ─────────────────────────── */
+
+.setup-progress {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--border);
+  margin-bottom: 20px;
+  overflow: hidden;
+}
+
+.setup-progress__bar {
+  height: 100%;
+  border-radius: 3px;
+  background: var(--accent);
+  transition: width 0.4s ease;
+  min-width: 0;
+}
+
+/* ── Milestones ───────────────────────────── */
+
+.setup-milestones {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.setup-milestone {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.setup-milestone--done {
+  opacity: 0.7;
+}
+
+.setup-milestone__header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+}
+
+.setup-milestone__header::-webkit-details-marker {
+  display: none;
+}
+
+.setup-milestone__emoji {
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+.setup-milestone__info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.setup-milestone__title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.setup-milestone__meta {
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.setup-milestone__status {
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.setup-milestone__body {
+  padding: 0 16px 16px;
+}
+
+.setup-milestone__desc {
+  font-size: 13px;
+  color: var(--text-dim);
+  margin: 0 0 12px;
+}
+
+/* ── Steps ────────────────────────────────── */
+
+.setup-steps {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.setup-step {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text);
+  padding: 4px 0;
+}
+
+.setup-step--done {
+  color: var(--text-dim);
+  text-decoration: line-through;
+}
+
+.setup-step__check {
+  flex-shrink: 0;
+  width: 16px;
+  text-align: center;
+  font-size: 12px;
+}
+
+.setup-step__label {
+  flex: 1;
+}
+
+.setup-step__detail {
+  font-size: 11px;
+  color: var(--text-dim);
+  margin-left: auto;
+}
+
+/* ── Actions ──────────────────────────────── */
+
+.setup-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.setup-action-btn {
+  padding: 8px 16px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.setup-action-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.setup-action-btn--text {
+  border: none;
+  background: transparent;
+  color: var(--text-dim);
+  padding: 8px 8px;
+}
+
+.setup-action-btn--text:hover {
+  color: var(--text);
+  border: none;
+}
+
+/* ── Loading ──────────────────────────────── */
+
+.setup-loading {
+  text-align: center;
+  padding: 48px 24px;
+  color: var(--text-dim);
+  font-size: 14px;
+}
+
+/* ── Help Banner ─────────────────────────── */
+
+.setup-help-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+  border-radius: 8px;
+  border: 1px dashed var(--border);
+  background: var(--bg);
+  margin-top: 16px;
+}
+
+.setup-help-banner__text {
+  font-size: 13px;
+  color: var(--text-dim);
+}
+
+.setup-help-banner__btn {
+  padding: 6px 14px;
+  border-radius: 6px;
+  border: 1px solid var(--accent);
+  background: transparent;
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s;
+}
+
+.setup-help-banner__btn:hover {
+  background: var(--accent);
+  color: var(--accent-foreground);
+}
+
+/* ── Nav Badge ────────────────────────────── */
+
+.nav-item__badge {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--accent);
+  margin-left: auto;
+  padding: 1px 6px;
+  border-radius: 8px;
+  background: var(--accent-subtle);
+}

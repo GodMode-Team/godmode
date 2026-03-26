@@ -1,0 +1,94 @@
+/* ===========================================
+   Settings Tab — Sub-tab Navigation
+   =========================================== */
+
+.settings-tab {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+.settings-tab__memory-notice {
+  padding: 6px 12px;
+  font-size: 12px;
+  color: var(--warning-text, #c9a227);
+  background: var(--warning-bg, rgba(201, 162, 39, 0.08));
+  border-bottom: 1px solid var(--warning-border, rgba(201, 162, 39, 0.2));
+  flex-shrink: 0;
+}
+
+.settings-tab__nav {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--border);
+  overflow-x: auto;
+  flex-shrink: 0;
+  scrollbar-width: thin;
+  -webkit-overflow-scrolling: touch;
+}
+
+.settings-tab__nav::-webkit-scrollbar {
+  height: 3px;
+}
+
+.settings-tab__nav::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 2px;
+}
+
+.settings-tab__group-label {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  padding: 4px 8px 4px 12px;
+  white-space: nowrap;
+  user-select: none;
+}
+
+.settings-tab__group-label:first-child {
+  padding-left: 4px;
+}
+
+.settings-tab__nav-btn {
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 500;
+  padding: 6px 12px;
+  border-radius: var(--radius-sm, 6px);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+
+.settings-tab__nav-btn:hover {
+  color: var(--text);
+  background: var(--surface-hover, rgba(255, 255, 255, 0.06));
+}
+
+.settings-tab__nav-btn.active {
+  color: var(--text-strong, var(--text));
+  background: var(--surface-active, rgba(255, 255, 255, 0.1));
+  font-weight: 600;
+}
+
+.settings-tab__content {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+/* Make gm-settings participate in flex layout like gm-chat */
+.content > gm-settings {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}

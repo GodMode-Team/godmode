@@ -1,0 +1,1084 @@
+/* ===========================================
+   Mission Control — Agent command center
+   =========================================== */
+
+.mc-section {
+  padding: 0;
+}
+
+/* ── Header Row ── */
+
+.mc-header-row {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 12px;
+}
+
+.mc-full-control-toggle {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted, var(--muted));
+  background: var(--bg-hover, rgba(255, 255, 255, 0.06));
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 4px 14px;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+  white-space: nowrap;
+}
+
+.mc-full-control-toggle:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+/* ── Status Line (simplified mode) ── */
+
+.mc-status-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-muted, var(--muted));
+  margin-bottom: 1.25rem;
+  padding: 10px 0;
+}
+
+/* ── Two-Column Layout ── */
+
+.mc-two-col {
+  display: flex;
+  gap: 24px;
+  align-items: flex-start;
+}
+
+.mc-col-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.mc-col-side {
+  width: 380px;
+  flex-shrink: 0;
+  position: sticky;
+  top: 12px;
+}
+
+@media (max-width: 800px) {
+  .mc-two-col {
+    flex-direction: column;
+  }
+  .mc-col-side {
+    width: 100%;
+    position: static;
+  }
+}
+
+/* ── Stats Banner ── */
+
+.mc-stats-banner {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 1.25rem;
+}
+
+.mc-stat-card {
+  flex: 1;
+  padding: 14px 12px;
+  background: var(--bg-card, var(--bg-secondary));
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  text-align: center;
+}
+
+.mc-stat-value {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: var(--text-strong, var(--text));
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.mc-stat-label {
+  font-size: 0.6875rem;
+  color: var(--text-muted, var(--muted));
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 600;
+  margin-top: 4px;
+}
+
+/* ── Active Dot (pulsing) ── */
+
+.mc-active-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #22c55e;
+  animation: mc-pulse 1.5s ease infinite;
+}
+
+@keyframes mc-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+
+/* ── Section Titles ── */
+
+.mc-section-title {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted, var(--muted));
+  margin: 0 0 10px;
+}
+
+/* ── Agent Cards ── */
+
+.mc-agents-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 1.5rem;
+}
+
+.mc-agent-card {
+  padding: 14px 18px;
+  background: var(--bg-card, var(--bg-secondary));
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  border-left: 3px solid var(--border);
+}
+
+.mc-agent-card--active {
+  border-left-color: #22c55e;
+}
+
+.mc-agent-card--queued {
+  border-left-color: #eab308;
+}
+
+.mc-agent-card--done {
+  border-left-color: var(--text-muted, var(--muted));
+  opacity: 0.75;
+}
+
+.mc-agent-card--failed {
+  border-left-color: var(--danger, #ef4444);
+}
+
+.mc-agent-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.mc-agent-card-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  flex: 1;
+}
+
+.mc-agent-card-task {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-strong, var(--text));
+  letter-spacing: -0.01em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mc-agent-card-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--text-muted, var(--muted));
+}
+
+.mc-agent-card-duration {
+  font-family: var(--font-mono, monospace);
+  font-size: 12px;
+}
+
+.mc-agent-card-model {
+  font-family: var(--font-mono, monospace);
+  font-size: 11px;
+  background: var(--bg-hover, rgba(255, 255, 255, 0.06));
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+
+/* ── Attention Section (simplified mode) ── */
+
+.mc-attention-section {
+  margin-bottom: 1.5rem;
+}
+
+.mc-attention-empty {
+  text-align: center;
+  color: var(--text-muted, var(--muted));
+  font-size: 13px;
+  padding: 20px 16px;
+  opacity: 0.8;
+}
+
+.mc-attention-card {
+  padding: 12px 16px;
+  background: var(--bg-card, var(--bg-secondary));
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  border-left: 3px solid var(--border);
+}
+
+/* ── Queue Depth Hint (simplified mode) ── */
+
+.mc-queue-depth-text {
+  font-size: 12px;
+  color: var(--text-muted, var(--muted));
+  margin-bottom: 1rem;
+  opacity: 0.7;
+}
+
+/* ── Idle CTA (simplified mode) ── */
+
+.mc-idle-cta {
+  text-align: center;
+  padding: 24px 16px;
+  color: var(--text-muted, var(--muted));
+  font-size: 13px;
+}
+
+.mc-idle-cta p {
+  margin: 0 0 10px;
+}
+
+/* ── Compact Agent Card (simplified mode) ── */
+
+.mc-agent-card--compact {
+  cursor: pointer;
+  padding: 10px 14px;
+  transition: background 0.1s;
+}
+
+.mc-agent-card--compact:hover {
+  background: var(--bg-hover, rgba(255, 255, 255, 0.04));
+}
+
+.mc-agent-card--compact .mc-agent-card-header {
+  gap: 10px;
+}
+
+/* ── Type Badges ── */
+
+.mc-type-badge {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.mc-type-badge--coding {
+  color: #3b82f6;
+  background: rgba(59, 130, 246, 0.12);
+}
+
+.mc-type-badge--subagent {
+  color: #a855f7;
+  background: rgba(168, 85, 247, 0.12);
+}
+
+.mc-type-badge--swarm {
+  color: #f59e0b;
+  background: rgba(245, 158, 11, 0.12);
+}
+
+/* ── Swarm Pipeline Visualization ── */
+
+.mc-pipeline {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 8px;
+}
+
+.mc-pipeline-stage {
+  padding: 3px 10px;
+  border-radius: 5px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+.mc-pipeline-stage--pending {
+  background: var(--bg-hover, rgba(255, 255, 255, 0.06));
+  color: var(--text-muted, var(--muted));
+}
+
+.mc-pipeline-stage--running {
+  background: rgba(59, 130, 246, 0.2);
+  color: #3b82f6;
+  animation: mc-pulse 1.5s ease infinite;
+}
+
+.mc-pipeline-stage--done {
+  background: rgba(34, 197, 94, 0.12);
+  color: #22c55e;
+}
+
+.mc-pipeline-stage--failed {
+  background: rgba(239, 68, 68, 0.12);
+  color: var(--danger, #ef4444);
+}
+
+.mc-pipeline-arrow {
+  color: var(--text-muted, var(--muted));
+  font-size: 12px;
+  opacity: 0.5;
+}
+
+/* ── Cancel Button ── */
+
+.mc-cancel-btn {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--danger, #ef4444);
+  background: transparent;
+  border: 1px solid var(--danger, #ef4444);
+  border-radius: 6px;
+  padding: 3px 10px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.mc-cancel-btn:hover {
+  background: var(--danger, #ef4444);
+  color: #fff;
+}
+
+/* ── Activity Feed ── */
+
+.mc-feed {
+  margin-bottom: 1.5rem;
+}
+
+.mc-feed-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.mc-feed-item {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--border-light, var(--border));
+  font-size: 13px;
+}
+
+.mc-feed-time {
+  font-size: 11px;
+  color: var(--text-muted, var(--muted));
+  white-space: nowrap;
+  min-width: 50px;
+  font-family: var(--font-mono, monospace);
+  opacity: 0.7;
+}
+
+.mc-feed-icon {
+  font-size: 13px;
+  flex-shrink: 0;
+  width: 18px;
+  text-align: center;
+}
+
+.mc-feed-text {
+  color: var(--text);
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mc-feed-link {
+  color: var(--accent);
+  text-decoration: none;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.mc-feed-link:hover {
+  text-decoration: underline;
+}
+
+.mc-show-more-btn {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--accent);
+  background: transparent;
+  border: none;
+  padding: 8px 0;
+  cursor: pointer;
+}
+
+.mc-show-more-btn:hover {
+  text-decoration: underline;
+}
+
+/* ── Collapsible Section ── */
+
+.mc-collapsible-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  user-select: none;
+  margin-bottom: 10px;
+}
+
+.mc-collapsible-chevron {
+  font-size: 12px;
+  color: var(--text-muted, var(--muted));
+  transition: transform 0.15s;
+}
+
+.mc-collapsible-chevron--open {
+  transform: rotate(90deg);
+}
+
+/* ── PR Link Badge ── */
+
+.mc-pr-badge {
+  font-size: 11px;
+  font-weight: 600;
+  color: #22c55e;
+  background: rgba(34, 197, 94, 0.12);
+  padding: 2px 8px;
+  border-radius: 4px;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.mc-pr-badge:hover {
+  background: rgba(34, 197, 94, 0.2);
+}
+
+/* ── Empty / Loading States ── */
+
+.mc-empty,
+.mc-loading {
+  text-align: center;
+  color: var(--text-muted, var(--muted));
+  font-size: 14px;
+  padding: 40px 16px;
+}
+
+.mc-empty-hint {
+  font-size: 12px;
+  margin-top: 8px;
+  opacity: 0.7;
+}
+
+/* ── Queue Badge ── */
+
+.mc-type-badge--queue {
+  color: #14b8a6;
+  background: rgba(20, 184, 166, 0.12);
+}
+
+/* ── Review Card ── */
+
+.mc-agent-card--review {
+  border-left-color: #14b8a6;
+  background: rgba(20, 184, 166, 0.04);
+}
+
+/* ── Approve Button ── */
+
+.mc-approve-btn {
+  font-size: 11px;
+  font-weight: 600;
+  color: #14b8a6;
+  background: transparent;
+  border: 1px solid #14b8a6;
+  border-radius: 6px;
+  padding: 3px 10px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.mc-approve-btn:hover {
+  background: #14b8a6;
+  color: #fff;
+}
+
+/* ── Open Session Button ── */
+
+.mc-open-session-btn {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--accent);
+  background: transparent;
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  padding: 3px 10px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.mc-open-session-btn:hover {
+  background: var(--accent);
+  color: #fff;
+}
+
+/* ── Detail + Retry Buttons ── */
+
+.mc-detail-btn {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--accent);
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 3px 10px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.mc-detail-btn:hover {
+  border-color: var(--accent);
+}
+
+.mc-retry-btn {
+  font-size: 11px;
+  font-weight: 600;
+  color: #f59e0b;
+  background: transparent;
+  border: 1px solid #f59e0b;
+  border-radius: 6px;
+  padding: 3px 10px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.mc-retry-btn:hover {
+  background: #f59e0b;
+  color: #fff;
+}
+
+.mc-agent-card-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+/* ── Clickable Feed Items ── */
+
+.mc-feed-item--clickable {
+  cursor: pointer;
+  transition: background 0.1s;
+}
+
+.mc-feed-item--clickable:hover {
+  background: var(--bg-hover, rgba(255, 255, 255, 0.04));
+}
+
+/* ── Priority Badges ── */
+
+.mc-priority-badge {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 4px;
+  text-transform: uppercase;
+}
+
+.mc-priority-badge--high {
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.12);
+}
+
+.mc-priority-badge--normal {
+  color: var(--text-muted);
+  background: var(--bg-hover);
+}
+
+.mc-priority-badge--low {
+  color: var(--text-muted);
+  opacity: 0.6;
+}
+
+/* ── View PR Button (replaces anchor) ── */
+
+.mc-pr-btn {
+  font-size: 11px;
+  font-weight: 600;
+  color: #22c55e;
+  background: rgba(34, 197, 94, 0.12);
+  padding: 2px 8px;
+  border-radius: 4px;
+  border: none;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.mc-pr-btn:hover {
+  background: rgba(34, 197, 94, 0.2);
+}
+
+/* ── Swarm Section ── */
+
+.mc-swarm-section {
+  margin-bottom: 1.5rem;
+  padding: 16px;
+  background: var(--bg-card, var(--bg-secondary));
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+
+.mc-swarm-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+/* ── Project Switcher ── */
+
+.mc-swarm-switcher {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 16px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+
+.mc-swarm-switcher-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  background: var(--bg-hover, rgba(255, 255, 255, 0.06));
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--text-muted, var(--muted));
+  white-space: nowrap;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.mc-swarm-switcher-btn:hover {
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+.mc-swarm-switcher-btn--active {
+  border-color: var(--accent);
+  color: var(--text-strong, var(--text));
+  background: rgba(99, 102, 241, 0.08);
+}
+
+.mc-swarm-switcher-title {
+  font-weight: 600;
+}
+
+.mc-swarm-switcher-meta {
+  font-family: var(--font-mono, monospace);
+  font-size: 11px;
+  opacity: 0.7;
+}
+
+/* ── Org Chart / Pipeline Graph ── */
+
+.mc-swarm-org {
+  margin-bottom: 16px;
+}
+
+.mc-swarm-graph {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.mc-swarm-connector {
+  width: 2px;
+  height: 16px;
+  background: var(--border);
+  margin-left: 24px;
+}
+
+.mc-swarm-node {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.mc-swarm-node:hover {
+  background: var(--bg-hover, rgba(255, 255, 255, 0.04));
+}
+
+.mc-swarm-node--done {
+  border-left: 3px solid #22c55e;
+}
+
+.mc-swarm-node--active {
+  border-left: 3px solid #3b82f6;
+  animation: mc-pulse-border 2s ease infinite;
+}
+
+@keyframes mc-pulse-border {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); }
+  50% { box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15); }
+}
+
+.mc-swarm-node--failed {
+  border-left: 3px solid var(--danger, #ef4444);
+}
+
+.mc-swarm-node--pending {
+  border-left: 3px solid var(--border);
+  opacity: 0.6;
+}
+
+.mc-swarm-node-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: rgba(99, 102, 241, 0.15);
+  color: var(--accent, #6366f1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.mc-swarm-node-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.mc-swarm-node-persona {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-strong, var(--text));
+}
+
+.mc-swarm-node-task {
+  font-size: 12px;
+  color: var(--text-muted, var(--muted));
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mc-swarm-node-status {
+  display: flex;
+  align-items: center;
+  font-size: 11px;
+  color: var(--text-muted, var(--muted));
+  opacity: 0.7;
+  margin-top: 2px;
+}
+
+.mc-swarm-node-actions {
+  flex-shrink: 0;
+}
+
+/* ── Steering Panel ── */
+
+.mc-steer-panel {
+  margin: 4px 0 8px 36px;
+  padding: 10px 14px;
+  background: var(--bg-hover, rgba(255, 255, 255, 0.04));
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.mc-steer-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted, var(--muted));
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 6px;
+}
+
+.mc-steer-row {
+  display: flex;
+  gap: 6px;
+}
+
+.mc-steer-input {
+  flex: 1;
+  padding: 6px 10px;
+  font-size: 13px;
+  background: var(--bg-primary, var(--bg));
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  outline: none;
+}
+
+.mc-steer-input:focus {
+  border-color: var(--accent);
+}
+
+.mc-steer-send {
+  padding: 6px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #fff;
+  background: var(--accent, #6366f1);
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.mc-steer-send:hover {
+  opacity: 0.9;
+}
+
+/* ── Swarm Agent Cards ── */
+
+.mc-swarm-agents {
+  margin-bottom: 16px;
+}
+
+.mc-swarm-agents-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 10px;
+}
+
+.mc-swarm-agent-card {
+  padding: 12px 14px;
+  background: var(--bg-hover, rgba(255, 255, 255, 0.03));
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  border-left: 3px solid var(--border);
+}
+
+.mc-swarm-agent-card--working {
+  border-left-color: #3b82f6;
+}
+
+.mc-swarm-agent-card--done {
+  border-left-color: #22c55e;
+  opacity: 0.7;
+}
+
+.mc-swarm-agent-card--failed {
+  border-left-color: var(--danger, #ef4444);
+}
+
+.mc-swarm-agent-card--idle {
+  opacity: 0.5;
+}
+
+.mc-swarm-agent-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.mc-swarm-agent-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-strong, var(--text));
+}
+
+.mc-swarm-agent-task {
+  font-size: 12px;
+  color: var(--text);
+  margin-bottom: 6px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mc-swarm-agent-task--idle {
+  color: var(--text-muted, var(--muted));
+  text-transform: capitalize;
+}
+
+.mc-swarm-agent-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  color: var(--text-muted, var(--muted));
+  font-family: var(--font-mono, monospace);
+}
+
+/* ── Progress Bar ── */
+
+.mc-swarm-progress {
+  flex: 1;
+  height: 4px;
+  background: var(--border);
+  border-radius: 2px;
+  overflow: hidden;
+  max-width: 80px;
+}
+
+.mc-swarm-progress-bar {
+  height: 100%;
+  background: var(--accent, #6366f1);
+  border-radius: 2px;
+  transition: width 0.3s ease;
+}
+
+.mc-swarm-heartbeat {
+  opacity: 0.6;
+}
+
+/* ── Budget ── */
+
+.mc-swarm-budget {
+  margin-bottom: 16px;
+}
+
+.mc-swarm-budget-total {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--text-strong, var(--text));
+  margin-bottom: 8px;
+}
+
+.mc-swarm-budget-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--text-muted, var(--muted));
+  padding: 3px 0;
+  border-bottom: 1px solid var(--border-light, var(--border));
+}
+
+/* ── Deliverables ── */
+
+.mc-swarm-deliverables {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.mc-swarm-deliverable {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 14px;
+  background: rgba(34, 197, 94, 0.04);
+  border: 1px solid rgba(34, 197, 94, 0.2);
+  border-radius: 8px;
+}
+
+.mc-swarm-deliverable-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  flex: 1;
+}
+
+.mc-swarm-deliverable-persona {
+  font-size: 11px;
+  font-weight: 600;
+  color: #22c55e;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.mc-swarm-deliverable-title {
+  font-size: 13px;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── Responsive ── */
+
+@media (max-width: 600px) {
+  .mc-stats-banner {
+    flex-wrap: wrap;
+  }
+  .mc-stat-card {
+    flex: 1 1 calc(50% - 6px);
+    min-width: 0;
+  }
+  .mc-swarm-agents-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ── Swarm Progress Text (header) ── */
+
+.mc-swarm-progress-text {
+  font-size: 11px;
+  color: var(--text-muted, var(--muted));
+  opacity: 0.7;
+}
+
+/* ── Swarm Status Icon ── */
+
+.mc-swarm-status-icon {
+  margin-right: 3px;
+}
+
+/* ── Swarm Node Cost ── */
+
+.mc-swarm-node-cost {
+  font-size: 10px;
+  color: var(--text-muted, var(--muted));
+  opacity: 0.6;
+  margin-top: 2px;
+}
+
+/* ── Swarm Output Preview ── */
+
+.mc-swarm-output-preview {
+  margin: 4px 0 8px 36px;
+  padding: 8px 12px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--text-muted, var(--muted));
+  background: var(--bg-hover, rgba(255, 255, 255, 0.03));
+  border-left: 2px solid var(--accent, #14b8a6);
+  border-radius: 4px;
+  white-space: pre-wrap;
+  max-height: 80px;
+  overflow: hidden;
+}

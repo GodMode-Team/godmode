@@ -1,0 +1,163 @@
+{
+  "description": "Extended routing tests — hard cases for skill card trigger optimization",
+  "generated": "2026-03-10T03:50:27.650Z",
+  "categories": {
+    "multi_domain_ambiguity": "Messages that reference multiple domains — tests which signal wins",
+    "colloquial_slang": "Informal language that should still route correctly",
+    "negation": "Messages that negate one domain — should route to the intended one",
+    "compound_requests": "Multi-step requests — tests which action is primary",
+    "edge_cases": "Unusual phrasing or ambiguous intent"
+  },
+  "tests": [
+    {
+      "message": "Save my meeting notes as a task",
+      "expected": "tasks",
+      "note": "task intent > file/calendar content"
+    },
+    {
+      "message": "Write up the research and save it to drive",
+      "expected": "files",
+      "note": "save to drive = files, even though research could be queue"
+    },
+    {
+      "message": "Remind me to check twitter tomorrow",
+      "expected": "tasks",
+      "note": "remind = tasks intent, twitter is content"
+    },
+    {
+      "message": "Schedule a call with the person I met at the conference",
+      "expected": "calendar",
+      "note": "schedule = calendar, person is context"
+    },
+    {
+      "message": "Add a note about the meeting with Morgan",
+      "expected": "second-brain",
+      "note": "note = second-brain, meeting/person is context"
+    },
+    {
+      "message": "Find what Alex tweeted about our integration",
+      "expected": "x-twitter",
+      "note": "tweeted = x-twitter, person/integration is context"
+    },
+    {
+      "message": "Queue up a draft tweet about the product launch",
+      "expected": "queue",
+      "note": "queue = queue intent, draft tweet is the task content"
+    },
+    {
+      "message": "Look up the file I saved about the team contact list",
+      "expected": "files",
+      "note": "file = files, team/contact is content"
+    },
+    {
+      "message": "yo drop that in my notes",
+      "expected": "second-brain",
+      "note": "colloquial for saving to vault/notes"
+    },
+    {
+      "message": "nah skip the meeting",
+      "expected": "calendar",
+      "note": "skip the meeting = calendar action"
+    },
+    {
+      "message": "lemme see what's poppin on the timeline",
+      "expected": "x-twitter",
+      "note": "timeline = x-twitter"
+    },
+    {
+      "message": "bruh who even is this guy",
+      "expected": "people",
+      "note": "who is = people lookup"
+    },
+    {
+      "message": "aight throw that on my list",
+      "expected": "tasks",
+      "note": "my list = todo/task list"
+    },
+    {
+      "message": "can you just bang out that report real quick",
+      "expected": "queue",
+      "note": "bang out a report = delegate to queue"
+    },
+    {
+      "message": "Don't add this to my calendar, just note it",
+      "expected": "second-brain",
+      "note": "negation of calendar + note intent = second-brain"
+    },
+    {
+      "message": "I don't need a reminder, just look it up",
+      "expected": "second-brain",
+      "note": "negation of reminder + look up = second-brain"
+    },
+    {
+      "message": "Not a task, more of a research question",
+      "expected": "queue",
+      "note": "negation of task + research = queue"
+    },
+    {
+      "message": "This isn't for twitter, save it as a document",
+      "expected": "files",
+      "note": "negation of twitter + document = files"
+    },
+    {
+      "message": "Check twitter and add a task about what you find",
+      "expected": "x-twitter",
+      "note": "twitter check is primary, task is secondary"
+    },
+    {
+      "message": "Search my vault and then draft a summary for the team",
+      "expected": "second-brain",
+      "note": "vault search is primary action"
+    },
+    {
+      "message": "Look at my schedule and tell me when I can do deep work",
+      "expected": "calendar",
+      "note": "schedule is the primary lookup"
+    },
+    {
+      "message": "Find my notes on the topic and queue a research deep dive",
+      "expected": "second-brain",
+      "note": "notes lookup first, then queue — notes has more triggers"
+    },
+    {
+      "message": "Who was at the meeting and what did we discuss?",
+      "expected": "people",
+      "note": "who = people intent, meeting is context"
+    },
+    {
+      "message": "Check if the API integration is working and file a task if not",
+      "expected": "integrations",
+      "note": "integration check is primary"
+    },
+    {
+      "message": "bookmark this",
+      "expected": "x-twitter",
+      "note": "bookmark = x-twitter bookmarks feature"
+    },
+    {
+      "message": "what's the word on the street",
+      "expected": "x-twitter",
+      "note": "social sentiment = x-twitter discussions"
+    },
+    {
+      "message": "jot this down for me",
+      "expected": "second-brain",
+      "note": "jot down = note-taking"
+    },
+    {
+      "message": "ping Alex about the deliverable",
+      "expected": "people",
+      "note": "person-directed action"
+    },
+    {
+      "message": "offload this to someone",
+      "expected": "queue",
+      "note": "offload = delegate to queue"
+    },
+    {
+      "message": "is everything hooked up properly",
+      "expected": "integrations",
+      "note": "hooked up = integration status check"
+    }
+  ]
+}

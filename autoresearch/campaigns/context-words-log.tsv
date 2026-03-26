@@ -1,0 +1,31 @@
+iteration	score_before	score_after	mutation	status
+1	1.0000	1.0000	add "eta" to TIME_WORDS	kept
+2	1.0000	1.0000	remove "busy" from TIME_WORDS	kept
+3	1.0000	1.0000	remove "status" from OPS_WORDS	kept
+4	1.0000	1.0000	add "release" to OPS_WORDS	kept
+5	1.0000	1.0000	add "backlog" to OPS_WORDS	kept
+6	1.0000	1.0000	add "one on one" to TIME_WORDS	kept
+7	1.0000	1.0000	add "review" to TIME_WORDS	kept
+8	1.0000	1.0000	remove "book" from TIME_WORDS	kept
+9	1.0000	1.0000	add "weekly" to TIME_WORDS	kept
+10	1.0000	1.0000	add "anything urgent" to OPS_WORDS	kept
+11	1.0000	1.0000	remove "due" from OPS_WORDS	kept
+12	1.0000	0.9875	remove "priorities" from OPS_WORDS	discarded
+13	1.0000	1.0000	remove "what's going on" from OPS_WORDS	kept
+14	1.0000	1.0000	add "what needs" to OPS_WORDS	kept
+15	1.0000	1.0000	remove "overdue" from OPS_WORDS	kept
+16	1.0000	1.0000	add "ship" to OPS_WORDS	kept
+17	1.0000	1.0000	remove "ship" from OPS_WORDS	kept
+18	1.0000	1.0000	remove "when" from TIME_WORDS	kept
+19	1.0000	1.0000	add "blockers" to OPS_WORDS	kept
+20	1.0000	1.0000	remove "what do i" from OPS_WORDS	kept
+21	1.0000	1.0000	remove "today" from TIME_WORDS	kept
+22	1.0000	1.0000	remove "what time" from TIME_WORDS	kept
+23	1.0000	1.0000	add "by when" to TIME_WORDS	kept
+24	1.0000	0.9875	remove "hey ally" from OPS_WORDS	discarded
+25	1.0000	0.9900	remove "task" from OPS_WORDS	discarded
+26	1.0000	1.0000	add "blocked" to OPS_WORDS	kept
+27	1.0000	1.0000	remove "remind" from OPS_WORDS	kept
+28	1.0000	1.0000	add "retro" to OPS_WORDS	kept
+29	1.0000	1.0000	add "ship it" to OPS_WORDS	kept
+30	1.0000	1.0000	add "how's it going" to OPS_WORDS	kept

@@ -1,0 +1,35 @@
+node_modules/
+dist/
+ui/dist/
+.DS_Store
+*.log
+*.db
+*.pem
+*.key
+*.p12
+*.pfx
+coverage/
+.tmp/
+.worktrees/
+.claude/worktrees/
+.godmode/
+experiments/
+
+# Environment files
+.env
+.env.*
+.env.local
+.env.*.local
+!.env.example
+.qa-reports/
+.gstack/
+
+# Vercel
+.vercel/
+
+# SQLite databases (runtime)
+*.sqlite
+*.sqlite3
+
+# Autoresearch runtime outputs (screenshots, state, scores)
+autoresearch/results/

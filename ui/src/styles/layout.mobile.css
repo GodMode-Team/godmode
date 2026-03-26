@@ -1,0 +1,533 @@
+/* ===========================================
+   Mobile Layout
+   =========================================== */
+
+/* Tablet: Horizontal nav */
+@media (max-width: 1100px) {
+  .nav {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    gap: 4px;
+    padding: 10px 14px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+
+  .nav::-webkit-scrollbar {
+    display: none;
+  }
+
+  .nav-group {
+    display: contents;
+  }
+
+  .nav-group__items {
+    display: contents;
+  }
+
+  .nav-label {
+    display: none;
+  }
+
+  .nav-group--collapsed .nav-group__items {
+    display: contents;
+  }
+
+  .nav-item {
+    padding: 8px 14px;
+    font-size: 13px;
+    border-radius: var(--radius-md);
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+}
+
+/* Mobile-specific styles */
+@media (max-width: 600px) {
+  .shell {
+    --shell-pad: 12px;
+    --shell-gap: 10px;
+  }
+
+  /* Topbar */
+  .topbar {
+    padding: 12px 14px;
+    gap: 10px;
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .brand {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .brand-title {
+    font-size: 16px;
+  }
+
+  .brand-sub {
+    display: none;
+  }
+
+  .topbar-status {
+    gap: 8px;
+    width: auto;
+    flex-wrap: nowrap;
+  }
+
+  .topbar-status .pill {
+    padding: 6px 10px;
+    font-size: 16px;
+    gap: 6px;
+  }
+
+  .topbar-status .pill .mono {
+    display: none;
+  }
+
+  .topbar-status .pill span:nth-child(2) {
+    display: none;
+  }
+
+  /* Nav */
+  .nav {
+    padding: 10px 12px;
+    gap: 8px;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+
+  .nav::-webkit-scrollbar {
+    display: none;
+  }
+
+  .nav-group {
+    display: contents;
+  }
+
+  .nav-label {
+    display: none;
+  }
+
+  .nav-item {
+    min-height: 44px;
+    padding: 10px 16px;
+    font-size: 16px;
+    line-height: 1.2;
+    border-radius: var(--radius-md);
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  /* Mobile nav drawer overlay mode */
+  .shell--nav-drawer .nav {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: 280px;
+    max-width: 80vw;
+    z-index: 300;
+    flex-direction: column;
+    flex-wrap: nowrap;
+    overflow-x: hidden;
+    overflow-y: auto;
+    background: var(--bg-surface, var(--bg-base));
+    border-right: 1px solid var(--border);
+    box-shadow: 4px 0 24px rgba(0, 0, 0, 0.2);
+    transform: translateX(-100%);
+    transition: transform 250ms cubic-bezier(0.4, 0, 0.2, 1);
+    padding: 16px 12px;
+    gap: 4px;
+    pointer-events: auto;
+    opacity: 1;
+  }
+
+  .shell--nav-drawer .nav--collapsed {
+    /* Override collapse styles in drawer mode — drawer controls visibility */
+    width: 280px;
+    max-width: 80vw;
+    min-width: unset;
+    padding: 16px 12px;
+    overflow-y: auto;
+    border-right: 1px solid var(--border);
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .shell--nav-drawer.shell--nav-drawer-open .nav,
+  .shell--nav-drawer.shell--nav-drawer-open .nav.nav--collapsed {
+    transform: translateX(0);
+  }
+
+  /* Show nav group labels in drawer mode */
+  .shell--nav-drawer .nav .nav-group {
+    display: block;
+  }
+
+  .shell--nav-drawer .nav .nav-label {
+    display: flex;
+  }
+
+  .shell--nav-drawer .nav .nav-group__items {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .shell--nav-drawer .nav .nav-group--collapsed .nav-group__items {
+    display: none;
+  }
+
+  /* Content */
+  .content-header {
+    display: none;
+  }
+
+  .content {
+    padding: 8px 8px 20px;
+    gap: 14px;
+  }
+
+  /* Cards */
+  .card {
+    padding: 16px;
+    border-radius: var(--radius-md);
+  }
+
+  .card-title {
+    font-size: 16px;
+  }
+
+  /* Stats */
+  .stat-grid {
+    gap: 12px;
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .stat {
+    padding: 14px;
+    border-radius: var(--radius-md);
+  }
+
+  .stat-label {
+    font-size: 16px;
+  }
+
+  .stat-value {
+    font-size: 20px;
+  }
+
+  /* Notes */
+  .note-grid {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  /* Forms */
+  .form-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .field input,
+  .field textarea,
+  .field select {
+    min-height: 44px;
+    padding: 12px 14px;
+    border-radius: var(--radius-md);
+    font-size: 16px;
+    line-height: 1.3;
+  }
+
+  /* Buttons */
+  .btn {
+    min-height: 44px;
+    padding: 10px 16px;
+    font-size: 16px;
+    line-height: 1.1;
+  }
+
+  /* Pills */
+  .pill {
+    min-height: 36px;
+    padding: 8px 12px;
+    font-size: 16px;
+  }
+
+  /* Scroll pill — clear taller mobile compose area */
+  .chat-scroll-bottom {
+    bottom: 140px;
+    right: 12px;
+    width: 36px;
+    height: 36px;
+  }
+
+  /* Chat */
+  .chat-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+
+  .chat-header__left {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .chat-header__right {
+    justify-content: space-between;
+    gap: 8px;
+  }
+
+  .chat-session {
+    min-width: unset;
+    width: 100%;
+  }
+
+  .chat-thread {
+    margin-top: 8px;
+    padding: 16px 10px;
+  }
+
+  .chat-msg {
+    max-width: 90%;
+  }
+
+  .chat-bubble {
+    padding: 12px 16px;
+    border-radius: var(--radius-md);
+  }
+
+  .chat-compose {
+    padding: 12px 8px 8px;
+  }
+
+  .chat-compose__wrapper {
+    max-width: 100%;
+  }
+
+  .chat-compose__input-area {
+    padding: 8px 12px;
+    border-radius: var(--radius-md);
+  }
+
+  .chat-compose__textarea {
+    font-size: 16px; /* Prevent iOS zoom on focus */
+  }
+
+  .chat-compose__toolbar-btn {
+    width: 44px;
+    height: 44px;
+  }
+
+  .chat-compose__toolbar-btn svg {
+    width: 18px;
+    height: 18px;
+  }
+
+  .chat-compose__send-btn {
+    width: 44px;
+    height: 44px;
+  }
+
+  .chat-compose__send-btn svg {
+    width: 18px;
+    height: 18px;
+  }
+
+  .chat-context-badge {
+    font-size: 12px;
+    padding: 4px 8px;
+  }
+
+  .chat-compose__compact-btn {
+    font-size: 14px;
+    padding: 6px 12px;
+  }
+
+  /* Log stream */
+  .log-stream {
+    border-radius: var(--radius-md);
+    max-height: 380px;
+  }
+
+  .log-row {
+    grid-template-columns: 1fr;
+    gap: 4px;
+    padding: 10px;
+  }
+
+  .log-time {
+    font-size: 14px;
+  }
+
+  .log-level {
+    font-size: 14px;
+  }
+
+  .log-subsystem {
+    font-size: 14px;
+  }
+
+  .log-message {
+    font-size: 14px;
+  }
+
+  /* Lists */
+  .list-item {
+    padding: 14px;
+    border-radius: var(--radius-md);
+  }
+
+  .list-title {
+    font-size: 16px;
+  }
+
+  .list-sub {
+    font-size: 16px;
+  }
+
+  /* Code blocks */
+  .code-block {
+    padding: 12px;
+    border-radius: var(--radius-md);
+    font-size: 14px;
+  }
+
+  /* Theme toggle */
+  .theme-toggle {
+    --theme-item: 34px;
+    --theme-gap: 4px;
+    --theme-pad: 6px;
+  }
+
+  .theme-icon {
+    width: 16px;
+    height: 16px;
+  }
+}
+
+/* Small mobile */
+@media (max-width: 400px) {
+  .shell {
+    --shell-pad: 8px;
+  }
+
+  .topbar {
+    padding: 10px 12px;
+  }
+
+  .brand-title {
+    font-size: 16px;
+  }
+
+  .nav {
+    padding: 8px 10px;
+  }
+
+  .nav-item {
+    min-height: 44px;
+    padding: 10px 14px;
+    font-size: 16px;
+  }
+
+  .content {
+    padding: 8px 8px 16px;
+    gap: 12px;
+  }
+
+  .card {
+    padding: 14px;
+  }
+
+  .stat {
+    padding: 12px;
+  }
+
+  .stat-value {
+    font-size: 18px;
+  }
+
+  .chat-bubble {
+    padding: 12px 14px;
+  }
+
+  .chat-compose {
+    padding: 8px 4px;
+  }
+
+  .chat-compose__input-area {
+    padding: 6px 10px;
+  }
+
+  /* Hide context badge on very small screens */
+  .chat-context-badge {
+    display: none;
+  }
+
+  .btn {
+    min-height: 44px;
+    padding: 10px 14px;
+    font-size: 16px;
+  }
+
+  .topbar-status .pill {
+    padding: 6px 8px;
+    font-size: 16px;
+  }
+
+  .theme-toggle {
+    --theme-item: 30px;
+    --theme-gap: 3px;
+    --theme-pad: 5px;
+  }
+
+  .theme-icon {
+    width: 14px;
+    height: 14px;
+  }
+
+  /* UI redesign responsive adjustments */
+  .chat-context-bar {
+    height: 4px;
+  }
+
+  .chat-context-text {
+    font-size: 12px;
+  }
+}
+
+/* Medium breakpoint - adjust session controls and context indicator */
+@media (max-width: 600px) {
+  .session-tab-add {
+    gap: 4px;
+  }
+
+  .session-picker {
+    min-height: 44px;
+    font-size: 16px;
+    padding: 8px 12px;
+  }
+
+  .chat-context-indicator {
+    margin-right: 8px;
+  }
+
+  .chat-context-text {
+    font-size: 12px;
+    min-width: 60px;
+  }
+
+  .chat-compose__actions {
+    gap: 8px;
+  }
+
+  .chat-compose__send {
+    max-width: none;
+  }
+}

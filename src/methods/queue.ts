@@ -1,0 +1,652 @@
+import { readFile } from "node:fs/promises";
+import { execFile as execFileCb } from "node:child_process";
+import { join, resolve, normalize } from "node:path";
+import { promisify } from "node:util";
+import { DATA_DIR, GODMODE_ROOT, localDateString } from "../data-paths.js";
+import {
+  readQueueState,
+  updateQueueState,
+  newQueueItemId,
+  type QueueItem,
+  type QueueItemType,
+  type QueueItemStatus,
+} from "../lib/queue-state.js";
+import { updateTasks } from "./tasks.js";
+import type { GatewayRequestHandler } from "../types/plugin-api.js";
+import type { LessonCategory } from "../lib/agent-lessons.js";
+
+const execFile = promisify(execFileCb);
+
+const INBOX_DIR = join(GODMODE_ROOT, "memory", "inbox");
+
+// ── Helpers ──────────────────────────────────────────────────────
+
+function countsByStatus(items: QueueItem[]): Record<QueueItemStatus, number> {
+  const counts: Record<QueueItemStatus, number> = {
+    pending: 0,
+    processing: 0,
+    "hitl-pending": 0,
+    review: 0,
+    "needs-review": 0,
+    done: 0,
+    failed: 0,
+  };
+  for (const item of items) {
+    if (item.status in counts) {
+      counts[item.status]++;
+    }
+  }
+  return counts;
+}
+
+// ── RPC Handlers ─────────────────────────────────────────────────
+
+const addItem: GatewayRequestHandler = async ({ params, respond }) => {
+  // Runtime type validation before cast
+  if (params.title !== undefined && typeof params.title !== "string") {
+    respond(false, null, { code: "INVALID_REQUEST", message: "title must be a string" });
+    return;
+  }
+  if (params.type !== undefined && typeof params.type !== "string") {
+    respond(false, null, { code: "INVALID_REQUEST", message: "type must be a string" });
+    return;
+  }
+  if (params.description !== undefined && typeof params.description !== "string") {
+    respond(false, null, { code: "INVALID_REQUEST", message: "description must be a string" });
+    return;
+  }
+  if (params.url !== undefined && typeof params.url !== "string") {
+    respond(false, null, { code: "INVALID_REQUEST", message: "url must be a string" });
+    return;
+  }
+  if (params.repoRoot !== undefined && typeof params.repoRoot !== "string") {
+    respond(false, null, { code: "INVALID_REQUEST", message: "repoRoot must be a string" });
+    return;
+  }
+  if (params.priority !== undefined && typeof params.priority !== "string") {
+    respond(false, null, { code: "INVALID_REQUEST", message: "priority must be a string" });
+    return;
+  }
+  if (params.priority !== undefined && !["high", "normal", "low"].includes(params.priority as string)) {
+    respond(false, null, { code: "INVALID_REQUEST", message: `Invalid priority "${params.priority}". Must be "high", "normal", or "low".` });
+    return;
+  }
+  if (params.engine !== undefined && typeof params.engine !== "string") {
+    respond(false, null, { code: "INVALID_REQUEST", message: "engine must be a string" });
+    return;
+  }
+  if (params.engine !== undefined && !["claude", "codex", "gemini"].includes(params.engine as string)) {
+    respond(false, null, { code: "INVALID_REQUEST", message: `Invalid engine "${params.engine}". Must be "claude", "codex", or "gemini".` });
+    return;
+  }
+  if (params.sourceTaskId !== undefined && typeof params.sourceTaskId !== "string") {
+    respond(false, null, { code: "INVALID_REQUEST", message: "sourceTaskId must be a string" });
+    return;
+  }
+  if (params.personaHint !== undefined && typeof params.personaHint !== "string") {
+    respond(false, null, { code: "INVALID_REQUEST", message: "personaHint must be a string" });
+    return;
+  }
+  if (params.sessionId !== undefined && typeof params.sessionId !== "string") {
+    respond(false, null, { code: "INVALID_REQUEST", message: "sessionId must be a string" });
+    return;
+  }
+
+  const { type, title, description, url, repoRoot, priority, sourceTaskId, personaHint, engine, sessionId } = params as {
+    type?: QueueItemType;
+    title?: string;
+    description?: string;
+    url?: string;
+    repoRoot?: string;
+    priority?: "high" | "normal" | "low";
+    sourceTaskId?: string;
+    personaHint?: string;
+    engine?: "claude" | "codex" | "gemini";
+    sessionId?: string;
+  };
+  if (!title) {
+    respond(false, null, { code: "INVALID_REQUEST", message: "Missing title" });
+    return;
+  }
+  // Reject auto-generated IDs passed as titles
+  const ID_PATTERN = /^(concurrent|batch|item|task)-\d{10,}-\d+$/;
+  if (ID_PATTERN.test(title) || /^\d{10,}$/.test(title)) {
+    respond(false, null, { code: "INVALID_REQUEST", message: `Title "${title}" looks like an auto-generated ID, not a real topic` });
+    return;
+  }
+  if (!type) {
+    respond(false, null, { code: "INVALID_REQUEST", message: "Missing type" });
+    return;
+  }
+
+  // Proof doc creation is handled by ensureProofDocument in queue-processor
+  // when the item starts processing. No need to create here.
+
+  const { result: item } = await updateQueueState((state) => {
+    const newItem: QueueItem = {
+      id: newQueueItemId(title),
+      type,
+      title,
+      description: description || undefined,
+      url: url || undefined,
+      repoRoot: repoRoot || undefined,
+      priority: priority || "normal",
+      status: "pending",
+      source: "manual",
+      sourceTaskId: sourceTaskId || undefined,
+      sessionId: sessionId || undefined,
+      personaHint: personaHint || undefined,
+      engine: engine || undefined,
+      createdAt: Date.now(),
+    };
+    state.items.push(newItem);
+    return newItem;
+  });
+
+  respond(true, { item });
+};
+
+const listItems: GatewayRequestHandler = async ({ params, respond }) => {
+  const { status, type, limit } = params as {
+    status?: QueueItemStatus;
+    type?: QueueItemType;
+    limit?: number;
+  };
+  const state = await readQueueState();
+  let items = state.items;
+
+  if (status) {
+    items = items.filter((i) => i.status === status);
+  }
+  if (type) {
+    items = items.filter((i) => i.type === type);
+  }
+
+  const counts = countsByStatus(state.items);
+
+  // Sort: active statuses first (processing > pending > review/needs-review), then by most recent activity
+  const statusOrder: Record<string, number> = {
+    processing: 0, pending: 1, "needs-review": 2, review: 3, failed: 4, done: 5,
+  };
+  items = items.sort((a, b) => {
+    const sa = statusOrder[a.status] ?? 9;
+    const sb = statusOrder[b.status] ?? 9;
+    if (sa !== sb) return sa - sb;
+    return (b.completedAt ?? b.createdAt) - (a.completedAt ?? a.createdAt);
+  });
+
+  if (limit && limit > 0) {
+    items = items.slice(0, limit);
+  }
+
+  respond(true, { items, counts });
+};
+
+const updateItem: GatewayRequestHandler = async ({ params, respond }) => {
+  const { id, status, result, error } = params as {
+    id?: string;
+    status?: QueueItemStatus;
+    result?: QueueItem["result"];
+    error?: string;
+  };
+  if (!id) {
+    respond(false, null, { code: "INVALID_REQUEST", message: "Missing id" });
+    return;
+  }
+
+  // Agents can only set status to "review" or "failed" — never "done"
+  if (status && status !== "review" && status !== "failed") {
+    respond(false, null, {
+      code: "INVALID_REQUEST",
+      message: 'Agents can only set status to "review" or "failed". Use queue.approve for "done".',
+    });
+    return;
+  }
+
+  const { result: item } = await updateQueueState((state) => {
+    const idx = state.items.findIndex((i) => i.id === id);
+    if (idx === -1) return null;
+    const existing = state.items[idx];
+    if (status) existing.status = status;
+    if (result) existing.result = result;
+    if (error) existing.error = error;
+    if (status === "review" || status === "failed") {
+      existing.completedAt = Date.now();
+    }
+    state.items[idx] = existing;
+    return existing;
+  });
+
+  if (!item) {
+    respond(false, null, { code: "INVALID_REQUEST", message: "Queue item not found" });
+    return;
+  }
+  respond(true, { item });
+};
+
+const approveItem: GatewayRequestHandler = async ({ params, respond }) => {
+  const { id } = params as { id?: string };
+  if (!id) {
+    respond(false, null, { code: "INVALID_REQUEST", message: "Missing id" });
+    return;
+  }
+
+  const { result } = await updateQueueState((state) => {
+    const idx = state.items.findIndex((i) => i.id === id);
+    if (idx === -1) return { item: null, error: "Queue item not found" };
+    const existing = state.items[idx];
+    if (existing.status !== "review" && existing.status !== "needs-review") {
+      return { item: null, error: `Cannot approve item with status "${existing.status}". Only "review" or "needs-review" items can be approved.` };
+    }
+    existing.status = "done";
+    existing.completedAt = Date.now();
+    state.items[idx] = existing;
+    return { item: existing, error: null };
+  });
+
+  if (result.error || !result.item) {
+    respond(false, null, { code: "INVALID_REQUEST", message: result.error ?? "Queue item not found" });
+    return;
+  }
+
+  // If item has a sourceTaskId, mark the linked NativeTask as complete
+  // and sync brief checkboxes + team tasks to match.
+  if (result.item.sourceTaskId) {
+    try {
+      const { result: updatedTask } = await updateTasks((data) => {
+        const taskIdx = data.tasks.findIndex((t) => t.id === result.item!.sourceTaskId);
+        if (taskIdx !== -1) {
+          data.tasks[taskIdx].status = "complete";
+          data.tasks[taskIdx].completedAt = new Date().toISOString();
+          return data.tasks[taskIdx];
+        }
+        return null;
+      });
+      // Sync brief checkbox and team tasks (same path as tasks.update)
+      if (updatedTask) {
+        try {
+          const { syncBriefFromTasks } = await import("./daily-brief.js");
+          const syncDate = updatedTask.dueDate || localDateString();
+          await syncBriefFromTasks(syncDate, { taskTitle: updatedTask.title });
+        } catch { /* Brief sync is best-effort */ }
+      }
+    } catch {
+      // Task sync is best-effort; don't fail the approval
+    }
+  }
+
+  // Auto-rate the persona in the trust tracker (approval = good performance)
+  if (result.item.personaHint) {
+    try {
+      const { autoRate } = await import("./trust-tracker.js");
+      await autoRate(
+        result.item.personaHint,
+        7,
+        `Approved: "${result.item.title}"`,
+        "auto-approve",
+      );
+    } catch {
+      // Trust rating is best-effort
+    }
+  }
+
+  respond(true, { item: result.item });
+};
+
+const rejectItem: GatewayRequestHandler = async ({ params, respond }) => {
+  const { id, reason, category, lessonRule } = params as {
+    id?: string;
+    reason?: string;
+    category?: LessonCategory;
+    lessonRule?: string;
+  };
+
+  if (!id) {
+    respond(false, null, { code: "INVALID_REQUEST", message: "Missing id" });
+    return;
+  }
+
+  const { result } = await updateQueueState((state) => {
+    const idx = state.items.findIndex((i) => i.id === id);
+    if (idx === -1) return { item: null, error: "Queue item not found" };
+    const existing = state.items[idx];
+    if (existing.status !== "review" && existing.status !== "needs-review") {
+      return { item: null, error: `Cannot reject item with status "${existing.status}"` };
+    }
+    existing.status = "failed";
+    existing.completedAt = Date.now();
+    existing.error = reason || "Rejected by user";
+    state.items[idx] = existing;
+    return { item: existing, error: null };
+  });
+
+  if (result.error || !result.item) {
+    respond(false, null, { code: "INVALID_REQUEST", message: result.error ?? "Queue item not found" });
+    return;
+  }
+
+  const item = result.item;
+
+  // Auto-rate the persona (rejection = poor performance)
+  if (item.personaHint) {
+    try {
+      const { autoRate } = await import("./trust-tracker.js");
+      await autoRate(
+        item.personaHint,
+        3,
+        `Rejected: "${item.title}" — ${reason ?? "no reason given"}`,
+        "auto-reject",
+      );
+    } catch { /* best-effort */ }
+  }
+
+  // Create a lesson from the rejection
+  let lessonCreated = false;
+  if (reason) {
+    try {
+      const { addLesson } = await import("../lib/agent-lessons.js");
+      await addLesson(
+        {
+          rule: lessonRule || reason,
+          category: category || "other",
+          sourceTaskId: item.id,
+          sourceTaskTitle: item.title,
+        },
+        item.personaHint || undefined,
+      );
+      lessonCreated = true;
+    } catch { /* best-effort */ }
+  }
+
+  respond(true, { item, lessonCreated });
+};
+
+const removeItem: GatewayRequestHandler = async ({ params, respond }) => {
+  const { id } = params as { id?: string };
+  if (!id) {
+    respond(false, null, { code: "INVALID_REQUEST", message: "Missing id" });
+    return;
+  }
+
+  const { result: removed } = await updateQueueState((state) => {
+    const idx = state.items.findIndex((i) => i.id === id);
+    if (idx === -1) return null;
+    return state.items.splice(idx, 1)[0];
+  });
+
+  if (!removed) {
+    respond(false, null, { code: "INVALID_REQUEST", message: "Queue item not found" });
+    return;
+  }
+  respond(true, { item: removed });
+};
+
+/**
+ * Intentional pass-through stub. Returns the next pending item without spawning
+ * an agent. Actual agent spawning is handled by queue-processor.ts, which runs
+ * as an autonomous service on its own heartbeat tick.
+ */
+const processItem: GatewayRequestHandler = async ({ params, respond }) => {
+  const { id } = params as { id?: string };
+
+  const state = await readQueueState();
+  let item: QueueItem | undefined;
+  if (id) {
+    item = state.items.find((i) => i.id === id);
+  } else {
+    // Find next pending item (highest priority first)
+    const priorityOrder: Record<string, number> = { high: 0, normal: 1, low: 2 };
+    const pending = state.items
+      .filter((i) => i.status === "pending")
+      .sort((a, b) => (priorityOrder[a.priority] ?? 1) - (priorityOrder[b.priority] ?? 1));
+    item = pending[0];
+  }
+
+  if (!item) {
+    respond(true, { item: null, spawned: false, message: "No pending items in queue" });
+    return;
+  }
+  respond(true, { item, spawned: false });
+};
+
+/**
+ * Intentional pass-through stub. Lists pending items without spawning agents.
+ * Actual processing is handled by queue-processor.ts, which picks up pending
+ * items autonomously during its heartbeat cycle.
+ */
+const processAllItems: GatewayRequestHandler = async ({ params: _params, respond }) => {
+  const state = await readQueueState();
+  const pending = state.items.filter((i) => i.status === "pending");
+
+  respond(true, {
+    items: pending,
+    count: pending.length,
+    spawned: false,
+    message: pending.length > 0
+      ? `${pending.length} pending item(s) ready for processing`
+      : "No pending items in queue",
+  });
+};
+
+const prDiff: GatewayRequestHandler = async ({ params, respond }) => {
+  const { prUrl } = params as { prUrl?: string };
+  if (!prUrl) {
+    respond(false, null, { code: "INVALID_REQUEST", message: "Missing prUrl" });
+    return;
+  }
+
+  try {
+    const { stdout } = await execFile("gh", ["pr", "diff", prUrl], {
+      maxBuffer: 10 * 1024 * 1024,
+    });
+    respond(true, { content: stdout });
+  } catch {
+    respond(true, { content: "Failed to fetch PR diff" });
+  }
+};
+
+const readOutput: GatewayRequestHandler = async ({ params, respond }) => {
+  const { path: filePath } = params as { path?: string };
+  if (!filePath) {
+    respond(false, null, { code: "INVALID_REQUEST", message: "Missing path" });
+    return;
+  }
+
+  // Validate the path is within ~/godmode/memory/inbox/ to prevent traversal
+  const resolved = resolve(normalize(filePath));
+  const inboxResolved = resolve(INBOX_DIR);
+  if (!resolved.startsWith(inboxResolved + "/") && resolved !== inboxResolved) {
+    respond(false, null, {
+      code: "INVALID_REQUEST",
+      message: "Path must be within ~/godmode/memory/inbox/",
+    });
+    return;
+  }
+
+  try {
+    const content = await readFile(resolved, "utf-8");
+    respond(true, { content });
+  } catch {
+    respond(false, null, { code: "NOT_FOUND", message: "File not found or unreadable" });
+  }
+};
+
+const listRosterItems: GatewayRequestHandler = async ({ params: _params, respond }) => {
+  const { listRoster } = await import("../lib/agent-roster.js");
+  respond(true, { roster: listRoster() });
+};
+
+// ── Lesson Management RPCs ────────────────────────────────────────
+
+const listLessons: GatewayRequestHandler = async ({ params, respond }) => {
+  const { persona } = (params ?? {}) as { persona?: string };
+  const { readLessonsState } = await import("../lib/agent-lessons.js");
+  const state = await readLessonsState();
+
+  if (persona) {
+    respond(true, {
+      lessons: state.perPersona[persona] ?? [],
+      global: state.global,
+    });
+  } else {
+    respond(true, state);
+  }
+};
+
+const addLessonManual: GatewayRequestHandler = async ({ params, respond }) => {
+  const { rule, category, persona } = params as {
+    rule?: string;
+    category?: string;
+    persona?: string;
+  };
+  if (!rule) {
+    respond(false, null, { code: "INVALID_REQUEST", message: "Missing rule" });
+    return;
+  }
+
+  const { addLesson } = await import("../lib/agent-lessons.js");
+  const lesson = await addLesson(
+    {
+      rule,
+      category: (category as LessonCategory) || "other",
+      sourceTaskId: "manual",
+      sourceTaskTitle: "Manual lesson from user",
+    },
+    persona || undefined,
+  );
+  respond(true, { lesson });
+};
+
+const removeLessonRpc: GatewayRequestHandler = async ({ params, respond }) => {
+  const { id } = params as { id?: string };
+  if (!id) {
+    respond(false, null, { code: "INVALID_REQUEST", message: "Missing lesson id" });
+    return;
+  }
+
+  const { removeLesson } = await import("../lib/agent-lessons.js");
+  const removed = await removeLesson(id);
+  respond(true, { removed });
+};
+
+const retryItem: GatewayRequestHandler = async ({ params, respond }) => {
+  const { id } = params as { id?: string };
+  if (!id) {
+    respond(false, null, { code: "INVALID_REQUEST", message: "Missing id" });
+    return;
+  }
+
+  const { result } = await updateQueueState((state) => {
+    const idx = state.items.findIndex((i) => i.id === id);
+    if (idx === -1) return { item: null, error: "Queue item not found" };
+    const existing = state.items[idx];
+    if (existing.status !== "failed" && existing.status !== "review" && existing.status !== "needs-review") {
+      return { item: null, error: `Cannot retry item with status "${existing.status}". Only "failed", "review", or "needs-review" items can be retried.` };
+    }
+    existing.status = "pending";
+    existing.error = undefined;
+    existing.lastError = undefined;
+    existing.completedAt = undefined;
+    existing.startedAt = undefined;
+    existing.pid = undefined;
+    // Don't reset retryCount — the queue processor uses it to decide retry strategy
+    state.items[idx] = existing;
+    return { item: existing, error: null };
+  });
+
+  if (result.error || !result.item) {
+    respond(false, null, { code: "INVALID_REQUEST", message: result.error ?? "Queue item not found" });
+    return;
+  }
+  respond(true, { item: result.item });
+};
+
+const bulkDismiss: GatewayRequestHandler = async ({ params, respond }) => {
+  const { status } = params as { status?: string };
+  if (!status) {
+    respond(false, null, { code: "INVALID_REQUEST", message: "Missing status to dismiss" });
+    return;
+  }
+  let dismissed = 0;
+  await updateQueueState((state) => {
+    const before = state.items.length;
+    state.items = state.items.filter((item) => item.status !== status);
+    dismissed = before - state.items.length;
+  });
+  respond(true, { dismissed });
+};
+
+// ── HITL Checkpoint Handlers ─────────────────────────────────────
+
+const hitlRespond: GatewayRequestHandler = async ({ params, respond }) => {
+  const { checkpointId, action, modifiedInstructions } = params as {
+    checkpointId?: string;
+    action?: string;
+    modifiedInstructions?: string;
+  };
+  if (!checkpointId || !action) {
+    respond(false, null, { code: "INVALID_REQUEST", message: "Missing checkpointId or action" });
+    return;
+  }
+  if (!["continue", "modify", "abort"].includes(action)) {
+    respond(false, null, { code: "INVALID_REQUEST", message: `Invalid action: ${action}` });
+    return;
+  }
+  try {
+    const { getQueueProcessor } = await import("../services/queue-processor.js");
+    const qp = getQueueProcessor();
+    if (!qp) {
+      respond(false, null, { code: "NOT_READY", message: "Queue processor not initialized" });
+      return;
+    }
+    const result = await qp.respondToHitlCheckpoint(
+      checkpointId,
+      action as "continue" | "modify" | "abort",
+      modifiedInstructions,
+    );
+    if (result.ok) {
+      respond(true, { status: "resolved" });
+    } else {
+      respond(false, null, { code: "HITL_ERROR", message: result.error ?? "Could not process your checkpoint response — please try again." });
+    }
+  } catch (err) {
+    respond(false, null, { code: "HITL_ERROR", message: `Failed to process checkpoint feedback — please try again. (${String(err).slice(0, 100)})` });
+  }
+};
+
+const hitlList: GatewayRequestHandler = async ({ respond }) => {
+  try {
+    const { getQueueProcessor } = await import("../services/queue-processor.js");
+    const qp = getQueueProcessor();
+    if (!qp) {
+      respond(true, { checkpoints: [] });
+      return;
+    }
+    respond(true, { checkpoints: qp.getActiveHitlCheckpoints() });
+  } catch {
+    respond(true, { checkpoints: [] });
+  }
+};
+
+// ── Export ────────────────────────────────────────────────────────
+
+export const queueHandlers: Record<string, GatewayRequestHandler> = {
+  "queue.add": addItem,
+  "queue.list": listItems,
+  "queue.update": updateItem,
+  "queue.approve": approveItem,
+  "queue.reject": rejectItem,
+  "queue.retry": retryItem,
+  "queue.remove": removeItem,
+  "queue.process": processItem,
+  "queue.processAll": processAllItems,
+  "queue.prDiff": prDiff,
+  "queue.readOutput": readOutput,
+  "queue.roster": listRosterItems,
+  "queue.lessons": listLessons,
+  "queue.addLesson": addLessonManual,
+  "queue.removeLesson": removeLessonRpc,
+  "queue.bulkDismiss": bulkDismiss,
+  "queue.hitl.respond": hitlRespond,
+  "queue.hitl.list": hitlList,
+};

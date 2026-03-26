@@ -1,0 +1,1051 @@
+/**
+ * self-heal.ts — Auto-repair pipeline for GodMode subsystems.
+ *
+ * Runs inside the consciousness heartbeat tick. Each subsystem gets:
+ *   1. A health check (fast, no side effects)
+ *   2. An auto-repair attempt if unhealthy
+ *   3. A status entry in the registry (queryable via RPC)
+ *
+ * Philosophy: detect → repair → log. Never crash. Never block.
+ * If repair fails twice, surface it to the user via broadcast.
+ */
+
+import { existsSync, statSync } from "node:fs";
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
+import { homedir } from "node:os";
+import { DATA_DIR } from "../data-paths.js";
+import { health, repairLog } from "../lib/health-ledger.js";
+import { getCachedQmdStatus } from "../lib/qmd-status.js";
+
+// ── Types ────────────────────────────────────────────────────────────
+
+export type SubsystemId =
+  | "memory"
+  | "qmd"
+  | "identity-graph"
+  | "identity-cache"
+  | "queue-processor"
+  | "heartbeat"
+  | "api-keys"
+  | "oauth-token"
+  | "data-dir"
+  | "host-gateway"
+  | "host-ui"
+  | "host-plugins";
+
+export type HealthState = "healthy" | "degraded" | "offline" | "repaired";
+
+export interface SubsystemStatus {
+  id: SubsystemId;
+  state: HealthState;
+  message: string;
+  lastCheck: number;
+  lastRepair: number | null;
+  repairCount: number;
+  /** Number of consecutive failures (resets on healthy check) */
+  consecutiveFailures: number;
+}
+
+// ── Status Registry (in-memory, queryable via RPC) ───────────────────
+
+const registry = new Map<SubsystemId, SubsystemStatus>();
+
+function getOrCreate(id: SubsystemId): SubsystemStatus {
+  let entry = registry.get(id);
+  if (!entry) {
+    entry = {
+      id,
+      state: "offline",
+      message: "Not yet checked",
+      lastCheck: 0,
+      lastRepair: null,
+      repairCount: 0,
+      consecutiveFailures: 0,
+    };
+    registry.set(id, entry);
+  }
+  return entry;
+}
+
+function markHealthy(id: SubsystemId, message: string): void {
+  const s = getOrCreate(id);
+  s.state = "healthy";
+  s.message = message;
+  s.lastCheck = Date.now();
+  s.consecutiveFailures = 0;
+}
+
+function markDegraded(id: SubsystemId, message: string): void {
+  const s = getOrCreate(id);
+  s.state = "degraded";
+  s.message = message;
+  s.lastCheck = Date.now();
+  s.consecutiveFailures++;
+}
+
+function markOffline(id: SubsystemId, message: string): void {
+  const s = getOrCreate(id);
+  s.state = "offline";
+  s.message = message;
+  s.lastCheck = Date.now();
+  s.consecutiveFailures++;
+}
+
+function markRepaired(id: SubsystemId, message: string): void {
+  const s = getOrCreate(id);
+  s.state = "repaired";
+  s.message = message;
+  s.lastCheck = Date.now();
+  s.lastRepair = Date.now();
+  s.repairCount++;
+  s.consecutiveFailures = 0;
+}
+
+// ── Public API ───────────────────────────────────────────────────────
+
+import type { Logger } from "../types/plugin-api.js";
+type BroadcastFn = (event: string, payload: unknown) => void;
+
+/**
+ * Run all health checks and auto-repairs. Called from heartbeat tick.
+ * Returns a summary of what was checked and what was repaired.
+ */
+export async function runSelfHeal(
+  logger: Logger,
+  broadcast?: BroadcastFn,
+): Promise<{ checked: number; repaired: number; failures: string[] }> {
+  const repairs: string[] = [];
+  const failures: string[] = [];
+  let checked = 0;
+
+  // Record that the self-heal loop is alive
+  recordHeartbeatTick();
+
+  // 1. OAuth token freshness
+  checked++;
+  try {
+    await checkAndRepairOAuth(logger);
+    if (getOrCreate("oauth-token").state === "repaired") {
+      repairs.push("Refreshed stale OAuth token");
+    }
+  } catch (err) {
+    logger.warn(`[SelfHeal] OAuth check error: ${String(err)}`);
+  }
+
+  // 2. API keys availability
+  checked++;
+  try {
+    checkApiKeys(logger);
+  } catch (err) {
+    logger.warn(`[SelfHeal] API key check error: ${String(err)}`);
+  }
+
+  // 3. Memory (Honcho)
+  checked++;
+  try {
+    await checkAndRepairMemory(logger);
+    if (getOrCreate("memory").state === "repaired") {
+      repairs.push("Re-initialized Honcho memory");
+    }
+  } catch (err) {
+    logger.warn(`[SelfHeal] Memory check error: ${String(err)}`);
+  }
+
+  // 4. Identity graph
+  checked++;
+  try {
+    checkAndRepairIdentityGraph(logger);
+    if (getOrCreate("identity-graph").state === "repaired") {
+      repairs.push("Re-initialized identity graph");
+    }
+  } catch (err) {
+    logger.warn(`[SelfHeal] Identity graph check error: ${String(err)}`);
+  }
+
+  // 5. Identity cache staleness
+  checked++;
+  try {
+    await checkIdentityCache(logger);
+    if (getOrCreate("identity-cache").state === "repaired") {
+      repairs.push("Invalidated stale identity cache");
+    }
+  } catch (err) {
+    logger.warn(`[SelfHeal] Identity cache check error: ${String(err)}`);
+  }
+
+  // 6. Queue processor
+  checked++;
+  try {
+    await checkAndRepairQueueProcessor(logger);
+    if (getOrCreate("queue-processor").state === "repaired") {
+      repairs.push("Restarted queue processor");
+    }
+  } catch (err) {
+    logger.warn(`[SelfHeal] Queue processor check error: ${String(err)}`);
+  }
+
+  // 7. Heartbeat liveness
+  checked++;
+  try {
+    checkHeartbeat(logger);
+  } catch (err) {
+    logger.warn(`[SelfHeal] Heartbeat check error: ${String(err)}`);
+  }
+
+  // 8. Data directory integrity
+  checked++;
+  try {
+    await checkDataDirectoryIntegrity(logger);
+    if (getOrCreate("data-dir" as SubsystemId).state === "repaired") {
+      repairs.push("Repaired data directory structure");
+    }
+  } catch (err) {
+    logger.warn(`[SelfHeal] Data directory check error: ${String(err)}`);
+  }
+
+  // 9. Host gateway health (is OpenClaw gateway responding?)
+  checked++;
+  try {
+    await checkHostGateway(logger);
+  } catch (err) {
+    logger.warn(`[SelfHeal] Host gateway check error: ${String(err)}`);
+  }
+
+  // 10. Host UI assets (detect missing Control UI — common v2026.3.22 bug)
+  checked++;
+  try {
+    checkHostUiAssets(logger);
+  } catch (err) {
+    logger.warn(`[SelfHeal] Host UI assets check error: ${String(err)}`);
+  }
+
+  // 11. Host plugin config (detect stale acpx references, disabled plugins)
+  checked++;
+  try {
+    await checkHostPluginConfig(logger);
+  } catch (err) {
+    logger.warn(`[SelfHeal] Host plugin config check error: ${String(err)}`);
+
+  }
+
+  // Collect failures for surfacing
+  for (const [, status] of registry) {
+    if (status.consecutiveFailures >= 2 && status.state !== "healthy" && status.state !== "repaired") {
+      failures.push(`${status.id}: ${status.message}`);
+    }
+  }
+
+  // Surface persistent failures to user via broadcast
+  if (failures.length > 0 && broadcast) {
+    broadcast("ally:notification", {
+      type: "health-alert",
+      summary: `GodMode self-heal: ${failures.length} subsystem(s) need attention`,
+      details: failures,
+      repairs: repairs.length > 0 ? repairs : undefined,
+    });
+  }
+
+  if (repairs.length > 0) {
+    logger.info(`[SelfHeal] Auto-repaired ${repairs.length} subsystem(s): ${repairs.join(", ")}`);
+  }
+
+  // ── Code Repair Escalation ──────────────────────────────────────
+  // If runtime repairs aren't working, escalate to Claude Code CLI
+  // to do an actual code fix (runs in background, non-blocking).
+  const escalationCandidates = Array.from(registry.values())
+    .filter((s) => s.state !== "healthy" && s.state !== "repaired")
+    .map((s) => ({
+      id: s.id,
+      message: s.message,
+      consecutiveFailures: s.consecutiveFailures,
+      repairCount: s.repairCount,
+    }));
+
+  if (escalationCandidates.some((c) => c.consecutiveFailures >= 5 && c.repairCount >= 2)) {
+    // REMOVED (v2 slim): code-repair escalation — OC has godmode_repair
+    logger.warn(`[SelfHeal] Subsystems with persistent failures detected — manual intervention needed`);
+  }
+
+  return { checked, repaired: repairs.length, failures };
+}
+
+/**
+ * Get the full health report. Called by RPC handler.
+ */
+export function getHealthReport(): HealthReport {
+  const subsystems = Array.from(registry.values());
+  const cachedQmd = getCachedQmdStatus();
+  if (cachedQmd && !subsystems.some((s) => s.id === "qmd")) {
+    subsystems.push({
+      id: "qmd",
+      state: cachedQmd.available || !cachedQmd.backendConfigured ? "healthy" : "degraded",
+      message: cachedQmd.available
+        ? `QMD available${cachedQmd.version ? ` (${cachedQmd.version})` : ""}`
+        : cachedQmd.backendConfigured
+          ? cachedQmd.warning ?? "QMD unavailable"
+          : `QMD not required (memory.backend=${cachedQmd.backend})`,
+      lastCheck: Date.parse(cachedQmd.checkedAt) || Date.now(),
+      lastRepair: null,
+      repairCount: 0,
+      consecutiveFailures: cachedQmd.available || !cachedQmd.backendConfigured ? 0 : 1,
+    });
+  }
+  const overall: HealthState = subsystems.every((s) => s.state === "healthy" || s.state === "repaired")
+    ? "healthy"
+    : subsystems.some((s) => s.state === "offline")
+      ? "offline"
+      : "degraded";
+
+  const lastRepair = subsystems
+    .filter((s) => s.lastRepair)
+    .sort((a, b) => (b.lastRepair ?? 0) - (a.lastRepair ?? 0))[0];
+
+  // Include the signal ledger for operation-level visibility
+  const ledger = health.snapshot();
+
+  // Compute total repair success rate from repair log
+  const recentRepairs = repairLog.recent(50);
+  const totalRepairs = recentRepairs.length;
+  const verifiedRepairs = recentRepairs.filter((r) => r.verified).length;
+  const repairSuccessRate = totalRepairs > 0 ? verifiedRepairs / totalRepairs : null;
+
+  return {
+    ts: Date.now(),
+    overall,
+    subsystems,
+    lastRepairSummary: lastRepair ? `${lastRepair.id}: ${lastRepair.message}` : null,
+    repairSuccessRate,
+    ledger,
+  };
+}
+
+/** Extended HealthReport with signal ledger */
+export interface HealthReport {
+  ts: number;
+  overall: HealthState;
+  subsystems: SubsystemStatus[];
+  lastRepairSummary: string | null;
+  /** Ratio of verified-successful repairs to total repairs (0-1), null if no repairs recorded */
+  repairSuccessRate: number | null;
+  ledger?: import("../lib/health-ledger.js").LedgerSnapshot;
+}
+
+// ── Individual Checks ────────────────────────────────────────────────
+
+/**
+ * Check OAuth token freshness. If the token is expired or expiring soon,
+ * attempt to refresh it from Claude Code credentials.
+ */
+async function checkAndRepairOAuth(logger: Logger): Promise<void> {
+  const id: SubsystemId = "oauth-token";
+  try {
+    const credsPath = join(homedir(), ".claude", ".credentials.json");
+    if (!existsSync(credsPath)) {
+      markDegraded(id, "No Claude Code credentials file found");
+      return;
+    }
+
+    const creds = JSON.parse(await readFile(credsPath, "utf-8"));
+    const oauth = creds?.claudeAiOauth;
+    if (!oauth?.accessToken) {
+      markDegraded(id, "No OAuth access token in credentials");
+      return;
+    }
+
+    // Check if token has an expiry we can read
+    if (oauth.expiresAt) {
+      const expiresAt = typeof oauth.expiresAt === "number" ? oauth.expiresAt : Date.parse(oauth.expiresAt);
+      const now = Date.now();
+      const fiveMinutes = 5 * 60 * 1000;
+
+      if (expiresAt < now) {
+        // Token expired — try refresh
+        if (oauth.refreshToken) {
+          logger.info("[SelfHeal] OAuth token expired, attempting refresh...");
+          const refreshed = await refreshOAuthToken(oauth.refreshToken, credsPath, logger);
+          if (refreshed) {
+            // Update process.env so Honcho and other services pick it up
+            process.env.ANTHROPIC_API_KEY = refreshed;
+            const repairStart = Date.now();
+            markRepaired(id, "Refreshed expired OAuth token");
+            // Verify: re-read credentials to confirm the token was written
+            const verified = await verifyOAuthToken(credsPath);
+            repairLog.record({
+              ts: Date.now(),
+              subsystem: id,
+              failure: "OAuth token expired",
+              repairAction: "Refreshed OAuth token",
+              verified,
+              elapsed: Date.now() - repairStart,
+            });
+            health.signal("oauth.repair", verified, { verified });
+            return;
+          }
+        }
+        markOffline(id, "OAuth token expired and refresh failed");
+        return;
+      }
+
+      if (expiresAt - now < fiveMinutes) {
+        // Expiring soon — proactive refresh
+        if (oauth.refreshToken) {
+          logger.info("[SelfHeal] OAuth token expiring soon, proactive refresh...");
+          const refreshed = await refreshOAuthToken(oauth.refreshToken, credsPath, logger);
+          if (refreshed) {
+            process.env.ANTHROPIC_API_KEY = refreshed;
+            const repairStart = Date.now();
+            markRepaired(id, "Proactively refreshed OAuth token");
+            const verified = await verifyOAuthToken(credsPath);
+            repairLog.record({
+              ts: Date.now(),
+              subsystem: id,
+              failure: "OAuth token expiring soon",
+              repairAction: "Proactively refreshed OAuth token",
+              verified,
+              elapsed: Date.now() - repairStart,
+            });
+            health.signal("oauth.repair", verified, { verified });
+            return;
+          }
+        }
+        markDegraded(id, "OAuth token expiring soon, refresh failed");
+        return;
+      }
+    }
+
+    markHealthy(id, "OAuth token valid");
+  } catch (err) {
+    markDegraded(id, `OAuth check failed: ${String(err).slice(0, 80)}`);
+  }
+}
+
+/**
+ * Attempt to refresh an OAuth token using the refresh token.
+ * Returns the new access token on success, null on failure.
+ */
+async function refreshOAuthToken(
+  refreshToken: string,
+  credsPath: string,
+  logger: Logger,
+): Promise<string | null> {
+  try {
+    // Claude Code OAuth uses Anthropic's token endpoint
+    const resp = await fetch("https://console.anthropic.com/v1/oauth/token", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        grant_type: "refresh_token",
+        refresh_token: refreshToken,
+        // Client ID for Claude Code
+        client_id: "9d1c250a-e61b-44e4-8ed0-2de2c8e0ed33",
+      }),
+      signal: AbortSignal.timeout(10_000),
+    });
+
+    if (!resp.ok) {
+      logger.warn(`[SelfHeal] OAuth refresh failed: ${resp.status} ${resp.statusText}`);
+      return null;
+    }
+
+    const data = (await resp.json()) as {
+      access_token?: string;
+      expires_in?: number;
+      refresh_token?: string;
+    };
+
+    if (!data.access_token) {
+      logger.warn("[SelfHeal] OAuth refresh returned no access token");
+      return null;
+    }
+
+    // Update credentials file (atomic: write to temp, rename over original)
+    const { writeFile, rename } = await import("node:fs/promises");
+    const creds = JSON.parse(await readFile(credsPath, "utf-8"));
+    creds.claudeAiOauth = {
+      ...creds.claudeAiOauth,
+      accessToken: data.access_token,
+      expiresAt: Date.now() + (data.expires_in ?? 3600) * 1000,
+      ...(data.refresh_token ? { refreshToken: data.refresh_token } : {}),
+    };
+    const tmpPath = credsPath + ".tmp";
+    await writeFile(tmpPath, JSON.stringify(creds, null, 2), { encoding: "utf-8", mode: 0o600 });
+    await rename(tmpPath, credsPath);
+
+    logger.info("[SelfHeal] OAuth token refreshed successfully");
+    return data.access_token;
+  } catch (err) {
+    logger.warn(`[SelfHeal] OAuth refresh error: ${String(err)}`);
+    return null;
+  }
+}
+
+/**
+ * Verify that the OAuth token on disk is valid and not expired.
+ * Used to confirm a repair actually worked.
+ */
+async function verifyOAuthToken(credsPath: string): Promise<boolean> {
+  try {
+    const creds = JSON.parse(await readFile(credsPath, "utf-8"));
+    const oauth = creds?.claudeAiOauth;
+    if (!oauth?.accessToken) return false;
+    if (oauth.expiresAt) {
+      const expiresAt = typeof oauth.expiresAt === "number" ? oauth.expiresAt : Date.parse(oauth.expiresAt);
+      return expiresAt > Date.now();
+    }
+    // Has a token but no expiry — assume valid
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Check that required API keys are present in process.env.
+ */
+function checkApiKeys(logger: Logger): void {
+  const id: SubsystemId = "api-keys";
+  const keys: Array<{ name: string; envVars: string[]; required: boolean }> = [
+    { name: "Anthropic", envVars: ["ANTHROPIC_API_KEY"], required: true },
+    // Embeddings are optional — Honcho replaces Mem0, embedding keys no longer required
+    { name: "Embeddings", envVars: ["GEMINI_API_KEY", "GOOGLE_API_KEY", "OPENAI_API_KEY"], required: false },
+  ];
+
+  const missing: string[] = [];
+  for (const key of keys) {
+    const hasKey = key.envVars.some((v) => !!process.env[v]);
+    if (!hasKey && key.required) {
+      missing.push(key.name);
+    }
+  }
+
+  if (missing.length > 0) {
+    markDegraded(
+      id,
+      `Missing required API key: ${missing.join(", ")}. ` +
+      `Set ANTHROPIC_API_KEY in your environment or add it to ~/godmode/.env — ` +
+      `get a key at https://console.anthropic.com/settings/keys`,
+    );
+  } else {
+    markHealthy(id, "All required API keys present");
+  }
+}
+
+/**
+ * Check memory status. Honcho is the primary memory system.
+ * If HONCHO_API_KEY is not configured, memory is simply unavailable (non-critical).
+ */
+async function checkAndRepairMemory(logger: Logger): Promise<void> {
+  const id: SubsystemId = "memory";
+  try {
+    // Check memory via provider facade
+    try {
+      const { isMemoryReady, initMemory, getMemoryProvider } = await import("../lib/memory.js");
+      const provider = getMemoryProvider();
+      if (isMemoryReady()) {
+        markHealthy(id, `Memory operational (provider: ${provider})`);
+        return;
+      }
+
+      if (provider !== "none") {
+        logger.info(`[SelfHeal] Memory offline but provider "${provider}" configured — attempting re-init...`);
+        const repairStart = Date.now();
+        const ok = await initMemory();
+        if (ok) {
+          markRepaired(id, `Re-initialized memory (provider: ${provider})`);
+          // Verify: re-check if memory is actually ready after repair
+          const verified = isMemoryReady();
+          health.signal("memory.repair", verified, { verified });
+          repairLog.record({
+            ts: Date.now(),
+            subsystem: id,
+            failure: `Memory offline (provider: ${provider})`,
+            repairAction: `Re-initialized memory (provider: ${provider})`,
+            verified,
+            elapsed: Date.now() - repairStart,
+          });
+        } else {
+          markDegraded(id, `Memory re-init failed (provider: ${provider})`);
+        }
+      } else {
+        // No provider configured — memory is simply unavailable, not broken
+        markDegraded(id, "No memory provider configured — memory features disabled but chat works fine");
+      }
+    } catch {
+      markDegraded(id, "Memory service not available — chat works fine without it");
+    }
+  } catch (err) {
+    markDegraded(id, `Memory check failed: ${String(err).slice(0, 80)}`);
+  }
+}
+
+/**
+ * Check identity graph. If DB is missing or not initialized, re-init.
+ */
+async function checkAndRepairIdentityGraph(logger: Logger): Promise<void> {
+  const id: SubsystemId = "identity-graph";
+  try {
+    const { isGraphReady, initIdentityGraph } = await import("../lib/identity-graph.js");
+
+    if (isGraphReady()) {
+      markHealthy(id, "Identity graph operational");
+      return;
+    }
+
+    // Try re-init
+    logger.info("[SelfHeal] Identity graph not ready — attempting re-init...");
+    const repairStart = Date.now();
+    initIdentityGraph();
+
+    if (isGraphReady()) {
+      markRepaired(id, "Re-initialized identity graph");
+      // Verify: re-check graph readiness as verification
+      const verified = isGraphReady();
+      repairLog.record({
+        ts: Date.now(),
+        subsystem: id,
+        failure: "Identity graph not ready",
+        repairAction: "Re-initialized identity graph",
+        verified,
+        elapsed: Date.now() - repairStart,
+      });
+      health.signal("identity-graph.repair", verified, { verified });
+    } else {
+      markOffline(id, "Identity graph init failed");
+    }
+  } catch (err) {
+    // Dynamic import may fail if better-sqlite3 isn't available
+    markOffline(id, `Identity graph unavailable: ${String(err).slice(0, 80)}`);
+  }
+}
+
+/**
+ * Check if the identity cache (USER.md) is stale. If the file changed
+ * since last cache, invalidate it so the next turn gets fresh data.
+ */
+let lastUserMdMtime = 0;
+
+async function checkIdentityCache(logger: Logger): Promise<void> {
+  const id: SubsystemId = "identity-cache";
+  try {
+    // Check if USER.md has been modified
+    const userMdPath = join(DATA_DIR, "..", "USER.md");
+    if (!existsSync(userMdPath)) {
+      markDegraded(id, "USER.md not found");
+      return;
+    }
+
+    const stat = statSync(userMdPath);
+    const mtime = stat.mtimeMs;
+
+    if (lastUserMdMtime > 0 && mtime > lastUserMdMtime) {
+      // File changed — invalidate the cache
+      logger.info("[SelfHeal] USER.md changed — invalidating identity cache");
+      try {
+        const repairStart = Date.now();
+        const { invalidateIdentityCache } = await import("../lib/context-budget.js");
+        invalidateIdentityCache();
+        markRepaired(id, "Invalidated stale identity cache after USER.md change");
+        // Cache invalidation is fire-and-forget; verified = true if no error thrown
+        repairLog.record({
+          ts: Date.now(),
+          subsystem: id,
+          failure: "Stale identity cache (USER.md changed)",
+          repairAction: "Invalidated identity cache",
+          verified: true,
+          elapsed: Date.now() - repairStart,
+        });
+        health.signal("identity-cache.repair", true, { verified: true });
+      } catch {
+        markDegraded(id, "USER.md changed but cache invalidation failed");
+      }
+    } else {
+      markHealthy(id, "Identity cache in sync");
+    }
+
+    lastUserMdMtime = mtime;
+  } catch (err) {
+    markDegraded(id, `Identity cache check failed: ${String(err).slice(0, 80)}`);
+  }
+}
+
+/**
+ * Check queue processor is alive. If it stopped, restart polling.
+ */
+async function checkAndRepairQueueProcessor(logger: Logger): Promise<void> {
+  const id: SubsystemId = "queue-processor";
+  try {
+    const { getQueueProcessor } = await import("./queue-processor.js");
+    const processor = getQueueProcessor();
+
+    if (!processor) {
+      markOffline(id, "Queue processor not initialized");
+      return;
+    }
+
+    // Check if polling is active
+    if (processor.isPolling?.()) {
+      markHealthy(id, "Queue processor polling");
+      return;
+    }
+
+    // Not polling — try to restart
+    logger.info("[SelfHeal] Queue processor not polling — restarting...");
+    const repairStart = Date.now();
+    processor.startPolling();
+
+    if (processor.isPolling?.()) {
+      markRepaired(id, "Restarted queue processor polling");
+      // Verify: re-check polling is actually running
+      const verified = !!processor.isPolling?.();
+      repairLog.record({
+        ts: Date.now(),
+        subsystem: id,
+        failure: "Queue processor not polling",
+        repairAction: "Restarted queue processor polling",
+        verified,
+        elapsed: Date.now() - repairStart,
+      });
+      health.signal("queue-processor.repair", verified, { verified });
+    } else {
+      markDegraded(id, "Queue processor restart failed");
+    }
+  } catch (err) {
+    markDegraded(id, `Queue processor check failed: ${String(err).slice(0, 80)}`);
+  }
+}
+
+/**
+ * Check heartbeat liveness. The heartbeat runs on a 15-min interval.
+ * If it hasn't ticked in over 20 minutes, something is wrong.
+ */
+let lastHeartbeatTick = Date.now(); // initialized to now — first check gets grace period
+
+/** Called by the heartbeat tick to record liveness. */
+export function recordHeartbeatTick(): void {
+  lastHeartbeatTick = Date.now();
+}
+
+function checkHeartbeat(logger: Logger): void {
+  const id: SubsystemId = "heartbeat";
+  const elapsed = Date.now() - lastHeartbeatTick;
+  const MAX_HEARTBEAT_GAP_MS = 20 * 60 * 1000; // 20 minutes
+
+  if (elapsed < MAX_HEARTBEAT_GAP_MS) {
+    markHealthy(id, `Last tick ${Math.round(elapsed / 1000)}s ago`);
+  } else {
+    markDegraded(id, `No heartbeat tick for ${Math.round(elapsed / 60_000)}m — heartbeat may be stalled`);
+    logger.warn(`[SelfHeal] Heartbeat appears stalled — last tick was ${Math.round(elapsed / 60_000)}m ago`);
+  }
+}
+
+/**
+ * Check data directory integrity. Ensure ~/godmode/data/ exists and
+ * critical files are parseable JSON (not corrupted).
+ */
+async function checkDataDirectoryIntegrity(logger: Logger): Promise<void> {
+  const id: SubsystemId = "data-dir";
+  try {
+    const { mkdir } = await import("node:fs/promises");
+
+    // Ensure data dir exists
+    await mkdir(DATA_DIR, { recursive: true });
+
+    // Check critical JSON files are parseable
+    const criticalFiles = ["queue.json", "onboarding.json"];
+    const corruptFiles: string[] = [];
+
+    for (const file of criticalFiles) {
+      const filePath = join(DATA_DIR, file);
+      if (!existsSync(filePath)) continue; // Missing files are OK — they get created on demand
+
+      try {
+        const content = await readFile(filePath, "utf-8");
+        if (content.trim().length > 0) {
+          JSON.parse(content);
+        }
+      } catch {
+        // File exists but is corrupted — try to recover from backup
+        const bakPath = filePath + ".bak";
+        if (existsSync(bakPath)) {
+          try {
+            const repairStart = Date.now();
+            const bakContent = await readFile(bakPath, "utf-8");
+            JSON.parse(bakContent); // Validate backup is also good
+            const { writeFile } = await import("node:fs/promises");
+            await writeFile(filePath, bakContent, "utf-8");
+            logger.info(`[SelfHeal] Recovered corrupted ${file} from backup`);
+            // Verify: re-read and parse the restored file
+            let verified = false;
+            try {
+              const restored = await readFile(filePath, "utf-8");
+              JSON.parse(restored);
+              verified = true;
+            } catch { /* verification failed */ }
+            repairLog.record({
+              ts: Date.now(),
+              subsystem: "data-dir",
+              failure: `Corrupted data file: ${file}`,
+              repairAction: `Restored ${file} from backup`,
+              verified,
+              elapsed: Date.now() - repairStart,
+            });
+            health.signal("data-dir.repair", verified, { file, verified });
+          } catch {
+            corruptFiles.push(file);
+          }
+        } else {
+          corruptFiles.push(file);
+        }
+      }
+    }
+
+    if (corruptFiles.length > 0) {
+      markDegraded(id, `Corrupted data files: ${corruptFiles.join(", ")}`);
+      logger.warn(`[SelfHeal] Corrupted data files detected: ${corruptFiles.join(", ")}`);
+    } else {
+      markHealthy(id, "Data directory intact");
+    }
+  } catch (err) {
+    markDegraded(id, `Data directory check failed: ${String(err).slice(0, 80)}`);
+  }
+}
+
+// ── Escalation Chain ─────────────────────────────────────────────────
+
+/**
+ * Build an escalation context string for the ally to inject when
+ * subsystems are degraded. This goes into before_prompt_build so
+ * the ally knows to warn the user instead of pretending everything works.
+ *
+ * Returns null if everything is healthy.
+ */
+export function getEscalationContext(): string | null {
+  const alerts: string[] = [];
+
+  for (const [, status] of registry) {
+    if (status.state === "offline" && status.consecutiveFailures >= 3) {
+      alerts.push(`[OFFLINE] ${status.id}: ${status.message}`);
+    } else if (status.state === "degraded" && status.consecutiveFailures >= 2) {
+      alerts.push(`[DEGRADED] ${status.id}: ${status.message}`);
+    }
+  }
+
+  // Also check the signal ledger for operation-level alerts
+  const ledger = health.snapshot();
+  for (const alert of ledger.alerts) {
+    if (!alerts.some((a) => a.includes(alert.split(":")[0]))) {
+      alerts.push(`[ALERT] ${alert}`);
+    }
+  }
+
+  if (alerts.length === 0) return null;
+
+  return [
+    "## System Health Warnings",
+    "The following subsystems have issues. Be transparent with the user about what's working and what isn't.",
+    "Do NOT pretend capabilities work when they're degraded.",
+    ...alerts.map((a) => `- ${a}`),
+  ].join("\n");
+}
+
+// ── Host Environment Checks (OpenClaw v2026.3.22 release hardening) ───
+
+/**
+ * Check if the host OpenClaw gateway is responsive.
+ * A non-responsive gateway means GodMode is also down.
+ */
+async function checkHostGateway(logger: Logger): Promise<void> {
+  const id: SubsystemId = "host-gateway";
+  try {
+    // Check if the openclaw process is running by looking for the state dir
+    const stateDir = join(homedir(), ".openclaw");
+    if (!existsSync(stateDir)) {
+      markDegraded(id, "OpenClaw state directory (~/.openclaw) not found — gateway may not be installed");
+      return;
+    }
+
+    // Check if the gateway PID file exists and the process is alive
+    const pidPath = join(stateDir, "gateway.pid");
+    if (existsSync(pidPath)) {
+      try {
+        const pidStr = (await readFile(pidPath, "utf-8")).trim();
+        const pid = parseInt(pidStr, 10);
+        if (!isNaN(pid)) {
+          try {
+            process.kill(pid, 0); // signal 0 = check only
+            markHealthy(id, "Gateway process alive");
+          } catch {
+            markDegraded(id, `Gateway PID ${pid} not running. Run: openclaw doctor --fix`);
+          }
+        } else {
+          markHealthy(id, "Gateway state dir exists (PID check skipped)");
+        }
+      } catch {
+        markHealthy(id, "Gateway state dir exists (PID file unreadable)");
+      }
+    } else {
+      // No PID file is normal in some setups — just check state dir existence
+      markHealthy(id, "Gateway state dir exists");
+    }
+  } catch (err) {
+    markDegraded(id, `Gateway check error: ${String(err)}`);
+  }
+}
+
+/**
+ * Check if the host Control UI assets exist.
+ * Missing assets is the #1 complaint from v2026.3.22 (upstream #52808).
+ */
+function checkHostUiAssets(logger: Logger): void {
+  const id: SubsystemId = "host-ui";
+  try {
+    // Check common locations for Control UI assets
+    const candidates = [
+      join(homedir(), ".openclaw", "control-ui"),
+      join(homedir(), ".openclaw", "dist", "control-ui"),
+    ];
+
+    // Also check if our own GodMode UI fallback exists
+    const godmodeUiFallback = join(DATA_DIR, "..", "dist", "godmode-ui");
+    const godmodeUiAssets = join(DATA_DIR, "..", "assets", "godmode-ui");
+
+    const hostUiExists = candidates.some((p) => existsSync(p));
+    const godmodeUiExists = existsSync(godmodeUiFallback) || existsSync(godmodeUiAssets);
+
+    if (hostUiExists) {
+      markHealthy(id, "Host Control UI assets present");
+    } else if (godmodeUiExists) {
+      markDegraded(id, 
+        "Host Control UI assets missing (known v2026.3.22 bug — upstream #52808). " +
+        "GodMode UI fallback is intact. " +
+        "Fix: openclaw doctor --fix, or update to beta: openclaw update --channel beta"
+      );
+      logger.warn("[SelfHeal] Host Control UI missing — GodMode UI fallback is serving");
+    } else {
+      markDegraded(id, 
+        "Both host Control UI and GodMode UI assets missing. " +
+        "Run: openclaw doctor --fix, then: pnpm ui:sync in godmode-plugin"
+      );
+    }
+  } catch (err) {
+    markDegraded(id, `UI assets check error: ${String(err)}`);
+  }
+}
+
+/**
+ * Check the host OpenClaw config for known problematic patterns:
+ * - Stale acpx plugin reference (should be removed, now built into core)
+ * - GodMode plugin still enabled
+ * - WhatsApp plugin present in config but missing from dist
+ */
+async function checkHostPluginConfig(logger: Logger): Promise<void> {
+  const id: SubsystemId = "host-plugins";
+  try {
+    const configPath = join(homedir(), ".openclaw", "openclaw.json");
+    if (!existsSync(configPath)) {
+      // Try alternate location
+      const altConfig = join(homedir(), ".openclaw", "config.json");
+      if (!existsSync(altConfig)) {
+        markHealthy(id, "No host config file found (may use defaults)");
+        return;
+      }
+    }
+
+    const configStr = await readFile(
+      existsSync(join(homedir(), ".openclaw", "openclaw.json"))
+        ? join(homedir(), ".openclaw", "openclaw.json")
+        : join(homedir(), ".openclaw", "config.json"),
+      "utf-8"
+    );
+
+    let config: Record<string, unknown>;
+    try {
+      config = JSON.parse(configStr);
+    } catch {
+      markDegraded(id, "Host config file is malformed JSON. Run: openclaw doctor --fix");
+      return;
+    }
+
+    const issues: string[] = [];
+
+    // Check for stale acpx plugin reference
+    const plugins = config.plugins as Record<string, unknown> | undefined;
+    const extensions = config.extensions as Record<string, unknown> | undefined;
+    const pluginList = plugins || extensions;
+    
+    if (pluginList) {
+      if ("acpx" in pluginList || "@openclaw/acpx" in pluginList) {
+        issues.push(
+          "Stale 'acpx' plugin in config — acpx is now built into core. " +
+          "Remove it and set acp.backend: 'core' in config"
+        );
+      }
+
+      // Check if GodMode/godmode plugin is present
+      const hasGodmode = Object.keys(pluginList).some(
+        (k) => k.toLowerCase().includes("godmode")
+      );
+      if (!hasGodmode) {
+        issues.push(
+          "GodMode plugin not found in host config — may have been disabled by config drift during update"
+        );
+      }
+    }
+
+    if (issues.length === 0) {
+      markHealthy(id, "Host plugin config looks clean");
+    } else {
+      markDegraded(id, issues.join("; "));
+      for (const issue of issues) {
+        logger.warn(`[SelfHeal] Host config issue: ${issue}`);
+      }
+    }
+  } catch (err) {
+    // Config check is best-effort — don't fail hard
+    markHealthy(id, "Host config check skipped (not accessible)");
+  }
+}
+
+/**
+ * Check for and kill orphaned agent processes (zombie PIDs from before restart).
+ * Returns count of killed processes.
+ */
+export async function cleanOrphanedAgents(logger: Logger): Promise<number> {
+  try {
+    const { readQueueState, updateQueueState } = await import("../lib/queue-state.js");
+    const state = await readQueueState();
+    let cleaned = 0;
+
+    const processing = state.items.filter((i) => i.status === "processing" && i.pid);
+
+    for (const item of processing) {
+      const pid = item.pid!;
+      try {
+        // Check if process is alive (signal 0 = check only)
+        process.kill(pid, 0);
+        // Process is alive — leave it
+      } catch {
+        // Process is dead — mark item as failed for retry
+        logger.warn(`[SelfHeal] Orphaned agent PID ${pid} for "${item.title}" — marking for retry`);
+        await updateQueueState((s) => {
+          const qi = s.items.find((i) => i.id === item.id);
+          if (qi && qi.status === "processing") {
+            qi.status = "pending";
+            qi.pid = undefined;
+            qi.retryCount = (qi.retryCount ?? 0) + 1;
+          }
+        });
+        cleaned++;
+      }
+    }
+
+    if (cleaned > 0) {
+      logger.info(`[SelfHeal] Cleaned ${cleaned} orphaned agent(s) — re-queued for processing`);
+    }
+
+    return cleaned;
+  } catch {
+    return 0;
+  }
+}

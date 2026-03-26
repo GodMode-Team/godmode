@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GodMode Demo - Scale Your Self</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚡</text></svg>">
+    <meta name="description" content="Watch the GodMode launch video - The Personal AI Operating System for the world's most inspiring and impactful people.">
+
+    <!-- Open Graph / Social Media -->
+    <meta property="og:type" content="video.other">
+    <meta property="og:title" content="GodMode Demo - Scale Your Self">
+    <meta property="og:description" content="The Personal AI Operating System for the world's most inspiring and impactful people.">
+    <meta property="og:video" content="https://lifeongodmode.com/godmode-launch.mp4">
+    <meta property="og:video:type" content="video/mp4">
+    <meta property="og:image" content="https://lifeongodmode.com/godmode-thumbnail.jpg">
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="player">
+    <meta name="twitter:title" content="GodMode Demo - Scale Your Self">
+    <meta name="twitter:description" content="The Personal AI Operating System for the world's most inspiring and impactful people.">
+    <meta name="twitter:player" content="https://lifeongodmode.com/demo">
+    <meta name="twitter:image" content="https://lifeongodmode.com/godmode-thumbnail.jpg">
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', sans-serif;
+            background: linear-gradient(135deg, #0a0a0a 0%, #1a1a1a 100%);
+            color: #ffffff;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            width: 100%;
+            text-align: center;
+        }
+
+        h1 {
+            font-size: 4rem;
+            font-weight: 900;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 1rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .tagline {
+            font-size: 2rem;
+            color: #a0a0a0;
+            margin-bottom: 3rem;
+            font-weight: 300;
+        }
+
+        .video-container {
+            position: relative;
+            width: 100%;
+            max-width: 1200px;
+            margin: 0 auto 3rem;
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: 0 0 60px rgba(139, 92, 246, 0.4);
+            background: #000;
+        }
+
+        video {
+            width: 100%;
+            height: auto;
+            display: block;
+        }
+
+        .cta-section {
+            display: flex;
+            flex-direction: column;
+            gap: 2rem;
+            align-items: center;
+        }
+
+        .cta-button {
+            display: inline-block;
+            padding: 20px 50px;
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #ffffff;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 50px;
+            text-decoration: none;
+            transition: transform 0.2s, box-shadow 0.2s;
+            box-shadow: 0 10px 30px rgba(139, 92, 246, 0.3);
+        }
+
+        .cta-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 15px 40px rgba(139, 92, 246, 0.5);
+        }
+
+        .share-buttons {
+            display: flex;
+            gap: 1rem;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .share-btn {
+            padding: 12px 24px;
+            font-size: 1rem;
+            font-weight: 600;
+            color: #ffffff;
+            background: rgba(255, 255, 255, 0.1);
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            border-radius: 30px;
+            text-decoration: none;
+            transition: all 0.2s;
+            cursor: pointer;
+        }
+
+        .share-btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+            border-color: rgba(255, 255, 255, 0.4);
+        }
+
+        .stats {
+            margin-top: 4rem;
+            padding: 3rem;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 16px;
+            border: 1px solid rgba(139, 92, 246, 0.3);
+        }
+
+        .stats h2 {
+            font-size: 2rem;
+            margin-bottom: 2rem;
+            color: #8b5cf6;
+        }
+
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 2rem;
+            text-align: left;
+        }
+
+        .feature {
+            padding: 1.5rem;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 12px;
+            border: 1px solid rgba(139, 92, 246, 0.2);
+        }
+
+        .feature-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+        }
+
+        .feature h3 {
+            font-size: 1.2rem;
+            margin-bottom: 0.5rem;
+            color: #ffffff;
+        }
+
+        .feature p {
+            color: #a0a0a0;
+            font-size: 0.95rem;
+            line-height: 1.6;
+        }
+
+        @media (max-width: 768px) {
+            h1 {
+                font-size: 2.5rem;
+            }
+
+            .tagline {
+                font-size: 1.2rem;
+            }
+
+            .cta-button {
+                font-size: 1.2rem;
+                padding: 15px 35px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>GodMode</h1>
+        <p class="tagline">Scale Your Self</p>
+
+        <div class="video-container">
+            <video controls autoplay loop>
+                <source src="godmode-launch.mp4?v=2" type="video/mp4">
+                Your browser does not support the video tag.
+            </video>
+        </div>
+
+        <div class="cta-section">
+            <a href="/" class="cta-button">Join the Movement</a>
+
+            <div class="share-buttons">
+                <button class="share-btn" onclick="shareTwitter()">Share on 𝕏</button>
+                <button class="share-btn" onclick="shareLinkedIn()">Share on LinkedIn</button>
+                <button class="share-btn" onclick="copyLink()">Copy Link</button>
+            </div>
+        </div>
+
+        <div class="stats">
+            <h2>The Personal AI Operating System</h2>
+            <div class="features-grid">
+                <div class="feature">
+                    <div class="feature-icon">🧠</div>
+                    <h3>Think Alongside You</h3>
+                    <p>Claude analyzes patterns, challenges ideas, and connects dots you miss</p>
+                </div>
+
+                <div class="feature">
+                    <div class="feature-icon">⚡</div>
+                    <h3>Execute Relentlessly</h3>
+                    <p>Build, ship, and automate—don't just plan, actually get things done</p>
+                </div>
+
+                <div class="feature">
+                    <div class="feature-icon">🎯</div>
+                    <h3>Anticipate Needs</h3>
+                    <p>Proactively identify what you need before you even ask</p>
+                </div>
+
+                <div class="feature">
+                    <div class="feature-icon">🚀</div>
+                    <h3>Amplify Output 10x</h3>
+                    <p>Accomplish exponentially more than you could alone</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function shareTwitter() {
+            const text = "Just watched the GodMode demo - The Personal AI OS that helps you Scale Your Self 🚀";
+            const url = "https://lifeongodmode.com/demo";
+            window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`, '_blank');
+        }
+
+        function shareLinkedIn() {
+            const url = "https://lifeongodmode.com/demo";
+            window.open(`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(url)}`, '_blank');
+        }
+
+        function copyLink() {
+            navigator.clipboard.writeText('https://lifeongodmode.com/demo');
+            const btn = event.target;
+            const originalText = btn.textContent;
+            btn.textContent = '✓ Copied!';
+            setTimeout(() => {
+                btn.textContent = originalText;
+            }, 2000);
+        }
+    </script>
+</body>
+</html>

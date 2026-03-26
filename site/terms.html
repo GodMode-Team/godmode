@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Terms of Service | GodMode</title>
+    <meta name="description" content="GodMode Terms of Service - Personal AI Operating System plugin for OpenClaw">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚡</text></svg>">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --black: #000000;
+            --dark: #0a0a0a;
+            --gray-dark: #1a1a1a;
+            --gray: #666666;
+            --gray-light: #999999;
+            --white: #ffffff;
+            --accent: #00ff88;
+            --accent-dim: rgba(0, 255, 136, 0.1);
+        }
+
+        html {
+            scroll-behavior: smooth;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--black);
+            color: var(--white);
+            line-height: 1.8;
+            overflow-x: hidden;
+        }
+
+        .bg-gradient {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background:
+                radial-gradient(ellipse at 20% 20%, rgba(0, 255, 136, 0.06) 0%, transparent 50%),
+                radial-gradient(ellipse at 80% 80%, rgba(0, 255, 136, 0.04) 0%, transparent 50%);
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .container {
+            position: relative;
+            z-index: 2;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 0 40px;
+        }
+
+        header {
+            padding: 40px 0 20px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+            margin-bottom: 60px;
+        }
+
+        header a {
+            color: var(--accent);
+            text-decoration: none;
+            font-family: 'Space Grotesk', sans-serif;
+            font-weight: 600;
+            font-size: 1.1rem;
+            letter-spacing: -0.02em;
+        }
+
+        header a:hover {
+            opacity: 0.8;
+        }
+
+        h1 {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 2.5rem;
+            font-weight: 700;
+            letter-spacing: -0.03em;
+            margin-bottom: 12px;
+        }
+
+        .last-updated {
+            color: var(--gray-light);
+            font-size: 0.9rem;
+            margin-bottom: 50px;
+        }
+
+        h2 {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 1.4rem;
+            font-weight: 600;
+            letter-spacing: -0.02em;
+            color: var(--accent);
+            margin-top: 48px;
+            margin-bottom: 16px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid rgba(0, 255, 136, 0.15);
+        }
+
+        h2:first-of-type {
+            margin-top: 0;
+        }
+
+        p {
+            color: rgba(255, 255, 255, 0.85);
+            margin-bottom: 16px;
+            font-size: 0.95rem;
+        }
+
+        ul, ol {
+            color: rgba(255, 255, 255, 0.85);
+            margin-bottom: 16px;
+            padding-left: 24px;
+            font-size: 0.95rem;
+        }
+
+        li {
+            margin-bottom: 8px;
+        }
+
+        strong {
+            color: var(--white);
+            font-weight: 600;
+        }
+
+        a {
+            color: var(--accent);
+            text-decoration: none;
+        }
+
+        a:hover {
+            text-decoration: underline;
+        }
+
+        .highlight-box {
+            background: rgba(0, 255, 136, 0.05);
+            border: 1px solid rgba(0, 255, 136, 0.15);
+            border-radius: 8px;
+            padding: 20px 24px;
+            margin: 20px 0;
+        }
+
+        .highlight-box p {
+            margin-bottom: 0;
+        }
+
+        footer {
+            margin-top: 80px;
+            padding: 40px 0;
+            border-top: 1px solid rgba(255, 255, 255, 0.06);
+            text-align: center;
+        }
+
+        footer p {
+            color: var(--gray);
+            font-size: 0.85rem;
+        }
+
+        footer a {
+            color: var(--gray-light);
+        }
+
+        @media (max-width: 640px) {
+            .container {
+                padding: 0 20px;
+            }
+
+            h1 {
+                font-size: 1.8rem;
+            }
+
+            h2 {
+                font-size: 1.2rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="bg-gradient"></div>
+    <div class="container">
+        <header>
+            <a href="/">GodMode</a>
+        </header>
+
+        <h1>Terms of Service</h1>
+        <p class="last-updated">Last updated: February 2026</p>
+
+        <h2>1. Agreement to Terms</h2>
+        <p>These Terms of Service ("Terms") govern your access to and use of the GodMode plugin ("Service"), a commercial extension for the OpenClaw AI gateway, operated by the GodMode Team ("we", "us", or "our").</p>
+        <p>By subscribing to, installing, or using GodMode, you agree to be bound by these Terms. If you do not agree, do not use the Service.</p>
+
+        <h2>2. Description of Service</h2>
+        <p>GodMode is a Personal AI Operating System delivered as a plugin for OpenClaw, an open-source AI gateway. The plugin provides workspace management, agent orchestration, daily briefings, life-tracking, and other AI-powered productivity capabilities.</p>
+        <p>GodMode operates locally on your machine. Your data (stored in <code>~/godmode/data/</code>) remains on your device. The plugin communicates with our servers only for license validation purposes.</p>
+
+        <h2>3. Subscription and Billing</h2>
+        <div class="highlight-box">
+            <p><strong>Subscription fee:</strong> $300 per month, billed automatically via Stripe.</p>
+        </div>
+        <ul>
+            <li><strong>Auto-renewal:</strong> Your subscription renews automatically each billing cycle unless you cancel before the renewal date.</li>
+            <li><strong>Payment processing:</strong> All payments are processed securely through Stripe. We do not store your credit card information on our servers.</li>
+            <li><strong>Cancellation:</strong> You may cancel your subscription at any time. Upon cancellation, your access continues until the end of the current billing period, followed by a 24-hour grace period.</li>
+            <li><strong>Refunds:</strong> Subscription fees are non-refundable. You will not receive a prorated refund for the unused portion of any billing period.</li>
+            <li><strong>Price changes:</strong> We may adjust pricing with at least 30 days' advance notice. Continued use after a price change constitutes acceptance of the new pricing.</li>
+        </ul>
+
+        <h2>4. License Grant</h2>
+        <p>Subject to your compliance with these Terms and active subscription, we grant you a limited, non-exclusive, non-transferable, revocable license to:</p>
+        <ul>
+            <li>Install and use one (1) copy of the GodMode plugin on a single OpenClaw installation.</li>
+            <li>Use the plugin for personal or professional productivity purposes.</li>
+        </ul>
+        <p>Each license key (format: <code>GM-PROD-{uuid}</code>) is single-seat and tied to one OpenClaw installation. You may not share, transfer, or use a single license key across multiple installations simultaneously.</p>
+
+        <h2>5. Restrictions</h2>
+        <p>You agree that you will <strong>not</strong>:</p>
+        <ul>
+            <li>Copy, redistribute, sublicense, sell, resell, or otherwise transfer the GodMode plugin or any portion of it to any third party.</li>
+            <li>Reverse engineer, decompile, disassemble, or attempt to derive the source code of the plugin.</li>
+            <li>Create derivative works based on the plugin or any of its components.</li>
+            <li>Remove, alter, or obscure any copyright notices, license keys, or proprietary markings.</li>
+            <li>Circumvent, disable, or interfere with the license validation mechanism.</li>
+            <li>Use the plugin in any way that violates applicable law or regulation.</li>
+            <li>Share your license key with any other person or entity.</li>
+            <li>Use automated means to generate, guess, or brute-force license keys.</li>
+        </ul>
+
+        <h2>6. Intellectual Property</h2>
+        <p>The GodMode plugin, including all code, design, architecture, documentation, and associated materials, is proprietary software owned by the GodMode Team. It is protected by copyright and intellectual property laws.</p>
+        <p>OpenClaw is a separate open-source project with its own license. Your use of OpenClaw is governed by the OpenClaw license, not these Terms. These Terms apply exclusively to the GodMode plugin.</p>
+        <p>Your data (workspaces, conversations, files, configurations) stored locally on your machine remains yours. We claim no ownership over your data.</p>
+
+        <h2>7. Privacy</h2>
+        <p>Your privacy is fundamental to how GodMode is designed. Please review our <a href="/privacy.html">Privacy Policy</a> for details on what information we collect and how we handle it.</p>
+        <p>In summary: GodMode runs locally. Your workspace data, conversations, and personal files never leave your device. The only network communication with our servers is license key validation.</p>
+
+        <h2>8. Disclaimers</h2>
+        <p>THE SERVICE IS PROVIDED "AS IS" AND "AS AVAILABLE" WITHOUT WARRANTIES OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, NON-INFRINGEMENT, AND ACCURACY.</p>
+        <p>We do not warrant that:</p>
+        <ul>
+            <li>The Service will be uninterrupted, error-free, or secure.</li>
+            <li>The results obtained from the Service will be accurate or reliable.</li>
+            <li>The Service will meet your specific requirements or expectations.</li>
+            <li>Any defects or errors in the Service will be corrected.</li>
+        </ul>
+        <p>GodMode integrates with third-party AI models and services. We are not responsible for the output, availability, or behavior of those third-party services.</p>
+
+        <h2>9. Limitation of Liability</h2>
+        <p>TO THE MAXIMUM EXTENT PERMITTED BY LAW, IN NO EVENT SHALL THE GODMODE TEAM, ITS OFFICERS, DIRECTORS, EMPLOYEES, OR AGENTS BE LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR PUNITIVE DAMAGES, OR ANY LOSS OF PROFITS, DATA, USE, GOODWILL, OR OTHER INTANGIBLE LOSSES, RESULTING FROM:</p>
+        <ul>
+            <li>Your access to, use of, or inability to use the Service.</li>
+            <li>Any conduct or content of any third party on or related to the Service.</li>
+            <li>Unauthorized access, use, or alteration of your data or transmissions.</li>
+            <li>Any other matter relating to the Service.</li>
+        </ul>
+        <p>OUR TOTAL AGGREGATE LIABILITY FOR ALL CLAIMS RELATED TO THE SERVICE SHALL NOT EXCEED THE AMOUNT YOU PAID TO US IN THE THREE (3) MONTHS PRECEDING THE CLAIM.</p>
+
+        <h2>10. Termination</h2>
+        <p><strong>By you:</strong> You may terminate your subscription at any time by canceling through your account or contacting us. Your access continues until the end of the current billing period plus a 24-hour grace period.</p>
+        <p><strong>By us:</strong> We reserve the right to suspend or terminate your license immediately, without prior notice or liability, if you violate these Terms. In particular, redistribution, reverse engineering, or license key abuse will result in immediate termination.</p>
+        <p>Upon termination:</p>
+        <ul>
+            <li>Your license key will be revoked and the plugin will cease to function.</li>
+            <li>Your local data (stored in <code>~/godmode/data/</code>) will remain on your device and is unaffected by license termination.</li>
+            <li>Sections 5, 6, 8, 9, and 11 survive termination.</li>
+        </ul>
+
+        <h2>11. Governing Law and Disputes</h2>
+        <p>These Terms shall be governed by and construed in accordance with the laws of the State of Delaware, United States, without regard to conflict of law principles.</p>
+        <p>Any disputes arising from or relating to these Terms or the Service shall be resolved through binding arbitration in accordance with the rules of the American Arbitration Association, except that either party may seek injunctive relief in any court of competent jurisdiction.</p>
+
+        <h2>12. Changes to Terms</h2>
+        <p>We may update these Terms from time to time. When we make material changes, we will notify you via email or through the Service at least 14 days before the changes take effect.</p>
+        <p>Your continued use of the Service after changes become effective constitutes acceptance of the revised Terms. If you do not agree to the updated Terms, you should cancel your subscription before they take effect.</p>
+
+        <h2>13. General Provisions</h2>
+        <ul>
+            <li><strong>Entire Agreement:</strong> These Terms, together with the Privacy Policy, constitute the entire agreement between you and the GodMode Team regarding the Service.</li>
+            <li><strong>Severability:</strong> If any provision of these Terms is found to be unenforceable, the remaining provisions will continue in full force and effect.</li>
+            <li><strong>No Waiver:</strong> Our failure to enforce any right or provision of these Terms shall not constitute a waiver of that right or provision.</li>
+            <li><strong>Assignment:</strong> You may not assign or transfer these Terms without our prior written consent. We may assign our rights and obligations without restriction.</li>
+        </ul>
+
+        <h2>14. Contact</h2>
+        <p>If you have questions about these Terms, please contact us at:</p>
+        <p><strong>Email:</strong> <a href="mailto:legal@lifeongodmode.com">legal@lifeongodmode.com</a></p>
+        <p><strong>Website:</strong> <a href="https://lifeongodmode.com">lifeongodmode.com</a></p>
+
+        <footer>
+            <p>&copy; 2026 GodMode Team. All rights reserved.</p>
+            <p style="margin-top: 8px;"><a href="/">Home</a> &middot; <a href="/privacy.html">Privacy Policy</a> &middot; <a href="/terms.html">Terms of Service</a></p>
+        </footer>
+    </div>
+</body>
+</html>

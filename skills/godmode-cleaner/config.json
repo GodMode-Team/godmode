@@ -1,0 +1,16 @@
+{
+  "archive_after_days": 30,
+  "archive_location": "memory/archive",
+  "safe_to_delete_patterns": [
+    "*.bak",
+    "*.old",
+    "*.tmp",
+    "*.deprecated",
+    "*_old.*",
+    "*_backup.*",
+    "*.pack.old",
+    "*.gz.old"
+  ],
+  "protected_files": ["memory/logs/actions.jsonl", "memory/state/*.json", ".env", "private/.env"],
+  "max_log_size_mb": 100
+}

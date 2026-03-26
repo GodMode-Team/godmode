@@ -1,0 +1,25 @@
+src/
+scripts/*
+!scripts/install-systemd.sh
+!scripts/godmode-gateway.service
+ui/
+docs/
+skills/
+assets/
+# Personal workspace templates — never ship to npm
+dist/assets/workspace-templates/patient-autopilot
+dist/assets/workspace-templates/patient-autopilot/**
+dist/assets/workspace-templates/trp
+dist/assets/workspace-templates/trp/**
+.github/
+tsup.config.ts
+tsconfig.json
+vitest.config.ts
+*.test.ts
+*.test.js
+.gitignore
+.env*
+VISION.md
+RECENT-CHANGES.md
+AGENTS.md
+pnpm-lock.yaml

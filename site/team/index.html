@@ -1,0 +1,868 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GodMode Team Workflow</title>
+<style>
+  :root {
+    --bg: #0a0a0f;
+    --surface: #12121a;
+    --surface-2: #1a1a26;
+    --border: #2a2a3a;
+    --text: #e4e4ef;
+    --text-muted: #8888a0;
+    --accent: #7c5cfc;
+    --accent-glow: rgba(124, 92, 252, 0.15);
+    --green: #34d399;
+    --green-glow: rgba(52, 211, 153, 0.12);
+    --amber: #fbbf24;
+    --red: #f87171;
+    --blue: #60a5fa;
+    --radius: 12px;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    min-height: 100vh;
+  }
+
+  .container {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 40px 24px 80px;
+  }
+
+  /* Header */
+  .header {
+    text-align: center;
+    margin-bottom: 56px;
+    padding-top: 20px;
+  }
+  .header-badge {
+    display: inline-block;
+    padding: 6px 16px;
+    border-radius: 20px;
+    background: var(--accent-glow);
+    border: 1px solid rgba(124, 92, 252, 0.3);
+    color: var(--accent);
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    margin-bottom: 20px;
+  }
+  .header h1 {
+    font-size: 40px;
+    font-weight: 700;
+    letter-spacing: -1px;
+    margin-bottom: 12px;
+    background: linear-gradient(135deg, #fff 0%, #a8a8c0 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .header p {
+    font-size: 18px;
+    color: var(--text-muted);
+    max-width: 520px;
+    margin: 0 auto;
+  }
+
+  /* Quick Start Banner */
+  .quick-start {
+    background: linear-gradient(135deg, rgba(124, 92, 252, 0.08) 0%, rgba(52, 211, 153, 0.06) 100%);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 32px;
+    margin-bottom: 48px;
+  }
+  .quick-start h2 {
+    font-size: 14px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--accent);
+    margin-bottom: 20px;
+  }
+  .quick-steps {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+  @media (max-width: 600px) {
+    .quick-steps { grid-template-columns: 1fr; }
+  }
+  .quick-step {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 16px;
+    background: var(--surface);
+    border-radius: 10px;
+    border: 1px solid var(--border);
+  }
+  .quick-step-num {
+    flex-shrink: 0;
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+    background: var(--accent);
+    color: #fff;
+    font-size: 14px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .quick-step-text {
+    font-size: 14px;
+    line-height: 1.5;
+  }
+  .quick-step-text strong {
+    color: #fff;
+  }
+  .quick-step code {
+    background: rgba(124, 92, 252, 0.15);
+    color: var(--accent);
+    padding: 2px 7px;
+    border-radius: 5px;
+    font-size: 13px;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+  }
+
+  /* Section */
+  .section {
+    margin-bottom: 48px;
+  }
+  .section-label {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: var(--text-muted);
+    margin-bottom: 8px;
+  }
+  .section h2 {
+    font-size: 24px;
+    font-weight: 700;
+    margin-bottom: 20px;
+    color: #fff;
+  }
+
+  /* Command Cards */
+  .command-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+  @media (max-width: 700px) {
+    .command-grid { grid-template-columns: 1fr; }
+  }
+  .command-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 24px;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+  .command-card:hover {
+    border-color: var(--accent);
+    box-shadow: 0 0 24px var(--accent-glow);
+  }
+  .command-name {
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    font-size: 20px;
+    font-weight: 700;
+    margin-bottom: 4px;
+  }
+  .command-name.bug { color: var(--red); }
+  .command-name.fix { color: var(--green); }
+  .command-name.review { color: var(--blue); }
+  .command-name.sync { color: var(--amber); }
+  .command-subtitle {
+    font-size: 14px;
+    color: var(--text-muted);
+    margin-bottom: 16px;
+  }
+  .command-steps {
+    list-style: none;
+    padding: 0;
+  }
+  .command-steps li {
+    position: relative;
+    padding-left: 20px;
+    margin-bottom: 8px;
+    font-size: 14px;
+    color: var(--text);
+  }
+  .command-steps li::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 8px;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--text-muted);
+  }
+  .command-examples {
+    margin-top: 14px;
+    padding-top: 14px;
+    border-top: 1px solid var(--border);
+  }
+  .command-examples code {
+    display: block;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    font-size: 12px;
+    color: var(--text-muted);
+    padding: 2px 0;
+  }
+
+  /* Flow Diagram */
+  .flow {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0;
+    padding: 32px 16px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    margin-bottom: 20px;
+    overflow-x: auto;
+  }
+  .flow-step {
+    text-align: center;
+    flex-shrink: 0;
+  }
+  .flow-icon {
+    width: 56px;
+    height: 56px;
+    border-radius: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    margin: 0 auto 8px;
+    font-weight: 700;
+  }
+  .flow-icon.spot { background: rgba(248, 113, 113, 0.15); border: 1px solid rgba(248, 113, 113, 0.3); }
+  .flow-icon.file { background: rgba(248, 113, 113, 0.15); border: 1px solid rgba(248, 113, 113, 0.3); }
+  .flow-icon.fix { background: rgba(52, 211, 153, 0.15); border: 1px solid rgba(52, 211, 153, 0.3); }
+  .flow-icon.ci { background: rgba(124, 92, 252, 0.15); border: 1px solid rgba(124, 92, 252, 0.3); }
+  .flow-icon.review { background: rgba(96, 165, 250, 0.15); border: 1px solid rgba(96, 165, 250, 0.3); }
+  .flow-icon.merge { background: rgba(251, 191, 36, 0.15); border: 1px solid rgba(251, 191, 36, 0.3); }
+  .flow-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text);
+  }
+  .flow-sub {
+    font-size: 11px;
+    color: var(--text-muted);
+  }
+  .flow-arrow {
+    flex-shrink: 0;
+    width: 40px;
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 18px;
+  }
+
+  /* Enforced Rules */
+  .rules-grid {
+    display: grid;
+    gap: 8px;
+  }
+  .rule-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 1px;
+    background: var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+  .rule-row.header-row {
+    background: transparent;
+    gap: 8px;
+    margin-bottom: 4px;
+  }
+  .rule-row.header-row > div {
+    background: transparent;
+    padding: 0 16px 8px;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--text-muted);
+    font-weight: 600;
+  }
+  .rule-cell {
+    background: var(--surface);
+    padding: 14px 16px;
+    font-size: 13px;
+  }
+  .rule-cell:first-child { font-weight: 600; color: #fff; }
+  .rule-cell:nth-child(2) { color: var(--text-muted); }
+  .rule-cell:nth-child(3) { color: var(--green); font-size: 12px; }
+  .rule-cell .enforcer {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 600;
+  }
+  .enforcer.hook { background: rgba(124, 92, 252, 0.15); color: var(--accent); }
+  .enforcer.ci { background: rgba(52, 211, 153, 0.15); color: var(--green); }
+  .enforcer.gh { background: rgba(96, 165, 250, 0.15); color: var(--blue); }
+
+  /* Daily Routine */
+  .routine {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr 1fr;
+    gap: 12px;
+  }
+  @media (max-width: 700px) {
+    .routine { grid-template-columns: 1fr 1fr; }
+  }
+  .routine-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px 16px;
+    text-align: center;
+  }
+  .routine-time {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--text-muted);
+    margin-bottom: 8px;
+  }
+  .routine-action {
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    font-size: 15px;
+    font-weight: 600;
+    margin-bottom: 4px;
+  }
+  .routine-desc {
+    font-size: 12px;
+    color: var(--text-muted);
+  }
+  .routine-duration {
+    display: inline-block;
+    margin-top: 10px;
+    padding: 3px 10px;
+    border-radius: 12px;
+    background: var(--surface-2);
+    font-size: 11px;
+    color: var(--text-muted);
+  }
+
+  /* Setup */
+  .setup-block {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+  .setup-header {
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+    font-size: 14px;
+    font-weight: 600;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .setup-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+  }
+  .setup-dot.red { background: #f87171; }
+  .setup-dot.yellow { background: #fbbf24; }
+  .setup-dot.green { background: #34d399; }
+  .setup-code {
+    padding: 20px;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    font-size: 13px;
+    line-height: 1.8;
+    color: var(--text);
+    overflow-x: auto;
+  }
+  .setup-code .comment { color: var(--text-muted); }
+  .setup-code .cmd { color: var(--green); }
+  .setup-code .flag { color: var(--amber); }
+
+  /* Human Rules */
+  .human-rules {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 12px;
+  }
+  @media (max-width: 700px) {
+    .human-rules { grid-template-columns: 1fr; }
+  }
+  .human-rule {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 24px 20px;
+    text-align: center;
+  }
+  .human-rule-icon {
+    font-size: 32px;
+    margin-bottom: 12px;
+  }
+  .human-rule h3 {
+    font-size: 15px;
+    margin-bottom: 8px;
+    color: #fff;
+  }
+  .human-rule p {
+    font-size: 13px;
+    color: var(--text-muted);
+    line-height: 1.5;
+  }
+
+  /* Troubleshooting */
+  .faq {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+  .faq-item {
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+  }
+  .faq-item:last-child { border-bottom: none; }
+  .faq-q {
+    font-size: 14px;
+    font-weight: 600;
+    color: #fff;
+    margin-bottom: 6px;
+  }
+  .faq-a {
+    font-size: 13px;
+    color: var(--text-muted);
+    line-height: 1.5;
+  }
+  .faq-a code {
+    background: var(--surface-2);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    font-size: 12px;
+    color: var(--text);
+  }
+
+  /* Footer */
+  .footer {
+    text-align: center;
+    margin-top: 60px;
+    padding-top: 32px;
+    border-top: 1px solid var(--border);
+    color: var(--text-muted);
+    font-size: 13px;
+  }
+  .footer a {
+    color: var(--accent);
+    text-decoration: none;
+  }
+</style>
+</head>
+<body>
+
+<div class="container">
+
+  <!-- Header -->
+  <div class="header">
+    <div class="header-badge">Team Playbook</div>
+    <h1>GodMode Dev Workflow</h1>
+    <p>How our team develops GodMode together. No engineering degree required.</p>
+  </div>
+
+  <!-- Quick Start -->
+  <div class="quick-start">
+    <h2>The 30-Second Version</h2>
+    <div class="quick-steps">
+      <div class="quick-step">
+        <div class="quick-step-num">1</div>
+        <div class="quick-step-text"><strong>See a bug?</strong> Type <code>/bug</code> and describe it. Claude files the GitHub Issue.</div>
+      </div>
+      <div class="quick-step">
+        <div class="quick-step-num">2</div>
+        <div class="quick-step-text"><strong>Want to fix it?</strong> Type <code>/fix 42</code> or <code>/fix next</code>. Claude does the rest.</div>
+      </div>
+      <div class="quick-step">
+        <div class="quick-step-num">3</div>
+        <div class="quick-step-text"><strong>Review PRs?</strong> Type <code>/pr-review</code>. Approve what looks good.</div>
+      </div>
+      <div class="quick-step">
+        <div class="quick-step-num">4</div>
+        <div class="quick-step-text"><strong>Stay current?</strong> Type <code>/sync</code>. Pulls latest code, rebuilds.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- How It Works Flow -->
+  <div class="section">
+    <div class="section-label">How it works</div>
+    <h2>The Pipeline</h2>
+    <div class="flow">
+      <div class="flow-step">
+        <div class="flow-icon spot">&#128065;</div>
+        <div class="flow-label">Spot Bug</div>
+        <div class="flow-sub">You notice it</div>
+      </div>
+      <div class="flow-arrow">&#8594;</div>
+      <div class="flow-step">
+        <div class="flow-icon file">&#128196;</div>
+        <div class="flow-label">/bug</div>
+        <div class="flow-sub">Files issue</div>
+      </div>
+      <div class="flow-arrow">&#8594;</div>
+      <div class="flow-step">
+        <div class="flow-icon fix">&#128295;</div>
+        <div class="flow-label">/fix</div>
+        <div class="flow-sub">Claude codes it</div>
+      </div>
+      <div class="flow-arrow">&#8594;</div>
+      <div class="flow-step">
+        <div class="flow-icon ci">&#9989;</div>
+        <div class="flow-label">CI Checks</div>
+        <div class="flow-sub">Auto-verified</div>
+      </div>
+      <div class="flow-arrow">&#8594;</div>
+      <div class="flow-step">
+        <div class="flow-icon review">&#128101;</div>
+        <div class="flow-label">/pr-review</div>
+        <div class="flow-sub">Team reviews</div>
+      </div>
+      <div class="flow-arrow">&#8594;</div>
+      <div class="flow-step">
+        <div class="flow-icon merge">&#128640;</div>
+        <div class="flow-label">Merged</div>
+        <div class="flow-sub">/sync to update</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 4 Commands -->
+  <div class="section">
+    <div class="section-label">Your toolkit</div>
+    <h2>The 4 Commands</h2>
+    <div class="command-grid">
+
+      <div class="command-card">
+        <div class="command-name bug">/bug</div>
+        <div class="command-subtitle">Report a bug</div>
+        <ul class="command-steps">
+          <li>Checks for duplicate issues</li>
+          <li>Investigates the code for root cause</li>
+          <li>Creates a GitHub Issue with full details</li>
+        </ul>
+        <div class="command-examples">
+          <code>/bug trust tracker shows NaN</code>
+          <code>/bug memory search returns empty</code>
+          <code>/bug [paste a screenshot]</code>
+        </div>
+      </div>
+
+      <div class="command-card">
+        <div class="command-name fix">/fix</div>
+        <div class="command-subtitle">Fix a bug</div>
+        <ul class="command-steps">
+          <li>Reads the issue &amp; creates a branch</li>
+          <li>Finds and fixes the bug</li>
+          <li>Runs typecheck + build</li>
+          <li>Pushes and opens a PR</li>
+        </ul>
+        <div class="command-examples">
+          <code>/fix 42</code>
+          <code>/fix next</code>
+          <code>/fix memory search broken</code>
+        </div>
+      </div>
+
+      <div class="command-card">
+        <div class="command-name review">/pr-review</div>
+        <div class="command-subtitle">Review pull requests</div>
+        <ul class="command-steps">
+          <li>Shows all open PRs with CI status</li>
+          <li>Deep-reviews code for correctness</li>
+          <li>Checks for scope creep &amp; safety</li>
+          <li>Helps approve and merge</li>
+        </ul>
+        <div class="command-examples">
+          <code>/pr-review</code>
+          <code>/pr-review 15</code>
+          <code>/pr-review all</code>
+        </div>
+      </div>
+
+      <div class="command-card">
+        <div class="command-name sync">/sync</div>
+        <div class="command-subtitle">Get the latest code</div>
+        <ul class="command-steps">
+          <li>Saves any uncommitted work</li>
+          <li>Pulls latest main</li>
+          <li>Reinstalls deps &amp; rebuilds</li>
+          <li>Shows new issues &amp; PRs</li>
+        </ul>
+        <div class="command-examples">
+          <code>/sync</code>
+          <code>/sync status</code>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Enforced Automatically -->
+  <div class="section">
+    <div class="section-label">Zero discipline required</div>
+    <h2>What's Enforced Automatically</h2>
+    <div class="rules-grid">
+      <div class="rule-row header-row">
+        <div>Rule</div>
+        <div>Enforced by</div>
+        <div>What happens</div>
+      </div>
+      <div class="rule-row">
+        <div class="rule-cell">No editing on main</div>
+        <div class="rule-cell"><span class="enforcer hook">Hook</span> branch-guard.sh</div>
+        <div class="rule-cell">Edit blocked, branch created</div>
+      </div>
+      <div class="rule-row">
+        <div class="rule-cell">No git stash</div>
+        <div class="rule-cell"><span class="enforcer hook">Hook</span> pre-tool-check.sh</div>
+        <div class="rule-cell">Blocked, told to commit instead</div>
+      </div>
+      <div class="rule-row">
+        <div class="rule-cell">No force push</div>
+        <div class="rule-cell"><span class="enforcer hook">Hook</span> pre-tool-check.sh</div>
+        <div class="rule-cell">Warning shown</div>
+      </div>
+      <div class="rule-row">
+        <div class="rule-cell">Code must typecheck</div>
+        <div class="rule-cell"><span class="enforcer ci">CI</span> GitHub Actions</div>
+        <div class="rule-cell">PR blocked until passing</div>
+      </div>
+      <div class="rule-row">
+        <div class="rule-cell">Code must build</div>
+        <div class="rule-cell"><span class="enforcer ci">CI</span> GitHub Actions</div>
+        <div class="rule-cell">PR blocked until passing</div>
+      </div>
+      <div class="rule-row">
+        <div class="rule-cell">PRs need 1 approval</div>
+        <div class="rule-cell"><span class="enforcer gh">GitHub</span> Branch protection</div>
+        <div class="rule-cell">Merge button disabled</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Daily Routine -->
+  <div class="section">
+    <div class="section-label">Your day</div>
+    <h2>Daily Routine</h2>
+    <div class="routine">
+      <div class="routine-card">
+        <div class="routine-time">Morning</div>
+        <div class="routine-action" style="color: var(--amber)">/sync</div>
+        <div class="routine-desc">Pull latest code</div>
+        <div class="routine-duration">2 min</div>
+      </div>
+      <div class="routine-card">
+        <div class="routine-time">See a bug</div>
+        <div class="routine-action" style="color: var(--red)">/bug</div>
+        <div class="routine-desc">Describe it, done</div>
+        <div class="routine-duration">30 sec</div>
+      </div>
+      <div class="routine-card">
+        <div class="routine-time">Fix something</div>
+        <div class="routine-action" style="color: var(--green)">/fix</div>
+        <div class="routine-desc">Let Claude cook</div>
+        <div class="routine-duration">hands-free</div>
+      </div>
+      <div class="routine-card">
+        <div class="routine-time">End of day</div>
+        <div class="routine-action" style="color: var(--blue)">/pr-review</div>
+        <div class="routine-desc">Review &amp; merge</div>
+        <div class="routine-duration">1 min</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Setup -->
+  <div class="section">
+    <div class="section-label">One-time setup</div>
+    <h2>Getting Started</h2>
+
+    <p style="color: var(--text-muted); margin-bottom: 20px; font-size: 14px;">We run GodMode from GitHub source (not the npm package) so everyone stays synced to the latest fixes.</p>
+
+    <!-- Step 1: Prerequisites -->
+    <div class="setup-block" style="margin-bottom: 16px;">
+      <div class="setup-header">
+        <span class="setup-dot red"></span>
+        <span class="setup-dot yellow"></span>
+        <span class="setup-dot green"></span>
+        Step 1 &mdash; Install Prerequisites
+      </div>
+      <div class="setup-code">
+        <span class="comment"># Claude Code (if you don't have it yet)</span><br>
+        <span class="cmd">npm install -g</span> @anthropic-ai/claude-code<br><br>
+        <span class="comment"># GitHub CLI</span><br>
+        <span class="cmd">brew install</span> gh<br>
+        <span class="cmd">gh auth login</span><br><br>
+        <span class="comment"># pnpm (if you don't have it)</span><br>
+        <span class="cmd">npm install -g</span> pnpm<br><br>
+        <span class="comment"># Node 22+ (check with: node --version)</span><br>
+        <span class="comment"># If below v22, install via: brew install node@22</span><br>
+      </div>
+    </div>
+
+    <!-- Step 2: Clone & Build -->
+    <div class="setup-block" style="margin-bottom: 16px;">
+      <div class="setup-header">
+        <span class="setup-dot red"></span>
+        <span class="setup-dot yellow"></span>
+        <span class="setup-dot green"></span>
+        Step 2 &mdash; Clone &amp; Build
+      </div>
+      <div class="setup-code">
+        <span class="comment"># Clone the repo</span><br>
+        <span class="cmd">git clone</span> https://github.com/GodMode-Team/godmode-plugin.git<br>
+        <span class="cmd">cd</span> godmode-plugin<br><br>
+        <span class="comment"># Install dependencies &amp; build</span><br>
+        <span class="cmd">pnpm install</span><br>
+        <span class="cmd">pnpm build</span><br><br>
+        <span class="comment"># Verify everything works</span><br>
+        <span class="cmd">gh auth status</span> <span class="comment">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# should show your GitHub username</span><br>
+        <span class="cmd">pnpm typecheck</span> <span class="comment">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# should pass with no errors</span><br>
+      </div>
+    </div>
+
+    <!-- Step 3: Point OpenClaw at your clone -->
+    <div class="setup-block" style="margin-bottom: 16px;">
+      <div class="setup-header">
+        <span class="setup-dot red"></span>
+        <span class="setup-dot yellow"></span>
+        <span class="setup-dot green"></span>
+        Step 3 &mdash; Point OpenClaw at Your Clone
+      </div>
+      <div class="setup-code">
+        <span class="comment"># Open your OpenClaw config</span><br>
+        <span class="cmd">nano</span> ~/.openclaw/openclaw.json<br><br>
+        <span class="comment"># Find the "plugins" section and update "load.paths"</span><br>
+        <span class="comment"># to include the FULL path to your clone:</span><br><br>
+        <span style="color: var(--text-muted);">"plugins": {</span><br>
+        <span style="color: var(--text-muted);">&nbsp;&nbsp;"load": {</span><br>
+        <span style="color: var(--text-muted);">&nbsp;&nbsp;&nbsp;&nbsp;"paths": [</span><br>
+        <span style="color: var(--green);">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"<span style="color: var(--amber);">/full/path/to</span>/godmode-plugin"</span><br>
+        <span style="color: var(--text-muted);">&nbsp;&nbsp;&nbsp;&nbsp;]</span><br>
+        <span style="color: var(--text-muted);">&nbsp;&nbsp;}</span><br>
+        <span style="color: var(--text-muted);">}</span><br><br>
+        <span class="comment"># Example paths:</span><br>
+        <span class="comment"># macOS:   /Users/yourname/Projects/godmode-plugin</span><br>
+        <span class="comment"># Linux:   /home/yourname/Projects/godmode-plugin</span><br>
+        <span class="comment"># Windows: C:\\Users\\yourname\\Projects\\godmode-plugin</span><br><br>
+        <span class="comment"># Then restart your gateway to pick up the change</span><br>
+        <span class="cmd">openclaw gateway restart</span><br>
+      </div>
+    </div>
+
+    <!-- Step 4: Start working -->
+    <div class="setup-block" style="margin-bottom: 16px;">
+      <div class="setup-header">
+        <span class="setup-dot red"></span>
+        <span class="setup-dot yellow"></span>
+        <span class="setup-dot green"></span>
+        Step 4 &mdash; Start Working
+      </div>
+      <div class="setup-code">
+        <span class="comment"># Open Claude Code in the godmode-plugin directory</span><br>
+        <span class="cmd">cd</span> godmode-plugin<br>
+        <span class="cmd">claude</span><br><br>
+        <span class="comment"># You now have access to all 4 commands:</span><br>
+        <span style="color: var(--red);">/bug</span> <span class="comment"> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# report a bug</span><br>
+        <span style="color: var(--green);">/fix</span> <span class="comment"> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# fix an issue</span><br>
+        <span style="color: var(--blue);">/pr-review</span> <span class="comment"> # review PRs</span><br>
+        <span style="color: var(--amber);">/sync</span> <span class="comment"> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# pull latest &amp; rebuild</span><br>
+      </div>
+    </div>
+
+    <!-- Why GitHub, not npm -->
+    <div style="background: var(--accent-glow); border: 1px solid rgba(124, 92, 252, 0.25); border-radius: var(--radius); padding: 20px 24px; margin-top: 8px;">
+      <div style="font-size: 13px; font-weight: 600; color: var(--accent); margin-bottom: 8px;">Why GitHub source instead of npm?</div>
+      <div style="font-size: 13px; color: var(--text-muted); line-height: 1.6;">
+        The npm package (<code style="background: var(--surface); padding: 2px 6px; border-radius: 4px; font-size: 12px;">@godmode-team/godmode</code>) only updates when we publish a release. Running from GitHub source means every merged fix is one <code style="background: var(--surface); padding: 2px 6px; border-radius: 4px; font-size: 12px;">/sync</code> away. Since we're all developing the plugin now, source keeps us all on the same version at all times.
+      </div>
+    </div>
+  </div>
+
+  <!-- Human Rules -->
+  <div class="section">
+    <div class="section-label">The only things humans do</div>
+    <h2>3 Rules for Humans</h2>
+    <div class="human-rules">
+      <div class="human-rule">
+        <div class="human-rule-icon">&#128065;</div>
+        <h3>Notice bugs</h3>
+        <p>If something looks wrong, file it with <code>/bug</code>. Don't assume someone else saw it.</p>
+      </div>
+      <div class="human-rule">
+        <div class="human-rule-icon">&#128064;</div>
+        <h3>Review PRs</h3>
+        <p>At least one person must approve before merging. <code>/pr-review</code> helps you understand the code.</p>
+      </div>
+      <div class="human-rule">
+        <div class="human-rule-icon">&#9889;</div>
+        <h3>Don't sit on PRs</h3>
+        <p>If a PR is open more than a day, review it. Stale PRs cause merge conflicts.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Troubleshooting -->
+  <div class="section">
+    <div class="section-label">When things go wrong</div>
+    <h2>Troubleshooting</h2>
+    <div class="faq">
+      <div class="faq-item">
+        <div class="faq-q">"Claude won't let me edit files"</div>
+        <div class="faq-a">That's the branch guard. You're on <code>main</code>. Tell Claude what you want to do and it'll create a branch automatically.</div>
+      </div>
+      <div class="faq-item">
+        <div class="faq-q">"My PR CI is failing"</div>
+        <div class="faq-a">Run <code>/fix</code> on your branch, or ask Claude to "fix the typecheck errors on this branch."</div>
+      </div>
+      <div class="faq-item">
+        <div class="faq-q">"I have merge conflicts"</div>
+        <div class="faq-a">Run <code>/sync</code> and Claude will help rebase your branch onto the latest <code>main</code>.</div>
+      </div>
+      <div class="faq-item">
+        <div class="faq-q">"Someone is already fixing the same thing"</div>
+        <div class="faq-a">That's what GitHub Issues prevents. <code>/fix</code> checks if an issue is assigned before starting. Pick a different one.</div>
+      </div>
+      <div class="faq-item">
+        <div class="faq-q">"I need to update after someone merged a fix"</div>
+        <div class="faq-a">Run <code>/sync</code>. It pulls the latest code, installs dependencies, and rebuilds everything.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <div class="footer">
+    <p>GodMode Team &middot; <a href="https://github.com/GodMode-Team/godmode-plugin">github.com/GodMode-Team/godmode-plugin</a></p>
+  </div>
+
+</div>
+
+</body>
+</html>

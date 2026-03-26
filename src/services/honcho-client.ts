@@ -1,0 +1,190 @@
+/**
+ * honcho-client.ts — Honcho-powered persistent user modeling for GodMode.
+ *
+ * Singleton client that wraps the Honcho SDK (@honcho-ai/sdk).
+ * Provides: message forwarding, context retrieval, peer queries, and vault sync.
+ *
+ * All methods are wrapped in try/catch — Honcho being unavailable never crashes the plugin.
+ */
+
+import { Honcho, type Peer, type Session } from "@honcho-ai/sdk";
+
+// ── Singleton State ──────────────────────────────────────────────────
+
+let honcho: InstanceType<typeof Honcho> | null = null;
+let peer: Peer | null = null;
+let ready = false;
+
+/** Map of GodMode sessionKey -> Honcho Session instance */
+const sessionCache = new Map<string, Session>();
+const SESSION_CACHE_MAX = 100;
+
+// ── Init ─────────────────────────────────────────────────────────────
+
+/**
+ * Initialize the Honcho client. Non-blocking, safe to call at startup.
+ * Returns true if Honcho is ready, false otherwise.
+ */
+export async function initHoncho(apiKey?: string): Promise<boolean> {
+  const key = apiKey ?? process.env.HONCHO_API_KEY;
+  if (!key) {
+    console.warn("[GodMode] Honcho not configured -- memory disabled");
+    return false;
+  }
+
+  try {
+    honcho = new Honcho({ apiKey: key });
+
+    // Get or create a peer for the GodMode owner
+    const ownerKey = process.env.GODMODE_OWNER ?? "owner";
+    peer = await honcho.peer(ownerKey);
+
+    ready = true;
+    console.warn("[GodMode] Honcho memory initialized");
+    return true;
+  } catch (err) {
+    console.warn(`[GodMode] Honcho init failed (non-fatal): ${String(err)}`);
+    ready = false;
+    return false;
+  }
+}
+
+// ── Session Management ───────────────────────────────────────────────
+
+async function getOrCreateSession(sessionKey: string): Promise<Session | null> {
+  if (!honcho) return null;
+
+  const cached = sessionCache.get(sessionKey);
+  if (cached) return cached;
+
+  try {
+    // Honcho session IDs only allow [a-zA-Z0-9_-], so sanitize GodMode keys (e.g. "agent:main:webchat-xxx")
+    const safeKey = sessionKey.replace(/[^a-zA-Z0-9_-]/g, "-");
+    const session = await honcho.session(safeKey);
+    // Evict oldest if cache is full
+    if (sessionCache.size >= SESSION_CACHE_MAX) {
+      const oldest = sessionCache.keys().next().value;
+      if (oldest) sessionCache.delete(oldest);
+    }
+    sessionCache.set(sessionKey, session);
+    return session;
+  } catch (err) {
+    console.warn(`[GodMode] Honcho session error: ${String(err)}`);
+    return null;
+  }
+}
+
+// ── Message Forwarding ───────────────────────────────────────────────
+
+/**
+ * Forward a user or assistant message to Honcho for memory processing.
+ * Fire-and-forget — never blocks the conversation.
+ */
+export async function forwardMessage(
+  role: "user" | "assistant",
+  content: string,
+  sessionKey: string,
+): Promise<void> {
+  if (!ready || !honcho || !peer) return;
+  if (!content || content.length < 5) return;
+
+  try {
+    const session = await getOrCreateSession(sessionKey);
+    if (!session) return;
+
+    await session.addMessages([
+      {
+        peerId: peer.id,
+        content,
+        metadata: { role },
+      },
+    ]);
+  } catch (err) {
+    console.warn(`[GodMode] Honcho forwardMessage error: ${String(err)}`);
+  }
+}
+
+// ── Context Retrieval ────────────────────────────────────────────────
+
+/**
+ * Get Honcho's user context for the current session.
+ * Returns a formatted string for context injection, or null if unavailable.
+ */
+export async function getContext(sessionKey: string): Promise<string | null> {
+  if (!ready || !honcho || !peer) return null;
+
+  try {
+    const session = await getOrCreateSession(sessionKey);
+    if (!session) return null;
+
+    const ctx = await session.context();
+    const ctxObj = ctx as unknown as Record<string, unknown> | string | null;
+    const content = typeof ctxObj === "string"
+      ? ctxObj
+      : ctxObj?.peerRepresentation as string
+        ?? ctxObj?.summary as string
+        ?? ctxObj?.content as string
+        ?? JSON.stringify(ctxObj);
+    if (!content || content.trim().length < 10) return null;
+
+    return `## Memory (Honcho)\n${content}`;
+  } catch (err) {
+    console.warn(`[GodMode] Honcho getContext error: ${String(err)}`);
+    return null;
+  }
+}
+
+// ── Peer Query ───────────────────────────────────────────────────────
+
+/**
+ * Query Honcho's user model with a specific question.
+ * Used by vault sync and skills that need deep memory recall.
+ */
+export async function queryPeer(question: string, sessionKey: string): Promise<string | null> {
+  if (!ready || !honcho || !peer) return null;
+
+  try {
+    const session = await getOrCreateSession(sessionKey);
+    const response = await peer.chat(question, {
+      session: session ?? undefined,
+    });
+
+    return typeof response === "string" ? response : (response as unknown as Record<string, unknown>)?.content as string ?? String(response);
+  } catch (err) {
+    console.warn(`[GodMode] Honcho queryPeer error: ${String(err)}`);
+    return null;
+  }
+}
+
+// ── Ingestion Forward ─────────────────────────────────────────────────
+
+/**
+ * Forward an arbitrary message to Honcho for processing by the Deriver.
+ * Used by ingestion pipelines and MCP capture to feed data into the reasoning engine.
+ * Thin wrapper over forwardMessage with role fixed to "user".
+ */
+export async function forwardToHoncho(
+  content: string,
+  sessionKey: string,
+): Promise<void> {
+  return forwardMessage("user", content, sessionKey);
+}
+
+// ── Status ───────────────────────────────────────────────────────────
+
+export function isHonchoReady(): boolean {
+  return ready;
+}
+
+export function getHonchoStatus(): "ready" | "degraded" | "offline" {
+  if (ready) return "ready";
+  if (honcho) return "degraded";
+  return "offline";
+}
+
+export function getStatus(): { ready: boolean; sessionCount: number } {
+  return {
+    ready,
+    sessionCount: sessionCache.size,
+  };
+}

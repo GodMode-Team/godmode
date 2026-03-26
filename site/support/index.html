@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Support — GodMode</title>
+<meta name="description" content="Get help with GodMode. Troubleshooting, quick fixes, and contact information.">
+<link rel="canonical" href="https://lifeongodmode.com/support">
+
+<!-- Favicon -->
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><defs><linearGradient id='b' x1='0' y1='0' x2='0' y2='1'><stop offset='0%25' stop-color='%23FFD700'/><stop offset='100%25' stop-color='%23FF8C00'/></linearGradient></defs><path d='M58 2 L22 54 L42 54 L36 98 L78 42 L56 42 Z' fill='url(%23b)'/></svg>">
+
+<style>
+:root {
+  --bg: #0b1120;
+  --bg-card: #111827;
+  --bg-code: #1e293b;
+  --text: #e2e8f0;
+  --text-muted: #94a3b8;
+  --text-dim: #64748b;
+  --accent: #38bdf8;
+  --accent-dim: #0ea5e9;
+  --green: #34d399;
+  --green-dim: #059669;
+  --border: #1e293b;
+  --border-hover: #334155;
+  --yellow: #fbbf24;
+  --red: #f87171;
+  --purple: #a78bfa;
+  --radius: 12px;
+  --radius-sm: 8px;
+  --font-body: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+  --font-mono: 'SF Mono', 'Fira Code', 'JetBrains Mono', Consolas, monospace;
+}
+
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+
+body {
+  font-family: var(--font-body);
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+a { color: var(--accent); text-decoration: none; transition: color 0.2s; }
+a:hover { color: #7dd3fc; text-decoration: underline; }
+
+::selection { background: rgba(56, 189, 248, 0.25); color: #fff; }
+
+/* Grain */
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  pointer-events: none;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  opacity: 0.03;
+  mix-blend-mode: overlay;
+}
+
+/* Nav */
+.nav {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  background: rgba(11, 17, 32, 0.88);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-bottom: 1px solid var(--border);
+  padding: 0 24px;
+}
+
+.nav-inner {
+  max-width: 800px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 60px;
+}
+
+.nav-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 700;
+  font-size: 18px;
+  color: var(--text);
+  text-decoration: none;
+}
+
+.nav-brand:hover { text-decoration: none; color: var(--text); }
+.nav-brand svg { width: 28px; height: 28px; }
+
+.nav-back {
+  font-size: 14px;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.nav-back:hover { color: var(--text); text-decoration: none; }
+
+/* Layout */
+.container {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 0 24px;
+}
+
+/* Header */
+.page-header {
+  padding: 64px 0 40px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 48px;
+}
+
+.page-header h1 {
+  font-size: 36px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  margin-bottom: 12px;
+}
+
+.page-header p {
+  font-size: 16px;
+  color: var(--text-muted);
+  max-width: 540px;
+}
+
+/* Section */
+.section {
+  margin-bottom: 48px;
+}
+
+.section h2 {
+  font-size: 22px;
+  font-weight: 600;
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.section-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.section-icon--blue { background: rgba(56, 189, 248, 0.12); }
+.section-icon--green { background: rgba(52, 211, 153, 0.12); }
+.section-icon--yellow { background: rgba(251, 191, 36, 0.12); }
+.section-icon--purple { background: rgba(167, 139, 250, 0.12); }
+
+/* Fix Cards */
+.fix-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.fix-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px 24px;
+  transition: border-color 0.2s;
+}
+
+.fix-card:hover {
+  border-color: var(--border-hover);
+}
+
+.fix-card h3 {
+  font-size: 15px;
+  font-weight: 600;
+  margin-bottom: 8px;
+  color: var(--text);
+}
+
+.fix-card p {
+  font-size: 14px;
+  color: var(--text-muted);
+  margin-bottom: 12px;
+  line-height: 1.5;
+}
+
+.fix-cmd {
+  display: flex;
+  align-items: center;
+  background: var(--bg-code);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 10px 16px;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--green);
+  overflow-x: auto;
+  scrollbar-width: none;
+  gap: 8px;
+}
+
+.fix-cmd::-webkit-scrollbar { display: none; }
+
+.fix-cmd-prefix {
+  color: var(--text-dim);
+  user-select: none;
+  flex-shrink: 0;
+}
+
+/* Contact card */
+.contact-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 28px;
+}
+
+.contact-card h3 {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 16px;
+}
+
+.contact-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.contact-list li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 14px;
+  color: var(--text-muted);
+}
+
+.contact-list li svg {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  color: var(--text-dim);
+}
+
+/* FAQ */
+.faq-item {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px 24px;
+}
+
+.faq-item + .faq-item {
+  margin-top: 12px;
+}
+
+.faq-item h3 {
+  font-size: 15px;
+  font-weight: 600;
+  margin-bottom: 8px;
+  color: var(--text);
+}
+
+.faq-item p {
+  font-size: 14px;
+  color: var(--text-muted);
+  line-height: 1.6;
+}
+
+/* Footer */
+.footer {
+  border-top: 1px solid var(--border);
+  padding: 32px 0;
+  margin-top: 64px;
+}
+
+.footer-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.footer-copy {
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.footer-links {
+  display: flex;
+  gap: 20px;
+  list-style: none;
+}
+
+.footer-links a {
+  color: var(--text-dim);
+  font-size: 13px;
+}
+
+.footer-links a:hover { color: var(--text-muted); text-decoration: none; }
+
+/* Responsive */
+@media (max-width: 640px) {
+  .page-header { padding: 40px 0 28px; }
+  .page-header h1 { font-size: 28px; }
+  .fix-cmd { font-size: 11px; }
+  .footer-inner { flex-direction: column; text-align: center; }
+}
+</style>
+</head>
+<body>
+
+<!-- Nav -->
+<nav class="nav">
+  <div class="nav-inner">
+    <a href="/" class="nav-brand">
+      <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="bolt" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#FFD700"/>
+            <stop offset="100%" stop-color="#FF8C00"/>
+          </linearGradient>
+        </defs>
+        <path d="M58 2 L22 54 L42 54 L36 98 L78 42 L56 42 Z" fill="url(#bolt)"/>
+      </svg>
+      GodMode
+    </a>
+    <a href="/" class="nav-back">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+      Back to home
+    </a>
+  </div>
+</nav>
+
+<div class="container">
+
+  <!-- Header -->
+  <div class="page-header">
+    <h1>Need Help?</h1>
+    <p>Common fixes, troubleshooting steps, and ways to reach us. Most issues resolve with a quick restart.</p>
+  </div>
+
+  <!-- Quick Fixes -->
+  <div class="section">
+    <h2>
+      <span class="section-icon section-icon--blue">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/></svg>
+      </span>
+      Quick Fixes
+    </h2>
+
+    <div class="fix-list">
+      <div class="fix-card">
+        <h3>Gateway not responding</h3>
+        <p>If the GodMode UI shows a connection error or won't load, restart the gateway.</p>
+        <div class="fix-cmd">
+          <span class="fix-cmd-prefix">$</span> openclaw gateway restart
+        </div>
+      </div>
+
+      <div class="fix-card">
+        <h3>Plugin not loading</h3>
+        <p>If GodMode doesn't appear after install, re-install the plugin and restart.</p>
+        <div class="fix-cmd">
+          <span class="fix-cmd-prefix">$</span> openclaw plugins install @godmode-team/godmode && openclaw gateway restart
+        </div>
+      </div>
+
+      <div class="fix-card">
+        <h3>Full reinstall</h3>
+        <p>Nuclear option. Removes and reinstalls everything cleanly.</p>
+        <div class="fix-cmd">
+          <span class="fix-cmd-prefix">$</span> curl -fsSL https://lifeongodmode.com/install.sh | sh
+        </div>
+      </div>
+
+      <div class="fix-card">
+        <h3>Authentication issues</h3>
+        <p>If Claude isn't responding, re-authenticate your AI connection.</p>
+        <div class="fix-cmd">
+          <span class="fix-cmd-prefix">$</span> openclaw auth login
+        </div>
+      </div>
+
+      <div class="fix-card">
+        <h3>Check gateway status</h3>
+        <p>Verify whether the gateway is currently running and on which port.</p>
+        <div class="fix-cmd">
+          <span class="fix-cmd-prefix">$</span> openclaw gateway status
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- FAQ -->
+  <div class="section">
+    <h2>
+      <span class="section-icon section-icon--purple">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+      </span>
+      Common Questions
+    </h2>
+
+    <div class="faq-item">
+      <h3>What does GodMode cost?</h3>
+      <p>GodMode is free and open source. It uses your existing Claude subscription (Pro, Max, or API key) — there are no additional API costs for Pro/Max subscribers.</p>
+    </div>
+
+    <div class="faq-item">
+      <h3>Does GodMode work on Windows?</h3>
+      <p>Yes! Run this in PowerShell: <code>irm https://lifeongodmode.com/install.ps1 | iex</code></p>
+    </div>
+
+    <div class="faq-item">
+      <h3>Where is my data stored?</h3>
+      <p>All data stays local on your machine. GodMode stores state in <code style="font-family: var(--font-mono); font-size: 13px; background: var(--bg-code); padding: 2px 6px; border-radius: 4px;">~/godmode/</code> and integrates with your Obsidian vault if configured. Nothing is sent to external servers.</p>
+    </div>
+
+    <div class="faq-item">
+      <h3>Can I use GodMode without Obsidian?</h3>
+      <p>Yes. Obsidian integration is optional. GodMode falls back to its own local storage in <code style="font-family: var(--font-mono); font-size: 13px; background: var(--bg-code); padding: 2px 6px; border-radius: 4px;">~/godmode/memory/</code> when no vault is configured.</p>
+    </div>
+  </div>
+
+  <!-- Contact -->
+  <div class="section">
+    <h2>
+      <span class="section-icon section-icon--green">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#34d399" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+      </span>
+      Get in Touch
+    </h2>
+
+    <div class="contact-card">
+      <h3>We're here to help</h3>
+      <ul class="contact-list">
+        <li>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+          Email: <a href="mailto:support@lifeongodmode.com">support@lifeongodmode.com</a>
+        </li>
+        <li>
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+          GitHub Issues: <a href="https://github.com/godmode-team/godmode-plugin/issues" target="_blank" rel="noopener">godmode-team/godmode-plugin</a>
+        </li>
+        <li>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+          Discussions: <a href="https://github.com/godmode-team/godmode-plugin/discussions" target="_blank" rel="noopener">GitHub Discussions</a>
+        </li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <div class="footer-inner">
+      <div class="footer-copy">GodMode &mdash; Your AI-powered operating system</div>
+      <ul class="footer-links">
+        <li><a href="/">Home</a></li>
+        <li><a href="/setup">Setup</a></li>
+        <li><a href="/terms.html">Terms</a></li>
+        <li><a href="/privacy.html">Privacy</a></li>
+      </ul>
+    </div>
+  </footer>
+
+</div>
+
+</body>
+</html>

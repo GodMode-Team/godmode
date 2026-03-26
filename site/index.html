@@ -1,0 +1,844 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GodMode | Scale Yourself</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚡</text></svg>">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --black: #000000;
+            --dark: #0a0a0a;
+            --gray-dark: #1a1a1a;
+            --gray: #666666;
+            --gray-light: #999999;
+            --white: #ffffff;
+            --accent: #00ff88;
+            --accent-dim: rgba(0, 255, 136, 0.1);
+            --warm: #FFB547;
+            --warm-dim: rgba(255, 181, 71, 0.06);
+        }
+
+        html {
+            scroll-behavior: smooth;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--black);
+            color: var(--white);
+            line-height: 1.6;
+            overflow-x: hidden;
+        }
+
+        /* Animated gradient background */
+        .bg-gradient {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background:
+                radial-gradient(ellipse at 20% 20%, rgba(0, 255, 136, 0.08) 0%, transparent 50%),
+                radial-gradient(ellipse at 80% 80%, rgba(0, 255, 136, 0.05) 0%, transparent 50%),
+                radial-gradient(ellipse at 50% 50%, rgba(0, 100, 255, 0.03) 0%, transparent 70%),
+                radial-gradient(ellipse at 70% 25%, rgba(255, 181, 71, 0.04) 0%, transparent 45%),
+                radial-gradient(ellipse at 30% 80%, rgba(255, 181, 71, 0.03) 0%, transparent 40%);
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        /* Grid pattern overlay */
+        .grid-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-image:
+                linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);
+            background-size: 60px 60px;
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        .container {
+            position: relative;
+            z-index: 2;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 40px;
+        }
+
+        /* Hero Section */
+        .hero {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            padding: 40px 20px 60px;
+        }
+
+        .logo {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 14px;
+            font-weight: 600;
+            letter-spacing: 4px;
+            text-transform: uppercase;
+            color: var(--accent);
+            margin-bottom: 40px;
+            opacity: 0;
+            animation: fadeInUp 1s ease forwards;
+            animation-delay: 0.2s;
+        }
+
+        .hero h1 {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: clamp(42px, 8vw, 100px);
+            font-weight: 700;
+            line-height: 1.05;
+            letter-spacing: -2px;
+            margin-bottom: 30px;
+            opacity: 0;
+            animation: fadeInUp 1s ease forwards;
+            animation-delay: 0.4s;
+        }
+
+        .hero h1 span {
+            display: block;
+            background: linear-gradient(135deg, var(--white) 0%, var(--gray-light) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .hero h1 .accent {
+            background: linear-gradient(135deg, #b2ffd9 0%, #66ffb2 20%, var(--accent) 50%, #00cc6a 80%, #00994f 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .tagline {
+            font-size: clamp(18px, 3vw, 24px);
+            color: var(--gray-light);
+            max-width: 600px;
+            margin-bottom: 40px;
+            opacity: 0;
+            animation: fadeInUp 1s ease forwards;
+            animation-delay: 0.6s;
+        }
+
+        .cta-group {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+            justify-content: center;
+            opacity: 0;
+            animation: fadeInUp 1s ease forwards;
+            animation-delay: 0.8s;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            padding: 16px 32px;
+            font-family: 'Inter', sans-serif;
+            font-size: 15px;
+            font-weight: 600;
+            text-decoration: none;
+            border-radius: 8px;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+
+        .btn-primary {
+            background: var(--accent);
+            color: var(--black);
+            border: 2px solid var(--accent);
+        }
+
+        .btn-primary:hover {
+            background: transparent;
+            color: var(--accent);
+            transform: translateY(-2px);
+            box-shadow: 0 10px 40px rgba(0, 255, 136, 0.2);
+        }
+
+        .btn-secondary {
+            background: transparent;
+            color: var(--white);
+            border: 2px solid var(--gray-dark);
+        }
+
+        .btn-secondary:hover {
+            border-color: var(--gray);
+            transform: translateY(-2px);
+        }
+
+        /* What is GodMode Section */
+        .section {
+            padding: 120px 0;
+        }
+
+        .section-label {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 12px;
+            font-weight: 600;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+            color: var(--accent);
+            margin-bottom: 20px;
+        }
+
+        .section h2 {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: clamp(32px, 5vw, 56px);
+            font-weight: 700;
+            line-height: 1.1;
+            margin-bottom: 30px;
+            max-width: 800px;
+        }
+
+        .section p.lead {
+            font-size: 20px;
+            color: var(--gray-light);
+            max-width: 700px;
+            margin-bottom: 60px;
+        }
+
+        /* Feature Grid */
+        .features {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 30px;
+            margin-top: 60px;
+        }
+
+        .feature {
+            background: linear-gradient(145deg, #1e1e1e 0%, var(--gray-dark) 30%, var(--dark) 100%);
+            border: 1px solid rgba(255,255,255,0.06);
+            border-radius: 16px;
+            padding: 40px;
+            transition: all 0.3s ease;
+        }
+
+        .feature:hover {
+            border-color: rgba(0, 255, 136, 0.25);
+            transform: translateY(-4px);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(0, 255, 136, 0.08);
+        }
+
+        .feature-icon {
+            width: 48px;
+            height: 48px;
+            background: var(--accent-dim);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 24px;
+            font-size: 24px;
+        }
+
+        .feature h3 {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 20px;
+            font-weight: 600;
+            margin-bottom: 12px;
+        }
+
+        .feature p {
+            font-size: 15px;
+            color: var(--gray-light);
+            line-height: 1.7;
+        }
+
+        /* Stats Section */
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 40px;
+            padding: 80px 0;
+            border-top: 1px solid rgba(255, 181, 71, 0.12);
+            border-bottom: 1px solid rgba(255, 181, 71, 0.12);
+            background: radial-gradient(ellipse at 50% 50%, rgba(255, 181, 71, 0.03) 0%, transparent 70%);
+        }
+
+        .stat {
+            text-align: center;
+        }
+
+        .stat-value {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: clamp(36px, 6vw, 64px);
+            font-weight: 700;
+            color: var(--accent);
+            line-height: 1;
+            margin-bottom: 10px;
+        }
+
+        .stat-label {
+            font-size: 14px;
+            color: var(--gray-light);
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        /* Quote Section */
+        .quote-section {
+            padding: 120px 0;
+            text-align: center;
+            background: radial-gradient(ellipse at 50% 50%, rgba(255, 181, 71, 0.04) 0%, transparent 60%);
+        }
+
+        .quote {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: clamp(24px, 4vw, 40px);
+            font-weight: 500;
+            line-height: 1.4;
+            max-width: 900px;
+            margin: 0 auto 30px;
+            color: var(--white);
+        }
+
+        .quote-author {
+            font-size: 16px;
+            color: var(--gray-light);
+        }
+
+        /* CTA Section */
+        .cta-section {
+            padding: 120px 0;
+            text-align: center;
+            background: radial-gradient(ellipse at 50% 30%, rgba(0, 255, 136, 0.05) 0%, transparent 50%),
+                        radial-gradient(ellipse at 50% 70%, rgba(255, 181, 71, 0.03) 0%, transparent 50%);
+        }
+
+        .cta-section h2 {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: clamp(32px, 5vw, 56px);
+            font-weight: 700;
+            margin-bottom: 20px;
+        }
+
+        .cta-section p {
+            font-size: 18px;
+            color: var(--gray-light);
+            margin-bottom: 40px;
+        }
+
+        /* Footer */
+        .footer {
+            padding: 60px 0;
+            border-top: 1px solid rgba(255,255,255,0.05);
+            text-align: center;
+        }
+
+        .footer-logo {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 20px;
+            font-weight: 700;
+            color: var(--white);
+            margin-bottom: 20px;
+        }
+
+        .footer p {
+            font-size: 14px;
+            color: var(--gray);
+        }
+
+        .footer a {
+            color: var(--accent);
+            text-decoration: none;
+        }
+
+        .footer a:hover {
+            text-decoration: underline;
+        }
+
+        /* Animations */
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .container {
+                padding: 0 24px;
+            }
+
+            .audit-btn-wrap {
+                position: relative;
+                padding: 16px 20px 0;
+                text-align: center;
+                width: 100%;
+            }
+
+            .audit-btn-wrap a {
+                display: inline-block;
+                font-size: 12px;
+                padding: 8px 16px;
+            }
+
+            .hero {
+                padding: 20px 20px 40px;
+            }
+
+            .hero h1 {
+                letter-spacing: -1px;
+            }
+
+            .stats {
+                grid-template-columns: 1fr;
+                gap: 30px;
+            }
+
+            .features {
+                grid-template-columns: 1fr;
+            }
+
+            .cta-group {
+                flex-direction: column;
+                align-items: center;
+            }
+
+            .btn {
+                width: 100%;
+                max-width: 300px;
+                justify-content: center;
+            }
+        }
+
+        /* Cursor glow effect */
+        .cursor-glow {
+            position: fixed;
+            width: 400px;
+            height: 400px;
+            background: radial-gradient(circle, rgba(0, 255, 136, 0.1) 0%, transparent 70%);
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: 0;
+            transform: translate(-50%, -50%);
+            transition: opacity 0.3s;
+            opacity: 0;
+        }
+
+        body:hover .cursor-glow {
+            opacity: 1;
+        }
+
+        /* Floating audit button */
+        .audit-btn-wrap {
+            position: fixed;
+            top: 0;
+            right: 0;
+            padding: 20px 40px;
+            z-index: 100;
+        }
+
+        .audit-btn-wrap a {
+            font-family: 'Inter', sans-serif;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--black);
+            background: linear-gradient(135deg, var(--accent) 0%, #00cc6a 100%);
+            padding: 10px 20px;
+            border-radius: 8px;
+            text-decoration: none;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 12px rgba(0, 255, 136, 0.2);
+        }
+
+        .audit-btn-wrap a:hover {
+            box-shadow: 0 4px 20px rgba(0, 255, 136, 0.35);
+            transform: translateY(-1px);
+        }
+
+        /* Opt-in form */
+        .optin-form {
+            display: flex;
+            gap: 12px;
+            width: 100%;
+            max-width: 480px;
+            justify-content: center;
+        }
+
+        .optin-form input[type="email"] {
+            flex: 1;
+            padding: 16px 20px;
+            font-family: 'Inter', sans-serif;
+            font-size: 15px;
+            background: var(--gray-dark);
+            border: 2px solid rgba(255,255,255,0.1);
+            border-radius: 8px;
+            color: var(--white);
+            outline: none;
+            transition: border-color 0.3s ease;
+        }
+
+        .optin-form input[type="email"]::placeholder {
+            color: var(--gray);
+        }
+
+        .optin-form input[type="email"]:focus {
+            border-color: var(--accent);
+        }
+
+        .optin-btn {
+            white-space: nowrap;
+            border: none;
+        }
+
+        .optin-success {
+            color: var(--accent);
+            font-size: 16px;
+            font-weight: 600;
+        }
+
+        .optin-error {
+            color: #ff4444;
+            font-size: 14px;
+        }
+
+        /* Hero impact metrics */
+        .hero-metrics {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 16px;
+            width: 100%;
+            max-width: 680px;
+            margin-top: 40px;
+            opacity: 0;
+            animation: fadeInUp 1s ease forwards;
+            animation-delay: 1s;
+        }
+
+        .hero-metric {
+            background: linear-gradient(160deg, rgba(0, 255, 136, 0.14) 0%, rgba(0, 255, 136, 0.06) 50%, rgba(0, 20, 10, 0.8) 100%);
+            border: 1px solid rgba(0, 255, 136, 0.25);
+            border-top: 3px solid var(--accent);
+            border-radius: 14px;
+            padding: 24px 16px;
+            text-align: center;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 20px rgba(0, 255, 136, 0.08), inset 0 1px 0 rgba(0, 255, 136, 0.1);
+        }
+
+        .hero-metric:hover {
+            border-color: rgba(0, 255, 136, 0.45);
+            border-top-color: var(--accent);
+            background: linear-gradient(160deg, rgba(0, 255, 136, 0.18) 0%, rgba(0, 255, 136, 0.08) 50%, rgba(0, 20, 10, 0.8) 100%);
+            box-shadow: 0 8px 40px rgba(0, 255, 136, 0.18), inset 0 1px 0 rgba(0, 255, 136, 0.12);
+            transform: translateY(-2px);
+        }
+
+        .hero-metric .metric-value {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: clamp(28px, 4vw, 40px);
+            font-weight: 700;
+            line-height: 1;
+            margin-bottom: 6px;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .hero-metric:nth-child(1) .metric-value {
+            background-image: linear-gradient(135deg, #00ff9d, #00e0c0);
+        }
+
+        .hero-metric:nth-child(2) .metric-value {
+            background-image: linear-gradient(135deg, #00e0c0, #1ac4e0);
+        }
+
+        .hero-metric:nth-child(3) .metric-value {
+            background-image: linear-gradient(135deg, #1ac4e0, #33d4ff);
+        }
+
+        .hero-metric .metric-label {
+            font-size: 12px;
+            color: var(--gray-light);
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            line-height: 1.3;
+        }
+
+        .hero-metrics-caption {
+            font-size: 13px;
+            color: var(--gray);
+            margin-top: 12px;
+            opacity: 0;
+            animation: fadeInUp 1s ease forwards;
+            animation-delay: 1.1s;
+        }
+
+        @media (max-width: 768px) {
+            .hero-metrics {
+                grid-template-columns: 1fr;
+                max-width: 280px;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .optin-form {
+                flex-direction: column;
+                align-items: center;
+            }
+
+            .optin-form input[type="email"] {
+                width: 100%;
+                max-width: 300px;
+            }
+
+            .optin-btn {
+                width: 100%;
+                max-width: 300px;
+                justify-content: center;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="bg-gradient"></div>
+    <div class="grid-overlay"></div>
+    <div class="cursor-glow" id="cursorGlow"></div>
+
+    <!-- Hero -->
+    <section class="hero">
+        <div class="audit-btn-wrap">
+            <a href="/ai-audit/">Schedule Your AI Audit</a>
+        </div>
+        <a href="/" class="logo" style="text-decoration: none;">GodMode</a>
+        <h1>
+            <span>Scale</span>
+            <span class="accent">Yourself</span>
+        </h1>
+        <div style="display: inline-flex; align-items: center; gap: 8px; padding: 8px 18px; background: rgba(0, 255, 136, 0.08); border: 1px solid rgba(0, 255, 136, 0.15); border-radius: 100px; margin-bottom: 24px; opacity: 0; animation: fadeInUp 1s ease forwards; animation-delay: 0.5s;">
+            <span style="font-family: 'Space Grotesk', sans-serif; font-size: 12px; font-weight: 600; color: var(--accent); letter-spacing: 1px;">POWERED BY OPENCLAW</span>
+        </div>
+        <p class="tagline">We build personal AI systems for entrepreneurs. Get the GodMode Brief + AI Prompt Pack to see real output from a real operator.</p>
+        <div class="cta-group">
+            <form id="optinForm" class="optin-form">
+                <input type="email" id="optinEmail" placeholder="Enter your email" required>
+                <button type="submit" class="btn btn-primary optin-btn">Get the Brief + Prompts</button>
+            </form>
+            <p id="optinSuccess" class="optin-success" style="display:none;">You're in. Check your inbox.</p>
+            <p id="optinError" class="optin-error" style="display:none;">Something went wrong. Try again.</p>
+        </div>
+        <div class="hero-metrics">
+            <div class="hero-metric">
+                <div class="metric-value">125 hrs</div>
+                <div class="metric-label">Man-hours of output<br>in a single day</div>
+            </div>
+            <div class="hero-metric">
+                <div class="metric-value">$20,625</div>
+                <div class="metric-label">Value created<br>at traditional rates</div>
+            </div>
+            <div class="hero-metric">
+                <div class="metric-value">10x</div>
+                <div class="metric-label">More output<br>than working solo</div>
+            </div>
+        </div>
+        <p class="hero-metrics-caption">Real numbers from a single day with GodMode.</p>
+    </section>
+
+    <!-- What is GodMode -->
+    <section class="section" id="what">
+        <div class="container">
+            <div class="section-label">What is GodMode</div>
+            <h2>A custom AI operating system, <span style="color: var(--accent);">built for YOU</span>.</h2>
+            <p class="lead">GodMode is a personal AI system built on OpenClaw — configured for how you work. It connects to your tools, learns your preferences, and runs autonomously so you can focus on what actually matters.</p>
+
+            <div class="features">
+                <div class="feature" style="border-color: rgba(0, 255, 136, 0.15); background: linear-gradient(135deg, rgba(0, 255, 136, 0.06) 0%, var(--dark) 100%);">
+                    <div class="feature-icon">🎛️</div>
+                    <h3>Flow State Interface</h3>
+                    <p>Run 3-5 parallel sessions with live action indicators showing exactly what each thread is doing. Context-switch between research, comms, and strategy without losing state. It's a cockpit for knowledge work — not a chatbox.</p>
+                </div>
+                <div class="feature" style="border-color: rgba(0, 255, 136, 0.15); background: linear-gradient(135deg, rgba(0, 255, 136, 0.06) 0%, var(--dark) 100%);">
+                    <div class="feature-icon">🛡️</div>
+                    <h3>Enterprise-Grade Security</h3>
+                    <p>7 built-in security guards protecting your data, your clients, and your reputation. Path protection, secret leak detection, prompt injection defense — running at wire speed with zero slowdown.</p>
+                </div>
+                <div class="feature" style="border-color: rgba(0, 255, 136, 0.15); background: linear-gradient(135deg, rgba(0, 255, 136, 0.06) 0%, var(--dark) 100%);">
+                    <div class="feature-icon">⚙️</div>
+                    <h3>78+ Custom Skills</h3>
+                    <p>Slack, Discord, email, CRM, browser automation, PDF editing, code agents — all built in. Need something custom? Build a new skill in minutes. Browse and install more from ClawHub.</p>
+                </div>
+                <div class="feature">
+                    <div class="feature-icon">🧠</div>
+                    <h3>Daily Command Brief</h3>
+                    <p>Every morning before coffee, a briefing lands on your phone — your calendar, priorities, and action items synthesized from your actual data. Not a template. Your day, already organized.</p>
+                </div>
+                <div class="feature">
+                    <div class="feature-icon">⚡</div>
+                    <h3>Autonomous Agents</h3>
+                    <p>Agents that research, draft comms, and run multi-step workflows on your behalf. You set the guardrails — they handle the rest.</p>
+                </div>
+                <div class="feature">
+                    <div class="feature-icon">🔗</div>
+                    <h3>Connected to Your Stack</h3>
+                    <p>Email, calendar, CRM, Slack, Discord, and more — connected through OpenClaw's channel system. One AI that talks to all your tools.</p>
+                </div>
+                <div class="feature">
+                    <div class="feature-icon">🎯</div>
+                    <h3>Custom to Your Business</h3>
+                    <p>Every GodMode setup is configured for your specific workflows, team structure, and business context. Not a one-size-fits-all chatbot.</p>
+                </div>
+                <div class="feature">
+                    <div class="feature-icon">🔒</div>
+                    <h3>Runs on Your Infrastructure</h3>
+                    <p>Built on OpenClaw's open-source foundation. Runs locally or on your own server. Your data stays yours — no third-party cloud lock-in.</p>
+                </div>
+                <div class="feature">
+                    <div class="feature-icon">∞</div>
+                    <h3>Persistent Memory</h3>
+                    <p>Remembers your projects, preferences, and past conversations across sessions. Gets smarter the longer it runs.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Stats -->
+    <section class="section">
+        <div class="container">
+            <div class="stats">
+                <div class="stat">
+                    <div class="stat-value">10x</div>
+                    <div class="stat-label">Output Multiplier</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-value">0</div>
+                    <div class="stat-label">Things Forgotten</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-value">24/7</div>
+                    <div class="stat-label">Always Working</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Urgency callout -->
+    <section style="padding: 60px 0; text-align: center; position: relative; z-index: 2;">
+        <div class="container">
+            <p style="font-family: 'Space Grotesk', sans-serif; font-size: clamp(20px, 3vw, 28px); font-weight: 600; color: var(--gray-light); max-width: 700px; margin: 0 auto; line-height: 1.5;">Every week without a system is a week spent in the weeds instead of on your <span style="color: var(--accent);">next big move</span>.</p>
+        </div>
+    </section>
+
+    <!-- Quote -->
+    <section class="quote-section">
+        <div class="container">
+            <p class="quote">"I built an AI system that runs my business at 3am, delivers my morning brief before coffee, and handles more context than any team member I've had."</p>
+            <p class="quote-author">— Caleb Hodges, Creator of GodMode</p>
+        </div>
+    </section>
+
+    <!-- CTA -->
+    <section class="cta-section">
+        <div class="container">
+            <h2>Compress years into months.</h2>
+            <p>GodMode closes the gap between where you are and where you're headed. Get the Brief to see what that looks like in real numbers.</p>
+            <a href="#top" class="btn btn-primary" onclick="document.getElementById('optinEmail').focus(); return false;">Get the Brief + Prompts</a>
+            <p style="margin-top: 30px; font-size: 15px; color: var(--gray-light);">Want a custom setup for your business? <a href="/ai-audit/" style="color: var(--accent); text-decoration: none; font-weight: 600;">Schedule your AI Audit &rarr;</a></p>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <a href="/" class="footer-logo" style="text-decoration: none; color: var(--white); display: block;">GodMode</a>
+            <div style="display: flex; flex-direction: column; align-items: center; gap: 12px; margin-bottom: 16px;">
+                <img src="/images/founder-headshot.png" alt="Caleb Hodges" style="width: 64px; height: 64px; border-radius: 50%; object-fit: cover; object-position: center 20%; border: 2px solid rgba(0, 255, 136, 0.25);">
+                <p style="margin: 0;">Built by <a href="mailto:team@lifeongodmode.com">Caleb Hodges</a></p>
+            </div>
+            <p><a href="https://x.com/CalebHodges" target="_blank" style="display: inline-flex; align-items: center; gap: 8px;">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+                @CalebHodges
+            </a></p>
+        </div>
+    </footer>
+
+    <script>
+        // Cursor glow effect
+        const cursorGlow = document.getElementById('cursorGlow');
+        document.addEventListener('mousemove', (e) => {
+            cursorGlow.style.left = e.clientX + 'px';
+            cursorGlow.style.top = e.clientY + 'px';
+        });
+
+        // Smooth reveal on scroll
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.style.opacity = '1';
+                    entry.target.style.transform = 'translateY(0)';
+                }
+            });
+        }, { threshold: 0.1 });
+
+        document.querySelectorAll('.feature, .stat').forEach(el => {
+            el.style.opacity = '0';
+            el.style.transform = 'translateY(20px)';
+            el.style.transition = 'opacity 0.6s ease, transform 0.6s ease';
+            observer.observe(el);
+        });
+
+        // Opt-in form submission
+        const optinForm = document.getElementById('optinForm');
+        const optinSuccess = document.getElementById('optinSuccess');
+        const optinError = document.getElementById('optinError');
+
+        optinForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const email = document.getElementById('optinEmail').value.trim();
+            if (!email) return;
+
+            const btn = optinForm.querySelector('button');
+            btn.textContent = 'Submitting...';
+            btn.disabled = true;
+            optinError.style.display = 'none';
+
+            try {
+                const res = await fetch('/api/subscribe', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email }),
+                });
+
+                if (res.ok) {
+                    optinForm.style.display = 'none';
+                    optinSuccess.style.display = 'block';
+                } else {
+                    throw new Error('Failed');
+                }
+            } catch (err) {
+                optinError.style.display = 'block';
+                btn.textContent = 'Get the Brief + Prompts';
+                btn.disabled = false;
+            }
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,17 @@
+iteration	score_before	score_after	mutation	status
+1	8.315	8.274	Swap 'Meta goal' to 'prime directive', strengthen wording	discard
+2	8.315	8.282	Add: acknowledge stress before helping	discard
+3	8.315	8.234	Remove QMD jargon, clarify vault search	discard
+4	8.315	8.339	Swap 'Meta goal' to 'prime directive', strengthen wording	keep
+5	8.339	8.323	Add: never present menus, just act	discard
+6	8.339	8.347	Add: morning greetings trigger full brief	keep
+7	8.347	8.371	Remove QMD implementation detail	keep
+8	8.371	8.371	Add: acknowledge stress before helping	keep
+9	8.371	8.371	Strengthen 'not a chatbot' line	keep
+10	8.371	8.419	Add: never present menus, just act	keep
+11	8.419	8.379	Add: set delegation expectations	discard
+12	8.419	8.516	Add: never say 'I don't have access to'	keep
+13	8.516	8.516	Remove QMD jargon, clarify vault search	skipped
+14	8.516	8.516	Remove QMD jargon, clarify vault search	skipped
+15	8.516	8.452	Add: structured briefing format	discard
+1	8.758	8.758	Add: never say 'I don't have access to'	skipped
