@@ -445,12 +445,39 @@ const godmodePlugin = {
     }) as Parameters<typeof api.registerGatewayMethod>[1]);
 
     // Set active model — UI model picker calls this for quick model switching.
+    // Sets BOTH the session-level modelOverride (takes effect immediately for
+    // the current session) AND the global default (for future sessions).
     api.registerGatewayMethod("godmode.config.model.set", (async ({ params, respond }: { params: Record<string, unknown>; respond: Function }) => {
       try {
         const { resolveConfigPath } = await import("./src/lib/openclaw-state.js");
+        const { resolveAgentStorePath, loadConfig, updateSessionStore } = await import("./src/lib/workspace-session-store.js");
         const cfgPath = resolveConfigPath();
         const primary = params?.primary as string;
+        const sessionKey = params?.sessionKey as string | undefined;
         if (!primary) { respond(false, { error: "primary is required" }); return; }
+
+        // Parse "provider/model" format
+        const slashIdx = primary.indexOf("/");
+        const provider = slashIdx > 0 ? primary.slice(0, slashIdx) : "";
+        const model = slashIdx > 0 ? primary.slice(slashIdx + 1) : primary;
+
+        // 1. Set session-level modelOverride (highest priority in OpenClaw's 3-tier resolution)
+        if (sessionKey) {
+          try {
+            const cfg = await loadConfig();
+            const storePath = resolveAgentStorePath(sessionKey, cfg);
+            await updateSessionStore(storePath, (store) => {
+              if (!store[sessionKey]) store[sessionKey] = {};
+              store[sessionKey].modelOverride = model;
+              store[sessionKey].providerOverride = provider;
+              store[sessionKey].updatedAt = Date.now();
+            });
+          } catch (sessionErr) {
+            console.warn(`[model-switch] session override failed: ${sessionErr}`);
+          }
+        }
+
+        // 2. Update global default for future sessions
         let raw: Record<string, unknown> = {};
         if (existsSync(cfgPath)) {
           raw = JSON.parse(readFileSync(cfgPath, "utf-8"));
@@ -460,15 +487,15 @@ const godmodePlugin = {
         if (!agents.defaults) agents.defaults = {};
         const defaults = agents.defaults as Record<string, unknown>;
         if (!defaults.model) defaults.model = {};
-        const model = defaults.model as Record<string, unknown>;
-        model.primary = primary;
+        const modelCfg = defaults.model as Record<string, unknown>;
+        modelCfg.primary = primary;
         if (primary.startsWith("anthropic/")) {
-          model.fallbacks = ["openai-codex/gpt-5.3-codex"];
+          modelCfg.fallbacks = ["openai-codex/gpt-5.3-codex"];
         } else {
-          model.fallbacks = ["anthropic/claude-sonnet-4-6"];
+          modelCfg.fallbacks = ["anthropic/claude-sonnet-4-6"];
         }
         writeFileSync(cfgPath, JSON.stringify(raw, null, 2), "utf-8");
-        respond(true, { primary, fallbacks: model.fallbacks });
+        respond(true, { primary, fallbacks: modelCfg.fallbacks });
       } catch (err) {
         respond(false, { error: String(err) });
       }

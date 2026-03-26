@@ -55,6 +55,32 @@ import type { Tab } from "../navigation.js";
 // Component
 // ---------------------------------------------------------------------------
 
+const WORKSPACES_OFFLINE_ERROR = "Connect to gateway to see workspaces";
+
+export function shouldRefreshWorkspaceData(params: {
+  connected: boolean;
+  hasGateway: boolean;
+  previousConnected: boolean;
+  gatewayChanged: boolean;
+  hasWorkspaceData: boolean;
+  workspacesError: string | null;
+}): boolean {
+  if (!params.connected || !params.hasGateway) {
+    return false;
+  }
+
+  const needsData = !params.hasWorkspaceData || Boolean(params.workspacesError);
+  if (!needsData) {
+    return false;
+  }
+
+  if (!params.previousConnected || params.gatewayChanged) {
+    return true;
+  }
+
+  return params.workspacesError === WORKSPACES_OFFLINE_ERROR;
+}
+
 @customElement("gm-work")
 export class GmWork extends LitElement {
   // -- Shared context (provided by root app) --------------------------------
@@ -101,6 +127,7 @@ export class GmWork extends LitElement {
   private _unsubs: Array<() => void> = [];
   private _lastConnected = false;
   private _refreshInFlight = false;
+  private _lastGateway: WorkspacesState["client"] = null;
 
   // -- Light DOM (no shadow root) so existing CSS classes work ---------------
 
@@ -132,8 +159,7 @@ export class GmWork extends LitElement {
       }),
     );
 
-    // Auto-load initial data (may fail if context hasn't synced yet — updated() retries)
-    void this._refresh();
+    this._maybeRefreshForContext();
   }
 
   override disconnectedCallback() {
@@ -145,14 +171,8 @@ export class GmWork extends LitElement {
   /** Re-fetch when gateway connection arrives after initial mount. */
   protected override updated(changed: Map<PropertyKey, unknown>) {
     super.updated?.(changed);
-    const nowConnected = this.ctx?.connected ?? false;
-    if (nowConnected && !this._lastConnected) {
-      // Context just became connected — retry load if we have no data or an error
-      if (!this.workspaces?.length || this.workspacesError) {
-        void this._refresh();
-      }
-    }
-    this._lastConnected = nowConnected;
+    void changed;
+    this._maybeRefreshForContext();
   }
 
   // -- Render ---------------------------------------------------------------
@@ -236,6 +256,27 @@ export class GmWork extends LitElement {
   }
 
   // -- Handlers -------------------------------------------------------------
+
+  private _maybeRefreshForContext(): void {
+    const nowConnected = this.ctx?.connected ?? false;
+    const gateway = this.ctx?.gateway ?? null;
+    const gatewayChanged = gateway !== this._lastGateway;
+    const shouldRefresh = shouldRefreshWorkspaceData({
+      connected: nowConnected,
+      hasGateway: Boolean(gateway),
+      previousConnected: this._lastConnected,
+      gatewayChanged,
+      hasWorkspaceData: Boolean(this.workspaces?.length),
+      workspacesError: this.workspacesError,
+    });
+
+    this._lastConnected = nowConnected;
+    this._lastGateway = gateway;
+
+    if (shouldRefresh) {
+      void this._refresh();
+    }
+  }
 
   private async _refresh(): Promise<void> {
     if (this._refreshInFlight) return; // deduplicate concurrent calls

@@ -409,7 +409,7 @@ Admin introduces new person in Telegram group, {{ALLY_NAME}} adds them to allowl
 **{{ALLY_NAME}} response:**
 
 ```
-Hey [name]! Welcome to GodMode. I'm {{ALLY_NAME}}, your AI assistant.
+Welcome to GodMode, I'm your AI Ally. I'll be your chief of staff, executive assistant, strategic partner, and more. Let's get started.
 
 I'll walk you through getting everything set up. It takes about
 30 minutes, and by the end you'll have your own personal AI

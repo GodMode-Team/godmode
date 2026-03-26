@@ -667,12 +667,30 @@ export class GodModeApp extends LitElement {
     // Listen for cross-tab chat navigation (e.g. "Create via Chat" from dashboards)
     this._eventBusUnsubs.push(
       appEventBus.on("chat-navigate", (payload) => {
+        let nextKey = this.sessionKey;
         if (payload.sessionKey && payload.sessionKey !== this.sessionKey) {
           if (payload.sessionKey === "new") {
             // Generate a fresh session key for new sessions
-            this.sessionKey = `webchat-${Date.now()}`;
+            nextKey = `webchat-${Date.now()}`;
           } else {
-            this.sessionKey = payload.sessionKey;
+            nextKey = payload.sessionKey;
+          }
+          this.sessionKey = nextKey;
+
+          // Ensure session appears as a tab (prevents ghost sessions)
+          const lower = nextKey.toLowerCase();
+          const isMainAlias = lower === "main" || lower === "agent:main:main" || lower.endsWith(":main");
+          if (!isMainAlias && !this.settings.openTabs.includes(nextKey)) {
+            this.applySettings({
+              ...this.settings,
+              openTabs: [...this.settings.openTabs, nextKey],
+              sessionKey: nextKey,
+              lastActiveSessionKey: nextKey,
+              tabLastViewed: {
+                ...this.settings.tabLastViewed,
+                [nextKey]: Date.now(),
+              },
+            });
           }
         }
         if (payload.tab === "chat") {

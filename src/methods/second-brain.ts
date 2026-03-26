@@ -1505,6 +1505,27 @@ const memoryPulse: GatewayRequestHandler = async ({ respond }) => {
     systems.push({ id: "screenpipe", name: "Screenpipe", status: "offline", detail: "Not running" });
   }
 
+  // 5. Connected Sources (aggregate of third-party integrations)
+  try {
+    const { getIntegrationsForPlatform, detectAllIntegrations } = await import("../lib/integration-registry.js");
+    const integrations = getIntegrationsForPlatform().filter(
+      (i) => !["composio", "obsidian-vault", "obsidian-sync"].includes(i.id),
+    );
+    const statuses = await detectAllIntegrations();
+    const connected = integrations.filter(
+      (i) => statuses[i.id]?.working || statuses[i.id]?.configured,
+    ).length;
+    systems.push({
+      id: "connected-sources",
+      name: "Connected Sources",
+      status: connected > 0 ? "ready" : "offline",
+      detail: connected > 0 ? `${connected} connected` : "None connected",
+      count: connected,
+    });
+  } catch {
+    systems.push({ id: "connected-sources", name: "Connected Sources", status: "offline", detail: "Check failed" });
+  }
+
   const readyCount = systems.filter(s => s.status === "ready").length;
   respond(true, { systems, readyCount, totalCount: systems.length });
 };

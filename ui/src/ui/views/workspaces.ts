@@ -916,6 +916,7 @@ function renderWorkspaceDetail(props: {
   onCreateTask?: (title: string, project: string) => void;
   onToggleCompletedTasks?: () => void;
   onStartTask?: (taskId: string) => void;
+  onViewTaskOutput?: (taskId: string) => void;
   editingTaskId?: string | null;
   onEditTask?: (taskId: string | null) => void;
   onUpdateTask?: (taskId: string, updates: { title?: string; dueDate?: string | null }) => void;
@@ -950,6 +951,7 @@ function renderWorkspaceDetail(props: {
     onCreateTask,
     onToggleCompletedTasks,
     onStartTask,
+    onViewTaskOutput,
     editingTaskId,
     onEditTask,
     onUpdateTask,
@@ -1527,6 +1529,7 @@ export function renderWorkspaces(props: WorkspacesProps) {
       onCreateTask,
       onToggleCompletedTasks,
       onStartTask,
+      onViewTaskOutput,
       editingTaskId,
       onEditTask,
       onUpdateTask,

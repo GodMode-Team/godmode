@@ -344,10 +344,22 @@ export class GmChat extends LitElement {
     s.chatQueue = [];
     s.resetToolStream();
     s.resetChatScroll();
+    // Ensure session appears as a tab (prevents ghost sessions from chat-navigate)
+    const isMainAlias = next === "main" || next === "agent:main:main" || next.endsWith(":main");
+    const openTabs = isMainAlias
+      ? s.settings.openTabs
+      : s.settings.openTabs.includes(next)
+        ? s.settings.openTabs
+        : [...s.settings.openTabs, next];
     s.applySettings({
       ...s.settings,
+      openTabs,
       sessionKey: next,
       lastActiveSessionKey: next,
+      tabLastViewed: {
+        ...s.settings.tabLastViewed,
+        [next]: Date.now(),
+      },
     });
     void s.loadAssistantIdentity();
     void loadChatHistory(s).then(() => {
