@@ -13,7 +13,7 @@ Before OSS prep, this repo had: personal emails, client project names, Telegram 
 `scripts/hooks/secrets-guard.sh` runs on every `git commit` and scans staged files for:
 - API keys (sk-*, ghp_*, AKIA*, xox*, Telegram tokens)
 - Stripe IDs (prod_*, price_*, sk_test_*, sk_live_*)
-- Personal emails (@gmail, @icloud, @patientautopilot, etc.)
+- Personal emails (@gmail, @icloud, @hotmail, etc.)
 - Hardcoded user paths (platform-specific home directories)
 - Passwords/secrets in code (password = "...", secret: "...")
 - Private keys (-----BEGIN ... PRIVATE KEY-----)

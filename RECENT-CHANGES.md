@@ -873,7 +873,7 @@ Major overnight audit, security hardening, and beta readiness pass. Every file i
 - CSS for setup help banner added to setup.css.
 
 ### Documentation
-- Team onboarding guide written: `VAULT/99-System/team-onboarding-guide.md` — full migration instructions for Titus, Ashley, and future team members.
+- Team onboarding guide written: `VAULT/99-System/team-onboarding-guide.md` — full migration instructions for team members.
 - Beta pre-flight checklist created: `VAULT/02-Projects/godmode-beta-preflight.md` — complete gap analysis including website, Stripe, license API, npm publishing.
 - Support agent knowledge base updated with all new features.
 - RECENT-CHANGES.md updated with comprehensive session summary.

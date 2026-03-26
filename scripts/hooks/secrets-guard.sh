@@ -110,7 +110,7 @@ check_pattern "Connection String with Password" \
 # ─── MEDIUM: PII ──────────────────────────────────────────────────────
 
 check_pattern "Personal Email (non-placeholder)" \
-  '[a-zA-Z0-9._%+-]+@(gmail|yahoo|hotmail|icloud|outlook|patientautopilot|godmode)\.(com|ai)' \
+  '[a-zA-Z0-9._%+-]+@(gmail|yahoo|hotmail|icloud|outlook)\.(com|ai)' \
   "MEDIUM"
 
 matches=$(echo "$STAGED" | xargs grep -nEH '/Users/[a-zA-Z][a-zA-Z0-9_-]+/' 2>/dev/null | grep -v '.env.example' | grep -v 'secrets-guard.sh' | grep -v 'node_modules/' | grep -v 'docs/audits/' | grep -vE '/Users/(example|yourname|test)(/|$)' || true)

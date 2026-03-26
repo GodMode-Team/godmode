@@ -1152,7 +1152,7 @@ export function renderApp(state: AppViewState) {
                   const item = e.detail.item as { title?: string; sessionId?: string; coworkSessionId?: string } | undefined;
                   // If the item has a cowork session, navigate to it
                   if (item?.coworkSessionId) {
-                    appEventBus.emit("chat-navigate", { sessionKey: `agent:prosper:${item.coworkSessionId}`, tab: "chat" });
+                    appEventBus.emit("chat-navigate", { sessionKey: `agent:ally:${item.coworkSessionId}`, tab: "chat" });
                   } else if (item?.sessionId) {
                     appEventBus.emit("chat-navigate", { sessionKey: item.sessionId, tab: "chat" });
                   } else {
