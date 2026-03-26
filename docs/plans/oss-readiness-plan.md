@@ -228,7 +228,6 @@ rg "ANTHROPIC_API_KEY.*=.*sk-" --type ts
 
 # 2. No hardcoded personal names in source
 rg "\\bOWNER_NAME\\b" src/ ui/src/ --type ts
-rg "\\bProsper\\b" src/ ui/src/ assets/ --type ts --type html | grep -v node_modules
 
 # 3. No hardcoded local paths
 rg "/Users/" src/ docs/ tests/
