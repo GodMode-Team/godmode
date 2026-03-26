@@ -625,15 +625,24 @@ async function handleChatThreadLinkClick(event: MouseEvent, props: ChatProps) {
       } catch { /* fall through */ }
     }
 
-    // External URLs: open synchronously via window.open BEFORE any await.
-    // Calling window.open after an await breaks the user-gesture chain and
-    // gets silently blocked by popup blockers / webview security.
+    // External URLs and same-origin artifact URLs: open synchronously via
+    // window.open BEFORE any await.  Calling window.open after an await breaks
+    // the user-gesture chain and gets silently blocked by popup blockers.
     try {
       const url = new URL(href, window.location.href);
-      if (/^https?:$/.test(url.protocol) && url.origin !== window.location.origin) {
-        event.preventDefault();
-        window.open(url.href, "_blank", "noopener,noreferrer");
-        return;
+      if (/^https?:$/.test(url.protocol)) {
+        // External URLs → new tab
+        if (url.origin !== window.location.origin) {
+          event.preventDefault();
+          window.open(url.href, "_blank", "noopener,noreferrer");
+          return;
+        }
+        // Same-origin artifact URLs → new tab (gateway-served rendered files)
+        if (/^\/godmode\/artifacts\//.test(url.pathname)) {
+          event.preventDefault();
+          window.open(url.href, "_blank", "noopener,noreferrer");
+          return;
+        }
       }
     } catch {
       // Not a valid URL — fall through to workspace file handler

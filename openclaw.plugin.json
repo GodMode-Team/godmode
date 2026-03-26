@@ -2,7 +2,7 @@
   "id": "godmode",
   "name": "GodMode",
   "description": "Personal AI Operating System — your deeply contextual AI ally that manages tasks, memory, integrations, and a swarm of agents",
-  "version": "1.8.1",
+  "version": "1.8.2",
   "license": "FSL-1.1-MIT",
   "author": {
     "name": "GodMode Team",

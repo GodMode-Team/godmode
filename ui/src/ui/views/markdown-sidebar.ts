@@ -210,16 +210,14 @@ function renderBody(props: MarkdownSidebarProps) {
   }
 
   if (mimeType === "text/html" || mimeType === "application/xhtml+xml") {
-    // Render full HTML pages in a sandboxed iframe so styles/layout are preserved
-    const blob = new Blob([content], { type: "text/html" });
-    const blobUrl = URL.createObjectURL(blob);
+    // Render full HTML pages in a sandboxed iframe so styles/layout are preserved.
+    // Uses srcdoc instead of Blob URLs so Lit's dirty-checking skips the DOM
+    // update when content hasn't changed (prevents iframe reload on unrelated re-renders).
     return html`<iframe
       class="sidebar-html-frame"
-      src=${blobUrl}
+      .srcdoc=${content}
       sandbox="allow-same-origin allow-top-navigation-by-user-activation allow-popups"
       @load=${(e: Event) => {
-        // Clean up blob URL after load
-        URL.revokeObjectURL(blobUrl);
         // Auto-size iframe to content height
         const iframe = e.target as HTMLIFrameElement;
         try {
