@@ -611,12 +611,34 @@ if [ -d "$STATE_DIR/extensions/godmode" ]; then
   info "Removed old plugin version"
 fi
 info "Installing @godmode-team/godmode (latest)..."
-openclaw plugins install @godmode-team/godmode || {
+# openclaw plugins install can hang after successful install because it loads
+# the plugin to validate it, which starts GodMode's long-running services.
+# Work around: run with a timeout, then verify success via the installed directory.
+PLUGIN_LOG=$(mktemp /tmp/godmode-install-XXXXXX.log 2>/dev/null || echo "/tmp/godmode-install-$$.log")
+if has timeout; then
+  timeout 120 openclaw plugins install @godmode-team/godmode >"$PLUGIN_LOG" 2>&1 || true
+else
+  # POSIX fallback: background + kill after timeout
+  openclaw plugins install @godmode-team/godmode >"$PLUGIN_LOG" 2>&1 &
+  INSTALL_PID=$!
+  ( sleep 120 && kill "$INSTALL_PID" 2>/dev/null ) &
+  TIMER_PID=$!
+  wait "$INSTALL_PID" 2>/dev/null || true
+  kill "$TIMER_PID" 2>/dev/null || true
+  wait "$TIMER_PID" 2>/dev/null || true
+fi
+# Filter OpenClaw's static-analysis warnings (child_process + env access are
+# expected — GodMode spawns agents and reads API keys)
+grep -v "WARNING: Plugin.*dangerous code patterns" "$PLUGIN_LOG" 2>/dev/null || true
+rm -f "$PLUGIN_LOG"
+# Verify plugin was actually installed
+if [ -d "$STATE_DIR/extensions/godmode/dist" ]; then
+  ok "GodMode plugin installed (latest)"
+else
   fail "GodMode plugin install failed"
   info "Try: openclaw plugins install @godmode-team/godmode"
   exit 1
-}
-ok "GodMode plugin installed (latest)"
+fi
 
 # Step 6: GodMode account
 step 6 "GodMode account"
