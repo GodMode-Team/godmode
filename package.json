@@ -8,10 +8,10 @@
   "homepage": "https://lifeongodmode.com",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/GodMode-Team/godmode-plugin.git"
+    "url": "git+https://github.com/GodMode-Team/godmode.git"
   },
   "bugs": {
-    "url": "https://github.com/GodMode-Team/godmode-plugin/issues"
+    "url": "https://github.com/GodMode-Team/godmode/issues"
   },
   "keywords": [
     "openclaw",
