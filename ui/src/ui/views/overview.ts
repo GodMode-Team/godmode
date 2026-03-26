@@ -15,13 +15,21 @@ export type OverviewProps = {
     fetchOk: boolean | null;
   } | null;
   updateLoading: boolean;
+  updateRunning: boolean;
+  pluginUpdateRunning: boolean;
+  updateError: string | null;
   onCheckUpdates: () => void;
   onUpdateOpenclaw: () => void;
   onUpdatePlugin: () => void;
 };
 
 export function renderOverview(props: OverviewProps) {
-  const { connected, updateStatus, updateLoading, onCheckUpdates, onUpdateOpenclaw, onUpdatePlugin } = props;
+  const {
+    connected, updateStatus, updateLoading, updateRunning, pluginUpdateRunning,
+    updateError, onCheckUpdates, onUpdateOpenclaw, onUpdatePlugin,
+  } = props;
+
+  const anyUpdateRunning = updateRunning || pluginUpdateRunning;
 
   return html`
     <section class="tab-body" style="max-width: 600px; margin: 0 auto;">
@@ -44,7 +52,11 @@ export function renderOverview(props: OverviewProps) {
               ${updateStatus.openclawUpdateAvailable && updateStatus.openclawLatest
                 ? html`
                     <span style="color: var(--text-muted, #888);">\u2192 v${updateStatus.openclawLatest}</span>
-                    <button class="btn btn--primary btn--sm" @click=${onUpdateOpenclaw}>Update</button>
+                    <button
+                      class="btn btn--primary btn--sm"
+                      ?disabled=${anyUpdateRunning}
+                      @click=${onUpdateOpenclaw}
+                    >${updateRunning ? "Updating\u2026" : "Update"}</button>
                   `
                 : html`<span style="color: var(--text-muted, #888); font-size: 0.85rem;">up to date</span>`}
             </div>
@@ -56,7 +68,11 @@ export function renderOverview(props: OverviewProps) {
               ${updateStatus.pluginUpdateAvailable && updateStatus.pluginLatest
                 ? html`
                     <span style="color: var(--text-muted, #888);">\u2192 v${updateStatus.pluginLatest}</span>
-                    <button class="btn btn--primary btn--sm" @click=${onUpdatePlugin}>Update</button>
+                    <button
+                      class="btn btn--primary btn--sm"
+                      ?disabled=${anyUpdateRunning}
+                      @click=${onUpdatePlugin}
+                    >${pluginUpdateRunning ? "Updating\u2026" : "Update"}</button>
                   `
                 : html`<span style="color: var(--text-muted, #888); font-size: 0.85rem;">up to date</span>`}
             </div>
@@ -71,11 +87,19 @@ export function renderOverview(props: OverviewProps) {
           `
         : html`<div style="color: var(--text-muted, #888); margin-bottom: 12px;">No version data yet.</div>`}
 
+      ${updateError
+        ? html`
+            <div style="margin-top: 12px; padding: 8px 12px; border-radius: 6px; background: var(--color-error-bg, rgba(239, 68, 68, 0.1)); color: var(--color-error, #ef4444); font-size: 0.85rem;">
+              ${updateError}
+            </div>
+          `
+        : nothing}
+
       <!-- Check for updates -->
       <div style="margin-top: 20px;">
         <button
           class="btn btn--secondary"
-          ?disabled=${updateLoading || !connected}
+          ?disabled=${updateLoading || anyUpdateRunning || !connected}
           @click=${onCheckUpdates}
         >
           ${updateLoading ? "Checking\u2026" : "Check for Updates"}

@@ -139,6 +139,7 @@ export type AppViewState = {
   configSaving: boolean;
   configApplying: boolean;
   updateRunning: boolean;
+  pluginUpdateRunning: boolean;
   configSnapshot: ConfigSnapshot | null;
   configSchema: unknown | null;
   configSchemaLoading: boolean;

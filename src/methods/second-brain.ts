@@ -878,6 +878,68 @@ export async function runQmdSearch(
   return JSON.parse(stdout) as QmdJsonResult[];
 }
 
+// ── Live Screenpipe Search ───────────────────────────────────────────
+
+/**
+ * Query Screenpipe REST API directly for recent screen/audio matches.
+ * Returns results shaped like SearchResult so they merge into brainSearch output.
+ * Fails silently — never throws.
+ */
+async function searchScreenpipeLive(
+  query: string,
+  limit = 5,
+): Promise<Array<{ path: string; name: string; section: string; excerpt: string; matchContext?: string; updatedAt?: string }>> {
+  try {
+    // Resolve API URL from config
+    let apiUrl: string;
+    try {
+      const { loadConfig } = await import("../services/ingestion/screenpipe-config.js");
+      const cfg = await loadConfig();
+      apiUrl = cfg.apiUrl || SCREENPIPE_API_URL;
+      if (!cfg.enabled) return []; // respect user's disable choice
+    } catch {
+      apiUrl = SCREENPIPE_API_URL;
+    }
+
+    const resp = await fetch(`${apiUrl}/search`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ q: query, limit, content_type: "all" }),
+      signal: AbortSignal.timeout(3_000),
+    });
+    if (!resp.ok) return [];
+
+    const data = (await resp.json()) as {
+      data?: Array<{
+        type: string;
+        content: { text?: string; transcription?: string; timestamp?: string; app_name?: string; window_name?: string };
+      }>;
+    };
+    if (!data.data?.length) return [];
+
+    return data.data
+      .filter((d) => d.content?.text || d.content?.transcription)
+      .slice(0, limit)
+      .map((d) => {
+        const text = d.content.text || d.content.transcription || "";
+        const app = d.content.app_name ?? "Screen";
+        const window = d.content.window_name ? ` — ${d.content.window_name}` : "";
+        const ts = d.content.timestamp ?? new Date().toISOString();
+
+        return {
+          path: `screenpipe://live/${encodeURIComponent(query)}`,
+          name: `${app}${window}`,
+          section: "screen-recall",
+          excerpt: text.length > 200 ? text.slice(0, 200) + "..." : text,
+          matchContext: text.length > 300 ? text.slice(0, 300) + "..." : text,
+          updatedAt: ts,
+        };
+      });
+  } catch {
+    return [];
+  }
+}
+
 // ── Brain Search ─────────────────────────────────────────────────────
 
 const brainSearch: GatewayRequestHandler = async ({ params, respond }) => {
@@ -951,6 +1013,14 @@ const brainSearch: GatewayRequestHandler = async ({ params, respond }) => {
         scope: collection ?? "all",
       });
     } catch { /* logging non-fatal */ }
+
+    // Append live Screenpipe results (non-blocking — don't fail the search if Screenpipe is down)
+    try {
+      const liveScreenHits = await searchScreenpipeLive(query, Math.max(1, Math.min(5, limit - results.length)));
+      if (liveScreenHits.length > 0) {
+        results.push(...liveScreenHits);
+      }
+    } catch { /* screenpipe offline — fine */ }
 
     respond(true, { results, query, total: results.length, source: "qmd" });
     return;
@@ -1065,6 +1135,14 @@ const brainSearch: GatewayRequestHandler = async ({ params, respond }) => {
     if (results.length >= limit) break;
     searchDir(dir, label, 0);
   }
+
+  // Append live Screenpipe results to file walk results too
+  try {
+    const liveScreenHits = await searchScreenpipeLive(query, Math.max(1, Math.min(5, limit - results.length)));
+    if (liveScreenHits.length > 0) {
+      results.push(...liveScreenHits);
+    }
+  } catch { /* screenpipe offline — fine */ }
 
   // Retrieval trajectory logging — file walk fallback
   try {

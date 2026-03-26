@@ -196,15 +196,14 @@ function renderSvgContent(content: string): TemplateResult {
 }
 
 function renderHtmlContent(content: string): TemplateResult {
-  const blob = new Blob([content], { type: "text/html" });
-  const blobUrl = URL.createObjectURL(blob);
+  // Uses srcdoc instead of Blob URLs so Lit's dirty-checking skips the DOM
+  // update when content hasn't changed (prevents iframe reload on unrelated re-renders).
   return html`
     <iframe
       class="fv-html-frame"
-      src=${blobUrl}
+      .srcdoc=${content}
       sandbox="allow-same-origin allow-scripts allow-popups allow-forms"
       @load=${(e: Event) => {
-        URL.revokeObjectURL(blobUrl);
         const iframe = e.target as HTMLIFrameElement;
         try {
           const h = iframe.contentDocument?.documentElement?.scrollHeight;

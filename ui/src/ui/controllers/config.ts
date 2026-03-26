@@ -160,12 +160,19 @@ export async function runUpdate(state: ConfigState) {
   if (!state.client || !state.connected) {
     return;
   }
+  if (!confirm("Update OpenClaw? The gateway will restart and briefly disconnect.")) {
+    return;
+  }
   state.updateRunning = true;
   state.lastError = null;
   try {
     await state.client.request("godmode.update.run", {});
   } catch (err) {
-    state.lastError = String(err);
+    // If the connection dropped, the gateway restarted as expected — not an error.
+    // Only surface errors when still connected (real RPC failure, e.g. npm network error).
+    if (state.connected) {
+      state.lastError = String(err);
+    }
   } finally {
     state.updateRunning = false;
   }
@@ -175,12 +182,18 @@ export async function runPluginUpdate(state: ConfigState) {
   if (!state.client || !state.connected) {
     return;
   }
+  if (!confirm("Update GodMode plugin? The gateway will restart and briefly disconnect.")) {
+    return;
+  }
   state.pluginUpdateRunning = true;
   state.lastError = null;
   try {
     await state.client.request("godmode.update.pluginRun", {});
   } catch (err) {
-    state.lastError = String(err);
+    // If the connection dropped, the gateway restarted as expected — not an error.
+    if (state.connected) {
+      state.lastError = String(err);
+    }
   } finally {
     state.pluginUpdateRunning = false;
   }
@@ -221,4 +234,5 @@ export async function switchModel(
   updateConfigFormValue(state, ["agents", "defaults", "model", "primary"], primary);
   updateConfigFormValue(state, ["agents", "defaults", "model", "fallbacks"], fallbacks);
   await saveConfig(state);
+  await applyConfig(state);
 }

@@ -45,6 +45,7 @@ import {
   testConnection,
   removeConnection,
   loadConnections,
+  backfillWorkspaceExtras,
   type WorkspacesState,
   type BrowseEntry,
 } from "../controllers/workspaces.js";
@@ -270,7 +271,7 @@ export class GmWork extends LitElement {
     this.requestUpdate();
     try {
       const timeout = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error("Workspace load timed out")), 10_000),
+        setTimeout(() => reject(new Error("Workspace load timed out")), 5_000),
       );
       await Promise.race([
         selectWorkspace(this as unknown as WorkspacesState, workspace),
@@ -297,6 +298,11 @@ export class GmWork extends LitElement {
       this.workspacesLoading = false;
       this.requestUpdate();
     }
+
+    // Backfill feed + connections in background after workspace is displayed
+    void backfillWorkspaceExtras(this as unknown as WorkspacesState, workspace.id)
+      .then(() => this.requestUpdate())
+      .catch(() => {});
   }
 
   private _onBack(): void {

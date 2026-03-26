@@ -109,6 +109,10 @@ export type BrainTreeNode = {
 export type ScreenpipeStatusData = {
   enabled: boolean;
   available: boolean;
+  installed: boolean;
+  version: string | null;
+  pid: number | null;
+  managedByUs: boolean;
   apiUrl: string;
   blockedApps: string[];
   retention: Record<string, unknown>;
@@ -212,6 +216,7 @@ export class GmSecondBrain extends LitElement {
 
   // Screenpipe & Ingestion
   @state() screenpipeStatus: ScreenpipeStatusData | null = null;
+  @state() screenpipeSetupBusy = false;
   @state() ingestionStatus: IngestionStatusData | null = null;
 
   // Search
@@ -467,7 +472,7 @@ export class GmSecondBrain extends LitElement {
           <input
             class="sb-search-input"
             type="text"
-            placeholder="Search your memory \u2014 Honcho, Vault, Sessions, Screenpipe..."
+            placeholder="Search your memory \u2014 conversations, vault, sessions, screen recall..."
             .value=${this.searchQuery}
             @input=${(e: Event) => this._onSearchInput(e)}
           />
@@ -705,39 +710,42 @@ export class GmSecondBrain extends LitElement {
 
   private _renderScreenpipePanel() {
     const sp = this.screenpipeStatus;
+    const busy = this.screenpipeSetupBusy;
 
     return html`
       <div class="sb-section">
         <div class="sb-section-header">
           <span class="sb-section-title">\u{1F4FA} Ambient Memory (Screenpipe)</span>
           ${sp ? html`
-            <span class="sb-dot ${sp.available ? "sb-dot--ready" : "sb-dot--offline"}"></span>
+            <span class="sb-dot ${sp.available ? "sb-dot--ready" : sp.installed ? "sb-dot--degraded" : "sb-dot--offline"}"></span>
           ` : nothing}
         </div>
         ${!sp ? html`
           <div class="sb-empty-block">
             <div class="sb-empty-hint">Loading Screenpipe status...</div>
           </div>
+        ` : !sp.installed ? html`
+          <div class="sb-screenpipe-setup">
+            <div class="sb-setup-message">
+              Ambient Memory captures what's on your screen and in your audio, locally.
+              Your ally uses it to recall context you've seen. All data stays on your machine.
+            </div>
+            <button
+              class="sb-action-btn"
+              ?disabled=${busy}
+              @click=${() => this._setupScreenpipe()}
+            >${busy ? "Installing..." : "Enable Ambient Memory"}</button>
+          </div>
         ` : !sp.available ? html`
           <div class="sb-screenpipe-setup">
             <div class="sb-setup-message">
-              Screenpipe captures what's on your screen and in your audio, locally. Your ally uses it to recall context you've seen.
+              Screenpipe is installed${sp.version ? ` (${sp.version})` : ""} but not running.
             </div>
-            <div class="sb-setup-steps">
-              <div class="sb-setup-step">
-                <span class="sb-setup-num">1</span>
-                <span>Install: <code>brew install screenpipe</code></span>
-              </div>
-              <div class="sb-setup-step">
-                <span class="sb-setup-num">2</span>
-                <span>Grant accessibility permissions when prompted</span>
-              </div>
-              <div class="sb-setup-step">
-                <span class="sb-setup-num">3</span>
-                <span>Run: <code>screenpipe</code> (keeps running in background)</span>
-              </div>
-            </div>
-            <button class="sb-action-btn" @click=${() => this._testScreenpipe()}>Check Connection</button>
+            <button
+              class="sb-action-btn"
+              ?disabled=${busy}
+              @click=${() => this._startScreenpipe()}
+            >${busy ? "Starting..." : "Start Screenpipe"}</button>
           </div>
         ` : html`
           <div class="sb-screenpipe-active">
@@ -745,6 +753,12 @@ export class GmSecondBrain extends LitElement {
               <span class="sb-screenpipe-label">Status</span>
               <span class="sb-screenpipe-value">${sp.enabled ? "Active — capturing" : "Connected but not enabled"}</span>
             </div>
+            ${sp.version ? html`
+              <div class="sb-screenpipe-row">
+                <span class="sb-screenpipe-label">Version</span>
+                <span class="sb-screenpipe-value">${sp.version}</span>
+              </div>
+            ` : nothing}
             <div class="sb-screenpipe-row">
               <span class="sb-screenpipe-label">Blocked Apps</span>
               <span class="sb-screenpipe-value">${sp.blockedApps?.length ?? 0} apps filtered</span>
@@ -762,18 +776,47 @@ export class GmSecondBrain extends LitElement {
     `;
   }
 
-  private async _testScreenpipe(): Promise<void> {
+  /** One-click setup: install + start + enable. Brew install can take 5+ min. */
+  private async _setupScreenpipe(): Promise<void> {
     if (!this.ctx.gateway || !this.ctx.connected) return;
+    this.screenpipeSetupBusy = true;
     try {
-      const result = await this.ctx.gateway.request<ScreenpipeStatusData>("ingestion.screenpipeStatus", {});
-      this.screenpipeStatus = result;
-      if (result.available) {
-        this.ctx.addToast("Screenpipe connected!", "success");
+      const result = await this.ctx.gateway.request<{ success: boolean; error?: string }>(
+        "ingestion.screenpipeSetup", {}, 300_000 // 5 min — brew install is slow
+      );
+      if (result.success) {
+        this.ctx.addToast("Ambient Memory enabled! Screenpipe is running.", "success");
+        const status = await this.ctx.gateway.request<ScreenpipeStatusData>("ingestion.screenpipeStatus", {});
+        this.screenpipeStatus = status;
       } else {
-        this.ctx.addToast("Screenpipe not running. Start it with `screenpipe`.", "error");
+        this.ctx.addToast(result.error ?? "Setup failed", "error");
       }
     } catch {
-      this.ctx.addToast("Could not check Screenpipe status", "error");
+      this.ctx.addToast("Screenpipe setup failed — check logs for details", "error");
+    } finally {
+      this.screenpipeSetupBusy = false;
+    }
+  }
+
+  /** Start the daemon (already installed). */
+  private async _startScreenpipe(): Promise<void> {
+    if (!this.ctx.gateway || !this.ctx.connected) return;
+    this.screenpipeSetupBusy = true;
+    try {
+      const result = await this.ctx.gateway.request<{ success: boolean; error?: string }>(
+        "ingestion.screenpipeStart", {}, 30_000 // 30s — daemon startup + health check
+      );
+      if (result.success) {
+        this.ctx.addToast("Screenpipe daemon started", "success");
+        const status = await this.ctx.gateway.request<ScreenpipeStatusData>("ingestion.screenpipeStatus", {});
+        this.screenpipeStatus = status;
+      } else {
+        this.ctx.addToast(result.error ?? "Failed to start", "error");
+      }
+    } catch {
+      this.ctx.addToast("Failed to start Screenpipe daemon", "error");
+    } finally {
+      this.screenpipeSetupBusy = false;
     }
   }
 

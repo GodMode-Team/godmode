@@ -20,7 +20,6 @@ import {
   deletePersistedCredential,
   persistCredential,
 } from "./credentials-store.js";
-import { SCREENPIPE_API_URL } from "./constants.js";
 
 // ── Types ──────────────────────────────────────────────────────────────
 
@@ -442,50 +441,52 @@ const honchoMemory: IntegrationProvider = {
 const screenpipe: IntegrationProvider = {
   id: "screenpipe",
   name: "Screenpipe",
-  description: "Ambient memory — captures screen text and audio transcriptions locally. Powers context recall.",
+  description: "Ambient memory — captures screen text and audio transcriptions locally. Managed by GodMode.",
   tier: "core",
   platforms: ["darwin", "linux", "win32"],
   envVars: [],
   cliDeps: ["screenpipe"],
   detect: async () => {
-    // Check CLI
-    const cliResult = await execCheck("screenpipe", ["--version"]);
-    // Check REST API
-    let apiReachable = false;
+    // Use the manager for consistent detection
     try {
-      const resp = await fetch(`${SCREENPIPE_API_URL}/health`, {
-        signal: AbortSignal.timeout(2_000),
-      });
-      apiReachable = resp.ok;
-    } catch { /* not running */ }
-
-    return {
-      configured: cliResult.ok || apiReachable,
-      cliInstalled: cliResult.ok,
-      authenticated: true, // local — no auth needed
-      working: apiReachable,
-      details: apiReachable
-        ? `Screenpipe running (${SCREENPIPE_API_URL})`
-        : cliResult.ok
-          ? "CLI installed but service not running"
-          : "Screenpipe not installed",
-    };
+      const { getDaemonStatus } = await import("../services/ingestion/screenpipe-manager.js");
+      const status = await getDaemonStatus();
+      return {
+        configured: status.installed,
+        cliInstalled: status.installed,
+        authenticated: true, // local — no auth needed
+        working: status.running,
+        details: status.running
+          ? `Running${status.version ? ` (${status.version})` : ""}${status.managedByUs ? " — managed by GodMode" : ""}`
+          : status.installed
+            ? "Installed but not running — enable in Second Brain tab"
+            : "Not installed — enable in Second Brain tab to auto-install",
+      };
+    } catch {
+      return {
+        configured: false,
+        cliInstalled: false,
+        authenticated: true,
+        working: false,
+        details: "Status check failed",
+      };
+    }
   },
   test: async () => {
     try {
-      const resp = await fetch(`${SCREENPIPE_API_URL}/health`, {
-        signal: AbortSignal.timeout(3_000),
-      });
-      if (resp.ok) return { success: true, message: "Screenpipe running and healthy" };
-      return { success: false, message: `Screenpipe API returned ${resp.status}` };
+      const { getDaemonStatus } = await import("../services/ingestion/screenpipe-manager.js");
+      const status = await getDaemonStatus();
+      if (status.running) return { success: true, message: `Screenpipe running${status.version ? ` (${status.version})` : ""}` };
+      if (status.installed) return { success: false, message: "Installed but not running — start from Second Brain tab" };
+      return { success: false, message: "Not installed — enable from Second Brain tab to auto-install" };
     } catch {
-      return { success: false, message: "Screenpipe not running — start it with `screenpipe`" };
+      return { success: false, message: "Screenpipe status check failed" };
     }
   },
   setupSteps: {
-    darwin: "1. Install: `brew install screenpipe` or download from [screenpi.pe](https://screenpi.pe)\n2. Start: `screenpipe`\n3. Optional: enable Obsidian sync pipe to auto-index screen history in your vault",
-    linux: "1. Install from [github.com/screenpipe/screenpipe](https://github.com/screenpipe/screenpipe)\n2. Start: `screenpipe`\n3. Optional: enable Obsidian sync pipe to auto-index screen history in your vault",
-    win32: "1. Download from [screenpi.pe](https://screenpi.pe)\n2. Start Screenpipe\n3. Optional: enable Obsidian sync pipe to auto-index screen history in your vault",
+    darwin: "GodMode handles Screenpipe installation and management automatically.\nGo to the Second Brain tab and click 'Enable Ambient Memory' to set it up.",
+    linux: "GodMode handles Screenpipe installation and management automatically.\nGo to the Second Brain tab and click 'Enable Ambient Memory' to set it up.",
+    win32: "Screenpipe is not yet auto-managed on Windows.\nInstall manually from https://github.com/screenpipe/screenpipe then restart GodMode.",
   },
 };
 

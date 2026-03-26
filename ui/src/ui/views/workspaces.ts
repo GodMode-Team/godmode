@@ -1637,7 +1637,7 @@ export function renderWorkspaces(props: WorkspacesProps) {
       ${error ? html`<div class="callout danger" role="alert" style="margin: 16px;">${error}</div>` : nothing}
 
       ${
-        loading
+        loading && filteredWorkspaces.length === 0
           ? html`
               <div class="workspaces-loading" role="status" aria-label="Loading workspaces">
                 <div class="spinner" aria-hidden="true"></div>

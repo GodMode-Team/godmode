@@ -652,7 +652,7 @@ export function connectGateway(host: GatewayHost) {
 
       // Set browser tab title to distinguish OC vs Hermes instances
       const feat = hello.features as Record<string, unknown> | undefined;
-      document.title = feat?.hermes ? "Hermes - GodMode" : "OC - GodMode";
+      document.title = feat?.hermes ? "Hermes - GodMode" : "GodMode";
 
       // Initialize host compatibility layer — probes capabilities in background
       initHostCompat(hello as unknown as Record<string, unknown>, host.client);
@@ -1465,12 +1465,48 @@ export async function switchModelFromChat(host: GatewayHost, modelId: string) {
   const app = host as unknown as {
     currentModel: string | null;
     modelPickerOpen: boolean;
+    modelCacheTs: number;
+    applySessionKey: string;
   };
   try {
-    await host.client.request("godmode.config.model.set", { primary: modelId });
+    // 1. Get current config snapshot (need hash for optimistic locking)
+    const snapshot = await host.client.request("config.get", {});
+    if (!snapshot?.config || !snapshot?.hash) {
+      console.error("[model-switch] failed to load config snapshot");
+      return;
+    }
+
+    // 2. Update model in config
+    const config = snapshot.config as Record<string, any>;
+    if (!config.agents) config.agents = {};
+    if (!config.agents.defaults) config.agents.defaults = {};
+    if (!config.agents.defaults.model) config.agents.defaults.model = {};
+    config.agents.defaults.model.primary = modelId;
+    // Auto-set fallback
+    if (modelId.startsWith("anthropic/")) {
+      config.agents.defaults.model.fallbacks = ["openai-codex/gpt-5.3-codex"];
+    } else {
+      config.agents.defaults.model.fallbacks = ["anthropic/claude-sonnet-4-6"];
+    }
+
+    // 3. Save via core RPC (persists to disk with proper gateway notification)
+    const raw = JSON.stringify(config, null, 2);
+    await host.client.request("config.set", { raw, baseHash: snapshot.hash });
+
+    // 4. Apply to running session so the gateway actually uses the new model
+    const updated = await host.client.request("config.get", {});
+    if (updated?.hash) {
+      await host.client.request("config.apply", {
+        raw: typeof updated.raw === "string" ? updated.raw : JSON.stringify(updated.config, null, 2),
+        baseHash: updated.hash,
+        sessionKey: app.applySessionKey || host.sessionKey,
+      });
+    }
+
+    // 5. Update UI state
     app.currentModel = modelId;
     app.modelPickerOpen = false;
-    (host as unknown as { modelCacheTs: number }).modelCacheTs = 0;
+    app.modelCacheTs = 0;
   } catch (err) {
     console.error("[model-switch]", err);
   }

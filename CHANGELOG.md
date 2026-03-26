@@ -4,6 +4,27 @@ All notable changes to the GodMode plugin are documented here.
 
 ---
 
+## [1.8.3] — 2026-03-25
+
+### Added
+- **Screenpipe managed lifecycle** — new `screenpipe-manager.ts` handles detection, installation (brew on macOS, script on Linux), daemon start/stop, PID management, and health monitoring. Users never touch the CLI directly.
+- **One-click Screenpipe setup** — `ingestion.screenpipeSetup` RPC installs, starts, and enables in a single call. Used by onboarding and "Enable Ambient Memory" buttons.
+- **Screenpipe RPC endpoints** — `screenpipeInstall`, `screenpipeSetup`, `screenpipeStart`, `screenpipeStop` for full lifecycle control from UI.
+- **Brain tab Screenpipe controls** — install/start/pause buttons with busy states replace "Set up" chat redirect.
+- **Second Brain tab managed install** — "Enable Ambient Memory" button replaces manual brew instructions.
+
+### Changed
+- **Gateway auto-start** — Screenpipe auto-start now uses centralized `startDaemon()` from screenpipe-manager instead of raw `spawn()`.
+- **Integration registry** — Screenpipe integration uses `getDaemonStatus()` for consistent detection; setup steps point to UI instead of CLI.
+- **Onboarding prompt** — Screenpipe step uses "Enable ambient memory" phrasing instead of "set up Screenpipe."
+- **Search placeholder** — "Honcho, Vault, Sessions, Screenpipe" → "conversations, vault, sessions, screen recall."
+- **Model switch** — `switchModelFromChat` now reads config snapshot, updates with proper optimistic locking, and applies to the running session immediately.
+- **Update buttons** — show "Updating..." state, disable during updates, confirm before running. Connection-drop errors during restart are suppressed.
+- **Workspace detail** — loads progressively: workspace shell renders immediately, feed + connections backfill in the background. Timeout reduced from 10s to 5s.
+
+### Fixed
+- **Sidebar HTML preview flicker** — replaced Blob URL with `srcdoc` in `markdown-sidebar.ts` and `file-viewer.ts`. Lit's dirty-checking now skips DOM updates when content hasn't changed, preventing iframe reload on every keystroke.
+
 ## [1.8.1] — 2026-03-24
 
 ### Added

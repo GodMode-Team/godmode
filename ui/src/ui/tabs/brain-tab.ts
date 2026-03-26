@@ -147,6 +147,7 @@ export class GmBrain extends LitElement {
 
   // Screenpipe & Ingestion
   @state() screenpipeStatus: ScreenpipeStatusData | null = null;
+  @state() screenpipeSetupBusy = false;
   @state() ingestionStatus: IngestionStatusData | null = null;
   @state() mcpStatusData: McpStatusData | null = null;
   @state() private integrationsData: IntegrationsStatusData | null = null;
@@ -347,6 +348,50 @@ export class GmBrain extends LitElement {
     }
   }
 
+  /** One-click setup: install + start + enable. Brew install can take 5+ min. */
+  private async _setupScreenpipe(): Promise<void> {
+    if (!this.ctx.gateway || !this.ctx.connected) return;
+    this.screenpipeSetupBusy = true;
+    try {
+      const result = await this.ctx.gateway.request<{ success: boolean; error?: string }>(
+        "ingestion.screenpipeSetup", {}, 300_000 // 5 min — brew install is slow
+      );
+      if (result.success) {
+        this.ctx.addToast("Ambient Memory enabled!", "success");
+        const status = await this.ctx.gateway.request<ScreenpipeStatusData>("ingestion.screenpipeStatus", {});
+        this.screenpipeStatus = status;
+      } else {
+        this.ctx.addToast(result.error ?? "Setup failed", "error");
+      }
+    } catch {
+      this.ctx.addToast("Screenpipe setup failed", "error");
+    } finally {
+      this.screenpipeSetupBusy = false;
+    }
+  }
+
+  /** Start daemon (already installed). */
+  private async _startScreenpipe(): Promise<void> {
+    if (!this.ctx.gateway || !this.ctx.connected) return;
+    this.screenpipeSetupBusy = true;
+    try {
+      const result = await this.ctx.gateway.request<{ success: boolean; error?: string }>(
+        "ingestion.screenpipeStart", {}, 30_000 // 30s — daemon startup + health check
+      );
+      if (result.success) {
+        this.ctx.addToast("Screenpipe started", "success");
+        const status = await this.ctx.gateway.request<ScreenpipeStatusData>("ingestion.screenpipeStatus", {});
+        this.screenpipeStatus = status;
+      } else {
+        this.ctx.addToast(result.error ?? "Failed to start", "error");
+      }
+    } catch {
+      this.ctx.addToast("Failed to start Screenpipe", "error");
+    } finally {
+      this.screenpipeSetupBusy = false;
+    }
+  }
+
   private async _runPipeline(pipeline: string): Promise<void> {
     if (!this.ctx.gateway || !this.ctx.connected) return;
     try {
@@ -515,7 +560,7 @@ export class GmBrain extends LitElement {
           <input
             class="brain-search-input"
             type="text"
-            placeholder="Search your memory \u2014 Honcho, Vault, Sessions, Screenpipe..."
+            placeholder="Search your memory \u2014 conversations, vault, sessions, screen recall..."
             .value=${this.searchQuery}
             @input=${(e: Event) => this._onSearchInput(e)}
             aria-label="Search your Second Brain"
@@ -858,18 +903,41 @@ export class GmBrain extends LitElement {
 
   private _renderScreenpipeRow() {
     const sp = this.screenpipeStatus;
+    const busy = this.screenpipeSetupBusy;
+
+    const statusLabel = !sp ? "Loading..."
+      : !sp.installed ? "Not installed"
+      : !sp.available ? "Installed — not running"
+      : sp.enabled ? "Active" : "Paused";
+
+    const dotClass = sp?.available
+      ? (sp.enabled ? "brain-dot--ready" : "brain-dot--degraded")
+      : sp?.installed ? "brain-dot--degraded" : "brain-dot--offline";
+
     return html`
       <div class="brain-engine-section">
         <h3 class="brain-subsection-title">Screenpipe (Ambient Memory)</h3>
         <div class="brain-screenpipe-row">
-          <span class="brain-dot ${sp?.available ? (sp.enabled ? "brain-dot--ready" : "brain-dot--degraded") : "brain-dot--offline"}"></span>
-          <span>${!sp ? "Loading..." : !sp.available ? "Not installed" : sp.enabled ? "Active" : "Paused"}</span>
+          <span class="brain-dot ${dotClass}"></span>
+          <span>${statusLabel}${sp?.version ? ` (${sp.version})` : ""}</span>
           ${sp?.available ? html`
-            <button class="brain-action-btn brain-action-btn--xs" aria-label="${sp.enabled ? "Pause ambient memory" : "Enable ambient memory"}" @click=${() => this._toggleScreenpipe(!sp.enabled)}>
+            <button class="brain-action-btn brain-action-btn--xs"
+              aria-label="${sp.enabled ? "Pause ambient memory" : "Enable ambient memory"}"
+              @click=${() => this._toggleScreenpipe(!sp.enabled)}>
               ${sp.enabled ? "Pause" : "Enable"}
             </button>
-          ` : !sp?.available && sp !== null ? html`
-            <button class="brain-action-btn brain-action-btn--xs" @click=${() => this._chatNavigate("Help me set up Screenpipe for ambient memory capture. Walk me through installation and configuration step by step.")}>Set up</button>
+          ` : sp && !sp.installed ? html`
+            <button class="brain-action-btn brain-action-btn--xs"
+              ?disabled=${busy}
+              @click=${() => this._setupScreenpipe()}>
+              ${busy ? "Installing..." : "Install & Enable"}
+            </button>
+          ` : sp && sp.installed && !sp.available ? html`
+            <button class="brain-action-btn brain-action-btn--xs"
+              ?disabled=${busy}
+              @click=${() => this._startScreenpipe()}>
+              ${busy ? "Starting..." : "Start"}
+            </button>
           ` : nothing}
         </div>
       </div>

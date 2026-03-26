@@ -258,24 +258,43 @@ export async function getWorkspace(
       memory: (result.memory ?? []).map(transformFile),
     };
 
-    // Load feed and connections in parallel — fail independently
-    try {
-      const [feedEntries, connections] = await Promise.all([
-        loadFeed(state, id).catch(() => []),
-        loadConnections(state, id).catch(() => []),
-      ]);
-      detail.feedEntries = feedEntries;
-      detail.connections = connections;
-      detail.feedCount = feedEntries.length;
-      detail.connectionCount = connections.length;
-    } catch {
-      // Non-fatal — workspace detail works without feed/connections
-    }
-
+    // Return immediately — feed/connections load lazily via backfillWorkspaceExtras
     return detail;
   } catch (err) {
     console.error("[Workspaces] get failed:", err);
     return null;
+  }
+}
+
+/**
+ * Load feed + connections in the background after the workspace is already displayed.
+ * Updates state.selectedWorkspace in-place so the UI fills in progressively.
+ */
+export async function backfillWorkspaceExtras(
+  state: WorkspacesState,
+  workspaceId: string,
+): Promise<void> {
+  if (!state.client || !state.connected || !state.selectedWorkspace) return;
+  if (state.selectedWorkspace.id !== workspaceId) return;
+
+  try {
+    const [feedEntries, connections] = await Promise.all([
+      loadFeed(state, workspaceId).catch(() => [] as FeedEntry[]),
+      loadConnections(state, workspaceId).catch(() => [] as WorkspaceConnectionSummary[]),
+    ]);
+
+    // Only update if the user is still viewing the same workspace
+    if (state.selectedWorkspace?.id === workspaceId) {
+      state.selectedWorkspace = {
+        ...state.selectedWorkspace,
+        feedEntries,
+        connections,
+        feedCount: feedEntries.length,
+        connectionCount: connections.length,
+      };
+    }
+  } catch {
+    // Non-fatal
   }
 }
 

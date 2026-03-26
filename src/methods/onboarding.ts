@@ -46,7 +46,6 @@ import {
   type OnboardingAnswers,
 } from "../services/onboarding.js";
 import { readEnvFile, writeEnvVar, getEnvVar } from "../lib/env-writer.js";
-import { SCREENPIPE_API_URL } from "../lib/constants.js";
 
 // ── Checklist Types ─────────────────────────────────────────────
 
@@ -1298,18 +1297,17 @@ export const onboardingHandlers: GatewayRequestHandlers = {
         }
 
         case "screenpipe": {
-          // Enable Screenpipe + auto-start when user completes this onboarding step
-          const { saveConfig } = await import("../services/ingestion/screenpipe-config.js");
-          await saveConfig({ enabled: true, autoStart: true });
-
-          // Try to start it now if not already running
-          const { isScreenpipeAvailable } = await import("../services/ingestion/screenpipe-funnel.js");
-          if (!(await isScreenpipeAvailable())) {
-            try {
-              const { spawn } = await import("node:child_process");
-              const child = spawn("screenpipe", [], { detached: true, stdio: "ignore" });
-              child.unref();
-            } catch { /* best effort — will start on next gateway boot */ }
+          // Full managed setup: install (if needed) + start daemon + enable config
+          const { ensureRunning } = await import("../services/ingestion/screenpipe-manager.js");
+          const { saveConfig: saveSPConfig } = await import("../services/ingestion/screenpipe-config.js");
+          const setupResult = await ensureRunning();
+          if (setupResult.success) {
+            await saveSPConfig({ enabled: true, autoStart: true });
+          }
+          // If install/start failed, we still save the intent so gateway retries on boot
+          if (!setupResult.success) {
+            await saveSPConfig({ enabled: true, autoStart: true });
+            console.warn(`[Screenpipe] Onboarding setup incomplete: ${setupResult.error}`);
           }
           break;
         }
@@ -1445,14 +1443,17 @@ export const onboardingHandlers: GatewayRequestHandlers = {
 
         case "screenpipe": {
           try {
-            const resp = await fetch(`${SCREENPIPE_API_URL}/health`, { signal: AbortSignal.timeout(3_000) });
-            if (resp.ok) {
+            const { getDaemonStatus } = await import("../services/ingestion/screenpipe-manager.js");
+            const status = await getDaemonStatus();
+            if (status.running) {
               respond(true, { success: true, message: "Screenpipe is running and healthy. Screen & audio memory active." });
+            } else if (status.installed) {
+              respond(true, { success: false, message: "Screenpipe is installed but not running. Click 'Enable' to start it." });
             } else {
-              respond(true, { success: false, message: `Screenpipe returned status ${resp.status}. Try restarting it with \`screenpipe\`.` });
+              respond(true, { success: false, message: "Screenpipe not installed. Click 'Set up' to install and start it automatically." });
             }
-          } catch {
-            respond(true, { success: false, message: "Screenpipe not running. Install with `brew install screenpipe` (macOS) then run `screenpipe` to start." });
+          } catch (err) {
+            respond(true, { success: false, message: `Screenpipe check failed: ${String(err).slice(0, 100)}` });
           }
           return;
         }

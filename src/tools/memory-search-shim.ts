@@ -25,8 +25,9 @@ export function createMemorySearchShimTool(ctx: ToolContext): AnyAgentTool {
     label: "Memory Search",
     name: "memory_search",
     description:
-      "Search your memory and knowledge base. Queries conversational memory (Honcho) " +
-      "and the vault/second brain (QMD full-text search). Returns combined results.",
+      "Search your memory, knowledge base, and recent screen activity. Queries conversational memory (Honcho), " +
+      "vault/second brain (QMD full-text search), session history, and live Screenpipe screen/audio capture. " +
+      "Use this for ANY factual lookup — including 'what was on my screen' or 'what was I looking at'.",
     parameters: {
       type: "object" as const,
       properties: {
@@ -152,7 +153,15 @@ async function searchFts5(query: string): Promise<Array<{ source: string; conten
 /** Query Screenpipe REST API for screen/audio context. Returns formatted hits. */
 async function searchScreenpipe(query: string): Promise<Array<{ source: string; content: string }>> {
   try {
-    const resp = await fetch(`${SCREENPIPE_API_URL}/search`, {
+    // Resolve API URL from config (respects custom port), fall back to constant
+    let apiUrl = SCREENPIPE_API_URL;
+    try {
+      const { loadConfig } = await import("../services/ingestion/screenpipe-config.js");
+      const cfg = await loadConfig();
+      if (cfg.apiUrl) apiUrl = cfg.apiUrl;
+    } catch { /* use default */ }
+
+    const resp = await fetch(`${apiUrl}/search`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ q: query, limit: 5, content_type: "all" }),

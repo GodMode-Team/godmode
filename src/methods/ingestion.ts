@@ -59,14 +59,18 @@ const screenpipeStatus: GatewayRequestHandler = async ({ respond }) => {
     const { loadConfig } = await import(
       "../services/ingestion/screenpipe-config.js"
     );
-    const { isScreenpipeAvailable } = await import(
-      "../services/ingestion/screenpipe-funnel.js"
+    const { getDaemonStatus } = await import(
+      "../services/ingestion/screenpipe-manager.js"
     );
     const config = await loadConfig();
-    const available = await isScreenpipeAvailable();
+    const daemon = await getDaemonStatus();
     respond(true, {
       enabled: config.enabled,
-      available,
+      available: daemon.running,
+      installed: daemon.installed,
+      version: daemon.version,
+      pid: daemon.pid,
+      managedByUs: daemon.managedByUs,
       apiUrl: config.apiUrl,
       blockedApps: config.blockedApps,
       retention: config.retention,
@@ -127,6 +131,91 @@ const screenpipeToggle: GatewayRequestHandler = async ({ params, respond }) => {
   }
 };
 
+/**
+ * One-click install: detects platform, installs CLI, starts daemon, enables config.
+ * This is the "just make it work" button for onboarding and UI.
+ */
+const screenpipeInstall: GatewayRequestHandler = async ({ respond }) => {
+  try {
+    const { installScreenpipe } = await import(
+      "../services/ingestion/screenpipe-manager.js"
+    );
+    const result = await installScreenpipe();
+    if (result.success) {
+      respond(true, { installed: true });
+    } else {
+      respond(true, { installed: false, error: result.error });
+    }
+  } catch (err) {
+    respond(false, undefined, {
+      code: "SCREENPIPE_ERROR",
+      message: `Installation failed: ${String(err).slice(0, 200)}`,
+    });
+  }
+};
+
+/**
+ * Full setup: install (if needed) + start daemon + enable config.
+ * Used by onboarding — single call that makes everything work.
+ */
+const screenpipeSetup: GatewayRequestHandler = async ({ respond }) => {
+  try {
+    const { ensureRunning } = await import(
+      "../services/ingestion/screenpipe-manager.js"
+    );
+    const { saveConfig } = await import(
+      "../services/ingestion/screenpipe-config.js"
+    );
+    const result = await ensureRunning();
+    if (result.success) {
+      // Save config separately — if this fails, daemon is still running (graceful)
+      try {
+        await saveConfig({ enabled: true, autoStart: true });
+      } catch (cfgErr) {
+        console.warn(`[Screenpipe] Config save failed (daemon is running): ${String(cfgErr)}`);
+      }
+      respond(true, { success: true, message: "Screenpipe installed, running, and enabled." });
+    } else {
+      respond(true, { success: false, error: result.error });
+    }
+  } catch (err) {
+    respond(false, undefined, {
+      code: "SCREENPIPE_ERROR",
+      message: `Setup failed: ${String(err).slice(0, 200)}`,
+    });
+  }
+};
+
+const screenpipeStart: GatewayRequestHandler = async ({ respond }) => {
+  try {
+    const { startDaemon } = await import(
+      "../services/ingestion/screenpipe-manager.js"
+    );
+    const result = await startDaemon();
+    respond(true, result);
+  } catch (err) {
+    respond(false, undefined, {
+      code: "SCREENPIPE_ERROR",
+      message: `Failed to start daemon: ${String(err).slice(0, 200)}`,
+    });
+  }
+};
+
+const screenpipeStop: GatewayRequestHandler = async ({ respond }) => {
+  try {
+    const { stopDaemon } = await import(
+      "../services/ingestion/screenpipe-manager.js"
+    );
+    const result = await stopDaemon();
+    respond(true, result);
+  } catch (err) {
+    respond(false, undefined, {
+      code: "SCREENPIPE_ERROR",
+      message: `Failed to stop daemon: ${String(err).slice(0, 200)}`,
+    });
+  }
+};
+
 const runPipeline: GatewayRequestHandler = async ({ params, respond }) => {
   const { pipeline } = params as { pipeline?: string };
   if (!pipeline) {
@@ -153,5 +242,9 @@ export const ingestionHandlers: Record<string, GatewayRequestHandler> = {
   "ingestion.screenpipeStatus": screenpipeStatus,
   "ingestion.screenpipeConfigure": screenpipeConfigure,
   "ingestion.screenpipeToggle": screenpipeToggle,
+  "ingestion.screenpipeInstall": screenpipeInstall,
+  "ingestion.screenpipeSetup": screenpipeSetup,
+  "ingestion.screenpipeStart": screenpipeStart,
+  "ingestion.screenpipeStop": screenpipeStop,
   "ingestion.runPipeline": runPipeline,
 };

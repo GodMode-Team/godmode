@@ -1,4 +1,4 @@
-import{d as y,b as a,A as n,o as $,g,r as c,t as f}from"./lit-core-CTInmNPB.js";import{a as h,w}from"./index-Covj4w7X.js";import{a as k}from"./views-settings-nvLQdpIB.js";import{f as _}from"./ctrl-settings-niym-WgY.js";import"./markdown-i_gIkIP3.js";var S=Object.defineProperty,x=Object.getOwnPropertyDescriptor,l=(e,t,i,d)=>{for(var o=d>1?void 0:d?x(t,i):t,s=e.length-1,p;s>=0;s--)(p=e[s])&&(o=(d?p(t,i,o):p(o))||o);return d&&o&&S(t,i,o),o};function b(e){if(!e)return"";try{return _(new Date(e).getTime())}catch{return""}}function C(e){return a`<div class="brain-md-body">${$(k(e))}</div>`}const v={ready:"brain-dot--ready",degraded:"brain-dot--degraded",offline:"brain-dot--offline"},P={"vault-capture":"📝","identity-update":"👤","calendar-enrichment":"📅","thought-captured":"💭",search:"🔍","file-modified":"📄"},F={honcho:"🟣",vault:"📓",session:"💬",screenpipe:"📺"};function m(e){return!e||e==="personal"?n:a`<span class="brain-scope-badge brain-scope-badge--shared" title="Shared to ${e}">\u{2197}\u{FE0F} ${e}</span>`}let r=class extends y{constructor(){super(...arguments),this.identityCard=null,this.loading=!1,this.error=null,this.pulse=null,this.activity=null,this.memoryBank=null,this.fileTree=null,this.vaultHealth=null,this.recentPeople=null,this.peopleTotalCount=0,this.peopleSearch="",this.screenpipeStatus=null,this.ingestionStatus=null,this.mcpStatusData=null,this.integrationsData=null,this.searchQuery="",this.searchResults=null,this.searching=!1,this.expandedPulseSystem=null,this.browsingFolder=null,this.folderEntries=null,this.folderName=null,this._unsubs=[],this._searchTimer=null,this._activityTimer=null}createRenderRoot(){return this}connectedCallback(){super.connectedCallback(),this._unsubs.push(h.on("refresh-requested",e=>{(e.target==="memory"||e.target==="brain"||e.target==="second-brain")&&this._loadAll()})),this._loadAll(),this._activityTimer=setInterval(()=>{this._refreshActivity()},6e4)}disconnectedCallback(){for(const e of this._unsubs)e();this._unsubs=[],this._searchTimer&&clearTimeout(this._searchTimer),this._activityTimer&&clearInterval(this._activityTimer),super.disconnectedCallback()}async _loadAll(){if(!(!this.ctx.gateway||!this.ctx.connected)){this.loading=!0,this.error=null;try{const e=this.ctx.gateway,[t,i,d]=await Promise.all([e.request("secondBrain.memoryPulse",{}),e.request("secondBrain.identityCard",{}).catch(()=>null),e.request("secondBrain.recentPeople",{limit:8}).catch(()=>null)]);this.pulse=t,this.identityCard=i,this.recentPeople=d?.people??null,this.peopleTotalCount=d?.total??0,this.loading=!1,Promise.all([e.request("secondBrain.activity",{limit:20}).catch(()=>null),e.request("secondBrain.memoryBank",{}).catch(()=>null),e.request("secondBrain.fileTree",{depth:3}).catch(()=>({tree:[]})),e.request("secondBrain.vaultHealth",{}).catch(()=>null)]).then(([o,s,p,u])=>{this.activity=o,this.memoryBank=s,this.fileTree=p?.tree??[],this.vaultHealth=u}),Promise.all([e.request("ingestion.screenpipeStatus",{}).catch(()=>null),e.request("ingestion.status",{}).catch(()=>null),e.request("secondBrain.mcpStatus",{}).catch(()=>null),e.request("integrations.status",{}).catch(()=>null)]).then(([o,s,p,u])=>{this.screenpipeStatus=o,this.ingestionStatus=s,this.mcpStatusData=p,this.integrationsData=u})}catch(e){console.error("[Brain] Load failed:",e),this.error=e instanceof Error?e.message:"Failed to load",this.loading=!1}}}async _refreshActivity(){if(!(!this.ctx.gateway||!this.ctx.connected))try{const e=await this.ctx.gateway.request("secondBrain.activity",{limit:20});this.activity=e}catch{}}async _doSearch(e){if(!this.ctx.gateway||!this.ctx.connected||!e.trim()){this.searchResults=null,this.searching=!1;return}this.searching=!0;try{const t=await this.ctx.gateway.request("secondBrain.search",{query:e,limit:30});this.searchQuery===e&&(this.searchResults=t.results??[])}catch(t){console.error("[Brain] Search failed:",t)}finally{this.searching=!1}}_onSearchInput(e){const t=e.target.value;if(this.searchQuery=t,this._searchTimer&&clearTimeout(this._searchTimer),!t.trim()){this.searchResults=null;return}this._searchTimer=setTimeout(()=>{this._doSearch(t)},300)}async _openFile(e){if(!(!this.ctx.gateway||!this.ctx.connected))try{const t=await this.ctx.gateway.request("secondBrain.memoryBankEntry",{path:e});if(t?.content){const i=e.endsWith(".html")||e.endsWith(".htm");this.ctx.openSidebar({content:t.content,mimeType:i?"text/html":"text/markdown",filePath:e,title:t.name||e.split("/").pop()||"File"})}}catch(t){console.error("[Brain] Open file failed:",t),this.ctx.addToast("Failed to open file","error")}}async _browseFolder(e){if(!(!this.ctx.gateway||!this.ctx.connected))try{const t=await this.ctx.gateway.request("secondBrain.memoryBank",{folder:e});this.browsingFolder=t.folder,this.folderName=t.folderName,this.folderEntries=t.entries}catch(t){console.error("[Brain] Browse folder failed:",t)}}_exitFolder(){this.browsingFolder=null,this.folderEntries=null,this.folderName=null}_chatNavigate(e){h.emit("chat-navigate",{sessionKey:"new",tab:"chat",message:e})}async _toggleScreenpipe(e){if(!(!this.ctx.gateway||!this.ctx.connected))try{await this.ctx.gateway.request("ingestion.screenpipeToggle",{enabled:e}),this.screenpipeStatus&&(this.screenpipeStatus={...this.screenpipeStatus,enabled:e}),this.ctx.addToast(e?"Ambient memory enabled":"Ambient memory paused","success")}catch{this.ctx.addToast("Failed to update Screenpipe config","error")}}async _runPipeline(e){if(!(!this.ctx.gateway||!this.ctx.connected))try{await this.ctx.gateway.request("ingestion.runPipeline",{pipeline:e}),this.ctx.addToast(`Pipeline "${e}" triggered`,"success")}catch{this.ctx.addToast(`Failed to run pipeline "${e}"`,"error")}}render(){return this.loading&&!this.pulse&&!this.identityCard?a`
+import{d as m,b as a,A as n,o as $,g,r as o,t as f}from"./lit-core-CTInmNPB.js";import{a as h,b as w}from"./index-Bd1dCOwm.js";import{a as S}from"./views-settings-BuhA31IH.js";import{f as _}from"./ctrl-settings-DqZuTIbw.js";import"./markdown-i_gIkIP3.js";var k=Object.defineProperty,x=Object.getOwnPropertyDescriptor,l=(e,t,i,d)=>{for(var c=d>1?void 0:d?x(t,i):t,s=e.length-1,p;s>=0;s--)(p=e[s])&&(c=(d?p(t,i,c):p(c))||c);return d&&c&&k(t,i,c),c};function u(e){if(!e)return"";try{return _(new Date(e).getTime())}catch{return""}}function C(e){return a`<div class="brain-md-body">${$(S(e))}</div>`}const v={ready:"brain-dot--ready",degraded:"brain-dot--degraded",offline:"brain-dot--offline"},T={"vault-capture":"📝","identity-update":"👤","calendar-enrichment":"📅","thought-captured":"💭",search:"🔍","file-modified":"📄"},F={honcho:"🟣",vault:"📓",session:"💬",screenpipe:"📺"};function y(e){return!e||e==="personal"?n:a`<span class="brain-scope-badge brain-scope-badge--shared" title="Shared to ${e}">\u{2197}\u{FE0F} ${e}</span>`}let r=class extends m{constructor(){super(...arguments),this.identityCard=null,this.loading=!1,this.error=null,this.pulse=null,this.activity=null,this.memoryBank=null,this.fileTree=null,this.vaultHealth=null,this.recentPeople=null,this.peopleTotalCount=0,this.peopleSearch="",this.screenpipeStatus=null,this.screenpipeSetupBusy=!1,this.ingestionStatus=null,this.mcpStatusData=null,this.integrationsData=null,this.searchQuery="",this.searchResults=null,this.searching=!1,this.expandedPulseSystem=null,this.browsingFolder=null,this.folderEntries=null,this.folderName=null,this._unsubs=[],this._searchTimer=null,this._activityTimer=null}createRenderRoot(){return this}connectedCallback(){super.connectedCallback(),this._unsubs.push(h.on("refresh-requested",e=>{(e.target==="memory"||e.target==="brain"||e.target==="second-brain")&&this._loadAll()})),this._loadAll(),this._activityTimer=setInterval(()=>{this._refreshActivity()},6e4)}disconnectedCallback(){for(const e of this._unsubs)e();this._unsubs=[],this._searchTimer&&clearTimeout(this._searchTimer),this._activityTimer&&clearInterval(this._activityTimer),super.disconnectedCallback()}async _loadAll(){if(!(!this.ctx.gateway||!this.ctx.connected)){this.loading=!0,this.error=null;try{const e=this.ctx.gateway,[t,i,d]=await Promise.all([e.request("secondBrain.memoryPulse",{}),e.request("secondBrain.identityCard",{}).catch(()=>null),e.request("secondBrain.recentPeople",{limit:8}).catch(()=>null)]);this.pulse=t,this.identityCard=i,this.recentPeople=d?.people??null,this.peopleTotalCount=d?.total??0,this.loading=!1,Promise.all([e.request("secondBrain.activity",{limit:20}).catch(()=>null),e.request("secondBrain.memoryBank",{}).catch(()=>null),e.request("secondBrain.fileTree",{depth:3}).catch(()=>({tree:[]})),e.request("secondBrain.vaultHealth",{}).catch(()=>null)]).then(([c,s,p,b])=>{this.activity=c,this.memoryBank=s,this.fileTree=p?.tree??[],this.vaultHealth=b}),Promise.all([e.request("ingestion.screenpipeStatus",{}).catch(()=>null),e.request("ingestion.status",{}).catch(()=>null),e.request("secondBrain.mcpStatus",{}).catch(()=>null),e.request("integrations.status",{}).catch(()=>null)]).then(([c,s,p,b])=>{this.screenpipeStatus=c,this.ingestionStatus=s,this.mcpStatusData=p,this.integrationsData=b})}catch(e){console.error("[Brain] Load failed:",e),this.error=e instanceof Error?e.message:"Failed to load",this.loading=!1}}}async _refreshActivity(){if(!(!this.ctx.gateway||!this.ctx.connected))try{const e=await this.ctx.gateway.request("secondBrain.activity",{limit:20});this.activity=e}catch{}}async _doSearch(e){if(!this.ctx.gateway||!this.ctx.connected||!e.trim()){this.searchResults=null,this.searching=!1;return}this.searching=!0;try{const t=await this.ctx.gateway.request("secondBrain.search",{query:e,limit:30});this.searchQuery===e&&(this.searchResults=t.results??[])}catch(t){console.error("[Brain] Search failed:",t)}finally{this.searching=!1}}_onSearchInput(e){const t=e.target.value;if(this.searchQuery=t,this._searchTimer&&clearTimeout(this._searchTimer),!t.trim()){this.searchResults=null;return}this._searchTimer=setTimeout(()=>{this._doSearch(t)},300)}async _openFile(e){if(!(!this.ctx.gateway||!this.ctx.connected))try{const t=await this.ctx.gateway.request("secondBrain.memoryBankEntry",{path:e});if(t?.content){const i=e.endsWith(".html")||e.endsWith(".htm");this.ctx.openSidebar({content:t.content,mimeType:i?"text/html":"text/markdown",filePath:e,title:t.name||e.split("/").pop()||"File"})}}catch(t){console.error("[Brain] Open file failed:",t),this.ctx.addToast("Failed to open file","error")}}async _browseFolder(e){if(!(!this.ctx.gateway||!this.ctx.connected))try{const t=await this.ctx.gateway.request("secondBrain.memoryBank",{folder:e});this.browsingFolder=t.folder,this.folderName=t.folderName,this.folderEntries=t.entries}catch(t){console.error("[Brain] Browse folder failed:",t)}}_exitFolder(){this.browsingFolder=null,this.folderEntries=null,this.folderName=null}_chatNavigate(e){h.emit("chat-navigate",{sessionKey:"new",tab:"chat",message:e})}async _toggleScreenpipe(e){if(!(!this.ctx.gateway||!this.ctx.connected))try{await this.ctx.gateway.request("ingestion.screenpipeToggle",{enabled:e}),this.screenpipeStatus&&(this.screenpipeStatus={...this.screenpipeStatus,enabled:e}),this.ctx.addToast(e?"Ambient memory enabled":"Ambient memory paused","success")}catch{this.ctx.addToast("Failed to update Screenpipe config","error")}}async _setupScreenpipe(){if(!(!this.ctx.gateway||!this.ctx.connected)){this.screenpipeSetupBusy=!0;try{const e=await this.ctx.gateway.request("ingestion.screenpipeSetup",{},3e5);if(e.success){this.ctx.addToast("Ambient Memory enabled!","success");const t=await this.ctx.gateway.request("ingestion.screenpipeStatus",{});this.screenpipeStatus=t}else this.ctx.addToast(e.error??"Setup failed","error")}catch{this.ctx.addToast("Screenpipe setup failed","error")}finally{this.screenpipeSetupBusy=!1}}}async _startScreenpipe(){if(!(!this.ctx.gateway||!this.ctx.connected)){this.screenpipeSetupBusy=!0;try{const e=await this.ctx.gateway.request("ingestion.screenpipeStart",{},3e4);if(e.success){this.ctx.addToast("Screenpipe started","success");const t=await this.ctx.gateway.request("ingestion.screenpipeStatus",{});this.screenpipeStatus=t}else this.ctx.addToast(e.error??"Failed to start","error")}catch{this.ctx.addToast("Failed to start Screenpipe","error")}finally{this.screenpipeSetupBusy=!1}}}async _runPipeline(e){if(!(!this.ctx.gateway||!this.ctx.connected))try{await this.ctx.gateway.request("ingestion.runPipeline",{pipeline:e}),this.ctx.addToast(`Pipeline "${e}" triggered`,"success")}catch{this.ctx.addToast(`Failed to run pipeline "${e}"`,"error")}}render(){return this.loading&&!this.pulse&&!this.identityCard?a`
         <div class="brain-loading" role="status" aria-label="Loading your Second Brain">
           <div class="brain-skeleton brain-skeleton--card"></div>
           <div class="brain-skeleton-row">
@@ -98,7 +98,7 @@ import{d as y,b as a,A as n,o as $,g,r as c,t as f}from"./lit-core-CTInmNPB.js";
         <div class="brain-id-footer">
           <button class="brain-id-correct-btn" aria-label="Edit your identity card via chat" @click=${()=>this._chatNavigate("I want to correct something in my identity card. Here's what needs updating:")}>Edit via Chat</button>
           ${e.lastUpdated?a`
-            <span class="brain-id-updated">Updated ${b(e.lastUpdated)}</span>
+            <span class="brain-id-updated">Updated ${u(e.lastUpdated)}</span>
           `:n}
         </div>
       </div>
@@ -116,7 +116,7 @@ import{d as y,b as a,A as n,o as $,g,r as c,t as f}from"./lit-core-CTInmNPB.js";
           <input
             class="brain-search-input"
             type="text"
-            placeholder="Search your memory \u2014 Honcho, Vault, Sessions, Screenpipe..."
+            placeholder="Search your memory \u2014 conversations, vault, sessions, screen recall..."
             .value=${this.searchQuery}
             @input=${e=>this._onSearchInput(e)}
             aria-label="Search your Second Brain"
@@ -140,7 +140,7 @@ import{d as y,b as a,A as n,o as $,g,r as c,t as f}from"./lit-core-CTInmNPB.js";
                         <div class="brain-entry-name">
                           ${e.name}
                           ${e.source?a`<span class="brain-source-tag">${F[e.source]??""} ${e.source}</span>`:n}
-                          ${e.scope?m(e.scope):n}
+                          ${e.scope?y(e.scope):n}
                         </div>
                         ${e.matchContext??e.excerpt?a`<div class="brain-entry-excerpt">${e.matchContext??e.excerpt}</div>`:n}
                       </div>
@@ -173,13 +173,13 @@ import{d as y,b as a,A as n,o as $,g,r as c,t as f}from"./lit-core-CTInmNPB.js";
       <div class="brain-activity-feed" role="log" aria-label="Memory activity feed">
         ${this.activity.events.slice(0,12).map(e=>a`
           <div class="brain-activity-item">
-            <span class="brain-activity-icon">${P[e.type]??"•"}</span>
+            <span class="brain-activity-icon">${T[e.type]??"•"}</span>
             <div class="brain-activity-body">
               <span class="brain-activity-title">${e.title}</span>
               ${e.detail?a`<span class="brain-activity-detail">${e.detail}</span>`:n}
             </div>
-            ${e.scope?m(e.scope):n}
-            <span class="brain-activity-time">${b(e.timestamp)}</span>
+            ${e.scope?y(e.scope):n}
+            <span class="brain-activity-time">${u(e.timestamp)}</span>
           </div>
         `)}
       </div>
@@ -189,7 +189,7 @@ import{d as y,b as a,A as n,o as $,g,r as c,t as f}from"./lit-core-CTInmNPB.js";
           <div class="brain-empty-hint">People you interact with will appear here. Connect your calendar to start.</div>
           <button class="brain-action-btn brain-action-btn--sm" aria-label="Connect your calendar to track people" @click=${()=>this._chatNavigate("Help me connect my calendar so my Brain can track the people I interact with.")}>Connect Calendar \u{2192}</button>
         </div>
-      `;const o=this.peopleSearch?i.filter(s=>s.name.toLowerCase().includes(this.peopleSearch.toLowerCase())):i;return a`
+      `;const c=this.peopleSearch?i.filter(s=>s.name.toLowerCase().includes(this.peopleSearch.toLowerCase())):i;return a`
       <h2 class="brain-panel-title">People
         <span class="brain-section-count">${d} tracked</span>
       </h2>
@@ -202,7 +202,7 @@ import{d as y,b as a,A as n,o as $,g,r as c,t as f}from"./lit-core-CTInmNPB.js";
         aria-label="Filter people"
       />
       <div class="brain-people-list" role="list" aria-label="People in your brain">
-        ${o.slice(0,8).map(s=>a`
+        ${c.slice(0,8).map(s=>a`
           <div class="brain-person-card" role="listitem" tabindex="0" aria-label="Open profile for ${s.name}" @click=${()=>this._openFile(s.path)} @keydown=${p=>{(p.key==="Enter"||p.key===" ")&&(p.preventDefault(),this._openFile(s.path))}}>
             <div class="brain-person-icon" aria-hidden="true">\u{1F464}</div>
             <div class="brain-person-body">
@@ -210,7 +210,7 @@ import{d as y,b as a,A as n,o as $,g,r as c,t as f}from"./lit-core-CTInmNPB.js";
               ${s.role?a`<div class="brain-person-role">${s.role}</div>`:n}
               ${!s.role&&s.excerpt?a`<div class="brain-person-excerpt">${s.excerpt}</div>`:n}
             </div>
-            ${s.updatedAt?a`<div class="brain-person-time">${b(s.updatedAt)}</div>`:n}
+            ${s.updatedAt?a`<div class="brain-person-time">${u(s.updatedAt)}</div>`:n}
           </div>
         `)}
       </div>
@@ -235,11 +235,11 @@ import{d as y,b as a,A as n,o as $,g,r as c,t as f}from"./lit-core-CTInmNPB.js";
       ${d.length>0?a`
         <div class="brain-knowledge-recent" role="list" aria-label="Recently modified files">
           <h3 class="brain-subsection-title">Recent</h3>
-          ${d.slice(0,5).map(o=>a`
-            <div class="brain-entry brain-entry--compact" role="listitem" tabindex="0" aria-label="Open ${o.name}" @click=${()=>this._openFile(o.path)} @keydown=${s=>{(s.key==="Enter"||s.key===" ")&&(s.preventDefault(),this._openFile(o.path))}}>
+          ${d.slice(0,5).map(c=>a`
+            <div class="brain-entry brain-entry--compact" role="listitem" tabindex="0" aria-label="Open ${c.name}" @click=${()=>this._openFile(c.path)} @keydown=${s=>{(s.key==="Enter"||s.key===" ")&&(s.preventDefault(),this._openFile(c.path))}}>
               <span class="brain-entry-icon" aria-hidden="true">\u{1F4C4}</span>
-              <span class="brain-entry-name">${o.name}</span>
-              <span class="brain-entry-meta">${b(o.updatedAt)}</span>
+              <span class="brain-entry-name">${c.name}</span>
+              <span class="brain-entry-meta">${u(c.updatedAt)}</span>
             </div>
           `)}
         </div>
@@ -356,29 +356,41 @@ import{d as y,b as a,A as n,o as $,g,r as c,t as f}from"./lit-core-CTInmNPB.js";
           `}
         </div>
       </div>
-    `}_renderScreenpipeRow(){const e=this.screenpipeStatus;return a`
+    `}_renderScreenpipeRow(){const e=this.screenpipeStatus,t=this.screenpipeSetupBusy,i=e?e.installed?e.available?e.enabled?"Active":"Paused":"Installed — not running":"Not installed":"Loading...",d=e?.available?e.enabled?"brain-dot--ready":"brain-dot--degraded":e?.installed?"brain-dot--degraded":"brain-dot--offline";return a`
       <div class="brain-engine-section">
         <h3 class="brain-subsection-title">Screenpipe (Ambient Memory)</h3>
         <div class="brain-screenpipe-row">
-          <span class="brain-dot ${e?.available?e.enabled?"brain-dot--ready":"brain-dot--degraded":"brain-dot--offline"}"></span>
-          <span>${e?e.available?e.enabled?"Active":"Paused":"Not installed":"Loading..."}</span>
+          <span class="brain-dot ${d}"></span>
+          <span>${i}${e?.version?` (${e.version})`:""}</span>
           ${e?.available?a`
-            <button class="brain-action-btn brain-action-btn--xs" aria-label="${e.enabled?"Pause ambient memory":"Enable ambient memory"}" @click=${()=>this._toggleScreenpipe(!e.enabled)}>
+            <button class="brain-action-btn brain-action-btn--xs"
+              aria-label="${e.enabled?"Pause ambient memory":"Enable ambient memory"}"
+              @click=${()=>this._toggleScreenpipe(!e.enabled)}>
               ${e.enabled?"Pause":"Enable"}
             </button>
-          `:!e?.available&&e!==null?a`
-            <button class="brain-action-btn brain-action-btn--xs" @click=${()=>this._chatNavigate("Help me set up Screenpipe for ambient memory capture. Walk me through installation and configuration step by step.")}>Set up</button>
+          `:e&&!e.installed?a`
+            <button class="brain-action-btn brain-action-btn--xs"
+              ?disabled=${t}
+              @click=${()=>this._setupScreenpipe()}>
+              ${t?"Installing...":"Install & Enable"}
+            </button>
+          `:e&&e.installed&&!e.available?a`
+            <button class="brain-action-btn brain-action-btn--xs"
+              ?disabled=${t}
+              @click=${()=>this._startScreenpipe()}>
+              ${t?"Starting...":"Start"}
+            </button>
           `:n}
         </div>
       </div>
     `}_renderEntry(e){const t=e.isDirectory,i=t?"📁":"📄",d=()=>{t?this._browseFolder(e.path):this._openFile(e.path)};return a`
-      <div class="brain-entry" role="listitem" tabindex="0" aria-label="${t?"Open folder":"Open file"}: ${e.name}" @click=${d} @keydown=${o=>{(o.key==="Enter"||o.key===" ")&&(o.preventDefault(),d())}}>
+      <div class="brain-entry" role="listitem" tabindex="0" aria-label="${t?"Open folder":"Open file"}: ${e.name}" @click=${d} @keydown=${c=>{(c.key==="Enter"||c.key===" ")&&(c.preventDefault(),d())}}>
         <div class="brain-entry-icon ${t?"brain-entry-icon--folder":""}" aria-hidden="true">${i}</div>
         <div class="brain-entry-body">
           <div class="brain-entry-name">${e.name}${t?"/":""}</div>
           ${e.excerpt?a`<div class="brain-entry-excerpt">${e.excerpt}</div>`:n}
         </div>
-        ${e.updatedAt?a`<div class="brain-entry-meta">${b(e.updatedAt)}</div>`:n}
+        ${e.updatedAt?a`<div class="brain-entry-meta">${u(e.updatedAt)}</div>`:n}
       </div>
     `}_renderFileTree(e,t){return a`
       <div class="brain-file-tree" role="tree" aria-label="${t===0?"Vault file browser":""}" style="padding-left: ${t*16}px">
@@ -399,4 +411,4 @@ import{d as y,b as a,A as n,o as $,g,r as c,t as f}from"./lit-core-CTInmNPB.js";
             </button>
           `)}
       </div>
-    `}};l([g({context:w,subscribe:!0})],r.prototype,"ctx",2);l([c()],r.prototype,"identityCard",2);l([c()],r.prototype,"loading",2);l([c()],r.prototype,"error",2);l([c()],r.prototype,"pulse",2);l([c()],r.prototype,"activity",2);l([c()],r.prototype,"memoryBank",2);l([c()],r.prototype,"fileTree",2);l([c()],r.prototype,"vaultHealth",2);l([c()],r.prototype,"recentPeople",2);l([c()],r.prototype,"peopleTotalCount",2);l([c()],r.prototype,"peopleSearch",2);l([c()],r.prototype,"screenpipeStatus",2);l([c()],r.prototype,"ingestionStatus",2);l([c()],r.prototype,"mcpStatusData",2);l([c()],r.prototype,"integrationsData",2);l([c()],r.prototype,"searchQuery",2);l([c()],r.prototype,"searchResults",2);l([c()],r.prototype,"searching",2);l([c()],r.prototype,"expandedPulseSystem",2);l([c()],r.prototype,"browsingFolder",2);l([c()],r.prototype,"folderEntries",2);l([c()],r.prototype,"folderName",2);r=l([f("gm-brain")],r);export{r as GmBrain};
+    `}};l([g({context:w,subscribe:!0})],r.prototype,"ctx",2);l([o()],r.prototype,"identityCard",2);l([o()],r.prototype,"loading",2);l([o()],r.prototype,"error",2);l([o()],r.prototype,"pulse",2);l([o()],r.prototype,"activity",2);l([o()],r.prototype,"memoryBank",2);l([o()],r.prototype,"fileTree",2);l([o()],r.prototype,"vaultHealth",2);l([o()],r.prototype,"recentPeople",2);l([o()],r.prototype,"peopleTotalCount",2);l([o()],r.prototype,"peopleSearch",2);l([o()],r.prototype,"screenpipeStatus",2);l([o()],r.prototype,"screenpipeSetupBusy",2);l([o()],r.prototype,"ingestionStatus",2);l([o()],r.prototype,"mcpStatusData",2);l([o()],r.prototype,"integrationsData",2);l([o()],r.prototype,"searchQuery",2);l([o()],r.prototype,"searchResults",2);l([o()],r.prototype,"searching",2);l([o()],r.prototype,"expandedPulseSystem",2);l([o()],r.prototype,"browsingFolder",2);l([o()],r.prototype,"folderEntries",2);l([o()],r.prototype,"folderName",2);r=l([f("gm-brain")],r);export{r as GmBrain};

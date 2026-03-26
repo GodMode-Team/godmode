@@ -24,7 +24,6 @@ import { loadNodes } from "./controllers/nodes";
 import { loadPresence } from "./controllers/presence";
 import { loadArchivedSessions, loadSessions } from "./controllers/sessions";
 import { loadGodModeSkills, loadSkills } from "./controllers/skills";
-import { loadWorkspaces } from "./controllers/workspaces";
 import {
   inferBasePathFromPathname,
   isCustomTab,
@@ -265,7 +264,8 @@ export async function refreshActiveTab(host: SettingsHost) {
     appEventBus.emit("refresh-requested", { target: "today" });
   }
   if (host.tab === "workspaces") {
-    await loadWorkspaces(host as unknown as GodModeApp);
+    // <gm-work> handles its own data loading; just signal a refresh
+    appEventBus.emit("refresh-requested", { target: "workspaces" });
   }
   if (host.tab === "channels") {
     await loadChannelsTab(host);

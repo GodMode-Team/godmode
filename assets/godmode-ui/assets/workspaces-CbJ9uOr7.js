@@ -1,4 +1,4 @@
-import{A as c,b as a}from"./lit-core-CTInmNPB.js";import{f as P,ab as Q}from"./ctrl-settings-niym-WgY.js";function ie(e){return!Number.isFinite(e)||e<=0?"0 B":e<1024?`${e} B`:e<1024*1024?`${(e/1024).toFixed(1)} KB`:`${(e/(1024*1024)).toFixed(1)} MB`}function z(e){switch(e){case"markdown":return"📄";case"html":return"🌐";case"image":return"🖼️";case"json":return"🧩";case"folder":return"📁";default:return"📄"}}function te(e){return e==="running"?"ws-session-dot ws-session-dot--running":e==="blocked"?"ws-session-dot ws-session-dot--blocked":"ws-session-dot ws-session-dot--complete"}function le(e){return`ws-task-priority ws-task-priority--${e}`}function oe(e){return e==="high"?"High":e==="low"?"Low":"Med"}function re(e){if(!e)return"";const t=Q();return e===t?"Today":e<t?`Overdue (${e})`:e}function ce(e){if(!e)return"ws-task-due";const t=Q();return e<t?"ws-task-due ws-task-due--overdue":e===t?"ws-task-due ws-task-due--today":"ws-task-due"}function V(e,t="due"){const s={high:0,medium:1,low:2};return[...e].sort((n,i)=>{if(t==="priority"){const l=s[n.priority]-s[i.priority];return l!==0?l:n.dueDate&&i.dueDate?n.dueDate.localeCompare(i.dueDate):n.dueDate&&!i.dueDate?-1:!n.dueDate&&i.dueDate?1:0}if(t==="newest")return(i.createdAt||"").localeCompare(n.createdAt||"");if(n.dueDate&&i.dueDate){const l=n.dueDate.localeCompare(i.dueDate);if(l!==0)return l}else{if(n.dueDate&&!i.dueDate)return-1;if(!n.dueDate&&i.dueDate)return 1}return s[n.priority]-s[i.priority]})}function se(e,t,s,n,i,l,r){const p=e.status==="complete";return n===e.id?a`
+import{A as c,b as a}from"./lit-core-CTInmNPB.js";import{f as P,ab as Q}from"./ctrl-settings-DqZuTIbw.js";function ie(e){return!Number.isFinite(e)||e<=0?"0 B":e<1024?`${e} B`:e<1024*1024?`${(e/1024).toFixed(1)} KB`:`${(e/(1024*1024)).toFixed(1)} MB`}function z(e){switch(e){case"markdown":return"📄";case"html":return"🌐";case"image":return"🖼️";case"json":return"🧩";case"folder":return"📁";default:return"📄"}}function te(e){return e==="running"?"ws-session-dot ws-session-dot--running":e==="blocked"?"ws-session-dot ws-session-dot--blocked":"ws-session-dot ws-session-dot--complete"}function le(e){return`ws-task-priority ws-task-priority--${e}`}function oe(e){return e==="high"?"High":e==="low"?"Low":"Med"}function re(e){if(!e)return"";const t=Q();return e===t?"Today":e<t?`Overdue (${e})`:e}function ce(e){if(!e)return"ws-task-due";const t=Q();return e<t?"ws-task-due ws-task-due--overdue":e===t?"ws-task-due ws-task-due--today":"ws-task-due"}function V(e,t="due"){const s={high:0,medium:1,low:2};return[...e].sort((n,i)=>{if(t==="priority"){const l=s[n.priority]-s[i.priority];return l!==0?l:n.dueDate&&i.dueDate?n.dueDate.localeCompare(i.dueDate):n.dueDate&&!i.dueDate?-1:!n.dueDate&&i.dueDate?1:0}if(t==="newest")return(i.createdAt||"").localeCompare(n.createdAt||"");if(n.dueDate&&i.dueDate){const l=n.dueDate.localeCompare(i.dueDate);if(l!==0)return l}else{if(n.dueDate&&!i.dueDate)return-1;if(!n.dueDate&&i.dueDate)return 1}return s[n.priority]-s[i.priority]})}function se(e,t,s,n,i,l,r){const p=e.status==="complete";return n===e.id?a`
       <form
         class="ws-list-row ws-task-row ws-task-edit-row"
         aria-label="Edit task: ${e.title}"
@@ -295,7 +295,7 @@ import{A as c,b as a}from"./lit-core-CTInmNPB.js";import{f as P,ab as Q}from"./c
             `)}
       </div>
     </div>
-  `}function Se(e){const{workspace:t,itemSearchQuery:s,expandedFolders:n=new Set,showCompletedTasks:i=!1,onItemSearch:l,onBack:r,onItemClick:p,onSessionClick:$,onPinToggle:d,onPinSessionToggle:m,onToggleFolder:u,onToggleTaskComplete:k,onCreateTask:b,onToggleCompletedTasks:f,onStartTask:D,editingTaskId:h,onEditTask:T,onUpdateTask:w,onBatchPushToDrive:v}=e,S=ae(s,t.pinned).toSorted((o,C)=>C.modified.getTime()-o.modified.getTime()),F=ne(s,t.pinnedSessions),g=ae(s,t.outputs).filter(o=>!t.pinned.some(C=>C.path===o.path)),x=(t.folderTree?.length??0)>0,L=x?pe(s,t.folderTree):[],O=ne(s,t.sessions),B=new Set(t.pinnedSessions.map(o=>o.key)),R=new Set(t.pinned.map(o=>o.path)),A=s.trim().length>0,_=S.length>0||F.length>0,N=O.length>0||t.sessions.length===0||A,I=he(t.outputs),W=I.length>0&&!A,M={expandedFolders:n,pinnedPaths:R,workspaceId:t.id,onToggleFolder:u,onItemClick:p,onPinToggle:d};return a`
+  `}function Se(e){const{workspace:t,itemSearchQuery:s,expandedFolders:n=new Set,showCompletedTasks:i=!1,onItemSearch:l,onBack:r,onItemClick:p,onSessionClick:$,onPinToggle:d,onPinSessionToggle:m,onToggleFolder:u,onToggleTaskComplete:k,onCreateTask:b,onToggleCompletedTasks:f,onStartTask:D,editingTaskId:h,onEditTask:T,onUpdateTask:w,onBatchPushToDrive:v}=e,S=ae(s,t.pinned).toSorted((o,C)=>C.modified.getTime()-o.modified.getTime()),F=ne(s,t.pinnedSessions),g=ae(s,t.outputs).filter(o=>!t.pinned.some(C=>C.path===o.path)),x=(t.folderTree?.length??0)>0,L=x?pe(s,t.folderTree):[],O=ne(s,t.sessions),B=new Set(t.pinnedSessions.map(o=>o.key)),R=new Set(t.pinned.map(o=>o.path)),A=s.trim().length>0,_=S.length>0||F.length>0,N=O.length>0||t.sessions.length===0||A,I=he(t.outputs),M=I.length>0&&!A,U={expandedFolders:n,pinnedPaths:R,workspaceId:t.id,onToggleFolder:u,onItemClick:p,onPinToggle:d};return a`
     <div class="workspaces-container" role="region" aria-label="Workspace: ${t.name}">
       <div class="workspaces-header">
         <div class="workspaces-title">
@@ -357,7 +357,7 @@ import{A as c,b as a}from"./lit-core-CTInmNPB.js";import{f as P,ab as Q}from"./c
 
         ${Fe({tasks:t.tasks??[],workspaceName:t.name,showCompleted:i,onToggleTaskComplete:k,onCreateTask:b,onToggleCompletedTasks:f,onStartTask:D,onViewTaskOutput,editingTaskId:h,onEditTask:T,onUpdateTask:w})}
 
-        ${W?a`
+        ${M?a`
               <section class="ws-section" aria-label="Recent files">
                 <div class="ws-section__header">
                   <h3>Recent</h3>
@@ -378,7 +378,7 @@ import{A as c,b as a}from"./lit-core-CTInmNPB.js";import{f as P,ab as Q}from"./c
           <div class="ws-list ws-list--scroll" role="list" aria-label="Artifacts list">
             ${x?L.length===0?a`<div class="ws-empty">
                       <span class="ws-empty-hint">No artifacts yet. Ask your ally to create a document, plan, or analysis — it'll appear here.</span>
-                    </div>`:L.map(o=>ue(o,0,M)):g.length===0?a`<div class="ws-empty">
+                    </div>`:L.map(o=>ue(o,0,U)):g.length===0?a`<div class="ws-empty">
                       <span class="ws-empty-hint">No artifacts yet. Ask your ally to create a document, plan, or analysis — it'll appear here.</span>
                     </div>`:g.map(o=>j({workspaceId:t.id,entry:o,pinned:!1,onOpen:p,onPinToggle:d}))}
           </div>
@@ -565,7 +565,7 @@ import{A as c,b as a}from"./lit-core-CTInmNPB.js";import{f as P,ab as Q}from"./c
             </form>
           `:c}
     </section>
-  `}function Re(e){const{connected:t,workspaces:s,selectedWorkspace:n,searchQuery:i,itemSearchQuery:l,expandedFolders:r,loading:p,createLoading:$,error:d,allTasks:m=[],taskFilter:u="outstanding",taskSort:k="due",taskSearch:b="",showCompletedTasks:f=!1,editingTaskId:D,workspaceNames:h=[],onSearch:T,onItemSearch:w,onSelectWorkspace:v,onBack:S,onItemClick:F,onSessionClick:g,onPinToggle:x,onPinSessionToggle:L,onCreateWorkspace:O,onDeleteWorkspace:B,onToggleFolder:R,onTeamSetup:A,onToggleTaskComplete:_,onCreateTask:N,onSetTaskFilter:I,onSetTaskSort:W,onSetTaskSearch:M,onToggleCompletedTasks:o,onStartTask:C,onViewTaskOutput:we,onEditTask:G,onUpdateTask:H}=e,U=s.filter(y=>be(i,`${y.name} ${y.path} ${y.type}`));return n?Se({workspace:n,itemSearchQuery:l??"",expandedFolders:r,showCompletedTasks:f,onItemSearch:w,onBack:S,onItemClick:F,onSessionClick:g,onPinToggle:x,onPinSessionToggle:L,onToggleFolder:R,onToggleTaskComplete:_,onCreateTask:N,onToggleCompletedTasks:o,onStartTask:C,editingTaskId:D,onEditTask:G,onUpdateTask:H,browsePath:e.browsePath,browseEntries:e.browseEntries,breadcrumbs:e.breadcrumbs,browseSearchQuery:e.browseSearchQuery,browseSearchResults:e.browseSearchResults,onBrowseFolder:e.onBrowseFolder,onBrowseSearch:e.onBrowseSearch,onBrowseBack:e.onBrowseBack,onCreateFolder:e.onCreateFolder,onBatchPushToDrive:e.onBatchPushToDrive,onPostToFeed:e.onPostToFeed,onLoadMoreFeed:e.onLoadMoreFeed,onTestConnection:e.onTestConnection,onRemoveConnection:e.onRemoveConnection}):a`
+  `}function Re(e){const{connected:t,workspaces:s,selectedWorkspace:n,searchQuery:i,itemSearchQuery:l,expandedFolders:r,loading:p,createLoading:$,error:d,allTasks:m=[],taskFilter:u="outstanding",taskSort:k="due",taskSearch:b="",showCompletedTasks:f=!1,editingTaskId:D,workspaceNames:h=[],onSearch:T,onItemSearch:w,onSelectWorkspace:v,onBack:S,onItemClick:F,onSessionClick:g,onPinToggle:x,onPinSessionToggle:L,onCreateWorkspace:O,onDeleteWorkspace:B,onToggleFolder:R,onTeamSetup:A,onToggleTaskComplete:_,onCreateTask:N,onSetTaskFilter:I,onSetTaskSort:M,onSetTaskSearch:U,onToggleCompletedTasks:o,onStartTask:C,onViewTaskOutput:we,onEditTask:G,onUpdateTask:H}=e,W=s.filter(y=>be(i,`${y.name} ${y.path} ${y.type}`));return n?Se({workspace:n,itemSearchQuery:l??"",expandedFolders:r,showCompletedTasks:f,onItemSearch:w,onBack:S,onItemClick:F,onSessionClick:g,onPinToggle:x,onPinSessionToggle:L,onToggleFolder:R,onToggleTaskComplete:_,onCreateTask:N,onToggleCompletedTasks:o,onStartTask:C,editingTaskId:D,onEditTask:G,onUpdateTask:H,browsePath:e.browsePath,browseEntries:e.browseEntries,breadcrumbs:e.breadcrumbs,browseSearchQuery:e.browseSearchQuery,browseSearchResults:e.browseSearchResults,onBrowseFolder:e.onBrowseFolder,onBrowseSearch:e.onBrowseSearch,onBrowseBack:e.onBrowseBack,onCreateFolder:e.onCreateFolder,onBatchPushToDrive:e.onBatchPushToDrive,onPostToFeed:e.onPostToFeed,onLoadMoreFeed:e.onLoadMoreFeed,onTestConnection:e.onTestConnection,onRemoveConnection:e.onRemoveConnection}):a`
     <div class="workspaces-container" role="region" aria-label="Workspaces">
       <div class="workspaces-toolbar" role="toolbar" aria-label="Workspace controls">
         <form
@@ -610,7 +610,7 @@ import{A as c,b as a}from"./lit-core-CTInmNPB.js";import{f as P,ab as Q}from"./c
             .value=${i}
             @input=${y=>T?.(y.target.value)}
           />
-          <span class="workspaces-count" aria-live="polite">${U.length} workspaces</span>
+          <span class="workspaces-count" aria-live="polite">${W.length} workspaces</span>
           <span class="workspaces-status ${t?"online":"offline"}" role="status">
             ${t?"Online":"Offline"}
           </span>
@@ -619,7 +619,7 @@ import{A as c,b as a}from"./lit-core-CTInmNPB.js";import{f as P,ab as Q}from"./c
 
       ${d?a`<div class="callout danger" role="alert" style="margin: 16px;">${d}</div>`:c}
 
-      ${p?a`
+      ${p&&W.length===0?a`
               <div class="workspaces-loading" role="status" aria-label="Loading workspaces">
                 <div class="spinner" aria-hidden="true"></div>
                 <span>Loading workspaces...</span>
@@ -627,16 +627,16 @@ import{A as c,b as a}from"./lit-core-CTInmNPB.js";import{f as P,ab as Q}from"./c
             `:a`
               <div class="workspaces-body">
                 <div class="workspace-grid" role="list" aria-label="Workspace list">
-                  ${U.length===0?a`
+                  ${W.length===0?a`
                           <div class="workspaces-empty">
                             <span class="workspaces-empty-icon" aria-hidden="true">${t?"📭":"🔌"}</span>
                             <span>${t?"No workspaces yet":"Connect to gateway to see workspaces"}</span>
                             ${t?a`<span class="workspaces-empty-hint">Workspaces organize your projects. Ask your ally to create one, or start a focused session in chat.</span>`:c}
                           </div>
-                        `:U.map(y=>ve(y,v,B))}
+                        `:W.map(y=>ve(y,v,B))}
                 </div>
 
-                ${xe({tasks:m,taskFilter:u,taskSort:k,taskSearch:b,onToggleTaskComplete:_,onSetTaskFilter:I,onSetTaskSort:W,onSetTaskSearch:M,onCreateTask:N,workspaceNames:h,onStartTask:C,editingTaskId:D,onEditTask:G,onUpdateTask:H,onViewTaskOutput:we})}
+                ${xe({tasks:m,taskFilter:u,taskSort:k,taskSearch:b,onToggleTaskComplete:_,onSetTaskFilter:I,onSetTaskSort:M,onSetTaskSearch:U,onCreateTask:N,workspaceNames:h,onStartTask:C,editingTaskId:D,onEditTask:G,onUpdateTask:H,onViewTaskOutput:we})}
               </div>
             `}
     </div>
