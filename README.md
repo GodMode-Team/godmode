@@ -24,7 +24,17 @@ GodMode turns your self-hosted AI into a personal operating system. It runs on t
 - **OpenClaw** `>=2026.2.0` ([install guide](https://github.com/nichochar/openclaw))
 - **Anthropic API key** ([get one here](https://console.anthropic.com))
 
-### Option A: Install as OpenClaw Plugin
+### Option A: One-Line Install (recommended)
+
+```bash
+curl -fsSL https://lifeongodmode.com/install.sh | sh
+```
+
+This handles everything — Node.js, OpenClaw, GodMode plugin, gateway config, and Tailscale (if present). Safe to re-run.
+
+Windows: `irm https://lifeongodmode.com/install.ps1 | iex`
+
+### Option B: Install as OpenClaw Plugin
 
 ```bash
 # Install the plugin
@@ -40,12 +50,12 @@ openclaw gateway restart
 open http://localhost:18789/godmode
 ```
 
-### Option B: Clone and Run (with OpenClaw from source)
+### Option C: Clone and Build from Source
 
 ```bash
 # Clone and build
-git clone https://github.com/GodMode-Team/godmode-plugin.git
-cd godmode-plugin
+git clone https://github.com/GodMode-Team/godmode.git
+cd godmode
 pnpm install
 pnpm build
 
@@ -64,11 +74,11 @@ openclaw gateway restart
 open http://localhost:18789/godmode
 ```
 
-### Option C: Clone and Develop
+### Option D: Clone and Develop
 
 ```bash
-git clone https://github.com/GodMode-Team/godmode-plugin.git
-cd godmode-plugin
+git clone https://github.com/GodMode-Team/godmode.git
+cd godmode
 pnpm install
 
 # Copy and configure environment
@@ -122,7 +132,7 @@ Drop a file in, restart, and your AI knows something new. No TypeScript required
 ## Architecture
 
 ```
-godmode-plugin/
+godmode/
 ├── index.ts              # OpenClaw plugin entry point
 ├── standalone.ts         # Standalone Hermes server (alternative to OpenClaw gateway)
 ├── src/
@@ -174,7 +184,7 @@ Contributions welcome! GodMode gets better when the community builds for their o
 
 ## Community
 
-- [GitHub Issues](https://github.com/GodMode-Team/godmode-plugin/issues) — Bug reports and feature requests
+- [GitHub Issues](https://github.com/GodMode-Team/godmode/issues) — Bug reports and feature requests
 - [Community Circle](https://lifeongodmode.com/community) — Weekly office hours, power user tips, creative workflows ($99/mo)
 - [Website](https://lifeongodmode.com) — Learn more about the GodMode vision
 
