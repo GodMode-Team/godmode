@@ -2,7 +2,7 @@
   "id": "godmode",
   "name": "GodMode",
   "description": "Personal AI Operating System — your deeply contextual AI ally that manages tasks, memory, integrations, and a swarm of agents",
-  "version": "1.8.2",
+  "version": "1.8.3",
   "license": "FSL-1.1-MIT",
   "author": {
     "name": "GodMode Team",
@@ -10,8 +10,21 @@
   },
   "repository": "https://github.com/GodMode-Team/godmode",
   "homepage": "https://lifeongodmode.com",
-  "keywords": ["ai", "personal-ai", "agent", "memory", "productivity", "second-brain", "automation"],
-  "categories": ["productivity", "ai-agents", "automation", "memory"],
+  "keywords": [
+    "ai",
+    "personal-ai",
+    "agent",
+    "memory",
+    "productivity",
+    "second-brain",
+    "automation"
+  ],
+  "categories": [
+    "productivity",
+    "ai-agents",
+    "automation",
+    "memory"
+  ],
   "icon": "assets/icon.png",
   "screenshots": [],
   "capabilities": {
@@ -34,8 +47,14 @@
   "quickStart": {
     "install": "openclaw plugins install @godmode-team/godmode",
     "alternative": "npx create-godmode",
-    "requiredEnv": ["ANTHROPIC_API_KEY"],
-    "optionalEnv": ["HONCHO_API_KEY", "COMPOSIO_API_KEY", "OBSIDIAN_VAULT_PATH"]
+    "requiredEnv": [
+      "ANTHROPIC_API_KEY"
+    ],
+    "optionalEnv": [
+      "HONCHO_API_KEY",
+      "COMPOSIO_API_KEY",
+      "OBSIDIAN_VAULT_PATH"
+    ]
   },
   "configSchema": {
     "type": "object",
