@@ -817,10 +817,29 @@ fi
 # Step 9: Start gateway
 step 9 "Starting gateway"
 
+# On VPS: enable linger so the gateway survives SSH disconnect,
+# and install the systemd service for auto-restart on reboot.
+if [ "$IS_HEADLESS" = true ] && has loginctl; then
+  CURRENT_USER="${USER:-$(id -un)}"
+  LINGER="$(loginctl show-user "$CURRENT_USER" -p Linger --value 2>/dev/null || echo "no")"
+  if [ "$LINGER" != "yes" ]; then
+    if [ "$CURRENT_USER" = "root" ]; then
+      loginctl enable-linger root 2>/dev/null && ok "Linger enabled (gateway survives SSH disconnect)" || true
+    else
+      sudo loginctl enable-linger "$CURRENT_USER" 2>/dev/null && ok "Linger enabled (gateway survives SSH disconnect)" || {
+        warn "Could not enable linger — gateway may stop when you disconnect SSH"
+        info "Fix: sudo loginctl enable-linger $CURRENT_USER"
+      }
+    fi
+  else
+    ok "Linger already enabled"
+  fi
+fi
+
 # Gateway was already stopped in step 5 if it was running.
-# Start gateway — try "gateway start" first (uses systemd/launchd).
-# Don't trust exit codes — check if the health endpoint actually responds.
-# If not, fall back to "gateway run" which works everywhere.
+# Install the gateway service for persistence, then start it.
+# --force ensures the service file is updated even if it already exists.
+openclaw gateway install --force >/dev/null 2>&1 || true
 openclaw gateway start >/dev/null 2>&1 || true
 
 # Give gateway start a few seconds to spin up
@@ -904,22 +923,17 @@ if [ "$IS_HEADLESS" = true ]; then
   fi
 
   if [ "$TAILSCALE_CONFIGURED" = true ]; then
-    # Tailscale configured — show HTTPS URL as primary, HTTP+token as fallback
+    # Tailscale configured — trusted-proxy auth means no token needed
     printf '  %s%s.%s Access GodMode via Tailscale:\n' "$CYN" "$STEP_NUM" "$RST"
     if [ -n "$TAILSCALE_FQDN" ]; then
-      printf '     %s%shttps://%s/godmode/onboarding%s  %s(recommended)%s\n' "  " "$CYN" "$TAILSCALE_FQDN" "$RST" "$GRN" "$RST"
-      printf '     %sUses HTTPS — secure, no token needed.%s\n' "     $DIM" "$RST"
-      if [ -n "$GATEWAY_TOKEN" ]; then
-        printf '     %sFallback (if HTTPS cert not ready): http://%s:%s/godmode/onboarding?token=%s%s\n' "     $DIM" "$TAILSCALE_IP" "$GODMODE_PORT" "$GATEWAY_TOKEN" "$RST"
-      fi
-    elif [ -n "$GATEWAY_TOKEN" ]; then
-      printf '     %s%shttp://%s:%s/godmode/onboarding?token=%s%s\n' "  " "$CYN" "$TAILSCALE_IP" "$GODMODE_PORT" "$GATEWAY_TOKEN" "$RST"
+      printf '     %s%shttps://%s/%s  %s(no token needed)%s\n' "  " "$CYN" "$TAILSCALE_FQDN" "$RST" "$GRN" "$RST"
+      printf '     %sTailscale identity is the auth — just open the URL.%s\n' "     $DIM" "$RST"
     else
-      printf '     %s%shttp://%s:%s/godmode/onboarding%s\n' "  " "$CYN" "$TAILSCALE_IP" "$GODMODE_PORT" "$RST"
+      printf '     %s%shttp://%s:%s/%s\n' "  " "$CYN" "$TAILSCALE_IP" "$GODMODE_PORT" "$RST"
     fi
     printf '\n'
-    printf '     %sChrome cert error? Wait 5 min and refresh — the TLS cert needs time to propagate.%s\n' "$DIM" "$RST"
-    printf '     %sStill broken? SSH fallback: ssh -L %s:localhost:%s user@this-server%s\n\n' "$DIM" "$GODMODE_PORT" "$GODMODE_PORT" "$RST"
+    printf '     %sCert error? Wait 5 min and refresh — the TLS cert needs time to propagate.%s\n' "$DIM" "$RST"
+    printf '     %sSSH fallback: ssh -L %s:localhost:%s user@this-server%s\n\n' "$DIM" "$GODMODE_PORT" "$GODMODE_PORT" "$RST"
     STEP_NUM=$((STEP_NUM + 1))
   else
     printf '  %s%s.%s Access GodMode remotely:\n' "$CYN" "$STEP_NUM" "$RST"
