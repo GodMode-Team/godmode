@@ -22,7 +22,7 @@ iteration	score_before	score_after	mutation	status
 21	1.0000	1.0000	remove "today" from TIME_WORDS	kept
 22	1.0000	1.0000	remove "what time" from TIME_WORDS	kept
 23	1.0000	1.0000	add "by when" to TIME_WORDS	kept
-24	1.0000	0.9875	remove "hey prosper" from OPS_WORDS	discarded
+24	1.0000	0.9875	remove "hey ally" from OPS_WORDS	discarded
 25	1.0000	0.9900	remove "task" from OPS_WORDS	discarded
 26	1.0000	1.0000	add "blocked" to OPS_WORDS	kept
 27	1.0000	1.0000	remove "remind" from OPS_WORDS	kept
