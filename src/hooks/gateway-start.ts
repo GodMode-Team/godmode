@@ -15,7 +15,7 @@ import { killZombieGateways } from "../lib/zombie-guard.js";
 import { refreshLicenseOnStart } from "../lib/license.js";
 import { health, turnErrors, sessions } from "../lib/health-ledger.js";
 import { writeSentinel, consumeSentinel } from "../lib/restart-sentinel.js";
-import { resolveProviderConfig } from "../lib/provider-config.js";
+import { resolveProviderConfig, bustProviderCache } from "../lib/provider-config.js";
 import {
   DEPLOY_DOMAIN, DEPLOY_REPO,
   HONCHO_SYNC_INTERVAL_MS as HONCHO_SYNC_CONST,
@@ -202,8 +202,8 @@ export async function runGatewayStart(
   }
 
   // ── API Key Check — actionable first-run warning ─────────────────
-  // After .env loading, check whether we can resolve any AI provider key.
-  // Without one, agent delegation, auto-titling, and other background features are degraded.
+  // Bust cache since env was just hydrated (standalone pre-flight may have cached empty state).
+  bustProviderCache();
   const providerCfg = resolveProviderConfig();
   if (!providerCfg.apiKey) {
     const gmEnvPath = join(GODMODE_ROOT, ".env");

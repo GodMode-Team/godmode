@@ -11,6 +11,7 @@
  */
 
 import { existsSync, readFileSync } from "node:fs";
+import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { HermesAdapter } from "./src/adapter/hermes/adapter.js";
@@ -112,31 +113,43 @@ async function main() {
   const { port, hermesUrl, hermesApiKey } = parseArgs();
 
   // ── API Key Pre-flight ────────────────────────────────────────
-  // Check for an Anthropic API key early so users get a clear, actionable
-  // message instead of mysterious failures later.
+  // Check for any AI provider key early so users get a clear, actionable
+  // message instead of mysterious failures later. Skip if a key will be
+  // available after .env hydration (which hasn't run yet at this point).
   try {
-    const { resolveAnthropicKey } = await import("./src/lib/anthropic-auth.js");
-    if (!resolveAnthropicKey()) {
-      console.warn(
-        "\n" +
-        "  ┌─────────────────────────────────────────────────────────────┐\n" +
-        "  │  GodMode requires an Anthropic API key.                    │\n" +
-        "  │                                                            │\n" +
-        "  │  Set it in your environment:                               │\n" +
-        "  │    export ANTHROPIC_API_KEY=sk-ant-...                     │\n" +
-        "  │                                                            │\n" +
-        "  │  Or create ~/godmode/.env with:                            │\n" +
-        "  │    ANTHROPIC_API_KEY=sk-ant-...                            │\n" +
-        "  │                                                            │\n" +
-        "  │  Get a key: https://console.anthropic.com/settings/keys   │\n" +
-        "  └─────────────────────────────────────────────────────────────┘\n" +
-        "\n" +
-        "  Continuing startup — chat may work via host auth, but agent\n" +
-        "  delegation and background features will be unavailable.\n",
-      );
+    const hasEnvKey = !!(process.env.ANTHROPIC_API_KEY?.trim() || process.env.VENICE_API_KEY?.trim());
+    if (!hasEnvKey) {
+      const envPaths = [join(homedir(), "godmode", ".env"), join(pluginRoot, ".env")];
+      let willHaveKey = false;
+      for (const p of envPaths) {
+        try {
+          const content = readFileSync(p, "utf-8");
+          if (/^(ANTHROPIC_API_KEY|VENICE_API_KEY)=\S+/m.test(content)) {
+            willHaveKey = true;
+            break;
+          }
+        } catch { /* missing or unreadable */ }
+      }
+      if (!willHaveKey) {
+        console.warn(
+          "\n" +
+          "  ┌─────────────────────────────────────────────────────────────┐\n" +
+          "  │  GodMode requires an AI provider key.                      │\n" +
+          "  │                                                            │\n" +
+          "  │  Set one in your environment:                              │\n" +
+          "  │    export VENICE_API_KEY=...                               │\n" +
+          "  │    export ANTHROPIC_API_KEY=sk-ant-...                     │\n" +
+          "  │                                                            │\n" +
+          "  │  Or add it to ~/godmode/.env                               │\n" +
+          "  └─────────────────────────────────────────────────────────────┘\n" +
+          "\n" +
+          "  Continuing startup — agent delegation and background\n" +
+          "  features will be unavailable until a key is configured.\n",
+        );
+      }
     }
   } catch {
-    // anthropic-auth module not yet available — non-fatal at this stage
+    // non-fatal at this stage
   }
 
   const adapter = new HermesAdapter({ port, hermesUrl, hermesApiKey });
