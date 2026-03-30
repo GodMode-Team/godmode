@@ -609,6 +609,16 @@ export class GodModeApp extends LitElement {
   @state() searchTavilyConfigured = false;
   @state() searchLoading = false;
 
+  // AI Provider state
+  @state() aiProvider: string = "anthropic";
+  @state() aiProviderModels: { fast: string; standard: string; primary: string } = { fast: "", standard: "", primary: "" };
+  @state() aiProviderAvailable: Array<{
+    id: string; name: string; privacy: string;
+    reasoning: boolean; contextWindow: number;
+    functionCalling: boolean; optimizedForCode: boolean;
+  }> = [];
+  @state() aiProviderLoading = false;
+
   // Custom tabs state
   @state() customTabs: Array<import("./views/custom-tab-renderer").CustomTabManifest> = [];
   @state() customTabData: Record<string, unknown> = {};

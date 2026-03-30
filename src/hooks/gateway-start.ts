@@ -15,7 +15,7 @@ import { killZombieGateways } from "../lib/zombie-guard.js";
 import { refreshLicenseOnStart } from "../lib/license.js";
 import { health, turnErrors, sessions } from "../lib/health-ledger.js";
 import { writeSentinel, consumeSentinel } from "../lib/restart-sentinel.js";
-import { resolveAnthropicKey } from "../lib/anthropic-auth.js";
+import { resolveProviderConfig } from "../lib/provider-config.js";
 import {
   DEPLOY_DOMAIN, DEPLOY_REPO,
   HONCHO_SYNC_INTERVAL_MS as HONCHO_SYNC_CONST,
@@ -202,20 +202,18 @@ export async function runGatewayStart(
   }
 
   // ── API Key Check — actionable first-run warning ─────────────────
-  // After .env loading, check whether we can resolve an Anthropic API key.
-  // Without one, chat still works (via host auth) but agent delegation,
-  // auto-titling, identity graph, and other background features are degraded.
-  if (!resolveAnthropicKey()) {
+  // After .env loading, check whether we can resolve any AI provider key.
+  // Without one, agent delegation, auto-titling, and other background features are degraded.
+  const providerCfg = resolveProviderConfig();
+  if (!providerCfg.apiKey) {
     const gmEnvPath = join(GODMODE_ROOT, ".env");
     logger.warn(
-      `[GodMode] No Anthropic API key found. ` +
-      `GodMode requires an Anthropic API key for full functionality (agent delegation, auto-titling, memory extraction). ` +
-      `Set ANTHROPIC_API_KEY in your environment or add it to ${gmEnvPath} — ` +
-      `get a key at https://console.anthropic.com/settings/keys`,
+      `[GodMode] No AI provider key found. ` +
+      `Set ANTHROPIC_API_KEY or VENICE_API_KEY in your environment or add it to ${gmEnvPath}`,
     );
     health.signal("gateway.api-key", false, {
-      warning: "No Anthropic API key found",
-      hint: `Set ANTHROPIC_API_KEY in env or ${gmEnvPath}`,
+      warning: "No AI provider key found",
+      hint: `Set ANTHROPIC_API_KEY or VENICE_API_KEY in env or ${gmEnvPath}`,
     });
   } else {
     health.signal("gateway.api-key", true);

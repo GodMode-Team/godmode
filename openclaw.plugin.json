@@ -34,7 +34,7 @@
   "quickStart": {
     "install": "openclaw plugins install @godmode-team/godmode",
     "alternative": "npx create-godmode",
-    "requiredEnv": ["ANTHROPIC_API_KEY"],
+    "requiredEnv": [],
     "optionalEnv": ["HONCHO_API_KEY", "COMPOSIO_API_KEY", "OBSIDIAN_VAULT_PATH"]
   },
   "configSchema": {

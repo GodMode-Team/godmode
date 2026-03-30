@@ -12,6 +12,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { GODMODE_ROOT, MEMORY_DIR, DATA_DIR, localDateString } from "../data-paths.js";
 import { resolveAnthropicKey } from "../lib/anthropic-auth.js";
+import { resolveProviderConfig } from "../lib/provider-config.js";
 import {
   QUEUE_POLL_MS as QUEUE_POLL_MS_CONST,
   AGENT_TIMEOUT_MS as AGENT_TIMEOUT_MS_CONST,
@@ -116,11 +117,10 @@ export function getQueueProcessor(): QueueProcessor | null {
 
 export function initQueueProcessor(logger: Logger): QueueProcessor {
   instance = new QueueProcessor(logger);
-  if (!resolveAnthropicKeyForAgents()) {
+  if (!resolveProviderConfig().apiKey) {
     logger.warn(
-      "[QueueProcessor] No Anthropic API key found — agent tasks will fail until a key is configured. " +
-      "Set ANTHROPIC_API_KEY in your environment or add it to ~/godmode/.env " +
-      "(get a key at https://console.anthropic.com/settings/keys)",
+      "[QueueProcessor] No AI provider key found — agent tasks will fail until a key is configured. " +
+      "Set ANTHROPIC_API_KEY or VENICE_API_KEY in your environment or add it to ~/godmode/.env",
     );
   }
   return instance;

@@ -17,6 +17,7 @@ import { homedir } from "node:os";
 import { DATA_DIR } from "../data-paths.js";
 import { health, repairLog } from "../lib/health-ledger.js";
 import { getCachedQmdStatus } from "../lib/qmd-status.js";
+import { resolveProviderConfig } from "../lib/provider-config.js";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -505,29 +506,16 @@ async function verifyOAuthToken(credsPath: string): Promise<boolean> {
  */
 function checkApiKeys(logger: Logger): void {
   const id: SubsystemId = "api-keys";
-  const keys: Array<{ name: string; envVars: string[]; required: boolean }> = [
-    { name: "Anthropic", envVars: ["ANTHROPIC_API_KEY"], required: true },
-    // Embeddings are optional — Honcho replaces Mem0, embedding keys no longer required
-    { name: "Embeddings", envVars: ["GEMINI_API_KEY", "GOOGLE_API_KEY", "OPENAI_API_KEY"], required: false },
-  ];
+  const { apiKey } = resolveProviderConfig();
 
-  const missing: string[] = [];
-  for (const key of keys) {
-    const hasKey = key.envVars.some((v) => !!process.env[v]);
-    if (!hasKey && key.required) {
-      missing.push(key.name);
-    }
-  }
-
-  if (missing.length > 0) {
+  if (!apiKey) {
     markDegraded(
       id,
-      `Missing required API key: ${missing.join(", ")}. ` +
-      `Set ANTHROPIC_API_KEY in your environment or add it to ~/godmode/.env — ` +
-      `get a key at https://console.anthropic.com/settings/keys`,
+      `No AI provider key found. ` +
+      `Set ANTHROPIC_API_KEY or VENICE_API_KEY in your environment or add it to ~/godmode/.env`,
     );
   } else {
-    markHealthy(id, "All required API keys present");
+    markHealthy(id, "AI provider key present");
   }
 }
 
