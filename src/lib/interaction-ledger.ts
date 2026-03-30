@@ -13,10 +13,9 @@
 
 import Database from "better-sqlite3";
 import { randomUUID } from "node:crypto";
-import { ANTHROPIC_API_URL, MODEL_HAIKU } from "./constants.js";
+import { callLLM } from "./llm-provider.js";
 import { readFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
-import { homedir } from "node:os";
 import { DATA_DIR, MEMORY_DIR } from "../data-paths.js";
 
 // ── Types ────────────────────────────────────────────────────────────
@@ -349,49 +348,27 @@ export function upsertSignal(raw: RawSignal, sessionKey?: string): string | null
 export async function extractSignals(transcript: string): Promise<RawSignal[]> {
   if (!transcript || transcript.length < 50) return [];
 
-  const apiKey = resolveAnthropicKey();
-  if (!apiKey) return [];
-
   const truncated = transcript.slice(0, 6000);
 
   try {
-    const body = JSON.stringify({
-      model: MODEL_HAIKU,
-      max_tokens: 2048,
+    const text = await callLLM({
+      tier: "fast",
+      maxTokens: 2048,
+      timeoutMs: 10_000,
+      system: "You are a behavioral signal extractor. Always respond with a JSON array starting with [. Do not include any text outside the JSON array.",
       messages: [
         {
           role: "user",
           content: EXTRACTION_PROMPT.replace("{TRANSCRIPT}", truncated),
         },
-        {
-          role: "assistant",
-          content: "[",
-        },
       ],
     });
 
-    const response = await fetchWithTimeout(
-      ANTHROPIC_API_URL,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-api-key": apiKey,
-          "anthropic-version": "2023-06-01",
-        },
-        body,
-      },
-      10_000,
-    );
-
-    if (!response.ok) return [];
-    const json = (await response.json()) as {
-      content?: Array<{ text?: string }>;
-    };
-    const text = json?.content?.[0]?.text;
     if (!text) return [];
 
-    const parsed = JSON.parse("[" + text) as unknown[];
+    // Strip markdown fences if present, then parse
+    const cleaned = text.replace(/```json?\s*|\s*```/g, "").trim();
+    const parsed = JSON.parse(cleaned) as unknown[];
     if (!Array.isArray(parsed)) return [];
 
     // Validate each signal
@@ -897,58 +874,3 @@ function mapCorrectionCategory(cat: string): SignalCategory {
   return map[cat] ?? "communication";
 }
 
-// ── Helpers (matching identity-graph.ts pattern) ─────────────────────
-
-function resolveAnthropicKey(): string | null {
-  const envKey = process.env.ANTHROPIC_API_KEY;
-  if (envKey) return envKey;
-
-  try {
-    const credsPath = join(homedir(), ".claude", ".credentials.json");
-    const creds = JSON.parse(readFileSync(credsPath, "utf-8"));
-    const oauth = creds?.claudeAiOauth;
-    if (oauth?.accessToken) return oauth.accessToken;
-  } catch {
-    // not found
-  }
-
-  try {
-    const oclawEnv = join(homedir(), ".openclaw", ".env");
-    const raw = readFileSync(oclawEnv, "utf-8");
-    for (const line of raw.split("\n")) {
-      if (line.startsWith("ANTHROPIC_API_KEY=")) {
-        const val = line.slice("ANTHROPIC_API_KEY=".length).trim();
-        if (val && !val.startsWith("#")) return val;
-      }
-    }
-  } catch {
-    // not found
-  }
-
-  try {
-    const profilesPath = join(homedir(), ".openclaw", "auth-profiles.json");
-    const raw = JSON.parse(readFileSync(profilesPath, "utf-8")) as {
-      profiles?: Record<string, { token?: string }>;
-    };
-    const profile = raw.profiles?.["anthropic:oauth"];
-    if (profile?.token) return profile.token;
-  } catch {
-    // not found
-  }
-
-  return null;
-}
-
-async function fetchWithTimeout(
-  url: string,
-  init: RequestInit,
-  timeoutMs: number,
-): Promise<Response> {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
-  try {
-    return await fetch(url, { ...init, signal: controller.signal });
-  } finally {
-    clearTimeout(timer);
-  }
-}

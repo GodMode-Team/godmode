@@ -148,24 +148,14 @@ function resolveAnthropicKeyForAgents(): string | null {
   return resolveAnthropicKey();
 }
 
-function buildChildEnv(): Record<string, string> {
-  const parentPath = process.env.PATH ?? "";
-  const childEnv: Record<string, string> = {
-    PATH: process.platform === "darwin" && !parentPath.includes("/opt/homebrew/bin")
-      ? `/opt/homebrew/bin:${parentPath}`
-      : parentPath,
-    HOME: process.env.HOME ?? "",
-    USER: process.env.USER ?? "",
-    SHELL: process.env.SHELL ?? "/bin/sh",
-    LANG: process.env.LANG ?? "en_US.UTF-8",
-    TERM: process.env.TERM ?? "xterm-256color",
-  };
+function buildQueueChildEnv(): Record<string, string> {
+  // Use the shared child-env builder (handles PATH, API key forwarding, Venice env)
+  const { buildChildEnv } = require("../lib/child-env.js") as typeof import("../lib/child-env.js");
+  const childEnv = buildChildEnv();
 
-  // Resolve and forward Anthropic API key — critical for headless/SSH agent spawning.
-  // Claude CLI OAuth may not work in non-interactive contexts (SSH, detached processes).
-  // This ensures agents can authenticate via API key even when OAuth fails.
+  // Also resolve Anthropic key from all sources (OAuth, .env files)
   const anthropicKey = resolveAnthropicKeyForAgents();
-  if (anthropicKey) {
+  if (anthropicKey && !childEnv.ANTHROPIC_API_KEY) {
     childEnv.ANTHROPIC_API_KEY = anthropicKey;
   }
 
@@ -475,9 +465,11 @@ class QueueProcessor {
 
     const prompt = await this.buildPromptForItem(item);
 
-    // Resolve which engine to use: explicit on item > persona > default claude
+    // Resolve which engine to use: explicit on item > persona > provider default
     const persona = resolvePersona(item.type, item.personaHint);
-    const engine = item.engine ?? persona?.engine ?? "claude";
+    const { isVeniceProvider } = await import("../lib/provider-config.js");
+    const defaultEngine = isVeniceProvider() ? "hermes" : "claude";
+    const engine = item.engine ?? persona?.engine ?? defaultEngine;
 
     // Validate engine is available — fall back to claude if not
     const effectiveEngine = isEngineAvailable(engine) ? engine : "claude";
@@ -511,7 +503,7 @@ class QueueProcessor {
       model: item.model,
       maxBudgetUsd: item.type === "coding" ? 10 : 5,
     });
-    const env = buildChildEnv();
+    const env = buildQueueChildEnv();
 
     // Codex needs OPENAI_API_KEY; Gemini needs GEMINI_API_KEY
     if (effectiveEngine === "codex" && process.env.OPENAI_API_KEY) {
@@ -1083,7 +1075,7 @@ class QueueProcessor {
 
     // Diagnostic agents always use claude (meta-reasoning task)
     const { bin: diagBin, args: diagArgs } = buildSpawnArgs("claude", diagPrompt);
-    const env = buildChildEnv();
+    const env = buildQueueChildEnv();
 
     try {
       await fs.mkdir(INBOX_DIR, { recursive: true });

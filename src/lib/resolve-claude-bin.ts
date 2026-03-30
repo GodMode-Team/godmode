@@ -42,6 +42,15 @@ const ENGINE_CONFIG: Record<
     ],
     fallback: "gemini",
   },
+  hermes: {
+    envVar: "HERMES_BIN",
+    searchPaths: [
+      "/opt/homebrew/bin/hermes",
+      "/usr/local/bin/hermes",
+      "/usr/bin/hermes",
+    ],
+    fallback: "hermes",
+  },
 };
 
 // ── Cache ────────────────────────────────────────────────────────
@@ -169,6 +178,16 @@ export function buildSpawnArgs(
       return {
         bin,
         args: ["-p", prompt],
+      };
+    case "hermes":
+      return {
+        bin,
+        args: [
+          "chat", "--quiet",
+          "-q", prompt,
+          "--model", options?.model ?? "deepseek-v3.2",
+          "--yolo",
+        ],
       };
   }
 }

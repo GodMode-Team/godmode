@@ -601,6 +601,48 @@ const godmodePlugin = {
       }
     }) as Parameters<typeof api.registerGatewayMethod>[1]);
 
+    // ── AI Provider config ─────────────────────────────────────────
+    api.registerGatewayMethod("godmode.config.provider", (async ({ respond }: { respond: Function }) => {
+      try {
+        const { resolveProviderConfig } = await import("./src/lib/provider-config.js");
+        const { getAvailableModels } = await import("./src/lib/provider-models.js");
+        const config = resolveProviderConfig();
+        const available = await getAvailableModels(config.provider);
+        respond(true, {
+          provider: config.provider,
+          models: config.models,
+          available,
+        });
+      } catch (err) {
+        respond(true, { provider: "anthropic", models: { fast: "", standard: "", primary: "" }, available: [], error: String(err) });
+      }
+    }) as Parameters<typeof api.registerGatewayMethod>[1]);
+
+    api.registerGatewayMethod("godmode.config.provider.set", (async ({ params, respond }: { params: Record<string, unknown>; respond: Function }) => {
+      try {
+        const { saveProviderConfig, resolveProviderConfig } = await import("./src/lib/provider-config.js");
+        const { syncHermesProviderConfig } = await import("./src/lib/hermes-config.js");
+        const { getAvailableModels } = await import("./src/lib/provider-models.js");
+        const provider = params?.provider as "anthropic" | "venice";
+        if (!provider || (provider !== "anthropic" && provider !== "venice")) {
+          respond(false, { error: "provider must be 'anthropic' or 'venice'" });
+          return;
+        }
+        const models = params?.models as Partial<Record<string, string>> | undefined;
+        saveProviderConfig({ provider, models: models as any });
+        const newConfig = resolveProviderConfig();
+        await syncHermesProviderConfig(newConfig);
+        const available = await getAvailableModels(newConfig.provider);
+        respond(true, {
+          provider: newConfig.provider,
+          models: newConfig.models,
+          available,
+        });
+      } catch (err) {
+        respond(false, { error: String(err) });
+      }
+    }) as Parameters<typeof api.registerGatewayMethod>[1]);
+
     api.registerGatewayMethod("godmode.health", (async ({ respond }: { respond: Function }) => {
       try {
         const { getHealthReport } = await import("./src/services/self-heal.js");

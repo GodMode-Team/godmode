@@ -192,7 +192,7 @@ export function createQueueAddTool(_ctx: ToolContext): AnyAgentTool {
           createdAt: Date.now(),
           sessionId: _ctx.sessionKey ?? undefined,
           personaHint: personaSlug ?? persona?.slug,
-          engine: params.engine ? (String(params.engine) as "claude" | "codex" | "gemini") : undefined,
+          engine: params.engine ? (String(params.engine) as import("../lib/agent-roster.js").AgentEngine) : undefined,
           model,
           scheduledAt,
           handoff,

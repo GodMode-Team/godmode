@@ -53,6 +53,16 @@ export type ConfigProps = {
   searchTavilyConfigured: boolean;
   searchLoading: boolean;
   onSearchProviderChange: (provider: string) => void;
+  // AI Provider
+  aiProvider: string;
+  aiProviderModels: { fast: string; standard: string; primary: string };
+  aiProviderAvailable: Array<{
+    id: string; name: string; privacy: string;
+    reasoning: boolean; contextWindow: number;
+    functionCalling: boolean; optimizedForCode: boolean;
+  }>;
+  aiProviderLoading: boolean;
+  onProviderChange: (provider: string, models?: Record<string, string>) => void;
 };
 
 // SVG Icons for sidebar (Lucide-style)
@@ -281,6 +291,15 @@ const sidebarIcons = {
       <circle cx="12" cy="7" r="4"></circle>
     </svg>
   `,
+  "ai-provider": html`
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <path
+        d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"
+      ></path>
+      <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
+      <line x1="12" y1="22.08" x2="12" y2="12"></line>
+    </svg>
+  `,
   default: html`
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
       <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
@@ -291,6 +310,7 @@ const sidebarIcons = {
 
 // Section definitions
 const SECTIONS: Array<{ key: string; label: string }> = [
+  { key: "ai-provider", label: "AI Provider" },
   { key: "model", label: "AI Model" },
   { key: "env", label: "Environment" },
   { key: "update", label: "Updates" },
@@ -311,7 +331,7 @@ const SECTIONS: Array<{ key: string; label: string }> = [
 ];
 
 // Sections that always appear (not schema-dependent)
-const FIXED_SECTIONS = new Set(["user", "model", "secrets", "webfetch", "search"]);
+const FIXED_SECTIONS = new Set(["user", "model", "secrets", "webfetch", "search", "ai-provider"]);
 
 type SubsectionEntry = {
   key: string;
@@ -434,6 +454,7 @@ const PROVIDER_COLORS: Record<string, string> = {
   openai: "#10b981",
   "openai-codex": "#10b981",
   xai: "#6366f1",
+  venice: "#8b5cf6",
 };
 
 function buildModelOptions(formValue: Record<string, unknown>): ModelOption[] {
@@ -662,6 +683,113 @@ function renderSearchProviders(props: ConfigProps) {
       <p class="config-search-providers__keyhint muted">
         Set API keys via <code>/secrets set EXA_API_KEY</code> or <code>/secrets set TAVILY_API_KEY</code>
       </p>
+    </div>
+  `;
+}
+
+// ── AI Provider Picker Section ─────────────────────────────────────
+
+function renderProviderPicker(props: ConfigProps) {
+  const currentProvider = props.aiProvider || "anthropic";
+  const models = props.aiProviderModels ?? { fast: "", standard: "", primary: "" };
+  const available = props.aiProviderAvailable ?? [];
+  const isLoading = props.aiProviderLoading;
+
+  const providers: Array<{ id: string; label: string; color: string }> = [
+    { id: "anthropic", label: "Anthropic", color: PROVIDER_COLORS.anthropic },
+    { id: "venice", label: "Venice", color: PROVIDER_COLORS.venice },
+  ];
+
+  const tiers: Array<{ key: string; label: string; description: string }> = [
+    { key: "fast", label: "Fast", description: "Quick tasks: auto-title, safety gates, triage" },
+    { key: "standard", label: "Standard", description: "Medium tasks: briefs, summaries, analysis" },
+    { key: "primary", label: "Primary", description: "Main model: chat, complex reasoning, delegation" },
+  ];
+
+  const privacyBadge = (privacy: string) => {
+    if (privacy === "private") {
+      return html`<span class="provider-privacy-badge provider-privacy-badge--private"><span class="provider-privacy-dot"></span>Private</span>`;
+    }
+    return html`<span class="provider-privacy-badge provider-privacy-badge--proxied"><span class="provider-privacy-dot"></span>Proxied</span>`;
+  };
+
+  return html`
+    <div class="provider-picker">
+      <h3 class="provider-picker__title">AI Provider</h3>
+      <p class="provider-picker__hint muted">
+        Choose your AI provider and assign models to each performance tier.
+      </p>
+
+      ${isLoading ? html`<div class="provider-picker__status">Loading provider config...</div>` : nothing}
+
+      <div class="provider-picker__selector">
+        ${providers.map((prov) => {
+          const isActive = prov.id === currentProvider;
+          return html`
+            <button
+              class="provider-card ${isActive ? "provider-card--active" : ""}"
+              style="--provider-accent: ${prov.color}"
+              aria-label="${isActive ? `${prov.label} (active)` : `Switch to ${prov.label}`}"
+              aria-pressed=${isActive ? "true" : "false"}
+              ?disabled=${isLoading}
+              @click=${() => {
+                if (isActive) return;
+                props.onProviderChange(prov.id);
+              }}
+            >
+              <div class="provider-card__body">
+                <span class="provider-card__dot" style="background: ${prov.color}"></span>
+                <span class="provider-card__name">${prov.label}</span>
+              </div>
+              ${isActive ? html`<span class="provider-card__check">Active</span>` : nothing}
+            </button>
+          `;
+        })}
+      </div>
+
+      ${available.length > 0 ? html`
+        <div class="provider-picker__tiers">
+          <h4 class="provider-picker__tiers-title">Model Assignments</h4>
+          ${tiers.map((tier) => {
+            const currentModel = models[tier.key as keyof typeof models] ?? "";
+            return html`
+              <div class="provider-tier">
+                <div class="provider-tier__header">
+                  <label class="provider-tier__label">${tier.label}</label>
+                  <span class="provider-tier__desc muted">${tier.description}</span>
+                </div>
+                <select
+                  class="config-select provider-tier__select"
+                  aria-label="${tier.label} model"
+                  .value=${currentModel}
+                  ?disabled=${isLoading}
+                  @change=${(e: Event) => {
+                    const newModelId = (e.target as HTMLSelectElement).value;
+                    props.onProviderChange(currentProvider, {
+                      ...models,
+                      [tier.key]: newModelId,
+                    });
+                  }}
+                >
+                  ${available.map((m) => html`
+                    <option value=${m.id} ?selected=${m.id === currentModel}>
+                      ${m.name}${m.reasoning ? " (reasoning)" : ""}${m.contextWindow > 0 ? ` - ${Math.round(m.contextWindow / 1000)}k ctx` : ""}
+                    </option>
+                  `)}
+                </select>
+                ${(() => {
+                  const selectedModel = available.find((m) => m.id === currentModel);
+                  return selectedModel ? privacyBadge(selectedModel.privacy) : nothing;
+                })()}
+              </div>
+            `;
+          })}
+        </div>
+      ` : !isLoading ? html`
+        <div class="provider-picker__empty muted">
+          No models available. Check your API key configuration.
+        </div>
+      ` : nothing}
     </div>
   `;
 }
@@ -948,7 +1076,9 @@ export function renderConfig(props: ConfigProps) {
         <!-- Form content -->
         <div class="config-content">
           ${
-            props.activeSection === "model"
+            props.activeSection === "ai-provider"
+              ? renderProviderPicker(props)
+              : props.activeSection === "model"
               ? renderModelPicker(props)
               : props.activeSection === "user"
               ? renderUserSettings({

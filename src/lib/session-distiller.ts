@@ -19,14 +19,13 @@
 import { existsSync, readdirSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import {
-  ANTHROPIC_API_URL, MODEL_HAIKU,
   SESSION_IDLE_THRESHOLD_MS, SESSION_DISTILL_MAX_PER_TICK,
   SESSION_DISTILL_MIN_MESSAGES, SESSION_DISTILL_MAX_CHARS,
   SESSION_DISTILL_MAX_STATE,
 } from "./constants.js";
 import { join } from "node:path";
 import { DATA_DIR, MEMORY_DIR } from "../data-paths.js";
-import { resolveAnthropicKey, fetchWithTimeout } from "./anthropic-auth.js";
+import { callLLM } from "./llm-provider.js";
 import { health } from "./health-ledger.js";
 import { getOwnerName } from "./ally-identity.js";
 
@@ -116,37 +115,18 @@ Conversation:
 `;
 
 async function extractFromTranscript(transcript: string): Promise<DistillerExtraction | null> {
-  const apiKey = resolveAnthropicKey();
-  if (!apiKey) return null;
-
   const truncated = transcript.slice(0, MAX_TRANSCRIPT_CHARS);
 
   try {
-    const body = JSON.stringify({
-      model: MODEL_HAIKU,
-      max_tokens: 1024,
+    const content = await callLLM({
+      tier: "fast",
+      maxTokens: 1024,
+      timeoutMs: 15_000,
       messages: [
         { role: "user", content: EXTRACTION_PROMPT + truncated },
       ],
     });
 
-    const response = await fetchWithTimeout(
-      ANTHROPIC_API_URL,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-api-key": apiKey,
-          "anthropic-version": "2023-06-01",
-        },
-        body,
-      },
-      15_000,
-    );
-
-    if (!response.ok) return null;
-    const json = (await response.json()) as { content?: Array<{ text?: string }> };
-    const content = json?.content?.[0]?.text;
     if (!content) return null;
 
     // Parse JSON — handle markdown code fences

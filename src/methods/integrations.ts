@@ -20,7 +20,8 @@ import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { exec } from "node:child_process";
 import { join } from "node:path";
 import { homedir } from "node:os";
-import { MODEL_SONNET, PAPERCLIP_URL } from "../lib/constants.js";
+import { PAPERCLIP_URL } from "../lib/constants.js";
+import { getModelForTier } from "../lib/provider-config.js";
 
 type GatewayRequestHandlers = Record<string, GatewayRequestHandler>;
 
@@ -623,7 +624,7 @@ const paperclipSetup: GatewayRequestHandler = async ({ params, respond }) => {
               adapterType: "claude_local",
               adapterConfig: {
                 command: "claude",
-                model: MODEL_SONNET,
+                model: getModelForTier("standard"),
                 cwd: homedir(),
                 maxTurnsPerRun: 50,
                 timeoutSec: 1800,

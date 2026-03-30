@@ -46,7 +46,7 @@ Your machine. Your data. Your rules. Nothing leaves your stack unless you say so
 - **Node.js 22+** (check with `node -v`, use [nvm](https://github.com/nvm-sh/nvm) to install)
 - **pnpm** (`npm install -g pnpm`)
 - **OpenClaw** `>=2026.2.0` ([install guide](https://github.com/nichochar/openclaw))
-- **Anthropic API key** ([get one here](https://console.anthropic.com))
+- **AI Provider API key** — either [Anthropic](https://console.anthropic.com) or [Venice AI](https://venice.ai)
 
 ### Option A: One-Line Install (recommended)
 
@@ -118,17 +118,20 @@ pnpm dev:ui
 
 ## Configuration
 
-The only **required** environment variable is `ANTHROPIC_API_KEY`. Everything else degrades gracefully:
+The only **required** environment variable is an AI provider key — either `ANTHROPIC_API_KEY` or `VENICE_API_KEY`. Everything else degrades gracefully:
 
 | Variable | Required | What it enables |
 |----------|----------|-----------------|
-| `ANTHROPIC_API_KEY` | **Yes** | Agent spawning, auto-titling, identity extraction |
+| `ANTHROPIC_API_KEY` | **Yes*** | Agent spawning, auto-titling, identity extraction |
+| `VENICE_API_KEY` | **Yes*** | Alternative AI provider — private inference, 58+ open models |
 | `HONCHO_API_KEY` | Recommended | Persistent conversational memory |
 | `OBSIDIAN_VAULT_PATH` | No | Second Brain vault sync (fallback: `~/godmode/memory/`) |
 | `GOG_CALENDAR_ACCOUNT` | No | Google Calendar in daily brief |
 | `XAI_API_KEY` | No | X/Twitter intelligence |
 | `COMPOSIO_API_KEY` | No | Third-party tool auth (Gmail, Slack, Notion) |
 | `PAPERCLIP_URL` | No | Multi-agent orchestration |
+
+*\*One of `ANTHROPIC_API_KEY` or `VENICE_API_KEY` is required. Venice is recommended for private, sovereign inference.*
 
 See [.env.example](.env.example) for the full list.
 

@@ -1618,6 +1618,80 @@ export async function setSearchProvider(host: GatewayHost, defaultProvider: stri
   }
 }
 
+export async function loadProviderConfig(host: GatewayHost) {
+  if (!host.client) return;
+  const app = host as unknown as {
+    aiProvider: string;
+    aiProviderModels: { fast: string; standard: string; primary: string };
+    aiProviderAvailable: Array<{
+      id: string; name: string; privacy: string;
+      reasoning: boolean; contextWindow: number;
+      functionCalling: boolean; optimizedForCode: boolean;
+    }>;
+    aiProviderLoading: boolean;
+  };
+  app.aiProviderLoading = true;
+  try {
+    const res = await host.client.request<{
+      provider: string;
+      models: { fast: string; standard: string; primary: string };
+      available: Array<{
+        id: string; name: string; privacy: string;
+        reasoning: boolean; contextWindow: number;
+        functionCalling: boolean; optimizedForCode: boolean;
+      }>;
+    }>("godmode.config.provider", {});
+    app.aiProvider = res?.provider ?? "anthropic";
+    app.aiProviderModels = res?.models ?? { fast: "", standard: "", primary: "" };
+    app.aiProviderAvailable = res?.available ?? [];
+  } catch {
+    app.aiProvider = "anthropic";
+    app.aiProviderModels = { fast: "", standard: "", primary: "" };
+    app.aiProviderAvailable = [];
+  } finally {
+    app.aiProviderLoading = false;
+  }
+}
+
+export async function setProviderConfig(
+  host: GatewayHost,
+  provider: string,
+  models?: Record<string, string>,
+) {
+  if (!host.client) return;
+  const app = host as unknown as {
+    aiProvider: string;
+    aiProviderModels: { fast: string; standard: string; primary: string };
+    aiProviderAvailable: Array<{
+      id: string; name: string; privacy: string;
+      reasoning: boolean; contextWindow: number;
+      functionCalling: boolean; optimizedForCode: boolean;
+    }>;
+    aiProviderLoading: boolean;
+  };
+  app.aiProviderLoading = true;
+  try {
+    const params: Record<string, unknown> = { provider };
+    if (models) params.models = models;
+    const res = await host.client.request<{
+      provider: string;
+      models: { fast: string; standard: string; primary: string };
+      available: Array<{
+        id: string; name: string; privacy: string;
+        reasoning: boolean; contextWindow: number;
+        functionCalling: boolean; optimizedForCode: boolean;
+      }>;
+    }>("godmode.config.provider.set", params);
+    app.aiProvider = res?.provider ?? provider;
+    app.aiProviderModels = res?.models ?? app.aiProviderModels;
+    app.aiProviderAvailable = res?.available ?? app.aiProviderAvailable;
+  } catch (err) {
+    console.error("[provider-set]", err);
+  } finally {
+    app.aiProviderLoading = false;
+  }
+}
+
 export function applySnapshot(host: GatewayHost, hello: GatewayHelloOk) {
   const snapshot = hello.snapshot as
     | {

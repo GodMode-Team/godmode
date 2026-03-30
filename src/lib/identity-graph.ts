@@ -13,10 +13,9 @@
 
 import Database from "better-sqlite3";
 import { join } from "node:path";
-import { ANTHROPIC_API_URL, MODEL_SONNET_SHORT } from "./constants.js";
 import { reportConnected, reportDegraded } from "./service-health.js";
 import { DATA_DIR } from "../data-paths.js";
-import { resolveAnthropicKey, fetchWithTimeout } from "./anthropic-auth.js";
+import { callLLM } from "./llm-provider.js";
 import { getOwnerName } from "./ally-identity.js";
 
 // ── Singleton ────────────────────────────────────────────────────────
@@ -136,15 +135,13 @@ interface ExtractedData {
 export async function extractAndStore(text: string): Promise<void> {
   if (!db || !text || text.length < 30) return;
 
-  const apiKey = resolveAnthropicKey();
-  if (!apiKey) return;
-
   const truncated = text.slice(0, 2000);
 
   try {
-    const body = JSON.stringify({
-      model: MODEL_SONNET_SHORT,
-      max_tokens: 1024,
+    const raw = await callLLM({
+      tier: "standard",
+      maxTokens: 1024,
+      timeoutMs: 8_000,
       messages: [
         {
           role: "user",
@@ -169,27 +166,10 @@ ${truncated}`,
       ],
     });
 
-    const response = await fetchWithTimeout(
-      ANTHROPIC_API_URL,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-api-key": apiKey,
-          "anthropic-version": "2023-06-01",
-        },
-        body,
-      },
-      8_000,
-    );
-
-    if (!response.ok) return;
-    const json = (await response.json()) as { content?: Array<{ text?: string }> };
-    const content = json?.content?.[0]?.text;
-    if (!content) return;
+    if (!raw) return;
 
     // Parse JSON — handle markdown code fences
-    const cleaned = content.replace(/```json?\s*|\s*```/g, "").trim();
+    const cleaned = raw.replace(/```json?\s*|\s*```/g, "").trim();
     const data: ExtractedData = JSON.parse(cleaned);
 
     // Store extracted entities and relationships
@@ -477,5 +457,3 @@ export async function seedFromVault(): Promise<void> {
   }
 }
 
-// ── Helpers ──────────────────────────────────────────────────────────
-// resolveAnthropicKey and fetchWithTimeout imported from ./anthropic-auth.js

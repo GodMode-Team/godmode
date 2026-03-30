@@ -16,7 +16,8 @@ import { join, basename } from "node:path";
 import { existsSync, readdirSync } from "node:fs";
 import { MEMORY_DIR } from "../data-paths.js";
 import { getVaultPath, VAULT_FOLDERS } from "./vault-paths.js";
-import { MODEL_HAIKU, MAX_RAW_FEEDBACK_ITEMS } from "./constants.js";
+import { MAX_RAW_FEEDBACK_ITEMS } from "./constants.js";
+import { callLLM } from "./llm-provider.js";
 
 const MAX_RAW_ITEMS = MAX_RAW_FEEDBACK_ITEMS;
 const FEEDBACK_HEADING = "## User Feedback";
@@ -200,8 +201,6 @@ function replaceFeedbackSection(content: string, consolidated: string[]): string
 
 async function consolidateFeedback(items: string[]): Promise<string[] | null> {
   try {
-    const { spawn } = await import("node:child_process");
-
     const prompt = [
       "Consolidate these user feedback items for an AI agent into 3-4 concise, actionable directives.",
       "Merge duplicates, keep the most specific guidance, drop anything vague.",
@@ -211,24 +210,17 @@ async function consolidateFeedback(items: string[]): Promise<string[] | null> {
       ...items.map((f) => `- ${f}`),
     ].join("\n");
 
-    const result = await new Promise<string>((resolve, reject) => {
-      const proc = spawn("claude", ["-p", "--model", MODEL_HAIKU], {
-        stdio: ["pipe", "pipe", "pipe"],
-        timeout: 30_000,
-      });
-
-      let stdout = "";
-      let stderr = "";
-      proc.stdout.on("data", (d: Buffer) => { stdout += d.toString(); });
-      proc.stderr.on("data", (d: Buffer) => { stderr += d.toString(); });
-      proc.on("close", (code: number | null) => {
-        if (code === 0 && stdout.trim()) resolve(stdout.trim());
-        else reject(new Error(stderr || `exit ${code}`));
-      });
-      proc.on("error", reject);
-      proc.stdin.write(prompt);
-      proc.stdin.end();
+    const result = await callLLM({
+      tier: "fast",
+      messages: [{ role: "user", content: prompt }],
+      maxTokens: 1024,
+      timeoutMs: 30_000,
     });
+
+    if (!result) {
+      console.error("[TrustRefinement] Consolidation failed, keeping raw items: LLM returned null");
+      return null;
+    }
 
     // Parse bullet points from response
     const consolidated = result

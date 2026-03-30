@@ -3,9 +3,9 @@ import path from "node:path";
 import { getWorkspaceSyncService } from "../lib/workspace-sync-service.js";
 import { readWorkspaceConfig, type WorkspaceConfigEntry } from "../lib/workspaces-config.js";
 import {
-  ANTHROPIC_API_URL, MODEL_HAIKU,
   CURATION_SCHEDULE_MS, CURATION_CHECK_INTERVAL_MS, CURATION_MAX_TOKENS as CURATION_MAX_TOKENS_CONST,
 } from "../lib/constants.js";
+import { callLLM } from "../lib/llm-provider.js";
 
 import type { Logger } from "../types/plugin-api.js";
 
@@ -242,7 +242,6 @@ type CurationLLMResult = {
   sopCandidates?: string;
 };
 
-const CURATION_MODEL = MODEL_HAIKU;
 const CURATION_MAX_TOKENS = CURATION_MAX_TOKENS_CONST;
 
 function buildCurationPrompt(params: {
@@ -308,49 +307,26 @@ async function runCurationLLM(params: {
   const { workspace, memoryFiles, currentMemory, currentSops, log } = params;
 
   // Try LLM-based curation first
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (apiKey) {
-    try {
-      const prompt = buildCurationPrompt({ memoryFiles, currentMemory, currentSops });
-      const response = await fetch(ANTHROPIC_API_URL, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-api-key": apiKey,
-          "anthropic-version": "2023-06-01",
-        },
-        body: JSON.stringify({
-          model: CURATION_MODEL,
-          max_tokens: CURATION_MAX_TOKENS,
-          messages: [{ role: "user", content: prompt }],
-        }),
-        signal: AbortSignal.timeout(30_000),
-      });
+  try {
+    const prompt = buildCurationPrompt({ memoryFiles, currentMemory, currentSops });
+    const text = await callLLM({
+      tier: "fast",
+      maxTokens: CURATION_MAX_TOKENS,
+      timeoutMs: 30_000,
+      messages: [{ role: "user", content: prompt }],
+    });
 
-      if (response.ok) {
-        const body = (await response.json()) as {
-          content: Array<{ type: string; text?: string }>;
-        };
-        const text = body.content
-          ?.filter((b) => b.type === "text")
-          .map((b) => b.text)
-          .join("");
-
-        if (text) {
-          const result = parseCurationResponse(text);
-          if (result.updatedMemory) {
-            log.info(`[Curation] LLM curation completed for ${workspace.id}`);
-            return result;
-          }
-        }
-      } else {
-        log.warn(`[Curation] LLM API returned ${response.status} — falling back to merge`);
+    if (text) {
+      const result = parseCurationResponse(text);
+      if (result.updatedMemory) {
+        log.info(`[Curation] LLM curation completed for ${workspace.id}`);
+        return result;
       }
-    } catch (err) {
-      log.warn(`[Curation] LLM call failed: ${err instanceof Error ? err.message : String(err)} — falling back to merge`);
+    } else {
+      log.warn("[Curation] LLM returned no text — falling back to merge");
     }
-  } else {
-    log.info("[Curation] No ANTHROPIC_API_KEY — using merge-based curation");
+  } catch (err) {
+    log.warn(`[Curation] LLM call failed: ${err instanceof Error ? err.message : String(err)} — falling back to merge`);
   }
 
   // Fallback: simple merge-based curation

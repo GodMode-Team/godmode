@@ -526,6 +526,51 @@ export async function registerGodMode(
   }) as StandaloneRequestHandler);
   methodCount++;
 
+  // ── AI Provider config ─────────────────────────────────────────
+  adapter.registerMethod("godmode.config.provider", (async ({ respond }) => {
+    try {
+      const { resolveProviderConfig } = await import("../lib/provider-config.js");
+      const { getAvailableModels } = await import("../lib/provider-models.js");
+      const config = resolveProviderConfig();
+      const available = await getAvailableModels(config.provider);
+      respond(true, {
+        provider: config.provider,
+        models: config.models,
+        available,
+      });
+    } catch (err) {
+      respond(true, { provider: "anthropic", models: { fast: "", standard: "", primary: "" }, available: [], error: String(err) });
+    }
+  }) as StandaloneRequestHandler);
+  methodCount++;
+
+  adapter.registerMethod("godmode.config.provider.set", (async ({ params, respond }) => {
+    try {
+      const { saveProviderConfig, resolveProviderConfig } = await import("../lib/provider-config.js");
+      const { syncHermesProviderConfig } = await import("../lib/hermes-config.js");
+      const { getAvailableModels } = await import("../lib/provider-models.js");
+      const p = params as Record<string, unknown>;
+      const provider = p?.provider as "anthropic" | "venice";
+      if (!provider || (provider !== "anthropic" && provider !== "venice")) {
+        respond(false, { error: "provider must be 'anthropic' or 'venice'" });
+        return;
+      }
+      const models = p?.models as Partial<Record<string, string>> | undefined;
+      saveProviderConfig({ provider, models: models as any });
+      const newConfig = resolveProviderConfig();
+      await syncHermesProviderConfig(newConfig);
+      const available = await getAvailableModels(newConfig.provider);
+      respond(true, {
+        provider: newConfig.provider,
+        models: newConfig.models,
+        available,
+      });
+    } catch (err) {
+      respond(false, { error: String(err) });
+    }
+  }) as StandaloneRequestHandler);
+  methodCount++;
+
   logger.info(`[GodMode] Registered ${methodCount} gateway methods (standalone v${pluginVersion})`);
 
   // ── 3. Register all tools ─────────────────────────────────────

@@ -31,7 +31,7 @@ import {
 import { getUserTimezone, getUserLocation, getTempUnit } from "../lib/user-config.js";
 import { loadLatestReflection } from "../lib/evening-reflection.js";
 import { resolveAnthropicKey } from "../lib/anthropic-auth.js";
-import { ANTHROPIC_API_URL, MODEL_SONNET, MODEL_HAIKU } from "../lib/constants.js";
+import { callLLM } from "../lib/llm-provider.js";
 
 type GatewayRequestHandlers = Record<string, GatewayRequestHandler>;
 
@@ -73,129 +73,20 @@ function resolveAnthropicAuth(): string | null {
   return resolveAnthropicKey();
 }
 
-/** Call Claude via `claude` CLI (OAuth/Claude Max). Always uses Max subscription. */
+/** Call LLM via the provider-agnostic callLLM layer. */
 async function callClaude(
   systemPrompt: string,
   userPrompt: string,
   opts?: { model?: string; maxTokens?: number },
 ): Promise<string | null> {
-  // Always use the CLI which routes through OAuth/Max subscription.
-  // Never call the direct API — that bills to the API account.
-  return callClaudeCLI(systemPrompt, userPrompt, opts);
-}
-
-/** Direct Anthropic Messages API call (requires API key, not OAuth). */
-async function callClaudeDirectAPI(
-  apiKey: string,
-  systemPrompt: string,
-  userPrompt: string,
-  opts?: { model?: string; maxTokens?: number },
-): Promise<string | null> {
-  const model = opts?.model ?? MODEL_SONNET;
-  const maxTokens = opts?.maxTokens ?? 8192;
-
-  try {
-    const resp = await fetch(ANTHROPIC_API_URL, {
-      method: "POST",
-      headers: {
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01",
-        "content-type": "application/json",
-      },
-      body: JSON.stringify({
-        model,
-        max_tokens: maxTokens,
-        system: systemPrompt,
-        messages: [{ role: "user", content: userPrompt }],
-      }),
-      signal: AbortSignal.timeout(120_000),
-    });
-
-    if (!resp.ok) {
-      const body = await resp.text().catch(() => "");
-      console.error(`[BriefGenerator] Claude API ${resp.status}: ${body.slice(0, 300)}`);
-      return null;
-    }
-
-    const data = (await resp.json()) as {
-      content?: Array<{ type: string; text?: string }>;
-      error?: { message?: string };
-    };
-
-    if (data.error?.message) {
-      console.error(`[BriefGenerator] Claude API error: ${data.error.message}`);
-      return null;
-    }
-
-    return data.content?.find((c) => c.type === "text")?.text ?? null;
-  } catch (err) {
-    console.error(`[BriefGenerator] Claude API call failed: ${err instanceof Error ? err.message : "unknown"}`);
-    return null;
-  }
-}
-
-/** Call Claude via the `claude` CLI in print mode. Handles OAuth/Max auth natively. */
-async function callClaudeCLI(
-  systemPrompt: string,
-  userPrompt: string,
-  opts?: { model?: string; maxTokens?: number },
-): Promise<string | null> {
-  const { spawn } = await import("node:child_process");
-
-  // Map full model IDs to CLI-friendly aliases
-  const modelMap: Record<string, string> = {
-    [MODEL_SONNET]: "sonnet",
-    "claude-opus-4-6": "opus",
-    [MODEL_HAIKU]: "haiku",
-  };
-  const rawModel = opts?.model ?? MODEL_SONNET;
-  const model = modelMap[rawModel] ?? rawModel;
-
-  try {
-    console.log(`[BriefGenerator] Using claude CLI (model: ${model})...`);
-
-    // Use spawn + stdin to avoid ARG_MAX limits with large prompts
-    const combined = `<system>${systemPrompt}</system>\n\n${userPrompt}`;
-
-    return new Promise<string | null>((resolve) => {
-      const child = spawn("claude", ["-p", "--model", model], {
-        stdio: ["pipe", "pipe", "pipe"],
-        timeout: 180_000,
-        env: { ...process.env, PATH: `/opt/homebrew/bin:/usr/local/bin:${process.env.PATH}` },
-      });
-
-      const chunks: Buffer[] = [];
-      const errChunks: Buffer[] = [];
-
-      child.stdout.on("data", (d: Buffer) => chunks.push(d));
-      child.stderr.on("data", (d: Buffer) => errChunks.push(d));
-
-      child.on("close", (code) => {
-        const out = Buffer.concat(chunks).toString("utf-8").trim();
-        const err = Buffer.concat(errChunks).toString("utf-8").trim();
-
-        if (err) console.warn(`[BriefGenerator] claude CLI stderr: ${err.slice(0, 200)}`);
-
-        if (code !== 0 || !out) {
-          console.error(`[BriefGenerator] claude CLI exit ${code}, output length=${out.length}`);
-          resolve(null);
-          return;
-        }
-        resolve(out);
-      });
-
-      child.on("error", (e) => {
-        console.error(`[BriefGenerator] claude CLI spawn error: ${e.message}`);
-        resolve(null);
-      });
-
-      child.stdin.write(combined);
-      child.stdin.end();
-    });
-  } catch (err) {
-    console.error(`[BriefGenerator] claude CLI failed: ${err instanceof Error ? err.message.slice(0, 300) : "unknown"}`);
-    return null;
-  }
+  console.log("[BriefGenerator] Calling LLM (tier: standard) to render brief...");
+  return callLLM({
+    tier: "standard",
+    system: systemPrompt,
+    messages: [{ role: "user", content: userPrompt }],
+    maxTokens: opts?.maxTokens ?? 8192,
+    timeoutMs: 180_000,
+  });
 }
 
 // ── Date helpers ─────────────────────────────────────────────────────────────
@@ -1535,10 +1426,9 @@ ${cronFailures && cronFailures.cronErrors.length > 0 ? "\nIMPORTANT: Surface the
   // Trust feedback is now baked directly into persona/skill markdown files
   // by trust-refinement.ts — no runtime injection needed here.
 
-  // ── Call Claude to render the brief ─────────────────────────────
-  console.log("[BriefGenerator] Calling Claude Sonnet 4.6 to render brief...");
+  // ── Call LLM to render the brief ────────────────────────────────
+  console.log("[BriefGenerator] Calling LLM to render brief...");
   let briefContent = await callClaude(BRIEF_SYSTEM_PROMPT, briefUserPrompt, {
-    model: MODEL_SONNET,
     maxTokens: 8192,
   });
 

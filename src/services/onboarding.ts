@@ -17,6 +17,7 @@ import {
   ONBOARDING_MAX_FIELD_LENGTH, ONBOARDING_MAX_KEY_PEOPLE,
   ONBOARDING_MAX_HARD_RULES, MODEL_ADAPTER_DEFAULT,
 } from "../lib/constants.js";
+import { resolveProviderConfig } from "../lib/provider-config.js";
 import {
   generateAgentsMd,
   generateUserMd,
@@ -382,16 +383,31 @@ export function buildConfigPatch(answers: OnboardingAnswers): Record<string, unk
           },
         },
         thinkingDefault: "low",
-        models: {
-          [MODEL_ADAPTER_DEFAULT]: {
-            alias: "sonnet",
-            params: { cacheRetention: "long" },
-          },
-          "anthropic/claude-opus-4-6": {
-            alias: "opus",
-            params: { cacheRetention: "long" },
-          },
-        },
+        models: (() => {
+          const cfg = resolveProviderConfig();
+          if (cfg.provider === "venice") {
+            return {
+              [`venice/${cfg.models.primary}`]: {
+                alias: "primary",
+                params: { cacheRetention: "long" },
+              },
+              [`venice/${cfg.models.standard}`]: {
+                alias: "standard",
+                params: { cacheRetention: "long" },
+              },
+            };
+          }
+          return {
+            [MODEL_ADAPTER_DEFAULT]: {
+              alias: "sonnet",
+              params: { cacheRetention: "long" },
+            },
+            "anthropic/claude-opus-4-6": {
+              alias: "opus",
+              params: { cacheRetention: "long" },
+            },
+          };
+        })(),
       },
     },
     memory: {

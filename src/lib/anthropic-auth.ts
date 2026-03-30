@@ -13,7 +13,8 @@
 
 import { readFileSync } from "node:fs";
 import { homedir } from "node:os";
-import { ANTHROPIC_API_URL, MODEL_HAIKU } from "./constants.js";
+// ANTHROPIC_API_URL and MODEL_HAIKU were used by the now-removed callHaiku().
+// resolveAnthropicKey() and fetchWithTimeout() remain — used by llm-provider.ts and others.
 import { join } from "node:path";
 
 /**
@@ -70,46 +71,6 @@ export function resolveAnthropicKey(): string | null {
   } catch { /* not found */ }
 
   return null;
-}
-
-/**
- * Call the Anthropic Messages API and return the first text content block.
- * Handles auth resolution, prefill, and timeout. Returns null on failure.
- */
-export async function callHaiku(opts: {
-  messages: Array<{ role: string; content: string }>;
-  model?: string;
-  maxTokens?: number;
-  system?: string;
-  timeoutMs?: number;
-}): Promise<string | null> {
-  const apiKey = resolveAnthropicKey();
-  if (!apiKey) return null;
-
-  const body: Record<string, unknown> = {
-    model: opts.model ?? MODEL_HAIKU,
-    max_tokens: opts.maxTokens ?? 1024,
-    messages: opts.messages,
-  };
-  if (opts.system) body.system = opts.system;
-
-  const response = await fetchWithTimeout(
-    ANTHROPIC_API_URL,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01",
-      },
-      body: JSON.stringify(body),
-    },
-    opts.timeoutMs ?? 15_000,
-  );
-
-  if (!response.ok) return null;
-  const json = (await response.json()) as { content?: Array<{ type: string; text?: string }> };
-  return json?.content?.[0]?.type === "text" ? (json.content[0].text ?? null) : null;
 }
 
 /**

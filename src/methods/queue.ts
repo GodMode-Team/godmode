@@ -14,6 +14,7 @@ import {
 import { updateTasks } from "./tasks.js";
 import type { GatewayRequestHandler } from "../types/plugin-api.js";
 import type { LessonCategory } from "../lib/agent-lessons.js";
+import type { AgentEngine } from "../lib/agent-roster.js";
 
 const execFile = promisify(execFileCb);
 
@@ -101,7 +102,7 @@ const addItem: GatewayRequestHandler = async ({ params, respond }) => {
     priority?: "high" | "normal" | "low";
     sourceTaskId?: string;
     personaHint?: string;
-    engine?: "claude" | "codex" | "gemini";
+    engine?: AgentEngine;
     sessionId?: string;
   };
   if (!title) {

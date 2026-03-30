@@ -97,6 +97,8 @@ import {
   setWebFetchProvider,
   loadSearchConfig,
   setSearchProvider,
+  loadProviderConfig,
+  setProviderConfig,
 } from "../app-gateway.js";
 import { scheduleLogsScroll } from "../app-scroll.js";
 import {
@@ -304,6 +306,12 @@ export class GmSettings extends LitElement {
           searchTavilyConfigured: s.searchTavilyConfigured ?? false,
           searchLoading: s.searchLoading ?? false,
           onSearchProviderChange: (provider: string) => setSearchProvider(s, provider),
+          aiProvider: s.aiProvider ?? "anthropic",
+          aiProviderModels: s.aiProviderModels ?? { fast: "", standard: "", primary: "" },
+          aiProviderAvailable: s.aiProviderAvailable ?? [],
+          aiProviderLoading: s.aiProviderLoading ?? false,
+          onProviderChange: (provider: string, models?: Record<string, string>) =>
+            setProviderConfig(s, provider, models),
         });
 
       case "channels":
@@ -717,6 +725,7 @@ export class GmSettings extends LitElement {
             loadSecrets(s),
             loadWebFetchConfig(s),
             loadSearchConfig(s),
+            loadProviderConfig(s),
           ]);
           break;
         case "channels":

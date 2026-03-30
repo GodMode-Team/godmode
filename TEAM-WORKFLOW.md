@@ -21,11 +21,11 @@ That's the whole workflow. Claude does the git stuff. You just describe problems
 - **Claude Code** installed and working (`claude` command in terminal)
 - **GitHub CLI** installed (`gh` — run `gh auth status` to check)
 - **Node.js 22+** and **pnpm** installed
-- Access to the `GodMode-Team/godmode-plugin` repo (ask the repo admin if you get a 404)
+- Access to the `GodMode-Team/godmode` repo (ask the repo admin if you get a 404)
 
 ### Clone and build
 ```bash
-git clone https://github.com/GodMode-Team/godmode-plugin.git
+git clone https://github.com/GodMode-Team/godmode.git
 cd godmode-plugin
 pnpm install
 pnpm build
@@ -34,7 +34,7 @@ pnpm build
 ### Verify your setup
 ```bash
 gh auth status          # should show your GitHub username
-gh repo view GodMode-Team/godmode-plugin --json name   # should return the repo name
+gh repo view GodMode-Team/godmode --json name   # should return the repo name
 pnpm typecheck          # should pass with no errors
 ```
 

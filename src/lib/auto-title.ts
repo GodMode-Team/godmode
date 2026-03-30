@@ -14,7 +14,8 @@ const TITLED_SESSIONS_MAX = 5_000;
 /** Max llm_output fires to wait for assistant text before giving up and using string derivation */
 export const MAX_TITLE_ATTEMPTS = 8;
 /** Expire pending entries after 5 minutes (handles sessions that never get a response) */
-import { PENDING_TITLE_TTL_MS, ANTHROPIC_API_URL, MODEL_HAIKU } from "./constants.js";
+import { PENDING_TITLE_TTL_MS } from "./constants.js";
+import { callLLM } from "./llm-provider.js";
 
 export const PENDING_TTL_MS = PENDING_TITLE_TTL_MS;
 
@@ -51,13 +52,6 @@ export async function generateSessionTitle(
   assistantResponse?: string,
 ): Promise<string | null> {
   try {
-    const { resolveAnthropicAuth } = await import("../methods/brief-generator.js");
-    const apiKey = resolveAnthropicAuth();
-    if (!apiKey) {
-      console.warn("[GodMode][AutoTitle] No Anthropic API key found — session titles will use fallback text. Set ANTHROPIC_API_KEY in your environment or ~/godmode/.env");
-      return null;
-    }
-
     // Strip system content from user message before sending to title generator
     const cleanMessage = userMessage
       .replace(/<system-context>[\s\S]*?<\/system-context>/g, "")
@@ -78,55 +72,36 @@ export async function generateSessionTitle(
     const userSnippet = cleanMessage.slice(0, 300);
     const assistantSnippet = cleanResponse.slice(0, 300);
 
-    const resp = await fetch(ANTHROPIC_API_URL, {
-      method: "POST",
-      headers: {
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01",
-        "content-type": "application/json",
-      },
-      body: JSON.stringify({
-        model: MODEL_HAIKU,
-        max_tokens: 20,
-        system: [
-          "You are a conversation title generator. Given a user's first message, output a short label for what this chat is about.",
-          "Rules:",
-          "- 2-5 words max",
-          "- Capture the SUBJECT the user is talking about, not a meta-description of the message type",
-          "- Use the user's own words/nouns when possible",
-          "- No quotes, no punctuation, no prefixes like 'Topic:' or 'Re:'",
-          "- Title case",
-          "- Output ONLY the label, nothing else",
-          "",
-          "Examples:",
-          "User: 'hows our memory working?' → Memory System Status",
-          "User: 'can you research community platforms for my project?' → Community Platform Research",
-          "User: 'what tips could I give Scott about his ads?' → Scott Ad Strategy Tips",
-          "User: 'build me a front intelligence dashboard' → Front Email Intelligence",
-          "User: 'pink elephants running wild in the fields' → Pink Elephants",
-          "User: 'write me an entrepreneur joke' → Entrepreneur Joke",
-          "User: 'hey whats up' → Quick Chat",
-        ].join("\n"),
-        messages: [{
-          role: "user",
-          content: assistantSnippet
-            ? `User message: ${userSnippet}\n\nAssistant response (first 300 chars): ${assistantSnippet}`
-            : `User message: ${userSnippet}`,
-        }],
-      }),
-      signal: AbortSignal.timeout(8_000),
-    });
-
-    if (!resp.ok) {
-      console.warn(`[GodMode][AutoTitle] Haiku API returned ${resp.status} — falling back to string derivation`);
-      return null;
-    }
-
-    const data = (await resp.json()) as {
-      content?: Array<{ type: string; text?: string }>;
-    };
-
-    const raw = data.content?.find((c) => c.type === "text")?.text?.trim();
+    const raw = (await callLLM({
+      tier: "fast",
+      maxTokens: 20,
+      timeoutMs: 8_000,
+      system: [
+        "You are a conversation title generator. Given a user's first message, output a short label for what this chat is about.",
+        "Rules:",
+        "- 2-5 words max",
+        "- Capture the SUBJECT the user is talking about, not a meta-description of the message type",
+        "- Use the user's own words/nouns when possible",
+        "- No quotes, no punctuation, no prefixes like 'Topic:' or 'Re:'",
+        "- Title case",
+        "- Output ONLY the label, nothing else",
+        "",
+        "Examples:",
+        "User: 'hows our memory working?' → Memory System Status",
+        "User: 'can you research community platforms for my project?' → Community Platform Research",
+        "User: 'what tips could I give Scott about his ads?' → Scott Ad Strategy Tips",
+        "User: 'build me a front intelligence dashboard' → Front Email Intelligence",
+        "User: 'pink elephants running wild in the fields' → Pink Elephants",
+        "User: 'write me an entrepreneur joke' → Entrepreneur Joke",
+        "User: 'hey whats up' → Quick Chat",
+      ].join("\n"),
+      messages: [{
+        role: "user",
+        content: assistantSnippet
+          ? `User message: ${userSnippet}\n\nAssistant response (first 300 chars): ${assistantSnippet}`
+          : `User message: ${userSnippet}`,
+      }],
+    }))?.trim();
     if (!raw || raw.length < 3 || raw.length > 60) {
       console.warn(`[GodMode][AutoTitle] LLM returned invalid title: "${raw ?? "(empty)}"} (len=${raw?.length ?? 0})`);
       return null;

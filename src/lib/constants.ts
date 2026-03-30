@@ -28,6 +28,10 @@ export const HERMES_API_URL =
 export const PAPERCLIP_URL =
   process.env.PAPERCLIP_URL ?? "http://localhost:3100";
 
+/** Venice AI OpenAI-compatible API endpoint. */
+export const VENICE_API_URL =
+  process.env.VENICE_API_URL ?? "https://api.venice.ai/api/v1";
+
 // ─── Model Defaults ──────────────────────────────────────────────────────────
 
 /** Fast / cheap model for extraction, classification, safety gates. */

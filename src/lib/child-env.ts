@@ -53,10 +53,18 @@ export function buildChildEnv(
     "ANTHROPIC_API_KEY",
     "OPENAI_API_KEY",
     "GEMINI_API_KEY",
+    "VENICE_API_KEY",
   ]) {
     if (process.env[key]) {
       env[key] = process.env[key]!;
     }
+  }
+
+  // When Venice is the provider, set OpenAI-compatible env vars so
+  // Hermes (and other OpenAI-compat agents) route to Venice automatically.
+  if (process.env.VENICE_API_KEY && !env.OPENAI_BASE_URL) {
+    env.OPENAI_BASE_URL = process.env.VENICE_API_URL ?? "https://api.venice.ai/api/v1";
+    env.OPENAI_API_KEY = process.env.VENICE_API_KEY;
   }
 
   if (extraKeys) {

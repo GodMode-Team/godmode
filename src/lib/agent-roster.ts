@@ -24,7 +24,7 @@ import { AGENT_ROSTER_CACHE_TTL_MS } from "./constants.js";
 // ── Types ────────────────────────────────────────────────────────
 
 /** Which CLI engine to use when spawning an agent for this persona. */
-export type AgentEngine = "claude" | "codex" | "gemini";
+export type AgentEngine = "claude" | "codex" | "gemini" | "hermes";
 
 export type PersonaProfile = {
   slug: string;
@@ -285,10 +285,10 @@ function parsePersonaFile(filePath: string, category: string): PersonaProfile | 
     const taskTypes = meta.taskTypes
       ? (meta.taskTypes.split(",").map((t) => t.trim()) as QueueItemType[])
       : [];
-    const engine = (["claude", "codex", "gemini"] as const).includes(
-      meta.engine?.toLowerCase() as AgentEngine,
-    )
-      ? (meta.engine.toLowerCase() as AgentEngine)
+    const validEngines: AgentEngine[] = ["claude", "codex", "gemini", "hermes"];
+    const rawEngine = meta.engine?.toLowerCase();
+    const engine = validEngines.includes(rawEngine as AgentEngine)
+      ? (rawEngine as AgentEngine)
       : undefined;
     const mission = meta.mission || undefined;
     return {

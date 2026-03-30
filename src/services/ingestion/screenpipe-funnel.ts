@@ -22,7 +22,9 @@ import {
 import { join } from "node:path";
 import { MEMORY_DIR, localDateString } from "../../data-paths.js";
 import { health } from "../../lib/health-ledger.js";
-import { ANTHROPIC_API_URL, MODEL_HAIKU, MODEL_SONNET_SHORT, SCREENPIPE_API_URL } from "../../lib/constants.js";
+import { SCREENPIPE_API_URL } from "../../lib/constants.js";
+import { callLLM } from "../../lib/llm-provider.js";
+import type { ModelTier } from "../../lib/provider-config.js";
 import { forwardMessage, isHonchoReady } from "../honcho-client.js";
 import { loadConfig, type ScreenpipeConfig } from "./screenpipe-config.js";
 
@@ -84,44 +86,26 @@ export async function isScreenpipeAvailable(): Promise<boolean> {
 // ── LLM Summarization ───────────────────────────────────────────────
 
 /**
- * Summarize a chunk of text via Anthropic API.
- * Falls back to simple truncation if no API key is available.
+ * Summarize a chunk of text via LLM provider.
+ * Falls back to simple truncation if no API key is available or the call fails.
  */
 async function summarizeChunk(
   text: string,
   systemPrompt: string,
-  model = MODEL_HAIKU,
+  tier: ModelTier = "fast",
 ): Promise<string> {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) {
-    // Fallback: truncate to ~2000 chars
-    return text.length > 2000 ? text.slice(0, 2000) + "\n\n[truncated — set ANTHROPIC_API_KEY in ~/godmode/.env for full summaries]" : text;
-  }
-
   try {
-    const res = await fetch(ANTHROPIC_API_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01",
-      },
-      body: JSON.stringify({
-        model,
-        max_tokens: 1024,
-        system: systemPrompt,
-        messages: [{ role: "user", content: text }],
-      }),
+    const result = await callLLM({
+      tier,
+      maxTokens: 1024,
+      system: systemPrompt,
+      messages: [{ role: "user", content: text }],
     });
 
-    if (!res.ok) {
-      const errBody = await res.text().catch(() => "");
-      console.warn(`[Screenpipe] LLM summarize failed (${res.status}): ${errBody.slice(0, 200)}`);
-      return text.length > 2000 ? text.slice(0, 2000) + "\n\n[truncated — LLM error]" : text;
-    }
+    if (result) return result;
 
-    const body = (await res.json()) as { content?: Array<{ text?: string }> };
-    return body.content?.[0]?.text ?? text;
+    // callLLM returns null when no API key is configured
+    return text.length > 2000 ? text.slice(0, 2000) + "\n\n[truncated — set ANTHROPIC_API_KEY in ~/godmode/.env for full summaries]" : text;
   } catch (err) {
     console.warn(`[Screenpipe] LLM summarize error: ${String(err)}`);
     return text.length > 2000 ? text.slice(0, 2000) + "\n\n[truncated — LLM error]" : text;
@@ -586,7 +570,7 @@ export async function runWeeklyCompression(): Promise<void> {
         "Highlight patterns: what apps/projects dominated, key people interacted with, " +
         "major decisions made, time allocation trends. " +
         "Use concise bullet points. This is for personal reflection.",
-      MODEL_SONNET_SHORT,
+      "standard",
     );
 
     // Write weekly file
@@ -675,7 +659,7 @@ export async function runMonthlyCompression(): Promise<void> {
       "Compress these weekly screen activity summaries into a single concise monthly overview. " +
         "One paragraph capturing: dominant projects, key relationships, behavioral patterns, " +
         "and any shifts in focus. This is a high-level reflection for long-term memory.",
-      MODEL_SONNET_SHORT,
+      "standard",
     );
 
     // Write monthly file

@@ -4,7 +4,7 @@ Thanks for your interest in GodMode! This guide covers everything you need to ge
 
 ## Prerequisites
 
-- **Node.js** >= 20
+- **Node.js** >= 22
 - **pnpm** >= 9
 - **OpenClaw** runtime (`npm install -g openclaw`)
 
@@ -76,7 +76,7 @@ Tools are LLM-callable functions the ally can invoke during conversation.
    }
    ```
 
-2. Register it in `src/hooks/lifecycle-hooks.ts` inside the `before_prompt_build` tool array.
+2. Register it in `src/hooks/lifecycle-hooks.ts` inside the `before_prompt_build` tool array, and wire it in `src/adapter/register-all.ts` for standalone mode.
 
 3. Build and verify: `pnpm build && pnpm typecheck`
 
@@ -96,7 +96,7 @@ RPC methods are called by the UI or external clients via the gateway.
    export default { "godmode.my-method": myHandler };
    ```
 
-2. Import and spread into the handlers object in `src/methods/register-all.ts`.
+2. Import and spread into the handlers object in `src/adapter/register-all.ts`.
 
 3. Build and verify: `pnpm build && pnpm typecheck`
 

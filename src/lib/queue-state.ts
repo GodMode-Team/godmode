@@ -3,6 +3,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { withFileLock } from "./sdk-helpers.js";
 import { DATA_DIR } from "../data-paths.js";
+import type { AgentEngine } from "./agent-roster.js";
 
 // ── Curated agent type taxonomy ──────────────────────────────────
 
@@ -68,8 +69,8 @@ export type QueueItem = {
   completedAt?: number;
   /** Slug of target agent-roster persona (e.g. "frontend-developer") */
   personaHint?: string;
-  /** Which CLI engine to use (claude/codex/gemini). Resolved from persona or explicit. */
-  engine?: "claude" | "codex" | "gemini";
+  /** Which CLI engine to use. Resolved from persona or explicit. */
+  engine?: AgentEngine;
   /** Which model to use (e.g. "opus", "sonnet", "claude-opus-4-6"). Passed to --model flag. */
   model?: string;
   /** Whether this item needs human approval before processing */
