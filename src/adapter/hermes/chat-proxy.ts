@@ -212,10 +212,11 @@ export class HermesChatProxy {
     let fullResponse = "";
     let lastUsage: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number } | null = null;
 
-    // Abort controller with 2-minute timeout to prevent zombie streams (BUG-007).
+    // Abort controller with 5-minute timeout to prevent zombie streams (BUG-007).
     // If Hermes hangs or becomes unreachable, the fetch aborts cleanly.
+    // 5 minutes allows for long agent loops (tool chains, first-run setup).
     const controller = new AbortController();
-    const abortTimeout = setTimeout(() => controller.abort(), 120_000);
+    const abortTimeout = setTimeout(() => controller.abort(), 300_000);
 
     try {
       const res = await fetch(`${this.hermesUrl}/v1/chat/completions`, {
