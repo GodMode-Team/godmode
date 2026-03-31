@@ -2,7 +2,7 @@ import type { GodModeApp } from "./app";
 import { ALLY_SESSION_KEY } from "./controllers/ally";
 import { appEventBus } from "./context/event-bus.js";
 import { refreshChat } from "./app-chat";
-import { getEventLogSnapshot } from "./app-gateway";
+import { getEventLogSnapshot, loadProviderConfig } from "./app-gateway";
 import {
   startLogsPolling,
   stopLogsPolling,
@@ -338,8 +338,11 @@ export async function refreshActiveTab(host: SettingsHost) {
     }
   }
   if (host.tab === "config") {
-    await loadConfigSchema(host as unknown as GodModeApp);
-    await loadConfig(host as unknown as GodModeApp);
+    await Promise.allSettled([
+      loadConfigSchema(host as unknown as GodModeApp),
+      loadConfig(host as unknown as GodModeApp),
+      loadProviderConfig(host as unknown as GodModeApp),
+    ]);
   }
   if (host.tab === "debug") {
     await loadDebug(host as unknown as GodModeApp);

@@ -790,6 +790,7 @@ export class GmSettings extends LitElement {
     }
 
     this._initialized.add(subtab);
+    this.requestUpdate();
   }
 }
 

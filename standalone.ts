@@ -95,6 +95,9 @@ function registerOcStubs(adapter: { registerMethod: (name: string, handler: Stan
   adapter.registerMethod("config.set", async ({ respond }) => {
     respond(true, { ok: true });
   });
+  adapter.registerMethod("config.schema", async ({ respond }) => {
+    respond(true, { schema: null, uiHints: {}, version: null });
+  });
 
   // System
   adapter.registerMethod("system.checkUpdates", async ({ respond }) => {

@@ -37,6 +37,12 @@ export async function registerGodMode(
   const cleanup: CleanupEntry[] = [];
   let methodCount = 0;
 
+  // Set plugin version for system-update module (standalone doesn't go through index.ts)
+  try {
+    const { setPluginVersion } = await import("../methods/system-update.js");
+    setPluginVersion(pluginVersion);
+  } catch { /* non-fatal */ }
+
   // ── 1. Register all method modules ────────────────────────────
   const methodModules: Array<() => Promise<Record<string, unknown>>> = [
     () => import("../methods/tasks.js"),

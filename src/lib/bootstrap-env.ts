@@ -52,9 +52,13 @@ export function hydrateProcessEnvFromDisk(
   const godModeEnvPath = join(resolveGodModeRoot(env), ".env");
   const godModeLoaded = mergeEnvFileIntoProcess(godModeEnvPath, env);
 
+  // Also load from CWD .env (covers standalone mode running from source)
+  const cwdEnvPath = join(process.cwd(), ".env");
+  const cwdLoaded = mergeEnvFileIntoProcess(cwdEnvPath, env);
+
   const persistedKeysLoaded = mergePersistedCredentialsIntoEnv(env).length;
   return {
-    envFileKeysLoaded: openClawLoaded + godModeLoaded,
+    envFileKeysLoaded: openClawLoaded + godModeLoaded + cwdLoaded,
     persistedKeysLoaded,
   };
 }

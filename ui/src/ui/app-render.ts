@@ -96,6 +96,8 @@ import {
   setWebFetchProvider,
   loadSearchConfig,
   setSearchProvider,
+  loadProviderConfig,
+  setProviderConfig,
 } from "./app-gateway";
 import { renderToasts } from "./views/toast";
 import { renderOnboardingWizard, type WizardStep } from "./views/onboarding-wizard";
@@ -1834,6 +1836,11 @@ export function renderApp(state: AppViewState) {
                 searchTavilyConfigured: state.searchTavilyConfigured ?? false,
                 searchLoading: state.searchLoading ?? false,
                 onSearchProviderChange: (provider) => setSearchProvider(state, provider),
+                aiProvider: state.aiProvider ?? "anthropic",
+                aiProviderModels: state.aiProviderModels ?? { fast: "", standard: "", primary: "" },
+                aiProviderAvailable: state.aiProviderAvailable ?? [],
+                aiProviderLoading: state.aiProviderLoading ?? false,
+                onProviderChange: (provider, models) => setProviderConfig(state, provider, models),
               })}
               <div style="margin-top: 24px; padding: 16px; border-top: 1px solid var(--border, #333);">
                 <button
