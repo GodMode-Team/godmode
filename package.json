@@ -1,6 +1,6 @@
 {
   "name": "@godmode-team/godmode",
-  "version": "1.8.3",
+  "version": "1.8.4",
   "private": false,
   "description": "GodMode - Personal AI Operating System plugin for OpenClaw",
   "license": "FSL-1.1-MIT",
@@ -87,7 +87,7 @@
     "@browserbasehq/stagehand": "^3.2.0",
     "@types/node": "^24.3.3",
     "@types/ws": "^8.18.1",
-    "openclaw": "^2026.3.22",
+    "openclaw": "^2026.4.15",
     "tsup": "^8.5.1",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3",
