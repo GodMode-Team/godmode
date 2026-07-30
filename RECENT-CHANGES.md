@@ -4,6 +4,25 @@ This file tracks recent development changes so the ally and other agents can qui
 
 ---
 
+## Fix: Reproducible Install + TweetClaw Companion (2026-07-30)
+
+### What Landed
+- Updated the lockfile to match the declared `better-sqlite3` dependency.
+- Aligned the context-pressure test with queue review's P1 contract.
+- Expanded the X/Twitter skill card with accurate native tool parameters.
+- Added an optional TweetClaw guide for structured Xquik workflows.
+- Kept GodMode responsible for planning, review, and saved work products.
+
+### Verification
+- `pnpm install --frozen-lockfile`
+- `pnpm typecheck`
+- `pnpm build`
+- `npx vitest run`
+- Forbidden import scan
+- Markdown link and frontmatter checks
+
+---
+
 ## Fix: OSS Surface Cleanup + Guard Hardening (2026-03-24)
 
 ### What Landed
