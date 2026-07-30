@@ -153,6 +153,8 @@ GodMode is designed to be personal. Most customization is **files, not code**:
 
 Drop a file in, restart, and your AI knows something new. No TypeScript required.
 
+For structured X workflows, see the optional [TweetClaw companion guide](docs/tweetclaw-openclaw-workflows.md).
+
 ## Architecture
 
 ```

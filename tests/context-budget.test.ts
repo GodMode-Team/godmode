@@ -156,7 +156,7 @@ describe("assembleContext", () => {
     expect(result).toContain("Client Review");
   });
 
-  it("drops P2 content under moderate pressure (0.7+)", () => {
+  it("drops P2 content but keeps P1 queue review under moderate pressure (0.7+)", () => {
     const result = assembleContext(baseInputs({
       meetingPrep: "## Upcoming: Client Review at 2:00 PM",
       cronFailures: "## Cron Failures\n- daily-brief failed",
@@ -165,7 +165,7 @@ describe("assembleContext", () => {
     }));
     expect(result).not.toContain("Client Review");
     expect(result).not.toContain("Cron Failures");
-    expect(result).not.toContain("queue items ready");
+    expect(result).toContain("queue items ready");
   });
 
   it("includes routing lessons at P2", () => {
